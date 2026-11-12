@@ -45,6 +45,7 @@ mod bone_match;
 mod build;
 mod build_lod;
 mod companion;
+mod controller_binding;
 mod crch;
 mod crch_mesh;
 mod crch_node;
@@ -105,6 +106,7 @@ mod reader;
 mod rig_logic_bytes;
 mod second_uv;
 mod skeleton;
+mod skeleton_source;
 mod skin;
 mod smooth_normals;
 mod soc_entities;
@@ -131,6 +133,7 @@ pub use companion::{
     CompanionError, CompanionPath, CompanionResolver, GREY_PROBE_MIP, MAX_GREY_SATURATION,
     companion_file_names,
 };
+pub use controller_binding::{ControllerBinder, ControllerBinding, ControllerEligibility};
 pub use dba_animation_sources::DbaAnimationSources;
 pub use error::{CorruptChunk, ModelError, UnsupportedLayout};
 pub use included::{
@@ -174,6 +177,7 @@ pub use prefab::{
     PrefabObject, PrefabRef,
 };
 pub use rig_logic_bytes::RigLogicBytes;
+pub use skeleton_source::SkeletonSource;
 pub use soc_entities::{
     MAX_SOC_ENTITIES, MAX_SOC_PLACED, SocClassEntity, SocEntities, SocEntitiesError, SocPalette,
     SocProp,

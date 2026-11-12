@@ -35,6 +35,10 @@ impl RequiredInput<'_> {
 }
 
 impl RequiredInput<'_> {
+    pub(crate) fn read_payload(&mut self) -> Result<Vec<u8>, MediaError> {
+        self.reader.read_payload()
+    }
+
     fn observe_digest_origin(&self, writer: &MediaWriter<'_>) -> Result<(), MediaError> {
         let input = self.origin_input(writer)?;
         let mut observation = writer.capture_origins();

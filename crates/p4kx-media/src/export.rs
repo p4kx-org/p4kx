@@ -42,6 +42,8 @@ pub struct ExportOptions {
     pub diagnostic: bool,
     /// Additional audio artifact format.
     pub audio_output: AudioOutput,
+    /// Exact skeleton Entry path within each selected CAF or DBA's owning Archive.
+    pub animation_skeleton: Option<String>,
 }
 
 /// Observable result of a generation attempt.
@@ -92,6 +94,9 @@ pub fn export_with(
     registry: &ProviderRegistry,
 ) -> Result<ExportOutcome, MediaError> {
     options.limits.validate()?;
+    if let Some(path) = options.animation_skeleton.as_deref() {
+        crate::animation::validate_skeleton_path(path)?;
+    }
     let providers = registry.selected(&options.kinds)?;
     if !options.diagnostic
         && archive

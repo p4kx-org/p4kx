@@ -17,22 +17,7 @@ pub(crate) fn read_all(
     let budget = &context.directory.input_state()?.budget;
     let limits = writer.limits();
     let size = context.source.size;
-    if size > budget.remaining_bytes(limits) {
-        return Err(MediaError::Limit {
-            budget: "source_bytes",
-            limit: limits.source_bytes,
-        });
-    }
-    let native_size = usize::try_from(size)
-        .map_err(|_| MediaError::Contract("retained input exceeds native address width".into()))?;
-    let mut bytes = Vec::new();
-    bytes.try_reserve_exact(native_size).map_err(|cause| {
-        error::io(
-            Path::new(context.entry.path()),
-            io::Error::new(io::ErrorKind::OutOfMemory, cause),
-        )
-    })?;
-    bytes.resize(native_size, 0);
+    let mut bytes = payload_buffer(size, budget, limits, context.entry.path())?;
     let mut reader = RequiredReader::open(
         context.payload,
         context.entry.path(),
@@ -44,6 +29,31 @@ pub(crate) fn read_all(
     reader
         .read_exact(&mut bytes)
         .map_err(|cause| error::io(Path::new(context.entry.path()), cause))?;
+    Ok(bytes)
+}
+
+fn payload_buffer(
+    size: u64,
+    budget: &InputBudget,
+    limits: Limits,
+    name: &str,
+) -> Result<Vec<u8>, MediaError> {
+    if size > budget.remaining_bytes(limits) {
+        return Err(MediaError::Limit {
+            budget: "source_bytes",
+            limit: limits.source_bytes,
+        });
+    }
+    let native_size = usize::try_from(size)
+        .map_err(|_| MediaError::Contract("retained input exceeds native address width".into()))?;
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(native_size).map_err(|cause| {
+        error::io(
+            Path::new(name),
+            io::Error::new(io::ErrorKind::OutOfMemory, cause),
+        )
+    })?;
+    bytes.resize(native_size, 0);
     Ok(bytes)
 }
 
@@ -80,6 +90,18 @@ impl<'input> RequiredReader<'input> {
         };
         reader.check_length()?;
         Ok(reader)
+    }
+
+    pub(crate) fn read_payload(&mut self) -> Result<Vec<u8>, MediaError> {
+        if self.position != 0 {
+            return Err(MediaError::Contract(
+                "whole-payload read must start at byte zero".into(),
+            ));
+        }
+        let mut bytes = payload_buffer(self.size, self.budget, self.limits, self.name)?;
+        self.read_exact(&mut bytes)
+            .map_err(|cause| error::io(Path::new(self.name), cause))?;
+        Ok(bytes)
     }
 
     fn check_length(&self) -> Result<(), MediaError> {

@@ -6,12 +6,15 @@ use std::ops::Range;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::binding_payload::{Binding, Skeleton};
 use crate::{ByteOrder, ChunkReference, OffsetBasis, SourceRange};
 
 pub(crate) const ENTRY: &str = "animation-entry";
 pub(crate) const CHUNK: &str = "animation-chunk";
 pub(crate) const CLIP: &str = "animation-clip";
 pub(crate) const CONTROLLER: &str = "animation-controller";
+pub(crate) const SKELETON: &str = "animation-skeleton";
+pub(crate) const BINDING: &str = "animation-controller-binding";
 
 #[derive(Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -58,6 +61,8 @@ pub(crate) enum AnimationPayload<'a> {
     Chunk(AnimationChunk),
     Clip(Clip<'a>),
     Controller(Controller),
+    Skeleton(Skeleton<'a>),
+    ControllerBinding(Binding),
 }
 
 #[derive(Serialize, JsonSchema)]

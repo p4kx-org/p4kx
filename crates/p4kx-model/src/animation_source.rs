@@ -217,6 +217,13 @@ impl<'a> AnimationSource<'a> {
         self.data.at + self.block.at as u64..self.data.at + self.block.end as u64
     }
 
+    /// Returns the original contiguous table of controller IDs.
+    #[must_use]
+    pub const fn controller_ids_range(&self) -> Range<u64> {
+        let first = self.data.at + self.block.ids_at() as u64;
+        first..first + self.block.count as u64 * size_of::<u32>() as u64
+    }
+
     /// Visits the controller entries in authored order, including entries without keys.
     ///
     /// # Errors

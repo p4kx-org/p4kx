@@ -10,7 +10,7 @@ use crate::mesh::split_by_node;
 use crate::model::MESH_TYPES;
 use crate::mtl_load::load;
 use crate::nmc::read_nodes;
-use crate::skeleton::{read_bones, read_compact_bones};
+use crate::skeleton_source::SkeletonChunk;
 use crate::skin::read_skin;
 use crate::{
     Bone, ChunkUsage, CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection,
@@ -39,20 +39,11 @@ pub(crate) fn read_skeleton<B: AsRef<[u8]>>(
     which: ModelFile,
     read: &mut Vec<(ModelFile, usize)>,
 ) -> Result<Vec<Bone>, ModelError> {
-    let Some((index, chunk)) = [ivo::COMPILED_BONES_2, ivo::COMPILED_BONES]
-        .into_iter()
-        .find_map(|chunk_type| file.chunks_of(chunk_type).next())
-    else {
+    let Some(chunk) = SkeletonChunk::primary(file) else {
         return Ok(Vec::new());
     };
-    read.push((which, index));
-    let data = file.chunk_data(index).unwrap_or_default();
-    let (chunk_name, bones) = if chunk.chunk_type() == ivo::COMPILED_BONES_2 {
-        ("CompiledBones2", read_bones(data))
-    } else {
-        ("CompiledBones", read_compact_bones(data))
-    };
-    bones.map_err(corrupt(name, index, chunk_name))
+    read.push((which, chunk.index));
+    chunk.bones(name)
 }
 
 pub(crate) fn build<B: AsRef<[u8]>>(

@@ -47,6 +47,7 @@ fn export(args: &MediaExportArgs, as_json: bool) -> anyhow::Result<ExitCode> {
         cancel: extract::cancel_on_interrupt()?,
         diagnostic: args.diagnostic,
         audio_output: args.audio_format.into(),
+        animation_skeleton: args.animation_skeleton.clone(),
     };
     let result = p4kx_media::export(&archive, &args.out, &options)?;
     let (status, index, code) = match &result {

@@ -46,6 +46,12 @@ pub(crate) struct Block {
     pub(crate) end: usize,
 }
 
+impl Block {
+    pub(crate) const fn ids_at(self) -> usize {
+        self.at + BLOCK_HEADER_LEN
+    }
+}
+
 pub(crate) fn read_block(
     data: &[u8],
     at: usize,
@@ -108,7 +114,7 @@ pub(crate) fn controllers<'a>(
     block: &Block,
     file_offset: u64,
 ) -> Result<impl Iterator<Item = AnimationController<'a>> + use<'a>, CorruptAnimation> {
-    let ids_at = block.at + BLOCK_HEADER_LEN;
+    let ids_at = block.ids_at();
     let ids = bytes_at(data, ids_at, 4 * block.count)?.as_chunks::<4>().0;
     let table_at = ids_at + 4 * block.count;
     let table = bytes_at(data, table_at, CONTROLLER_LEN * block.count)?

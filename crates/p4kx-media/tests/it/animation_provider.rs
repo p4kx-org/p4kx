@@ -310,3 +310,6 @@ fn a_configured_chunk_budget_never_publishes_an_incomplete_animation_index() -> 
     );
     Ok(())
 }
+
+#[path = "animation_skeleton_binding.rs"]
+mod skeleton_binding;

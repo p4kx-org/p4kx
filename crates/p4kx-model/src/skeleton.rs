@@ -7,10 +7,10 @@ use crate::hierarchy::find_cycle;
 use crate::reader::{ReadValues, to_usize};
 use crate::{Bone, BoneTransform, CorruptChunk};
 
-const ENTRY_LEN: usize = 68;
-const COMPACT_HEADER_LEN: usize = 48;
+pub(crate) const ENTRY_LEN: usize = 68;
+pub(crate) const COMPACT_HEADER_LEN: usize = 48;
 const COMPACT_HEADER_USED: usize = 8;
-const COMPACT_RECORD_LEN: usize = 16;
+pub(crate) const COMPACT_RECORD_LEN: usize = 16;
 const POSE_LEN: usize = 28;
 const NODE_AT: usize = 14;
 const PARENT_AT: usize = 8;

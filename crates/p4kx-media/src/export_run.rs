@@ -42,6 +42,9 @@ pub(crate) fn build(
         options.diagnostic,
     )?;
     writer.audio_output = options.audio_output;
+    writer
+        .animation_skeleton
+        .clone_from(&options.animation_skeleton);
     writer.origins.observe_root(archive, size)?;
     writer.bind_build(archive, &mut root)?;
     root_callbacks(&root, providers, &mut writer)?;

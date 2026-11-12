@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::{Cell, RefCell};
+use std::cell::{Cell, OnceCell, RefCell};
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::io;
@@ -17,6 +17,7 @@ struct Slot {
 
 pub(crate) struct DirectoryInputs<'run> {
     pub(crate) budget: &'run InputBudget,
+    pub(crate) animation_skeleton: OnceCell<crate::animation::SkeletonSelection>,
     slots: RefCell<HashMap<usize, Slot>>,
     admitted: Cell<u64>,
     count: usize,
@@ -36,6 +37,7 @@ impl<'run> DirectoryInputs<'run> {
         }
         Ok(Self {
             budget,
+            animation_skeleton: OnceCell::new(),
             slots: RefCell::new(HashMap::new()),
             admitted: Cell::new(0),
             count,

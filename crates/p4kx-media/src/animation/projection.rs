@@ -5,8 +5,10 @@ use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::chunks::{ByteOrder as ChunkByteOrder, Chunk, ChunkFile, Container};
 use p4kx_extraction::model::{AnimationMetadata, AnimationSource, AnimationTiming};
 
+use super::binding_projection::ClipBinding;
 use super::origin::{self as proof, AnimationOrigins};
 use super::payload::{self as wire, AnimationChunk, AnimationPayload, Clip, DatabaseName, Timing};
+use super::skeleton_selection::SelectedSkeleton;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::{ByteOrder, MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
 
@@ -84,6 +86,7 @@ pub(crate) fn clip(
     file: &ParsedFile,
     clip: AnimationSource<'_>,
     origins: &AnimationOrigins<'_>,
+    skeleton: Option<&SelectedSkeleton>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     writer.checkpoint()?;
@@ -138,11 +141,25 @@ pub(crate) fn clip(
         }),
         &issues,
     )?;
+    controllers(&clip, origins, skeleton, writer)
+}
+
+fn controllers(
+    clip: &AnimationSource<'_>,
+    origins: &AnimationOrigins<'_>,
+    skeleton: Option<&SelectedSkeleton>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
     let controllers = clip.controllers().map_err(|cause| {
         MediaError::Contract(format!("validated animation controller table: {cause}"))
     })?;
+    let mut bindings =
+        skeleton.map(|skeleton| ClipBinding::new(skeleton, clip.controller_ids_range()));
     for controller in controllers {
         super::controller_projection::write(clip.ordinal(), controller, origins, writer)?;
+        if let Some(binding) = &mut bindings {
+            binding.write(clip.ordinal(), &controller, origins, writer)?;
+        }
     }
     Ok(())
 }

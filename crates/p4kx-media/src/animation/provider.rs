@@ -9,6 +9,7 @@ use p4kx_extraction::model::{AnimationError, AnimationSource, DbaAnimationSource
 
 use super::origin::{self as proof, AnimationOrigins};
 use super::payload::{self as wire, AnimationPayload, Entry, EntryLayout, Family};
+use super::skeleton_selection::{self, SelectedSkeleton};
 use crate::{
     Capability, FieldGroup, MediaError, MediaIssue, MediaKind, MediaWriter, Projection, Provider,
     Severity, SourceContext, Status, Subresource, required_reader,
@@ -21,7 +22,7 @@ impl Provider for AnimationProvider {
         let mut capability = Capability::new(
             MediaKind::Animation,
             "p4kx.animation.source",
-            "1.0.0",
+            "1.1.0",
             "Exact CAF, DBA and AIM Entry bytes with authored chunk, clip and controller positions. Decoded samples are separate typed chunks.",
         );
         capability.field_groups = vec![
@@ -37,9 +38,9 @@ impl Provider for AnimationProvider {
                 "aim-pose-semantics",
                 "AIM retains original bytes and chunk table without interpreting poses.",
             ),
-            FieldGroup::new_with_unsupported_projection(
+            FieldGroup::new(
                 "skeleton-binding",
-                "The standalone source inventory does not request or resolve a skeleton.",
+                "Optional exact Entry in the owning Archive; original controller and bone selections are supplementary.",
             ),
         ];
         capability
@@ -69,7 +70,15 @@ impl Provider for AnimationProvider {
             }
         };
         super::projection::table(&file, &origins, writer)?;
-        let issue = clips(name, family, &file, &origins, writer)?;
+        let skeleton = match family {
+            Family::Caf | Family::Dba => skeleton_selection::selected(context, writer)?,
+            Family::Aim => None,
+        };
+        if let Some(skeleton) = skeleton {
+            skeleton.write(&origins, writer)?;
+        }
+        let skeleton = skeleton.and_then(skeleton_selection::SkeletonSelection::parsed);
+        let issue = clips(name, family, &file, &origins, skeleton, writer)?;
         entry(
             family,
             Some(file.chunks().len()),
@@ -87,12 +96,13 @@ fn clips(
     family: Family,
     file: &ChunkFile<Vec<u8>>,
     origins: &AnimationOrigins<'_>,
+    skeleton: Option<&SelectedSkeleton>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<Option<AnimationError>, MediaError> {
     match family {
         Family::Aim => {}
         Family::Caf => match AnimationSource::read_caf(name, file) {
-            Ok(clip) => super::projection::clip(file, clip, origins, writer)?,
+            Ok(clip) => super::projection::clip(file, clip, origins, skeleton, writer)?,
             Err(error) => return Ok(Some(error)),
         },
         Family::Dba => {
@@ -102,7 +112,7 @@ fn clips(
             };
             for result in clips {
                 match result {
-                    Ok(clip) => super::projection::clip(file, clip, origins, writer)?,
+                    Ok(clip) => super::projection::clip(file, clip, origins, skeleton, writer)?,
                     Err(error) => return Ok(Some(error)),
                 }
             }

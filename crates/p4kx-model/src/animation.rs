@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
-
 use crate::Bone;
+use crate::controller_binding::{BoneControllers, ControllerEligibility};
 
 /// The keys of one channel of a track: the frames they sit at and their values.
 ///
@@ -138,22 +137,15 @@ pub(crate) fn bind_controllers(
     bones: &[Bone],
     controllers: impl IntoIterator<Item = u32>,
 ) -> Vec<Option<usize>> {
-    let mut by_controller: HashMap<u32, usize> = HashMap::with_capacity(bones.len());
-    for (index, bone) in bones.iter().enumerate() {
-        by_controller.entry(bone.controller_id).or_insert(index);
-    }
-    let mut taken = vec![false; bones.len()];
+    let bones = BoneControllers::new(bones);
+    let mut binder = bones.binder();
     controllers
         .into_iter()
-        .map(|controller| {
-            let bone = by_controller
-                .get(&controller)
-                .copied()
-                .filter(|&bone| taken.get(bone).is_some_and(|taken| !taken))?;
-            if let Some(slot) = taken.get_mut(bone) {
-                *slot = true;
-            }
-            Some(bone)
+        .enumerate()
+        .map(|(ordinal, id)| {
+            binder
+                .observe(ordinal, id, ControllerEligibility::Track)
+                .bound_bone()
         })
         .collect()
 }

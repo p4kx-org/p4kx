@@ -536,6 +536,15 @@
         }
       ]
     },
+    "AnimationBindingDisposition": {
+      "enum": [
+        "bound",
+        "empty-controller",
+        "missing-bone",
+        "duplicate-controller"
+      ],
+      "type": "string"
+    },
     "AnimationChannel": {
       "additionalProperties": false,
       "properties": {
@@ -716,6 +725,111 @@
       ],
       "type": "object"
     },
+    "AnimationControllerBinding": {
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "bound_bone_ordinal": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "disposition": {
+                "const": "bound"
+              }
+            },
+            "required": [
+              "disposition"
+            ]
+          },
+          "then": {
+            "properties": {
+              "bound_bone_ordinal": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "first_bone_ordinal": {
+                "type": "integer"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "matching_bones": {
+                "const": 0
+              }
+            },
+            "required": [
+              "matching_bones"
+            ]
+          },
+          "then": {
+            "properties": {
+              "first_bone_ordinal": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "bound_bone_ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "disposition": {
+          "$ref": "#/$defs/AnimationBindingDisposition"
+        },
+        "first_bone_ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "first_controller_ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "first_track_ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "matching_bones": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "disposition",
+        "first_controller_ordinal",
+        "first_track_ordinal",
+        "first_bone_ordinal",
+        "matching_bones",
+        "bound_bone_ordinal"
+      ],
+      "type": "object"
+    },
     "AnimationDatabaseName": {
       "additionalProperties": false,
       "properties": {
@@ -845,6 +959,40 @@
             "payload"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationSkeleton"
+            },
+            "record_type": {
+              "const": "skeleton",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationControllerBinding"
+            },
+            "record_type": {
+              "const": "controller-binding",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
         }
       ],
       "title": "AnimationPayload"
@@ -908,6 +1056,142 @@
           },
           "required": [
             "layout"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AnimationSkeleton": {
+      "additionalProperties": false,
+      "properties": {
+        "reference": {
+          "$ref": "#/$defs/Reference"
+        },
+        "skeleton": {
+          "$ref": "#/$defs/AnimationSkeletonDisposition"
+        }
+      },
+      "required": [
+        "reference",
+        "skeleton"
+      ],
+      "type": "object"
+    },
+    "AnimationSkeletonDisposition": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "bone_count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "chunk_ordinal": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "state": {
+              "const": "ready",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "chunk_ordinal",
+            "bone_count"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "missing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "explicitly-excluded",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "no-supported-skeleton",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "invalid-container",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "invalid-skeleton",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
           ],
           "type": "object"
         }
@@ -32723,6 +33007,116 @@
                 "properties": {
                   "record_type": {
                     "const": "controller"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-skeleton"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "skeleton"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 0,
+                "minItems": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-controller-binding"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "controller-binding"
                   }
                 },
                 "required": [

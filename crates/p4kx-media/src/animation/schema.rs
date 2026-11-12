@@ -23,6 +23,8 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         (wire::CHUNK, "chunk", 1),
         (wire::CLIP, "clip", 1),
         (wire::CONTROLLER, "controller", 2),
+        (wire::SKELETON, "skeleton", 0),
+        (wire::BINDING, "controller-binding", 2),
     ] {
         branches.push(json!({
             "if": {
