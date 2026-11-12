@@ -6,6 +6,7 @@ use std::fmt::Write;
 
 use p4kx_audio::Loop;
 
+use super::TxtpApproximation;
 use super::tree::{Combine, Group, Leaf, Node};
 
 /// The longest text of a comment line, in characters.
@@ -34,6 +35,32 @@ pub(super) fn comment_text(text: &str) -> String {
         .collect()
 }
 
+pub(super) struct RenderedTxtp {
+    pub(super) text: String,
+    pub(super) approximations: Vec<TxtpApproximation>,
+}
+
+impl RenderedTxtp {
+    fn note(&mut self, approximation: TxtpApproximation) {
+        if !self.approximations.contains(&approximation) {
+            self.approximations.push(approximation);
+        }
+    }
+
+    fn insert_notes(&mut self, offset: usize) {
+        if self.approximations.is_empty() {
+            return;
+        }
+        let mut notes = String::new();
+        for approximation in &self.approximations {
+            notes.push_str("# approximation: ");
+            notes.push_str(approximation.code());
+            notes.push('\n');
+        }
+        self.text.insert_str(offset, &notes);
+    }
+}
+
 /// Writes the TXTP of `tree` under the comment lines `header`: each leaf is a file line, each
 /// group with several children a `group` line after them, nested as the objects are.
 ///
@@ -44,17 +71,22 @@ pub(super) fn render(
     tree: &Group,
     header: &[String],
     files: &HashMap<u32, SoundFile<'_>>,
-) -> Result<String, String> {
-    let mut text = String::new();
+) -> Result<RenderedTxtp, String> {
+    let mut rendered = RenderedTxtp {
+        text: String::new(),
+        approximations: Vec::new(),
+    };
     for line in header {
-        let _ = writeln!(text, "# {}", comment_text(line));
+        let _ = writeln!(rendered.text, "# {}", comment_text(line));
     }
-    group_lines(&mut text, tree, 0, files)?;
-    Ok(text)
+    let header_end = rendered.text.len();
+    group_lines(&mut rendered, tree, 0, files)?;
+    rendered.insert_notes(header_end);
+    Ok(rendered)
 }
 
 fn group_lines(
-    text: &mut String,
+    rendered: &mut RenderedTxtp,
     group: &Group,
     depth: usize,
     files: &HashMap<u32, SoundFile<'_>>,
@@ -62,16 +94,16 @@ fn group_lines(
     let [only] = group.children.as_slice() else {
         for child in &group.children {
             match child {
-                Node::Leaf(leaf) => leaf_line(text, leaf, depth + 1, files)?,
-                Node::Group(inner) => group_lines(text, inner, depth + 1, files)?,
+                Node::Leaf(leaf) => leaf_line(&mut rendered.text, leaf, depth + 1, files)?,
+                Node::Group(inner) => group_lines(rendered, inner, depth + 1, files)?,
             }
         }
-        group_line(text, group, depth);
+        group_line(rendered, group, depth);
         return Ok(());
     };
     match only {
-        Node::Leaf(leaf) => leaf_line(text, leaf, depth, files),
-        Node::Group(inner) => group_lines(text, inner, depth, files),
+        Node::Leaf(leaf) => leaf_line(&mut rendered.text, leaf, depth, files),
+        Node::Group(inner) => group_lines(rendered, inner, depth, files),
     }
 }
 
@@ -100,13 +132,17 @@ fn leaf_line(
     Ok(())
 }
 
-fn group_line(text: &mut String, group: &Group, depth: usize) {
+fn group_line(rendered: &mut RenderedTxtp, group: &Group, depth: usize) {
     let count = group.children.len();
     let (kind, selection, mix) = match group.combine {
         Combine::Layers => ('L', "", " #@layer-v"),
         Combine::Segments => ('S', "", ""),
-        Combine::Select => ('R', ">1", ""),
+        Combine::Select => {
+            rendered.note(TxtpApproximation::SelectFirstAlternative);
+            ('R', ">1", "")
+        }
     };
+    let text = &mut rendered.text;
     let indent = depth * INDENT;
     let _ = write!(
         text,
@@ -132,6 +168,14 @@ fn group_line(text: &mut String, group: &Group, depth: usize) {
 mod tests {
     use super::*;
     use crate::audio::{NodeKind, PathStep, SourceKind};
+
+    fn render_text(
+        tree: &Group,
+        header: &[String],
+        files: &HashMap<u32, SoundFile<'_>>,
+    ) -> Result<String, String> {
+        render(tree, header, files).map(|rendered| rendered.text)
+    }
 
     fn leaf(wem_id: u32) -> Node {
         Node::Leaf(Leaf {
@@ -182,7 +226,7 @@ mod tests {
             vec![Node::Group(group(NodeKind::Action, 6, vec![leaf(1)]))],
         );
 
-        assert_eq!(render(&tree, &[], &files()).as_deref(), Ok("a.ogg\n"));
+        assert_eq!(render_text(&tree, &[], &files()).as_deref(), Ok("a.ogg\n"));
     }
 
     #[test]
@@ -190,11 +234,12 @@ mod tests {
         let inner = group(NodeKind::Random, 7, vec![leaf(1), leaf(2)]);
         let tree = group(NodeKind::Event, 5, vec![leaf(1), Node::Group(inner)]);
 
-        let text = render(&tree, &["x".to_owned()], &files());
+        let text = render_text(&tree, &["x".to_owned()], &files());
 
         assert_eq!(
             text.as_deref(),
             Ok("# x
+# approximation: select-first-alternative
   a.ogg
     a.ogg
     b.ogg #I 10 90
@@ -210,7 +255,7 @@ group = -L2 #@layer-v
     fn a_sequence_is_a_segment_group() {
         let tree = group(NodeKind::Sequence, 9, vec![leaf(1), leaf(2)]);
 
-        let text = render(&tree, &[], &files()).expect("renders");
+        let text = render_text(&tree, &[], &files()).expect("renders");
 
         assert!(
             text.contains(
@@ -227,7 +272,7 @@ group = -S2
         let tree = group(NodeKind::Event, 5, vec![leaf(1), leaf(3)]);
 
         assert_eq!(
-            render(&tree, &[], &files()),
+            render_text(&tree, &[], &files()),
             Err("embedded source 3 has no file".to_owned())
         );
     }

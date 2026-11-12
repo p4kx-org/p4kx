@@ -376,7 +376,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   and two hex digits, an empty name becomes `%`, a name taken under the case fold of the rule gets
   `_2`, `_3`, Ã¢â‚¬Â¦), and a sound whose path exceeds its limit is reported as failed while the others
   are written. `--txtp` also writes one vgmstream `<event>.txtp` text file per Wwise event of the
-  trigger next to the sounds (ADR-0254); P4KX writes the text only and does not run vgmstream.
+  trigger next to the sounds (ADR-0254). It writes text for vgmstream. A generated choice of
+  several alternatives reports `select-first-alternative` in its header and the JSON report.
   `p4kx entity audio --extract <folder>` does the same for every trigger of an Entity.
 - `p4kx loc languages <archive>` lists the languages the Archive holds a `global.ini` for, with
   their codes (`en`, `de`, `fr`, `it`, `es-ES`, `es-419`, `pt-BR`, `ja`, `ko`, `zh-Hans`,

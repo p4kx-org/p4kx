@@ -10,17 +10,19 @@
 //! file settles on the first child. Names in a TXTP are file names of the export folder, so they
 //! follow the portable rule of ADR-0248.
 
+mod approximation;
+mod output;
 mod render;
 mod tree;
+
+pub use self::approximation::TxtpApproximation;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::{
-    ConflictPolicy, ConversionError, check_path_length, write_replacing_counted,
-};
+use p4kx_extraction::ConflictPolicy;
 
-use self::render::{SoundFile, comment_text, render};
+use self::render::{RenderedTxtp, SoundFile, comment_text, render};
 use super::export::name::{StemSet, portable_stem};
 use super::{ExportReport, ExportState, ExportedSound, SoundVariant, TriggerSounds};
 
@@ -32,6 +34,7 @@ const FALLBACK_STEM: &str = "event";
 
 /// A TXTP file of an export.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct TxtpFile {
     /// The audio trigger the Wwise event belongs to.
     pub trigger: String,
@@ -46,6 +49,8 @@ pub struct TxtpFile {
     /// How many broken links the walk met in the event; above 0 the file is incomplete, as its
     /// header says, because the objects behind a broken link are not played.
     pub breaks: usize,
+    /// Approximation codes for written or byte-verified content, or `None` when unchecked.
+    pub approximations: Option<Vec<TxtpApproximation>>,
 }
 
 /// A Wwise event that got no TXTP.
@@ -135,22 +140,15 @@ pub fn write_txtp(
                 .count();
             let files = files_of(name, variants, &sounds);
             let written =
-                event_text(name, event.name(), variants, &files, breaks).and_then(|text| {
+                event_text(name, event.name(), variants, &files, breaks).and_then(|rendered| {
                     let path = folder.join(format!(
                         "{}.{EXTENSION}",
                         stems.unique(&portable_stem(event.name(), FALLBACK_STEM))
                     ));
-                    write_file(&path, &text, policy).map(|(size, state)| (path, size, state))
+                    publish_event(path, name, event.name(), breaks, rendered, policy)
                 });
             match written {
-                Ok((path, size, state)) => report.files.push(TxtpFile {
-                    trigger: name.to_owned(),
-                    event: event.name().to_owned(),
-                    path,
-                    size,
-                    state,
-                    breaks,
-                }),
+                Ok(file) => report.files.push(file),
                 Err(reason) => report.skipped.push(TxtpSkip {
                     trigger: name.to_owned(),
                     event: comment_text(event.name()),
@@ -162,6 +160,28 @@ pub fn write_txtp(
     report
 }
 
+fn publish_event(
+    path: PathBuf,
+    trigger: &str,
+    event: &str,
+    breaks: usize,
+    rendered: RenderedTxtp,
+    policy: ConflictPolicy,
+) -> Result<TxtpFile, String> {
+    let publication = output::write(&path, &rendered.text, policy)?;
+    Ok(TxtpFile {
+        trigger: trigger.to_owned(),
+        event: event.to_owned(),
+        path,
+        size: publication.size,
+        state: publication.state,
+        breaks,
+        approximations: publication
+            .verified_content
+            .then_some(rendered.approximations),
+    })
+}
+
 /// Returns the TXTP text of one event, or why it cannot be written.
 fn event_text(
     trigger: &str,
@@ -169,7 +189,7 @@ fn event_text(
     variants: &[SoundVariant<'_>],
     files: &HashMap<u32, SoundFile<'_>>,
     breaks: usize,
-) -> Result<String, String> {
+) -> Result<RenderedTxtp, String> {
     let tree = tree::build(variants).ok_or_else(|| "the event has no object path".to_owned())?;
     let mut header = vec![format!("P4KX: event {event} of trigger {trigger}")];
     if breaks > 0 {
@@ -202,32 +222,4 @@ fn files_of<'a>(
             ))
         })
         .collect()
-}
-
-fn write_file(
-    path: &Path,
-    text: &str,
-    policy: ConflictPolicy,
-) -> Result<(u64, ExportState), String> {
-    let absolute = std::path::absolute(path).map_err(|error| error.to_string())?;
-    check_path_length(&absolute).map_err(|limit| limit.to_string())?;
-    if policy == ConflictPolicy::Skip
-        && let Ok(existing) = std::fs::symlink_metadata(path)
-    {
-        return Ok((existing.len(), ExportState::Kept));
-    }
-    let replaced = write_replacing_counted(path, policy == ConflictPolicy::IfChanged, |out| {
-        out.write_all(text.as_bytes())
-            .map_err(|source| ConversionError::Write {
-                path: path.to_path_buf(),
-                source,
-            })
-    })
-    .map_err(|error| error.to_string())?;
-    let state = if replaced.changed {
-        ExportState::Written
-    } else {
-        ExportState::Kept
-    };
-    Ok((replaced.len, state))
 }

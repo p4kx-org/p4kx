@@ -16,6 +16,9 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+#[path = "wwise_txtp_approximation.rs"]
+mod txtp_approximation;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const PLAY: u16 = 0x0403;

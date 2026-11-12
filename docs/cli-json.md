@@ -886,7 +886,7 @@ or `cancelled` is true.
 
 With `--txtp`, the object has a `txtp` member, absent without it:
 `{"written": 1, "kept": 0, "skipped": 1, "files": [{"trigger": "Play_Multi", "event": "Play_Multi",
-"file": "…\\Play_Multi.txtp", "size": 120, "kept": false, "breaks": 0}, …], "skips": [{"trigger": "Play_Multi",
+"file": "…\\Play_Multi.txtp", "size": 120, "kept": false, "breaks": 0, "approximations": []}, …], "skips": [{"trigger": "Play_Multi",
 "event": "Play_Other", "reason": "plug-in source 9 has no file"}, …]}`. One `.txtp` file in
 vgmstream's TXTP syntax is written per Wwise event that leads to sounds, named after the event by
 the rule of the sound files (`event` for a name too long for a file) and holding the names of the exported files, which lie in the same
@@ -898,9 +898,13 @@ whole file (a source plug-in or external source, a WEM nothing holds, only the p
 a streamed WEM) is listed in `skips` and gets no file, as does an event whose file cannot be
 written, e.g. because its path exceeds the limit of ADR-0248. An event with broken links is written
 with the header comment `incomplete: <n> broken links`, and `breaks` of its file is `n`. A `group`
-line carries only the macro; the comment on the object is the line above it. `files` and `skips` do
-not change the exit code; the sounds without a file are in `failures` already. Not written when
-Ctrl+C cancelled the export.
+line carries only the macro; the comment on the object is the line above it.
+Each `files` row includes an `approximations` array for written or verified retained text.
+A choice with several rendered alternatives includes `"select-first-alternative"`, also written
+in the TXTP header. An empty array means the writer emitted no reported approximation code.
+A retained file has `"approximations": null` when its text was unverified or differed from the
+generated text. The sound export determines the exit code and reports missing audio files in
+`failures`. A cancellation stops TXTP generation.
 
 `p4kx entity audio --extract <folder>` writes the same files for every trigger of the Entity and
 adds an `extraction` object with exactly `target`, `format`, `written`, `kept`, `unconverted`,

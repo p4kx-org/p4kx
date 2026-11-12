@@ -4,7 +4,9 @@
 use std::io::{self, Write};
 use std::path::Path;
 
-use p4kx_assembly::audio::{ExportReport, ExportState, TriggerSounds, TxtpReport, write_txtp};
+use p4kx_assembly::audio::{
+    ExportReport, ExportState, TriggerSounds, TxtpApproximation, TxtpReport, write_txtp,
+};
 use serde::Serialize;
 
 use crate::cli_wwise::WwiseExtractArgs;
@@ -29,6 +31,7 @@ struct TxtpFileJson {
     size: u64,
     kept: bool,
     breaks: usize,
+    approximations: Option<Vec<&'static str>>,
 }
 
 #[derive(Serialize)]
@@ -63,6 +66,13 @@ pub(crate) fn to_json(report: &TxtpReport) -> TxtpJson {
                 size: file.size,
                 kept: file.state == ExportState::Kept,
                 breaks: file.breaks,
+                approximations: file.approximations.as_ref().map(|reasons| {
+                    reasons
+                        .iter()
+                        .copied()
+                        .map(TxtpApproximation::code)
+                        .collect()
+                }),
             })
             .collect(),
         skips: report
