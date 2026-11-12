@@ -32,6 +32,7 @@ impl Collected<'_> {
             Kind::BlueprintCategoryLists => self.blueprint_category_lists.len(),
             Kind::ExplosionDefinitions => self.explosion_definitions.len(),
             Kind::InventoryContainers => self.inventory_containers.len(),
+            Kind::MedicalItemTierConfigs => self.medical_item_tier_configs.len(),
             Kind::AmmoDefinitions => self.ammo_definitions.len(),
             Kind::GameplayProperties => self.gameplay_properties.len(),
             Kind::QualityDistributions => self.quality.distributions.len(),

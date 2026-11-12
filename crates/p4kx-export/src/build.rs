@@ -20,6 +20,7 @@ use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition;
 use crate::catalog_v3::catalog_independent_configurations::{self, IndependentConfigurations};
 use crate::catalog_v3::inventory_container_definition::table as inventory_table;
+use crate::catalog_v3::medical::medical_tier_config;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
 use crate::mission_data::link_scenario_factions;
@@ -217,6 +218,10 @@ fn assemble<R>(
             blueprints: blueprints.definitions,
             shop_inventories: collected.shop_inventories,
             inventory_containers: inventory_table(&forge, collected.inventory_containers),
+            medical_item_tier_configs: medical_tier_config::table(
+                &forge,
+                collected.medical_item_tier_configs,
+            ),
             explosion_definitions: crate::catalog_v3::explosion_definition::table(
                 &forge,
                 collected.explosion_definitions,

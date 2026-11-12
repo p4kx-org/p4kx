@@ -13,6 +13,7 @@ use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyPick;
+use crate::catalog_v3::medical::medical_tier_config::PreparedMedicalTier;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
 use crate::catalog_v3::starmap_object_definition::StarmapObjectRead;
 use crate::contract::{
@@ -63,6 +64,7 @@ pub(crate) enum Picked<'f> {
     ExplosionDefinition(Box<PreparedExplosionDefinition<'f>>),
     AmmoDefinition(Box<PreparedAmmoDefinition<'f>>),
     InventoryContainer(Box<PreparedInventoryContainer<'f>>),
+    MedicalItemTierConfig(Box<PreparedMedicalTier<'f>>),
     Faction(Box<PreparedFaction<'f>>),
     Law(LawPick<'f>),
     LocationVocabulary(LocationVocabularyPick<'f>),
@@ -145,6 +147,7 @@ impl<'f> Picked<'f> {
             | Kind::ExplosionDefinitions
             | Kind::AmmoDefinitions
             | Kind::InventoryContainers
+            | Kind::MedicalItemTierConfigs
             | Kind::Factions
             | Kind::ReputationPerks
             | Kind::ReputationTriggerRecords

@@ -8,7 +8,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
-use super::catalog_facility::Facility;
+use super::catalog_facility::{self, Facility, FacilityKind};
 use super::catalog_fuel_configurations::{
     FuelConfigurationKind, FuelConfigurationRows, FuelConfigurationTables,
 };
@@ -16,7 +16,6 @@ use super::catalog_interactions::{self, InteractionConfiguration, InteractionKin
 use super::catalog_item_alignment::{ItemAlignmentKind, ItemAlignmentRows, ItemAlignmentTables};
 use super::catalog_resource_component::{self, ResourceComponent};
 use super::catalog_resource_connection::{self, ConnectionKind, ResourceConnection};
-use super::catalog_seat;
 use super::catalog_vehicle_armor::{self, VehicleArmor};
 use super::inventory_entity_configurations::{InventoryEntityRows, InventoryEntityTables};
 use super::inventory_item_occupancy::InventoryItemOccupancy;
@@ -109,7 +108,9 @@ impl<'source> EntityConfigurationRows<'source> {
             ConfigurationKind::Connection(kind) => self
                 .connections
                 .push(ResourceConnection::read(kind, owner, source, notes)?),
-            ConfigurationKind::Seat => self.facilities.push(Facility::seat(owner, source, notes)?),
+            ConfigurationKind::Facility(kind) => self
+                .facilities
+                .push(Facility::read(kind, owner, source, projection, notes)?),
             ConfigurationKind::VehicleArmor => self
                 .vehicle_armor
                 .push(VehicleArmor::read(owner, source, notes)?),
@@ -143,7 +144,7 @@ impl<'source> EntityConfigurationRows<'source> {
             fuel: self.fuel.into_tables(forge),
             inventory: self.inventory.into_tables(forge),
             interactions: catalog_interactions::table(forge, self.interactions),
-            facilities: CatalogTable::new(forge, &[catalog_seat::COMPONENT], self.facilities),
+            facilities: CatalogTable::new(forge, catalog_facility::SOURCE_TYPES, self.facilities),
             resource_components: CatalogTable::new(
                 forge,
                 &[catalog_resource_component::COMPONENT],
@@ -193,7 +194,7 @@ enum ConfigurationKind {
     Resource,
     Connection(ConnectionKind),
     RoomAssociations,
-    Seat,
+    Facility(FacilityKind),
     VehicleArmor,
 }
 
@@ -201,11 +202,13 @@ impl ConfigurationKind {
     fn of(value: &StructValue<'_>, input: &OriginalCatalogInput<'_, '_>) -> Option<Self> {
         match value.type_name() {
             catalog_resource_component::COMPONENT => return Some(Self::Resource),
-            catalog_seat::COMPONENT => return Some(Self::Seat),
             inventory_owner_storage::ITEM_COMPONENT => return Some(Self::InventoryStorage),
             inventory_owner_bounds::METADATA_COMPONENT => return Some(Self::ObjectMetadataBounds),
             catalog_vehicle_armor::COMPONENT => return Some(Self::VehicleArmor),
             _ => {}
+        }
+        if let Some(kind) = FacilityKind::of(value.type_name()) {
+            return Some(Self::Facility(kind));
         }
         if value.type_name() == room_associations::VEHICLE {
             return Some(Self::RoomAssociations);

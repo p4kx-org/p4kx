@@ -7,6 +7,7 @@ use super::Scan;
 use crate::Kind;
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::{self, LocationVocabularyPick};
+use crate::catalog_v3::medical::medical_tier_config;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
 use crate::loot_kinds::LootPick;
 use crate::mission_kinds::MissionPick;
@@ -23,17 +24,10 @@ impl<'f> Scan<'_, '_, 'f> {
         tree: &RecordTree<'f>,
     ) -> Result<Option<(Picked<'f>, Vec<FieldError>)>, ScanError> {
         let projection = match kind {
-            Kind::LootPoolFilters => {
-                let value = crate::catalog_v3::loot_filter_catalog::read(
-                    admission.record(),
-                    tree,
-                    self.projection,
-                    self.options.cancel,
-                )?;
-                (Picked::Loot(LootPick::Filter(Box::new(value))), Vec::new())
-            }
+            Kind::LootPoolFilters => self.loot_pool_filter_definition(admission, tree)?,
             Kind::ExplosionDefinitions => self.explosion_definition(admission, tree)?,
             Kind::InventoryContainers => self.inventory_definition(admission, tree)?,
+            Kind::MedicalItemTierConfigs => self.medical_definition(admission, tree)?,
             Kind::Factions => self.faction_definition(admission, tree)?,
             Kind::StarmapTypes | Kind::StarmapPresets | Kind::StarmapAmenities => {
                 self.starmap_definition(kind, admission, tree)?
@@ -82,6 +76,30 @@ impl<'f> Scan<'_, '_, 'f> {
             _ => return self.read_mission_definition(kind, admission, tree),
         };
         Ok(Some(projection))
+    }
+
+    fn loot_pool_filter_definition(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let value = crate::catalog_v3::loot_filter_catalog::read(
+            admission.record(),
+            tree,
+            self.projection,
+            self.options.cancel,
+        )?;
+        Ok((Picked::Loot(LootPick::Filter(Box::new(value))), Vec::new()))
+    }
+
+    fn medical_definition(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (value, notes) =
+            medical_tier_config::read(tree, self.projection, admission, self.options.cancel)?;
+        Ok((Picked::MedicalItemTierConfig(Box::new(value)), notes))
     }
 
     fn read_mission_definition(

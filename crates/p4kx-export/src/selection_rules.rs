@@ -81,6 +81,10 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::inventory_container_definition::SOURCE_TYPE,
             },
+            Self::MedicalItemTierConfigs => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::medical::medical_tier_config::SOURCE_TYPE,
+            },
             Self::ExplosionDefinitions => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::explosion_definition::SOURCE_TYPE,

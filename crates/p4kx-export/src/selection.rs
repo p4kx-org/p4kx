@@ -182,6 +182,8 @@ pub enum Kind {
     LocationSizeRegistries,
     /// All physical inventory storage Records.
     InventoryContainers,
+    /// Physical shared medical tier and consumption configuration Records.
+    MedicalItemTierConfigs,
     /// Physical starmap object type definitions.
     StarmapTypes,
     /// Physical starmap preset definitions.
@@ -192,7 +194,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 71] = [
+    pub const ALL: [Self; 72] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -261,6 +263,7 @@ impl Kind {
         Self::LocationFunctionRegistries,
         Self::LocationSizeRegistries,
         Self::InventoryContainers,
+        Self::MedicalItemTierConfigs,
         Self::StarmapTypes,
         Self::StarmapPresets,
         Self::StarmapAmenities,
@@ -342,6 +345,7 @@ impl Kind {
             Self::LocationFunctionRegistries => "locationFunctionRegistries",
             Self::LocationSizeRegistries => "locationSizeRegistries",
             Self::InventoryContainers => "inventoryContainers",
+            Self::MedicalItemTierConfigs => "medicalItemTierConfigs",
             Self::StarmapTypes => "starmapTypes",
             Self::StarmapPresets => "starmapPresets",
             Self::StarmapAmenities => "starmapAmenities",

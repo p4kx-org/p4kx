@@ -34,6 +34,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) blueprint_category_lists: KindCompleteness<'a>,
     /// The completeness of `inventoryContainers`.
     pub(crate) inventory_containers: KindCompleteness<'a>,
+    /// The filtered physical medical tier and consumption configuration selection.
+    pub(crate) medical_item_tier_configs: KindCompleteness<'a>,
     /// The filtered physical `ExplosionRecord` selection.
     pub(crate) explosion_definitions: KindCompleteness<'a>,
     /// The filtered physical `AmmoParams` selection.
@@ -169,6 +171,7 @@ impl<'a> Completeness<'a> {
             blueprint_category_lists: completeness,
             explosion_definitions: completeness,
             inventory_containers: completeness,
+            medical_item_tier_configs: completeness,
             ammo_definitions: completeness,
             gameplay_properties: completeness,
             quality_distributions: completeness,

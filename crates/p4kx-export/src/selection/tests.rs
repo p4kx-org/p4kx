@@ -77,6 +77,7 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries
                 | Kind::InventoryContainers
+                | Kind::MedicalItemTierConfigs
                 | Kind::StarmapTypes
                 | Kind::StarmapPresets
                 | Kind::StarmapAmenities => {

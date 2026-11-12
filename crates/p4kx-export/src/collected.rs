@@ -22,6 +22,7 @@ use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
 use crate::catalog_v3::law_kinds::LawKinds;
 use crate::catalog_v3::location_vocabulary::LocationVocabulary;
+use crate::catalog_v3::medical::medical_tier_config::PreparedMedicalTier;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitions;
 use crate::contract::{
     BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
@@ -87,6 +88,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) blueprint_category_lists: Vec<PreparedBlueprintCategoryList<'f>>,
     pub(crate) explosion_definitions: Vec<PreparedExplosionDefinition<'f>>,
     pub(crate) inventory_containers: Vec<PreparedInventoryContainer<'f>>,
+    pub(crate) medical_item_tier_configs: Vec<PreparedMedicalTier<'f>>,
     pub(crate) ammo_definitions: Vec<PreparedAmmoDefinition<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayPropertyDefinition<'f>>,
     pub(crate) quality: QualityRows<'f>,
@@ -189,6 +191,7 @@ impl<'f> Collected<'f> {
             blueprint_category_lists: Vec::new(),
             explosion_definitions: Vec::new(),
             inventory_containers: Vec::new(),
+            medical_item_tier_configs: Vec::new(),
             ammo_definitions: Vec::new(),
             gameplay_properties: crafting.properties,
             quality: crafting.quality,
@@ -279,6 +282,7 @@ impl<'f> Collected<'f> {
             Picked::ExplosionDefinition(entity) => self.explosion_definitions.push(*entity),
             Picked::AmmoDefinition(entity) => self.ammo_definitions.push(*entity),
             Picked::InventoryContainer(entity) => self.inventory_containers.push(*entity),
+            Picked::MedicalItemTierConfig(entity) => self.medical_item_tier_configs.push(*entity),
             Picked::Starmap(read) => {
                 self.starmap_definitions.push_object(read.definition);
                 self.starmap_objects.push(read.object);

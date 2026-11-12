@@ -4138,6 +4138,9 @@
         "manufacturers": {
           "$ref": "#/$defs/CatalogTableOfManufacturerDefinition"
         },
+        "medicalItemTierConfigs": {
+          "$ref": "#/$defs/CatalogTableOfMedicalItemTierConfig"
+        },
         "missionBrokerEntries": {
           "$ref": "#/$defs/CatalogTableOfBrokerDefinition"
         },
@@ -4211,6 +4214,7 @@
         "locationSizes",
         "lootPoolFilters",
         "manufacturers",
+        "medicalItemTierConfigs",
         "missionBrokerEntries",
         "qualityDistributions",
         "qualityQuantizations",
@@ -5259,6 +5263,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ManufacturerDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfMedicalItemTierConfig": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/MedicalItemTierConfig"
           },
           "type": "array"
         }
@@ -6876,6 +6899,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `manufacturers`."
         },
+        "medicalItemTierConfigs": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The filtered physical medical tier and consumption configuration selection."
+        },
         "mineableCompositions": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `mineableCompositions`."
@@ -7043,6 +7070,7 @@
         "lootPoolFilters",
         "lootTables",
         "manufacturers",
+        "medicalItemTierConfigs",
         "mineableCompositions",
         "mineableElements",
         "mineableEntities",
@@ -11069,6 +11097,19 @@
           "properties": {
             "kind": {
               "const": "seat",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/MedBed",
+          "properties": {
+            "kind": {
+              "const": "medBed",
               "type": "string"
             }
           },
@@ -17009,6 +17050,10 @@
           "value": "inventoryContainers"
         },
         {
+          "description": "Physical shared medical tier and consumption configuration Records.",
+          "value": "medicalItemTierConfigs"
+        },
+        {
           "description": "Physical starmap object type definitions.",
           "value": "starmapTypes"
         },
@@ -19097,6 +19142,309 @@
         "materialVariants",
         "palette",
         "tags"
+      ],
+      "type": "object"
+    },
+    "MedBed": {
+      "description": "The original fields of one authored medical facility component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "canRespawnHere": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "cancelAllRespawnsInteraction": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "cancelRespawnInteraction": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "delayBeforeHeal": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "healInteraction": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "invulnerableDuration": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "invulnerableUser": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "medBedTier": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "medicalItemTierConfig": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "resourceRegenerationPerMinute": {
+          "$ref": "#/$defs/SourcedValueOfResourceCapacity"
+        },
+        "respawnInteraction": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "respawnInteractionPoint": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "respawnRangeOverride": {
+          "$ref": "#/$defs/SourcedValueOfMedBedRespawnRange"
+        },
+        "setRespawnInteraction": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "surgeryNames": {
+          "$ref": "#/$defs/SourcedValueOfMedBedSurgeryNames"
+        },
+        "surgerySequenceState": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "timeToHeal": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "useChannelToHealActor": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "canRespawnHere",
+        "cancelAllRespawnsInteraction",
+        "cancelRespawnInteraction",
+        "delayBeforeHeal",
+        "healInteraction",
+        "invulnerableDuration",
+        "invulnerableUser",
+        "medBedTier",
+        "medicalItemTierConfig",
+        "resourceRegenerationPerMinute",
+        "respawnInteraction",
+        "respawnInteractionPoint",
+        "respawnRangeOverride",
+        "setRespawnInteraction",
+        "surgeryNames",
+        "surgerySequenceState",
+        "timeToHeal",
+        "useChannelToHealActor"
+      ],
+      "type": "object"
+    },
+    "MedBedInjuryNames": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "deadlyInjuryName": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "injuryName": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "majorInjuryName": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "deadlyInjuryName",
+        "injuryName",
+        "majorInjuryName",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "MedBedResourceConsumption": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "bedResource": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "resourceAmountForCloning": {
+          "$ref": "#/$defs/SourcedValueOfResourceCapacity"
+        },
+        "resourceAmountForSurgeryT1": {
+          "$ref": "#/$defs/SourcedValueOfResourceCapacity"
+        },
+        "resourceAmountForSurgeryT2": {
+          "$ref": "#/$defs/SourcedValueOfResourceCapacity"
+        },
+        "resourceAmountForSurgeryT3": {
+          "$ref": "#/$defs/SourcedValueOfResourceCapacity"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "bedResource",
+        "resourceAmountForCloning",
+        "resourceAmountForSurgeryT1",
+        "resourceAmountForSurgeryT2",
+        "resourceAmountForSurgeryT3",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "MedBedRespawnRange": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "respawnRange": {
+          "$ref": "#/$defs/SourcedValueOfint64"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "respawnRange",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "MedBedSurgeryNames": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "headInjuries": {
+          "$ref": "#/$defs/SourcedValueOfMedBedInjuryNames"
+        },
+        "leftArmInjuries": {
+          "$ref": "#/$defs/SourcedValueOfMedBedInjuryNames"
+        },
+        "leftLegInjuries": {
+          "$ref": "#/$defs/SourcedValueOfMedBedInjuryNames"
+        },
+        "rightArmInjuries": {
+          "$ref": "#/$defs/SourcedValueOfMedBedInjuryNames"
+        },
+        "rightLegInjuries": {
+          "$ref": "#/$defs/SourcedValueOfMedBedInjuryNames"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "torsoInjuries": {
+          "$ref": "#/$defs/SourcedValueOfMedBedInjuryNames"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "headInjuries",
+        "leftArmInjuries",
+        "leftLegInjuries",
+        "rightArmInjuries",
+        "rightLegInjuries",
+        "sourceType",
+        "torsoInjuries"
+      ],
+      "type": "object"
+    },
+    "MedBedTier": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "defaultRespawnRange": {
+          "$ref": "#/$defs/SourcedValueOfint64"
+        },
+        "drugEfficacyForConsumableTypes": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfUnitSource"
+        },
+        "medBedTier": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "statTypesToHeal": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "defaultRespawnRange",
+        "drugEfficacyForConsumableTypes",
+        "medBedTier",
+        "sourceType",
+        "statTypesToHeal"
+      ],
+      "type": "object"
+    },
+    "MedicalItemTierConfig": {
+      "description": "One physical tier and consumption Record shared by medical facilities.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "availableDrugTypes": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfUnitSource"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "drugEfficacyConfig": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfUnitSource"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "medBedConfigs": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfMedBedTier"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "resourceConsumption": {
+          "$ref": "#/$defs/SourcedValueOfMedBedResourceConsumption"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "availableDrugTypes",
+        "className",
+        "drugEfficacyConfig",
+        "fileName",
+        "guid",
+        "medBedConfigs",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "resourceConsumption",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -39226,6 +39574,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfMaelstromEvent"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfMedBedTier": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfMedBedTier"
                 },
                 "type": "array"
               }
@@ -60166,6 +60647,656 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/MaterialEffect"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMedBedInjuryNames": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MedBedInjuryNames"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMedBedResourceConsumption": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MedBedResourceConsumption"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMedBedRespawnRange": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MedBedRespawnRange"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMedBedSurgeryNames": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MedBedSurgeryNames"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMedBedTier": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MedBedTier"
               }
             }
           }

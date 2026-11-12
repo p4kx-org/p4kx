@@ -16,6 +16,7 @@ use crate::catalog_v3::inventory_container_definition::InventoryContainerDefinit
 use crate::catalog_v3::jurisdiction_definition::JurisdictionDefinition;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyTables;
 use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
+use crate::catalog_v3::medical::medical_tier_config::MedicalItemTierConfig;
 use crate::catalog_v3::reputation_context_definition::ContextDefinition;
 use crate::catalog_v3::reputation_faction_definition::FactionReputationDefinition;
 use crate::catalog_v3::reputation_perk_list::ReputationPerkList;
@@ -53,6 +54,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) shop_inventories: ShopInventoryTable,
     pub(crate) explosion_definitions: CatalogTable<ExplosionDefinition<'source>>,
     pub(crate) inventory_containers: CatalogTable<InventoryContainerDefinition<'source>>,
+    pub(crate) medical_item_tier_configs: CatalogTable<MedicalItemTierConfig<'source>>,
     pub(crate) ammo_definitions: CatalogTable<AmmoDefinition<'source>>,
     pub(crate) reputation_contexts: CatalogTable<ContextDefinition<'source>>,
     pub(crate) reputation_scopes: CatalogTable<ScopeDefinition<'source>>,

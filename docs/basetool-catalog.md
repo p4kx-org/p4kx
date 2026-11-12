@@ -691,6 +691,10 @@ expose source capacity and the physical item or vehicle components that select i
 `configurations.interactions`. Their original condition lists, tasks and state links retain
 physical owners and per-value provenance.
 
+[Ship facility configurations and placements](catalog-ship-facilities.md) link the authored
+seat and medical components and storage configurations to their resolved Loadout contexts.
+Medical tier and resource consumption definitions retain their own physical Record identity.
+
 #### Playability
 
 The catalog lists every ship and item Record of the Build, among them AI, mission and event

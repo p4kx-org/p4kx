@@ -234,6 +234,8 @@ mod inventory_owner_storage;
 mod item_alignment_options;
 #[path = "item_component_owner.rs"]
 mod item_component_owner;
+#[path = "medical/mod.rs"]
+pub(crate) mod medical;
 #[path = "network_endpoint.rs"]
 mod network_endpoint;
 #[path = "ordnance_fields.rs"]

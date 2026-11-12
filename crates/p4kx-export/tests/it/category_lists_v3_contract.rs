@@ -215,7 +215,7 @@ fn assert_header(catalog: &Value) -> TestResult {
     Ok(())
 }
 
-const EXPECTED_KINDS: [&str; 71] = [
+const EXPECTED_KINDS: [&str; 72] = [
     "manufacturers",
     "items",
     "ships",
@@ -284,6 +284,7 @@ const EXPECTED_KINDS: [&str; 71] = [
     "locationFunctionRegistries",
     "locationSizeRegistries",
     "inventoryContainers",
+    "medicalItemTierConfigs",
     "starmapTypes",
     "starmapPresets",
     "starmapAmenities",

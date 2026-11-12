@@ -30,6 +30,26 @@ ADS audio triggers. Member order, source types, array slots and references
 are retained in the arena. A missing field, null pointer, unreadable field
 and present zero or false have distinct source states.
 
+## Medical facilities and tier definitions
+
+The `medBed` facility kind retains the physical `MedBedComponentParams` owner and
+component ordinal. The original `MedBedTier` label, treatment and delay Singles,
+respawn and invulnerability flags, and the optional signed `respawnRangeOverride`
+are separate source values. Authored interaction, point, use-channel and surgery
+state WeakPointers retain their actual record or owned-instance target. Surgery
+labels use the protected game-text domain.
+
+The sourced `medicalItemTierConfig` Reference can join to the physical
+`definitions.medicalItemTierConfigs` row by Record index and GUID. Each definition
+contains the ordered `medBedConfigs` and `statTypesToHeal` slots. Drug efficacy
+and available drug entries retain their concrete source types and original members
+in the authored value arena. The separate resource consumption block retains its
+`bedResource` Reference and surgery T1–T3 and cloning amounts.
+
+Regeneration and resource costs use the shared cargo-unit representation. Stored
+values retain their own source units, exact Single bits and signed integer amounts.
+The ranges and timing fields retain the original scalar values.
+
 ## Ship Loadout placements
 
 `placements.facilityInstances` links physical facility and inventory configurations to their

@@ -6,6 +6,7 @@ use p4kx_extraction::{Filter, Guid};
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_number_health::EmittedNumber;
 use crate::catalog_row::{CatalogRow, CatalogRows};
+use crate::catalog_v3::medical::medical_tier_config;
 use crate::collected::Collected;
 use crate::selection::Kind;
 use crate::template_number_capture::TemplateNumbers;
@@ -116,6 +117,12 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
             .inventory_containers
             .iter()
             .map(|row| (row.physical_guid, row.physical_path)),
+    );
+    append(
+        emitted,
+        Kind::MedicalItemTierConfigs,
+        medical_tier_config::sources(&collected.medical_item_tier_configs)
+            .map(|(_, guid, path, _)| (guid, path)),
     );
 }
 
@@ -305,6 +312,10 @@ fn physical_definition_number_groups<'rows>(
         .inventory_containers
         .iter()
         .map(|row| (Kind::InventoryContainers, row.numbers.as_slice()))
+        .chain(
+            medical_tier_config::sources(&collected.medical_item_tier_configs)
+                .map(|(kind, _, _, numbers)| (kind, numbers)),
+        )
         .chain(
             collected
                 .explosion_definitions

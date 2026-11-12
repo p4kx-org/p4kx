@@ -72,6 +72,7 @@ locationClassRegistries: 0 written, 0 skipped, complete
 locationFunctionRegistries: 0 written, 0 skipped, complete
 locationSizeRegistries: 0 written, 0 skipped, complete
 inventoryContainers: 0 written, 0 skipped, complete
+medicalItemTierConfigs: 0 written, 0 skipped, complete
 starmapTypes: 0 written, 0 skipped, complete
 starmapPresets: 0 written, 0 skipped, complete
 starmapAmenities: 0 written, 0 skipped, complete
@@ -88,4 +89,4 @@ ships variants: 0 in 0 groups
 quality quantizations: 0 used by no ResourceType, 0 links reach no quantization
 en: 16 texts resolved, 1 unresolved, 0 placeholders
 de: 2 texts resolved, 15 unresolved, 0 placeholders
-wrote [DIR]/basetool-catalog.json: 218905 bytes, 1 Records skipped, 0 failed
+wrote [DIR]/basetool-catalog.json: 219740 bytes, 1 Records skipped, 0 failed

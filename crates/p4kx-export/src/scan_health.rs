@@ -109,6 +109,9 @@ impl SourceTrace {
                         Some(Kind::InventoryContainers)
                     }
 
+                    crate::catalog_v3::medical::medical_tier_config::SOURCE_TYPE => {
+                        Some(Kind::MedicalItemTierConfigs)
+                    }
                     crate::catalog_v3::reputation_perk_list::SOURCE_TYPE => {
                         Some(Kind::ReputationPerks)
                     }

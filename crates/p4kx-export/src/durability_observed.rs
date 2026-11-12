@@ -166,6 +166,19 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         })
     }
 
+    pub(super) fn int64(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<i64>, CatalogError> {
+        self.scalar(name, "a nullable Int64", notes, |fact| {
+            Ok(match fact.value() {
+                Value::Int64(value) => Some(*value),
+                _ => None,
+            })
+        })
+    }
+
     pub(super) fn string(
         &self,
         name: &str,

@@ -28,6 +28,8 @@ mod ammo_source;
 mod durability;
 #[path = "catalog_facility_instances.rs"]
 mod facility_instances;
+#[path = "catalog_facility_medbed.rs"]
+mod facility_medbed;
 #[path = "catalog_facility_seats.rs"]
 mod facility_seats;
 #[path = "catalog_fuel_capacity.rs"]

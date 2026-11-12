@@ -16,6 +16,7 @@ use super::facility_instance::{
 use super::inventory_owner_storage;
 use super::item_component_owner::ComponentOwner;
 use super::loadout_position::{self, LoadoutPosition};
+use super::medical::med_bed;
 use super::room_associations;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_table::CatalogTable;
@@ -45,6 +46,7 @@ pub(super) fn table(
         forge,
         &[
             catalog_seat::COMPONENT,
+            med_bed::COMPONENT,
             inventory_owner_storage::ITEM_COMPONENT,
             room_associations::VEHICLE,
         ],

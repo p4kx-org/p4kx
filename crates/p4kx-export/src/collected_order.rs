@@ -8,6 +8,7 @@ impl Collected<'_> {
     /// Orders the failures and the picked kinds by the text of the GUID.
     pub(super) fn order(&mut self) {
         self.order_failures();
+        crate::catalog_v3::medical::medical_tier_config::order(&mut self.medical_item_tier_configs);
         self.inventory_containers
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         self.explosion_definitions

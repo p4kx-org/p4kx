@@ -39,6 +39,7 @@ pub(crate) fn named_rows<'catalog>(
         Kind::ExplosionDefinitions => "/definitions/explosionDefinitions",
         Kind::AmmoDefinitions => "/definitions/ammoDefinitions",
         Kind::InventoryContainers => "/definitions/inventoryContainers",
+        Kind::MedicalItemTierConfigs => "/definitions/medicalItemTierConfigs",
         Kind::ReputationContexts => "/definitions/reputationContexts",
         Kind::ReputationScopes => "/definitions/reputationScopes",
         Kind::ReputationStandings => "/definitions/reputationStandings",
@@ -102,6 +103,7 @@ fn checked_table<'catalog>(
                 | Kind::ExplosionDefinitions
                 | Kind::AmmoDefinitions
                 | Kind::InventoryContainers
+                | Kind::MedicalItemTierConfigs
                 | Kind::ReputationContexts
                 | Kind::ReputationScopes
                 | Kind::ReputationStandings

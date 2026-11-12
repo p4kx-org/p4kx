@@ -88,6 +88,7 @@ fn expected_completeness() -> Value {
         "locationFunctionRegistries": {"status": "complete"},
         "locationSizeRegistries": {"status": "complete"},
         "inventoryContainers": {"status": "complete"},
+        "medicalItemTierConfigs": {"status": "complete"},
         "starmapTypes": {"status": "complete"},
         "starmapPresets": {"status": "complete"},
         "starmapAmenities": {"status": "complete"},
