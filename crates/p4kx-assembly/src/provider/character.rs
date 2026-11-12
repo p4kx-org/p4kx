@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use p4kx_extraction::ModelArchiveSource;
 use p4kx_extraction::model::Model;
 
 use super::{ArchiveModels, ModelFailure, ProvidedAttachment, ProvidedModel, without_mtl};
@@ -11,7 +12,13 @@ use crate::build_models::vertices;
 use crate::cdf::{self, MAX_CDF_BYTES};
 use crate::cdf_bone::BoneAttachment;
 
-type AttachmentModels<'bone> = HashMap<String, HashMap<Option<&'bone str>, Arc<Model>>>;
+type AttachmentModels<'bone> = HashMap<String, HashMap<Option<&'bone str>, ReadAttachment>>;
+
+#[derive(Clone)]
+struct ReadAttachment {
+    model: Arc<Model>,
+    sources: Arc<[ModelArchiveSource]>,
+}
 
 impl ArchiveModels<'_> {
     /// Reads the character definition at `entry`: its skin as the model, its bone attachments as
@@ -69,14 +76,15 @@ impl ArchiveModels<'_> {
         models: &mut AttachmentModels<'bone>,
     ) -> Result<ProvidedAttachment, ModelFailure> {
         let entry = self.entry_of(&bone.binding).ok_or(ModelFailure::Missing)?;
-        let model = self.attachment_model(&entry, bone.material.as_deref(), lod, models)?;
+        let read = self.attachment_model(&entry, bone.material.as_deref(), lod, models)?;
         Ok(ProvidedAttachment {
             name: bone.name.clone(),
             bone: bone.bone.clone(),
             position: bone.position,
             rotation: bone.rotation,
             entry,
-            model,
+            model: read.model,
+            archive_sources: read.sources,
         })
     }
 
@@ -86,24 +94,30 @@ impl ArchiveModels<'_> {
         material: Option<&'bone str>,
         lod: u32,
         models: &mut AttachmentModels<'bone>,
-    ) -> Result<Arc<Model>, ModelFailure> {
+    ) -> Result<ReadAttachment, ModelFailure> {
         if let Some(model) = models
             .get(entry)
             .and_then(|variants| variants.get(&material))
         {
-            return Ok(Arc::clone(model));
+            return Ok(model.clone());
         }
         let ProvidedModel {
-            entry, mut model, ..
+            entry,
+            mut model,
+            archive_sources,
+            ..
         } = self.read_model(entry.to_owned(), lod, Vec::new())?;
         if let Some(material) = material {
             model.material_library = Some(without_mtl(material).to_owned());
         }
-        let model = Arc::new(model);
+        let read = ReadAttachment {
+            model: Arc::new(model),
+            sources: archive_sources,
+        };
         models
             .entry(entry)
             .or_default()
-            .insert(material, Arc::clone(&model));
-        Ok(model)
+            .insert(material, read.clone());
+        Ok(read)
     }
 }

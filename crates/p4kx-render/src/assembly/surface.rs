@@ -24,6 +24,7 @@ pub(super) type SurfaceKey = (usize, usize, u16);
 pub(super) struct Surface {
     pub(super) colour: [f32; 4],
     pub(super) translucent: bool,
+    pub(super) library_slot: Option<usize>,
     pub(super) texture: Option<String>,
     /// The layered material whose blended image is the texture, which a path does not name.
     pub(super) layered: Option<Material>,
@@ -47,17 +48,18 @@ pub(super) fn surface_key(part: &Piece<'_>, id: u16) -> SurfaceKey {
 pub(super) fn resolve(part: &Piece<'_>, id: u16, mode: ModelMaterials) -> Option<Surface> {
     let fallback = Material::engine_default();
     let library = part.materials.library();
-    let found = library
-        .and_then(|library| {
-            let position = if library.single { 0 } else { usize::from(id) };
-            library.materials.get(position)
-        })
-        .unwrap_or(&fallback);
+    let selected = library.and_then(|library| {
+        let slot = if library.single { 0 } else { usize::from(id) };
+        Some((slot, library.materials.get(slot)?))
+    });
+    let found = selected.map_or(&fallback, |(_, material)| material);
     if found.hidden() || is_one_of(&found.shader, &DECAL_SHADERS) {
         return None;
     }
     let tinted = part.palette.and_then(|palette| palette.apply(found));
-    surface_of(tinted.as_ref().unwrap_or(found), mode)
+    let mut surface = surface_of(tinted.as_ref().unwrap_or(found), mode)?;
+    surface.library_slot = selected.map(|(slot, _)| slot);
+    Some(surface)
 }
 
 /// Returns how `material` is drawn: the base colour the GLB writer uses (the specular colour of a
@@ -85,6 +87,7 @@ pub(super) fn surface_of(material: &Material, mode: ModelMaterials) -> Option<Su
     Some(Surface {
         colour: [red, green, blue, alpha],
         translucent,
+        library_slot: None,
         layered: blend.is_some().then(|| material.clone()),
         texture: blend
             .map(|key| format!("{LAYERED_PREFIX}{key}"))

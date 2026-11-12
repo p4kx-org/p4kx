@@ -4,6 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use p4kx_extraction::{EntryOrigin, ModelArchiveSource};
 use p4kx_model::{Lod, Model};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -23,6 +24,8 @@ const WAVE: usize = 256;
 pub(crate) struct Loaded {
     pub(crate) entry: String,
     pub(crate) model: Arc<Model>,
+    pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) definition_origin: Option<EntryOrigin>,
     pub(crate) left_out: Vec<String>,
     pub(crate) attachments: Vec<ProvidedAttachment>,
     pub(crate) skeleton: Option<SkeletonProblem>,
@@ -173,6 +176,8 @@ fn read_files(
                 let result = provider.model(path, lod).map(|provided| Loaded {
                     entry: provided.entry,
                     model: Arc::new(provided.model),
+                    archive_sources: provided.archive_sources,
+                    definition_origin: provided.definition_origin,
                     left_out: provided.left_out,
                     attachments: provided.attachments,
                     skeleton: provided.skeleton,

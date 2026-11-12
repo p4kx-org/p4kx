@@ -64,6 +64,7 @@ pub struct ProvidedAttachment {
     pub entry: String,
     /// The model, read without its material library.
     pub model: Arc<Model>,
+    pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
 }
 
 /// Why a [`ModelProvider`] cannot supply a model.

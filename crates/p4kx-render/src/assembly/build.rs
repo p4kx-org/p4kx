@@ -254,6 +254,7 @@ impl AssemblyScene {
                 .and_then(|id| meshes.get(id).map(|mesh| (id, mesh)))
                 .and_then(|(id, mesh)| mesh.as_ref().map(|mesh| (id, mesh)));
             let mut info = PartInfo {
+                source: part.source,
                 name: part.name.clone(),
                 path: part.path.clone().into_owned(),
                 parent: part.parent,
@@ -330,6 +331,7 @@ impl AssemblyScene {
                 });
             }
             pending.push(Item {
+                library_slot: surface.library_slot,
                 group,
                 colour: surface.colour,
             });

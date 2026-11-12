@@ -17,9 +17,10 @@ mod scene;
 mod skeleton;
 
 pub use assembly::{
-    AssemblyScene, BuildError, BuildOptions, DrawList, GroupDraw, Hooks, Instance, Left,
-    MAX_VIEW_ITEMS, MAX_VIEW_TEXTURE_BYTES, MAX_VIEW_TRIANGLES, MAX_VIEW_VERTICES, MIN_PART_PIXELS,
-    PartInfo, Progress, VIEW_TEXTURE_MIP, hidden_mask,
+    AssemblyPieceSource, AssemblyScene, BuildError, BuildOptions, DrawList, GroupDraw, Hooks,
+    Instance, Left, MAX_VIEW_ITEMS, MAX_VIEW_TEXTURE_BYTES, MAX_VIEW_TRIANGLES, MAX_VIEW_VERTICES,
+    MIN_PART_PIXELS, ObservedDrawList, PartInfo, PlacedPieceInput, Progress, VIEW_TEXTURE_MIP,
+    hidden_mask,
 };
 pub use camera::{Camera, HologramView, Matrix, Step, Uniforms};
 pub use gpu::{

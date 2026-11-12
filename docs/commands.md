@@ -628,6 +628,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   device waits for the queue to go idle for a limited time; a driver that does not finish in it
   leaves a warning that names the stage it stopped in. The background is `transparent` or
   `#RRGGBB[AA]`; the PNG has straight alpha. Textures and interiors are not drawn.
+  A sibling `<file>.p4kx-origin.jsonl` binds the committed PNG by name, byte length and SHA-256.
+  With `--json`, the report includes its name, artifact origin and the individual camera origins.
 - `p4kx ui screens <archive> <entity>` lists the `BuildingBlocks` screens of an Entity and of
   everything in its default Loadout, e.g. the MFDs, the radar and the HUD of a ship: per screen the
   port, the Entity, the canvas Record and its size, the canvases, textures, vector graphics, movies

@@ -4,9 +4,9 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use p4kx_model::{MaterialStatus, Transform};
+use p4kx_model::Transform;
 
-use crate::build::{Libraries, issue, library_key_of, materials_for};
+use crate::build::{Libraries, Library, issue, library_key_of, materials_for};
 use crate::build_models::Loaded;
 use crate::flatten::Draft;
 use crate::placement::bone_transform;
@@ -18,7 +18,7 @@ use crate::{AttachedModel, Issue, IssueKind, ProvidedAttachment};
 pub(crate) fn attached(
     draft: &Draft<'_>,
     loaded: Option<&Loaded>,
-    libraries: (&Libraries, &Arc<MaterialStatus>),
+    libraries: (&Libraries, &Library),
     reported: &mut HashSet<String>,
     issues: &mut Vec<Issue>,
 ) -> Vec<AttachedModel> {
@@ -49,6 +49,8 @@ pub(crate) fn attached(
                 found: bone.is_some(),
                 entry: attachment.entry.clone(),
                 model: Arc::clone(&attachment.model),
+                archive_sources: Arc::clone(&attachment.archive_sources),
+                definition_origin: loaded.definition_origin.clone(),
                 materials,
             }
         })

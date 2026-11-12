@@ -4,55 +4,91 @@
 use anyhow::Result;
 use p4kx_assembly::{HologramCameraField, ObservedHologramCamera};
 use p4kx_extraction::{
-    DataForgeEntry, DataForgeOrigin, FieldOrigins, FieldPath, InputScope, SourceInput,
+    DataForgeEntry, DataForgeOrigin, FieldOrigin, FieldOrigins, FieldPath, InputScope, SourceInput,
     SourceInventory, SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses,
     SourceValueState,
 };
 use serde::Serialize;
 
-use super::Summary;
+use super::{HologramArgs, Summary};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct Evidence {
+pub(super) struct Evidence<'artifact> {
     field_origins: FieldOrigins,
     provenance: SourceInventory,
+    artifact_origin: &'artifact FieldOrigin,
+    origin_receipt: &'artifact str,
 }
 
-impl Evidence {
-    pub(super) fn of(
-        entry: &DataForgeEntry,
-        entity_record: u32,
-        camera: &ObservedHologramCamera,
-        summary: &Summary<'_>,
-    ) -> Result<Self> {
-        let uses = SourceUses::new();
-        let input = match entry.origin() {
-            DataForgeOrigin::Archive(entry) => SourceInput::Archive(entry),
-            _ => SourceInput::Unknown,
-        };
-        let scope = uses.observe(input, InputScope::Payload)?;
-        let mut projection = Projection {
-            uses,
-            scope,
-            fields: FieldOrigins::new(),
-        };
-        projection.summary(entity_record, summary)?;
-        projection.camera(camera, summary)?;
-        Ok(Self {
-            field_origins: projection.fields,
-            provenance: projection.uses.freeze()?,
-        })
+pub(super) struct CameraInput {
+    field: &'static str,
+    sources: Vec<SourceUse>,
+    complete: bool,
+}
+
+impl CameraInput {
+    pub(super) fn sources(&self) -> &[SourceUse] {
+        &self.sources
     }
 }
 
-struct Projection {
+pub(super) type CameraInputs = [CameraInput; 3];
+
+pub(super) struct Projection {
     uses: SourceUses,
     scope: SourceScope,
     fields: FieldOrigins,
 }
 
 impl Projection {
+    pub(super) fn new(entry: &DataForgeEntry) -> Result<Self> {
+        let uses = SourceUses::new();
+        let input = match entry.origin() {
+            DataForgeOrigin::Archive(entry) => SourceInput::Archive(entry),
+            _ => SourceInput::Unknown,
+        };
+        let scope = uses.observe(input, InputScope::Payload)?;
+        Ok(Self {
+            uses,
+            scope,
+            fields: FieldOrigins::new(),
+        })
+    }
+
+    pub(super) fn finish<'artifact>(
+        mut self,
+        entity_record: u32,
+        camera: &ObservedHologramCamera,
+        settings: &CameraInputs,
+        summary: &Summary<'_>,
+        published: &'artifact super::png_origins::Published,
+    ) -> Result<Evidence<'artifact>> {
+        self.summary(entity_record, summary)?;
+        self.camera(camera, settings)?;
+        self.put("/originReceipt", &[], true)?;
+        self.fields
+            .insert(FieldPath::parse("/bytes")?, published.artifact.clone())?;
+        for path in ["/drawn_parts", "/triangles"] {
+            self.fields
+                .insert(FieldPath::parse(path)?, published.scene.clone())?;
+        }
+        Ok(Evidence {
+            field_origins: self.fields,
+            provenance: self.uses.freeze()?,
+            artifact_origin: &published.artifact,
+            origin_receipt: &published.receipt,
+        })
+    }
+
+    pub(super) const fn uses(&self) -> &SourceUses {
+        &self.uses
+    }
+
+    pub(super) const fn scope(&self) -> &SourceScope {
+        &self.scope
+    }
+
     fn summary(&mut self, entity: u32, summary: &Summary<'_>) -> Result<()> {
         for path in [
             "/archive",
@@ -76,14 +112,7 @@ impl Projection {
             let original = self.header(entity, field, role)?;
             self.put(path, &[original], true)?;
         }
-        for path in [
-            "/bytes",
-            "/parts",
-            "/modelled_parts",
-            "/drawn_parts",
-            "/meshes",
-            "/triangles",
-        ] {
+        for path in ["/parts", "/modelled_parts", "/meshes"] {
             self.put(path, &[], false)?;
         }
         self.diagnostics(summary)
@@ -124,7 +153,7 @@ impl Projection {
         Ok(())
     }
 
-    fn camera(&mut self, original: &ObservedHologramCamera, summary: &Summary<'_>) -> Result<()> {
+    fn camera(&mut self, original: &ObservedHologramCamera, settings: &CameraInputs) -> Result<()> {
         if let Some(index) = original.record_index() {
             let read = original.camera().is_some();
             let role = if read {
@@ -142,41 +171,61 @@ impl Projection {
         }
         self.put("/camera", &[], false)?;
         self.put("/camera/elevation_degrees", &[], true)?;
-        for (name, setting, overridden) in [
-            (
-                "fov_degrees",
-                HologramCameraField::FieldOfView,
-                summary.args.fov.is_some(),
-            ),
-            (
-                "view_angle_degrees",
-                HologramCameraField::ViewAngle,
-                summary.args.view_angle.is_some(),
-            ),
-            (
-                "distance_scaler",
-                HologramCameraField::DistanceScaler,
-                summary.args.distance_scaler.is_some(),
-            ),
-        ] {
-            self.setting(&format!("/camera/{name}"), original, setting, overridden)?;
+        for setting in settings {
+            self.put(
+                &format!("/camera/{}", setting.field),
+                &setting.sources,
+                setting.complete,
+            )?;
         }
         Ok(())
     }
 
+    pub(super) fn camera_inputs(
+        &self,
+        original: &ObservedHologramCamera,
+        args: &HologramArgs,
+    ) -> Result<CameraInputs> {
+        Ok([
+            self.setting(
+                "fov_degrees",
+                original,
+                HologramCameraField::FieldOfView,
+                args.fov.is_some(),
+            )?,
+            self.setting(
+                "view_angle_degrees",
+                original,
+                HologramCameraField::ViewAngle,
+                args.view_angle.is_some(),
+            )?,
+            self.setting(
+                "distance_scaler",
+                original,
+                HologramCameraField::DistanceScaler,
+                args.distance_scaler.is_some(),
+            )?,
+        ])
+    }
+
     fn setting(
-        &mut self,
-        path: &str,
+        &self,
+        field: &'static str,
         original: &ObservedHologramCamera,
         setting: HologramCameraField,
         overridden: bool,
-    ) -> Result<()> {
+    ) -> Result<CameraInput> {
         let state = original.field_state(setting);
+        let mut input = CameraInput {
+            field,
+            sources: Vec::new(),
+            complete: overridden || state == SourceValueState::Absent,
+        };
         if overridden {
-            return self.put(path, &[], true);
+            return Ok(input);
         }
         let Some(record_index) = original.record_index() else {
-            return self.put(path, &[], state == SourceValueState::Absent);
+            return Ok(input);
         };
         let (role, complete) = match state {
             SourceValueState::Present => (SourceUseRole::Conversion, true),
@@ -211,7 +260,9 @@ impl Projection {
             SourceUseRole::Attempted
         };
         let selected = self.header(record_index, "recordName", selection)?;
-        self.put(path, &[used, selected], complete)
+        input.sources = vec![used, selected];
+        input.complete = complete;
+        Ok(input)
     }
 
     fn header(&self, record: u32, field: &str, role: SourceUseRole) -> Result<SourceUse> {

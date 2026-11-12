@@ -4,7 +4,8 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use p4kx_model::{MaterialStatus, Transform};
+use p4kx_extraction::{ArchiveMaterialRead, EntryOrigin, ModelArchiveSource};
+use p4kx_model::{MaterialStatus, Model, Transform};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::build_attachments::attached;
@@ -22,7 +23,8 @@ use crate::{
     ObjectContainerRef, PaletteProvider, Part, SkeletonProblem,
 };
 
-pub(crate) type Libraries = HashMap<String, Arc<MaterialStatus>>;
+pub(crate) type Library = Arc<ArchiveMaterialRead>;
+pub(crate) type Libraries = HashMap<String, Library>;
 
 impl Assembly {
     /// Builds the Assembly of the Loadout tree `tree`: the Entity's geometry and, for every
@@ -81,7 +83,7 @@ impl Assembly {
         let loaded = load_models(&mut drafts, models, options, &mut issues)?;
         let chosen = choose_models(&drafts, &loaded, options.max_vertices, &mut issues);
         let libraries = read_libraries(&drafts, &chosen, models);
-        let unnamed = Arc::new(MaterialStatus::Unnamed);
+        let unnamed = Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed));
         let shared = (&libraries, &unnamed);
         let mut reported = HashSet::new();
         let mut characters = HashSet::new();
@@ -92,14 +94,16 @@ impl Assembly {
             let materials = materials_of(draft, *model, shared, &mut reported, &mut issues);
             note_character(draft, *model, &mut characters, &mut issues);
             let attachments = attached(draft, *model, shared, &mut reported, &mut issues);
-            let (palette, unresolved) = palettes.of_part(draft, *model, &materials);
+            let (palette, unresolved) = palettes.of_part(draft, *model, &materials.status);
             issues.extend(unresolved.into_iter().map(|kind| issue(draft, kind)));
             let rig = under_skin(draft, &parts)
                 .then(|| creature_rig::anchor_bones_of(&parts, &issues, options.lod))
                 .flatten();
             let prop = is_prop(draft, *model, options.lod);
-            let (local, placement) = place(draft, &parts, *model, rig, prop, &mut issues);
+            let (local, placement, placement_source) =
+                place(draft, &parts, *model, rig, prop, &mut issues);
             let world = world_of(draft, &parts, &local);
+            let geometry = rendered_geometry(cut.as_ref(), index, draft, *model, &mut issues);
             parts.push(Part {
                 name: draft.name.clone(),
                 path: draft.path.clone(),
@@ -110,13 +114,11 @@ impl Assembly {
                 local,
                 world,
                 placement,
+                placement_source,
                 geometry: draft.geometry_path().map(str::to_owned),
-                model: model.map(|loaded| {
-                    cut.as_ref().map_or_else(
-                        || Arc::clone(&loaded.model),
-                        |cut| cut.model_of(index, draft, loaded, &mut issues),
-                    )
-                }),
+                model: geometry.model,
+                model_archive_sources: geometry.sources,
+                model_definition_origin: geometry.definition,
                 materials,
                 palette,
                 attachments,
@@ -132,6 +134,48 @@ impl Assembly {
             interior: None,
             containers: containers_of(&drafts),
         })
+    }
+}
+
+#[derive(Default)]
+struct RenderedGeometry {
+    model: Option<Arc<Model>>,
+    sources: Arc<[ModelArchiveSource]>,
+    definition: Option<EntryOrigin>,
+}
+
+fn rendered_geometry(
+    cut: Option<&BodyCut>,
+    index: usize,
+    draft: &Draft<'_>,
+    model: Option<&Loaded>,
+    issues: &mut Vec<Issue>,
+) -> RenderedGeometry {
+    let Some(loaded) = model else {
+        return RenderedGeometry::default();
+    };
+    let rendered = cut.map_or_else(
+        || Arc::clone(&loaded.model),
+        |cut| cut.model_of(index, draft, loaded, issues),
+    );
+    let sources = model_inputs(loaded, &rendered);
+    RenderedGeometry {
+        model: Some(rendered),
+        sources,
+        definition: loaded.definition_origin.clone(),
+    }
+}
+
+fn model_inputs(loaded: &Loaded, rendered: &Model) -> Arc<[ModelArchiveSource]> {
+    if std::ptr::eq(loaded.model.as_ref(), rendered) {
+        Arc::clone(&loaded.archive_sources)
+    } else {
+        loaded
+            .archive_sources
+            .iter()
+            .filter(|source| source.supplies(rendered))
+            .cloned()
+            .collect()
     }
 }
 
@@ -154,10 +198,10 @@ fn world_of(draft: &Draft<'_>, parts: &[Part], local: &Transform) -> Transform {
 fn materials_of(
     draft: &Draft<'_>,
     model: Option<&Loaded>,
-    libraries: (&Libraries, &Arc<MaterialStatus>),
+    libraries: (&Libraries, &Library),
     reported: &mut HashSet<String>,
     issues: &mut Vec<Issue>,
-) -> Arc<MaterialStatus> {
+) -> Library {
     let key = model.and_then(|loaded| library_key(draft, loaded));
     materials_for(draft, key, libraries, reported, issues)
 }
@@ -166,17 +210,20 @@ fn materials_of(
 pub(crate) fn materials_for(
     draft: &Draft<'_>,
     key: Option<String>,
-    (libraries, unnamed): (&Libraries, &Arc<MaterialStatus>),
+    (libraries, unnamed): (&Libraries, &Library),
     reported: &mut HashSet<String>,
     issues: &mut Vec<Issue>,
-) -> Arc<MaterialStatus> {
+) -> Library {
     let materials = key
         .as_ref()
         .and_then(|key| libraries.get(key))
         .map_or_else(|| Arc::clone(unnamed), Arc::clone);
     if let (Some(key), Some(reason)) = (
         key,
-        materials.problem().or_else(|| materials.layer_problem()),
+        materials
+            .status
+            .problem()
+            .or_else(|| materials.status.layer_problem()),
     ) && reported.insert(key)
     {
         issues.push(issue(draft, IssueKind::MaterialLibrary { reason }));
@@ -311,6 +358,11 @@ fn read_libraries(
         .collect();
     wanted
         .par_iter()
-        .map(|(key, entry, name)| (key.clone(), Arc::new(provider.library(entry, name))))
+        .map(|(key, entry, name)| {
+            (
+                key.clone(),
+                Arc::new(provider.library_observed(entry, name)),
+            )
+        })
         .collect()
 }

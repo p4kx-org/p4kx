@@ -5,13 +5,17 @@ use std::io::Write;
 use std::sync::Arc;
 
 use p4kx_dataforge::Guid;
+use p4kx_extraction::{ArchiveMaterialRead, EntryOrigin, ModelArchiveSource};
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, Scene, SceneNode, ScenePart, TextureLoader, write_scene_glb,
     write_scene_glb_with,
 };
 use p4kx_model::{MaterialStatus, Model, TintPalette, Transform, UnresolvedLayers};
 
-use crate::{AttachedModel, Issue, creature_rig};
+use crate::{AttachedModel, Issue, PortPlacementSource, creature_rig};
+
+#[path = "assembly_part_inputs.rs"]
+mod part_inputs;
 
 /// The most parts an Assembly holds; further parts of the Loadout are left out.
 pub const MAX_ASSEMBLY_PARTS: usize = 1 << 14;
@@ -111,9 +115,12 @@ pub struct Part {
     pub(crate) local: Transform,
     pub(crate) world: Transform,
     pub(crate) placement: Placement,
+    pub(crate) placement_source: Option<PortPlacementSource>,
     pub(crate) geometry: Option<String>,
     pub(crate) model: Option<Arc<Model>>,
-    pub(crate) materials: Arc<MaterialStatus>,
+    pub(crate) model_archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) model_definition_origin: Option<EntryOrigin>,
+    pub(crate) materials: Arc<ArchiveMaterialRead>,
     pub(crate) palette: Option<Arc<TintPalette>>,
     pub(crate) attachments: Vec<AttachedModel>,
     pub(crate) hidden: bool,
@@ -204,7 +211,7 @@ impl Part {
     /// else the one the model names.
     #[must_use]
     pub fn materials(&self) -> &MaterialStatus {
-        &self.materials
+        &self.materials.status
     }
 
     /// Returns the tint palette the part's materials that take one are drawn with: the one its
@@ -359,7 +366,7 @@ impl Assembly {
         for part in &self.parts {
             let mut node = SceneNode::new(part.name.clone(), part.parent, part.local);
             if let Some(model) = &part.model {
-                let drawn = ScenePart::new(model, &part.materials);
+                let drawn = ScenePart::new(model, part.materials());
                 node = node.with_part(
                     part.palette
                         .as_deref()
@@ -369,7 +376,7 @@ impl Assembly {
             scene.push(node)?;
         }
         for (index, attached) in self.attached_models() {
-            let drawn = ScenePart::new(&attached.model, &attached.materials);
+            let drawn = ScenePart::new(&attached.model, attached.materials());
             let palette = self
                 .parts
                 .get(index)

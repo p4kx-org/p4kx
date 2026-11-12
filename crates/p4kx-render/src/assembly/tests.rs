@@ -4,7 +4,8 @@
 use std::collections::HashSet;
 
 use super::{
-    AssemblyScene, DrawList, Group, Item, Left, MIN_PART_PIXELS, PartDraw, PartInfo, hidden_mask,
+    AssemblyPieceSource, AssemblyScene, DrawList, Group, Item, Left, MIN_PART_PIXELS, PartDraw,
+    PartInfo, hidden_mask,
 };
 use crate::scene::{Bounds, Rows};
 use crate::{Camera, Matrix};
@@ -18,6 +19,7 @@ fn at(x: f32, y: f32, z: f32) -> Rows {
 
 fn info(path: &str, parent: Option<usize>) -> PartInfo {
     PartInfo {
+        source: AssemblyPieceSource::Part(0),
         name: path.to_owned(),
         path: path.to_owned(),
         parent,
@@ -87,6 +89,7 @@ fn group(translucent: bool) -> Group {
 
 fn scene() -> AssemblyScene {
     let item = |group| Item {
+        library_slot: Some(0),
         group,
         colour: [0.5, 0.5, 0.5, 1.0],
     };
@@ -148,6 +151,7 @@ fn translucent_items_are_drawn_from_the_far_part_to_the_near_one() {
     scene.groups.push(group(true));
     scene.draws.clear();
     let item = |group| Item {
+        library_slot: Some(0),
         group,
         colour: [0.5; 4],
     };
@@ -275,4 +279,21 @@ fn the_work_of_a_frame_follows_the_parts_not_the_triangles() {
 
     assert_eq!(list.draws().len(), 1, "one draw call for 4000 instances");
     assert_eq!(list.instances().len(), 4000, "one instance each");
+}
+
+#[test]
+fn observed_frame_records_the_accepted_pieces_and_bound_material_ranges() {
+    let scene = scene();
+    let view = view(&scene);
+    let observed = DrawList::of_observed(&scene, &[false, true, false, true], &view, HEIGHT);
+    assert_eq!(observed.parts(), [0, 2]);
+    let (list, selected) = observed.into_parts();
+    assert_eq!(list.visible_parts(), selected.len());
+    let inputs: Vec<_> = scene
+        .placed_inputs()
+        .map(|piece| (piece.ordinal(), piece.material_slots().collect::<Vec<_>>()))
+        .collect();
+    assert_eq!(inputs.len(), 4);
+    assert_eq!(inputs.first(), Some(&(0, vec![0])));
+    assert_eq!(inputs.get(2), Some(&(2, vec![0, 0])));
 }

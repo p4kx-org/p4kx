@@ -3,6 +3,9 @@
 
 use std::sync::Arc;
 
+use p4kx_extraction::{
+    ArchiveMaterialRead, EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource,
+};
 use p4kx_model::{MaterialStatus, Model, Transform};
 
 /// A rigid model a part carries at a bone of its skeleton: a bone attachment of the character
@@ -15,7 +18,9 @@ pub struct AttachedModel {
     pub(crate) found: bool,
     pub(crate) entry: String,
     pub(crate) model: Arc<Model>,
-    pub(crate) materials: Arc<MaterialStatus>,
+    pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) definition_origin: Option<EntryOrigin>,
+    pub(crate) materials: Arc<ArchiveMaterialRead>,
 }
 
 impl AttachedModel {
@@ -57,9 +62,27 @@ impl AttachedModel {
         &self.model
     }
 
+    /// Returns the original Archive reads of the model retained by this attachment.
+    #[must_use]
+    pub fn model_archive_sources(&self) -> &[ModelArchiveSource] {
+        &self.archive_sources
+    }
+
+    /// Returns the actual character definition that selected this attachment, if observed.
+    #[must_use]
+    pub const fn model_definition_origin(&self) -> Option<&EntryOrigin> {
+        self.definition_origin.as_ref()
+    }
+
+    /// Returns the original observations of the material library used by this attachment.
+    #[must_use]
+    pub fn material_archive_origins(&self) -> &MaterialArchiveOrigins {
+        &self.materials.origins
+    }
+
     /// Returns the material library the model is drawn with.
     #[must_use]
     pub fn materials(&self) -> &MaterialStatus {
-        &self.materials
+        &self.materials.status
     }
 }

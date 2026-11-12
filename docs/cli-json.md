@@ -1950,8 +1950,9 @@ pixels, and a `--out` that is the movie file, print no JSON and fail with exit c
 `defaults` when it has none (a field of view of 10 degrees, a view angle of 60 and a distance
 factor of 1.5), and `… and options` when `--fov`, `--view-angle` or `--distance-scaler` replaced
 a value. The camera values are the ones used: values that are not finite fall back to the
-defaults and the rest are clamped, as the camera does. `drawn_parts` is the number of parts with
-geometry the picture shows, `triangles` the triangles they place, and `issues` the notes and
+defaults and the rest are clamped, as the camera does. `drawn_parts` counts the parts placed
+in the scene before camera culling. `triangles` counts the triangles of their meshes. `issues`
+contains the notes and
 skipped parts of the Assembly as `entity glb` lists them. `milliseconds` splits the run into
 reading and assembling, building the scene, drawing and reading the picture back, and writing
 the file. An Entity the Archive lacks, a bad option, a `--out` that is the Archive or lies in a
@@ -1965,7 +1966,14 @@ a graphics adapter fails with `no graphics adapter` on stderr and exit code 1.
 Each setting uses the actual field of the selected `UIHoloVehicle_Config` Record or a command-line
 option. An explicit override is tool-authored even when its number equals the stored value.
 A readable Record with a missing setting retains the declaration survey that chose the fallback.
-Assembly counters and diagnostics whose source contributions are unproved retain unknown origins.
+`originReceipt` names the sibling `<file>.p4kx-origin.jsonl`. `artifactOrigin` addresses the
+committed PNG as one opaque payload and is also the origin of the measured `bytes`. It includes
+model and character-definition reads used for placed geometry, resolved material slots, authored
+port helper and offset fields, and the camera settings. Models that place scene bounds contribute
+even when the camera later culls them. An unused LOD or material library carries no contribution.
+The known contributors of `drawn_parts` and `triangles` come from the placed scene. An incomplete
+set can still have a positive encryption marker when a known contributor is encrypted. Other
+Assembly counters and diagnostics retain unknown origins where their inputs are unproved.
 
 ## `p4kx ui screens <archive> <entity> --json`
 

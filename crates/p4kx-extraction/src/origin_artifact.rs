@@ -126,7 +126,9 @@ pub struct OriginArtifactDigest {
 }
 
 impl OriginArtifactDigest {
-    pub(crate) const fn byte_length(&self) -> u64 {
+    /// Returns the measured length in bytes.
+    #[must_use]
+    pub const fn byte_length(&self) -> u64 {
         self.byte_length.get()
     }
 }

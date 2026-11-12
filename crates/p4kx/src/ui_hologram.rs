@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{self, BufWriter, Write};
+use std::io::{self, Write};
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -9,12 +9,9 @@ use std::time::{Duration, Instant};
 use anyhow::{Context, Result};
 use p4kx_assembly::{
     ArchiveFiles, ArchiveModels, Assembly, AssemblyOptions, ForgePalettes, HologramCamera,
-    LoadoutResolver,
+    LoadoutResolver, ObservedHologramCamera,
 };
-use p4kx_extraction::{
-    ArchiveWriteProtection, CancelToken, ConversionError, DataForgeEntry, is_same_file,
-    write_replacing_protected,
-};
+use p4kx_extraction::{ArchiveWriteProtection, CancelToken, DataForgeEntry, is_same_file};
 use p4kx_render::{
     Adapters, AssemblyDraw, AssemblyScene, BuildOptions, Camera, Colours, DrawList, Frame,
     Hologram, HologramView, Hooks, Look, Offscreen, Picture, Released, Shading, Subject,
@@ -25,13 +22,17 @@ use serde::Serialize;
 use crate::cli_hologram::HologramArgs;
 use crate::entity_glb::GlbOutputIsArchive;
 use crate::entity_glb_json::IssueJson;
-use crate::query_table::one_line;
 use crate::{exit, json};
 
 #[path = "ui_hologram_origins.rs"]
 mod origins;
 
-use self::origins::Evidence;
+#[path = "ui_hologram_png_origins.rs"]
+mod png_origins;
+#[path = "ui_hologram_text.rs"]
+mod text;
+
+use self::origins::{CameraInputs, Evidence, Projection};
 
 #[derive(Serialize)]
 struct CameraJson {
@@ -74,7 +75,7 @@ struct HologramJson<'a> {
     incompatible: Vec<crate::entity_ignored::IncompatibleJson<'a>>,
     issues: Vec<IssueJson<'a>>,
     #[serde(flatten)]
-    evidence: Evidence,
+    evidence: Evidence<'a>,
 }
 
 /// Returns the view of the camera the options and the Record ask for, and where it came from.
@@ -116,21 +117,21 @@ const fn height(size: [u32; 2]) -> f32 {
     size[1] as f32
 }
 
-fn frame(scene: &Arc<AssemblyScene>, view: &HologramView, args: &HologramArgs) -> Frame {
+fn frame(
+    scene: &Arc<AssemblyScene>,
+    view: &HologramView,
+    args: &HologramArgs,
+) -> (Frame, Vec<usize>) {
     let mut camera = Camera::holographic(scene.bounds(), view);
     camera.fit(aspect(args.size));
     let uniforms = camera.uniforms(aspect(args.size));
     let hidden = vec![false; scene.parts().len()];
-    let list = Arc::new(DrawList::of(
-        scene,
-        &hidden,
-        &uniforms.view_proj,
-        height(args.size),
-    ));
-    Frame {
+    let (list, selected) =
+        DrawList::of_observed(scene, &hidden, &uniforms.view_proj, height(args.size)).into_parts();
+    let frame = Frame {
         subject: Subject::Assembly(AssemblyDraw {
             scene: Arc::clone(scene),
-            list,
+            list: Arc::new(list),
         }),
         uniforms,
         size: args.size,
@@ -144,24 +145,8 @@ fn frame(scene: &Arc<AssemblyScene>, view: &HologramView, args: &HologramArgs) -
             opacity: args.opacity,
             glow: args.glow,
         }),
-    }
-}
-
-fn write(
-    picture: &Picture,
-    out: &std::path::Path,
-    protection: &ArchiveWriteProtection,
-    cancel: &CancelToken,
-) -> Result<u64> {
-    write_replacing_protected(out, Some(protection), Some(cancel), |writer| {
-        picture
-            .write_png(writer)
-            .map_err(|error| ConversionError::Write {
-                path: out.to_path_buf(),
-                source: io::Error::other(error),
-            })
-    })?;
-    Ok(std::fs::metadata(out)?.len())
+    };
+    (frame, selected)
 }
 
 const fn millis(time: Duration) -> u128 {
@@ -175,17 +160,46 @@ struct Outcome {
     adapter: String,
     camera: (HologramView, &'static str),
     times: TimesJson,
+    published: png_origins::Published,
+}
+
+impl Outcome {
+    fn summary<'a>(
+        &'a self,
+        args: &'a HologramArgs,
+        assembly: &'a Assembly,
+        applied: &'a p4kx_assembly::ChangedLoadout,
+    ) -> Summary<'a> {
+        Summary {
+            args,
+            class_name: applied.node().class_name(),
+            picture: &self.picture,
+            bytes: self.bytes,
+            assembly,
+            applied,
+            scene: &self.scene,
+            adapter: &self.adapter,
+            camera: self.camera,
+            times: self.times,
+        }
+    }
+}
+
+struct HologramInputs<'a> {
+    projection: &'a Projection,
+    camera: &'a ObservedHologramCamera,
+    settings: &'a CameraInputs,
 }
 
 fn draw_picture(
     args: &HologramArgs,
     (assembly, class_name): (&Assembly, &str),
-    record: Option<HologramCamera>,
+    original: &HologramInputs<'_>,
     (started, assembled): (Instant, Duration),
     protection: &ArchiveWriteProtection,
     cancel: &CancelToken,
 ) -> Result<Outcome> {
-    let camera = view_of(args, record);
+    let camera = view_of(args, original.camera.camera());
     let scene = AssemblyScene::build(
         assembly,
         &BuildOptions {
@@ -205,9 +219,18 @@ fn draw_picture(
     } else {
         Adapters::Best
     })?;
-    let picture = offscreen.draw(&frame(&scene, &camera.0, args))?;
+    let (frame, visible) = frame(&scene, &camera.0, args);
+    let picture = offscreen.draw(&frame)?;
+    drop(frame);
     let drawn = started.elapsed();
-    let bytes = write(&picture, &args.out, protection, cancel)?;
+    let published = png_origins::publish(
+        &picture,
+        &args.out,
+        (protection, cancel),
+        original,
+        (assembly, &scene, &visible),
+    )?;
+    let bytes = published.bytes;
     let total = started.elapsed();
     let adapter = offscreen.adapter_name().to_owned();
     if let Released::Abandoned(stage) = offscreen.close() {
@@ -222,6 +245,7 @@ fn draw_picture(
         bytes,
         adapter,
         camera,
+        published,
         times: TimesJson {
             assembly: millis(assembled),
             scene: millis(built.saturating_sub(assembled)),
@@ -257,28 +281,29 @@ pub(crate) fn run(args: &HologramArgs, as_json: bool) -> Result<ExitCode> {
     let palettes = ForgePalettes::new(&forge);
     let assembly = Assembly::build_with_palettes(tree, &models, &palettes, &options)?;
     let camera = HologramCamera::read_observed(&forge);
+    let evidence = Projection::new(&entry)?;
+    let settings = evidence.camera_inputs(&camera, args)?;
     let outcome = draw_picture(
         args,
         (&assembly, tree.class_name()),
-        camera.camera(),
+        &HologramInputs {
+            projection: &evidence,
+            camera: &camera,
+            settings: &settings,
+        },
         (started, started.elapsed()),
         &protection,
         &cancel,
     )?;
-    let summary = Summary {
-        args,
-        class_name: tree.class_name(),
-        picture: &outcome.picture,
-        bytes: outcome.bytes,
-        assembly: &assembly,
-        applied: &applied,
-        scene: &outcome.scene,
-        adapter: &outcome.adapter,
-        camera: outcome.camera,
-        times: outcome.times,
-    };
+    let summary = outcome.summary(args, &assembly, &applied);
     if as_json {
-        let evidence = Evidence::of(&entry, record.index(), &camera, &summary)?;
+        let evidence = evidence.finish(
+            record.index(),
+            &camera,
+            &settings,
+            &summary,
+            &outcome.published,
+        )?;
         json::print(&summary.json(&archive, tree.guid().to_string(), evidence))?;
         return Ok(ExitCode::from(exit::SUCCESS));
     }
@@ -306,7 +331,7 @@ impl<'a> Summary<'a> {
         &'a self,
         archive: &p4kx_extraction::Archive,
         guid: String,
-        evidence: Evidence,
+        evidence: Evidence<'a>,
     ) -> HologramJson<'a> {
         let (view, source) = self.camera;
         HologramJson {
@@ -336,65 +361,5 @@ impl<'a> Summary<'a> {
             issues: self.assembly.issues().iter().map(IssueJson::from).collect(),
             evidence,
         }
-    }
-
-    fn print(&self) -> io::Result<()> {
-        let (view, source) = self.camera;
-        let mut out = BufWriter::new(io::stdout().lock());
-        writeln!(
-            out,
-            "wrote {} of {}: {} x {} px, {} bytes",
-            self.args.out.display(),
-            one_line(self.class_name),
-            self.picture.width(),
-            self.picture.height(),
-            self.bytes
-        )?;
-        writeln!(
-            out,
-            "{} parts ({} with models, {} drawn), {} meshes, {} triangles",
-            self.assembly.parts().len(),
-            self.assembly.modelled_parts(),
-            self.scene.drawn_parts(),
-            self.scene.meshes(),
-            self.scene.placed_triangles()
-        )?;
-        writeln!(
-            out,
-            "camera from {source}: field of view {} degrees, view angle {}, elevation {}, distance factor {}",
-            view.fov_degrees, view.view_angle_degrees, view.elevation_degrees, view.distance_scaler
-        )?;
-        writeln!(
-            out,
-            "drawn on {} in {} ms (assembly {} ms, scene {} ms, picture {} ms, file {} ms)",
-            one_line(self.adapter),
-            self.times.total,
-            self.times.assembly,
-            self.times.scene,
-            self.times.draw,
-            self.times.write
-        )?;
-        let (skipped, noted): (Vec<_>, Vec<_>) = self
-            .assembly
-            .issues()
-            .iter()
-            .partition(|issue| issue.kind().skips());
-        for issue in &skipped {
-            let label = if issue.path().is_empty() {
-                issue.name().to_owned()
-            } else {
-                format!("{} ({})", issue.path(), issue.name())
-            };
-            writeln!(
-                out,
-                "skipped {}: {}",
-                one_line(&label),
-                one_line(&issue.kind().to_string())
-            )?;
-        }
-        if !noted.is_empty() {
-            writeln!(out, "{} parts have notes, which --json lists", noted.len())?;
-        }
-        out.flush()
     }
 }

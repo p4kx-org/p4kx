@@ -9,6 +9,9 @@ use std::path::{Path, PathBuf};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, assembly_entries, hologram_entries, test_key};
 use serde_json::Value;
 
+#[path = "ui_hologram_png_origins.rs"]
+mod png_origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 struct Run {

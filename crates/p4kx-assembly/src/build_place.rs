@@ -8,7 +8,9 @@ use crate::build_models::Loaded;
 use crate::creature_rig;
 use crate::flatten::Draft;
 use crate::placement::{bone_transform, node_transform, offset};
-use crate::{Issue, IssueKind, Part, Placement, PortDefinition, PortNode, PortTransform};
+use crate::{
+    Issue, IssueKind, Part, Placement, PortDefinition, PortNode, PortPlacementSource, PortTransform,
+};
 
 /// Returns whether the parent of the part is a skin part.
 pub(crate) fn under_skin(draft: &Draft<'_>, parts: &[Part]) -> bool {
@@ -32,7 +34,7 @@ pub(crate) fn place(
     rig: Option<&[Bone]>,
     prop: bool,
     issues: &mut Vec<Issue>,
-) -> (Transform, Placement) {
+) -> (Transform, Placement, Option<PortPlacementSource>) {
     let mut unreported = Vec::new();
     let issues = if draft.hidden {
         &mut unreported
@@ -40,13 +42,14 @@ pub(crate) fn place(
         issues
     };
     let Some(parent) = draft.parent.and_then(|parent| parts.get(parent)) else {
-        return (Transform::IDENTITY, Placement::Root);
+        return (Transform::IDENTITY, Placement::Root, None);
     };
     if let Some(gear) = draft.gear {
-        return place_gear(draft, gear.bone(), parent, issues);
+        let (local, placement) = place_gear(draft, gear.bone(), parent, issues);
+        return (local, placement, None);
     }
     let Some(port) = draft.port else {
-        return (Transform::IDENTITY, Placement::Origin);
+        return (Transform::IDENTITY, Placement::Origin, None);
     };
     let port_definition = port.definition();
     let definition = port_definition.and_then(PortDefinition::transform);
@@ -60,7 +63,13 @@ pub(crate) fn place(
     let (placement, base) = if port_definition.is_some_and(PortDefinition::is_skin) {
         match prop.then(on_rig).flatten() {
             Some(found) => found,
-            None => return (Transform::IDENTITY, Placement::Skin),
+            None => {
+                return (
+                    Transform::IDENTITY,
+                    Placement::Skin,
+                    PortPlacementSource::skin(port),
+                );
+            }
         }
     } else {
         match anchor(parent.model(), helper, port) {
@@ -75,20 +84,27 @@ pub(crate) fn place(
         let helper = helper.to_owned();
         issues.push(issue(draft, IssueKind::HelperNotFound { helper }));
     }
+    let (local, offset_helper) = with_offset(base, definition, model);
+    let source = PortPlacementSource::anchor(port, &placement, definition, offset_helper);
+    (local, placement, source)
+}
+
+fn with_offset(
+    base: Transform,
+    definition: Option<&PortTransform>,
+    model: Option<&Loaded>,
+) -> (Transform, bool) {
     let Some(definition) = definition else {
-        return (base, placement);
+        return (base, false);
     };
-    let mut local = base.then(&offset(definition.position(), definition.rotation()));
+    let local = base.then(&offset(definition.position(), definition.rotation()));
     let inner = (!definition.offset_helper().is_empty())
         .then(|| {
             let child = model?;
             node_transform(&child.model, definition.offset_helper())?.inverse()
         })
         .flatten();
-    if let Some(inner) = inner {
-        local = local.then(&inner);
-    }
-    (local, placement)
+    inner.map_or((local, false), |inner| (local.then(&inner), true))
 }
 
 /// Returns the transform of a landing gear: the node `bone` of its Entity's model.

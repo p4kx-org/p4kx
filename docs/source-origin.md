@@ -142,6 +142,16 @@ values identify the exact canvas Record fields used to derive them.
 Explicit dimensions and command options have their own tool-authored origins.
 A report value whose contributors cannot be established has a null marker.
 
+## Hologram rendering
+
+`p4kx ui hologram` publishes `<file>.p4kx-origin.jsonl` alongside the PNG.
+The opaque payload row binds the committed filename, byte length and SHA-256.
+Its uses include the placed and drawn model reads, selected material slots,
+authored port placement and camera settings. Model and character-definition
+files without retained internal coordinates carry an explicit opaque use.
+Unobserved inputs keep the contributor set incomplete. A known encrypted
+input still gives the artifact a positive marker.
+
 ## CHF GLB
 
 `p4kx chf glb` writes a sibling `<output>.p4kx-origin.jsonl` companion. Its

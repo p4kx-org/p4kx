@@ -161,6 +161,7 @@ pub struct PortTransform {
     pub(crate) offset_helper: String,
     pub(crate) position: [f32; 3],
     pub(crate) rotation: [f32; 3],
+    offset_fields: [bool; 2],
 }
 
 impl PortTransform {
@@ -186,6 +187,10 @@ impl PortTransform {
     #[must_use]
     pub const fn position(&self) -> [f32; 3] {
         self.position
+    }
+
+    pub(crate) const fn offset_fields(&self) -> [bool; 2] {
+        self.offset_fields
     }
 
     /// Returns the rotation from the helper in degrees as stored, `[x, y, z]`.
@@ -233,11 +238,14 @@ fn read_transform(attachment: &StructValue<'_>) -> Option<PortTransform> {
     let helper =
         struct_field(attachment, "Helper").and_then(|node| struct_field(node, "Helper"))?;
     let offset = struct_field(helper, "Offset");
+    let position = offset.and_then(|offset| struct_field(offset, "Position"));
+    let rotation = offset.and_then(|offset| struct_field(offset, "Rotation"));
     Some(PortTransform {
         attachment: attachment_kind(attachment).to_owned(),
         helper: text(helper, "Name").to_owned(),
         offset_helper: text(helper, "ItemOffsetHelperName").to_owned(),
-        position: xyz(offset.and_then(|offset| struct_field(offset, "Position"))),
-        rotation: xyz(offset.and_then(|offset| struct_field(offset, "Rotation"))),
+        position: xyz(position),
+        rotation: xyz(rotation),
+        offset_fields: [position.is_some(), rotation.is_some()],
     })
 }
