@@ -199,7 +199,7 @@ pub use hirc_music_track_automation::{
     BankTrackAutomationExtent, BankTrackAutomationFields, BankTrackAutomationPoints,
 };
 pub use hirc_music_track_transition::BankMusicTrackTransitionFields;
-pub use hirc_music_transition::BankMusicTransitionFields;
+pub use hirc_music_transition::{BankMusicTransitionFields, MusicTransitionFeatures};
 pub use hirc_music_transition_rule::{
     BankMusicTransitionDestinationFields, BankMusicTransitionIds, BankMusicTransitionObjectFields,
     BankMusicTransitionRuleFields, BankMusicTransitionSourceFields,

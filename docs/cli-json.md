@@ -903,6 +903,9 @@ Each `files` row includes an `approximations` array for written or verified reta
 A choice with several rendered alternatives includes `"select-first-alternative"`, also written
 in the TXTP header. Rendered MusicTrack sources can add `omit-music-clip-timing`,
 `omit-music-clip-events` or `nonfinite-music-clip-timing` from their owning track's clip fields.
+A rendered path through a MusicPlaylist or MusicSwitch can add `omit-music-transition-fades`
+for nonzero original fade timing or `omit-music-transition-segments` for an allocated
+transition object with a nonzero segment ID.
 An empty array means the writer emitted no reported approximation code.
 A retained file has `"approximations": null` when its text was unverified or differed from the
 generated text. The sound export determines the exit code and reports missing audio files in

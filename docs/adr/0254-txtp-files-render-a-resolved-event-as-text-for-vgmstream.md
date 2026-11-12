@@ -82,3 +82,7 @@ MusicTrack leaves carry the observed clip features of their owning track.
 The report and header identify omitted finite nonzero start and trim times
 in milliseconds, omitted posted Events and nonfinite timing words. The
 source duration is a separate authored value.
+
+A rendered path carries observed fade and transition-segment features
+from its actual MusicPlaylist and MusicSwitch ancestors. The writer
+reports each omitted feature in the header and JSON.

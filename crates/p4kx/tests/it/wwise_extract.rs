@@ -20,6 +20,8 @@ use serde_json::Value;
 mod txtp_approximation;
 #[path = "wwise_txtp_clip_omissions.rs"]
 mod txtp_clip_omissions;
+#[path = "wwise_txtp_transition_omissions.rs"]
+mod txtp_transition_omissions;
 
 type TestResult = Result<(), Box<dyn Error>>;
 

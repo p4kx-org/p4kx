@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_audio::{ContainerKind, HircKind, MediaStorage, SoundSource};
+use p4kx_audio::{ContainerKind, HircKind, MediaStorage, MusicTransitionFeatures, SoundSource};
 
 use super::music_clip_features::MusicClipFeatures;
 use super::{AtlTrigger, BrokenLink, IndexedSoundbank, LanguageChoice, WemSelection, WwiseEvent};
@@ -211,6 +211,7 @@ pub struct SoundVariant<'i> {
     /// Number of visits still shared with the previous emitted variant in this Event walk.
     pub(crate) shared_path_prefix: usize,
     pub(super) music_clip_features: MusicClipFeatures,
+    pub(super) music_transition_features: MusicTransitionFeatures,
     pub(crate) source: SoundSource,
     pub(crate) location: Option<WemLocation<'i>>,
     pub(crate) selection: WemSelection,

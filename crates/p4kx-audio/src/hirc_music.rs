@@ -7,6 +7,7 @@ use std::fmt;
 
 use crate::hirc::SoundSource;
 use crate::hirc_music_playlist_depth::PlaylistDepth;
+use crate::hirc_music_transition::MusicTransitionFeatures;
 
 /// The tempo and time signature of a music node.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -139,6 +140,8 @@ pub struct MusicSwitch {
     pub node: MusicNode,
     /// The number of transition rules.
     pub rule_count: u32,
+    /// Features observed in the original transition rules.
+    pub transition_features: MusicTransitionFeatures,
     /// The IDs of the state or switch groups the decision tree tests, outermost first.
     pub group_ids: Vec<u32>,
     /// The IDs of the nodes the leaves of the decision tree play, in tree order, 0 left out.
@@ -263,6 +266,8 @@ pub struct MusicPlaylist {
     pub node: MusicNode,
     /// The number of transition rules.
     pub rule_count: u32,
+    /// Features observed in the original transition rules.
+    pub transition_features: MusicTransitionFeatures,
     /// The playlist items in bank order, children after their parent.
     pub items: Vec<MusicPlaylistItem>,
 }

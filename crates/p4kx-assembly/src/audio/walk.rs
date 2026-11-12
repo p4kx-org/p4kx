@@ -3,7 +3,9 @@
 
 use std::rc::Rc;
 
-use p4kx_audio::{HircKind, HircObject, HircValue, SoundSource, Soundbank};
+use p4kx_audio::{
+    HircKind, HircObject, HircValue, MusicTransitionFeatures, SoundSource, Soundbank,
+};
 
 use super::locate::locate;
 use super::music_clip_features::MusicClipFeatures;
@@ -44,6 +46,7 @@ pub(crate) fn event<'i>(banks: Banks<'_, 'i>, event: &'i WwiseEvent, budget: usi
 struct ResolvedPathStep<'index> {
     owner: Loaded<'index>,
     step: PathStep,
+    transition_features: MusicTransitionFeatures,
 }
 
 struct Walk<'w, 'i> {
@@ -127,15 +130,33 @@ impl<'i> Walk<'_, 'i> {
             return;
         }
         let left = entered.map(|next| std::mem::replace(&mut self.current, next));
+        self.enter(object);
+        self.visit(object);
+        self.leave(left);
+    }
+
+    fn enter(&mut self, object: &HircObject) {
+        let authored = match &object.value {
+            HircValue::MusicPlaylist(playlist) => playlist.transition_features,
+            HircValue::MusicSwitch(switch) => switch.transition_features,
+            _ => MusicTransitionFeatures::default(),
+        };
+        let transition_features = self.transition_features().combine(authored);
         self.path.push(ResolvedPathStep {
             owner: self.current.clone(),
             step: PathStep {
                 kind: node_kind(object),
-                id,
+                id: object.id,
             },
+            transition_features,
         });
-        self.visit(object);
-        self.leave(left);
+    }
+
+    fn transition_features(&self) -> MusicTransitionFeatures {
+        self.path
+            .last()
+            .map(|step| step.transition_features)
+            .unwrap_or_default()
     }
 
     fn leave(&mut self, previous: Option<Loaded<'i>>) {
@@ -284,6 +305,7 @@ impl<'i> Walk<'_, 'i> {
             path: self.public_path(),
             shared_path_prefix: self.shared_path_prefix,
             music_clip_features,
+            music_transition_features: self.transition_features(),
             source,
             location: located.location,
             selection: located.selection,

@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use p4kx_audio::Loop;
+use p4kx_audio::{Loop, MusicTransitionFeatures};
 
 use crate::audio::music_clip_features::MusicClipFeatures;
 
@@ -58,6 +58,15 @@ impl RenderedTxtp {
         }
         if clips.nonfinite_timing {
             self.note(TxtpApproximation::NonfiniteMusicClipTiming);
+        }
+    }
+
+    fn note_music_transitions(&mut self, transitions: MusicTransitionFeatures) {
+        if transitions.has_fade_timing() {
+            self.note(TxtpApproximation::OmitMusicTransitionFades);
+        }
+        if transitions.has_transition_segment() {
+            self.note(TxtpApproximation::OmitMusicTransitionSegments);
         }
     }
 
@@ -139,6 +148,7 @@ fn leaf_line(
         ));
     }
     rendered.note_music_clips(leaf.music_clip_features);
+    rendered.note_music_transitions(leaf.music_transition_features);
     let text = &mut rendered.text;
     let _ = write!(text, "{:indent$}{}", "", file.name, indent = depth * INDENT);
     if let Some(points) = file.loop_points {
@@ -199,6 +209,7 @@ mod tests {
             source_id: wem_id,
             kind: SourceKind::Embedded,
             music_clip_features: MusicClipFeatures::default(),
+            music_transition_features: MusicTransitionFeatures::default(),
         })
     }
 

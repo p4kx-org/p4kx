@@ -4,7 +4,57 @@
 use std::ops::Range;
 
 use crate::bank_object_fields::{BankHircField, ObjectFields};
-use crate::hirc_music_transition_rule;
+use crate::hirc_music_fade::BankMusicFadeFields;
+use crate::hirc_music_transition_rule::{self, BankMusicTransitionRuleFields};
+
+/// Compact observations from the original rules of one music node.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct MusicTransitionFeatures {
+    fades: bool,
+    segments: bool,
+}
+
+impl MusicTransitionFeatures {
+    /// Returns whether any checked fade has nonzero time or offset.
+    #[must_use]
+    pub const fn has_fade_timing(self) -> bool {
+        self.fades
+    }
+
+    /// Returns whether any allocated object names a nonzero segment.
+    #[must_use]
+    pub const fn has_transition_segment(self) -> bool {
+        self.segments
+    }
+
+    /// Returns the combined observations of two resolved source nodes.
+    #[must_use]
+    pub const fn combine(self, other: Self) -> Self {
+        Self {
+            fades: self.fades || other.fades,
+            segments: self.segments || other.segments,
+        }
+    }
+
+    fn observe(&mut self, rule: &BankMusicTransitionRuleFields) {
+        let object = rule.transition_object.as_ref();
+        self.fades |= fade_timing(&rule.source.fade)
+            || fade_timing(&rule.destination.fade)
+            || object.is_some_and(|object| {
+                fade_timing(&object.fade_in) || fade_timing(&object.fade_out)
+            });
+        self.segments |= object
+            .and_then(|object| object.segment_id.as_ref())
+            .is_some_and(|id| id.value != 0);
+    }
+}
+
+fn fade_timing(fade: &BankMusicFadeFields) -> bool {
+    [&fade.time_bits, &fade.offset_bits]
+        .into_iter()
+        .flatten()
+        .any(|word| word.value != 0)
+}
 
 /// Original transition count and checked physical rule extents.
 #[derive(Debug, Default)]
@@ -18,6 +68,8 @@ pub struct BankMusicTransitionFields {
     pub checked_range: Option<Range<u64>>,
     /// Number of complete original rules.
     pub complete_rules: u32,
+    /// Timing and segment features found in readable original rule fields.
+    pub features: MusicTransitionFeatures,
 }
 
 pub(crate) fn read<F: ObjectFields>(
@@ -47,7 +99,9 @@ fn scan<F: ObjectFields>(
     observed.rules_range = Some(start..start);
     for ordinal in 0..count {
         let first_count = fields.read_u32()?;
-        hirc_music_transition_rule::read(fields, first_count).1?;
+        let (rule, read) = hirc_music_transition_rule::read(fields, first_count);
+        observed.features.observe(&rule);
+        read?;
         observed.rules_range = Some(start..fields.offset());
         observed.complete_rules = ordinal + 1;
     }

@@ -19,3 +19,8 @@ their physical rule and list positions and carry exact per-field source uses.
 
 The ordinary layout follows [wwiser's music transition reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L2532)
 and [StarBreaker's transition rule reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/music.rs#L136).
+
+The same pass records whether checked rules carry nonzero fade time or
+offset words, and whether an allocated object names a nonzero segment.
+Those observations follow the physical nodes reached by TXTP. A rule
+count and an empty allocation carry no omission code by themselves.

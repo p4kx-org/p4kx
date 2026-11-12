@@ -13,6 +13,10 @@ pub enum TxtpApproximation {
     OmitMusicClipEvents,
     /// The owning track contains a nonfinite clip start or trim value.
     NonfiniteMusicClipTiming,
+    /// The rendered path omits nonzero authored transition fade timing.
+    OmitMusicTransitionFades,
+    /// The rendered path omits an authored transition-object segment.
+    OmitMusicTransitionSegments,
 }
 
 impl TxtpApproximation {
@@ -24,6 +28,8 @@ impl TxtpApproximation {
             Self::OmitMusicClipTiming => "omit-music-clip-timing",
             Self::OmitMusicClipEvents => "omit-music-clip-events",
             Self::NonfiniteMusicClipTiming => "nonfinite-music-clip-timing",
+            Self::OmitMusicTransitionFades => "omit-music-transition-fades",
+            Self::OmitMusicTransitionSegments => "omit-music-transition-segments",
         }
     }
 }

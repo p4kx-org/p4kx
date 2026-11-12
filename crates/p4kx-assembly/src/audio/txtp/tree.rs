@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_audio::HircKind;
+use p4kx_audio::{HircKind, MusicTransitionFeatures};
 
 use crate::audio::music_clip_features::MusicClipFeatures;
 use crate::audio::{NodeKind, PathStep, SoundVariant, SourceKind};
@@ -38,6 +38,7 @@ pub(super) struct Leaf {
     pub(super) source_id: u32,
     pub(super) kind: SourceKind,
     pub(super) music_clip_features: MusicClipFeatures,
+    pub(super) music_transition_features: MusicTransitionFeatures,
 }
 
 /// A child of a group: a sound or another group.
@@ -120,6 +121,7 @@ fn build_holder(root: PathStep, variants: &[SoundVariant<'_>]) -> Group {
                 source_id: variant.source().source_id,
                 kind: variant.source_kind(),
                 music_clip_features: variant.music_clip_features,
+                music_transition_features: variant.music_transition_features,
             },
         );
     }

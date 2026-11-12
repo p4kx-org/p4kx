@@ -12,7 +12,7 @@ use crate::hirc_music_switch::{
     self, BankMusicSwitchFields, BankMusicSwitchNode, NODE_LEN, SwitchGroups,
 };
 use crate::hirc_music_switch_traversal::Traversal;
-use crate::hirc_music_transition::{self, BankMusicTransitionFields};
+use crate::hirc_music_transition::{self, BankMusicTransitionFields, MusicTransitionFeatures};
 use crate::hirc_node::{self, ID_LEN};
 use crate::{BankError, SectionId};
 
@@ -39,7 +39,11 @@ pub(crate) fn segment(fields: &mut SectionReader<'_>) -> Result<MusicSegment, Ba
 }
 
 pub(crate) fn switch(fields: &mut SectionReader<'_>) -> Result<MusicSwitch, BankError> {
-    let (node, rule_count) = transition_node(fields)?;
+    let TransitionNode {
+        node,
+        rule_count,
+        transition_features,
+    } = transition_node(fields)?;
     let mut observed = BankMusicSwitchFields::default();
     let mut groups = SwitchGroups::default();
     let mut group_ids = Vec::new();
@@ -57,6 +61,7 @@ pub(crate) fn switch(fields: &mut SectionReader<'_>) -> Result<MusicSwitch, Bank
     Ok(MusicSwitch {
         node,
         rule_count,
+        transition_features,
         group_ids,
         targets,
     })
@@ -73,7 +78,11 @@ fn slice_node(tree: &[u8], index: u32) -> Result<BankMusicSwitchNode, BankError>
 }
 
 pub(crate) fn playlist(fields: &mut SectionReader<'_>) -> Result<MusicPlaylist, BankError> {
-    let (node, rule_count) = transition_node(fields)?;
+    let TransitionNode {
+        node,
+        rule_count,
+        transition_features,
+    } = transition_node(fields)?;
     let count = fields.u32()?;
     let mut items = Vec::with_capacity(capacity(fields, count, PLAYLIST_ITEM_LEN));
     for _ in 0..count {
@@ -83,6 +92,7 @@ pub(crate) fn playlist(fields: &mut SectionReader<'_>) -> Result<MusicPlaylist, 
     Ok(MusicPlaylist {
         node,
         rule_count,
+        transition_features,
         items,
     })
 }
@@ -109,10 +119,21 @@ fn node(fields: &mut SectionReader<'_>) -> Result<MusicNode, BankError> {
     })
 }
 
-fn transition_node(fields: &mut SectionReader<'_>) -> Result<(MusicNode, u32), BankError> {
+struct TransitionNode {
+    node: MusicNode,
+    rule_count: u32,
+    transition_features: MusicTransitionFeatures,
+}
+
+fn transition_node(fields: &mut SectionReader<'_>) -> Result<TransitionNode, BankError> {
     let node = node(fields)?;
-    let rules = hirc_music_transition::read(fields, &mut BankMusicTransitionFields::default())?;
-    Ok((node, rules))
+    let mut observed = BankMusicTransitionFields::default();
+    let rule_count = hirc_music_transition::read(fields, &mut observed)?;
+    Ok(TransitionNode {
+        node,
+        rule_count,
+        transition_features: observed.features,
+    })
 }
 
 fn capacity(fields: &SectionReader<'_>, count: u32, item_len: usize) -> usize {
