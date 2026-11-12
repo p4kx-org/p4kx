@@ -46,6 +46,20 @@ Join an authored requirement's target by its physical Record index and GUID. A t
 the input even when the Record Filter excludes its definition row. This table describes authored
 configuration. Scenario progress and faction reward tiers are available in `contractScenarios`.
 
+## Local generator configuration
+
+Each row in `configurations.localContractGenerators` belongs to a physical Handler in a
+selected Generator. Join `source.inputRef` and `source.recordIndex` to
+`definitions.contractGenerators`. The `source.handler.valueIndex` points into that
+definition's original source arena. Handlers keep their stored order and remain in this table
+when their logical contracts are excluded or deduplicated.
+
+`localGeneratorParams` retains its authored `scope`, `parentLocationGeneralTags` and
+`factionIdentities`. The DNF retains ordered terms and ordered positive and negative Tag
+references within each term. Repeated, empty, null and unresolved slots carry their original
+states. `defaultAvailability.missionBoardAvailability` retains the authored enum when
+declared. The values describe the source configuration.
+
 ## Run terms
 
 `timeToComplete` and `buyInAmount` are sourced values on `projections.contracts.rows`. Both

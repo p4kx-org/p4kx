@@ -68,6 +68,11 @@ pub(crate) fn add_contracts<'f>(
     collected.ledger.merge(missions.ledger);
     collected.add_contracts(missions.contracts, missions.skipped, missions.failures);
     collected.contract_generators = missions.generators;
+    collected.local_contract_generators =
+        crate::catalog_v3::mission_sources::local_contract_generator_configuration::table(
+            forge,
+            missions.local_generators,
+        );
     collected.contract_scenario_requirements = missions.scenario_requirements;
     collected.mission_property_sets = missions.property_sets.into_rows();
     let ContractTemplates {

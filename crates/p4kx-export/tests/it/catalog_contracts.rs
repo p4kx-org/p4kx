@@ -5,6 +5,9 @@
 
 use crate::contracts_fixture;
 
+#[path = "catalog_local_contract_generators.rs"]
+mod local_generators;
+
 #[path = "catalog_location_vocabulary.rs"]
 mod location_vocabulary;
 #[path = "catalog_mission_scenario_definitions.rs"]

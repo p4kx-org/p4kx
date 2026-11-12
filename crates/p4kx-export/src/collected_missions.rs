@@ -3,16 +3,59 @@
 
 use crate::broker_definition::BrokerDefinition;
 use crate::broker_entry::BrokerProjection;
+use crate::contract_missions::ContractWithTitles;
 use crate::crafting_warning::CraftingWarning;
+use crate::location_template::LocationTemplates;
 use crate::record_read::KindRead;
+use crate::spawn_pools::SpawnPools;
 use crate::template_definition::TemplateDefinition;
 use crate::template_issues::{UnknownVocabularyReport, Unknowns};
 use crate::template_rows::TemplateConfigurations;
-use crate::{CatalogError, Kind};
+use crate::texts::Texts;
+use crate::{CatalogError, CatalogReadFailure, Kind};
 
 use super::Collected;
 
 impl<'f> Collected<'f> {
+    /// Stores the contracts, counts the entries left out as `skipped` and adds the failures.
+    pub(crate) fn add_contracts(
+        &mut self,
+        contracts: Vec<ContractWithTitles<'f>>,
+        skipped: usize,
+        failures: Vec<CatalogReadFailure<'f>>,
+    ) {
+        (self.contracts, self.mission_titles) = contracts
+            .into_iter()
+            .map(|contract| (contract.row, contract.titles))
+            .unzip();
+        if let Some(slot) = self.skipped.get_mut(Kind::Contracts.index()) {
+            *slot = skipped;
+        }
+        self.add_failures(failures);
+    }
+
+    /// Stores the location templates and the distinct spawn descriptions and location queries of
+    /// the contracts, resolving the texts of the descriptions with `texts`, counts the templates
+    /// left out as `skipped` and adds the failures.
+    pub(crate) fn add_spawns(
+        &mut self,
+        templates: LocationTemplates<'f>,
+        mut pools: SpawnPools<'f>,
+        texts: &Texts<'f>,
+    ) {
+        self.ledger.merge(templates.ledger);
+        self.mission_location_templates = templates.items;
+        if let Some(slot) = self.skipped.get_mut(Kind::MissionLocationTemplates.index()) {
+            *slot = templates.skipped;
+        }
+        pools.resolve_texts(texts);
+        self.contract_ship_spawns = pools.ships.into_values().collect();
+        self.contract_npc_spawns = pools.npcs.into_values().collect();
+        self.contract_entity_spawns = pools.entities.into_values().collect();
+        self.contract_location_queries = pools.locations.into_values().collect();
+        self.add_failures(templates.failures);
+    }
+
     /// Collects contract templates, configurations and source warnings.
     pub(crate) fn add_contract_templates(
         &mut self,

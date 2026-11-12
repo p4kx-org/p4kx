@@ -230,6 +230,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.contractGenerators`, `projections.contracts`, `projections.missionTitles` | Physical Generator definitions, logical contract and sub-contract rows, and their sourced titles and descriptions ([contract](catalog-contract-generators.md)) |
 | `definitions.missionScenarios` | Physical `MissionScenario` Records with authored variables, cycles, schedule and flags. [Mission scenario definitions](catalog-contract-generators.md#physical-mission-scenario-definitions) |
 | `configurations.missionBoards` | Authored mission-board components with physical Entity and component identity, declared board type, and ordered faction reputation links. [Mission location vocabulary](catalog-location-vocabulary.md) |
+| `configurations.localContractGenerators` | Ordered authored Handler scope and mission-board availability. [Contract generator sources](catalog-contract-generators.md#local-generator-configuration) |
 | `declarations.contractScenarioRequirements` | Ordered authored scenario references at their original Generator, Handler and Contract slots. [Contract generator sources](catalog-contract-generators.md#authored-scenario-requirements) |
 | `mineableElements` | The mineable elements with their instability and other plain numbers, each linked to a `ResourceType`, ordered by GUID |
 | `refiningProcesses` | The refining processes (speed and quality pairs of a refinery), ordered by GUID |

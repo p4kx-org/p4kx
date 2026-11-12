@@ -200,7 +200,7 @@ fn assemble<R>(
             resource_group_members: group_tables.members,
             ammo_bindings: components.ammo_bindings,
             contract_scenario_requirements:
-                crate::catalog_v3::contract_scenario_requirements::table(
+                crate::catalog_v3::mission_sources::contract_scenario_requirements::table(
                     &forge,
                     collected.contract_scenario_requirements,
                 ),
@@ -321,6 +321,7 @@ fn assemble<R>(
             quantum_drives: components.quantum_drives,
             shield_generators: components.shield_generators,
             entity_configurations: collected.entity_configurations.into_tables(&forge),
+            local_contract_generators: collected.local_contract_generators,
             contract_templates: CatalogTable::new(
                 &forge,
                 &["ContractTemplate"],

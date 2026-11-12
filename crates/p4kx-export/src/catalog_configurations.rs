@@ -42,6 +42,9 @@ pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) mission_broker_entries: CatalogTable<BrokerProjection<'source>>,
     #[serde(flatten)]
     pub(crate) independent: IndependentConfigurationTables<'source>,
+    pub(crate) local_contract_generators: CatalogTable<
+        crate::catalog_v3::mission_sources::local_contract_generator_configuration::LocalContractGeneratorConfiguration<'source>,
+    >,
     pub(crate) mission_flows: CatalogTable<MissionFlowConfiguration>,
     pub(crate) mission_properties: CatalogTable<MissionPropertyConfiguration>,
 }

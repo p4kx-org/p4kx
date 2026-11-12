@@ -9,7 +9,9 @@ use crate::blueprint;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_read::original::OriginalFlowFields;
-use crate::catalog_v3::contract_scenario_requirements;
+use crate::catalog_v3::mission_sources::{
+    contract_scenario_requirements, local_contract_generator_configuration,
+};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::mission_entry_source::MissionEntryContext;
@@ -103,17 +105,10 @@ fn project_tree<'source>(
         source: indexed.source,
     };
     let capture = TemplateFieldCapture::new(fields, input, admission)?;
-    let mut scenario_notes = Vec::new();
-    let scenario_requirements =
-        contract_scenario_requirements::read(input, tree, fields, &capture, &mut scenario_notes)?;
-    crate::source_projection_notes::record(
-        Kind::Contracts,
-        ExportSourceRole::Selected,
-        admission,
-        tree,
-        scenario_notes,
-        &mut ledger,
-    )?;
+    let Authored {
+        scenario_requirements,
+        local_generators,
+    } = authored(input, admission, tree, fields, &capture, &mut ledger)?;
     match project(admission, tree, context, fields, &capture) {
         Ok(piece) => {
             crate::mission_ledger::observe(
@@ -127,6 +122,7 @@ fn project_tree<'source>(
                 piece: Piece::Contracts(Box::new(piece)),
                 definition: Some(definition),
                 scenario_requirements,
+                local_generators,
                 ledger,
             })
         }
@@ -142,10 +138,45 @@ fn project_tree<'source>(
                 )?;
                 observed.definition = Some(definition);
                 observed.scenario_requirements = scenario_requirements;
+                observed.local_generators = local_generators;
                 Ok(observed)
             }
         },
     }
+}
+
+struct Authored<'source> {
+    scenario_requirements:
+        Vec<contract_scenario_requirements::ContractScenarioRequirements<'source>>,
+    local_generators:
+        Vec<local_contract_generator_configuration::LocalContractGeneratorConfiguration<'source>>,
+}
+
+fn authored<'source>(
+    input: &OriginalCatalogInput<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    tree: &RecordTree<'source>,
+    fields: &OriginalFlowFields<'_, '_, 'source>,
+    capture: &dyn FieldCapture<'source>,
+    ledger: &mut ExportLedger,
+) -> Result<Authored<'source>, CatalogError> {
+    let mut notes = Vec::new();
+    let scenario_requirements =
+        contract_scenario_requirements::read(input, tree, fields, capture, &mut notes)?;
+    let local_generators =
+        local_contract_generator_configuration::read(input, tree, fields, capture, &mut notes)?;
+    crate::source_projection_notes::record(
+        Kind::Contracts,
+        ExportSourceRole::Selected,
+        admission,
+        tree,
+        notes,
+        ledger,
+    )?;
+    Ok(Authored {
+        scenario_requirements,
+        local_generators,
+    })
 }
 
 fn failed<'f>(
@@ -160,6 +191,7 @@ fn failed<'f>(
         piece: Piece::Failed(CatalogReadFailure::of(admission.record(), error)),
         definition: None,
         scenario_requirements: Vec::new(),
+        local_generators: Vec::new(),
         ledger,
     })
 }

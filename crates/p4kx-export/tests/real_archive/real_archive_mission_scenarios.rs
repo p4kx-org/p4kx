@@ -6,7 +6,9 @@ use std::error::Error;
 use std::time::SystemTime;
 
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, Filter, build_catalog_from};
-use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry, TreeBuilder};
+use p4kx_extraction::{
+    Archive, ArchiveWatch, DataForge, DataForgeEntry, TreeBuilder, Value as ForgeValue,
+};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
@@ -41,6 +43,7 @@ fn authored_mission_scenarios_match_their_physical_records_and_requirement_slots
     let requirements = rows(&catalog, "/declarations/contractScenarioRequirements/rows")?;
     verify_definitions(&forge, definitions)?;
     verify_requirements(&forge, requirements)?;
+    verify_local_generators(&forge, &catalog)?;
     watch
         .check()
         .map_err(|_| "Archive changed during scenario verification")?;
@@ -173,4 +176,81 @@ fn record_index(value: &Value) -> TestResult<u32> {
     Ok(u32::try_from(
         value.as_u64().ok_or("physical Record index")?,
     )?)
+}
+
+fn verify_local_generators(forge: &DataForge<'_>, catalog: &Value) -> TestResult {
+    let table = field(field(catalog, "configurations")?, "localContractGenerators")?;
+    let mut declared = false;
+    for structure in forge.structs() {
+        match structure.name()? {
+            "LocalContractGeneratorParams" => declared = true,
+            "ContractAvailability" => {
+                for property in structure.properties() {
+                    declared |= property.name()? == "missionBoardAvailability";
+                }
+            }
+            _ => {}
+        }
+    }
+    assert_eq!(
+        field(table, "availability")?.as_str(),
+        Some(if declared { "available" } else { "absent" }),
+        "availability reflects the original generator and board declarations"
+    );
+    let mut trees = TreeBuilder::new();
+    for row in rows(catalog, "/configurations/localContractGenerators/rows")? {
+        let source = field(row, "source")?;
+        let index = record_index(field(source, "recordIndex")?)?;
+        let ordinal = field(field(source, "handler")?, "valueIndex")?
+            .as_str()
+            .ok_or("original Handler index")?
+            .parse::<usize>()?;
+        let record = forge.record(index).ok_or("original Generator Record")?;
+        assert_eq!(
+            record.type_name()?,
+            GENERATOR,
+            "the exact Generator owns the Handler"
+        );
+        let tree = trees
+            .build(&record)
+            .map_err(|_| "read original Generator")?;
+        let mut check = None;
+        tree.root().visit_owned_values(|visit| {
+            if visit.ordinal() == ordinal {
+                check = Some(verify_local_handler(visit.value(), row));
+            }
+        });
+        check.ok_or("missing original Handler occurrence")??;
+    }
+    Ok(())
+}
+
+fn verify_local_handler(source: &ForgeValue<'_>, row: &Value) -> TestResult {
+    let ForgeValue::Struct(handler) = source else {
+        return Err("original Handler slot is not a structure".into());
+    };
+    if let Some(ForgeValue::Struct(params)) = handler.field("localGeneratorParams")
+        && let Some(ForgeValue::Enum(scope)) = params.field("scope")
+    {
+        let cell = field(
+            consumer::present(field(row, "localGeneratorParams")?)?,
+            "scope",
+        )?;
+        assert_eq!(
+            consumer::present(cell)?.as_str(),
+            Some(*scope),
+            "the scope is the original Handler enum"
+        );
+    }
+    if let Some(ForgeValue::Struct(availability)) = handler.field("defaultAvailability")
+        && let Some(ForgeValue::Enum(board)) = availability.field("missionBoardAvailability")
+    {
+        let defaults = consumer::present(field(row, "defaultAvailability")?)?;
+        assert_eq!(
+            consumer::present(field(defaults, "missionBoardAvailability")?)?.as_str(),
+            Some(*board),
+            "the board setting is the original Handler enum"
+        );
+    }
+    Ok(())
 }

@@ -23,6 +23,7 @@ use crate::catalog_v3::inventory_container_definition::PreparedInventoryContaine
 use crate::catalog_v3::law_kinds::LawKinds;
 use crate::catalog_v3::location_vocabulary::LocationVocabulary;
 use crate::catalog_v3::medical::medical_tier_config::PreparedMedicalTier;
+use crate::catalog_v3::mission_sources::local_contract_generator_configuration::LocalContractGeneratorConfiguration;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitions;
 use crate::contract::{
     BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
@@ -31,13 +32,12 @@ use crate::contract::{
     RefiningProcess, ResourceGroup, ResourceType, Ship, Shop, StarmapObject,
     SubHarvestableMultiConfig,
 };
-use crate::contract_missions::ContractWithTitles;
 use crate::crafting_warning::CraftingWarning;
 use crate::entity_spawn_model::EntitySpawnPool;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
-use crate::location_template::{LocationTemplates, MissionLocationTemplate};
+use crate::location_template::MissionLocationTemplate;
 use crate::loot_kinds::LootKinds;
 use crate::manufacturer::Manufacturer;
 use crate::mission_generator::GeneratorDefinition;
@@ -52,10 +52,8 @@ use crate::quality_catalog::QualityRows;
 use crate::shop_inventories::ShopInventoryTable;
 use crate::shop_inventory_resolution::ShopInventoryResolution;
 use crate::spawn_model::{LocationQuery, ShipSpawnPool};
-use crate::spawn_pools::SpawnPools;
 use crate::template_definition::TemplateDefinition;
 use crate::template_rows::TemplateConfigurations;
-use crate::texts::Texts;
 use crate::{ItemClassSummary, Kind, KindSummary};
 
 #[path = "collected_counts.rs"]
@@ -100,8 +98,9 @@ pub(crate) struct Collected<'f> {
     pub(crate) contracts: Vec<ContractEntry<'f>>,
     pub(crate) mission_titles: Vec<MissionTitles<'f>>,
     pub(crate) contract_generators: Vec<GeneratorDefinition<'f>>,
+    pub(crate) local_contract_generators: CatalogTable<LocalContractGeneratorConfiguration<'f>>,
     pub(crate) contract_scenario_requirements:
-        Vec<crate::catalog_v3::contract_scenario_requirements::ContractScenarioRequirements<'f>>,
+        Vec<crate::catalog_v3::mission_sources::contract_scenario_requirements::ContractScenarioRequirements<'f>>,
     pub(crate) mission_location_templates: Vec<MissionLocationTemplate<'f>>,
     pub(crate) contract_ship_spawns: Vec<ShipSpawnPool>,
     pub(crate) contract_location_queries: Vec<LocationQuery>,
@@ -203,6 +202,7 @@ impl<'f> Collected<'f> {
             contracts: Vec::new(),
             mission_titles: Vec::new(),
             contract_generators: Vec::new(),
+            local_contract_generators: CatalogTable::empty(DatasetAvailability::Absent),
             contract_scenario_requirements: Vec::new(),
             mission_location_templates: Vec::new(),
             contract_ship_spawns: Vec::new(),
@@ -333,45 +333,6 @@ impl<'f> Collected<'f> {
             }
         }
         skipped
-    }
-
-    /// Stores the contracts, counts the entries left out as `skipped` and adds the failures.
-    pub(crate) fn add_contracts(
-        &mut self,
-        contracts: Vec<ContractWithTitles<'f>>,
-        skipped: usize,
-        failures: Vec<CatalogReadFailure<'f>>,
-    ) {
-        (self.contracts, self.mission_titles) = contracts
-            .into_iter()
-            .map(|contract| (contract.row, contract.titles))
-            .unzip();
-        if let Some(slot) = self.skipped.get_mut(Kind::Contracts.index()) {
-            *slot = skipped;
-        }
-        self.add_failures(failures);
-    }
-
-    /// Stores the location templates and the distinct spawn descriptions and location queries of
-    /// the contracts, resolving the texts of the descriptions with `texts`, counts the templates
-    /// left out as `skipped` and adds the failures.
-    pub(crate) fn add_spawns(
-        &mut self,
-        templates: LocationTemplates<'f>,
-        mut pools: SpawnPools<'f>,
-        texts: &Texts<'f>,
-    ) {
-        self.ledger.merge(templates.ledger);
-        self.mission_location_templates = templates.items;
-        if let Some(slot) = self.skipped.get_mut(Kind::MissionLocationTemplates.index()) {
-            *slot = templates.skipped;
-        }
-        pools.resolve_texts(texts);
-        self.contract_ship_spawns = pools.ships.into_values().collect();
-        self.contract_npc_spawns = pools.npcs.into_values().collect();
-        self.contract_entity_spawns = pools.entities.into_values().collect();
-        self.contract_location_queries = pools.locations.into_values().collect();
-        self.add_failures(templates.failures);
     }
 
     /// Adds `failures` and orders all of them by the text of the GUID, one per Record.

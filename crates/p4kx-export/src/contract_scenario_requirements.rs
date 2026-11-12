@@ -8,8 +8,7 @@ use p4kx_extraction::{DataForge, DecimalU64, PhysicalSourceRef, RecordTree, Sour
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::authored_fields::Observed;
-use super::mission_scenario_definition;
+use super::super::{authored_fields::Observed, mission_scenario_definition};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueEdge, OriginalValueFact};
 use crate::catalog_record_reference::CatalogRecordReference;
