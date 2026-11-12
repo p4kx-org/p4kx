@@ -120,7 +120,11 @@ fn project<'source>(
     let row = ResourceNetworkConfiguration::read(source, receiver, &mut notes)?;
     let span = rule_span(&originals)?;
     ledger.merge(export_field_walk::inspect_configuration(
-        input, tree, admission, span, cancel,
+        input,
+        tree,
+        admission,
+        span.as_slice(),
+        cancel,
     )?);
     source_projection_notes::record_dependency(admission, tree, notes, ledger)?;
     ledger.observe(admission.source(None, ROLE, SourceDisposition::Projected)?);

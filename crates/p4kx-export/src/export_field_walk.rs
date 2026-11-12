@@ -66,14 +66,21 @@ pub(crate) fn inspect_observed<'source>(
     )
 }
 
-/// Inspects the original value span used by one independent configuration.
+/// Inspects original spans of one owner's independent configurations in source order.
 pub(crate) fn inspect_configuration<'source>(
     input: &OriginalCatalogInput<'_, '_>,
     tree: &RecordTree<'source>,
     admission: &RecordObservation<'_, 'source>,
-    span: Option<Range<usize>>,
+    spans: &[Range<usize>],
     cancel: Option<&CancelToken>,
 ) -> Result<ExportLedger, CatalogError> {
+    if spans.iter().any(Range::is_empty)
+        || spans
+            .windows(2)
+            .any(|pair| matches!(pair, [first, next] if first.end > next.start))
+    {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    }
     inspect_values(
         Some(input),
         tree,
@@ -81,7 +88,7 @@ pub(crate) fn inspect_configuration<'source>(
         None,
         ExportSourceRole::Dependency,
         cancel,
-        &FieldSelection::Subtree(span),
+        &FieldSelection::Subtrees(spans),
     )
 }
 

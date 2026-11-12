@@ -36,3 +36,21 @@ and AI tag values still describe their original tag fields.
 Mission location filters that reference these definitions join to their original GUID
 and physical Record identity when available. The registry membership and visible scopes
 describe configuration stored in the Archive.
+
+## Mission board providers
+
+`configurations.missionBoards` contains each selected
+`EntityComponentMissionBoardUIProvider` occurrence in an Entity Record's `Components` array.
+The Record filter applies to the original owner path. The table remains available when
+the source declares the component type and the filter selects no matching owners.
+Each row carries the owner GUID, physical Record index and original component ordinal.
+
+`boardType` is an original StrongPointer to `MissionBoardType_Base`. The `career`
+variant holds `guildFactionReputation` and the ordered `factions` Reference array.
+Both target `FactionReputation` definitions. Duplicate occurrences, null slots and
+missing targets keep their source positions and states. The `notice` and `base`
+variants retain their concrete identity. Additional variants retain their concrete type
+and complete authored fields. A null pointer has its own sourced state.
+
+The table describes authored Entity configuration. Contract availability belongs to the
+contract source.

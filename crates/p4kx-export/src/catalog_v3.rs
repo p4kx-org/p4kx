@@ -130,16 +130,20 @@ mod catalog_facility;
 mod catalog_fuel;
 #[path = "catalog_fuel_configurations.rs"]
 mod catalog_fuel_configurations;
-#[path = "catalog_global_configurations.rs"]
-pub(crate) mod catalog_global_configurations;
 #[path = "catalog_hacking_chips.rs"]
 pub(crate) mod catalog_hacking_chips;
+#[path = "catalog_independent_configurations.rs"]
+pub(crate) mod catalog_independent_configurations;
 #[path = "catalog_interactions.rs"]
 mod catalog_interactions;
 #[path = "catalog_item_alignment.rs"]
 pub(crate) mod catalog_item_alignment;
 #[path = "catalog_item_components.rs"]
 pub(crate) mod catalog_item_components;
+#[path = "catalog_mission_board.rs"]
+mod catalog_mission_board;
+#[path = "catalog_mission_board_read.rs"]
+mod catalog_mission_board_read;
 #[path = "catalog_quantum_drive.rs"]
 pub(crate) mod catalog_quantum_drive;
 #[path = "catalog_resource_component.rs"]

@@ -39,7 +39,7 @@ pub(crate) fn inspect_record_field<'source>(
 
 pub(super) enum FieldSelection<'read, 'source> {
     All,
-    Subtree(Option<Range<usize>>),
+    Subtrees(&'read [Range<usize>]),
     RecordField {
         name: &'static str,
         value: Option<&'read Value<'source>>,
@@ -53,11 +53,14 @@ impl FieldSelection<'_, '_> {
     ) -> Result<bool, ExportAccountingError> {
         match self {
             Self::All => Ok(true),
-            Self::Subtree(None) | Self::RecordField { value: None, .. } => Ok(false),
-            Self::Subtree(Some(span)) => {
+            Self::RecordField { value: None, .. } => Ok(false),
+            Self::Subtrees(spans) => {
                 let index = usize::try_from(site.ordinal())
                     .map_err(|_| ExportAccountingError::CounterOverflow)?;
-                Ok(span.contains(&index))
+                let position = spans.partition_point(|span| span.end <= index);
+                Ok(spans
+                    .get(position)
+                    .is_some_and(|span| span.contains(&index)))
             }
             Self::RecordField {
                 value: Some(value), ..
@@ -66,16 +69,17 @@ impl FieldSelection<'_, '_> {
     }
 
     pub(super) const fn is_empty(&self) -> bool {
-        matches!(
-            self,
-            Self::Subtree(None) | Self::RecordField { value: None, .. }
-        )
+        match self {
+            Self::Subtrees(spans) => spans.is_empty(),
+            Self::RecordField { value, .. } => value.is_none(),
+            Self::All => false,
+        }
     }
 
     pub(super) const fn root_field(&self) -> Option<&'static str> {
         match self {
             Self::RecordField { name, .. } => Some(name),
-            Self::All | Self::Subtree(_) => None,
+            Self::All | Self::Subtrees(_) => None,
         }
     }
 }

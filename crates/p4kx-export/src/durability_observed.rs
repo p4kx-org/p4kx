@@ -94,6 +94,13 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         }
     }
 
+    pub(super) const fn at_owner(self, owner: &'reader Fact<'scope, 'read, 'source>) -> Self {
+        Self {
+            owner: Some(owner),
+            ..self
+        }
+    }
+
     pub(super) const fn configuration(
         originals: &'reader OriginalFlowFields<'scope, 'read, 'source>,
         input: &'reader OriginalCatalogInput<'reader, 'source>,

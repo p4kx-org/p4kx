@@ -8,6 +8,9 @@ use crate::contracts_fixture;
 #[path = "catalog_location_vocabulary.rs"]
 mod location_vocabulary;
 
+#[path = "catalog_mission_boards.rs"]
+mod mission_boards;
+
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 

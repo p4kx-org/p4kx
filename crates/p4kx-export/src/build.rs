@@ -18,7 +18,7 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition;
-use crate::catalog_v3::catalog_global_configurations::{self, GlobalConfigurations};
+use crate::catalog_v3::catalog_independent_configurations::{self, IndependentConfigurations};
 use crate::catalog_v3::inventory_container_definition::table as inventory_table;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
@@ -134,11 +134,11 @@ fn assemble<R>(
         options.cancel,
     )?);
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
-    let GlobalConfigurations {
-        tables: globals,
+    let IndependentConfigurations {
+        tables: independent,
         recovery_numbers,
         configuration_numbers,
-    } = catalog_global_configurations::read(&forge, &projection, options, &mut collected)?;
+    } = catalog_independent_configurations::read(&forge, &projection, options, &mut collected)?;
     let kinds = collected.summary(options.filter.is_none());
     let mut catalog_rows = crate::catalog_rows::snapshot(&mut collected, options.filter);
     catalog_rows.recovery_numbers = recovery_numbers;
@@ -311,7 +311,7 @@ fn assemble<R>(
         configurations: crate::catalog_configurations::CatalogConfigurations {
             blueprint_tiers: blueprints.tiers,
             reputation_triggers: reputation_tables.factions.triggers,
-            globals,
+            independent,
             durability: components.durability.health,
             degradation: components.durability.degradation,
             distortion: components.durability.distortion,

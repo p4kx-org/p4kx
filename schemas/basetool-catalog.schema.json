@@ -2911,6 +2911,86 @@
       ],
       "type": "object"
     },
+    "BoardDetails": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "factions": {
+              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+            },
+            "guildFactionReputation": {
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+            },
+            "type": {
+              "const": "career",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "guildFactionReputation",
+            "factions"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "notice",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "authored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "BoardType": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "details": {
+          "$ref": "#/$defs/BoardDetails"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "details",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "BombFields": {
       "description": "The five bomb-specific fields beside the shared ordnance settings.",
       "properties": {
@@ -3875,6 +3955,9 @@
         "itemRecoveryPolicy": {
           "$ref": "#/$defs/CatalogTableOfItemRecoveryPolicy"
         },
+        "missionBoards": {
+          "$ref": "#/$defs/CatalogTableOfMissionBoard"
+        },
         "missionBrokerEntries": {
           "$ref": "#/$defs/CatalogTableOfBrokerProjection"
         },
@@ -3932,6 +4015,7 @@
         "itemRecoveryEconomy",
         "itemRecoveryOverrides",
         "itemRecoveryPolicy",
+        "missionBoards",
         "missionBrokerEntries",
         "missionFlows",
         "missionProperties",
@@ -5129,6 +5213,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ManufacturerDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfMissionBoard": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/MissionBoard"
           },
           "type": "array"
         }
@@ -6925,6 +7028,26 @@
         "starmapTypes",
         "subHarvestableMultiConfigs",
         "tags"
+      ],
+      "type": "object"
+    },
+    "ComponentOwner": {
+      "description": "The shared physical Record and original Components slot of a configuration.",
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "ownerGuid",
+        "ownerRecordIndex"
       ],
       "type": "object"
     },
@@ -19666,6 +19789,26 @@
         "lockTime",
         "lockingAngle",
         "trackingSignalType"
+      ],
+      "type": "object"
+    },
+    "MissionBoard": {
+      "description": "An authored mission board on a physical Entity component.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "boardType": {
+          "$ref": "#/$defs/SourcedValueOfBoardType"
+        },
+        "owner": {
+          "$ref": "#/$defs/ComponentOwner"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "boardType",
+        "owner"
       ],
       "type": "object"
     },
@@ -46295,6 +46438,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/BlueprintResearchEnvelope"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfBoardType": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/BoardType"
               }
             }
           }

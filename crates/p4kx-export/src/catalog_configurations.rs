@@ -9,8 +9,8 @@ use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_ammo_containers::AmmoContainer;
 use crate::catalog_v3::catalog_durability::{Degradation, Distortion, Durability};
 use crate::catalog_v3::catalog_explosives::Explosive;
-use crate::catalog_v3::catalog_global_configurations::GlobalConfigurationTables;
 use crate::catalog_v3::catalog_hacking_chips::HackingChip;
+use crate::catalog_v3::catalog_independent_configurations::IndependentConfigurationTables;
 use crate::catalog_v3::catalog_quantum_drive::QuantumDrive;
 use crate::catalog_v3::catalog_shield_generator::ShieldGenerator;
 use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
@@ -41,7 +41,7 @@ pub(crate) struct CatalogConfigurations<'source> {
         crate::catalog_v3::catalog_entity_configurations::EntityConfigurationTables<'source>,
     pub(crate) mission_broker_entries: CatalogTable<BrokerProjection<'source>>,
     #[serde(flatten)]
-    pub(crate) globals: GlobalConfigurationTables<'source>,
+    pub(crate) independent: IndependentConfigurationTables<'source>,
     pub(crate) mission_flows: CatalogTable<MissionFlowConfiguration>,
     pub(crate) mission_properties: CatalogTable<MissionPropertyConfiguration>,
 }
