@@ -3,11 +3,10 @@
 
 //! Bounded soundbank reads, source inspection, and extraction.
 
-use std::fs::{self, File};
-use std::io::{self, Write};
+use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use p4kx_archive::{Archive, Entry, EntryOrigin};
 use p4kx_audio::{AudioError, EmbeddedWem, MediaClass, Soundbank};
 pub use p4kx_audio::{
     BankActionFields, BankActionRead, BankContainerChild, BankContainerChildren,
@@ -82,11 +81,14 @@ pub use p4kx_audio::{
 };
 use rayon::prelude::*;
 
-use crate::entry_content::find_entry;
-use crate::output_file::{read_error, write_error, write_replacing_protected};
-use crate::sound::read_capped;
+#[path = "bank_read.rs"]
+mod read;
+
+use self::read::BankReadOrigin;
+
+use crate::ConversionError;
+use crate::output_file::{write_error, write_replacing_protected};
 use crate::source_protection::SourceProtection;
-use crate::{ConversionError, UnknownEntries};
 
 /// The largest soundbank read into memory, far above the largest soundbank of a real Archive.
 pub const MAX_SOUNDBANK_LEN: u64 = 512 << 20;
@@ -152,94 +154,15 @@ pub struct Bank {
     protection: SourceProtection,
     name: String,
     soundbank: Soundbank<Vec<u8>>,
-    archive_origin: Option<EntryOrigin>,
+    origin: BankReadOrigin,
 }
 
 impl Bank {
-    /// Reads and parses the soundbank Entry at `path`, matched with either separator and ignoring
-    /// ASCII case.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ConversionError::UnknownEntry`] when no Entry has that path,
-    /// [`ConversionError::SoundTooLarge`] when it exceeds [`MAX_SOUNDBANK_LEN`],
-    /// [`ConversionError::Soundbank`] when it is no valid soundbank, and another
-    /// [`ConversionError`] when it cannot be read.
-    pub fn from_archive(archive: &Archive, path: &str) -> Result<Self, ConversionError> {
-        let entry =
-            find_entry(archive, path).ok_or_else(|| UnknownEntries(vec![path.to_owned()]))?;
-        Self::read_entry(archive, entry, None)
-    }
-
-    /// Reads the exact Archive Entry position and retains its original physical source.
-    ///
-    /// # Errors
-    /// Returns the read and format errors of [`Self::from_archive`].
-    pub fn from_archive_position_observed(
-        archive: &Archive,
-        position: usize,
-    ) -> Result<Self, ConversionError> {
-        let entry = archive
-            .entries()
-            .get(position)
-            .ok_or_else(|| UnknownEntries(vec![format!("Entry position {position}")]))?;
-        Self::read_entry(archive, entry, archive.entry_origin(entry))
-    }
-
-    fn read_entry(
-        archive: &Archive,
-        entry: &Entry,
-        archive_origin: Option<EntryOrigin>,
-    ) -> Result<Self, ConversionError> {
-        let protection = SourceProtection::new(Some(archive.path()));
-        let name = entry.path().to_owned();
-        let reader = archive.open_entry(entry)?;
-        let bytes = read_capped(reader, entry.uncompressed_size(), MAX_SOUNDBANK_LEN).map_err(
-            |source| ConversionError::ReadEntry {
-                entry: name.clone(),
-                source,
-            },
-        )?;
-        Self::parse(name, bytes, protection, archive_origin)
-    }
-
-    /// Reads and parses the soundbank file at `path`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ConversionError::NoSuchFile`] when the file does not exist,
-    /// [`ConversionError::SoundTooLarge`] when it exceeds [`MAX_SOUNDBANK_LEN`],
-    /// [`ConversionError::Soundbank`] when it is no valid soundbank, and another
-    /// [`ConversionError`] when it cannot be read.
-    pub fn from_file(path: &Path) -> Result<Self, ConversionError> {
-        let file = File::open(path).map_err(|source| {
-            if source.kind() == io::ErrorKind::NotFound {
-                ConversionError::NoSuchFile {
-                    path: path.to_path_buf(),
-                }
-            } else {
-                read_error(path, source)
-            }
-        })?;
-        let len = file
-            .metadata()
-            .map_err(|source| read_error(path, source))?
-            .len();
-        let bytes =
-            read_capped(file, len, MAX_SOUNDBANK_LEN).map_err(|source| read_error(path, source))?;
-        Self::parse(
-            path.display().to_string(),
-            bytes,
-            SourceProtection::new(None),
-            None,
-        )
-    }
-
     fn parse(
         name: String,
         bytes: Option<Vec<u8>>,
         protection: SourceProtection,
-        archive_origin: Option<EntryOrigin>,
+        origin: BankReadOrigin,
     ) -> Result<Self, ConversionError> {
         let Some(bytes) = bytes else {
             return Err(ConversionError::SoundTooLarge {
@@ -252,7 +175,7 @@ impl Bank {
                 protection,
                 name,
                 soundbank,
-                archive_origin,
+                origin,
             }),
             Err(source) => Err(ConversionError::Soundbank { bank: name, source }),
         }
@@ -262,12 +185,6 @@ impl Bank {
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
-    }
-
-    /// Returns the original Entry of an observed Archive read.
-    #[must_use]
-    pub const fn archive_origin(&self) -> Option<&EntryOrigin> {
-        self.archive_origin.as_ref()
     }
 
     /// Returns the parsed soundbank.

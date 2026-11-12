@@ -10,10 +10,16 @@ use serde::{Serialize, Serializer};
 
 #[path = "hirc_view_build.rs"]
 mod build;
+#[path = "hirc_source_fields.rs"]
+mod source_fields;
 #[path = "hirc_view_state.rs"]
 mod state;
 
+use crate::bank::Bank;
+
 use self::build::detail;
+pub use self::source_fields::ObjectSourceFields;
+use self::source_fields::ObjectSourceSchema;
 pub use self::state::{StateDetail, StatePropertyView, StateRange};
 
 /// One `HIRC` object.
@@ -42,6 +48,10 @@ pub struct ObjectView<'a> {
     pub children: Vec<u32>,
     /// The fields that depend on the type.
     pub detail: Option<Detail<'a>>,
+    /// Original source fields available for the selected physical object.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<ObjectSourceSchema>")]
+    pub source_fields: Option<ObjectSourceFields<'a>>,
 }
 
 /// The fields of an object that depend on its type.
@@ -249,6 +259,17 @@ pub struct ItemView {
 }
 
 impl<'a> ObjectView<'a> {
+    pub(crate) fn attach_source_fields(&mut self, bank: &'a Bank) {
+        if bank
+            .soundbank()
+            .objects()
+            .get(self.index)
+            .is_some_and(|object| object.kind == HircKind::DialogueEvent)
+        {
+            self.source_fields = Some(ObjectSourceFields::new(bank, self.index));
+        }
+    }
+
     /// Describes the object at `index` in bank order.
     #[must_use]
     pub fn new(index: usize, object: &'a HircObject) -> Self {
@@ -265,6 +286,7 @@ impl<'a> ObjectView<'a> {
             parent: object.parent_id().filter(|parent| *parent != 0),
             children: object.children().collect(),
             detail: detail(&object.value),
+            source_fields: None,
         }
     }
 }

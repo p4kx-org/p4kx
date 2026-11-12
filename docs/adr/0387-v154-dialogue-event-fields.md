@@ -27,3 +27,14 @@ The ordinary field order is established by
 and [StarBreaker's DialogueEvent reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/misc.rs#L43).
 The supported mode and group labels follow
 [wwiser's enum table](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wdefs.py#L1356).
+
+
+The CLI and MCP ObjectView share a source-fields projection from the original
+opened bank. A checked physical cursor reads the selected object's own
+envelope and verifies it against the parsed bank directory. The projection
+streams original argument, node and property rows with direct per-value
+receipts. Its original source coverage is separate from eager playback
+coverage. The MCP response budget admits whole objects and explicitly
+refuses an oversized object. The CLI can stream all checked rows for that
+object. A standalone bank read has unknown original Archive encryption
+lineage even when its physical file coordinates are known.

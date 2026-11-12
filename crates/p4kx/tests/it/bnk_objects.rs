@@ -12,6 +12,9 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+#[path = "bnk_dialogue_source_fields.rs"]
+mod dialogue_source_fields;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const BANK_ENTRY: &str = "Data\\Sounds\\wwise\\SSAM_Music.bnk";

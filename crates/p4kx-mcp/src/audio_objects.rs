@@ -4,8 +4,10 @@
 //! `list_soundbank_objects`: one page of the `HIRC` objects of a soundbank, in the shape of
 //! `p4kx bnk objects --json`.
 
+use std::io::ErrorKind;
+
 use p4kx_extraction::HircKind;
-use p4kx_extraction::hirc_select::{LayoutCounts, select};
+use p4kx_extraction::hirc_select::{LayoutCounts, select_with_sources};
 use p4kx_extraction::hirc_view::ObjectView;
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
@@ -14,7 +16,7 @@ use serde_json::value::RawValue;
 use crate::archives::Opened;
 use crate::audio_params::SoundbankObjectsParams;
 use crate::audio_wem::open_bank;
-use crate::budget::{fill_within, json_len};
+use crate::budget::{Capped, MAX_RESPONSE_LEN, fill_within, json_len};
 use crate::error::ToolError;
 use crate::page::Page;
 
@@ -59,10 +61,19 @@ impl Serialize for Listed {
 
 impl Listed {
     fn new(view: &ObjectView<'_>) -> Result<Self, ToolError> {
-        Ok(Self {
-            id: view.id,
-            json: serde_json::value::to_raw_value(view)?,
-        })
+        let mut output = Capped::new(MAX_RESPONSE_LEN);
+        if let Err(error) = serde_json::to_writer(&mut output, view) {
+            if error.io_error_kind() == Some(ErrorKind::FileTooLarge) {
+                return Err(ToolError::TooLargeItem {
+                    what: format!("object {}", view.id),
+                    limit: MAX_RESPONSE_LEN,
+                    hint: "the complete original object exceeds one response",
+                });
+            }
+            return Err(error.into());
+        }
+        let json = RawValue::from_string(String::from_utf8(output.into_bytes())?)?;
+        Ok(Self { id: view.id, json })
     }
 }
 
@@ -88,7 +99,7 @@ pub(crate) fn soundbank_objects(
     let bank = open_bank(opened, &params.soundbank)?;
     let soundbank = bank.soundbank();
     let objects = soundbank.objects();
-    let selected = select(objects, kind, params.id, page.offset(), page.limit());
+    let selected = select_with_sources(&bank, kind, params.id, page.offset(), page.limit());
     page.check(selected.matched)?;
     let mut result = SoundbankObjectsResult {
         archive: opened.archive().path().display().to_string(),

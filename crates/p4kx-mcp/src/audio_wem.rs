@@ -89,7 +89,7 @@ pub(crate) fn open_bank(opened: &Opened, path: &str) -> Result<Bank, ToolError> 
             limit: MAX_SOUNDBANK_LEN,
         });
     }
-    Bank::from_archive(opened.archive(), path)
+    Bank::from_archive_observed(opened.archive(), path)
         .map_err(|error| ToolError::converted(path, "a soundbank", error))
 }
 

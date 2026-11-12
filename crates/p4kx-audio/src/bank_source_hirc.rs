@@ -172,6 +172,22 @@ impl<'input, R: Read + Seek> BankHirc<'input, R> {
 }
 
 impl<R> BankHirc<'_, R> {
+    pub(crate) const fn start_at(&mut self, ordinal: u32, offset: u64) -> Result<(), BankError> {
+        let body = self.section.body_offset();
+        if ordinal >= self.count
+            || offset < body + COUNT_LEN
+            || offset >= self.section.body_end_exclusive()
+        {
+            return Err(BankError::invalid(
+                SectionId::HIRC,
+                "the selected object position is outside its original section",
+            ));
+        }
+        self.ordinal = ordinal;
+        self.position = offset;
+        Ok(())
+    }
+
     /// Returns the authored object count.
     #[must_use]
     pub const fn object_count(&self) -> u32 {

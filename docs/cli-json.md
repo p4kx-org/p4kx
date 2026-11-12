@@ -1689,7 +1689,22 @@ ID of the parent node, `null` for a node at the top and for an object without a 
 `children` lists the IDs the object holds in bank order: the actions of an event, the children of
 a container, the tracks of a segment, the segments of a playlist and, for a music track, the media
 IDs of its sources. `detail` depends on the type and is `null` for an event (its actions are the
-children) and for undecoded, unsupported and malformed objects:
+children) and for undecoded, unsupported and malformed objects.
+
+DialogueEvent objects include `source_fields` with the checked original declaration. Its
+`layout` gives decoded, malformed or unsupported source coverage. The original object `status`
+describes the playback reader's coverage. The `fields` member includes authored header words and
+checked table extents. `rows` keeps original argument, node and property occurrences in order.
+A malformed declaration keeps every readable row prefix. A readable link word carries an
+`undetermined` interpretation. An unsupported layout reports its version and an empty row list.
+
+Source values carry `containsEncryptedSource`, `sourceUsesRefs` and `sourceSetComplete`. The
+object-local `source_inventory` resolves each reference to its physical input and exact half-open
+bank-relative byte span. A standalone file has unknown original Archive encryption lineage.
+The same object shape is returned by MCP `list_soundbank_objects` within its existing whole-object
+response budget. The CLI writes the complete checked rows for each selected object.
+
+Other object details:
 
 - `state`: standalone State versions 128 through 145 expose `property_count`, `count_range`,
   ordered `properties`, `consumed_range` and `trailing_range`. A property has its original RTPC

@@ -3,6 +3,9 @@
 
 use std::ops::Range;
 
+#[path = "soundbank_source_fields.rs"]
+mod source_fields;
+
 use crate::bank_parse::{self, MediaRange, SectionRange};
 use crate::media_class;
 use crate::{AudioError, BankError, BankWarning, HircObject, MediaClass, SectionId, Wem};
