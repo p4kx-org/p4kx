@@ -109,7 +109,6 @@ impl<'f> Picked<'f> {
             Kind::MiningGlobalParams => Self::MiningParams(mining_global_params(tree)),
             Kind::FactionReputations
             | Kind::ReputationScopes
-            | Kind::ReputationStandings
             | Kind::ReputationContexts
             | Kind::MissionTypes
             | Kind::MissionLocalities
@@ -133,6 +132,7 @@ impl<'f> Picked<'f> {
             | Kind::Blueprints
             | Kind::BlueprintCategories
             | Kind::BlueprintCategoryLists
+            | Kind::ReputationStandings
             | Kind::ExplosionDefinitions
             | Kind::AmmoDefinitions
             | Kind::Factions

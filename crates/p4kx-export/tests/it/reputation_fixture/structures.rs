@@ -49,10 +49,15 @@ fn reputation_structs() -> Vec<TestStruct> {
             .field("initialReputation", TestType::Int32)
             .array("standings", TestType::Reference),
         TestStruct::new("SReputationStandingParams")
+            .field("name", TestType::String)
+            .field("description", TestType::String)
+            .field("perkDescription", TestType::Locale)
+            .field("icon", TestType::String)
+            .field("missionBoardIcon", TestType::String)
             .field("displayName", TestType::Locale)
-            .field("minReputation", TestType::Int32)
-            .field("driftReputation", TestType::Int32)
-            .field("driftTimeHours", TestType::Int32)
+            .field("minReputation", TestType::Int64)
+            .field("driftReputation", TestType::Int64)
+            .field("driftTimeHours", TestType::Single)
             .field("gated", TestType::Bool),
         TestStruct::new("SReputationContextUI")
             .field("primaryScopeContext", class("SReputationScopeContextUI"))

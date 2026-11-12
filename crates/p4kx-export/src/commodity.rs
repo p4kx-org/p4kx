@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{RecordTree, SourceUse, SourceUseRole, SourceValue, SourcedValue};
+use p4kx_extraction::{DataForge, RecordTree, SourceUse, SourceUseRole, SourceValue, SourcedValue};
 
 use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_table::CatalogTable;
 use crate::commodity_authoring_contract::CommodityAuthoring;
 use crate::commodity_authoring_read;
 use crate::commodity_contract::{
@@ -225,11 +226,30 @@ pub(crate) fn resource_commodity<'source>(
     })
 }
 
-/// Separates already-prepared rows without re-reading inputs or projecting a second view.
-pub(crate) fn split(
-    rows: Vec<Commodity<'_>>,
-) -> (Vec<CommodityDefinition<'_>>, Vec<CommodityPresentation>) {
-    rows.into_iter()
+pub(crate) struct CommodityTables<'source> {
+    pub(crate) definitions: CatalogTable<CommodityDefinition<'source>>,
+    pub(crate) presentation: CatalogTable<CommodityPresentation>,
+}
+
+/// Builds definition and presentation tables from the same selected rows.
+pub(crate) fn tables<'source>(
+    forge: &DataForge<'_>,
+    rows: Vec<Commodity<'source>>,
+) -> CommodityTables<'source> {
+    let (definitions, presentation) = rows
+        .into_iter()
         .map(|row| (row.definition, row.presentation))
-        .unzip()
+        .unzip();
+    let definitions = CatalogTable::new(
+        forge,
+        &["EntityClassDefinition", "ResourceType"],
+        definitions,
+    );
+    CommodityTables {
+        presentation: CatalogTable {
+            availability: definitions.availability,
+            rows: presentation,
+        },
+        definitions,
+    }
 }

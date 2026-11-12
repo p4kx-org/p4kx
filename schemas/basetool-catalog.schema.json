@@ -3796,6 +3796,9 @@
         "qualityQuantizations": {
           "$ref": "#/$defs/CatalogTableOfQualityQuantizationDefinition"
         },
+        "reputationStandings": {
+          "$ref": "#/$defs/CatalogTableOfStandingDefinition"
+        },
         "resourceGroups": {
           "$ref": "#/$defs/CatalogTableOfResourceGroupDefinition"
         },
@@ -3824,6 +3827,7 @@
         "missionBrokerEntries",
         "qualityDistributions",
         "qualityQuantizations",
+        "reputationStandings",
         "resourceGroups",
         "resourceTypes",
         "shopInventories",
@@ -4907,6 +4911,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ShopInventoryResolution"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfStandingDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/StandingDefinition"
           },
           "type": "array"
         }
@@ -22010,70 +22033,6 @@
         "reputationCeiling",
         "scopeName",
         "standingGuids"
-      ],
-      "type": "object"
-    },
-    "ReputationStanding": {
-      "description": "A reputation standing: an `SReputationStandingParams` Record under `reputation/standings`, one\nrank of a scope.",
-      "properties": {
-        "className": {
-          "description": "The Record name without its type, e.g. `ReputationStanding_Faction_B2_00`.",
-          "type": "string"
-        },
-        "displayName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The `displayName`, the name of the rank.",
-          "x-gameText": true
-        },
-        "driftReputation": {
-          "description": "The reputation the standing drifts back by (`driftReputation`).",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "driftTimeHours": {
-          "description": "The hours between two drifts (`driftTimeHours`).",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "gated": {
-          "description": "Whether the standing is gated (`gated`).",
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
-        },
-        "minReputation": {
-          "description": "The reputation from which the standing applies (`minReputation`).",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
-        }
-      },
-      "required": [
-        "className",
-        "displayName",
-        "driftReputation",
-        "driftTimeHours",
-        "gated",
-        "guid",
-        "minReputation",
-        "recordPath"
       ],
       "type": "object"
     },
@@ -65315,6 +65274,94 @@
       ],
       "type": "object"
     },
+    "StandingDefinition": {
+      "description": "An original standing definition with its authored presentation and progression fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "description": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "displayName": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "driftReputation": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "driftTimeHours": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The original number of hours between reputation drifts."
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "gated": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "icon": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "minReputation": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "missionBoardIcon": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "perkDescription": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "className",
+        "description",
+        "displayName",
+        "driftReputation",
+        "driftTimeHours",
+        "fileName",
+        "gated",
+        "guid",
+        "icon",
+        "metadataTag",
+        "minReputation",
+        "missionBoardIcon",
+        "name",
+        "perkDescription",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "StandingLevel": {
       "description": "The level at which a prerequisite is stated.",
       "type": "string",
@@ -68679,13 +68726,6 @@
       },
       "type": "array"
     },
-    "reputationStandings": {
-      "description": "The reputation standings, the ranks of the scopes, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/ReputationStanding"
-      },
-      "type": "array"
-    },
     "schemaVersion": {
       "const": 3,
       "description": "The version of the catalog shape; an import rejects a version it does not know.",
@@ -68777,7 +68817,6 @@
     "refiningProcesses",
     "reputationContexts",
     "reputationScopes",
-    "reputationStandings",
     "schemaVersion",
     "shipStoreSlugs",
     "ships",

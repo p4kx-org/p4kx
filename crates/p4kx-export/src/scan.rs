@@ -39,6 +39,8 @@ const CRAFTER_STRUCT: &str = "CrafterComponentParams";
 
 #[path = "scan_ammo.rs"]
 mod ammo;
+#[path = "scan_definition_projection.rs"]
+mod definition_projection;
 #[path = "scan_groups.rs"]
 mod groups;
 #[path = "scan_projection.rs"]

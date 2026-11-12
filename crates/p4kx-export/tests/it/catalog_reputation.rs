@@ -6,19 +6,20 @@
 
 #[path = "catalog_faction.rs"]
 mod catalog_faction;
-
 #[path = "catalog_faction_modifier.rs"]
 mod faction_modifier;
-
 #[path = "catalog_scenario_faction_scope.rs"]
 mod faction_scope;
 
 use crate::reputation_fixture::{
     CONTEXT, FACTION, FACTION_BARE, LEGACY_FACTION, LOCALITY, MISSION_TYPE, PLAIN_A, PLAIN_B,
-    SCENARIO, SCOPE, STANDING_HIGH, STANDING_LOW, write_archive,
+    SCENARIO, SCOPE, STANDING_HIGH, STANDING_LOW, write_archive, write_archive_with_drift,
 };
 
+use crate::health_origin_assertions as proof;
+
 use std::error::Error;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, UNIX_EPOCH};
 
 use p4kx_export::{BuiltCatalog, CatalogOptions, Filter, Kind, build_catalog};
@@ -28,9 +29,15 @@ use serde_json::{Value, json};
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
+    build_with_archive(filter, write_archive)
+}
+
+fn build_with_archive(
+    filter: Option<&Filter>,
+    write: impl FnOnce(&Path) -> Result<PathBuf, Box<dyn Error>>,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
-    let archive =
-        Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
+    let archive = Archive::open_with_key(write(dir.path())?, Some(p4kx_testkit::test_key()))?;
     let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
     options.filter = filter;
     let built = build_catalog(&archive, &options)?;
@@ -126,27 +133,118 @@ fn a_scope_lists_its_standings_in_stored_order() -> TestResult {
 }
 
 #[test]
-fn a_standing_carries_its_numbers_and_a_placeholder_name_has_no_key() -> TestResult {
+fn a_standing_preserves_the_original_fields_and_protected_texts() -> TestResult {
     let (built, catalog) = build(None)?;
-    assert_eq!(
-        *entry(&catalog, "reputationStandings", STANDING_HIGH)?,
-        json!({
-            "guid": guid(STANDING_HIGH),
-            "className": "ReputationStanding_Faction_B0_01",
-            "recordPath": "libs/foundry/records/reputation/standings/faction/band_0/reputationstanding_faction_b0_01",
-            "displayName": {"key": null, "en": null, "de": null},
-            "minReputation": 4500,
-            "driftReputation": -5,
-            "driftTimeHours": 24,
-            "gated": true
-        })
-    );
-    assert_eq!(
-        counts(&built, Kind::ReputationStandings),
-        Some((2, 1)),
-        "the test standing is a leftover"
-    );
+    let high = standing(&catalog, STANDING_HIGH)?;
+    let low = standing(&catalog, STANDING_LOW)?;
+    assert!(catalog.get("reputationStandings").is_none());
+    proof::present(high, "guid", &json!(guid(STANDING_HIGH)), Some(true))?;
+    proof::present(
+        high,
+        "className",
+        &json!("ReputationStanding_Faction_B0_01"),
+        Some(true),
+    )?;
+    proof::present(
+        high,
+        "minReputation",
+        &json!({"type":"int64","value":"4500"}),
+        Some(true),
+    )?;
+    proof::present(
+        high,
+        "driftReputation",
+        &json!({"type":"int64","value":"-5"}),
+        Some(true),
+    )?;
+    proof::present(
+        high,
+        "driftTimeHours",
+        &json!({"rawBits":"41c40000","finite":24.5}),
+        Some(true),
+    )?;
+    proof::present(
+        low,
+        "driftTimeHours",
+        &json!({"rawBits":"80000000","finite":-0.0}),
+        Some(true),
+    )?;
+    assert_eq!(low["driftTimeHours"]["value"]["finite"].to_string(), "-0.0");
+    proof::present(high, "gated", &json!(true), Some(true))?;
+    proof::present(low, "gated", &json!(false), Some(true))?;
+    proof::present(
+        high,
+        "description",
+        &json!("Synthetic standing description"),
+        Some(true),
+    )?;
+    proof::present(high, "icon", &json!("ui/fixture/standing.dds"), Some(true))?;
+    proof::present(
+        high,
+        "missionBoardIcon",
+        &json!("ui/fixture/board.dds"),
+        Some(true),
+    )?;
+    check_standing_texts(&catalog, high)?;
+    assert_eq!(counts(&built, Kind::ReputationStandings), Some((2, 1)));
+    proof::closure(&catalog)?;
     Ok(())
+}
+
+fn check_standing_texts(catalog: &Value, high: &Value) -> TestResult {
+    for (field, key, expected) in [
+        ("displayName", "@LOC_PLACEHOLDER", Value::Null),
+        (
+            "perkDescription",
+            "@fixture_standing_perk",
+            json!("Synthetic perk"),
+        ),
+    ] {
+        let identifier = proof::cell(high, field, "present")?
+            .get("value")
+            .ok_or("protected standing text reference")?;
+        let protected = proof::rows(catalog, "/texts/gameTexts")?
+            .iter()
+            .find(|row| row.pointer("/id/value") == Some(identifier))
+            .ok_or("protected standing text is registered")?;
+        assert_eq!(
+            protected.pointer("/key/value").and_then(Value::as_str),
+            Some(key),
+            "original localization key for {field}"
+        );
+        assert_eq!(
+            protected
+                .pointer("/translations/value/en/displayText/value")
+                .unwrap_or(&Value::Null),
+            &expected,
+            "English translation for {field}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_nonfinite_reputation_drift_preserves_its_exact_source_word() -> TestResult {
+    let (_, catalog) = build_with_archive(None, |dir| {
+        write_archive_with_drift(dir, f32::from_bits(0x7fc0_1073))
+    })?;
+    proof::present(
+        standing(&catalog, STANDING_HIGH)?,
+        "driftTimeHours",
+        &json!({"rawBits":"7fc01073","finite":null}),
+        Some(true),
+    )?;
+    assert_eq!(catalog["exportHealth"]["status"], "complete");
+    proof::closure(&catalog)?;
+    Ok(())
+}
+
+fn standing(catalog: &Value, record: u128) -> Result<&Value, Box<dyn Error>> {
+    let identity = guid(record);
+    proof::rows(catalog, "/definitions/reputationStandings/rows")?
+        .iter()
+        .find(|row| row.pointer("/guid/value").and_then(Value::as_str) == Some(&identity))
+        .ok_or_else(|| format!("missing standing {identity}").into())
 }
 
 #[test]

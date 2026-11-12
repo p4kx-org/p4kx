@@ -50,3 +50,11 @@ dataset retains its own identity and standing semantics.
   `minStandingGuid` and `standingRequirements` to the new kinds by GUID, and
   `contracts[].missionTypeGuid` to `missionTypes`; on LIVE every link resolves.
 - Two factions have enemies and none has allies on LIVE; the lists are as stored.
+
+## Catalog v3 standing definitions
+
+The standing rows belong to `definitions.reputationStandings`. Their physical Record
+identity and field provenance follow ADR-0356 and ADR-0357. The authored description,
+perk text and icon paths are part of the definition. Rank display names and perk
+descriptions use the protected text registry. Stored drift intervals retain their
+Single bits and original hours, including fractional intervals and signed zero.

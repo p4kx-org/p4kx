@@ -42,6 +42,13 @@ fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, Box<dyn
         .collect())
 }
 
+fn standing_guids(catalog: &Value) -> Result<HashSet<&str>, Box<dyn Error>> {
+    crate::catalog_v3_consumer::rows(catalog, p4kx_export::Kind::ReputationStandings)?
+        .iter()
+        .map(|row| text(row, "/guid/value").ok_or_else(|| "a sourced standing GUID".into()))
+        .collect()
+}
+
 fn named<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, Box<dyn Error>> {
     list(catalog, kind)?
         .iter()
@@ -108,7 +115,7 @@ fn the_factions_and_their_reputation_ladders_of_a_real_archive_are_linked() -> T
     let catalog = catalog()?;
     let factions = list(&catalog, "factionReputations")?;
     let scopes = guids(&catalog, "reputationScopes")?;
-    let standings = guids(&catalog, "reputationStandings")?;
+    let standings = standing_guids(&catalog)?;
     let contexts = guids(&catalog, "reputationContexts")?;
     let faction_guids = guids(&catalog, "factionReputations")?;
     print_line(&format!(
@@ -156,10 +163,11 @@ fn the_factions_and_their_reputation_ladders_of_a_real_archive_are_linked() -> T
         }
     }
     check_ladders(&catalog, &scopes, &standings)?;
-    let ranked = list(&catalog, "reputationStandings")?
-        .iter()
-        .filter(|standing| standing["minReputation"].is_i64())
-        .count();
+    let ranked =
+        crate::catalog_v3_consumer::rows(&catalog, p4kx_export::Kind::ReputationStandings)?
+            .iter()
+            .filter(|standing| standing["minReputation"]["state"] == "present")
+            .count();
     assert_eq!(ranked, standings.len(), "every standing has a minimum");
     Ok(())
 }
@@ -193,7 +201,7 @@ fn a_contract_of_a_real_archive_names_its_type_and_standing_range() -> TestResul
     let catalog = catalog()?;
     let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let types = guids(&catalog, "missionTypes")?;
-    let standings = guids(&catalog, "reputationStandings")?;
+    let standings = standing_guids(&catalog)?;
     let scopes = guids(&catalog, "reputationScopes")?;
     let factions = guids(&catalog, "factionReputations")?;
     let ranged: Vec<&Value> = contracts

@@ -12,6 +12,7 @@ use crate::catalog_v3::explosion_definition::ExplosionDefinition;
 use crate::catalog_v3::faction_definition::FactionDefinition;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
+use crate::catalog_v3::reputation_standing_definition::StandingDefinition;
 use crate::commodity_contract::CommodityDefinition;
 use crate::manufacturer::ManufacturerDefinition;
 use crate::mission_generator::GeneratorDefinition;
@@ -41,6 +42,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) shop_inventories: ShopInventoryTable,
     pub(crate) explosion_definitions: CatalogTable<ExplosionDefinition<'source>>,
     pub(crate) ammo_definitions: CatalogTable<AmmoDefinition<'source>>,
+    pub(crate) reputation_standings: CatalogTable<StandingDefinition<'source>>,
     pub(crate) resource_groups:
         CatalogTable<super::resource_group_catalog::ResourceGroupDefinition<'source>>,
     pub(crate) resource_types: CatalogTable<ResourceType<'source>>,

@@ -300,6 +300,7 @@ impl Coverage<'_, '_> {
                     | Kind::ExplosionDefinitions
                     | Kind::AmmoDefinitions
                     | Kind::Factions
+                    | Kind::ReputationStandings
             )
         ) {
             return self.owned(required);
@@ -345,6 +346,7 @@ impl Coverage<'_, '_> {
             return false;
         };
         let ordinal = required.original_ordinal;
+        let captured = actual.occurrence;
         let (occurrence, contract) = match self.kind {
             Some(Kind::LootPoolFilters) => (
                 NumberOccurrence::LootValue { ordinal },
@@ -355,10 +357,7 @@ impl Coverage<'_, '_> {
                 ResourceNumberContract::Number,
             ),
             Some(Kind::Items)
-                if matches!(
-                    actual.occurrence,
-                    NumberOccurrence::ItemComponentRawValue { .. }
-                ) =>
+                if matches!(captured, NumberOccurrence::ItemComponentRawValue { .. }) =>
             {
                 (
                     NumberOccurrence::ItemComponentRawValue { ordinal },
@@ -369,18 +368,27 @@ impl Coverage<'_, '_> {
                 NumberOccurrence::ItemComponentValue { ordinal },
                 ResourceNumberContract::Single,
             ),
-            Some(Kind::Factions) => (
-                NumberOccurrence::AuthoredDefinitionRawValue { ordinal },
-                ResourceNumberContract::Number,
-            ),
-            Some(Kind::ExplosionDefinitions | Kind::AmmoDefinitions) => (
+            Some(Kind::Factions | Kind::ReputationStandings)
+                if matches!(
+                    captured,
+                    NumberOccurrence::AuthoredDefinitionRawValue { .. }
+                ) =>
+            {
+                (
+                    NumberOccurrence::AuthoredDefinitionRawValue { ordinal },
+                    ResourceNumberContract::Number,
+                )
+            }
+            Some(
+                Kind::ExplosionDefinitions | Kind::AmmoDefinitions | Kind::ReputationStandings,
+            ) => (
                 NumberOccurrence::AuthoredDefinitionValue { ordinal },
                 ResourceNumberContract::Single,
             ),
             _ => return false,
         };
         scalar_matches(required, actual)
-            && actual.occurrence == occurrence
+            && captured == occurrence
             && actual.contract == contract
             && self.consumed_owned.insert(required.original_ordinal)
     }

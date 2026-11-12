@@ -17,8 +17,8 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
-use crate::catalog_v3::ammo_definition;
 use crate::catalog_v3::catalog_global_configurations::{self, GlobalConfigurations};
+use crate::catalog_v3::{ammo_definition, reputation_standing_definition};
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
 use crate::mission_data::link_scenario_factions;
@@ -183,17 +183,7 @@ fn assemble<R>(
             .map(|ship| (ship.guid.0, ship.class_name)),
         options.filter.is_some(),
     );
-    let (commodity_definitions, commodity_presentation) =
-        crate::commodity::split(collected.commodities);
-    let commodities = CatalogTable::new(
-        &forge,
-        &["EntityClassDefinition", "ResourceType"],
-        commodity_definitions,
-    );
-    let commodity_presentation = CatalogTable {
-        availability: commodities.availability,
-        rows: commodity_presentation,
-    };
+    let commodity_tables = crate::commodity::tables(&forge, collected.commodities);
     let group_tables = crate::catalog_v3::resource_group_catalog::tables(
         &forge,
         collected.resource_groups,
@@ -236,6 +226,10 @@ fn assemble<R>(
                 collected.explosion_definitions,
             ),
             ammo_definitions: ammo_definition::table(&forge, collected.ammo_definitions),
+            reputation_standings: reputation_standing_definition::table(
+                &forge,
+                collected.mission_kinds.standings,
+            ),
             contract_generators: CatalogTable::new(
                 &forge,
                 &["ContractGenerator"],
@@ -280,7 +274,7 @@ fn assemble<R>(
             resource_groups: group_tables.definitions,
             tags: CatalogTable::new(&forge, &["Tag"], collected.tags.definitions),
             resource_types: CatalogTable::new(&forge, &["ResourceType"], collected.resource_types),
-            commodities,
+            commodities: commodity_tables.definitions,
             manufacturers: crate::manufacturer::table(&forge, collected.manufacturers),
             factions: crate::catalog_v3::faction_definition::table(&forge, collected.factions),
         },
@@ -300,7 +294,7 @@ fn assemble<R>(
             resource_group_parents: group_tables.parents,
             weapon_magazine_resolutions: components.magazine_resolutions,
             tag_paths: CatalogTable::new(&forge, &["Tag"], collected.tags.paths),
-            commodity_presentation,
+            commodity_presentation: commodity_tables.presentation,
         },
         configurations: crate::catalog_configurations::CatalogConfigurations {
             blueprint_tiers: blueprints.tiers,
@@ -355,7 +349,6 @@ fn assemble<R>(
         shops: collected.shops,
         faction_reputations: collected.mission_kinds.factions,
         reputation_scopes: collected.mission_kinds.scopes,
-        reputation_standings: collected.mission_kinds.standings,
         reputation_contexts: collected.mission_kinds.contexts,
         mission_types: collected.mission_kinds.types,
         mission_localities: collected.mission_kinds.localities,

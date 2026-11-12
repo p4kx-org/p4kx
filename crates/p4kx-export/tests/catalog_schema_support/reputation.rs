@@ -3,7 +3,10 @@
 
 //! One entity of each faction, reputation and mission kind.
 
+use p4kx_extraction::SourceValue;
 use serde_json::json;
+
+use super::source_values as values;
 
 const SCOPE: &str = "61000000-0000-4000-8000-000000000001";
 const STANDING: &str = "62000000-0000-4000-8000-000000000001";
@@ -38,16 +41,27 @@ pub(super) fn scopes() -> serde_json::Value {
 }
 
 pub(super) fn standings() -> serde_json::Value {
-    json!([{
-        "guid": STANDING,
-        "className": "ReputationStanding_Faction_B0_00",
-        "recordPath": "libs/foundry/records/reputation/standings/faction/band_0/reputationstanding_faction_b0_00",
-        "displayName": {"key": null, "en": null, "de": null},
-        "minReputation": 0,
-        "driftReputation": -5,
-        "driftTimeHours": 24,
-        "gated": false
-    }])
+    json!({"availability":"available","rows":[{
+        "guid":values::present(json!(STANDING)),
+        "recordName":values::present(json!("ReputationStanding_Faction_B0_00")),
+        "className":values::present(json!("ReputationStanding_Faction_B0_00")),
+        "recordPath":values::present(json!("libs/foundry/records/reputation/standings/faction/band_0/reputationstanding_faction_b0_00")),
+        "recordIndex":values::present(json!(0)),
+        "sourceType":values::present(json!("SReputationStandingParams")),
+        "fileName":values::present(json!("libs/foundry/records/reputation/standings/faction/band_0/reputationstanding_faction_b0_00.xml")),
+        "metadataTag":values::source(SourceValue::Absent),
+        "name":values::source(SourceValue::Absent),
+        "description":values::source(SourceValue::Absent),
+        "displayName":values::source(SourceValue::Absent),
+        "perkDescription":values::source(SourceValue::Absent),
+        "icon":values::source(SourceValue::Absent),
+        "missionBoardIcon":values::source(SourceValue::Absent),
+        "minReputation":values::present(json!({"type":"int64","value":"0"})),
+        "driftReputation":values::present(json!({"type":"int64","value":"-5"})),
+        "driftTimeHours":values::present(json!({"rawBits":"41c40000","finite":24.5})),
+        "gated":values::present(json!(false)),
+        "additionalFields":{"roots":[],"values":[]}
+    }]})
 }
 
 pub(super) fn contexts() -> serde_json::Value {

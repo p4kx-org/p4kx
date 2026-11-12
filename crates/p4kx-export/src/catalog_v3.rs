@@ -31,6 +31,8 @@ pub(crate) mod faction_definition;
 
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;
+#[path = "reputation_standing_definition.rs"]
+pub(crate) mod reputation_standing_definition;
 
 #[path = "ammo_definition.rs"]
 pub(crate) mod ammo_definition;

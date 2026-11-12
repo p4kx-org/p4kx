@@ -107,7 +107,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | shops | D.shops; A.shopInventoryResolution | registry identity/type/brand/place, conservative all-sources-agree resolution |
 | factionReputations | D.factionReputations | distinct from Faction/FactionIdentity |
 | reputationScopes | D.reputationScopes | standing membership/order/configuration |
-| reputationStandings | D.reputationStandings | rank/source thresholds, not player state |
+| reputationStandings | D.reputationStandings | authored rank names, descriptions, perk text, icon paths, gating and exact progression values |
 | reputationContexts | D.reputationContexts | display scopes/relations |
 | missionTypes | D.missionTypes | mission-type definitions and source text |
 | missionLocalities | D.missionLocalities | stored starmap-object membership |

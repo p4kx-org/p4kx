@@ -154,6 +154,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "explosionDefinitions": absent_table(),
             "factions": absent_table(),
             "ammoDefinitions": absent_table(),
+            "reputationStandings": reputation::standings(),
             "shopInventories": {"availability": "absent", "meaning": "offlineDesignTime", "rows": []}},
         "configurations": {
             "blueprintTiers": blueprints::tiers(),
@@ -261,7 +262,6 @@ pub(crate) fn minimal_catalog() -> Value {
         "shops": harvest::shops(),
         "factionReputations": reputation::factions(),
         "reputationScopes": reputation::scopes(),
-        "reputationStandings": reputation::standings(),
         "reputationContexts": reputation::contexts(),
         "missionTypes": reputation::mission_types(),
         "missionLocalities": reputation::localities(),

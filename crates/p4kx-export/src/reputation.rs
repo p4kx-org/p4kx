@@ -4,7 +4,7 @@
 use p4kx_extraction::{RecordTree, StructValue};
 
 use crate::contract_reputation::{
-    FactionReputation, RelationStanding, ReputationContext, ReputationScope, ReputationStanding,
+    FactionReputation, RelationStanding, ReputationContext, ReputationScope,
 };
 use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{key, one};
@@ -53,24 +53,6 @@ pub(crate) fn reputation_scope<'f>(
         reputation_ceiling: integer(map, "reputationCeiling"),
         initial_reputation: integer(map, "initialReputation"),
         standing_guids: references(map, "standings"),
-    }
-}
-
-/// Returns the reputation standing the Record tree `tree` describes.
-pub(crate) fn reputation_standing<'f>(
-    tree: &RecordTree<'f>,
-    texts: &Texts<'f>,
-) -> ReputationStanding<'f> {
-    let root = Some(tree.root());
-    ReputationStanding {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        display_name: texts.localised(key(root, "displayName")),
-        min_reputation: integer(root, "minReputation"),
-        drift_reputation: integer(root, "driftReputation"),
-        drift_time_hours: integer(root, "driftTimeHours"),
-        gated: boolean(root, "gated"),
     }
 }
 

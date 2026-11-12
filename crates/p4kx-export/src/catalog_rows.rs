@@ -124,6 +124,15 @@ fn template_numbers(collected: &Collected<'_>) -> Vec<TemplateNumbers> {
 fn append_missions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
     append(
         emitted,
+        Kind::ReputationStandings,
+        collected
+            .mission_kinds
+            .standings
+            .iter()
+            .map(|row| (row.physical_guid, row.physical_path)),
+    );
+    append(
+        emitted,
         Kind::ContractTemplates,
         collected
             .contract_templates
@@ -224,6 +233,7 @@ fn numbers(collected: &Collected<'_>) -> Vec<EmittedNumber> {
 fn definition_number_groups<'rows>(
     collected: &'rows Collected<'_>,
 ) -> impl Iterator<Item = (Kind, &'rows [CapturedNumber])> {
+    let standings = collected.mission_kinds.standings.iter();
     collected
         .resource_types
         .iter()
@@ -234,6 +244,7 @@ fn definition_number_groups<'rows>(
                 .iter()
                 .map(|row| (Kind::Factions, row.numbers.as_slice())),
         )
+        .chain(standings.map(|row| (Kind::ReputationStandings, row.numbers.as_slice())))
         .chain(
             collected
                 .explosion_definitions

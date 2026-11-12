@@ -103,7 +103,7 @@ fn faction(guid: u128, name: &str, bare: bool) -> TestRecord {
         )
 }
 
-fn standing(guid: u128, name: &str, minimum: i32, gated: bool) -> TestRecord {
+fn standing(guid: u128, name: &str, minimum: i64, gated: bool, hours: f32) -> TestRecord {
     record(
         guid,
         "SReputationStandingParams",
@@ -113,10 +113,18 @@ fn standing(guid: u128, name: &str, minimum: i32, gated: bool) -> TestRecord {
             name.to_lowercase()
         ),
     )
+    .value("name", TestValue::text(name))
+    .value(
+        "description",
+        TestValue::text("Synthetic standing description"),
+    )
     .value("displayName", TestValue::text("@LOC_PLACEHOLDER"))
-    .value("minReputation", TestValue::Int32(minimum))
-    .value("driftReputation", TestValue::Int32(-5))
-    .value("driftTimeHours", TestValue::Int32(24))
+    .value("perkDescription", TestValue::text("@fixture_standing_perk"))
+    .value("icon", TestValue::text("ui/fixture/standing.dds"))
+    .value("missionBoardIcon", TestValue::text("ui/fixture/board.dds"))
+    .value("minReputation", TestValue::Int64(minimum))
+    .value("driftReputation", TestValue::Int64(-5))
+    .value("driftTimeHours", TestValue::Single(hours))
     .value("gated", TestValue::Bool(gated))
 }
 
@@ -214,20 +222,27 @@ fn scenario() -> TestRecord {
     )
 }
 
-fn database() -> DataForgeBuilder {
+fn database(high_drift_hours: f32) -> DataForgeBuilder {
     [
         faction(FACTION, "Acme", false),
         faction(FACTION_BARE, "Bare", true),
         faction(FACTION_TEST, "Test_Corp", true),
         scope(),
-        standing(STANDING_LOW, "ReputationStanding_Faction_B0_00", 0, false),
+        standing(
+            STANDING_LOW,
+            "ReputationStanding_Faction_B0_00",
+            0,
+            false,
+            -0.0,
+        ),
         standing(
             STANDING_HIGH,
             "ReputationStanding_Faction_B0_01",
             4_500,
             true,
+            high_drift_hours,
         ),
-        standing(STANDING_TEST, "ReputationStanding_Test", 1, false),
+        standing(STANDING_TEST, "ReputationStanding_Test", 1, false, 3.0),
         context(),
         record(
             MISSION_TYPE,
@@ -270,15 +285,24 @@ fn database() -> DataForgeBuilder {
 
 /// Writes the fixture Archive into `dir` and returns its path.
 pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    write_archive_with_drift(dir, 24.5)
+}
+
+/// Writes the fixture with a supplied source Single on the higher standing.
+pub(super) fn write_archive_with_drift(
+    dir: &Path,
+    high_drift_hours: f32,
+) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()).encrypted())
+        .entry(TestEntry::zstd("Data\\Game2.dcb", database(high_drift_hours).build()).encrypted())
         .entry(TestEntry::zstd(
             "Data\\Localization\\english\\global.ini",
             GlobalIniBuilder::new()
                 .text("faction_acme", "Acme Emporium")
                 .text("scope_standing", "Standing")
                 .text("type_job", "Job")
+                .text("fixture_standing_perk", "Synthetic perk")
                 .build(),
         ))
         .write_to(&path)?;

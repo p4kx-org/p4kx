@@ -11,12 +11,10 @@ use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
 use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDiagnosis};
 use crate::harvest_config::multi_config;
 use crate::harvest_preset::provider_preset;
-use crate::loot_kinds::LootPick;
 use crate::mining::mineable_entity;
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
-use crate::source_fields::FieldError;
 use crate::starmap::starmap_object;
 use crate::{CatalogError, ExportAccountingError, Kind, item_stats, item_variant};
 
@@ -145,116 +143,6 @@ impl<'f> Scan<'_, '_, 'f> {
             ledger,
         )?;
         Ok(Some(picked))
-    }
-
-    fn read_definition(
-        &self,
-        kind: Kind,
-        admission: &RecordObservation<'_, 'f>,
-        tree: &RecordTree<'f>,
-    ) -> Result<Option<(Picked<'f>, Vec<FieldError>)>, ScanError> {
-        let projection = match kind {
-            Kind::LootPoolFilters => {
-                let value = crate::catalog_v3::loot_filter_catalog::read(
-                    admission.record(),
-                    tree,
-                    self.projection,
-                    self.options.cancel,
-                )?;
-                (Picked::Loot(LootPick::Filter(Box::new(value))), Vec::new())
-            }
-            Kind::ExplosionDefinitions => self.explosion_definition(admission, tree)?,
-            Kind::Factions => self.faction_definition(admission, tree)?,
-            Kind::BlueprintCategoryLists => {
-                let read = crate::catalog_v3::blueprint_category_list_read::read(
-                    tree,
-                    self.projection,
-                    admission,
-                    self.options.cancel,
-                )?;
-                (Picked::BlueprintCategoryList(read.value), read.notes)
-            }
-            Kind::BlueprintCategories => {
-                let read = crate::blueprint_category::read(
-                    tree,
-                    self.projection,
-                    admission,
-                    self.options.cancel,
-                )?;
-                (Picked::BlueprintCategory(read.value), read.notes)
-            }
-            Kind::Manufacturers => {
-                let read = crate::manufacturer::read(
-                    tree,
-                    self.projection,
-                    admission,
-                    self.options.cancel,
-                )?;
-                (Picked::Manufacturer(Box::new(read.value)), read.notes)
-            }
-            Kind::ResourceTypes => {
-                let read = crate::resource_read::read(
-                    tree,
-                    self.projection,
-                    self.groups.all_of_resource(&tree.guid()),
-                    admission,
-                    self.options.cancel,
-                )?;
-                (Picked::ResourceType(Box::new(read.value)), read.notes)
-            }
-            Kind::ResourceGroups => self.resource_group(admission, tree)?,
-            _ => return Ok(None),
-        };
-        Ok(Some(projection))
-    }
-
-    fn explosion_definition(
-        &self,
-        admission: &RecordObservation<'_, 'f>,
-        tree: &RecordTree<'f>,
-    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
-        let read = crate::catalog_v3::explosion_definition::read(
-            tree,
-            self.projection,
-            admission,
-            self.options.cancel,
-        )?;
-        Ok((
-            Picked::ExplosionDefinition(Box::new(read.value)),
-            read.notes,
-        ))
-    }
-
-    fn faction_definition(
-        &self,
-        admission: &RecordObservation<'_, 'f>,
-        tree: &RecordTree<'f>,
-    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
-        let read = crate::catalog_v3::faction_definition::read(
-            tree,
-            self.projection,
-            admission,
-            self.options.cancel,
-        )?;
-        Ok((Picked::Faction(Box::new(read.value)), read.notes))
-    }
-
-    fn resource_group(
-        &self,
-        admission: &RecordObservation<'_, 'f>,
-        tree: &RecordTree<'f>,
-    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
-        let parent = self
-            .groups
-            .parent_choice(&tree.guid(), self.options.cancel)?;
-        let read = crate::resource_group_read::read(
-            tree,
-            self.projection,
-            parent,
-            admission,
-            self.options.cancel,
-        )?;
-        Ok((Picked::ResourceGroup(read.value), read.notes))
     }
 
     fn ship(

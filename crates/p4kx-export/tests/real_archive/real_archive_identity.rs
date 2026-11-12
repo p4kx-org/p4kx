@@ -14,6 +14,7 @@ use crate::catalog_v3_consumer;
 pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
     check_family_aliases(catalog, Kind::BlueprintCategoryLists)?;
     check_family_aliases(catalog, Kind::GameplayProperties)?;
+    check_family_aliases(catalog, Kind::ReputationStandings)?;
     let mut seen: HashMap<&str, (Kind, &Value)> = HashMap::new();
     check_contract_order(catalog)?;
     let kinds = Kind::ALL
@@ -29,6 +30,7 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
                 | Kind::GameplayProperties
                 | Kind::ExplosionDefinitions
                 | Kind::AmmoDefinitions
+                | Kind::ReputationStandings
                 | Kind::QualityDistributions
                 | Kind::QualityQuantizations
         ) {

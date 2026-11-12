@@ -149,6 +149,7 @@ fn origins<'source>(
                 | Kind::QualityDistributions
                 | Kind::QualityQuantizations
                 | Kind::StarmapObjects
+                | Kind::ReputationStandings
         ) || !source.disposition.read_succeeded()
             || (matches!(scope, OriginScope::Emitted)
                 && (source.role != ExportSourceRole::Selected

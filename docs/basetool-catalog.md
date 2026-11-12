@@ -237,7 +237,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `shops` | The shops of the shop registry with kind, brand, location and the link to a starmap object, ordered by `key` |
 | `factionReputations` | The factions of the reputation system with their allies, enemies and relation standings, ordered by GUID |
 | `reputationScopes` | The reputation scopes, each the ladder of standings one kind of reputation climbs, ordered by GUID |
-| `reputationStandings` | The reputation standings, the ranks of the scopes with their thresholds, ordered by GUID |
+| `definitions.reputationStandings` | The physical reputation standings with authored presentation and progression fields, ordered by GUID and original Record index |
 | `reputationContexts` | The reputation contexts, the scopes a faction is shown with, ordered by GUID |
 | `missionTypes` | The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID |
 | `missionLocalities` | The mission localities, named sets of starmap objects, ordered by GUID |
@@ -1177,7 +1177,7 @@ that the rule on equal `guid` and `subContractGuid` above drops.
 | `giverFaction` | The faction of the contract and where it was found: `source` (`handler`, `reputationResult` or `reputationPrerequisite`) and `faction` (`guid`, `name`, `displayName`), `null` when none names one (see "Giver faction") |
 | `blueprintRewards` | The blueprint pools the contract hands out, each `poolGuid` (an entry of `blueprintPools`), `source` (`result` or `temporaryModifier`) and `chance` as stored, `null` for a modifier (see "Blueprint rewards") |
 | `reputationGains` | Sourced list of success reputation changes. The faction, scope and amount each have source evidence. `amount` is a signed decimal string. See [Reputation gains](catalog-contract-generators.md#reputation-gains). |
-| `minStandingGuid`, `maxStandingGuid` | The `minStanding` and `maxStanding` of the contract: the standings between which it is offered, entries of `reputationStandings`; `null` when absent. A sub contract shares the contract's |
+| `minStandingGuid`, `maxStandingGuid` | The `minStanding` and `maxStanding` of the contract: the standings between which it is offered, rows of `definitions.reputationStandings`; `null` when absent. A sub contract shares the contract's |
 | `standingRequirements` | The reputation prerequisites (see "Standing") |
 | `cooldownLayer` | Sourced nearest level among the five cooldown choices (`subContract`, `contract` or `handler`) |
 | `cooldownLayers` | A sourced level for each of the five cooldown fields |
@@ -1339,7 +1339,7 @@ Sub-contract rows share the parent's list. Calculated rewards are computed outsi
 data. A contract with only calculated rewards has an empty `fixedRewards.value` list.
 
 **Standing (ADR-0237).** `minStandingGuid` and `maxStandingGuid` are the `minStanding` and
-`maxStanding` References of the contract, entries of `reputationStandings`; a sub contract has none
+`maxStanding` References of the contract, rows of `definitions.reputationStandings`; a sub contract has none
 of its own and shares the contract's. `standingRequirements` lists the
 `ContractPrerequisite_Reputation` prerequisites, each with `level` (`handler`, `contract` or `subContract`; `handler`: the
 `defaultAvailability` of the handler; `contract` and `subContract`: their
@@ -1469,9 +1469,16 @@ their source declarations and values. The same rules apply to each owned overrid
 
 **Scopes, standings and contexts.** A scope (`reputationScopes`) has `scopeName`, `displayName` (a
 game text), `reputationCeiling`, `initialReputation` and `standingGuids`, its standings in stored
-order. A standing (`reputationStandings`) has `displayName` (the rank's name, a game text; 196 of
-380 have a text, the rest are placeholders), `minReputation`, `driftReputation`, `driftTimeHours`
-and `gated` (47 standings). A context (`reputationContexts`) has `primaryScopeGuid` and `scopeGuids`
+order. The standing definitions under `definitions.reputationStandings.rows` retain physical
+Record identity and join to stored standing GUIDs from scopes, scenarios and contracts.
+Each definition includes the original `name`, `description`, `displayName`, `perkDescription`,
+`icon` and `missionBoardIcon` fields. The rank name and perk text use the protected
+localization table. The literal description also carries `x-gameText`. Icon values are paths.
+The progression fields preserve `minReputation` and `driftReputation` with their original
+numeric widths and `gated` with its source state. `driftTimeHours` keeps the original
+Single in hours with exact IEEE bits and a nullable finite projection. Each sourced field
+has its original contributors. Additional fields remain in the shared source arena.
+A context (`reputationContexts`) has `primaryScopeGuid` and `scopeGuids`
 (the `scopeContextList`). The scope of a gain in `reputationGains` is an entry of
 `reputationScopes` (10 of the 46 are used by a contract).
 

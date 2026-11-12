@@ -33,6 +33,8 @@ const FIELDS: [(&str, TextDomain); 2] = [
     ("description", TextDomain::GameText),
 ];
 
+const STANDING_DISPLAY_FIELDS: [(&str, TextDomain); 1] = [("displayName", TextDomain::GameText)];
+
 const PRESENTATION_FIELDS: [(&str, TextDomain); 3] = [
     ("name", TextDomain::PublicName),
     ("description", TextDomain::GameText),
@@ -264,7 +266,11 @@ pub(crate) fn kind_coverage(
     }
     if matches!(
         kind,
-        Kind::Manufacturers | Kind::Commodities | Kind::ResourceTypes | Kind::Blueprints
+        Kind::Manufacturers
+            | Kind::Commodities
+            | Kind::ResourceTypes
+            | Kind::Blueprints
+            | Kind::ReputationStandings
     ) {
         return canonical_coverage(catalog, kind, english_oracle, german_oracle);
     }
@@ -360,7 +366,12 @@ fn canonical_coverage(
             }
             continue;
         }
-        let (fields, shape) = if kind == Kind::Commodities {
+        let (fields, shape) = if kind == Kind::ReputationStandings {
+            (
+                STANDING_DISPLAY_FIELDS.as_slice(),
+                TextReferenceShape::Required,
+            )
+        } else if kind == Kind::Commodities {
             (PRESENTATION_FIELDS.as_slice(), TextReferenceShape::Nullable)
         } else {
             (FIELDS.as_slice(), TextReferenceShape::Required)

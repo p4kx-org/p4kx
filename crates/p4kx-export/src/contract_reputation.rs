@@ -77,31 +77,6 @@ pub(crate) struct ReputationScope<'a> {
     pub(crate) standing_guids: Vec<CatalogGuid>,
 }
 
-/// A reputation standing: an `SReputationStandingParams` Record under `reputation/standings`, one
-/// rank of a scope.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct ReputationStanding<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `ReputationStanding_Faction_B2_00`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The `displayName`, the name of the rank.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) display_name: LocalisedText<'a>,
-    /// The reputation from which the standing applies (`minReputation`).
-    pub(crate) min_reputation: Option<i64>,
-    /// The reputation the standing drifts back by (`driftReputation`).
-    pub(crate) drift_reputation: Option<i64>,
-    /// The hours between two drifts (`driftTimeHours`).
-    pub(crate) drift_time_hours: Option<i64>,
-    /// Whether the standing is gated (`gated`).
-    pub(crate) gated: Option<bool>,
-}
-
 /// A reputation context: an `SReputationContextUI` Record under `reputation/contexts`, the scopes a
 /// faction is shown with.
 #[derive(Debug, Serialize, JsonSchema)]
