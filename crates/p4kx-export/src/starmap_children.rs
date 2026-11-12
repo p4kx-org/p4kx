@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use p4kx_assembly::is_external_child_value;
 use p4kx_extraction::Guid;
 
 use super::{Bounds, CHILD, CHILDREN, Child, Level, Pose};
@@ -100,7 +101,7 @@ fn external(
     let Some(external) = xml.attribute(child, "external")? else {
         return Ok(None);
     };
-    if external.as_str() != "1" {
+    if !is_external_child_value(external.as_str()) {
         return Ok(None);
     }
     let Some(path) = xml.attribute(child, "name")? else {

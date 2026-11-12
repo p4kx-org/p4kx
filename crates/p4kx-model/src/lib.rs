@@ -188,7 +188,7 @@ pub use mtl_texture::{DIFFUSE_SLOT, texture_suffix, texture_suffix_lowercase};
 pub use mtl_unresolved::UnresolvedLayers;
 pub use object_container::{
     ChildContainer, ContainerBounds, MAX_CHILD_CONTAINERS, MAX_STREAMED_SOCS, MAX_STREAMING_DEPTH,
-    ObjectContainer, ObjectContainerError,
+    ObjectContainer, ObjectContainerError, is_external_child_value,
 };
 pub use palette::{PaletteSlot, TintEntry, TintPalette, srgb8_to_linear};
 pub use positioned_animation::{PositionedAnimation, PositionedDba};

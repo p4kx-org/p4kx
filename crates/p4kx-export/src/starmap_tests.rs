@@ -332,3 +332,6 @@ fn a_second_child_list_is_reported() {
         "an issue line"
     );
 }
+
+#[path = "starmap_child_path_tests.rs"]
+mod child_paths;

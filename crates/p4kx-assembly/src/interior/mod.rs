@@ -13,8 +13,12 @@ use p4kx_model::{Lod, MaterialStatus, Model, SocLight, TintPalette, Transform};
 use crate::Issue;
 
 mod build;
+mod child_container_path;
 mod classes;
 mod files;
+
+pub use child_container_path::ChildContainerPath;
+pub use p4kx_model::is_external_child_value;
 mod layers;
 mod light;
 mod models;

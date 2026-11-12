@@ -208,6 +208,12 @@ fn streams<'a>(
     Ok(())
 }
 
+/// Returns whether an authored Child value declares a separately stored container.
+#[must_use]
+pub fn is_external_child_value(value: &str) -> bool {
+    value == "1" || value.eq_ignore_ascii_case("true")
+}
+
 fn child_container<'a>(child: impl XmlElement<'a>) -> ChildContainer {
     let (pos, rot) = (child.attribute("pos"), child.attribute("rot"));
     let position = numbers::<3>(pos);
@@ -221,7 +227,7 @@ fn child_container<'a>(child: impl XmlElement<'a>) -> ChildContainer {
         rotation: rotation.unwrap_or([1.0, 0.0, 0.0, 0.0]),
         external: child
             .attribute("external")
-            .is_some_and(|value| value == "1" || value.eq_ignore_ascii_case("true")),
+            .is_some_and(is_external_child_value),
     }
 }
 

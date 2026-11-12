@@ -207,9 +207,9 @@ pub use gear_pose_sources::{
 pub use geometry::{Geometry, GeometryVariant, PaletteRef};
 pub use hologram::{HologramCamera, HologramCameraField, ObservedHologramCamera};
 pub use interior::{
-    Interior, InteriorForge, InteriorOptions, InteriorPart, InteriorPartKind, InteriorProgress,
-    InteriorWatch, MAX_INTERIOR_CONTAINERS, MAX_INTERIOR_DEPTH, MAX_INTERIOR_FILE_LEN,
-    MAX_INTERIOR_PARTS,
+    ChildContainerPath, Interior, InteriorForge, InteriorOptions, InteriorPart, InteriorPartKind,
+    InteriorProgress, InteriorWatch, MAX_INTERIOR_CONTAINERS, MAX_INTERIOR_DEPTH,
+    MAX_INTERIOR_FILE_LEN, MAX_INTERIOR_PARTS, is_external_child_value,
 };
 #[cfg(feature = "verification")]
 pub use interior_check::{

@@ -26,6 +26,10 @@ container on the chain (up to 128 MiB each) was held at once. Only the systems r
 - **A container whose XML is not named like it is reported.** When no `<stem>.xml` exists and the
   first other XML entry is taken, the report gets an issue line naming it. It is read, not counted
   as unreadable, because the position data is intact.
+- **Resolve authored external Child paths with the shared grammar.** The external flag
+  accepts `1` and `true`. Existing exact root Archive matches take priority. For
+  other declarations the shared lookup tries the written path, optional `.socpak`
+  extension, and root Archive prefixes used by interior assembly.
 - **A second `ChildObjectContainers` is reported.** Only the first list of an element is read;
   when its direct siblings hold another one, an issue line says so. The positions are unchanged.
 - **Type names are read once.** `TypeNames` caches the name of each type Record by GUID for the

@@ -4,6 +4,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
+use p4kx_assembly::ChildContainerPath;
 use p4kx_extraction::{Archive, Entry};
 
 pub(crate) const SYSTEM_FOLDER: &str = "data\\objectcontainers\\pu\\system\\";
@@ -33,7 +34,11 @@ impl<'a> Index<'a> {
         if !wanted.starts_with("data\\") {
             wanted.insert_str(0, "data\\");
         }
-        self.by_path.get(&wanted).copied()
+        self.by_path.get(&wanted).copied().or_else(|| {
+            ChildContainerPath::new(path)?
+                .root_candidates()
+                .find_map(|candidate| self.by_path.get(&key(&candidate)).copied())
+        })
     }
 
     /// Returns the folder name and the Entry of the main container of every star system, ordered

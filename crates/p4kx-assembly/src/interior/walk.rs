@@ -7,8 +7,9 @@ use std::sync::Arc;
 use p4kx_extraction::Archive;
 use p4kx_model::{ChildContainer, MaterialStatus, Transform};
 
+use super::child_container_path::ChildContainerPath;
 use super::classes::ClassLookup;
-use super::files::{child_candidates, file_name, find_first, is_plain, path_key, stem};
+use super::files::{file_name, find_first, path_key, stem};
 use super::layers::Layers;
 use super::scan::{Scan, StreamScan, scan_container};
 use super::{
@@ -307,16 +308,19 @@ impl<'a> Walker<'a> {
         child: &ChildContainer,
         name: &str,
     ) -> Result<Option<(Archive, String, String)>, AssemblyError> {
-        let found = if is_plain(&child.name) {
+        let found = ChildContainerPath::new(&child.name).and_then(|path| {
             todo.chain.iter().rev().find_map(|&layer| {
                 let archive = self.layers.get(layer)?;
                 let keys = self.layers.keys.get(layer)?;
-                let candidates = child_candidates(&child.name, layer == 0);
-                find_first(&keys.index(archive), &candidates).map(|entry| (layer, entry))
+                let index = keys.index(archive);
+                let entry = if layer == 0 {
+                    find_first(&index, path.root_candidates())
+                } else {
+                    index.find(path.relative())
+                };
+                entry.map(|entry| (layer, entry))
             })
-        } else {
-            None
-        };
+        });
         let Some((layer, entry)) = found else {
             let kind = IssueKind::ContainerMissing {
                 name: child.name.clone(),
