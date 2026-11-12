@@ -10,6 +10,8 @@ use p4kx_extraction::{Archive, ArchiveWatch, Checksum, Entry, Exclusion, Filter}
 use p4kx_media::{Algorithm, ByteScope, ExportOptions, ExportOutcome, Index, MediaKind, Source};
 use sha2::Sha256;
 
+mod animation_accounting;
+mod animation_samples;
 mod audio_accounting;
 mod manifests;
 mod preservation_provider;

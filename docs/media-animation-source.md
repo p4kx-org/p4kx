@@ -38,3 +38,21 @@ The field-origin companion addresses every JSON field. Decoded chunk receipts bi
 source descriptor and encoded interval to each emitted artifact occurrence. A source-backed
 field from an encrypted Entry is marked independently of the Entry name or suffix derived
 from the Archive directory.
+
+## Installed Archive verification
+
+The opt-in Media census selects every CAF, DBA and AIM Entry across the root and nested
+containers. Each family uses a separate temporary generation. It verifies physical selection,
+raw bytes, chunk and clip order, original controller words, declared and decoded key counts,
+and the typed sample bytes and source ranges. It reconciles the counts with the header reader
+where that reader covers the selected source. Legacy header-budget refusals are counted
+separately. The streaming source reader still checks the complete available declarations.
+Diagnostic rows are verified and an incomplete census fails the check.
+
+Configure the Archive paths and temporary directory as described in [CLAUDE.md](../CLAUDE.md).
+The test uses `P4KX_DATA_P4K` and the optional `P4KX_DATA_P4K_B`, then reports aggregate
+counts without recording asset names or payloads.
+
+```powershell
+cargo test --locked -p p4kx-media --test real_archive all_selected_animation_entries_clips_and_keys_reconcile -- --ignored
+```
