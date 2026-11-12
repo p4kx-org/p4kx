@@ -8,6 +8,7 @@ pub(super) const RESEARCH: &str = "CraftingResearch";
 pub(super) const COSTS: &str = "CraftingRecipeCosts_Base";
 pub(super) const UNLOCK: &str = "CraftingResearchUnlock_Base";
 pub(super) const UNKNOWN: &str = "CraftingRecipeCosts_SyntheticFuture";
+pub(super) const MISSING: u128 = 0x1076_0012;
 const TIER: &str = "CraftingBlueprintTier";
 
 #[derive(Clone, Copy)]
@@ -31,6 +32,32 @@ pub(super) fn database(case: Case) -> DataForgeBuilder {
     } else {
         COSTS
     };
+    declarations(tier, costs_base).record(record(vec![tier_value(
+        (!matches!(case, Case::Absent)).then(|| research(case)),
+    )]))
+}
+
+pub(super) fn graph() -> DataForgeBuilder {
+    let tier = TestStruct::new(TIER).field("research", pointer(RESEARCH));
+    declarations(tier, COSTS)
+        .instance(
+            "first",
+            TestInstance::new(UNKNOWN)
+                .value("next", TestValue::pointer("second"))
+                .value("missing", TestValue::Reference(MISSING)),
+        )
+        .instance(
+            "second",
+            TestInstance::new(UNKNOWN).value("next", TestValue::pointer("first")),
+        )
+        .record(record(vec![
+            tier_value(Some(research(Case::Empty))),
+            tier_value(Some(envelope(TestValue::pointer("first")))),
+            tier_value(Some(research(Case::Known))),
+        ]))
+}
+
+fn declarations(tier: TestStruct, costs_base: &str) -> DataForgeBuilder {
     DataForgeBuilder::new()
         .version(8)
         .structure(
@@ -49,16 +76,24 @@ pub(super) fn database(case: Case) -> DataForgeBuilder {
         .structure(
             TestStruct::new(UNKNOWN)
                 .parent(COSTS)
-                .field("opaqueToken", TestType::UInt64),
+                .field("opaqueToken", TestType::UInt64)
+                .field("next", pointer(UNKNOWN))
+                .field(
+                    "missing",
+                    TestType::ReferenceTo("CraftingBlueprintRecord".to_owned()),
+                ),
         )
-        .record(record(case))
 }
 
-fn record(case: Case) -> TestRecord {
+fn tier_value(research: Option<TestValue>) -> TestValue {
     let mut tier = TestInstance::new(TIER);
-    if !matches!(case, Case::Absent) {
-        tier = tier.value("research", research(case));
+    if let Some(research) = research {
+        tier = tier.value("research", research);
     }
+    TestValue::Struct(tier)
+}
+
+fn record(tiers: Vec<TestValue>) -> TestRecord {
     TestRecord::new(
         OWNER,
         "CraftingBlueprintRecord",
@@ -68,8 +103,7 @@ fn record(case: Case) -> TestRecord {
     .value(
         "blueprint",
         TestValue::Struct(
-            TestInstance::new("CraftingBlueprint")
-                .value("tiers", TestValue::Array(vec![TestValue::Struct(tier)])),
+            TestInstance::new("CraftingBlueprint").value("tiers", TestValue::Array(tiers)),
         ),
     )
 }
@@ -89,6 +123,10 @@ fn research(case: Case) -> TestValue {
                 .collect(),
         ),
     };
+    envelope(costs)
+}
+
+fn envelope(costs: TestValue) -> TestValue {
     TestValue::Struct(
         TestInstance::new(RESEARCH)
             .value("researchCosts", costs)

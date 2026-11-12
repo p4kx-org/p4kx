@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "crafting_research_graph.rs"]
+mod graph;
+
 use p4kx_export::{CatalogError, CatalogPublicationMode, Research, ResearchValue};
 use p4kx_extraction::{DataForgeEntry, DataType, Value as Raw};
 use serde_json::Value;
