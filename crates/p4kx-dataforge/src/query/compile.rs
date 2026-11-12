@@ -9,11 +9,13 @@ use p4kx_foundation::PathPattern;
 use crate::query::path_plan::PathPlan;
 use crate::query::predicate::{self, Predicate, Test};
 use crate::query::reader::Reader;
+use crate::query::reference_selection;
 use crate::query::schema::{StructFields, ancestors_include};
 use crate::query::shared::Groups;
 use crate::query::suggest::closest;
 use crate::query::syntax::{Name, Path, Query, Segment};
 use crate::query::{Comparison, QueryError, QueryErrorKind};
+use crate::record::NamedRecords;
 use crate::{DataForge, DataForgeError, DataType, ReferenceIndex};
 
 /// A Query checked against one DataForge and ready to run.
@@ -215,6 +217,20 @@ impl Query {
         forge: &'f DataForge<'f>,
         references: impl FnOnce() -> Option<R>,
     ) -> Result<CompiledQuery<'f>, QueryError> {
+        self.compile_with_lookup(forge, |targets| {
+            let index = references()?;
+            Some(reference_selection::ordinary(
+                &targets.positions,
+                index.borrow(),
+            ))
+        })
+    }
+
+    pub(super) fn compile_with_lookup<'f>(
+        &self,
+        forge: &'f DataForge<'f>,
+        lookup: impl FnOnce(&NamedRecords) -> Option<Box<[u32]>>,
+    ) -> Result<CompiledQuery<'f>, QueryError> {
         let structs = StructFields::read_all(forge).map_err(|error| {
             let span = self
                 .from
@@ -250,7 +266,7 @@ impl Query {
             .zip(&columns)
             .map(|(path, plan)| ColumnKind::of(path, plan))
             .collect();
-        let referrers = self.referrers(forge, references)?;
+        let referrers = self.referrers(forge, lookup)?;
         Ok(CompiledQuery {
             forge,
             kinds,
@@ -261,42 +277,6 @@ impl Query {
             plans,
             share_prefixes: true,
         })
-    }
-}
-
-impl Query {
-    /// Returns the sorted indices of the Records that refer to the Records `referencing` names.
-    fn referrers<R: Borrow<ReferenceIndex>>(
-        &self,
-        forge: &DataForge<'_>,
-        references: impl FnOnce() -> Option<R>,
-    ) -> Result<Option<Box<[u32]>>, QueryError> {
-        let Some(referent) = &self.referencing else {
-            return Ok(None);
-        };
-        let text = referent.as_str();
-        let targets = forge.records_named(text);
-        if targets.is_empty() {
-            return Err(QueryError::new(
-                QueryErrorKind::UnknownReferencedRecord {
-                    text: text.to_owned(),
-                },
-                referent.span(),
-            ));
-        }
-        let Some(index) = references() else {
-            return Err(QueryError::new(
-                QueryErrorKind::MissingReferenceIndex,
-                referent.span(),
-            ));
-        };
-        let mut found: Vec<u32> = targets
-            .iter()
-            .flat_map(|target| index.borrow().referrers(*target))
-            .collect();
-        found.sort_unstable();
-        found.dedup();
-        Ok(Some(found.into_boxed_slice()))
     }
 }
 

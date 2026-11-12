@@ -3,12 +3,41 @@
 
 use std::collections::BTreeSet;
 
+use crate::record::RecordNameKind;
 use crate::{DataForge, Value};
 
 /// Original input coordinates actually used by the Query evaluator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum QuerySource {
+    /// A physical target of the Query's Reference-index lookup.
+    ReferenceTarget {
+        /// Original target Record table index.
+        index: u32,
+        /// Original column consulted by the target lookup.
+        kind: RecordNameKind,
+    },
+    /// An actual incoming Reference occurrence consulted by the Query.
+    ReferenceEdge {
+        /// Original Record that holds this occurrence.
+        source: u32,
+        /// Original canonical value position excluding the root.
+        ordinal: u64,
+        /// Original Record admitted as the target.
+        target: u32,
+    },
+    /// Original Records actually traversed by the observed Reference scan.
+    ReferenceScan {
+        /// Exclusive end of the Record range beginning at zero.
+        end: u64,
+    },
+    /// An unread original position that may hide a Reference.
+    ReferenceGap {
+        /// Original Record table index.
+        record: u32,
+        /// Original canonical value position, absent for an unreadable Record.
+        ordinal: Option<u64>,
+    },
     /// Half-open range in the decoded DCB.
     Bytes {
         /// Inclusive offset.

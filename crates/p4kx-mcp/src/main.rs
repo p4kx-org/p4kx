@@ -76,6 +76,7 @@ mod picture;
 mod query;
 mod query_origins;
 mod query_selection_sources;
+mod query_source_uses;
 mod query_tools;
 mod record_origins;
 mod record_search;

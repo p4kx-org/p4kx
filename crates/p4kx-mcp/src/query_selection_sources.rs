@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use p4kx_extraction::query::QuerySource;
+use p4kx_extraction::query::{QuerySource, RecordNameKind, ReferenceCoverage};
 
 use crate::budget::MAX_RESPONSE_LEN;
 
@@ -23,6 +23,7 @@ pub(crate) enum SurveyMode {
 pub(crate) struct Survey {
     sources: BTreeSet<QuerySource>,
     omitted: bool,
+    reference_coverage: Option<ReferenceCoverage>,
 }
 
 impl Survey {
@@ -34,6 +35,40 @@ impl Survey {
             self.sources.pop_last();
             self.omitted = true;
         }
+    }
+
+    pub(crate) const fn set_reference_coverage(&mut self, coverage: ReferenceCoverage) {
+        self.reference_coverage = Some(coverage);
+    }
+
+    pub(crate) const fn references_complete(&self) -> bool {
+        matches!(self.reference_coverage, Some(ReferenceCoverage::Complete))
+    }
+
+    pub(crate) fn selected_by_guid(&self) -> bool {
+        self.sources.iter().any(|source| {
+            matches!(
+                source,
+                QuerySource::ReferenceTarget {
+                    kind: RecordNameKind::Guid,
+                    ..
+                }
+            )
+        })
+    }
+
+    pub(crate) fn reference_for(&self, source: u32) -> Option<QuerySource> {
+        let first = QuerySource::ReferenceEdge {
+            source,
+            ordinal: 0,
+            target: 0,
+        };
+        let last = QuerySource::ReferenceEdge {
+            source,
+            ordinal: u64::MAX,
+            target: u32::MAX,
+        };
+        self.sources.range(first..=last).next().copied()
     }
 
     pub(crate) fn selected(&self, mode: SurveyMode) -> impl Iterator<Item = QuerySource> + '_ {

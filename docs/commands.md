@@ -859,7 +859,10 @@ For `run_query`, `fieldOrigins` addresses the actual JSON columns and list eleme
 payloads, followed Reference slots and selected instances identify their original decoded DCB
 positions. The total retains the WHERE inputs actually read, including short-circuit evaluation.
 Pages charge provenance to the 256 KiB response budget. A selection survey that cannot fit retains
-an original source witness and marks its contributor set incomplete.
+an original source witness and marks its contributor set incomplete. The referencing lookup
+retains actual target Record fields and incoming edges. Edge coordinates are
+[sourceRecord, valueOrdinal, targetRecord], with the value position in original canonical
+preorder excluding the root. Unread indexed positions keep the selection evidence incomplete.
 
 For `get_record`, `fieldOrigins` follows the exact canonical Record JSON, including reserved or
 duplicate field wrappers, nested array elements and Reference members. `dataforgeDecodedBytes`

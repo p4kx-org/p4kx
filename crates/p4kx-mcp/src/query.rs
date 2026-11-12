@@ -52,11 +52,8 @@ pub(crate) fn run(
 ) -> Result<QueryResult, ToolError> {
     let query = Query::parse(text).map_err(|error| invalid(&error, text))?;
     check_size(&query)?;
-    let compiled = query
-        .compile(target.forge)
-        .map_err(|error| invalid(&error, text))?;
     let canonical = query.to_string();
-    let records = selection(target.opened, &compiled, &canonical, cancel)?;
+    let (compiled, records) = compile_selection(target, &query, text, &canonical, cancel)?;
     let selected = compiled.resume(records.records.to_vec());
     let total = selected.len();
     page.check(total)?;
@@ -106,17 +103,37 @@ pub(crate) fn run(
     }
 }
 
+fn compile_selection<'source>(
+    target: &Target<'source>,
+    query: &Query,
+    text: &str,
+    canonical: &str,
+    cancel: &CancelToken,
+) -> Result<(CompiledQuery<'source>, Arc<SelectionReceipt>), ToolError> {
+    if let Some(records) = target.opened.selection(canonical) {
+        let compiled = query
+            .compile(target.forge)
+            .map_err(|error| invalid(&error, text))?;
+        return Ok((compiled, records));
+    }
+    let mut survey = Survey::default();
+    let (compiled, coverage) = query
+        .compile_observing_references(target.forge, |source| survey.record(source))
+        .map_err(|error| invalid(&error, text))?;
+    survey.set_reference_coverage(coverage);
+    let records = selection(target.opened, &compiled, canonical, cancel, survey)?;
+    Ok((compiled, records))
+}
+
 fn selection(
     opened: &ForgeSource,
     compiled: &CompiledQuery<'_>,
     canonical: &str,
     cancel: &CancelToken,
+    survey: Survey,
 ) -> Result<Arc<SelectionReceipt>, ToolError> {
-    if let Some(records) = opened.selection(canonical) {
-        return Ok(records);
-    }
     let deadline = Instant::now() + TIME_LIMIT;
-    let survey = Mutex::new(Survey::default());
+    let survey = Mutex::new(survey);
     let run = compiled
         .run_observed(
             || !cancel.is_cancelled() && Instant::now() < deadline,

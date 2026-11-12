@@ -3,14 +3,13 @@
 
 use std::slice;
 
-use p4kx_extraction::query::{CompiledQuery, QueryByteUse, QuerySource, RECORD_PATH_COLUMN, Row};
-use p4kx_extraction::{
-    DataForgeOrigin, FieldPath, SourceLocation, SourceUse, SourceUseRole, Value,
-};
+use p4kx_extraction::query::{CompiledQuery, RECORD_PATH_COLUMN, Row};
+use p4kx_extraction::{DataForgeOrigin, FieldPath, SourceUse, SourceUseRole, Value};
 
 use crate::forge_origins::{EvidenceError, ForgeOrigins, site};
 use crate::forge_shapes::ForgeFieldOrigins;
 use crate::query_selection_sources::{Survey, SurveyMode};
+use crate::query_source_uses::{record_site, uses};
 
 pub(crate) struct PageEvidence<'a, 'source> {
     pub(crate) origin: &'a DataForgeOrigin,
@@ -101,9 +100,20 @@ fn navigation(
         page.survey.selected(page.mode),
         SourceUseRole::Selector,
     )?);
+    if page.survey.selected_by_guid() {
+        sites.push(site(
+            &origins.scope,
+            "dataforgeRecordSurvey",
+            "guidWords",
+            vec![0, forge.record_count() as u64],
+            SourceUseRole::Selector,
+        )?);
+    }
+    let reference_complete =
+        !page.compiled.has_reference_filter() || page.survey.references_complete();
     let complete = origins.complete
         && page.survey.complete(page.mode)
-        && !page.compiled.has_reference_filter()
+        && reference_complete
         && forge.path_order().len() == forge.record_count();
     bind(origins, "total", &sites, complete)?;
     if page.cursor {
@@ -130,6 +140,7 @@ fn rows(origins: &mut ForgeOrigins, page: &PageEvidence<'_, '_>) -> Result<(), E
     let mut row_count = 0;
     let mut failed_count = 0;
     let mut output = Vec::new();
+    let mut output_complete = true;
     let mut failures = Vec::new();
     let mut unresolved = Vec::new();
     for row in page.rows {
@@ -144,8 +155,17 @@ fn rows(origins: &mut ForgeOrigins, page: &PageEvidence<'_, '_>) -> Result<(), E
                 slice::from_ref(&path),
                 origins.complete,
             )?;
-            bind(origins, &at, slice::from_ref(&path), origins.complete)?;
-            output.push(path);
+            let mut membership = uses(
+                origins,
+                page.survey.reference_for(record),
+                SourceUseRole::Selector,
+            )?;
+            let complete = origins.complete
+                && (!page.compiled.has_reference_filter() || !membership.is_empty());
+            membership.push(path);
+            bind(origins, &at, &membership, complete)?;
+            output.extend(membership);
+            output_complete &= complete;
             row_cells(origins, page, row, &at, values)?;
             unresolved.extend(follow_inputs(origins, page.compiled, row)?);
         } else {
@@ -155,12 +175,7 @@ fn rows(origins: &mut ForgeOrigins, page: &PageEvidence<'_, '_>) -> Result<(), E
             failures.push(path);
         }
     }
-    bind(
-        origins,
-        "rows",
-        &output,
-        output.is_empty() || origins.complete,
-    )?;
+    bind(origins, "rows", &output, output_complete)?;
     if !failures.is_empty() {
         bind(origins, "failed", &failures, origins.complete)?;
     }
@@ -270,21 +285,6 @@ fn field_path(parent: &str, name: &str) -> Result<String, EvidenceError> {
     Ok(format!("{parent}{}", path.as_str()))
 }
 
-fn record_site(
-    origins: &ForgeOrigins,
-    index: u32,
-    field: &str,
-    role: SourceUseRole,
-) -> Result<SourceUse, EvidenceError> {
-    Ok(origins.scope.at(
-        SourceLocation::DataForge {
-            record_index: index,
-            field: field.to_owned(),
-        },
-        role,
-    )?)
-}
-
 fn bind(
     origins: &mut ForgeOrigins,
     path: &str,
@@ -317,69 +317,6 @@ fn follow_inputs(
         result.append(&mut used);
     }
     Ok(result)
-}
-
-fn uses(
-    origins: &ForgeOrigins,
-    sources: impl IntoIterator<Item = QuerySource>,
-    value_role: SourceUseRole,
-) -> Result<Vec<SourceUse>, EvidenceError> {
-    sources
-        .into_iter()
-        .filter_map(|source| bind_source(origins, source, value_role))
-        .collect()
-}
-
-fn bind_source(
-    origins: &ForgeOrigins,
-    source: QuerySource,
-    value_role: SourceUseRole,
-) -> Option<Result<SourceUse, EvidenceError>> {
-    Some(match source {
-        QuerySource::Bytes { start, end, kind } => {
-            let (label, role) = match kind {
-                QueryByteUse::Value => ("slot", value_role),
-                QueryByteUse::Text => ("text", value_role),
-                QueryByteUse::Array => ("arrayHeader", SourceUseRole::Selector),
-                QueryByteUse::Pointer => ("pointer", SourceUseRole::Selector),
-                QueryByteUse::Reference => ("reference", SourceUseRole::Selector),
-                QueryByteUse::WeakLink => ("weakLink", SourceUseRole::Selector),
-                QueryByteUse::Unresolved => ("unresolvedLink", SourceUseRole::Selector),
-                _ => return None,
-            };
-            site(
-                &origins.scope,
-                "dataforgeDecodedBytes",
-                label,
-                vec![start, end],
-                role,
-            )
-            .map_err(Into::into)
-        }
-        QuerySource::Record { index } => {
-            record_site(origins, index, "instance", SourceUseRole::Selector)
-        }
-        QuerySource::Instance {
-            structure,
-            instance,
-        } => site(
-            &origins.scope,
-            "dataforgeInstance",
-            "selection",
-            vec![u64::from(structure), u64::from(instance)],
-            SourceUseRole::Selector,
-        )
-        .map_err(Into::into),
-        QuerySource::Structure { index } => site(
-            &origins.scope,
-            "dataforgeStructDefinition",
-            "sourceType",
-            vec![u64::from(index)],
-            SourceUseRole::Selector,
-        )
-        .map_err(Into::into),
-        _ => return None,
-    })
 }
 
 fn ordinal_ranges(indices: impl IntoIterator<Item = u32>) -> Vec<u64> {

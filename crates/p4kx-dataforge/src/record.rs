@@ -139,6 +139,21 @@ impl<'f> Record<'f> {
     }
 }
 
+/// The original column that names a Record in a lookup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum RecordNameKind {
+    /// The stored GUID.
+    Guid,
+    /// The stored file name.
+    Path,
+}
+
+pub(crate) struct NamedRecords {
+    pub(crate) kind: RecordNameKind,
+    pub(crate) positions: Vec<u32>,
+}
+
 impl<'a> DataForge<'a> {
     /// Returns every Record in definition order.
     pub fn records(&self) -> impl ExactSizeIterator<Item = Record<'_>> {
@@ -180,17 +195,25 @@ impl<'a> DataForge<'a> {
     /// matches it; empty when no Record has it.
     #[must_use]
     pub fn records_named(&self, text: &str) -> Vec<u32> {
+        self.select_named_records(text).positions
+    }
+
+    pub(crate) fn select_named_records(&self, text: &str) -> NamedRecords {
         text.parse::<Guid>().map_or_else(
-            |_| {
-                self.records_at_path(text)
+            |_| NamedRecords {
+                kind: RecordNameKind::Path,
+                positions: self
+                    .records_at_path(text)
                     .map(|record| record.index())
-                    .collect()
+                    .collect(),
             },
-            |guid| {
-                self.record_by_guid(guid)
+            |guid| NamedRecords {
+                kind: RecordNameKind::Guid,
+                positions: self
+                    .record_by_guid(guid)
                     .map(|record| record.index())
                     .into_iter()
-                    .collect()
+                    .collect(),
             },
         )
     }
