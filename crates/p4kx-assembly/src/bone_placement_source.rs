@@ -56,6 +56,11 @@ impl<'a> BonePlacementSource<'a> {
         self.owner.geometry_selector()
     }
 
+    /// Returns the original CDF attributes that selected the model supplying this placement.
+    pub fn cdf_model_selectors(&self) -> impl Iterator<Item = SourceLocation> {
+        self.owner.cdf_model_selectors()
+    }
+
     /// Returns the physical character definition that selected the model.
     #[must_use]
     pub const fn definition_origin(&self) -> Option<&EntryOrigin> {

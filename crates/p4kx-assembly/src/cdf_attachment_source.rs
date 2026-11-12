@@ -6,6 +6,7 @@ use std::sync::Arc;
 use p4kx_cryxml::SourceAttributePosition;
 use p4kx_extraction::SourceLocation;
 
+use crate::cdf_attribute_position::CdfCoordinateDomain;
 use crate::loadout_xml::{Node, Scope};
 
 /// An authored CDF attribute that can supply an admitted bone attachment.
@@ -71,28 +72,7 @@ impl CdfAttachmentSite {
     /// Returns the original text span or CryXml table position.
     #[must_use]
     pub fn location(&self) -> Option<SourceLocation> {
-        let (namespace, indices) = match &self.position {
-            SourceAttributePosition::Text(range) => (
-                "cdfAttachmentTextBytes",
-                vec![
-                    u64::try_from(range.start).ok()?,
-                    u64::try_from(range.end).ok()?,
-                ],
-            ),
-            SourceAttributePosition::CryXml {
-                node_index,
-                attribute_index,
-            } => (
-                "cdfAttachmentCryXmlAttribute",
-                vec![u64::from(*node_index), u64::from(*attribute_index)],
-            ),
-            _ => return None,
-        };
-        Some(SourceLocation::Subresource {
-            namespace: namespace.into(),
-            indices,
-            field: self.field.name().into(),
-        })
+        CdfCoordinateDomain::Attachment.location(&self.position, self.field.name())
     }
 }
 

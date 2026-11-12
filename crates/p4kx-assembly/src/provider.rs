@@ -18,6 +18,7 @@ use thiserror::Error;
 #[path = "provider_file.rs"]
 mod file;
 
+use crate::cdf_model_sources::CdfModelSources;
 use crate::path_match::starts_with_path;
 use crate::skeleton::SkeletonProblem;
 use crate::{CdfAttachmentSite, MAX_ASSEMBLY_VERTICES};
@@ -45,6 +46,7 @@ pub struct ProvidedModel {
     /// the file is fine, the definition names none, or the file is no character definition.
     pub skeleton: Option<SkeletonProblem>,
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) cdf_model_sources: Option<Arc<CdfModelSources>>,
     pub(crate) definition_origin: Option<p4kx_extraction::EntryOrigin>,
 }
 
@@ -382,6 +384,7 @@ impl ArchiveModels<'_> {
             attachments: Vec::new(),
             skeleton: None,
             archive_sources: sources.into(),
+            cdf_model_sources: None,
             definition_origin: None,
         })
     }

@@ -14,6 +14,9 @@ use serde_json::{Value, json};
 use super::super::hologram_for;
 use super::{TestResult, receipt, skip, source_uses, write_archive};
 
+#[path = "ui_hologram_cdf_main.rs"]
+mod main_model;
+
 const DEFINITION: &str = "Data\\Objects\\Test\\thruster.cdf";
 const FIELDS: [(&str, &str, &str); 6] = [
     ("Type", "Type", "selector"),
@@ -77,12 +80,7 @@ struct Observation {
     report: Value,
 }
 
-fn observed(
-    dir: &Path,
-    definition: Vec<u8>,
-    test: &str,
-) -> Result<Option<Observation>, Box<dyn std::error::Error>> {
-    let input = tempfile::tempdir_in(dir)?;
+fn entries_with_definition(definition: Vec<u8>) -> Vec<TestEntry> {
     let mut entries = bone_thruster_entries("");
     entries.retain(|entry| entry.path() != DEFINITION);
     entries.push(TestEntry::stored(DEFINITION, definition).encrypted());
@@ -91,6 +89,23 @@ fn observed(
         "Data\\Objects\\Test\\hidden.mtl",
         TestMtl::multi(&[hidden(), hidden(), hidden()]).cryxml(),
     ));
+    entries
+}
+
+fn observed(
+    dir: &Path,
+    definition: Vec<u8>,
+    test: &str,
+) -> Result<Option<Observation>, Box<dyn std::error::Error>> {
+    observed_entries(dir, entries_with_definition(definition), test)
+}
+
+fn observed_entries(
+    dir: &Path,
+    entries: Vec<TestEntry>,
+    test: &str,
+) -> Result<Option<Observation>, Box<dyn std::error::Error>> {
+    let input = tempfile::tempdir_in(dir)?;
     let archive = write_archive(input.path(), entries)?;
     let output = input.path().join("ship.png");
     let run = hologram_for(

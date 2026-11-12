@@ -4,13 +4,15 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use p4kx_extraction::{ArchiveMaterialRead, EntryOrigin, ModelArchiveSource};
+use p4kx_extraction::{ArchiveMaterialRead, ModelArchiveSource};
 use p4kx_model::{MaterialStatus, Model, Transform};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
+use crate::assembly::ModelDefinition;
 use crate::build_attachments::attached;
 use crate::build_gear::load_models;
 use crate::build_hidden::hide_worn;
+use crate::build_library_name::{self, LibraryName};
 use crate::build_models::{Loaded, choose_models};
 use crate::build_palettes::Palettes;
 use crate::build_place::{place, under_skin};
@@ -92,10 +94,10 @@ impl Assembly {
         let cut = BodyCut::of(tree, &drafts, &chosen, &mut issues);
         let mut parts: Vec<Part> = Vec::with_capacity(drafts.len());
         for (index, (draft, model)) in drafts.iter().zip(&chosen).enumerate() {
-            let materials = materials_of(draft, *model, shared, &mut reported, &mut issues);
+            let library = materials_of(draft, *model, shared, &mut reported, &mut issues);
             note_character(draft, *model, &mut characters, &mut issues);
             let attachments = attached(draft, *model, shared, &mut reported, &mut issues);
-            let (palette, unresolved) = palettes.of_part(draft, *model, &materials.status);
+            let (palette, unresolved) = palettes.of_part(draft, *model, &library.materials.status);
             issues.extend(unresolved.into_iter().map(|kind| issue(draft, kind)));
             let rig = under_skin(draft, &parts)
                 .then(|| creature_rig::anchor_skeleton(&parts, &issues, options.lod))
@@ -119,9 +121,9 @@ impl Assembly {
                 geometry: draft.geometry_path().map(str::to_owned),
                 model: geometry.model,
                 model_archive_sources: geometry.sources,
-                model_definition_origin: geometry.definition,
+                model_definition: ModelDefinition::of(*model, library.from_model),
                 geometry_selectors: geometry.selectors,
-                materials,
+                materials: library.materials,
                 palette,
                 attachments,
                 hidden: draft.hidden,
@@ -143,7 +145,6 @@ impl Assembly {
 struct RenderedGeometry {
     model: Option<Arc<Model>>,
     sources: Arc<[ModelArchiveSource]>,
-    definition: Option<EntryOrigin>,
     selectors: GeometrySelectors,
 }
 
@@ -170,7 +171,6 @@ fn rendered_geometry(
     RenderedGeometry {
         model: Some(rendered),
         sources,
-        definition: loaded.definition_origin.clone(),
         selectors,
     }
 }
@@ -203,6 +203,11 @@ fn world_of(draft: &Draft<'_>, parts: &[Part], local: &Transform) -> Transform {
         .map_or(*local, |parent| parent.world.then(local))
 }
 
+struct SelectedLibrary {
+    materials: Library,
+    from_model: bool,
+}
+
 /// Returns the materials a part draws with, noting a library that has a problem once.
 fn materials_of(
     draft: &Draft<'_>,
@@ -210,9 +215,16 @@ fn materials_of(
     libraries: (&Libraries, &Library),
     reported: &mut HashSet<String>,
     issues: &mut Vec<Issue>,
-) -> Library {
-    let key = model.and_then(|loaded| library_key(draft, loaded));
-    materials_for(draft, key, libraries, reported, issues)
+) -> SelectedLibrary {
+    let name = model
+        .and_then(|loaded| build_library_name::choose(draft, loaded).map(|name| (loaded, name)));
+    let from_model = matches!(name, Some((_, LibraryName::Model(_))));
+    let key = name.map(|(loaded, name)| library_key_of(name.path(), &loaded.entry));
+    let materials = materials_for(draft, key, libraries, reported, issues);
+    SelectedLibrary {
+        materials,
+        from_model,
+    }
 }
 
 /// Returns the materials of the library cached under `key`, noting a problem of it once.
@@ -306,21 +318,6 @@ pub(crate) fn file_key(path: &str) -> String {
         .map_or_else(|| key.clone(), str::to_owned)
 }
 
-/// Returns the name of the library a part draws with: the one its Entity chooses, else the one
-/// its model names.
-fn library_name<'a>(draft: &'a Draft<'_>, loaded: &'a Loaded) -> Option<&'a str> {
-    draft
-        .library
-        .or_else(|| draft.geometry.and_then(|geometry| geometry.material()))
-        .or(loaded.model.material_library.as_deref())
-}
-
-/// Returns the key under which a part's library is cached: a bare name is relative to the
-/// model's folder, any other name is the same for every model.
-fn library_key(draft: &Draft<'_>, loaded: &Loaded) -> Option<String> {
-    Some(library_key_of(library_name(draft, loaded)?, &loaded.entry))
-}
-
 /// Returns the key under which the library `name` of the model at `entry` is cached.
 pub(crate) fn library_key_of(name: &str, entry: &str) -> String {
     if name.trim_start().starts_with(['/', '\\']) {
@@ -350,9 +347,14 @@ fn read_libraries(
         .zip(chosen)
         .filter_map(|(draft, loaded)| Some((draft, (*loaded)?)))
         .flat_map(|(draft, loaded)| {
-            let part = library_name(draft, loaded)
-                .zip(library_key(draft, loaded))
-                .map(|(name, key)| (key, loaded.entry.as_str(), name));
+            let part = build_library_name::choose(draft, loaded).map(|selected| {
+                let name = selected.path();
+                (
+                    library_key_of(name, &loaded.entry),
+                    loaded.entry.as_str(),
+                    name,
+                )
+            });
             let attached = loaded.attachments.iter().filter_map(|attached| {
                 let name = attached.model.material_library.as_deref()?;
                 Some((

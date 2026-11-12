@@ -30,7 +30,7 @@ impl ArchiveModels<'_> {
             reason: format!("{entry}: {reason}"),
         };
         let read = if self.observe_nodes && definition_origin.is_some() {
-            cdf::read_observing_attachments
+            cdf::read_observing_sources
         } else {
             cdf::read
         };
@@ -40,6 +40,7 @@ impl ArchiveModels<'_> {
             .ok_or_else(|| unreadable(format!("{} does not exist", character.model)))?;
         let mut provided = self.read_model(model_entry, lod, Vec::new())?;
         provided.definition_origin = definition_origin;
+        provided.cdf_model_sources = character.model_sources.take().map(Arc::new);
         let mut remaining = self
             .max_attachment_vertices
             .saturating_sub(vertices(&provided.model));

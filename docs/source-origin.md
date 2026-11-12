@@ -168,6 +168,16 @@ relative-pose fields belong to the effective main or LOD skeleton.
 Equipment anchored through a parent skin uses the original character-root
 rig when that rig supplied its placement.
 
+The actual CDF main model selection is recorded as the winning attachment
+`Binding` or fallback `Model.File`. A `CA_SKIN` preference also records the
+winning attachment's `Type`. A CDF `Material` attribute contributes when
+that override supplies a used surface or suppression after applying
+loadout and Entity geometry overrides. Main model attributes use
+`cdfModelTextBytes` for original half-open text byte ranges and
+`cdfModelCryXmlAttribute` for original node and global attribute ordinals.
+These selectors also apply when the main model supplies a consumed node
+or bone transform.
+
 CDF bone attachments retain the type and binding that selected the
 model. A placed attachment retains its bone name and the authored
 relative transform it used. Text attributes use the half-open original

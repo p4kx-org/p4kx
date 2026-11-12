@@ -14,7 +14,7 @@ use p4kx_extraction::{
 
 use p4kx_render::MeshNodeInput;
 
-use super::Projection;
+use super::{Projection, cdf_origins};
 
 pub(super) fn placement(
     projection: &Projection,
@@ -26,6 +26,12 @@ pub(super) fn placement(
         projection.authored_selector(source.geometry_selector(), uses)?;
         if let Some(definition) = source.definition_origin() {
             uses.push(projection.opaque_archive(definition, SourceUseRole::Selector)?);
+            cdf_origins::model_selectors(
+                projection,
+                Some(definition),
+                source.cdf_model_selectors(),
+                uses,
+            )?;
         }
         let scope = projection
             .uses()

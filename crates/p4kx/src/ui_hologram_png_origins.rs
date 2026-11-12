@@ -10,16 +10,17 @@ use p4kx_assembly::{Assembly, AttachedModel, Part};
 use p4kx_extraction::model::{Model, ModelFile};
 use p4kx_extraction::{
     ArchiveWriteProtection, CancelToken, ConversionError, EntryOrigin, FieldOrigin, FileReceipt,
-    InputScope, MaterialArchiveOrigins, ModelArchiveSource, OriginArtifactBinding,
-    OriginOutputAddress, SourceInput, SourceLocation, SourceScope, SourceUse, SourceUseRole,
-    write_origin_companion,
+    ModelArchiveSource, OriginArtifactBinding, OriginOutputAddress, SourceLocation, SourceUse,
+    SourceUseRole, write_origin_companion,
 };
 use p4kx_render::{
     AssemblyPieceSource, AssemblyScene, MaterialSuppressionEffect, MaterialSuppressionReason,
     Picture, PlacedPieceInput,
 };
 
+use super::material_origins::{self, MaterialInputs};
 use super::origins::CameraInput;
+
 use super::{HologramInputs, Projection};
 use super::{bone_origins, cdf_origins, node_origins};
 use crate::json;
@@ -134,6 +135,9 @@ impl PieceInputs<'_> {
             role,
             &mut sources.placed,
         )?;
+        if let Some(owner) = self.material.owner {
+            cdf_origins::model(projection, owner, &mut sources.placed)?;
+        }
         self.material
             .selected(projection, piece.material_slots(), &mut sources.placed)?;
         self.mesh_nodes(projection, piece, drawn, sources)?;
@@ -279,12 +283,14 @@ fn suppressed_materials(
             continue;
         };
         if let Some(scope) = input.material.scope(projection, uses)? {
-            if let (MaterialSuppressionEffect::WholePiece, Some((_, attachment))) =
-                (suppression.effect(), input.material.attachment)
-            {
-                cdf_origins::whole_piece_selection(projection, attachment, uses)?;
+            if suppression.effect() == MaterialSuppressionEffect::WholePiece {
+                input.material.whole_piece(projection, uses)?;
             }
-            uses.push(material_slot(&scope, suppression.slot(), field)?);
+            uses.push(material_origins::material_slot(
+                &scope,
+                suppression.slot(),
+                field,
+            )?);
         }
     }
     Ok(())
@@ -306,61 +312,6 @@ fn model_inputs(
         sources.push(projection.opaque_archive(origin, role)?);
     }
     Ok(())
-}
-
-struct MaterialInputs<'a> {
-    archive: &'a MaterialArchiveOrigins,
-    owner: Option<&'a Part>,
-    attachment: Option<(usize, &'a AttachedModel)>,
-}
-
-impl MaterialInputs<'_> {
-    fn scope(
-        &self,
-        projection: &Projection,
-        sources: &mut Vec<SourceUse>,
-    ) -> Result<Option<SourceScope>> {
-        let Some(origin) = self.archive.library() else {
-            return Ok(None);
-        };
-        projection.authored_selector(self.owner.and_then(Part::material_selector), sources)?;
-        if let Some((_, attachment)) = self.attachment {
-            cdf_origins::material(projection, attachment, sources)?;
-        }
-        Ok(Some(projection.uses().observe(
-            SourceInput::Archive(origin),
-            InputScope::Payload,
-        )?))
-    }
-
-    fn selected(
-        &self,
-        projection: &Projection,
-        slots: impl Iterator<Item = usize>,
-        sources: &mut Vec<SourceUse>,
-    ) -> Result<()> {
-        let mut slots = slots.peekable();
-        if slots.peek().is_none() {
-            return Ok(());
-        }
-        if let Some(scope) = self.scope(projection, sources)? {
-            for slot in slots {
-                sources.push(material_slot(&scope, slot, "selectedMaterial")?);
-            }
-        }
-        Ok(())
-    }
-}
-
-fn material_slot(scope: &SourceScope, slot: usize, field: &str) -> Result<SourceUse> {
-    Ok(scope.at(
-        SourceLocation::Subresource {
-            namespace: "materialLibrary".into(),
-            indices: vec![u64::try_from(slot)?],
-            field: field.into(),
-        },
-        SourceUseRole::Selector,
-    )?)
 }
 
 fn port_placement(

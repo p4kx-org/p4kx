@@ -6,6 +6,7 @@ use std::sync::Arc;
 use crate::CdfAttachmentSite;
 use crate::cdf_attachment_source;
 use crate::cdf_bone::BoneAttachment;
+use crate::cdf_model_sources::CdfModelSources;
 use crate::loadout_xml::Node;
 use crate::markup::{self, Budget, Element};
 
@@ -22,6 +23,7 @@ pub(crate) struct Character {
     pub(crate) bones: Vec<BoneAttachment>,
     pub(crate) left_out: Vec<String>,
     pub(crate) skeleton: Option<String>,
+    pub(crate) model_sources: Option<CdfModelSources>,
 }
 
 /// Returns whether `path` names a character definition.
@@ -40,22 +42,45 @@ pub(crate) fn is_character_definition(path: &str) -> bool {
 pub(crate) fn read(bytes: &[u8]) -> Result<Character, String> {
     let mut budget = Budget::new(bytes.len());
     let root = markup::parse(bytes, &mut budget)?;
-    project(&root, |_| None)
+    project(&root, |_| None, |_| None)
 }
 
-pub(crate) fn read_observing_attachments(bytes: &[u8]) -> Result<Character, String> {
+pub(crate) fn read_observing_sources(bytes: &[u8]) -> Result<Character, String> {
     let mut budget = Budget::new(bytes.len());
     markup::parse_with_source(bytes, &mut budget, |root, original, scope| {
-        let original = original
-            .children()
-            .into_iter()
+        let children = original.children();
+        let attachments = children
+            .iter()
+            .copied()
             .find(|child| child.name().eq_ignore_ascii_case("AttachmentList"))
             .map(Node::children);
-        project(&root, |ordinal| {
-            let node = original.as_ref()?.get(ordinal).copied()?;
-            Some(cdf_attachment_source::capture(node, scope))
-        })
+        let attachment = |ordinal| attachments.as_ref()?.get(ordinal).copied();
+        project(
+            &root,
+            |ordinal| Some(cdf_attachment_source::capture(attachment(ordinal)?, scope)),
+            |selected| match selected {
+                MainSelector::Attachment {
+                    ordinal,
+                    preferred_skin,
+                } => CdfModelSources::attachment(attachment(ordinal)?, scope, preferred_skin),
+                MainSelector::ModelFile => {
+                    let node = children
+                        .iter()
+                        .copied()
+                        .find(|child| child.name().eq_ignore_ascii_case("Model"))?;
+                    CdfModelSources::file(node, scope)
+                }
+            },
+        )
     })
+}
+
+enum MainSelector {
+    Attachment {
+        ordinal: usize,
+        preferred_skin: bool,
+    },
+    ModelFile,
 }
 
 struct Candidate<'a> {
@@ -68,6 +93,7 @@ struct Candidate<'a> {
 fn project(
     root: &Element,
     capture: impl FnMut(usize) -> Option<Arc<[CdfAttachmentSite]>>,
+    capture_model: impl FnOnce(MainSelector) -> Option<CdfModelSources>,
 ) -> Result<Character, String> {
     if !root.name.eq_ignore_ascii_case("CharacterDefinition") {
         return Err(format!(
@@ -75,38 +101,24 @@ fn project(
             root.name
         ));
     }
-    let attachments: Vec<_> = root
-        .child("AttachmentList")
-        .into_iter()
-        .flat_map(|list| list.children.iter().enumerate())
-        .filter_map(|(ordinal, attachment)| {
-            if !attachment.name.eq_ignore_ascii_case("Attachment") {
-                return None;
-            }
-            let binding = attachment.attribute("Binding").filter(|b| !b.is_empty())?;
-            let skin = attachment
-                .attribute("Type")
-                .is_some_and(|kind| kind.eq_ignore_ascii_case("CA_SKIN"));
-            Some(Candidate {
-                ordinal,
-                binding,
-                skin,
-                element: attachment,
-            })
-        })
-        .collect();
+    let attachments: Vec<_> = attachment_candidates(root).collect();
     let chosen = attachments
         .iter()
         .position(|candidate| candidate.skin)
         .or_else(|| (!attachments.is_empty()).then_some(0));
-    let (model, material) = match chosen.and_then(|at| attachments.get(at)) {
+    let (model, material, selected) = match chosen.and_then(|at| attachments.get(at)) {
         Some(candidate) => (
             slashes(candidate.binding),
             candidate.element.attribute("Material").map(slashes),
+            MainSelector::Attachment {
+                ordinal: candidate.ordinal,
+                preferred_skin: candidate.skin,
+            },
         ),
         None => (
             slashes(skeleton_file(root).ok_or("it names no model and no attachment")?),
             None,
+            MainSelector::ModelFile,
         ),
     };
     if is_character_definition(&model) {
@@ -127,7 +139,29 @@ fn project(
         bones,
         left_out,
         skeleton,
+        model_sources: capture_model(selected),
     })
+}
+
+fn attachment_candidates(root: &Element) -> impl Iterator<Item = Candidate<'_>> {
+    root.child("AttachmentList")
+        .into_iter()
+        .flat_map(|list| list.children.iter().enumerate())
+        .filter_map(|(ordinal, attachment)| {
+            if !attachment.name.eq_ignore_ascii_case("Attachment") {
+                return None;
+            }
+            let binding = attachment.attribute("Binding").filter(|b| !b.is_empty())?;
+            let skin = attachment
+                .attribute("Type")
+                .is_some_and(|kind| kind.eq_ignore_ascii_case("CA_SKIN"));
+            Some(Candidate {
+                ordinal,
+                binding,
+                skin,
+                element: attachment,
+            })
+        })
 }
 
 /// Returns the file of the definition's `Model` element, its skeleton.

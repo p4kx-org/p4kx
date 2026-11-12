@@ -9,6 +9,7 @@ use p4kx_model::{Lod, Model};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::build::{file_key, issue};
+use crate::cdf_model_sources::CdfModelSources;
 use crate::flatten::Draft;
 use crate::geometry_choice::GeometryChoice;
 use crate::{
@@ -25,6 +26,7 @@ pub(crate) struct Loaded {
     pub(crate) entry: String,
     pub(crate) model: Arc<Model>,
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) cdf_model_sources: Option<Arc<CdfModelSources>>,
     pub(crate) definition_origin: Option<EntryOrigin>,
     pub(crate) left_out: Vec<String>,
     pub(crate) attachments: Vec<ProvidedAttachment>,
@@ -177,6 +179,7 @@ fn read_files(
                     entry: provided.entry,
                     model: Arc::new(provided.model),
                     archive_sources: provided.archive_sources,
+                    cdf_model_sources: provided.cdf_model_sources,
                     definition_origin: provided.definition_origin,
                     left_out: provided.left_out,
                     attachments: provided.attachments,

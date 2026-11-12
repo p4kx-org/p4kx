@@ -30,6 +30,9 @@ mod bone_origins;
 #[path = "ui_hologram_cdf_origins.rs"]
 mod cdf_origins;
 
+#[path = "ui_hologram_material_origins.rs"]
+mod material_origins;
+
 #[path = "ui_hologram_node_origins.rs"]
 mod node_origins;
 

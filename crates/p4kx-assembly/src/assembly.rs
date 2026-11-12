@@ -5,13 +5,14 @@ use std::io::Write;
 use std::sync::Arc;
 
 use p4kx_dataforge::Guid;
-use p4kx_extraction::{ArchiveMaterialRead, EntryOrigin, ModelArchiveSource};
+use p4kx_extraction::{ArchiveMaterialRead, ModelArchiveSource};
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, Scene, SceneNode, ScenePart, TextureLoader, write_scene_glb,
     write_scene_glb_with,
 };
 use p4kx_model::{MaterialStatus, Model, TintPalette, Transform, UnresolvedLayers};
 
+pub(crate) use self::part_inputs::ModelDefinition;
 use crate::geometry::GeometrySelectors;
 use crate::model_placement_sources::ModelPlacement;
 use crate::{AttachedModel, Issue, PortPlacementSource, creature_rig};
@@ -122,7 +123,7 @@ pub struct Part {
     pub(crate) geometry: Option<String>,
     pub(crate) model: Option<Arc<Model>>,
     pub(crate) model_archive_sources: Arc<[ModelArchiveSource]>,
-    pub(crate) model_definition_origin: Option<EntryOrigin>,
+    pub(crate) model_definition: ModelDefinition,
     pub(crate) geometry_selectors: GeometrySelectors,
     pub(crate) materials: Arc<ArchiveMaterialRead>,
     pub(crate) palette: Option<Arc<TintPalette>>,
