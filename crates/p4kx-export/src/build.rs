@@ -17,11 +17,8 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::ammo_definition;
 use crate::catalog_v3::catalog_global_configurations::{self, GlobalConfigurations};
-use crate::catalog_v3::{
-    ammo_definition, reputation_perk_list, reputation_scope_definition,
-    reputation_standing_definition,
-};
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
 use crate::mission_data::link_scenario_factions;
@@ -192,6 +189,7 @@ fn assemble<R>(
         collected.resource_groups,
         collected.resource_group_members,
     );
+    let reputation_tables = collected.mission_kinds.take_reputation_tables(&forge);
     let components = collected.item_components.into_tables(&forge);
     let topology =
         std::mem::take(&mut collected.entity_configurations.topology).into_tables(&forge);
@@ -229,14 +227,9 @@ fn assemble<R>(
                 collected.explosion_definitions,
             ),
             ammo_definitions: ammo_definition::table(&forge, collected.ammo_definitions),
-            reputation_scopes: reputation_scope_definition::table(
-                &forge,
-                collected.mission_kinds.scopes,
-            ),
-            reputation_standings: reputation_standing_definition::table(
-                &forge,
-                collected.mission_kinds.standings,
-            ),
+            reputation_contexts: reputation_tables.contexts,
+            reputation_scopes: reputation_tables.scopes,
+            reputation_standings: reputation_tables.standings,
             contract_generators: CatalogTable::new(
                 &forge,
                 &["ContractGenerator"],
@@ -284,7 +277,7 @@ fn assemble<R>(
             commodities: commodity_tables.definitions,
             manufacturers: crate::manufacturer::table(&forge, collected.manufacturers),
             factions: crate::catalog_v3::faction_definition::table(&forge, collected.factions),
-            reputation_perks: reputation_perk_list::table(&forge, collected.mission_kinds.perks),
+            reputation_perks: reputation_tables.perks,
         },
         projections: CatalogProjections {
             contracts: CatalogTable::new(&forge, &["ContractGenerator"], collected.contracts),
@@ -356,7 +349,6 @@ fn assemble<R>(
         loot_containers: collected.loot_containers,
         shops: collected.shops,
         faction_reputations: collected.mission_kinds.factions,
-        reputation_contexts: collected.mission_kinds.contexts,
         mission_types: collected.mission_kinds.types,
         mission_localities: collected.mission_kinds.localities,
         contract_scenarios: collected.mission_kinds.scenarios,

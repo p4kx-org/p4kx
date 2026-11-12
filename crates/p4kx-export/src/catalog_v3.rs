@@ -35,6 +35,10 @@ pub(crate) mod reputation_perk_list;
 
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;
+#[path = "reputation_blackboard.rs"]
+mod reputation_blackboard;
+#[path = "reputation_context_definition.rs"]
+pub(crate) mod reputation_context_definition;
 #[path = "reputation_scope_definition.rs"]
 pub(crate) mod reputation_scope_definition;
 #[path = "reputation_standing_definition.rs"]

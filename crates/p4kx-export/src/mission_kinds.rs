@@ -1,21 +1,24 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::RecordTree;
+use p4kx_extraction::{DataForge, RecordTree};
 
 use crate::Kind;
 use crate::cargo_manifest::cargo_manifest;
 use crate::catalog_number_capture::CapturedNumber;
-use crate::catalog_v3::reputation_perk_list::PreparedPerkList;
-use crate::catalog_v3::reputation_scope_definition::PreparedScope;
-use crate::catalog_v3::reputation_standing_definition::PreparedStanding;
+use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::reputation_context_definition::{self, ContextDefinition, PreparedContext};
+use crate::catalog_v3::reputation_perk_list::{self, PreparedPerkList, ReputationPerkList};
+use crate::catalog_v3::reputation_scope_definition::{self, PreparedScope, ScopeDefinition};
+use crate::catalog_v3::reputation_standing_definition::{
+    self, PreparedStanding, StandingDefinition,
+};
 use crate::contract::{
     CargoManifest, ContractScenario, FactionReputation, MissionLocality, MissionType,
-    ReputationContext,
 };
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::mission_data::{contract_scenario, mission_locality, mission_type};
-use crate::reputation::{faction_reputation, reputation_context};
+use crate::reputation::faction_reputation;
 use crate::texts::Texts;
 
 /// An entity of one of the mission and reputation kinds.
@@ -29,7 +32,7 @@ pub(crate) enum MissionPick<'f> {
     /// A physical list of reputation perks.
     Perks(Box<PreparedPerkList<'f>>),
     /// A reputation context.
-    Context(ReputationContext<'f>),
+    Context(Box<PreparedContext<'f>>),
     /// A mission type.
     Type(MissionType<'f>),
     /// A mission locality.
@@ -46,7 +49,6 @@ impl<'f> MissionPick<'f> {
     pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>, texts: &Texts<'f>) -> Option<Self> {
         Some(match kind {
             Kind::FactionReputations => Self::Faction(faction_reputation(tree, texts)),
-            Kind::ReputationContexts => Self::Context(reputation_context(tree)),
             Kind::MissionTypes => Self::Type(mission_type(tree, texts)),
             Kind::MissionLocalities => Self::Locality(mission_locality(tree)),
             Kind::ContractScenarios => Self::Scenario(contract_scenario(tree)),
@@ -63,11 +65,18 @@ pub(crate) struct MissionKinds<'f> {
     pub(crate) scopes: Vec<PreparedScope<'f>>,
     pub(crate) standings: Vec<PreparedStanding<'f>>,
     pub(crate) perks: Vec<PreparedPerkList<'f>>,
-    pub(crate) contexts: Vec<ReputationContext<'f>>,
+    pub(crate) contexts: Vec<PreparedContext<'f>>,
     pub(crate) types: Vec<MissionType<'f>>,
     pub(crate) localities: Vec<MissionLocality<'f>>,
     pub(crate) scenarios: Vec<ContractScenario<'f>>,
     pub(crate) manifests: Vec<CargoManifest<'f>>,
+}
+
+pub(crate) struct ReputationTables<'source> {
+    pub(crate) contexts: CatalogTable<ContextDefinition<'source>>,
+    pub(crate) scopes: CatalogTable<ScopeDefinition<'source>>,
+    pub(crate) standings: CatalogTable<StandingDefinition<'source>>,
+    pub(crate) perks: CatalogTable<ReputationPerkList<'source>>,
 }
 
 impl<'f> MissionKinds<'f> {
@@ -78,7 +87,7 @@ impl<'f> MissionKinds<'f> {
             MissionPick::Scope(entity) => self.scopes.push(*entity),
             MissionPick::Standing(entity) => self.standings.push(*entity),
             MissionPick::Perks(entity) => self.perks.push(*entity),
-            MissionPick::Context(entity) => self.contexts.push(entity),
+            MissionPick::Context(entity) => self.contexts.push(*entity),
             MissionPick::Type(entity) => self.types.push(entity),
             MissionPick::Locality(entity) => self.localities.push(entity),
             MissionPick::Scenario(entity) => self.scenarios.push(entity),
@@ -95,11 +104,28 @@ impl<'f> MissionKinds<'f> {
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         self.perks
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
-        sort_by_guid(&mut self.contexts, |entity| entity.guid);
+        self.contexts
+            .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         sort_by_guid(&mut self.types, |entity| entity.guid);
         sort_by_guid(&mut self.localities, |entity| entity.guid);
         sort_by_guid(&mut self.scenarios, |entity| entity.guid);
         sort_by_guid(&mut self.manifests, |entity| entity.guid);
+    }
+
+    /// Takes the physical reputation definitions into their canonical catalog tables.
+    pub(crate) fn take_reputation_tables(&mut self, forge: &DataForge<'_>) -> ReputationTables<'f> {
+        ReputationTables {
+            contexts: reputation_context_definition::table(
+                forge,
+                std::mem::take(&mut self.contexts),
+            ),
+            scopes: reputation_scope_definition::table(forge, std::mem::take(&mut self.scopes)),
+            standings: reputation_standing_definition::table(
+                forge,
+                std::mem::take(&mut self.standings),
+            ),
+            perks: reputation_perk_list::table(forge, std::mem::take(&mut self.perks)),
+        }
     }
 
     /// Returns original numeric receipts attached to emitted reputation definitions.
@@ -118,6 +144,11 @@ impl<'f> MissionKinds<'f> {
                 self.perks
                     .iter()
                     .map(|row| (Kind::ReputationPerks, row.numbers.as_slice())),
+            )
+            .chain(
+                self.contexts
+                    .iter()
+                    .map(|row| (Kind::ReputationContexts, row.numbers.as_slice())),
             )
     }
 

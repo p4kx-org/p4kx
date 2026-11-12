@@ -109,7 +109,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | reputationScopes | D.reputationScopes | physical scopes, protected names and descriptions, icon paths, exact standing-map limits and ordered standing links |
 | reputationStandings | D.reputationStandings | authored rank names, descriptions, perk text, icon paths, gating and exact progression values |
 | reputationPerks | D.reputationPerks | physical perk lists, ordered scope/standing bindings, typed item/category rewards, original words and unclassified authored variants |
-| reputationContexts | D.reputationContexts | display scopes/relations |
+| reputationContexts | D.reputationContexts | physical contexts, authored sort order, ordered scope occurrences, protected and original dynamic display properties |
 | missionTypes | D.missionTypes | mission-type definitions and source text |
 | missionLocalities | D.missionLocalities | stored starmap-object membership |
 | contractScenarios | D.contractScenarios | faction reward tiers/progression, source flags, no active state |

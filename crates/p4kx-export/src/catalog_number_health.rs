@@ -302,6 +302,7 @@ impl Coverage<'_, '_> {
                     | Kind::Factions
                     | Kind::ReputationScopes
                     | Kind::ReputationStandings
+                    | Kind::ReputationContexts
                     | Kind::ReputationPerks
             )
         ) {
@@ -367,6 +368,7 @@ impl Coverage<'_, '_> {
                     Kind::Factions
                     | Kind::ReputationScopes
                     | Kind::ReputationStandings
+                    | Kind::ReputationContexts
                     | Kind::ReputationPerks,
                 ),
                 AuthoredDefinitionRawValue { .. },
@@ -376,6 +378,7 @@ impl Coverage<'_, '_> {
                     Kind::ExplosionDefinitions
                     | Kind::AmmoDefinitions
                     | Kind::ReputationStandings
+                    | Kind::ReputationContexts
                     | Kind::ReputationPerks,
                 ),
                 _,

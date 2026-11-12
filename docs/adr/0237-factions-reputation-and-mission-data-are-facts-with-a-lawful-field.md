@@ -66,3 +66,10 @@ owned standing map retains the authored numeric widths and each standing referen
 in stored order, including unresolved references. Scope labels and descriptions use
 the protected text registry. The icon remains a path, and the source arena retains
 additional declarations.
+
+## Catalog v3 context definitions
+
+`definitions.reputationContexts` retains physical contexts, their authored sort order, and
+each primary and listed scope occurrence. Scope references preserve their original identity and
+resolution. Each occurrence retains its original blackboard properties, including protected
+Locale references and exact numeric values. Unclassified dynamic bodies remain in the source arena.

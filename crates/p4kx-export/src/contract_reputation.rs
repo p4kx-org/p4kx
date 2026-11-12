@@ -51,21 +51,3 @@ pub(crate) struct RelationStanding {
     /// The `SReputationStandingParams` Record, `null` when the relation names none.
     pub(crate) standing_guid: Option<CatalogGuid>,
 }
-
-/// A reputation context: an `SReputationContextUI` Record under `reputation/contexts`, the scopes a
-/// faction is shown with.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct ReputationContext<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `ReputationContext_Transport`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The scope of the `primaryScopeContext`, `null` when it names none.
-    pub(crate) primary_scope_guid: Option<CatalogGuid>,
-    /// The scopes of the `scopeContextList`, in the stored order.
-    pub(crate) scope_guids: Vec<CatalogGuid>,
-}

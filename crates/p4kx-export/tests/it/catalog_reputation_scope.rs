@@ -74,34 +74,40 @@ fn a_scope_keeps_standing_reference_order_when_targets_are_filtered() -> TestRes
 }
 
 #[test]
-fn a_legacy_scope_string_key_still_resolves_as_protected_text() -> TestResult {
+fn legacy_reputation_string_keys_still_resolve_as_protected_text() -> TestResult {
     use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
     use crate::commodity_v3_fixture::{self as archive, DcbOrigin, text_row};
 
-    let source_type = "SReputationScopeParams";
-    let database = DataForgeBuilder::new()
-        .version(8)
-        .structure(TestStruct::new(source_type).field("displayName", TestType::String))
-        .record(
-            TestRecord::new(
-                SCOPE,
-                source_type,
-                "SReputationScopeParams.Legacy",
-                "libs/foundry/records/reputation/scopes/legacy.xml",
-            )
-            .value("displayName", TestValue::text("@shared")),
-        );
+    let mut database = DataForgeBuilder::new().version(8);
+    for (guid, source_type, folder) in [
+        (SCOPE, "SReputationScopeParams", "scopes"),
+        (STANDING_LOW, "SReputationStandingParams", "standings"),
+    ] {
+        database = database
+            .structure(TestStruct::new(source_type).field("displayName", TestType::String))
+            .record(
+                TestRecord::new(
+                    guid,
+                    source_type,
+                    format!("{source_type}.Legacy"),
+                    format!("libs/foundry/records/reputation/{folder}/legacy.xml"),
+                )
+                .value("displayName", TestValue::text("@shared")),
+            );
+    }
     let (_folder, input) = archive::open(&database, DcbOrigin::Plain)?;
     let built = p4kx_export::build_catalog(&input, &archive::options())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let row = proof::at(&catalog, "/definitions/reputationScopes/rows/0")?;
-    let display = proof::cell(row, "displayName", "present")?;
-    let text = text_row(&catalog, "gameTexts", proof::at(display, "/value")?)?;
-    assert_eq!(proof::at(text, "/key/value")?, &json!("@shared"));
-    assert_eq!(
-        proof::at(text, "/translations/value/en/displayText/value")?,
-        &json!("Shared text")
-    );
+    for table in ["reputationScopes", "reputationStandings"] {
+        let row = proof::at(&catalog, &format!("/definitions/{table}/rows/0"))?;
+        let display = proof::cell(row, "displayName", "present")?;
+        let text = text_row(&catalog, "gameTexts", proof::at(display, "/value")?)?;
+        assert_eq!(proof::at(text, "/key/value")?, &json!("@shared"));
+        assert_eq!(
+            proof::at(text, "/translations/value/en/displayText/value")?,
+            &json!("Shared text")
+        );
+    }
     proof::closure(&catalog)
 }

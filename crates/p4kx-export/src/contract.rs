@@ -28,7 +28,7 @@ pub(crate) use crate::contract_mining::{
 pub(crate) use crate::contract_mining_params::MiningGlobalParams;
 pub(crate) use crate::contract_mission_data::{ContractScenario, MissionLocality, MissionType};
 pub(crate) use crate::contract_missions::ContractEntry;
-pub(crate) use crate::contract_reputation::{FactionReputation, ReputationContext};
+pub(crate) use crate::contract_reputation::FactionReputation;
 pub(crate) use crate::contract_rewards::{BlueprintPool, CraftingGlobal, DismantleProcess};
 pub(crate) use crate::contract_shops::Shop;
 pub(crate) use crate::contract_source::{BuildSource, Source};
@@ -113,8 +113,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) shops: Vec<Shop>,
     /// The factions with their reputation links, ordered by GUID.
     pub(crate) faction_reputations: Vec<FactionReputation<'a>>,
-    /// The reputation contexts, the scopes a faction is shown with, ordered by GUID.
-    pub(crate) reputation_contexts: Vec<ReputationContext<'a>>,
     /// The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID.
     pub(crate) mission_types: Vec<MissionType<'a>>,
     /// The mission localities, sets of starmap objects, ordered by GUID.

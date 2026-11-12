@@ -124,6 +124,15 @@ fn template_numbers(collected: &Collected<'_>) -> Vec<TemplateNumbers> {
 fn append_missions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
     append(
         emitted,
+        Kind::ReputationContexts,
+        collected
+            .mission_kinds
+            .contexts
+            .iter()
+            .map(|row| (row.physical_guid, row.physical_path)),
+    );
+    append(
+        emitted,
         Kind::ReputationPerks,
         collected
             .mission_kinds

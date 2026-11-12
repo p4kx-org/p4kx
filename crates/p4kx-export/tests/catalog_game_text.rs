@@ -110,7 +110,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 59,
+        marked, 60,
         "every protected field in the canonical schema is accounted for"
     );
 
@@ -136,6 +136,9 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
         | ("StandingDefinition", "perkDescription")
         | ("TemplateLocalization", "text")
         | ("ProjectedMissionText", "key" | "translations") => true,
+        ("BlackboardPropertyBody", "value") => {
+            field.get("$ref").and_then(Value::as_str) == Some("#/$defs/SourcedValueOfGameTextRef")
+        }
         ("BrokerProjection" | "TemplateProjection", "title") => {
             assert!(
                 references(

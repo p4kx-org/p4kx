@@ -2063,6 +2063,140 @@
       ],
       "type": "object"
     },
+    "BlackboardProperty": {
+      "description": "An authored reputation blackboard property and its original dynamic value.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "dynamicProperty": {
+          "$ref": "#/$defs/SourcedValueOfBlackboardPropertyBody"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "dynamicProperty",
+        "name",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "BlackboardPropertyBody": {
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "boolean",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "float",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "integer",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SourcedValueOfint32"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "localized",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SourcedValueOfGameTextRef",
+              "x-gameText": true
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "string",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "authored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "BlueprintCategoryDefinition": {
       "description": "One physical fieldless `BlueprintCategoryRecord` definition with directly sourced metadata.",
       "properties": {
@@ -3796,6 +3930,9 @@
         "qualityQuantizations": {
           "$ref": "#/$defs/CatalogTableOfQualityQuantizationDefinition"
         },
+        "reputationContexts": {
+          "$ref": "#/$defs/CatalogTableOfContextDefinition"
+        },
         "reputationPerks": {
           "$ref": "#/$defs/CatalogTableOfReputationPerkList"
         },
@@ -3833,6 +3970,7 @@
         "missionBrokerEntries",
         "qualityDistributions",
         "qualityQuantizations",
+        "reputationContexts",
         "reputationPerks",
         "reputationScopes",
         "reputationStandings",
@@ -4178,6 +4316,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/CommodityPresentation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfContextDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ContextDefinition"
           },
           "type": "array"
         }
@@ -6446,6 +6603,62 @@
         "ownerRecordIndex",
         "primaryAmmo",
         "secondaryAmmo"
+      ],
+      "type": "object"
+    },
+    "ContextDefinition": {
+      "description": "Authored reputation display scope configuration.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "primaryScopeContext": {
+          "$ref": "#/$defs/SourcedValueOfScopeContext"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "scopeContextList": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfScopeContext"
+        },
+        "sortOrderScope": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "primaryScopeContext",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "scopeContextList",
+        "sortOrderScope",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -22078,49 +22291,6 @@
         }
       ]
     },
-    "ReputationContext": {
-      "description": "A reputation context: an `SReputationContextUI` Record under `reputation/contexts`, the scopes a\nfaction is shown with.",
-      "properties": {
-        "className": {
-          "description": "The Record name without its type, e.g. `ReputationContext_Transport`.",
-          "type": "string"
-        },
-        "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
-        },
-        "primaryScopeGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The scope of the `primaryScopeContext`, `null` when it names none."
-        },
-        "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
-        },
-        "scopeGuids": {
-          "description": "The scopes of the `scopeContextList`, in the stored order.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "className",
-        "guid",
-        "primaryScopeGuid",
-        "recordPath",
-        "scopeGuids"
-      ],
-      "type": "object"
-    },
     "ReputationGain": {
       "description": "One reputation amount a contract grants on success.",
       "properties": {
@@ -24822,6 +24992,29 @@
         "blueprintPoolGuids",
         "globalPointsMultiplier",
         "minPoints"
+      ],
+      "type": "object"
+    },
+    "ScopeContext": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "propertiesBb": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfBlackboardProperty"
+        },
+        "scope": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "propertiesBb",
+        "scope",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -30058,6 +30251,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfAttachableEntity"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfBlackboardProperty": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfBlackboardProperty"
                 },
                 "type": "array"
               }
@@ -36081,6 +36407,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfScopeContext": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfScopeContext"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfSecondaryMagazine": {
       "allOf": [
         {
@@ -38421,6 +38880,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/BaseSignature"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfBlackboardProperty": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/BlackboardProperty"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfBlackboardPropertyBody": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/BlackboardPropertyBody"
               }
             }
           }
@@ -61017,6 +61736,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfScopeContext": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ScopeContext"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfScopeStandingMap": {
       "allOf": [
         {
@@ -69565,13 +70414,6 @@
       },
       "type": "array"
     },
-    "reputationContexts": {
-      "description": "The reputation contexts, the scopes a faction is shown with, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/ReputationContext"
-      },
-      "type": "array"
-    },
     "schemaVersion": {
       "const": 3,
       "description": "The version of the catalog shape; an import rejects a version it does not know.",
@@ -69661,7 +70503,6 @@
     "projections",
     "provenance",
     "refiningProcesses",
-    "reputationContexts",
     "schemaVersion",
     "shipStoreSlugs",
     "ships",

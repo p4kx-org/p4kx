@@ -3,7 +3,7 @@
 
 use p4kx_extraction::{RecordTree, StructValue};
 
-use crate::contract_reputation::{FactionReputation, RelationStanding, ReputationContext};
+use crate::contract_reputation::{FactionReputation, RelationStanding};
 use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{key, one};
 use crate::record_fields::{boolean, class_name, reference, references, structs, text};
@@ -32,20 +32,6 @@ pub(crate) fn faction_reputation<'f>(
         enemy_guids: references(root, "enemies"),
         hostility: relation(root, "hostilityParams"),
         allied: relation(root, "alliedParams"),
-    }
-}
-
-/// Returns the reputation context the Record tree `tree` describes.
-pub(crate) fn reputation_context<'f>(tree: &RecordTree<'f>) -> ReputationContext<'f> {
-    let root = Some(tree.root());
-    ReputationContext {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        primary_scope_guid: reference(one(root, "primaryScopeContext"), "scope"),
-        scope_guids: structs(root, "scopeContextList")
-            .filter_map(|context| reference(Some(context), "scope"))
-            .collect(),
     }
 }
 

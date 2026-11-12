@@ -77,13 +77,36 @@ pub(super) fn standings() -> serde_json::Value {
 }
 
 pub(super) fn contexts() -> serde_json::Value {
-    json!([{
-        "guid": "63000000-0000-4000-8000-000000000001",
-        "className": "ReputationContext_Transport",
-        "recordPath": "libs/foundry/records/reputation/contexts/reputationcontext_transport",
-        "primaryScopeGuid": SCOPE,
-        "scopeGuids": [SCOPE]
-    }])
+    let property = values::present(json!({
+        "sourceType":values::present(json!("SReputationContextBBPropertyParams")),
+        "name":values::present(json!("fixtureLabel")),
+        "dynamicProperty":values::present(json!({
+            "sourceType":values::present(json!("SBBDynamicPropertyLocString")),
+            "kind":"localized",
+            "value":values::source(SourceValue::Null),
+            "authoredFields":{"roots":[],"values":[]}
+        })),
+        "authoredFields":{"roots":[],"values":[]}
+    }));
+    json!({"availability":"available","rows":[{
+        "guid":values::present(json!("63000000-0000-4000-8000-000000000001")),
+        "recordName":values::present(json!("SReputationContextUI.Transport")),
+        "className":values::present(json!("Transport")),
+        "recordPath":values::present(json!("libs/foundry/records/reputation/contexts/transport")),
+        "recordIndex":values::present(json!(2)),
+        "sourceType":values::present(json!("SReputationContextUI")),
+        "fileName":values::present(json!("libs/foundry/records/reputation/contexts/transport.xml")),
+        "metadataTag":values::source(SourceValue::Absent),
+        "sortOrderScope":values::present(json!("FixtureSortOrder")),
+        "primaryScopeContext":values::present(json!({
+            "sourceType":values::present(json!("SReputationScopeContextUI")),
+            "scope":values::source(SourceValue::Null),
+            "propertiesBb":values::present(json!([property])),
+            "authoredFields":{"roots":[],"values":[]}
+        })),
+        "scopeContextList":values::present(json!([])),
+        "authoredFields":{"roots":[],"values":[]}
+    }]})
 }
 
 pub(super) fn mission_types() -> serde_json::Value {

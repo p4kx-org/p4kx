@@ -150,6 +150,7 @@ fn origins<'source>(
                 | Kind::QualityDistributions
                 | Kind::QualityQuantizations
                 | Kind::StarmapObjects
+                | Kind::ReputationContexts
                 | Kind::ReputationScopes
                 | Kind::ReputationStandings
         ) || !source.disposition.read_succeeded()

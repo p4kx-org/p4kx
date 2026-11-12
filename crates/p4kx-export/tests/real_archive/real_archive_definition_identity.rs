@@ -33,6 +33,7 @@ pub(super) fn check(catalog: &Value, kind: Kind) -> TestResult {
             Kind::GameplayProperties => source_type == "CraftingGameplayPropertyDef",
             Kind::ExplosionDefinitions => source_type == "ExplosionRecord",
             Kind::AmmoDefinitions => source_type == "AmmoParams",
+            Kind::ReputationContexts => source_type == "SReputationContextUI",
             Kind::ReputationScopes => source_type == "SReputationScopeParams",
             Kind::ReputationStandings => source_type == "SReputationStandingParams",
             Kind::QualityQuantizations => source_type == "CraftingQualityQuantizationRecord",

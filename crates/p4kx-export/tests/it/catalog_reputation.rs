@@ -10,6 +10,8 @@ mod catalog_faction;
 mod faction_modifier;
 #[path = "catalog_scenario_faction_scope.rs"]
 mod faction_scope;
+#[path = "catalog_reputation_context.rs"]
+mod reputation_context;
 #[path = "reputation_perks.rs"]
 mod reputation_perks;
 #[path = "catalog_reputation_scope.rs"]
@@ -252,11 +254,20 @@ fn standing(catalog: &Value, record: u128) -> Result<&Value, Box<dyn Error>> {
 #[test]
 fn a_context_names_its_primary_and_listed_scopes() -> TestResult {
     let (_, catalog) = build(None)?;
-    let context = entry(&catalog, "reputationContexts", CONTEXT)?;
-    assert_eq!(context["primaryScopeGuid"], guid(SCOPE).as_str());
+    let context = proof::at(&catalog, "/definitions/reputationContexts/rows/0")?;
+    proof::present(context, "guid", &json!(guid(CONTEXT)), Some(true))?;
     assert_eq!(
-        context["scopeGuids"],
-        json!([guid(SCOPE), guid(PLAIN_A)]),
+        proof::at(context, "/primaryScopeContext/value/scope/value/guid/value")?,
+        &json!(guid(SCOPE))
+    );
+    let slots = proof::rows(context, "/scopeContextList/value")?;
+    let links = slots
+        .iter()
+        .map(|row| proof::at(row, "/value/scope/value/guid/value"))
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        links,
+        vec![&json!(guid(SCOPE)), &json!(guid(PLAIN_A))],
         "listed in stored order"
     );
     Ok(())

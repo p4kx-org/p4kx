@@ -239,7 +239,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.reputationScopes` | Physical reputation scope definitions with authored presentation and ordered standing maps |
 | `definitions.reputationStandings` | The physical reputation standings with authored presentation and progression fields, ordered by GUID and original Record index |
 | `definitions.reputationPerks` | The physical perk lists with ordered original scope/standing associations and owned reward or category data |
-| `reputationContexts` | The reputation contexts, the scopes a faction is shown with, ordered by GUID |
+| `definitions.reputationContexts` | Physical reputation contexts with authored scope order, original references and display properties |
 | `missionTypes` | The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID |
 | `missionLocalities` | The mission localities, named sets of starmap objects, ordered by GUID |
 | `contractScenarios` | The contract scenarios with the reward tiers of each faction, ordered by GUID |

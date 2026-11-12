@@ -95,15 +95,20 @@ fn check_ladders(catalog: &Value, scopes: &HashSet<&str>, standings: &HashSet<&s
             standings,
         );
     }
-    for context in list(catalog, "reputationContexts")? {
+    for context in catalog_v3_consumer::rows(catalog, Kind::ReputationContexts)? {
         assert_resolve(
             "the scopes of a context",
-            strings(context, "scopeGuids"),
+            context
+                .pointer("/scopeContextList/value")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|slot| text(slot, "/value/scope/value/guid/value")),
             scopes,
         );
         assert_resolve(
             "the primary scope",
-            text(context, "/primaryScopeGuid"),
+            text(context, "/primaryScopeContext/value/scope/value/guid/value"),
             scopes,
         );
     }
@@ -117,7 +122,7 @@ fn the_factions_and_their_reputation_ladders_of_a_real_archive_are_linked() -> T
     let factions = list(&catalog, "factionReputations")?;
     let scopes = canonical_guids(&catalog, "reputationScopes")?;
     let standings = canonical_guids(&catalog, "reputationStandings")?;
-    let contexts = guids(&catalog, "reputationContexts")?;
+    let contexts = canonical_guids(&catalog, "reputationContexts")?;
     let faction_guids = guids(&catalog, "factionReputations")?;
     print_line(&format!(
         "{} factions, {} scopes, {} standings, {} contexts",

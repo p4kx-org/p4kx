@@ -129,7 +129,11 @@ impl<'source> StandingPresentation<'source> {
         Ok(Self {
             name: source.borrowed_string("name", notes)?,
             description: source.borrowed_string("description", notes)?,
-            display_name: source.protected_locale("displayName", projection, notes)?,
+            display_name: source.protected_locale_or_legacy_key(
+                "displayName",
+                projection,
+                notes,
+            )?,
             perk_description: source.protected_locale("perkDescription", projection, notes)?,
             icon: source.borrowed_string("icon", notes)?,
             mission_board_icon: source.borrowed_string("missionBoardIcon", notes)?,
