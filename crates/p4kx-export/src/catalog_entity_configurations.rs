@@ -17,6 +17,9 @@ use super::catalog_resource_connection::{self, ConnectionKind, ResourceConnectio
 use super::catalog_vehicle_armor::{self, VehicleArmor};
 use super::item_alignment_options::AlignmentOptions;
 use super::item_component_owner::ComponentOwner;
+use super::resource_network_links::ResourceNetworkLinks;
+use super::resource_topology_declarations::ResourceTopologyDeclarations;
+use super::room_associations::{self, RoomAssociations};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
@@ -30,6 +33,7 @@ use crate::template_field_capture::TemplateFieldCapture;
 #[derive(Default)]
 pub(crate) struct EntityConfigurationRows<'source> {
     pub(crate) alignment: ItemAlignmentRows<'source>,
+    pub(crate) topology: ResourceTopologyDeclarations<'source>,
     fuel: FuelConfigurationRows<'source>,
     resources: Vec<ResourceComponent<'source>>,
     connections: Vec<ResourceConnection<'source>>,
@@ -40,6 +44,7 @@ pub(crate) struct EntityConfigurationRows<'source> {
 impl<'source> EntityConfigurationRows<'source> {
     pub(crate) fn extend(&mut self, other: Self) {
         self.alignment.extend(other.alignment);
+        self.topology.extend(other.topology);
         self.fuel.extend(other.fuel);
         self.resources.extend(other.resources);
         self.connections.extend(other.connections);
@@ -94,6 +99,7 @@ enum ConfigurationKind {
     Fuel(FuelConfigurationKind),
     Resource,
     Connection(ConnectionKind),
+    RoomAssociations,
     VehicleArmor,
 }
 
@@ -103,6 +109,9 @@ impl ConfigurationKind {
             catalog_resource_component::COMPONENT => return Some(Self::Resource),
             catalog_vehicle_armor::COMPONENT => return Some(Self::VehicleArmor),
             _ => {}
+        }
+        if value.type_name() == room_associations::VEHICLE {
+            return Some(Self::RoomAssociations);
         }
         ItemAlignmentKind::of(value, input)
             .map(Self::Alignment)
@@ -150,9 +159,19 @@ pub(crate) fn read<'source>(
         let source = Observed::new(&originals, input, component, &capture, &numbers);
         match configuration {
             ConfigurationKind::Alignment(alignment) => {
+                if matches!(alignment, ItemAlignmentKind::Port)
+                    && let Some(links) =
+                        ResourceNetworkLinks::read(owner.clone(), source, &mut notes)?
+                {
+                    rows.topology.links.push(links);
+                }
                 rows.alignment
                     .push(alignment, owner, source, options, &mut notes)?;
             }
+            ConfigurationKind::RoomAssociations => rows
+                .topology
+                .rooms
+                .push(RoomAssociations::read(owner, source, &mut notes)?),
             ConfigurationKind::Fuel(fuel) => rows.fuel.push(fuel, owner, source, &mut notes)?,
             ConfigurationKind::Resource => rows
                 .resources

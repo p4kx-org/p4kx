@@ -357,3 +357,6 @@ fn an_item_without_a_stat_block_has_null_stats_whatever_connections_it_has() -> 
     assert!(plain["stats"].is_null());
     Ok(())
 }
+
+#[path = "catalog_resource_topology.rs"]
+mod resource_topology;

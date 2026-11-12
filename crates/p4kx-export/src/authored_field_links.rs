@@ -10,7 +10,9 @@ use crate::catalog_read::original::OriginalValuePart;
 use crate::catalog_v3::authored_link::{self as link, HealthLink};
 use crate::definition_reference::DefinitionStatus;
 use crate::source_fields::{FieldError, FieldViolation};
-use crate::source_value_catalog::{SourcePayload, SourceRecordReference, read_reference_payload};
+use crate::source_value_catalog::{
+    SourcePayload, SourceRecordReference, SourceWeakReference, read_reference_payload,
+};
 use crate::{CatalogError, ExportAccountingError};
 
 pub(in crate::catalog_v3) type ReferenceCell<'source> =
@@ -68,9 +70,32 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         self.read_link(
             name,
             "a nullable Reference",
-            Some(target_type),
+            Some((DataType::Reference, target_type)),
             notes,
             |fact, sources, selectors| self.decode_record_link(fact, sources, selectors),
+        )
+    }
+
+    /// Reads a scalar weak pointer to its exact declared family.
+    pub(in crate::catalog_v3) fn weak_link_to(
+        &self,
+        name: &str,
+        target_type: &'static str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<Box<SourceWeakReference<'source>>>, CatalogError> {
+        self.read_link(
+            name,
+            "a nullable WeakPointer",
+            Some((DataType::WeakPointer, target_type)),
+            notes,
+            |fact, sources, _| {
+                Ok(
+                    link::read(fact, sources)?.and_then(|(part, link)| match link {
+                        HealthLink::WeakReference { value } => Some((part, value)),
+                        HealthLink::RecordReference { .. } => None,
+                    }),
+                )
+            },
         )
     }
 
@@ -112,9 +137,9 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
             return self.absent();
         };
         let mut selectors = Vec::new();
-        if let Some(rejected) = self.reject_reference_declaration(
+        if let Some(rejected) = self.reject_link_declaration(
             fact,
-            target_type,
+            (DataType::Reference, target_type),
             ReferenceCardinality::Array,
             notes,
             &mut selectors,
@@ -150,10 +175,10 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         self.bind_link(fact, part, state, selectors)
     }
 
-    fn reject_reference_declaration<T>(
+    fn reject_link_declaration<T>(
         &self,
         fact: &Fact<'scope, 'read, 'source>,
-        expected_type: &str,
+        expected: (DataType, &str),
         cardinality: ReferenceCardinality,
         notes: &mut Vec<FieldError>,
         selectors: &mut Vec<SourceUse>,
@@ -163,7 +188,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
             selectors.push(fact.observe(part, SourceUseRole::Selector)?);
         }
         let mut declaration_error = None;
-        if storage.data_type() == DataType::Reference
+        if storage.data_type() == expected.0
             && storage.is_array() == (cardinality == ReferenceCardinality::Array)
         {
             selectors.push(fact.observe(OriginalValuePart::Target, SourceUseRole::Selector)?);
@@ -173,7 +198,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
                     .input
                     .declared_struct_name(storage.target(), SourceUseRole::Selector)?;
                 selectors.push(declaration);
-                if declared_type == Ok(expected_type) {
+                if declared_type == Ok(expected.1) {
                     return Ok(None);
                 }
                 declaration_error = declared_type.err();
@@ -242,7 +267,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         &self,
         name: &str,
         expected: &'static str,
-        expected_type: Option<&str>,
+        declaration: Option<(DataType, &str)>,
         notes: &mut Vec<FieldError>,
         decode: impl FnOnce(
             &Fact<'scope, 'read, 'source>,
@@ -254,10 +279,10 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
             return self.absent();
         };
         let mut selectors = Vec::new();
-        if let Some(expected_type) = expected_type
-            && let Some(rejected) = self.reject_reference_declaration(
+        if let Some(declaration) = declaration
+            && let Some(rejected) = self.reject_link_declaration(
                 fact,
-                expected_type,
+                declaration,
                 ReferenceCardinality::Scalar,
                 notes,
                 &mut selectors,

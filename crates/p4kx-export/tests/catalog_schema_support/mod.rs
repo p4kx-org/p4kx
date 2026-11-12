@@ -187,6 +187,8 @@ pub(crate) fn minimal_catalog() -> Value {
             "shopInventoryResolution": absent_table(),
             "entityTags": tags::entities(),
             "ammoBindings": absent_table(),
+            "resourceNetworkLinks": absent_table(),
+            "roomAssociations": absent_table(),
             "resourceGroupMembers": resource_groups::members()
         },
         "texts": {"publicNames": public_names(), "gameTexts": []},

@@ -200,6 +200,8 @@ fn assemble<R>(
         collected.resource_group_members,
     );
     let components = collected.item_components.into_tables(&forge);
+    let topology =
+        std::mem::take(&mut collected.entity_configurations.topology).into_tables(&forge);
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
         source: source(
@@ -219,6 +221,8 @@ fn assemble<R>(
             ),
             resource_group_members: group_tables.members,
             ammo_bindings: components.ammo_bindings,
+            resource_network_links: topology.resource_network_links,
+            room_associations: topology.room_associations,
             shop_inventory_resolution: collected.shop_inventory_resolution,
             tag_roots: CatalogTable::new(&forge, &["TagDatabase"], collected.tags.roots),
             entity_tags: CatalogTable::new(

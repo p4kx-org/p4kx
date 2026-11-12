@@ -119,6 +119,12 @@ mod quantum_fields;
 mod quantum_heat;
 #[path = "quantum_profile.rs"]
 mod quantum_profile;
+#[path = "resource_network_links.rs"]
+mod resource_network_links;
+#[path = "resource_topology_declarations.rs"]
+mod resource_topology_declarations;
+#[path = "room_associations.rs"]
+mod room_associations;
 #[path = "sensor_mine.rs"]
 mod sensor_mine;
 
