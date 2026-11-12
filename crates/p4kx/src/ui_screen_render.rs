@@ -6,14 +6,11 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::{Context, Result};
-use p4kx_extraction::gfx::{Background, CanvasSize, Localise, RasterOptions, Skipped};
-use p4kx_extraction::{
-    Archive, ArchiveImages, CancelToken, DataForgeEntry, FileReceipt, Language,
-    OriginOutputAddress, ScreenTexts, decode_line_breaks, write_origin_companion,
-};
+use p4kx_extraction::gfx::{Background, CanvasSize, RasterOptions, Skipped};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Language};
 use p4kx_screens::{
-    ImageSources, Report, ScreenComposer, Still, StillFormat, StillRequest, TextSources, Variable,
-    check_variable_count,
+    ArchiveScreen, ArchiveScreenError, ArchiveScreenRender, Report, Still, StillFormat,
+    StillRequest, Variable, check_variable_count,
 };
 use serde::Serialize;
 
@@ -21,7 +18,7 @@ use crate::{exit, json};
 
 #[path = "ui_screen_render_origins.rs"]
 mod origins;
-use self::origins::{ImageReads, ScreenEvidence, ScreenSource};
+use self::origins::ScreenEvidence;
 
 pub(crate) struct Options<'a> {
     pub(crate) screen: &'a str,
@@ -64,7 +61,7 @@ struct RenderJson<'a> {
     report: &'a Report,
     skipped: &'a [SkippedJson],
     #[serde(flatten)]
-    evidence: &'a ScreenEvidence,
+    evidence: &'a ScreenEvidence<'a>,
     #[serde(rename = "originReceipt")]
     origin_receipt: String,
 }
@@ -89,66 +86,16 @@ fn draw(
     archive: &Archive,
     options: &Options<'_>,
     cancel: &CancelToken,
-) -> Result<(Still, ScreenEvidence)> {
-    let stopped = || cancel.is_cancelled();
-    let entry = DataForgeEntry::read_until(archive, &stopped)?;
-    let forge = entry.open()?;
-    let font = ScreenComposer::new(&forge).font_file_source();
-    let texts = ScreenTexts::load_observed(
-        archive,
-        &font.path,
-        Some(options.lang.unwrap_or(Language::English)),
-    );
-    let mut warnings = texts.warnings().to_vec();
-    let ini = texts.parsed(&mut warnings);
+) -> Result<ArchiveScreenRender> {
+    let entry = DataForgeEntry::read_until(archive, &|| cancel.is_cancelled())?;
+    let screen = ArchiveScreen::new(archive, &entry).map_err(cli_error)?;
+    let texts = screen.load_texts(Some(options.lang.unwrap_or(Language::English)));
+    let mut warnings = Vec::new();
+    let rendered = screen.render(&texts, &options.request(), cancel, &mut warnings);
     for warning in &warnings {
         warn(warning);
     }
-    let lookup = |key: &str| {
-        ini.as_ref()?
-            .resolve(key)
-            .map(|text| decode_line_breaks(text).into_owned())
-    };
-    let images = ArchiveImages::new(archive);
-    let reads = ImageReads::default();
-    let read_texture = |path: &str, side: u32, pixels: u64| {
-        reads
-            .texture(&images, path, side, pixels)
-            .map_err(|error| describe(&error))
-    };
-    let read_vector = |path: &str| {
-        reads
-            .vector(&images, path)
-            .map_err(|error| describe(&error))
-    };
-    let request = options.request();
-    let text_sources = texts.fonts().map(|fonts| TextSources {
-        fonts,
-        localise: ini.as_ref().map(|_| &lookup as Localise<'_>),
-    });
-    let image_sources = ImageSources {
-        texture: &read_texture,
-        vector: &read_vector,
-    };
-    let drawn = Still::render_observed(
-        &forge,
-        text_sources,
-        Some(image_sources),
-        &request,
-        &stopped,
-    )?;
-    let evidence = ScreenEvidence::register(
-        &ScreenSource {
-            dataforge: &entry,
-            font: font.record_index,
-            texts: &texts,
-            ini: ini.as_ref(),
-        },
-        &drawn,
-        &reads,
-        request.raster.size,
-    )?;
-    Ok((drawn.still, evidence))
+    rendered.map_err(cli_error)
 }
 
 /// Runs `p4kx ui render --screen`.
@@ -157,30 +104,15 @@ pub(crate) fn run(archive: &Path, options: &Options<'_>, as_json: bool) -> Resul
     let archive = crate::key::open(archive)?;
     let cancel = crate::extract::cancel_on_interrupt()?;
     let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
-    let (still, evidence) = draw(&archive, options, &cancel)?;
-    let bytes = still.encode()?;
-    let receipt =
-        FileReceipt::new_with_cancel(options.out, Some(&protection), Some(&protection), cancel)?;
-    receipt.publish(
-        |writer| writer.write_all(&bytes),
-        |writer, binding, ()| {
-            write_origin_companion(
-                writer,
-                binding,
-                &evidence.provenance,
-                [(
-                    &OriginOutputAddress::OpaquePayload,
-                    &evidence.artifact_origin,
-                )],
-            )
-        },
-    )?;
+    let drawn = draw(&archive, options, &cancel)?;
+    let receipt = drawn
+        .publish(options.out, &protection, &cancel)
+        .map_err(cli_error)?;
+    let still = drawn.still();
     let skipped = skipped_json(still.skipped());
     if as_json {
-        let name = receipt
-            .path()
-            .file_name()
-            .context("missing Screen receipt name")?;
+        let name = receipt.file_name().context("missing Screen receipt name")?;
+        let evidence = ScreenEvidence::of(still, drawn.origin())?;
         json::print(&RenderJson {
             screen: options.screen,
             target: json::path(options.out),
@@ -193,7 +125,7 @@ pub(crate) fn run(archive: &Path, options: &Options<'_>, as_json: bool) -> Resul
             origin_receipt: json::path(Path::new(name)),
         })?;
     } else {
-        print_report(options, &still, &skipped)?;
+        print_report(options, still, &skipped)?;
     }
     Ok(ExitCode::from(if still.is_complete() {
         exit::SUCCESS
@@ -202,15 +134,14 @@ pub(crate) fn run(archive: &Path, options: &Options<'_>, as_json: bool) -> Resul
     }))
 }
 
-fn describe(error: &dyn std::error::Error) -> String {
-    let mut text = error.to_string();
-    let mut source = error.source();
-    while let Some(cause) = source {
-        text.push_str(": ");
-        text.push_str(&cause.to_string());
-        source = cause.source();
+fn cli_error(error: ArchiveScreenError) -> anyhow::Error {
+    match error {
+        ArchiveScreenError::DataForge(error) => error.into(),
+        ArchiveScreenError::Draw(error) => error.into(),
+        ArchiveScreenError::Evidence(error) => error.into(),
+        ArchiveScreenError::Publish(error) => error.into(),
+        other => other.into(),
     }
-    text
 }
 
 fn warn(error: &impl std::fmt::Display) {

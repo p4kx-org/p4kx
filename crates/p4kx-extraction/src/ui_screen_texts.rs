@@ -96,6 +96,14 @@ impl ScreenTexts {
         })
     }
 
+    /// Returns whether an observed font load used this requested path and owning Archive.
+    #[must_use]
+    pub fn uses_font_selection(&self, archive: &Archive, record_path: &str) -> bool {
+        self.fonts
+            .as_ref()
+            .is_some_and(|fonts| fonts.uses_selection(archive, record_path))
+    }
+
     /// Adds the selected font definition and its actual name inputs.
     ///
     /// # Errors

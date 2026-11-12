@@ -5,16 +5,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    ArchiveWriteProtection, CancelToken, ConversionError, ScreenTexts, WriteProtectionError,
-    is_same_file, write_replacing_protected,
+    ArchiveWriteProtection, CancelToken, ScreenTexts, WriteProtectionError, is_same_file,
 };
-use p4kx_screens::{StillFormat, StillRequest};
+use p4kx_screens::{ArchiveScreen, ArchiveScreenError, ScreenError, StillFormat, StillRequest};
 
 use super::job::{Job, Poll};
 use super::render::{Fail, RenderKey, UiSource, checkpoint, open_movie, reason};
 use super::report::UiReport;
 use super::settings::UiFormat;
-use super::still;
 use crate::EntryIndex;
 use crate::UiText;
 
@@ -256,11 +254,8 @@ fn write_screen(
     let (key, file) = (&request.key, &request.file);
     let source = index.forge().read(index, || {})?;
     checkpoint(cancel)?;
-    let forge = source.entry.open().map_err(|e| reason(&e))?;
-    let texts = match request.texts.clone() {
-        Some(texts) => texts,
-        None => Arc::new(still::load_texts(index, &forge, key.language)?),
-    };
+    let archive = index.entries_archive().map_err(|error| reason(&error))?;
+    let screen = ArchiveScreen::new(archive, &source.entry).map_err(|error| reason(&error))?;
     checkpoint(cancel)?;
     let asked = StillRequest {
         screen: canvas,
@@ -272,25 +267,34 @@ fn write_screen(
             UiFormat::Svg => StillFormat::Svg,
         },
     };
-    let (still, warnings) = still::draw(index, &forge, &texts, &asked, cancel)?;
+    let draw = |texts: &ScreenTexts| {
+        let mut warnings = Vec::new();
+        screen
+            .render(texts, &asked, cancel, &mut warnings)
+            .map(|drawn| (drawn, warnings))
+    };
+    let (drawn, warnings) = request
+        .texts
+        .as_deref()
+        .map_or_else(|| draw(&screen.load_texts(key.language)), draw)
+        .map_err(|error| match error {
+            ArchiveScreenError::Draw(ScreenError::Stopped) => Fail::Stopped,
+            other => reason(&other),
+        })?;
     checkpoint(cancel)?;
-    let bytes = still.encode().map_err(|e| reason(&e))?;
+    if index.watch().check().is_err() {
+        return Err(Fail::ArchiveChanged);
+    }
     let protection =
         ArchiveWriteProtection::new(index.path(), cancel.flag()).map_err(|error| reason(&error))?;
-    write_replacing_protected(file, Some(&protection), Some(cancel), |writer| {
-        use std::io::Write as _;
-        writer
-            .write_all(&bytes)
-            .map_err(|source| ConversionError::Write {
-                path: file.clone(),
-                source,
-            })
-    })
-    .map_err(|error| reason(&error))?;
+    drawn
+        .publish(file, &protection, cancel)
+        .map_err(|error| reason(&error))?;
+    let still = drawn.still();
     Ok(UiExportSummary {
         file: file.clone(),
         width: still.width(),
         height: still.height(),
-        left_out: counted(&UiReport::of_still(&still, &warnings)),
+        left_out: counted(&UiReport::of_still(still, &warnings)),
     })
 }

@@ -132,7 +132,8 @@ unknown marker.
 
 ## Screen rendering
 
-`p4kx ui render --screen` uses the same sibling companion for PNG and SVG.
+`p4kx ui render --screen` and the UI tab publish the same sibling companion for
+PNG and SVG Screen exports.
 Its artifact use includes the measured DataForge payload and the texture
 mips, vector files, font definitions and winning language values used by
 composition and drawing. A PNG records sources used by actual paints.

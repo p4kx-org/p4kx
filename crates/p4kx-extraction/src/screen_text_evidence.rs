@@ -22,6 +22,7 @@ pub(super) struct ScreenFontMovie {
 
 #[derive(Debug)]
 struct OriginalFonts {
+    record_path: String,
     input: Option<EntryOrigin>,
     read: MovieSource,
     fonts: Vec<FontOrigins>,
@@ -53,6 +54,7 @@ impl ScreenFontMovie {
         Ok(Self {
             fonts: observed.assets.fonts,
             original: Some(OriginalFonts {
+                record_path: record_path.to_owned(),
                 input,
                 read: *movie.movie().read_source(),
                 fonts: observed.origins.fonts,
@@ -63,6 +65,16 @@ impl ScreenFontMovie {
 
     pub(super) fn fonts(&self) -> &[Font] {
         &self.fonts
+    }
+
+    pub(super) fn uses_selection(&self, archive: &Archive, record_path: &str) -> bool {
+        self.original.as_ref().is_some_and(|original| {
+            original.record_path == record_path
+                && original
+                    .input
+                    .as_ref()
+                    .is_some_and(|entry| archive.owns_origin(entry))
+        })
     }
 
     pub(super) fn append_uses(

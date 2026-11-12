@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_dataforge::DataForge;
+
 use crate::compose::ScreenComposer;
 use crate::reader::text;
 
@@ -29,19 +31,26 @@ impl ScreenComposer<'_, '_> {
     /// Returns the actual authored selector when the Record supplies the font movie.
     #[must_use]
     pub fn font_file_source(&self) -> ScreenFontFile {
-        self.store
-            .forge()
+        ScreenFontFile::read(self.store.forge())
+    }
+}
+
+impl ScreenFontFile {
+    /// Returns the font movie path selected by the original DataForge field.
+    #[must_use]
+    pub fn read(forge: &DataForge<'_>) -> Self {
+        forge
             .records_at_path(UI_ELEMENT)
             .next()
             .and_then(|record| record.tree().ok())
             .and_then(|tree| {
                 let path = text(tree.root(), "fontFile")?.to_owned();
-                (!path.is_empty()).then_some(ScreenFontFile {
+                (!path.is_empty()).then_some(Self {
                     path,
                     record_index: Some(tree.record_index()),
                 })
             })
-            .unwrap_or_else(|| ScreenFontFile {
+            .unwrap_or_else(|| Self {
                 path: FALLBACK.to_owned(),
                 record_index: None,
             })
