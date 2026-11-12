@@ -3,7 +3,7 @@
 
 use p4kx_extraction::cryxml;
 
-use crate::starmap_transform::Rotation;
+use crate::starmap_transform::{Rotation, Transform};
 
 /// An element of text XML or `CryXml`, read alike.
 pub(crate) trait Node<'d>: Copy {
@@ -198,18 +198,41 @@ pub(crate) fn first_below<'d, N: Node<'d>>(node: N, name: &str) -> Option<N> {
     None
 }
 
-/// Returns the position and the rotation of a Child: `pos` as `x,y,z` (zero when absent) and
-/// `rot` as the quaternion `w,x,y,z` (none when absent); `None` for a value that is malformed.
-pub(crate) fn pose<'d>(child: impl Node<'d>) -> Option<([f64; 3], Rotation)> {
+/// The original Child coordinates and the transform used by the walk.
+#[derive(Clone, Copy)]
+pub(crate) struct AuthoredPose {
+    pub(crate) position: Option<[f64; 3]>,
+    pub(crate) rotation: Option<[f64; 4]>,
+    unit: Rotation,
+}
+
+impl AuthoredPose {
+    pub(crate) fn transform(self) -> Transform {
+        Transform {
+            position: self.position.unwrap_or([0.0; 3]),
+            rotation: self.unit,
+        }
+    }
+}
+
+/// Reads Child positions as x, y, z metres and quaternion rotations as w, x, y, z.
+pub(crate) fn pose<'d>(child: impl Node<'d>) -> Option<AuthoredPose> {
     let position = match attribute(child, "pos") {
-        Some(text) => numbers::<3>(text)?,
-        None => [0.0; 3],
+        Some(text) => Some(numbers::<3>(text)?),
+        None => None,
     };
-    let rotation = match attribute(child, "rot") {
-        Some(text) => Rotation::from_parts(numbers::<4>(text)?)?,
-        None => Rotation::IDENTITY,
+    let (rotation, unit) = match attribute(child, "rot") {
+        Some(text) => {
+            let parts = numbers::<4>(text)?;
+            (Some(parts), Rotation::from_parts(parts)?)
+        }
+        None => (None, Rotation::IDENTITY),
     };
-    Some((position, rotation))
+    Some(AuthoredPose {
+        position,
+        rotation,
+        unit,
+    })
 }
 
 fn numbers<const N: usize>(text: &str) -> Option<[f64; N]> {

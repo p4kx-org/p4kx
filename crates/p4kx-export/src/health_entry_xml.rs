@@ -10,12 +10,14 @@ use super::entry_selection_input::{EntrySelectionUse, SelectionSource};
 use super::health_entry_frame::EntryCapture;
 use super::health_entry_metadata::EntryMetadata;
 use super::health_entry_read::EntryRead;
+use super::health_entry_receipt::EntryReceipt;
 use super::health_entry_selection::AuthoredEntryPath;
 use crate::starmap_xml::{Document, Node, Root, XmlError};
 use crate::{CatalogError, ExportAccountingError};
 
 /// One actual parse borrowing only bytes from its sealed original Entry read.
 pub(crate) struct EntryXml<'read, 'capture, 'input> {
+    receipt: &'read EntryReceipt,
     entry: Arc<EntryMetadata>,
     capture: &'capture EntryCapture<'input>,
     document: Document<'read>,
@@ -32,10 +34,15 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
             Err(error) => return Ok(Err(error)),
         };
         Ok(Ok(Self {
+            receipt: read.receipt(),
             entry: Arc::new(read.receipt().payload_entry()?.clone()),
             capture,
             document,
         }))
+    }
+
+    pub(crate) fn containing_entry(&self) -> Result<EntryReceipt, ExportAccountingError> {
+        self.receipt.containing_entry()
     }
 
     pub(crate) fn root(&self) -> Root<'_> {
@@ -166,6 +173,10 @@ pub(crate) struct XmlNodeSource {
 }
 
 impl XmlNodeSource {
+    pub(crate) const fn index(&self) -> u32 {
+        self.index
+    }
+
     pub(crate) fn selected(&self) -> Result<SourceUse, CatalogError> {
         self.observe(
             vec![u64::from(self.index)],

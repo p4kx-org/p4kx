@@ -12,11 +12,11 @@ use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, 
 use crate::entry_source::EntrySource;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::starmap_containers::instance::ContainerFile;
 use crate::starmap_containers::proof::ChildOrigins;
 use crate::starmap_index::Index;
 use crate::starmap_read::main_xml;
-use crate::starmap_transform::Rotation;
-use crate::starmap_xml::XmlError;
+use crate::starmap_xml::{AuthoredPose, XmlError};
 use crate::{CatalogError, Kind};
 #[path = "starmap_children.rs"]
 mod children;
@@ -26,10 +26,7 @@ const CHILD: &str = "Child";
 
 /// The position and rotation of a Child, or the clipped attribute texts of one that has none.
 pub(crate) enum Pose {
-    Valid {
-        position: [f64; 3],
-        rotation: Rotation,
-    },
+    Valid(AuthoredPose),
     Malformed {
         pos: String,
         rot: String,
@@ -68,6 +65,7 @@ pub(crate) enum Body {
     Unparsed,
     Parsed {
         root: Level,
+        file: Box<ContainerFile>,
         fallback: Option<String>,
     },
 }
@@ -120,7 +118,7 @@ fn parse_body(
             return Ok(Body::Unreadable(reason));
         }
     };
-    let Ok(root) = parsed_root(&main.bytes, bounds, capture)? else {
+    let Ok((root, file)) = parsed_root(&main.bytes, bounds, capture)? else {
         ledger.incomplete_inventory(Kind::StarmapObjects);
         main.source.record(
             ledger,
@@ -142,6 +140,7 @@ fn parse_body(
         .record(ledger, Kind::StarmapObjects, disposition);
     Ok(Body::Parsed {
         root,
+        file: Box::new(file),
         fallback: main.fallback,
     })
 }
@@ -150,9 +149,15 @@ fn parsed_root(
     read: &EntryRead,
     bounds: &Bounds,
     capture: &EntryCapture<'_>,
-) -> Result<Result<Level, XmlError>, CatalogError> {
+) -> Result<Result<(Level, ContainerFile), XmlError>, CatalogError> {
     match EntryXml::parse(read, capture)? {
-        Ok(xml) => Ok(Ok(children::level(xml.root(), 0, bounds, &xml)?)),
+        Ok(xml) => {
+            let root = xml.root();
+            Ok(Ok((
+                children::level(root, 0, bounds, &xml)?,
+                ContainerFile::from_xml(&xml, capture)?,
+            )))
+        }
         Err(error) => Ok(Err(error)),
     }
 }

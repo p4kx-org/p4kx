@@ -114,12 +114,12 @@ fn external(
 }
 
 fn child_pose(child: Root<'_>) -> Pose {
-    match pose(child) {
-        Some((position, rotation)) => Pose::Valid { position, rotation },
-        None => Pose::Malformed {
+    pose(child).map_or_else(
+        || Pose::Malformed {
             pos: clip(attribute(child, "pos").unwrap_or_default()),
             rot: clip(attribute(child, "rot").unwrap_or_default()),
             entity: clip(attribute(child, "entityName").unwrap_or_default()),
         },
-    }
+        Pose::Valid,
+    )
 }

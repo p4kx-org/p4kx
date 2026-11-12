@@ -87,6 +87,6 @@ fn type_of<'f>(
     Some(plain.unwrap_or_else(|| class_name(&tree)))
 }
 
-fn millimetres(metres: f64) -> f64 {
+pub(crate) fn millimetres(metres: f64) -> f64 {
     (metres * MILLI).round() / MILLI + 0.0
 }

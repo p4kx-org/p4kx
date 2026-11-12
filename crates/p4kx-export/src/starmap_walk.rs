@@ -4,16 +4,18 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse};
+use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse, SourceValue};
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
 use crate::entry_source::EntrySource;
 use crate::starmap_containers::Limits;
+use crate::starmap_containers::instance::{ContainerFile, ContainerInstance, ContainerOccurrence};
 use crate::starmap_containers::proof::{PlacementProof, PlacementStep};
 use crate::starmap_index::Index;
 use crate::starmap_parse::{Body, Child, Level, Pose};
 use crate::starmap_report::{Placement, StarmapReport, clip};
 use crate::starmap_transform::Transform;
+use crate::starmap_xml::AuthoredPose;
 use crate::{CatalogError, ExportAccountingError};
 
 /// The most lines the report keeps per star system of the containers read, and of the issues.
@@ -33,6 +35,7 @@ pub(crate) struct SystemRead {
     pub(crate) deepest: usize,
     pub(crate) report: StarmapReport,
     pub(crate) containers: Vec<Opened>,
+    pub(crate) instances: Vec<ContainerInstance>,
 }
 
 /// A container the walk opened and the starmap record it hangs below.
@@ -43,11 +46,14 @@ pub(crate) struct Opened {
     pub(crate) under: Option<Guid>,
 }
 
+#[derive(Clone)]
 struct WalkPath {
     transform: Transform,
     under: Option<Guid>,
     external: usize,
     route: Option<Arc<PlacementStep>>,
+    parent_instance: Option<Arc<PlacementStep>>,
+    local: Option<AuthoredPose>,
     via: Option<AuthoredEntryPath>,
 }
 
@@ -57,10 +63,12 @@ impl WalkPath {
         under: None,
         external: 0,
         route: None,
+        parent_instance: None,
+        local: None,
         via: None,
     };
 
-    fn child(&self, child: &Child, transform: Transform) -> Self {
+    fn child(&self, child: &Child, pose: AuthoredPose, transform: Transform) -> Self {
         let route = child.origins.as_ref().map(|origins| {
             Arc::new(PlacementStep {
                 preceding: self.route.clone(),
@@ -74,17 +82,24 @@ impl WalkPath {
             under: child.record.or(self.under),
             external: self.external,
             route,
+            parent_instance: self.parent_instance.clone(),
+            local: Some(pose),
             via: None,
         }
     }
 
     fn external(&self, via: &AuthoredEntryPath) -> Self {
         Self {
-            transform: self.transform,
-            under: self.under,
             external: self.external + 1,
-            route: self.route.clone(),
             via: Some(via.clone()),
+            ..self.clone()
+        }
+    }
+
+    fn within_container(&self) -> Self {
+        Self {
+            parent_instance: self.route.clone(),
+            ..self.clone()
         }
     }
 }
@@ -96,6 +111,8 @@ pub(crate) struct System<'a> {
     cancel: Option<&'a CancelToken>,
     name: Arc<str>,
     root: Arc<[SourceUse]>,
+    root_entry: u32,
+    capture: &'a EntryCapture<'a>,
     read: SystemRead,
     limits: Limits,
     budget: usize,
@@ -111,7 +128,7 @@ impl<'a> System<'a> {
         entry: usize,
         cancel: Option<&'a CancelToken>,
         limits: Limits,
-        (archive, capture): (&Archive, &EntryCapture<'_>),
+        (archive, capture): (&Archive, &'a EntryCapture<'a>),
     ) -> Result<SystemRead, CatalogError> {
         let root = index
             .entries
@@ -119,12 +136,17 @@ impl<'a> System<'a> {
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         let source = EntrySource::outer(capture, archive, root)?;
         let directory = source.receipt().physical_reference(capture)?;
+        let SourceValue::Present(reference) = directory.value() else {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        };
         let mut system = Self {
             index,
             bodies,
             cancel,
             name: Arc::clone(name),
             root: Arc::from(directory.contributions().0),
+            root_entry: reference.entry_index,
+            capture,
             read: SystemRead::default(),
             limits,
             budget: limits.children,
@@ -196,8 +218,13 @@ impl<'a> System<'a> {
                 self.issue(&format!("{label}: the XML cannot be parsed"));
                 return Ok(());
             }
-            Body::Parsed { root, fallback } => {
+            Body::Parsed {
+                root,
+                file,
+                fallback,
+            } => {
                 self.opened(entry, path.under, path.external);
+                self.record_instance(path, file)?;
                 if let Some(taken) = fallback {
                     self.issue(&format!(
                         "{label}: no XML named like the container, read {} instead",
@@ -205,10 +232,15 @@ impl<'a> System<'a> {
                     ));
                 }
                 self.open.push(entry);
-                self.children(root, path, &label)?;
+                self.children(root, &path.within_container(), &label)?;
                 self.open.pop();
             }
         }
+        self.report_placements(before, &label);
+        Ok(())
+    }
+
+    fn report_placements(&mut self, before: [usize; 3], label: &str) {
         if self.seen[1] > before[1] {
             self.read.named += 1;
             if self.read.report.containers.len() < REPORT_LINES {
@@ -220,6 +252,26 @@ impl<'a> System<'a> {
                 ));
             }
         }
+    }
+
+    fn record_instance(
+        &mut self,
+        path: &WalkPath,
+        file: &ContainerFile,
+    ) -> Result<(), CatalogError> {
+        let instance = ContainerOccurrence {
+            system: &self.name,
+            root_entry: self.root_entry,
+            root_inputs: &self.root,
+            route: path.route.as_deref(),
+            parent_route: path.parent_instance.as_deref(),
+            declared: path.via.as_ref(),
+            local: path.local,
+            world: path.transform,
+        };
+        self.read
+            .instances
+            .push(instance.project(file, self.capture)?);
         Ok(())
     }
 
@@ -247,19 +299,8 @@ impl<'a> System<'a> {
             }
             self.budget -= 1;
             self.seen[0] += 1;
-            let world = match &child.pose {
-                Pose::Valid { position, rotation } => {
-                    let world = parent.transform.place(*position, *rotation);
-                    if !world.is_sane() {
-                        self.skipped(&format!(
-                            "{label}: out of range: pos {position:?} places {:?} of {}",
-                            world.position,
-                            clip(&child.entity_name)
-                        ));
-                        continue;
-                    }
-                    world
-                }
+            let pose = match &child.pose {
+                Pose::Valid(pose) => *pose,
                 Pose::Malformed { pos, rot, entity } => {
                     self.skipped(&format!(
                         "{label}: malformed pos {pos} rot {rot} of {entity}"
@@ -267,7 +308,18 @@ impl<'a> System<'a> {
                     continue;
                 }
             };
-            let child_path = parent.child(child, world);
+            let local = pose.transform();
+            let world = parent.transform.place(local.position, local.rotation);
+            if !world.is_sane() {
+                self.skipped(&format!(
+                    "{label}: out of range: pos {:?} places {:?} of {}",
+                    local.position,
+                    world.position,
+                    clip(&child.entity_name)
+                ));
+                continue;
+            }
+            let child_path = parent.child(child, pose, world);
             self.note(child, &child_path, parent.under)?;
             if let Some(path) = &child.external {
                 self.follow(path, &child_path, label)?;

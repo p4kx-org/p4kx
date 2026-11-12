@@ -11,7 +11,7 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::EntryCapture;
 use crate::collected::Collected;
 use crate::scan::Scan;
-use crate::starmap_containers::Placements;
+use crate::starmap_containers::{PlacementScope, Placements};
 use crate::{CatalogError, CatalogOptions};
 
 /// Reads required placements and assembles ordered selected Record rows.
@@ -34,14 +34,22 @@ pub(super) fn scan<'f>(
                 && options.filter.is_none_or(|filter| filter.matches(path))
         })
     });
-    let placements = if wanted {
-        Placements::read(
+    let scope = if wanted {
+        Some(PlacementScope::RecordSelection)
+    } else {
+        options
+            .filter
+            .is_none()
+            .then_some(PlacementScope::ArchiveInventory)
+    };
+    let mut placements = match scope {
+        Some(scope) => Placements::read(
             archive,
             options.cancel,
             &EntryCapture::for_input(projection.original()),
-        )?
-    } else {
-        Placements::default()
+            scope,
+        )?,
+        None => Placements::default(),
     };
     let scanned = Scan::run(
         forge,
@@ -66,6 +74,11 @@ pub(super) fn scan<'f>(
     collected.entity_configurations = scanned.entity_configurations;
     collected.tags.order_entities();
 
-    collected.ledger.merge(placements.ledger.clone());
+    let entry_ledger = if matches!(scope, Some(PlacementScope::RecordSelection)) {
+        placements.ledger.clone()
+    } else {
+        std::mem::take(&mut placements.ledger)
+    };
+    collected.ledger.merge(entry_ledger);
     Ok((collected, placements))
 }

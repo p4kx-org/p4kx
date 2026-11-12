@@ -11,13 +11,18 @@ use rayon::prelude::*;
 
 use crate::CatalogError;
 use crate::catalog_read::original::EntryCapture;
+use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, unreferenced};
 use crate::starmap_parse::{Read, read_all};
 use crate::starmap_report::{ContainerCounts, Placement, StarmapReport, apart, clip};
 use crate::starmap_walk::{Opened, System, SystemRead};
 
+use self::instance::ContainerInstance;
 use self::proof::{PlacementEvidence, PlacementProof};
+
+#[path = "starmap_container_instance.rs"]
+pub(crate) mod instance;
 
 #[path = "starmap_placement_proof.rs"]
 pub(crate) mod proof;
@@ -43,6 +48,13 @@ impl Default for Limits {
     }
 }
 
+/// The catalog scope that requires reading system containers.
+#[derive(Clone, Copy)]
+pub(crate) enum PlacementScope {
+    RecordSelection,
+    ArchiveInventory,
+}
+
 /// The placements of the Starmap Records in the system containers of an Archive.
 #[derive(Debug, Default)]
 pub(crate) struct Placements {
@@ -51,12 +63,23 @@ pub(crate) struct Placements {
     ambiguous: HashMap<Guid, Arc<[PlacementProof; 2]>>,
     pub(crate) counts: ContainerCounts,
     pub(crate) report: StarmapReport,
+    instances: Vec<ContainerInstance>,
+    instance_availability: Option<DatasetAvailability>,
     /// Every container below the system folder: those the walk opened, each with the record it
     /// hangs below, then those it did not reach, with none.
     pub(crate) opened: Vec<Opened>,
 }
 
 impl Placements {
+    pub(crate) fn take_instances(&mut self) -> CatalogTable<ContainerInstance> {
+        CatalogTable {
+            availability: self
+                .instance_availability
+                .unwrap_or(DatasetAvailability::Unavailable),
+            rows: std::mem::take(&mut self.instances),
+        }
+    }
+
     pub(crate) fn get(&self, record: Guid) -> Option<&Placement> {
         self.by_record.get(&record)
     }
@@ -77,8 +100,9 @@ impl Placements {
         archive: &Archive,
         cancel: Option<&CancelToken>,
         capture: &EntryCapture<'_>,
+        scope: PlacementScope,
     ) -> Result<Self, CatalogError> {
-        Self::read_within(archive, cancel, Limits::default(), capture)
+        Self::read_within(archive, cancel, Limits::default(), capture, scope)
     }
 
     pub(crate) fn read_within(
@@ -86,10 +110,20 @@ impl Placements {
         cancel: Option<&CancelToken>,
         limits: Limits,
         capture: &EntryCapture<'_>,
+        scope: PlacementScope,
     ) -> Result<Self, CatalogError> {
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
+        }
         let started = Instant::now();
         let index = Index::new(archive);
         let systems = index.systems();
+        if systems.is_empty() && matches!(scope, PlacementScope::ArchiveInventory) {
+            return Ok(Self {
+                instance_availability: Some(DatasetAvailability::Absent),
+                ..Self::default()
+            });
+        }
         let roots: Vec<usize> = systems.iter().map(|(_, entry)| *entry).collect();
         let Read { bodies, ledger, .. } = read_all(
             archive,
@@ -124,21 +158,39 @@ impl Placements {
             ledger,
             ..Self::default()
         };
-        placements.counts.systems = systems.len();
-        let mut opened: HashSet<usize> = HashSet::new();
-        let named = placements.merge_systems(read, &mut opened);
-        placements.counts.ambiguous = placements.ambiguous.len();
-        placements
-            .report
-            .containers
-            .push(format!("{named} containers name starmap records"));
-        for record in placements.ambiguous.keys() {
-            placements.by_record.remove(record);
-        }
-        placements.report.unreferenced = unreferenced(&index, &opened);
-        placements.add_unreached(&index, &opened);
+        placements.finish(&index, systems.len(), read, scope);
         placements.report.elapsed = started.elapsed();
         Ok(placements)
+    }
+
+    fn finish(
+        &mut self,
+        index: &Index<'_>,
+        roots: usize,
+        read: Vec<SystemRead>,
+        scope: PlacementScope,
+    ) {
+        self.counts.systems = roots;
+        self.instance_availability = Some(if roots == 0 {
+            DatasetAvailability::Absent
+        } else {
+            DatasetAvailability::Available
+        });
+        let mut opened = HashSet::new();
+        let named = self.merge_systems(read, &mut opened);
+        self.counts.ambiguous = self.ambiguous.len();
+        self.report
+            .containers
+            .push(format!("{named} containers name starmap records"));
+        for record in self.ambiguous.keys() {
+            self.by_record.remove(record);
+        }
+        self.report.unreferenced = unreferenced(index, &opened);
+        if matches!(scope, PlacementScope::RecordSelection) {
+            self.add_unreached(index, &opened);
+        } else {
+            self.opened.clear();
+        }
     }
 
     fn merge_systems(&mut self, systems: Vec<SystemRead>, opened: &mut HashSet<usize>) -> usize {
@@ -153,6 +205,7 @@ impl Placements {
             self.report.containers.extend(system.report.containers);
             self.report.issues.extend(system.report.issues);
             self.opened.extend(system.containers);
+            self.instances.extend(system.instances);
             for (record, placement) in system.placed {
                 self.add(record, placement);
             }

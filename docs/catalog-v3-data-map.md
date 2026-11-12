@@ -95,6 +95,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | paints | D.paints; A.paintShipCompatibility | item identity plus fit relationship |
 | loadouts | C.itemPorts; P.loadoutItems | source definitions/restrictions vs resolved default attachments/full path/parent and merge evidence |
 | starmapObjects | D.starmapObjects; P.starmapPlacements | identity/navigation definition vs physical placement/world projection |
+| object-container XML | P.containerInstances | resolved physical SOCpak occurrences with system-local instance keys, exact declaring paths and local/world transforms |
 | contracts | D.contractGenerators; V.contracts; V.missionTitles; A.contractPropertySetLinks | complete physical Generator arena, actual contract/subcontract occurrences, derived title and description with immediate per-language origin, and standing/reward/fact precedence ([contract](catalog-contract-generators.md)) |
 | mineableElements | D.mineableElements | element-local instability/resistance; many per ResourceType |
 | refiningProcesses | D.refiningProcesses | stored refining relationships/parameters |

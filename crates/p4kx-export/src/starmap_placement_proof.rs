@@ -47,6 +47,44 @@ pub(crate) struct PlacementStep {
     pub(crate) has_record: bool,
 }
 
+impl PlacementStep {
+    pub(crate) fn steps(&self) -> impl Iterator<Item = &Self> {
+        iter::successors(Some(self), |step| step.preceding.as_deref())
+    }
+
+    pub(crate) fn child_index(&self) -> u32 {
+        self.child.node.index()
+    }
+
+    pub(crate) fn selection(&self, uses: &mut Vec<SourceUse>) -> Result<bool, CatalogError> {
+        uses.push(self.child.list.selected()?);
+        uses.push(self.child.node.selected()?);
+        if let Some(via) = &self.via {
+            let (selectors, known) = via.selector_inputs()?;
+            uses.extend(selectors);
+            return Ok(known);
+        }
+        Ok(true)
+    }
+
+    pub(crate) fn position(&self, role: SourceUseRole) -> Result<SourceUse, CatalogError> {
+        self.child.position.observe(role)
+    }
+
+    pub(crate) fn rotation(&self, role: SourceUseRole) -> Result<SourceUse, CatalogError> {
+        self.child.rotation.observe(role)
+    }
+
+    pub(crate) fn position_uses(&self) -> Result<Vec<SourceUse>, CatalogError> {
+        let mut uses = vec![self.position(SourceUseRole::Conversion)?];
+        for step in self.steps().skip(1) {
+            uses.push(step.position(SourceUseRole::Conversion)?);
+            uses.push(step.rotation(SourceUseRole::Conversion)?);
+        }
+        Ok(uses)
+    }
+}
+
 /// The actual root choice and ordered Child route of one placement occurrence.
 #[derive(Debug, Clone)]
 pub(crate) struct PlacementProof {
@@ -97,14 +135,8 @@ impl PlacementProof {
     fn route_uses(&self, uses: &mut Vec<SourceUse>) -> Result<bool, CatalogError> {
         uses.extend_from_slice(&self.root);
         let mut complete = true;
-        for step in self.steps() {
-            uses.push(step.child.list.selected()?);
-            uses.push(step.child.node.selected()?);
-            if let Some(via) = &step.via {
-                let (selectors, known) = via.selector_inputs()?;
-                uses.extend(selectors);
-                complete &= known;
-            }
+        for step in self.last.steps() {
+            complete &= step.selection(uses)?;
         }
         uses.push(self.last.child.record.observe(SourceUseRole::Selector)?);
         Ok(complete)
@@ -121,13 +153,9 @@ impl PlacementProof {
         }
     }
 
-    fn steps(&self) -> impl Iterator<Item = &PlacementStep> {
-        iter::successors(Some(self.last.as_ref()), |step| step.preceding.as_deref())
-    }
-
     fn parent_uses(&self) -> Result<Vec<SourceUse>, CatalogError> {
         let mut uses = Vec::new();
-        for step in self.steps().skip(1) {
+        for step in self.last.steps().skip(1) {
             let role = if step.has_record {
                 SourceUseRole::Conversion
             } else {
@@ -142,16 +170,6 @@ impl PlacementProof {
     }
 
     fn position_uses(&self) -> Result<Vec<SourceUse>, CatalogError> {
-        let mut uses = vec![
-            self.last
-                .child
-                .position
-                .observe(SourceUseRole::Conversion)?,
-        ];
-        for step in self.steps().skip(1) {
-            uses.push(step.child.position.observe(SourceUseRole::Conversion)?);
-            uses.push(step.child.rotation.observe(SourceUseRole::Conversion)?);
-        }
-        Ok(uses)
+        self.last.position_uses()
     }
 }

@@ -58,3 +58,20 @@ translation and ancestor translations and rotations. Entity name and parent GUID
 retain their respective original attribute uses. The two positions that establish an
 ambiguous placement supply the absence evidence. Referenced or attempted targets
 stay in the operation ledger unless their contents contribute to a placement.
+
+## Container instance table
+
+`placements.containerInstances` contains one row per resolved SOCpak occurrence,
+including each reused file's separate Child route. The instance key is the system
+root Archive entry ordinal and the ordered XML Child node ordinals. The parent key
+identifies the enclosing physical container occurrence. An inline XML Child can
+lie between the enclosing physical container and the declaring Child.
+
+Local positions are metres in the immediate XML parent's frame. Local rotations
+are the authored quaternion components in w, x, y, z order. Missing authored
+components are absent and the world transform uses zero translation or identity
+rotation for those slots. World positions are in the system frame at millimetre
+precision. World rotations use the composed unit quaternions in w, x, y, z order.
+The root frame is the identity. Unread, malformed and unreachable placements
+remain visible through the traversal diagnostics. Table availability describes
+the discovered source family independently of traversal completeness.

@@ -85,7 +85,7 @@ fn assemble<R>(
     )?;
     let files = ArchiveFiles::new(archive);
     let entities = Arc::new(Entities::new(&forge));
-    let (mut collected, placements) = scanning::scan(
+    let (mut collected, mut placements) = scanning::scan(
         archive,
         &forge,
         &files,
@@ -163,8 +163,9 @@ fn assemble<R>(
             CatalogProvenance::new(origins.uses.freeze()?),
         )));
     }
+    let instances = placements.take_instances();
     let (catalog_placements, resource_declarations) =
-        collected.catalog_placements(&forge, &origins, options.cancel)?;
+        collected.catalog_placements(&forge, &origins, instances, options.cancel)?;
     let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
     let resolved = store_slugs.resolve(

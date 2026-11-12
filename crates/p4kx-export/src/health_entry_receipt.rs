@@ -292,6 +292,29 @@ impl EntryReceipt {
         })
     }
 
+    /// Returns the original containing Archive entry of a nested Entry read.
+    pub(super) fn containing_entry(&self) -> Result<Self, ExportAccountingError> {
+        if !matches!(self.recipes.as_slice(), [PathRecipe::Directory]) || self.inner.is_none() {
+            return Err(ExportAccountingError::ConflictingSourceDatum);
+        }
+        let outer = self
+            .outer
+            .as_ref()
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        Ok(Self {
+            frame: Arc::clone(&self.frame),
+            outer: Some(outer.clone()),
+            inner: None,
+            path: outer.path().clone(),
+            recipes: vec![PathRecipe::Directory],
+        })
+    }
+
+    pub(crate) fn physical_path(&self) -> Result<OriginalDatum<HealthText>, CatalogError> {
+        self.outer_directory()?;
+        self.directory_path()
+    }
+
     pub(crate) fn physical_reference(
         &self,
         capture: &EntryCapture<'_>,

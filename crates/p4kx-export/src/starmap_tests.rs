@@ -6,7 +6,7 @@ use std::path::Path;
 use p4kx_extraction::{Archive, Guid};
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestElement, TestEntry, test_key};
 
-use crate::starmap_containers::{Limits, Placements};
+use crate::starmap_containers::{Limits, PlacementScope, Placements};
 use crate::starmap_index::Index;
 use crate::starmap_parse::read_all;
 
@@ -82,7 +82,13 @@ fn open(dir: &Path, entries: Vec<TestEntry>) -> Archive {
 fn read(dir: &Path, entries: Vec<TestEntry>, limits: Limits) -> Placements {
     let archive = open(dir, entries);
     crate::catalog_read::original::with_entry_capture(&archive, |capture| {
-        Placements::read_within(&archive, None, limits, capture)
+        Placements::read_within(
+            &archive,
+            None,
+            limits,
+            capture,
+            PlacementScope::RecordSelection,
+        )
     })
     .expect("placements")
 }

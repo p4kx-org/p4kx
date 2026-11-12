@@ -15,6 +15,7 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_table::CatalogTable;
 use crate::collected::Collected;
 use crate::schema_fields::every_field_required;
+use crate::starmap_containers::instance::ContainerInstance;
 
 /// Contextual placements and relationships keyed by their physical definitions.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -25,6 +26,7 @@ pub(crate) struct CatalogPlacements {
     resource_network: ResourceNetworkPlacementTables,
     starmap_placements: CatalogTable<StarmapPlacement>,
     facility_instances: CatalogTable<FacilityInstance>,
+    container_instances: CatalogTable<ContainerInstance>,
 }
 
 impl<'source> Collected<'source> {
@@ -32,6 +34,7 @@ impl<'source> Collected<'source> {
         &mut self,
         forge: &DataForge<'_>,
         origins: &CatalogOrigins,
+        container_instances: CatalogTable<ContainerInstance>,
         cancel: Option<&CancelToken>,
     ) -> Result<(CatalogPlacements, ResourceTopologyTables<'source>), CatalogError> {
         let topology = self.resource_topology(forge, &origins.uses, cancel)?;
@@ -46,6 +49,7 @@ impl<'source> Collected<'source> {
                 origins,
                 cancel,
             )?,
+            container_instances,
         };
         Ok((placements, topology.declarations))
     }
