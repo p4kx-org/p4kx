@@ -5,9 +5,9 @@ use p4kx_testkit::{TestChunkFile, TestEntry, TestModel, TestSkeleton};
 use serde_json::{Value, json};
 
 use crate::model_bone_origin_checks::{
-    assert_all_addresses, assert_bone_span, assert_compiled_2_tip_sites, assert_prefix,
-    assert_retained_bone_positions, assert_site, field, marker, uses,
+    assert_bone_span, assert_compiled_2_tip_sites, assert_prefix, assert_retained_bone_positions,
 };
+use crate::model_item_origin_checks::{assert_all_addresses, assert_site, field, marker, uses};
 use crate::support::{Install, TestResult};
 
 const PRIMARY: &str = "Data/skeleton.chr";
@@ -200,8 +200,8 @@ fn an_empty_bone_list_proves_the_original_survey_for_its_container() -> TestResu
         .find(|tool| tool["name"] == "list_model_items")
         .ok_or("model item tool")?["outputSchema"];
     assert_eq!(
-        schema.pointer("/allOf/0/if/properties/section/const"),
-        Some(&json!("bones"))
+        schema.pointer("/allOf/0/if/properties/section/enum"),
+        Some(&json!(["bones", "nodes"]))
     );
     assert_eq!(
         schema.pointer("/allOf/0/then/required"),

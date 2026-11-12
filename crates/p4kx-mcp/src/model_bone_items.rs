@@ -3,95 +3,31 @@
 
 use std::ops::Range;
 
-use p4kx_extraction::model::{
-    ModelBoneSource, ModelBoneSources, ModelFile, PrimarySkeletonSelection,
-};
+use p4kx_extraction::model::{ModelBoneSource, ModelBoneSources, PrimarySkeletonSelection};
 use p4kx_extraction::{
-    BoneInfo, FieldOrigin, FieldOrigins, FieldOriginsError, FieldPath, FieldPathError,
-    ModelArchiveSource, ModelSource, SourceEvidenceError, SourceLocation, SourceUse, SourceUseRole,
+    BoneInfo, FieldOrigin, FieldOrigins, FieldPath, ModelArchiveSource, SourceEvidenceError,
+    SourceLocation, SourceUse, SourceUseRole,
 };
-use thiserror::Error;
 
-use crate::archives::Opened;
-use crate::budget;
 use crate::content_origin::EntryPageSources;
 use crate::error::ToolError;
-use crate::model_params::Section;
+use crate::model_item_page::{self, EvidenceError, ModelItemPage};
 use crate::model_shapes::{ModelItemOrigins, ModelItemsResult};
-use crate::page::Page;
 
-#[derive(Debug, Error)]
-pub(crate) enum EvidenceError {
-    #[error(transparent)]
-    Source(#[from] SourceEvidenceError),
-    #[error(transparent)]
-    Path(#[from] FieldPathError),
-    #[error(transparent)]
-    Duplicate(#[from] FieldOriginsError),
-}
-
-pub(crate) fn list(
-    opened: &Opened,
-    source: &ModelSource,
-    page: Page,
-    reserved: usize,
-) -> Result<ModelItemsResult, ToolError> {
-    let bones = &source.model().bones;
-    page.check(bones.len())?;
-    let primary = source
-        .archive_sources()
-        .iter()
-        .find(|read| read.file() == ModelFile::Model);
-    let values = page
+pub(crate) fn list(request: &ModelItemPage<'_>) -> Result<ModelItemsResult, ToolError> {
+    let bones = &request.source.model().bones;
+    let primary = request.primary();
+    let values = request
+        .page
         .slice(bones)
         .iter()
         .enumerate()
         .map(|(position, bone)| {
-            serde_json::to_value(BoneInfo::of_bone(page.offset() + position, bone))
+            serde_json::to_value(BoneInfo::of_bone(request.page.offset() + position, bone))
                 .map_err(ToolError::from)
         });
-    let (mut items, _) =
-        budget::fill_within(page, bones.len(), reserved, values, |_| "bone".to_owned())?;
-    let archive = opened.archive().path().display().to_string();
-    let (keep, result) = budget::fit_prefix(
-        items.len(),
-        |len| {
-            let next_cursor = page.next_cursor_after(len, bones.len())?;
-            let origins = field_origins(
-                primary,
-                page.offset()..page.offset() + len,
-                next_cursor.as_deref(),
-            )?;
-            Ok(ModelItemsResult {
-                archive: archive.clone(),
-                model: source.name().to_owned(),
-                section: Section::Bones.name(),
-                total: bones.len(),
-                items: items.split_at(len).0,
-                next_cursor,
-                origins: Some(origins),
-            })
-        },
-        || format!("bone {}", page.offset()),
-    )?;
-    let ModelItemsResult {
-        archive,
-        model,
-        section,
-        total,
-        next_cursor,
-        origins,
-        ..
-    } = result;
-    items.truncate(keep);
-    Ok(ModelItemsResult {
-        archive,
-        model,
-        section,
-        total,
-        items,
-        next_cursor,
-        origins,
+    request.publish(bones.len(), values, |range, cursor| {
+        field_origins(primary, range, cursor)
     })
 }
 
@@ -182,9 +118,7 @@ impl<'a> Fields<'a> {
         name: &str,
         value: FieldOrigin,
     ) -> Result<(), EvidenceError> {
-        let mut path = parent.clone();
-        path.push_field(name)?;
-        Ok(self.result.insert(path, value)?)
+        model_item_page::put(&mut self.result, parent, name, value)
     }
 
     fn bone(

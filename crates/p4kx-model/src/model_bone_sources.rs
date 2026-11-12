@@ -5,7 +5,8 @@ use std::ops::Range;
 
 use p4kx_chunks::{ChunkFile, ChunkTableRow};
 
-use crate::{Bone, ModelFile};
+use crate::model_chunk_words::Words;
+use crate::{Bone, ModelChunkWords, ModelFile};
 
 /// The original source examined by the primary skeleton selection.
 #[derive(Debug, Clone)]
@@ -16,50 +17,13 @@ pub enum PrimarySkeletonSelection {
     /// The original type words examined for a skeleton.
     ChunkTable {
         /// The exact examined prefix, absent when the source has no rows.
-        prefix: Option<SkeletonTypePrefix>,
+        prefix: Option<ModelChunkWords>,
     },
-}
-
-/// A contiguous sequence of strided type words in the original chunk table.
-#[derive(Debug, Clone)]
-pub struct SkeletonTypePrefix {
-    first: Range<u64>,
-    stride: u64,
-    count: usize,
-}
-
-impl SkeletonTypePrefix {
-    /// Returns the half-open first word interval in the decoded Entry.
-    #[must_use]
-    pub fn first_word(&self) -> Range<u64> {
-        self.first.clone()
-    }
-
-    /// Returns the byte distance between consecutive words.
-    #[must_use]
-    pub const fn stride(&self) -> u64 {
-        self.stride
-    }
-
-    /// Returns the number of examined words.
-    #[must_use]
-    pub const fn count(&self) -> usize {
-        self.count
-    }
 }
 
 impl PrimarySkeletonSelection {
     pub(crate) fn chunk_table<B: AsRef<[u8]>>(file: &ChunkFile<B>, count: usize) -> Self {
-        let table = file.table_range();
-        let stride = (table.end - table.start).checked_div(file.chunks().len() as u64);
-        let prefix = file
-            .table_row(0)
-            .zip(stride)
-            .map(|(first, stride)| SkeletonTypePrefix {
-                first: first.kind,
-                stride,
-                count,
-            });
+        let prefix = ModelChunkWords::read(file, count, Words::Type);
         Self::ChunkTable { prefix }
     }
 }

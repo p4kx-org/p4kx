@@ -7,13 +7,19 @@ use p4kx_chunks::{ChunkFile, ivo};
 use p4kx_foundation::ByteReader;
 
 use crate::hierarchy::find_cycle;
+use crate::model_node_coordinates::MatrixRead;
+use crate::nmc_properties;
 use crate::reader::{ReadValues, to_usize};
-use crate::{CorruptChunk, ModelFile, ModelNodeSource, ModelNodeSources, Node, Transform};
+use crate::{
+    CorruptChunk, ModelFile, ModelNodePropertySource, ModelNodeSelection, ModelNodeSource,
+    ModelNodeSources, Node, Transform,
+};
 
 const NODE_LEN: usize = 208;
 const LOCAL_TRANSFORM_AT: usize = 80;
 const SCALE_AT: usize = LOCAL_TRANSFORM_AT + 48;
 const PARENT_AT: usize = 148;
+const GEOMETRY_TYPE_AT: usize = PARENT_AT + size_of::<u16>();
 const FOOTER_LEN: usize = 32;
 const ROOT: u16 = 0xFFFF;
 const EPSILON: f32 = 1e-5;
@@ -33,9 +39,16 @@ pub(crate) struct NodeDecodeError {
 pub(crate) fn read_file_nodes<B: AsRef<[u8]>>(
     file: &ChunkFile<B>,
     read: &mut Vec<(ModelFile, usize)>,
-    sources: Option<&mut ModelNodeSources>,
+    mut sources: Option<&mut ModelNodeSources>,
 ) -> Result<Option<Nmc>, NodeDecodeError> {
-    let Some((index, chunk)) = file.chunks_of(ivo::NODE_MESH_COMBO).next() else {
+    let selected = file.chunks_of(ivo::NODE_MESH_COMBO).next();
+    if let Some(sources) = sources.as_mut() {
+        sources.set_selection(ModelNodeSelection::ivo(
+            file,
+            selected.map(|(index, chunk)| (index, chunk.offset())),
+        ));
+    }
+    let Some((index, chunk)) = selected else {
         return Ok(None);
     };
     read.push((ModelFile::Model, index));
@@ -74,36 +87,18 @@ fn read_nodes(data: &[u8], mut sources: Option<NodeMeshSources<'_>>) -> Result<N
         .iter()
         .map(|&pair| u16::from_le_bytes(pair))
         .collect();
+    let names_at = reader.offset();
+    let name_bytes = reader.read_bytes(names_len)?;
+    let properties_at = reader.offset();
+    let property_bytes = reader.read_bytes(properties_len.min(reader.remaining()))?;
     if let Some(sources) = sources.as_mut() {
-        sources.start(records_at, reader.offset(), names_len);
+        sources.start(
+            records_at,
+            names_at..properties_at,
+            properties_at..reader.offset(),
+        );
     }
-    let names = reader.read_bytes(names_len)?;
-    let mut names = names.split(|&byte| byte == 0);
-    let properties = reader.read_bytes(properties_len.min(reader.remaining()))?;
-    let mut properties = properties.split(|&byte| byte == 0);
-
-    let mut nodes = Vec::with_capacity(count);
-    for (index, record) in records.as_chunks::<NODE_LEN>().0.iter().enumerate() {
-        let mut node = read_record(index, record, count)?;
-        let name = names.next();
-        let line = name.and_then(|bytes| bytes.split(|&byte| byte == b'\n').next());
-        node.name = line.map_or_else(String::new, |bytes| {
-            String::from_utf8_lossy(bytes).into_owned()
-        });
-        if let Some(sources) = sources.as_mut() {
-            sources.record(index, name.map(<[u8]>::len), line.map(<[u8]>::len));
-        }
-        node.properties = properties
-            .next()
-            .map(|entry| {
-                entry
-                    .split(|&byte| byte == b'\n')
-                    .filter_map(property)
-                    .collect()
-            })
-            .unwrap_or_default();
-        nodes.push(node);
-    }
+    let nodes = read_rows(records, name_bytes, property_bytes, sources)?;
     let parents: Vec<Option<usize>> = nodes.iter().map(|node| node.parent).collect();
     if let Some(node) = find_cycle(&parents) {
         return Err(CorruptChunk::ParentCycle(node));
@@ -114,7 +109,55 @@ fn read_nodes(data: &[u8], mut sources: Option<NodeMeshSources<'_>>) -> Result<N
     })
 }
 
-fn read_record(index: usize, record: &[u8; NODE_LEN], count: usize) -> Result<Node, CorruptChunk> {
+fn read_rows(
+    records: &[u8],
+    name_bytes: &[u8],
+    property_bytes: &[u8],
+    mut sources: Option<NodeMeshSources<'_>>,
+) -> Result<Vec<Node>, CorruptChunk> {
+    let count = records.len() / NODE_LEN;
+    let mut names = name_bytes.split(|&byte| byte == 0);
+    let mut properties = property_bytes.split(|&byte| byte == 0);
+
+    let mut nodes = Vec::with_capacity(count);
+    for (index, record) in records.as_chunks::<NODE_LEN>().0.iter().enumerate() {
+        let mut record = read_record(index, record, count)?;
+        let name = names.next();
+        let line = name.and_then(|bytes| bytes.split(|&byte| byte == b'\n').next());
+        let entry = properties.next();
+        record.node.name = line.map_or_else(String::new, |bytes| {
+            String::from_utf8_lossy(bytes).into_owned()
+        });
+        let props = nmc_properties::read_entry(entry, sources.as_ref().map(|s| s.properties.start));
+        record.node.properties = props.values;
+        if let Some(sources) = sources.as_mut() {
+            sources.record(
+                index,
+                &record,
+                NodeStrings {
+                    name: name.map(<[u8]>::len),
+                    line: line.map(<[u8]>::len),
+                    property: entry.map(<[u8]>::len),
+                },
+                props.sites,
+            );
+        }
+        nodes.push(record.node);
+    }
+    Ok(nodes)
+}
+
+struct Record {
+    node: Node,
+    matrix_read: MatrixRead,
+    scale_read: bool,
+}
+
+fn read_record(
+    index: usize,
+    record: &[u8; NODE_LEN],
+    count: usize,
+) -> Result<Record, CorruptChunk> {
     let mut fields = ByteReader::new(record.as_slice());
     fields.skip(LOCAL_TRANSFORM_AT)?;
     let rows = fields.read_rows()?;
@@ -128,10 +171,10 @@ fn read_record(index: usize, record: &[u8; NODE_LEN], count: usize) -> Result<No
     if scale.iter().any(|value| !value.is_finite()) {
         return Err(CorruptChunk::NonFinite("node scale"));
     }
-    let transform = if rows.iter().flatten().all(|value| value.abs() < EPSILON) {
-        Transform::IDENTITY
+    let (transform, matrix_read) = if rows.iter().flatten().all(|value| value.abs() < EPSILON) {
+        (Transform::IDENTITY, MatrixRead::Identity)
     } else {
-        Transform { rows }
+        (Transform { rows }, MatrixRead::Rows)
     };
     let parent = match parent {
         ROOT => None,
@@ -145,24 +188,23 @@ fn read_record(index: usize, record: &[u8; NODE_LEN], count: usize) -> Result<No
         }
     };
     let mut node = Node::new(String::new(), parent, transform);
-    if scale.iter().any(|value| value.abs() >= EPSILON) {
+    let scale_read = scale.iter().any(|value| value.abs() >= EPSILON);
+    if scale_read {
         node.scale = scale;
     }
     node.geometry_type = Some(geometry_type);
-    Ok(node)
+    Ok(Record {
+        node,
+        matrix_read,
+        scale_read,
+    })
 }
 
-fn property(line: &[u8]) -> Option<(String, String)> {
-    let at = line.iter().position(|&byte| byte == b'=')?;
-    let (key, value) = line.split_at(at);
-    let key = key.trim_ascii();
-    let value = value.get(1..).unwrap_or_default().trim_ascii();
-    (!key.is_empty()).then(|| {
-        (
-            String::from_utf8_lossy(key).into_owned(),
-            String::from_utf8_lossy(value).into_owned(),
-        )
-    })
+#[derive(Clone, Copy)]
+struct NodeStrings {
+    name: Option<usize>,
+    line: Option<usize>,
+    property: Option<usize>,
 }
 
 struct NodeMeshSources<'a> {
@@ -171,6 +213,7 @@ struct NodeMeshSources<'a> {
     base: u64,
     records: u64,
     names: Range<u64>,
+    properties: Range<u64>,
 }
 
 impl<'a> NodeMeshSources<'a> {
@@ -181,30 +224,52 @@ impl<'a> NodeMeshSources<'a> {
             base,
             records: 0,
             names: 0..0,
+            properties: 0..0,
         }
     }
 
-    const fn start(&mut self, records: u64, names: u64, names_len: usize) {
+    const fn start(&mut self, records: u64, names: Range<u64>, properties: Range<u64>) {
         self.records = self.base + records;
-        self.names = self.base + names..self.base + names + names_len as u64;
+        self.names = self.base + names.start..self.base + names.end;
+        self.properties = self.base + properties.start..self.base + properties.end;
     }
 
-    fn record(&mut self, index: usize, name_len: Option<usize>, line_len: Option<usize>) {
+    fn record(
+        &mut self,
+        index: usize,
+        record: &Record,
+        strings: NodeStrings,
+        property_rows: Vec<ModelNodePropertySource>,
+    ) {
         let start = self.records + index as u64 * NODE_LEN as u64;
-        let name = line_len.and_then(|len| {
-            let end = self.names.start + len as u64;
-            let with_terminator = if end < self.names.end { end + 1 } else { end };
-            (with_terminator > self.names.start).then_some(self.names.start..with_terminator)
-        });
-        if let Some(len) = name_len {
-            self.names.start = (self.names.start + len as u64 + 1).min(self.names.end);
+        let name = text_extent(&self.names, strings.line);
+        if let Some(extent) = text_extent(&self.names, strings.name) {
+            self.names.start = extent.end;
+        }
+        let properties = text_extent(&self.properties, strings.property);
+        if let Some(extent) = &properties {
+            self.properties.start = extent.end;
         }
         self.nodes.push(ModelNodeSource {
             chunk: self.chunk,
             name,
             parent: start + PARENT_AT as u64..start + PARENT_AT as u64 + 2,
             matrix: start + LOCAL_TRANSFORM_AT as u64..start + SCALE_AT as u64,
-            id: None,
+            table: None,
+            matrix_read: record.matrix_read,
+            scale: Some(start + SCALE_AT as u64..start + SCALE_AT as u64 + 12),
+            scale_read: record.scale_read,
+            geometry_type: Some(
+                start + GEOMETRY_TYPE_AT as u64..start + GEOMETRY_TYPE_AT as u64 + 2,
+            ),
+            properties,
+            property_rows,
         });
     }
+}
+
+fn text_extent(table: &Range<u64>, length: Option<usize>) -> Option<Range<u64>> {
+    let end = table.start + length? as u64;
+    let with_separator = (end + 1).min(table.end);
+    (with_separator > table.start).then_some(table.start..with_separator)
 }

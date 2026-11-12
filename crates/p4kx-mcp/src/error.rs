@@ -15,7 +15,7 @@ use p4kx_extraction::{
 use p4kx_settings::{KeyChoiceError, SettingsError};
 use thiserror::Error;
 
-use crate::model_bone_items::EvidenceError as BoneEvidenceError;
+use crate::model_item_page::EvidenceError as ModelEvidenceError;
 
 /// A tool call that cannot be answered; its message goes back to the client as a tool error.
 #[derive(Debug, Error)]
@@ -111,9 +111,9 @@ pub(crate) enum ToolError {
     /// The chunk table's original input or field addresses could not be retained.
     #[error("cannot retain the chunk table source evidence")]
     ChunkEvidence(#[from] ChunkEvidenceError),
-    /// A model skeleton field's source evidence could not be represented.
-    #[error("cannot retain the model skeleton source evidence")]
-    BoneEvidence(#[from] BoneEvidenceError),
+    /// A model field's source evidence could not be represented.
+    #[error("cannot retain the model field source evidence")]
+    ModelEvidence(#[from] ModelEvidenceError),
     /// A material library cannot be read.
     #[error("cannot read the material library {path}")]
     Material {

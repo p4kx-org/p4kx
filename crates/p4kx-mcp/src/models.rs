@@ -4,7 +4,7 @@
 use p4kx_extraction::model::{LodSelection, MaterialReading, PositionBox};
 use p4kx_extraction::{
     AnimationChoice, AnimationInfo, AnimationSet, ChunkInfo, ConversionError, LibraryInfo, LodInfo,
-    MaterialInfo, MeshInfo, ModelSource, NodeInfo, TextureVerdicts, UnreadInfo,
+    MaterialInfo, MeshInfo, ModelSource, TextureVerdicts, UnreadInfo,
 };
 use serde::Serialize;
 
@@ -12,6 +12,8 @@ use crate::archives::Opened;
 use crate::budget::{MAX_RESPONSE_LEN, fill_within, json_len};
 use crate::error::ToolError;
 use crate::model_bone_items;
+use crate::model_item_page::ModelItemPage;
+use crate::model_node_items;
 use crate::model_params::Section;
 use crate::model_shapes::{LodShape, ModelCounts, ModelItemsResult, ModelOverview};
 use crate::page::Page;
@@ -74,6 +76,13 @@ pub(crate) fn items(
     let model = source.model();
     let what = section.name();
     let reserved = envelope_len(opened, source.name(), what);
+    let observed = ModelItemPage {
+        opened,
+        source: &source,
+        section,
+        page,
+        reserved,
+    };
     let (total, items, next_cursor) = match section {
         Section::Materials => paged(
             &MaterialInfo::of_model(model),
@@ -82,9 +91,7 @@ pub(crate) fn items(
             reserved,
             |item| item,
         )?,
-        Section::Nodes => paged(&NodeInfo::of_model(model), page, what, reserved, |item| {
-            item
-        })?,
+        Section::Nodes => return model_node_items::list(&observed),
         Section::Meshes => {
             let lods = LodInfo::of_model(model);
             let meshes: Vec<LodMesh<'_>> = lods
@@ -98,7 +105,7 @@ pub(crate) fn items(
                 .collect();
             paged(&meshes, page, what, reserved, |item| item)?
         }
-        Section::Bones => return model_bone_items::list(opened, &source, page, reserved),
+        Section::Bones => return model_bone_items::list(&observed),
         Section::Animations => {
             let read: Vec<_> = animations
                 .animations
@@ -174,10 +181,10 @@ fn read(
     request: ModelRead,
 ) -> Result<(ModelSource, AnimationSet), ToolError> {
     let index = opened.index();
-    let load = if matches!(request, ModelRead::Section(Section::Bones)) {
-        ModelSource::from_index_observing_model_sources
-    } else {
-        ModelSource::from_index_reading
+    let load = match request {
+        ModelRead::Section(Section::Bones) => ModelSource::from_index_observing_model_sources,
+        ModelRead::Section(Section::Nodes) => ModelSource::from_index_observing_nodes,
+        _ => ModelSource::from_index_reading,
     };
     let source = load(
         &index,

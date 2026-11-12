@@ -863,6 +863,13 @@ selector records the exact type-word prefix examined for that skeleton. A `CrCh`
 empty under the selected reader layout. Provenance counts toward the existing response budget,
 and the cursor resumes after the last returned bone.
 
+For `list_model_items` with `section: "nodes"`, `fieldOrigins` addresses the returned node fields
+and matrix, scale and property members. The recorded byte ranges locate the original IVO fields
+or the versioned `CrCh` node words, including the resolved parent ID and the transposed matrix
+cells. The parser's default selectors account for identity matrices and the synthetic root.
+The generated root name also uses the selected model's directory path. The same response budget
+and cursor apply to node pages.
+
 For `mtl_summary`, `fieldOrigins` addresses the fields of the returned page, including each
 admitted texture, parameter and layer. `materialXmlElement` locations are zero-based element
 child ordinals from the original XML root. `materialXmlAttribute` appends the original attribute

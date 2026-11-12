@@ -135,6 +135,11 @@ impl EntryPageSources {
         })
     }
 
+    pub(crate) fn leaf_path(&self) -> Result<SourceUse, SourceEvidenceError> {
+        self.directory
+            .at(metadata("path"), SourceUseRole::Conversion)
+    }
+
     pub(crate) fn stored_size(&self) -> Result<SourceUse, SourceEvidenceError> {
         self.directory
             .at(metadata("uncompressed_size"), SourceUseRole::Payload)

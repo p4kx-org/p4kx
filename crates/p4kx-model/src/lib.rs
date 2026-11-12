@@ -63,6 +63,9 @@ mod mesh;
 mod model;
 mod model_bone_sources;
 mod model_chunk_layout;
+mod model_chunk_words;
+mod model_node_coordinates;
+mod model_node_selection;
 mod model_node_sources;
 mod model_options;
 mod mtl;
@@ -101,6 +104,7 @@ mod mtl_vertex_colours;
 mod mtl_xml;
 mod mtl_xml_source;
 mod nmc;
+mod nmc_properties;
 mod object_container;
 mod palette;
 mod positioned_animation;
@@ -149,11 +153,13 @@ pub use material_companion::{MaterialCompanion, MaterialCompanionUse, MaterialRe
 pub use material_read_observation::{MaterialReadField, MaterialReadObservation, MaterialReadUse};
 pub use material_request::MaterialRequest;
 pub use model::{ChunkUsage, Lod, LodSelection, Mesh, Model, ModelChunk, ModelFile, Node, Submesh};
-pub use model_bone_sources::{
-    ModelBoneSource, ModelBoneSources, PrimarySkeletonSelection, SkeletonTypePrefix,
-};
+pub use model_bone_sources::{ModelBoneSource, ModelBoneSources, PrimarySkeletonSelection};
 pub use model_chunk_layout::ModelChunkLayout;
-pub use model_node_sources::{ModelNodeSource, ModelNodeSources, ModelReadSources};
+pub use model_chunk_words::ModelChunkWords;
+pub use model_chunk_words::ModelChunkWords as SkeletonTypePrefix;
+pub use model_node_coordinates::{ModelNodePropertySource, ModelNodeSource};
+pub use model_node_selection::{ModelNodeMeshChunk, ModelNodeSelection};
+pub use model_node_sources::{ModelNodeSources, ModelReadSources};
 pub use model_options::{ModelIssue, PositionBox};
 pub use mtl::{
     MAX_SUB_MATERIALS, Material, MaterialFlags, MaterialLibrary, MaterialStatus, TextureSlot,

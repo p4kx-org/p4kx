@@ -118,10 +118,17 @@ impl<'a> NodeInfo<'a> {
     /// Describes the nodes of `model`.
     #[must_use]
     pub fn of_model(model: &'a Model) -> Vec<Self> {
-        model.nodes.iter().enumerate().map(Self::of).collect()
+        model
+            .nodes
+            .iter()
+            .enumerate()
+            .map(|(index, node)| Self::of_node(index, node))
+            .collect()
     }
 
-    fn of((index, node): (usize, &'a Node)) -> Self {
+    /// Describes the selected original node at its model ordinal.
+    #[must_use]
+    pub fn of_node(index: usize, node: &'a Node) -> Self {
         Self {
             index,
             name: &node.name,

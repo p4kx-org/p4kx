@@ -9,10 +9,11 @@ use p4kx_foundation::ByteReader;
 use crate::build::corrupt;
 use crate::error::failure;
 use crate::hierarchy::find_cycle;
+use crate::model_node_coordinates::MatrixRead;
 use crate::reader::ReadValues;
 use crate::{
-    CorruptChunk, ModelError, ModelFile, ModelNodeSource, ModelNodeSources, Node, Transform,
-    UnsupportedLayout,
+    CorruptChunk, ModelError, ModelFile, ModelNodeSelection, ModelNodeSource, ModelNodeSources,
+    Node, Transform, UnsupportedLayout,
 };
 
 const NODE_VERSION: u32 = 0x824;
@@ -43,35 +44,12 @@ pub(crate) fn read_nodes<B: AsRef<[u8]>>(
     file_name: &str,
     file: &ChunkFile<B>,
     read: &mut Vec<(ModelFile, usize)>,
-    mut sources: Option<&mut ModelNodeSources>,
+    sources: Option<&mut ModelNodeSources>,
 ) -> Result<Vec<CrchNode>, ModelError> {
-    let mut raw = Vec::new();
-    let mut by_id = HashMap::new();
-    for (index, chunk) in file.chunks_of(crch::NODE) {
-        if chunk.version() != NODE_VERSION {
-            continue;
-        }
-        let fail = corrupt(file_name, index, "Node");
-        if chunk.byte_order() != ByteOrder::Little {
-            return Err(failure(file_name, index, "Node")(
-                UnsupportedLayout::BigEndian.into(),
-            ));
-        }
-        let chunk_id = chunk.id().unwrap_or_default();
-        let observe = |name_len: usize| {
-            if let Some(sources) = sources.as_mut() {
-                sources.push(node_source(file, index, chunk.offset(), name_len));
-            }
-        };
-        let record =
-            read_record(file.chunk_data(index).unwrap_or_default(), observe).map_err(&fail)?;
-        if by_id.insert(chunk_id, raw.len()).is_some() {
-            return Err(fail(CorruptChunk::RepeatedChunkId(chunk_id)));
-        }
-        read.push((ModelFile::Model, index));
-        raw.push((index, record));
-    }
-
+    let RawNodes {
+        records: raw,
+        by_id,
+    } = read_original_nodes(file_name, file, read, sources)?;
     let mut nodes = Vec::with_capacity(raw.len());
     for (position, (index, record)) in raw.iter().enumerate() {
         let parent = if record.parent == NO_PARENT {
@@ -105,11 +83,65 @@ pub(crate) fn read_nodes<B: AsRef<[u8]>>(
         .collect())
 }
 
+struct RawNodes {
+    records: Vec<(usize, Raw)>,
+    by_id: HashMap<u32, usize>,
+}
+
+fn read_original_nodes<B: AsRef<[u8]>>(
+    file_name: &str,
+    file: &ChunkFile<B>,
+    read: &mut Vec<(ModelFile, usize)>,
+    mut sources: Option<&mut ModelNodeSources>,
+) -> Result<RawNodes, ModelError> {
+    if let Some(sources) = sources.as_mut() {
+        sources.set_selection(ModelNodeSelection::crch(file));
+    }
+    let mut raw = Vec::new();
+    let mut by_id = HashMap::new();
+    for (index, chunk) in file.chunks_of(crch::NODE) {
+        if chunk.version() != NODE_VERSION {
+            continue;
+        }
+        let fail = corrupt(file_name, index, "Node");
+        if chunk.byte_order() != ByteOrder::Little {
+            return Err(failure(file_name, index, "Node")(
+                UnsupportedLayout::BigEndian.into(),
+            ));
+        }
+        let chunk_id = chunk.id().unwrap_or_default();
+        let observe = |name_len: usize, matrix_read: MatrixRead| {
+            if let Some(sources) = sources.as_mut() {
+                sources.push(node_source(
+                    file,
+                    index,
+                    chunk.offset(),
+                    name_len,
+                    matrix_read,
+                ));
+            }
+        };
+        let record =
+            read_record(file.chunk_data(index).unwrap_or_default(), observe).map_err(&fail)?;
+        if by_id.insert(chunk_id, raw.len()).is_some() {
+            return Err(fail(CorruptChunk::RepeatedChunkId(chunk_id)));
+        }
+        read.push((ModelFile::Model, index));
+        raw.push((index, record));
+    }
+
+    Ok(RawNodes {
+        records: raw,
+        by_id,
+    })
+}
+
 fn node_source<B: AsRef<[u8]>>(
     file: &ChunkFile<B>,
     index: usize,
     start: u64,
     name_len: usize,
+    matrix_read: MatrixRead,
 ) -> ModelNodeSource {
     let name_extent = (name_len + 1).min(NAME_LEN);
     ModelNodeSource {
@@ -117,11 +149,17 @@ fn node_source<B: AsRef<[u8]>>(
         name: Some(start..start + name_extent as u64),
         parent: start + PARENT_AT..start + PARENT_AT + 4,
         matrix: start + MATRIX_AT..start + MATRIX_AT + MATRIX_LEN,
-        id: file.table_row(index).and_then(|row| row.id),
+        table: file.table_row(index),
+        matrix_read,
+        scale: None,
+        scale_read: false,
+        geometry_type: None,
+        properties: None,
+        property_rows: Vec::new(),
     }
 }
 
-fn read_record(data: &[u8], observe: impl FnOnce(usize)) -> Result<Raw, CorruptChunk> {
+fn read_record(data: &[u8], observe: impl FnOnce(usize, MatrixRead)) -> Result<Raw, CorruptChunk> {
     let mut reader = ByteReader::new(data);
     let name = reader.read_bytes(NAME_LEN)?;
     let name = name.split(|&byte| byte == 0).next().unwrap_or(name);
@@ -135,20 +173,21 @@ fn read_record(data: &[u8], observe: impl FnOnce(usize)) -> Result<Raw, CorruptC
     if matrix.iter().flatten().any(|value| !value.is_finite()) {
         return Err(CorruptChunk::NonFinite("node transform"));
     }
-    observe(name.len());
+    let (local, matrix_read) = local_transform(&matrix);
+    observe(name.len(), matrix_read);
     Ok(Raw {
         object,
         parent,
         name: String::from_utf8_lossy(name).into_owned(),
-        local: local_transform(&matrix),
+        local,
     })
 }
 
 /// Converts the row-vector matrix of a node, translation in the last row, to a [`Transform`];
 /// an all-zero matrix is the identity.
-fn local_transform(matrix: &[[f32; 4]; 4]) -> Transform {
+fn local_transform(matrix: &[[f32; 4]; 4]) -> (Transform, MatrixRead) {
     if matrix.iter().flatten().all(|&value| value == 0.0) {
-        return Transform::IDENTITY;
+        return (Transform::IDENTITY, MatrixRead::Identity);
     }
     let at = |row: usize, column: usize| {
         matrix
@@ -157,7 +196,7 @@ fn local_transform(matrix: &[[f32; 4]; 4]) -> Transform {
             .copied()
             .unwrap_or(0.0)
     };
-    Transform {
+    let transform = Transform {
         rows: std::array::from_fn(|row| {
             std::array::from_fn(|column| {
                 if column == 3 {
@@ -167,5 +206,6 @@ fn local_transform(matrix: &[[f32; 4]; 4]) -> Transform {
                 }
             })
         }),
-    }
+    };
+    (transform, MatrixRead::Transposed)
 }
