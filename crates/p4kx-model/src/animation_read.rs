@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_chunks::{ChunkFile, Container, ivo};
+use p4kx_chunks::{Chunk, ChunkFile, ChunkType, Container, ivo};
 use p4kx_foundation::ByteReader;
 
-use crate::animation_keys::{bytes_at, read_rotations, read_times, read_translations};
+use crate::animation_controller::{CHANNEL_LEN, CONTROLLER_LEN};
+use crate::animation_keys::bytes_at;
 use crate::reader::to_usize;
-use crate::{Animation, AnimationError, CorruptAnimation, Keys, Track};
+use crate::{
+    Animation, AnimationController, AnimationError, AnimationTiming, CorruptAnimation, Track,
+};
 
 /// The most keys one animation may declare.
 pub const MAX_ANIMATION_KEYS: u64 = 1 << 22;
@@ -17,19 +20,10 @@ pub(crate) const ANIM_INFO_VERSION: u32 = 0x901;
 pub(crate) const CAF_DATA_VERSION: u32 = 0x900;
 pub(crate) const RECORD_LEN: usize = 48;
 const BLOCK_HEADER_LEN: usize = 12;
-const CONTROLLER_LEN: usize = 24;
-const SIDE_LEN: usize = 12;
 const ADDITIVE: u32 = 1;
 pub(crate) const CAF_SIGNATURE: [u8; 4] = *b"#caf";
 
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct Record {
-    pub(crate) additive: bool,
-    pub(crate) frames_per_second: u16,
-    pub(crate) end_frame: u32,
-}
-
-pub(crate) fn read_record(bytes: &[u8]) -> Result<Record, CorruptAnimation> {
+pub(crate) fn read_record(bytes: &[u8]) -> Result<AnimationTiming, CorruptAnimation> {
     let mut reader = ByteReader::new(bytes);
     let flags = reader.read_u32()?;
     let frames_per_second = reader.read_u16()?;
@@ -38,7 +32,7 @@ pub(crate) fn read_record(bytes: &[u8]) -> Result<Record, CorruptAnimation> {
     if frames_per_second == 0 {
         return Err(CorruptAnimation::FrameRate);
     }
-    Ok(Record {
+    Ok(AnimationTiming {
         additive: flags & ADDITIVE != 0,
         frames_per_second,
         end_frame,
@@ -76,140 +70,67 @@ pub(crate) fn read_block(
     })
 }
 
-#[derive(Debug, Clone, Copy)]
-struct Side {
-    count: usize,
-    format: u8,
-    times: u8,
-    time_at: usize,
-    data_at: usize,
-}
-
-impl Side {
-    fn read(bytes: &[u8], entry_at: usize) -> Result<Self, CorruptAnimation> {
-        let mut reader = ByteReader::new(bytes);
-        let count = usize::from(reader.read_u16()?);
-        let format = reader.read_u16()?;
-        let time = to_usize(reader.read_u32()?);
-        let data = to_usize(reader.read_u32()?);
-        let [times, kind] = format.to_le_bytes();
-        let absolute = |offset: usize| entry_at.saturating_add(offset);
-        Ok(Self {
-            count,
-            format: kind,
-            times,
-            time_at: absolute(time),
-            data_at: absolute(data),
-        })
-    }
-}
-
 pub(crate) fn declared_keys(data: &[u8], block: &Block) -> Result<u64, CorruptAnimation> {
-    let controllers_at = block.at + BLOCK_HEADER_LEN + 4 * block.count;
-    let controllers = bytes_at(data, controllers_at, block.count * CONTROLLER_LEN)?;
-    Ok(controllers
-        .as_chunks::<CONTROLLER_LEN>()
-        .0
-        .iter()
-        .map(side_keys)
+    Ok(controllers(data, block, 0)?
+        .map(|controller| u64::from(controller.declared_keys()))
         .sum())
 }
 
-fn side_keys(entry: &[u8; CONTROLLER_LEN]) -> u64 {
-    let count = |at: usize| {
-        entry
-            .get(at..at + 2)
-            .and_then(|pair| <[u8; 2]>::try_from(pair).ok())
-            .map_or(0, u16::from_le_bytes)
-    };
-    u64::from(count(0)) + u64::from(count(SIDE_LEN))
-}
-
-/// Returns the controller IDs of the tracks of `block` that have keys, in order, and the number
-/// of keys they declare, without decoding any key.
+/// Returns the IDs of the controllers with keys and the number of keys they declare.
 pub(crate) fn listed_tracks(
     data: &[u8],
     block: &Block,
 ) -> Result<(Vec<u32>, usize), CorruptAnimation> {
-    let hashes = bytes_at(data, block.at + BLOCK_HEADER_LEN, 4 * block.count)?;
-    let controllers_at = block.at + BLOCK_HEADER_LEN + 4 * block.count;
-    let controllers = bytes_at(data, controllers_at, block.count * CONTROLLER_LEN)?;
     let mut ids = Vec::with_capacity(block.count);
     let mut keys = 0_usize;
-    for (hash, entry) in hashes
-        .as_chunks::<4>()
-        .0
-        .iter()
-        .zip(controllers.as_chunks::<CONTROLLER_LEN>().0)
-    {
-        let declared = side_keys(entry);
+    for controller in controllers(data, block, 0)? {
+        let declared = controller.declared_keys();
         if declared > 0 {
-            ids.push(u32::from_le_bytes(*hash));
-            keys = keys.saturating_add(usize::try_from(declared).unwrap_or(usize::MAX));
+            ids.push(controller.controller_id());
+            keys = keys.saturating_add(to_usize(declared));
         }
     }
     Ok((ids, keys))
 }
 
 pub(crate) fn decode_tracks(data: &[u8], block: &Block) -> Result<Vec<Track>, CorruptAnimation> {
-    let hashes = bytes_at(data, block.at + BLOCK_HEADER_LEN, 4 * block.count)?;
-    let controllers_at = block.at + BLOCK_HEADER_LEN + 4 * block.count;
     let mut tracks = Vec::with_capacity(block.count);
-    for (index, hash) in hashes.as_chunks::<4>().0.iter().enumerate() {
-        let controller_id = u32::from_le_bytes(*hash);
-        let entry_at = controllers_at + index * CONTROLLER_LEN;
-        let entry = bytes_at(data, entry_at, CONTROLLER_LEN)?;
-        let (rotation, translation) = entry.split_at(SIDE_LEN);
-        let rotation = Side::read(rotation, entry_at)?;
-        let translation = Side::read(translation, entry_at)?;
-        let rotations = (rotation.count > 0)
-            .then(|| {
-                Ok::<_, CorruptAnimation>(Keys {
-                    frames: read_times(
-                        data,
-                        rotation.time_at,
-                        rotation.times,
-                        rotation.count,
-                        controller_id,
-                    )?,
-                    values: read_rotations(
-                        data,
-                        rotation.data_at,
-                        rotation.format,
-                        rotation.count,
-                        controller_id,
-                    )?,
-                })
-            })
-            .transpose()?;
-        let translations = (translation.count > 0)
-            .then(|| {
-                Ok::<_, CorruptAnimation>(Keys {
-                    frames: read_times(
-                        data,
-                        translation.time_at,
-                        translation.times,
-                        translation.count,
-                        controller_id,
-                    )?,
-                    values: read_translations(
-                        data,
-                        translation.data_at,
-                        translation.format,
-                        translation.count,
-                    )?,
-                })
-            })
-            .transpose()?;
-        if rotations.is_some() || translations.is_some() {
-            tracks.push(Track {
-                controller_id,
-                rotations,
-                translations,
-            });
+    for controller in controllers(data, block, 0)? {
+        if let Some(track) = controller.decode()? {
+            tracks.push(track);
         }
     }
     Ok(tracks)
+}
+
+pub(crate) fn controllers<'a>(
+    data: &'a [u8],
+    block: &Block,
+    file_offset: u64,
+) -> Result<impl Iterator<Item = AnimationController<'a>> + use<'a>, CorruptAnimation> {
+    let ids_at = block.at + BLOCK_HEADER_LEN;
+    let ids = bytes_at(data, ids_at, 4 * block.count)?.as_chunks::<4>().0;
+    let table_at = ids_at + 4 * block.count;
+    let table = bytes_at(data, table_at, CONTROLLER_LEN * block.count)?
+        .as_chunks::<CHANNEL_LEN>()
+        .0
+        .as_chunks::<2>()
+        .0;
+    Ok(ids
+        .iter()
+        .zip(table)
+        .enumerate()
+        .map(move |(ordinal, (id, channels))| {
+            AnimationController::of(
+                data,
+                file_offset,
+                ordinal,
+                ids_at + ordinal * 4,
+                u32::from_le_bytes(*id),
+                table_at + ordinal * CONTROLLER_LEN,
+                channels,
+            )
+        }))
 }
 
 pub(crate) const fn check_budget(keys: u64, limit: u64) -> Result<(), CorruptAnimation> {
@@ -222,7 +143,7 @@ pub(crate) const fn check_budget(keys: u64, limit: u64) -> Result<(), CorruptAni
 pub(crate) const fn build(
     name: String,
     path: String,
-    record: Record,
+    record: AnimationTiming,
     tracks: Vec<Track>,
 ) -> Animation {
     Animation {
@@ -252,10 +173,25 @@ pub(crate) fn corrupt(file: &str, chunk: &'static str, source: CorruptAnimation)
 pub(crate) fn chunk_bytes<'f, B: AsRef<[u8]>>(
     file_name: &str,
     file: &'f ChunkFile<B>,
-    chunk_type: p4kx_chunks::ChunkType,
+    chunk_type: ChunkType,
     version: u32,
     name: &'static str,
 ) -> Result<&'f [u8], AnimationError> {
+    let (index, _) = animation_chunk(file_name, file, chunk_type, version, name)?;
+    file.chunk_data_to_end(index)
+        .ok_or_else(|| AnimationError::MissingChunk {
+            file: file_name.to_owned(),
+            chunk: name,
+        })
+}
+
+pub(crate) fn animation_chunk<'a, B: AsRef<[u8]>>(
+    file_name: &str,
+    file: &'a ChunkFile<B>,
+    chunk_type: ChunkType,
+    version: u32,
+    name: &'static str,
+) -> Result<(usize, &'a Chunk), AnimationError> {
     if file.container() != Container::Ivo {
         return Err(AnimationError::UnsupportedContainer {
             file: file_name.to_owned(),
@@ -276,11 +212,7 @@ pub(crate) fn chunk_bytes<'f, B: AsRef<[u8]>>(
             version: chunk.version(),
         });
     }
-    file.chunk_data_to_end(index)
-        .ok_or_else(|| AnimationError::MissingChunk {
-            file: file_name.to_owned(),
-            chunk: name,
-        })
+    Ok((index, chunk))
 }
 
 impl Animation {

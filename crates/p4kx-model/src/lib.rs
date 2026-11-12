@@ -31,11 +31,13 @@
 //! model in its own file, as the physics mesh a `Mesh` chunk refers to (docs/crch-models.md).
 
 mod animation;
+mod animation_controller;
 mod animation_dba;
 mod animation_error;
 mod animation_header;
 mod animation_keys;
 mod animation_read;
+mod animation_source;
 mod bone;
 mod bone_extend;
 mod bone_map;
@@ -46,6 +48,7 @@ mod companion;
 mod crch;
 mod crch_mesh;
 mod crch_node;
+mod dba_animation_sources;
 mod error;
 mod hair_cap;
 mod hierarchy;
@@ -112,10 +115,12 @@ mod transform;
 mod vector;
 
 pub use animation::{Animation, BoundTracks, Keys, Track};
+pub use animation_controller::{AnimationChannel, AnimationController};
 pub use animation_dba::{Dba, DbaHeaders, SkippedAnimation};
 pub use animation_error::{AnimationError, CorruptAnimation};
 pub use animation_header::AnimationHeader;
 pub use animation_read::{MAX_ANIMATION_KEYS, MAX_DATABASE_KEYS};
+pub use animation_source::{AnimationMetadata, AnimationSource, AnimationTiming, DbaAnimationName};
 pub use bone::{Bone, BoneTransform};
 pub use bone_extend::{
     chained_world_poses, extend_skeleton, extend_skeleton_placed, multiply as multiply_quaternions,
@@ -126,6 +131,7 @@ pub use companion::{
     CompanionError, CompanionPath, CompanionResolver, GREY_PROBE_MIP, MAX_GREY_SATURATION,
     companion_file_names,
 };
+pub use dba_animation_sources::DbaAnimationSources;
 pub use error::{CorruptChunk, ModelError, UnsupportedLayout};
 pub use included::{
     IncludedObject, IncludedObjects, IncludedObjectsError, MAX_INCLUDED_MODELS,

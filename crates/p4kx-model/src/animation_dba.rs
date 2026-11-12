@@ -12,11 +12,11 @@ use crate::animation_read::{
 use crate::reader::to_usize;
 use crate::{Animation, AnimationError, AnimationHeader, CorruptAnimation};
 
-const DBA_DATA_VERSION: u32 = 0x900;
-const DBA_METADATA_VERSION: u32 = 0x902;
-const PREFIX_LEN: usize = 4;
-const METADATA_HEADER_LEN: usize = 8;
-const DBA_SIGNATURE: [u8; 4] = *b"#dba";
+pub(crate) const DBA_DATA_VERSION: u32 = 0x900;
+pub(crate) const DBA_METADATA_VERSION: u32 = 0x902;
+pub(crate) const PREFIX_LEN: usize = 4;
+pub(crate) const METADATA_HEADER_LEN: usize = 8;
+pub(crate) const DBA_SIGNATURE: [u8; 4] = *b"#dba";
 /// An animation of a `.dba` database that could not be read, with the reason; the other
 /// animations of the database are unaffected.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -179,25 +179,9 @@ fn read_headers(metadata: &[u8], data: &[u8]) -> Result<DbaHeaders, ChunkFailure
 fn layout<'a>(metadata: &'a [u8], data: &[u8]) -> Result<Layout<'a>, ChunkFailure> {
     let in_metadata = |source| ("DbaMetadata", source);
     let in_data = |source| ("DbaData", source);
-    let mut reader = ByteReader::new(metadata);
-    let count = to_usize(
-        reader
-            .read_u32()
-            .map_err(|error| in_metadata(error.into()))?,
-    );
-    reader
-        .skip(METADATA_HEADER_LEN - 4)
-        .map_err(|error| in_metadata(error.into()))?;
-    let records = reader
-        .read_bytes(count.saturating_mul(RECORD_LEN))
-        .map_err(|error| in_metadata(error.into()))?;
-    let paths = names(
-        reader
-            .read_bytes(reader.remaining())
-            .map_err(|error| in_metadata(error.into()))?,
-        count,
-    )
-    .map_err(in_metadata)?;
+    let (records, name_table) = metadata_parts(metadata).map_err(in_metadata)?;
+    let count = records.len() / RECORD_LEN;
+    let paths = names(name_table, count).map_err(in_metadata)?;
 
     let mut blocks = Vec::with_capacity(count);
     let mut position = PREFIX_LEN;
@@ -216,16 +200,29 @@ fn layout<'a>(metadata: &'a [u8], data: &[u8]) -> Result<Layout<'a>, ChunkFailur
     })
 }
 
-fn names(table: &[u8], count: usize) -> Result<Vec<String>, CorruptAnimation> {
-    let mut parts = table.split_inclusive(|&byte| byte == 0);
+pub(crate) fn metadata_parts(metadata: &[u8]) -> Result<(&[u8], &[u8]), CorruptAnimation> {
+    let mut reader = ByteReader::new(metadata);
+    let count = to_usize(reader.read_u32()?);
+    reader.skip(METADATA_HEADER_LEN - 4)?;
+    let records = reader.read_bytes(count.saturating_mul(RECORD_LEN))?;
+    let names = reader.read_bytes(reader.remaining())?;
+    Ok((records, names))
+}
+
+pub(crate) fn next_name(table: &[u8], count: usize) -> Result<(&[u8], &[u8]), CorruptAnimation> {
+    let mut parts = table.splitn(2, |&byte| byte == 0);
+    match (parts.next(), parts.next()) {
+        (Some(name), Some(rest)) => Ok((name, rest)),
+        _ => Err(CorruptAnimation::Names { animations: count }),
+    }
+}
+
+fn names(mut table: &[u8], count: usize) -> Result<Vec<String>, CorruptAnimation> {
     (0..count)
         .map(|_| {
-            parts
-                .next()
-                .and_then(<[u8]>::split_last)
-                .filter(|&(&last, _)| last == 0)
-                .map(|(_, name)| String::from_utf8_lossy(name).into_owned())
-                .ok_or(CorruptAnimation::Names { animations: count })
+            let (name, rest) = next_name(table, count)?;
+            table = rest;
+            Ok(String::from_utf8_lossy(name).into_owned())
         })
         .collect()
 }
