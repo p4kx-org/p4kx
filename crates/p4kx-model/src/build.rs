@@ -8,14 +8,16 @@ use crate::build_lod::read_lod_companions;
 use crate::material::material_library;
 use crate::mesh::split_by_node;
 use crate::model::MESH_TYPES;
+use crate::model_node_sources::ReadCapture;
 use crate::mtl_load::load;
-use crate::nmc::{self, NodeMeshSources};
-use crate::skeleton_source::SkeletonChunk;
+use crate::nmc;
+use crate::skeleton_source;
 use crate::skin::read_skin;
 use crate::{
     Bone, ChunkUsage, CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection,
-    LodSkeletonOrigin, MaterialReading, Mesh, Model, ModelChunk, ModelChunkLayout, ModelError,
-    ModelFile, ModelIssue, ModelNodeSources, Node, PositionBox, RigLogicBytes, Transform,
+    LodSkeletonOrigin, MaterialReading, Mesh, Model, ModelBoneSources, ModelChunk,
+    ModelChunkLayout, ModelError, ModelFile, ModelIssue, Node, PositionBox, RigLogicBytes,
+    Transform,
 };
 
 const MATERIAL_TYPES: [ChunkType; 2] = [ivo::MTL_NAME_320, ivo::MTL_NAME];
@@ -33,19 +35,6 @@ pub(crate) struct Rig<'a> {
     pub(crate) position_box: PositionBox,
 }
 
-pub(crate) fn read_skeleton<B: AsRef<[u8]>>(
-    name: &str,
-    file: &ChunkFile<B>,
-    which: ModelFile,
-    read: &mut Vec<(ModelFile, usize)>,
-) -> Result<Vec<Bone>, ModelError> {
-    let Some(chunk) = SkeletonChunk::primary(file) else {
-        return Ok(Vec::new());
-    };
-    read.push((which, chunk.index));
-    chunk.bones(name)
-}
-
 pub(crate) fn build<B: AsRef<[u8]>>(
     name: &str,
     file: &ChunkFile<B>,
@@ -53,49 +42,47 @@ pub(crate) fn build<B: AsRef<[u8]>>(
     selection: LodSelection,
     materials: MaterialReading,
     position_box: PositionBox,
-    node_sources: Option<&mut ModelNodeSources>,
+    mut capture: ReadCapture<'_>,
 ) -> Result<Model, ModelError> {
     let mut read = Vec::new();
-    let nmc = match file.chunks_of(ivo::NODE_MESH_COMBO).next() {
-        Some((index, chunk)) => {
-            read.push((ModelFile::Model, index));
-            let data = file.chunk_data(index).unwrap_or_default();
-            let sources =
-                node_sources.map(|nodes| NodeMeshSources::new(nodes, index, chunk.offset()));
-            Some(nmc::read_nodes(data, sources).map_err(corrupt(name, index, "NodeMeshCombo"))?)
-        }
-        None => None,
-    }
-    .filter(|nmc| !nmc.nodes.is_empty());
+    let nmc = nmc::read_file_nodes(file, &mut read, capture.nodes)
+        .map_err(|error| corrupt(name, error.index, "NodeMeshCombo")(error.source))?;
     let (nodes, material_indices) = nmc.map_or((None, Vec::new()), |nmc| {
         (Some(nmc.nodes), nmc.material_indices)
     });
-    let bones = read_skeleton(name, file, ModelFile::Model, &mut read)?;
+    let bones = skeleton_source::read_model_skeleton(
+        name,
+        file,
+        ModelFile::Model,
+        &mut read,
+        capture.skeletons.as_deref_mut(),
+    )?;
     let rig = Rig {
         nodes: nodes.as_ref().map(Vec::len),
         bones: &bones,
         position_box,
     };
-    let material = first_of(file, &MATERIAL_TYPES).map(|index| {
-        read.push((ModelFile::Model, index));
-        material_library(file.chunk_data(index).unwrap_or_default())
-    });
-
-    let rig_logic = first_of(file, &[ivo::RIG_LOGIC]).and_then(|index| {
-        read.push((ModelFile::Model, index));
-        file.chunk_data(index).map(RigLogicBytes::new)
-    });
+    let material_library =
+        read_primary_chunk(file, &MATERIAL_TYPES, &mut read).and_then(material_library);
+    let rig_logic = read_primary_chunk(file, &[ivo::RIG_LOGIC], &mut read).map(RigLogicBytes::new);
 
     let Geometry {
         lods,
         base_name,
         chunks: companion_chunks,
         issues,
-    } = read_geometry(name, file, companions, selection, rig, &mut read)?;
+    } = read_geometry(
+        name,
+        file,
+        companions,
+        selection,
+        rig,
+        &mut read,
+        capture.skeletons,
+    )?;
 
     let mut chunks = usage(file, ModelFile::Model, &read);
     chunks.extend(companion_chunks);
-    let material_library = material.flatten();
     let materials = load(
         material_library.as_deref(),
         companions,
@@ -117,6 +104,16 @@ pub(crate) fn build<B: AsRef<[u8]>>(
     })
 }
 
+fn read_primary_chunk<'a, B: AsRef<[u8]>>(
+    file: &'a ChunkFile<B>,
+    types: &[ChunkType],
+    read: &mut Vec<(ModelFile, usize)>,
+) -> Option<&'a [u8]> {
+    let index = first_of(file, types)?;
+    read.push((ModelFile::Model, index));
+    file.chunk_data(index)
+}
+
 /// The meshes of a model, the name of its geometry companion, the chunk usage of every
 /// companion, computed as each was read so that no companion's bytes outlive its reading, and
 /// what a lenient read worked around.
@@ -134,6 +131,7 @@ fn read_geometry<B: AsRef<[u8]>>(
     selection: LodSelection,
     rig: Rig<'_>,
     read: &mut Vec<(ModelFile, usize)>,
+    skeleton_sources: Option<&mut Vec<ModelBoneSources>>,
 ) -> Result<Geometry, ModelError> {
     let own_mesh = first_of(file, &MESH_TYPES);
     let mut issues = Vec::new();
@@ -166,7 +164,15 @@ fn read_geometry<B: AsRef<[u8]>>(
         issues,
     };
     if own_mesh.is_none() && announces_mesh(file) {
-        read_lod_companions(name, companions, selection, rig, read, &mut found)?;
+        read_lod_companions(
+            name,
+            companions,
+            selection,
+            rig,
+            read,
+            &mut found,
+            skeleton_sources,
+        )?;
     }
     if let LodSelection::OnlyOrBase(level) = selection
         && found.lods.is_empty()

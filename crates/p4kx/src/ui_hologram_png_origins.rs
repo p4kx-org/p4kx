@@ -19,9 +19,9 @@ use p4kx_render::{
     Picture, PlacedPieceInput,
 };
 
-use super::node_origins;
 use super::origins::CameraInput;
 use super::{HologramInputs, Projection};
+use super::{bone_origins, node_origins};
 use crate::json;
 
 pub(super) struct Published {
@@ -218,6 +218,7 @@ fn scene_inputs(
             };
             port_placement(projection, part, &mut sources.placed)?;
             node_origins::placement(projection, assembly, index, &mut sources.placed)?;
+            bone_origins::placement(projection, assembly, index, &mut sources.placed)?;
             at = part.parent();
         }
     }

@@ -161,6 +161,12 @@ also contributes when the helper's own mesh is absent from the scene.
 Successful child offset inversions also retain their node route. Bone and
 animation inputs outside these routes keep the artifact's contributor set
 incomplete.
+A port anchored to a parent model bone uses `modelBonePlacementBytes`.
+Its indices identify the physical skeleton chunk, bone ordinal and byte
+range in the selected Entry. The selected name and the parent and
+relative-pose fields belong to the effective main or LOD skeleton. Root
+character rig and CDF attachment bind poses are separate evidence paths.
+
 Direct mesh conversion uses `modelMeshNodeBytes` for the node matrices,
 parent links and CrCh parent IDs that supply the bounds of an admitted
 piece or the vertices of a visible draw range. The first two indices

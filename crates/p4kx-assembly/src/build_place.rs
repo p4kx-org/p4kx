@@ -7,8 +7,8 @@ use crate::build::issue;
 use crate::build_models::Loaded;
 use crate::creature_rig;
 use crate::flatten::Draft;
-use crate::model_placement_sources::ModelPlacement;
-use crate::placement::{self, NodePlacement, bone_transform, offset};
+use crate::model_placement_sources::{ModelAnchor, ModelPlacement};
+use crate::placement::{self, BonePlacement, NodePlacement, offset};
 use crate::{
     Issue, IssueKind, Part, Placement, PortDefinition, PortNode, PortPlacementSource, PortTransform,
 };
@@ -34,7 +34,7 @@ impl PlacedPart {
 struct Anchor {
     kind: Placement,
     transform: Transform,
-    node: Option<usize>,
+    source: ModelAnchor,
 }
 
 impl Anchor {
@@ -42,7 +42,7 @@ impl Anchor {
         Self {
             kind: Placement::Origin,
             transform: Transform::IDENTITY,
-            node: None,
+            source: ModelAnchor::None,
         }
     }
 
@@ -50,7 +50,15 @@ impl Anchor {
         Self {
             kind,
             transform: placement.transform,
-            node: Some(placement.node),
+            source: ModelAnchor::Node(placement.node),
+        }
+    }
+
+    const fn bone(kind: Placement, placement: BonePlacement) -> Self {
+        Self {
+            kind,
+            transform: placement.transform,
+            source: ModelAnchor::Bone(placement.selection),
         }
     }
 
@@ -66,7 +74,7 @@ impl Anchor {
             local,
             kind: self.kind,
             port: source,
-            nodes: ModelPlacement::new(self.node, offset),
+            nodes: ModelPlacement::new(self.source, offset),
         }
     }
 }
@@ -109,7 +117,7 @@ pub(crate) fn place(
             local: gear.transform,
             kind: gear.kind,
             port: None,
-            nodes: ModelPlacement::new(gear.node, None),
+            nodes: ModelPlacement::new(gear.source, None),
         };
     }
     let Some(port) = draft.port else {
@@ -126,7 +134,7 @@ pub(crate) fn place(
             .map(|(kind, transform)| Anchor {
                 kind,
                 transform,
-                node: None,
+                source: ModelAnchor::None,
             })
     };
     let anchored = if port_definition.is_some_and(PortDefinition::is_skin) {
@@ -198,12 +206,8 @@ fn anchor(parent: Option<&Model>, helper: Option<&str>, port: &PortNode) -> Anch
         if let Some(found) = placement::node_placement(parent, helper) {
             return Anchor::node(Placement::Helper(helper.to_owned()), found);
         }
-        if let Some(transform) = bone_transform(parent, helper) {
-            return Anchor {
-                kind: Placement::Helper(helper.to_owned()),
-                transform,
-                node: None,
-            };
+        if let Some(found) = placement::bone_placement(parent, helper) {
+            return Anchor::bone(Placement::Helper(helper.to_owned()), found);
         }
     }
     placement::node_placement(parent, port.name()).map_or_else(Anchor::origin, |found| {

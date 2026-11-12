@@ -3,11 +3,12 @@
 
 use std::ops::Range;
 
+use p4kx_chunks::{ChunkFile, ivo};
 use p4kx_foundation::ByteReader;
 
 use crate::hierarchy::find_cycle;
 use crate::reader::{ReadValues, to_usize};
-use crate::{CorruptChunk, ModelNodeSource, ModelNodeSources, Node, Transform};
+use crate::{CorruptChunk, ModelFile, ModelNodeSource, ModelNodeSources, Node, Transform};
 
 const NODE_LEN: usize = 208;
 const LOCAL_TRANSFORM_AT: usize = 80;
@@ -24,6 +25,26 @@ pub(crate) struct Nmc {
     pub(crate) material_indices: Vec<u16>,
 }
 
+pub(crate) struct NodeDecodeError {
+    pub(crate) index: usize,
+    pub(crate) source: CorruptChunk,
+}
+
+pub(crate) fn read_file_nodes<B: AsRef<[u8]>>(
+    file: &ChunkFile<B>,
+    read: &mut Vec<(ModelFile, usize)>,
+    sources: Option<&mut ModelNodeSources>,
+) -> Result<Option<Nmc>, NodeDecodeError> {
+    let Some((index, chunk)) = file.chunks_of(ivo::NODE_MESH_COMBO).next() else {
+        return Ok(None);
+    };
+    read.push((ModelFile::Model, index));
+    let data = file.chunk_data(index).unwrap_or_default();
+    let sources = sources.map(|nodes| NodeMeshSources::new(nodes, index, chunk.offset()));
+    let nodes = read_nodes(data, sources).map_err(|source| NodeDecodeError { index, source })?;
+    Ok((!nodes.nodes.is_empty()).then_some(nodes))
+}
+
 /// Reads a `NodeMeshCombo` chunk: a header of eight words, one 208-byte record per node, a
 /// footer, two index lists, the table of node names and the table of node properties. Both
 /// tables hold one NUL-terminated entry per node; an entry of the second is `key = value` lines
@@ -31,10 +52,7 @@ pub(crate) struct Nmc {
 ///
 /// A node's transform and scale that are zero on every axis (within [`EPSILON`]) are the
 /// identity and 1: records that store none.
-pub(crate) fn read_nodes(
-    data: &[u8],
-    mut sources: Option<NodeMeshSources<'_>>,
-) -> Result<Nmc, CorruptChunk> {
+fn read_nodes(data: &[u8], mut sources: Option<NodeMeshSources<'_>>) -> Result<Nmc, CorruptChunk> {
     let mut reader = ByteReader::new(data);
     reader.read_u32()?;
     let count = to_usize(reader.read_u32()?);
@@ -147,7 +165,7 @@ fn property(line: &[u8]) -> Option<(String, String)> {
     })
 }
 
-pub(crate) struct NodeMeshSources<'a> {
+struct NodeMeshSources<'a> {
     nodes: &'a mut ModelNodeSources,
     chunk: usize,
     base: u64,
@@ -156,7 +174,7 @@ pub(crate) struct NodeMeshSources<'a> {
 }
 
 impl<'a> NodeMeshSources<'a> {
-    pub(crate) const fn new(nodes: &'a mut ModelNodeSources, chunk: usize, base: u64) -> Self {
+    const fn new(nodes: &'a mut ModelNodeSources, chunk: usize, base: u64) -> Self {
         Self {
             nodes,
             chunk,

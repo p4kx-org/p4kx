@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_model::{Bone, Model, Transform, chained_world_poses};
+use p4kx_model::{Bone, Model, ModelFile, Transform, chained_world_poses};
 
 /// Returns the transform of a port's offset from its helper: the rotation `rotation` in degrees,
 /// about X first, then Y, then Z, and the translation `position` in metres.
@@ -90,22 +90,48 @@ pub(crate) fn is_character_item(item_type: &str) -> bool {
 /// Only the bones of the first level of detail count, and of several bones with the same name the
 /// first wins.
 pub(crate) fn bone_transform(model: &Model, name: &str) -> Option<Transform> {
-    let bones = model
+    bone_placement(model, name).map(|placement| placement.transform)
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BoneSelection {
+    pub(crate) file: ModelFile,
+    pub(crate) ordinal: usize,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct BonePlacement {
+    pub(crate) transform: Transform,
+    pub(crate) selection: BoneSelection,
+}
+
+pub(crate) fn bone_placement(model: &Model, name: &str) -> Option<BonePlacement> {
+    let (file, bones) = model
         .lods
         .first()
-        .map_or(model.bones.as_slice(), |lod| model.bones_of(lod));
-    bone_pose(bones, name)
+        .and_then(|lod| Some((ModelFile::LodModel(lod.level), lod.bones.as_deref()?)))
+        .unwrap_or((ModelFile::Model, model.bones.as_slice()));
+    let (ordinal, transform) = named_bone_pose(bones, name)?;
+    Some(BonePlacement {
+        transform,
+        selection: BoneSelection { file, ordinal },
+    })
 }
 
 /// Returns the bind pose of the bone of `bones` named `name`, ignoring ASCII case, in the space of
 /// the skeleton, or `None` when there is no such bone or its pose is not finite.
 pub(crate) fn bone_pose(bones: &[Bone], name: &str) -> Option<Transform> {
+    named_bone_pose(bones, name).map(|(_, transform)| transform)
+}
+
+fn named_bone_pose(bones: &[Bone], name: &str) -> Option<(usize, Transform)> {
     let at = bones
         .iter()
         .position(|bone| bone.name.eq_ignore_ascii_case(name))?;
     let pose = *chained_world_poses(bones).get(at)?;
     let [x, y, z, w] = pose.rotation.map(f64::from);
-    Transform::from_quaternion([w, x, y, z], pose.translation.map(f64::from))
+    let transform = Transform::from_quaternion([w, x, y, z], pose.translation.map(f64::from))?;
+    Some((at, transform))
 }
 
 #[cfg(test)]

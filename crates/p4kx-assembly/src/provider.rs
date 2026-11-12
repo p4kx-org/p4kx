@@ -247,7 +247,7 @@ impl<'a> ArchiveModels<'a> {
         }
     }
 
-    /// Retains original node coordinates with the primary Archive Entry of each read.
+    /// Retains original model node and skeleton coordinates with the Entries read.
     #[must_use]
     pub const fn with_model_node_sources(mut self) -> Self {
         self.observe_nodes = true;
@@ -340,7 +340,7 @@ impl ArchiveModels<'_> {
         left_out: Vec<String>,
     ) -> Result<ProvidedModel, ModelFailure> {
         let read_model = if self.observe_nodes {
-            ModelSource::from_index_observing_nodes
+            ModelSource::from_index_observing_model_sources
         } else {
             ModelSource::from_index_reading
         };

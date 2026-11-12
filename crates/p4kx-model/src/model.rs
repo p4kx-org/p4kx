@@ -3,7 +3,7 @@
 
 use p4kx_chunks::{ChunkFile, ChunkType, ivo};
 
-use crate::model_node_sources;
+use crate::model_node_sources::{self, ReadCapture};
 use crate::{
     Bone, CompanionResolver, Influences, LodSkeletonOrigin, MaterialReading, MaterialStatus,
     ModelChunkLayout, ModelError, ModelIssue, PositionBox, RigLogicBytes, Transform,
@@ -345,7 +345,15 @@ impl Model {
         position_box: PositionBox,
         materials: MaterialReading,
     ) -> Result<Self, ModelError> {
-        model_node_sources::read(name, file, companions, lods, position_box, materials, None)
+        model_node_sources::read(
+            name,
+            file,
+            companions,
+            lods,
+            position_box,
+            materials,
+            ReadCapture::default(),
+        )
     }
 
     /// Returns the bones the meshes of `lod` are weighted to: those of the level's own file when

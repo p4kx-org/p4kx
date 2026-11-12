@@ -5,7 +5,7 @@ use p4kx_foundation::ByteReader;
 
 use crate::hierarchy::find_cycle;
 use crate::reader::{ReadValues, to_usize};
-use crate::{Bone, BoneTransform, CorruptChunk};
+use crate::{Bone, BoneTransform, CorruptChunk, ModelBoneSource, ModelBoneSources};
 
 pub(crate) const ENTRY_LEN: usize = 68;
 pub(crate) const COMPACT_HEADER_LEN: usize = 48;
@@ -17,11 +17,28 @@ const PARENT_AT: usize = 8;
 
 /// Reads a `CompiledBones2` chunk: a bone count, one 68-byte entry per bone (controller ID,
 /// limb ID, parent, relative and world pose) and the NUL-terminated bone names.
-pub(crate) fn read_bones(data: &[u8]) -> Result<Vec<Bone>, CorruptChunk> {
+pub(crate) fn read_bones(
+    data: &[u8],
+    sources: Option<&mut ModelBoneSources>,
+) -> Result<Vec<Bone>, CorruptChunk> {
     let mut reader = ByteReader::new(data);
     let count = to_usize(reader.read_u32()?);
+    let record_start = reader.offset();
     let entries = reader.read_bytes(count.saturating_mul(ENTRY_LEN))?;
-    let names = names(reader.read_bytes(reader.remaining())?, count)?;
+    let names_start = reader.offset();
+    let parent_start = record_start + PARENT_AT as u64;
+    let capture = sources.map(|sources| NameCapture {
+        sources,
+        fields: BoneFields {
+            names_start,
+            parent_start,
+            parent_width: size_of::<u32>() as u64,
+            parent_stride: ENTRY_LEN,
+            relative_start: parent_start + size_of::<u32>() as u64,
+            relative_stride: ENTRY_LEN,
+        },
+    });
+    let names = names(reader.read_bytes(reader.remaining())?, count, capture)?;
     let mut bones = Vec::with_capacity(count);
     for (entry, name) in entries.as_chunks::<ENTRY_LEN>().0.iter().zip(names) {
         let mut fields = ByteReader::new(entry);
@@ -47,13 +64,30 @@ pub(crate) fn read_bones(data: &[u8]) -> Result<Vec<Bone>, CorruptChunk> {
 /// Reads a `CompiledBones` chunk: a header with the bone count and the size of the name table,
 /// one 16-byte record per bone (controller ID, limb ID, child count, parent, node index), the
 /// names, then the relative and the world poses of all bones.
-pub(crate) fn read_compact_bones(data: &[u8]) -> Result<Vec<Bone>, CorruptChunk> {
+pub(crate) fn read_compact_bones(
+    data: &[u8],
+    sources: Option<&mut ModelBoneSources>,
+) -> Result<Vec<Bone>, CorruptChunk> {
     let mut reader = ByteReader::new(data);
     let count = to_usize(reader.read_u32()?);
     let names_len = to_usize(reader.read_u32()?);
     reader.skip(COMPACT_HEADER_LEN - COMPACT_HEADER_USED)?;
+    let record_start = reader.offset();
     let records = reader.read_bytes(count.saturating_mul(COMPACT_RECORD_LEN))?;
-    let names = names(reader.read_bytes(names_len)?, count)?;
+    let names_start = reader.offset();
+    let name_bytes = reader.read_bytes(names_len)?;
+    let capture = sources.map(|sources| NameCapture {
+        sources,
+        fields: BoneFields {
+            names_start,
+            parent_start: record_start + PARENT_AT as u64,
+            parent_width: size_of::<u16>() as u64,
+            parent_stride: COMPACT_RECORD_LEN,
+            relative_start: reader.offset(),
+            relative_stride: POSE_LEN,
+        },
+    });
+    let names = names(name_bytes, count, capture)?;
     let relative = reader.read_bytes(count.saturating_mul(POSE_LEN))?;
     let world = reader.read_bytes(count.saturating_mul(POSE_LEN))?;
     let mut bones = Vec::with_capacity(count);
@@ -128,16 +162,55 @@ fn parent_index(parent: i32, bones: usize, bone: usize) -> Result<Option<usize>,
     }
 }
 
-fn names(table: &[u8], count: usize) -> Result<Vec<String>, CorruptChunk> {
+struct BoneFields {
+    names_start: u64,
+    parent_start: u64,
+    parent_width: u64,
+    parent_stride: usize,
+    relative_start: u64,
+    relative_stride: usize,
+}
+
+impl BoneFields {
+    fn observe(&mut self, sources: &mut ModelBoneSources, ordinal: usize, name_extent: usize) {
+        let name_start = sources.start + self.names_start;
+        self.names_start += name_extent as u64;
+        let parent_start =
+            sources.start + self.parent_start + (ordinal * self.parent_stride) as u64;
+        let pose_start =
+            sources.start + self.relative_start + (ordinal * self.relative_stride) as u64;
+        sources.fields.push(ModelBoneSource {
+            name: name_start..sources.start + self.names_start,
+            parent: parent_start..parent_start + self.parent_width,
+            relative: pose_start..pose_start + POSE_LEN as u64,
+        });
+    }
+}
+
+struct NameCapture<'a> {
+    sources: &'a mut ModelBoneSources,
+    fields: BoneFields,
+}
+
+fn names(
+    table: &[u8],
+    count: usize,
+    mut capture: Option<NameCapture<'_>>,
+) -> Result<Vec<String>, CorruptChunk> {
     let mut parts = table.split_inclusive(|&byte| byte == 0);
     (0..count)
-        .map(|_| {
-            parts
+        .map(|ordinal| {
+            let (_, name) = parts
                 .next()
                 .and_then(<[u8]>::split_last)
                 .filter(|&(&last, _)| last == 0)
-                .map(|(_, name)| String::from_utf8_lossy(name).into_owned())
-                .ok_or(CorruptChunk::BoneNames { bones: count })
+                .ok_or(CorruptChunk::BoneNames { bones: count })?;
+            if let Some(capture) = capture.as_mut() {
+                capture
+                    .fields
+                    .observe(capture.sources, ordinal, name.len() + 1);
+            }
+            Ok(String::from_utf8_lossy(name).into_owned())
         })
         .collect()
 }

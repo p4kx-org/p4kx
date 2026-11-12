@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_archive::EntryOrigin;
-use p4kx_model::{ChunkUsage, Model, ModelFile, ModelIssue, ModelNodeSources};
+use p4kx_model::{ChunkUsage, Model, ModelBoneSources, ModelFile, ModelIssue, ModelNodeSources};
 
 /// One admitted model or companion Entry and its interpreted file role.
 #[derive(Debug, Clone)]
@@ -12,6 +12,7 @@ pub struct ModelArchiveSource {
     file: ModelFile,
     origin: Option<EntryOrigin>,
     nodes: Option<Arc<ModelNodeSources>>,
+    bones: Option<Arc<ModelBoneSources>>,
 }
 
 impl ModelArchiveSource {
@@ -20,11 +21,22 @@ impl ModelArchiveSource {
             file,
             origin,
             nodes: None,
+            bones: None,
         }
     }
 
     pub(crate) fn set_node_sources(&mut self, nodes: ModelNodeSources) {
         self.nodes = Some(Arc::new(nodes));
+    }
+
+    pub(crate) fn set_bone_sources(&mut self, bones: ModelBoneSources) {
+        self.bones = Some(Arc::new(bones));
+    }
+
+    /// Returns this file's optional original skeleton coordinates.
+    #[must_use]
+    pub fn bone_sources(&self) -> Option<&ModelBoneSources> {
+        self.bones.as_deref()
     }
 
     /// Returns the primary file's optional original node coordinates.

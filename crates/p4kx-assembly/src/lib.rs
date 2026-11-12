@@ -73,6 +73,7 @@ mod assortment_requirement;
 mod attached;
 pub mod audio;
 mod bespoke;
+mod bone_placement_source;
 mod build;
 mod build_attachments;
 mod build_gear;
@@ -180,6 +181,7 @@ pub use assembly::{
     Placement,
 };
 pub use attached::AttachedModel;
+pub use bone_placement_source::BonePlacementSource;
 pub use catalogue::{EntityCatalogue, EntityKind, EntitySummary};
 pub use changes::{ChangeError, ChangedLoadout, LoadoutChanges, PortChange, ReplacementMismatch};
 pub use chf_name_sources::{ChfNameContributions, ObservedChfNames};

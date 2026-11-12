@@ -10,7 +10,7 @@ use crate::controller_binding::{BoneControllers, ControllerBinder};
 use crate::skeleton::{
     COMPACT_HEADER_LEN, COMPACT_RECORD_LEN, ENTRY_LEN, read_bones, read_compact_bones,
 };
-use crate::{Bone, ModelError};
+use crate::{Bone, ModelBoneSources, ModelError, ModelFile};
 
 /// An admitted primary skeleton and its original controller table positions.
 #[derive(Debug)]
@@ -37,15 +37,15 @@ impl Layout {
     }
 }
 
-pub(crate) struct SkeletonChunk<'file> {
-    pub(crate) index: usize,
+struct SkeletonChunk<'file> {
+    index: usize,
     start: u64,
     layout: Layout,
     bytes: &'file [u8],
 }
 
 impl<'file> SkeletonChunk<'file> {
-    pub(crate) fn primary<B: AsRef<[u8]>>(file: &'file ChunkFile<B>) -> Option<Self> {
+    fn primary<B: AsRef<[u8]>>(file: &'file ChunkFile<B>) -> Option<Self> {
         let (layout, (index, chunk)) = [
             (Layout::Compiled2, ivo::COMPILED_BONES_2),
             (Layout::Compiled, ivo::COMPILED_BONES),
@@ -60,12 +60,37 @@ impl<'file> SkeletonChunk<'file> {
         })
     }
 
-    pub(crate) fn bones(&self, name: &str) -> Result<Vec<Bone>, ModelError> {
+    fn bones(
+        &self,
+        name: &str,
+        sources: Option<&mut ModelBoneSources>,
+    ) -> Result<Vec<Bone>, ModelError> {
         let (chunk_name, bones) = match self.layout {
-            Layout::Compiled2 => ("CompiledBones2", read_bones(self.bytes)),
-            Layout::Compiled => ("CompiledBones", read_compact_bones(self.bytes)),
+            Layout::Compiled2 => ("CompiledBones2", read_bones(self.bytes, sources)),
+            Layout::Compiled => ("CompiledBones", read_compact_bones(self.bytes, sources)),
         };
         bones.map_err(corrupt(name, self.index, chunk_name))
+    }
+}
+
+pub(crate) fn read_model_skeleton<B: AsRef<[u8]>>(
+    name: &str,
+    file: &ChunkFile<B>,
+    which: ModelFile,
+    read: &mut Vec<(ModelFile, usize)>,
+    sources: Option<&mut Vec<ModelBoneSources>>,
+) -> Result<Vec<Bone>, ModelError> {
+    let Some(chunk) = SkeletonChunk::primary(file) else {
+        return Ok(Vec::new());
+    };
+    read.push((which, chunk.index));
+    if let Some(sources) = sources {
+        let mut skeleton = ModelBoneSources::new(which, chunk.index, chunk.start);
+        let bones = chunk.bones(name, Some(&mut skeleton))?;
+        sources.push(skeleton);
+        Ok(bones)
+    } else {
+        chunk.bones(name, None)
     }
 }
 
@@ -81,7 +106,7 @@ impl SkeletonSource {
         let Some(chunk) = SkeletonChunk::primary(file) else {
             return Ok(None);
         };
-        let bones = chunk.bones(name)?;
+        let bones = chunk.bones(name, None)?;
         Ok(Some(Self {
             controllers: BoneControllers::new(&bones),
             count: bones.len(),

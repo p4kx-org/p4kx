@@ -6,21 +6,30 @@ use std::num::NonZeroUsize;
 use p4kx_extraction::{EntryOrigin, SourceLocation};
 use p4kx_model::{Model, ModelFile, ModelNodeSource, ModelNodeSources};
 
+use crate::placement::BoneSelection;
 use crate::{Assembly, Part};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct ModelPlacement {
-    anchor: Option<NonZeroUsize>,
+    pub(crate) anchor: ModelAnchor,
     offset: Option<NonZeroUsize>,
 }
 
 impl ModelPlacement {
-    pub(crate) fn new(anchor: Option<usize>, offset: Option<usize>) -> Self {
+    pub(crate) fn new(anchor: ModelAnchor, offset: Option<usize>) -> Self {
         Self {
-            anchor: anchor.and_then(index),
+            anchor,
             offset: offset.and_then(index),
         }
     }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) enum ModelAnchor {
+    #[default]
+    None,
+    Node(usize),
+    Bone(BoneSelection),
 }
 
 fn index(ordinal: usize) -> Option<NonZeroUsize> {
@@ -87,10 +96,13 @@ impl Assembly {
     ) -> impl Iterator<Item = ModelPlacementInput<'_>> {
         self.parts.get(part).into_iter().flat_map(|part| {
             let nodes = part.model_placement;
-            let anchor = nodes.anchor.and_then(|node| {
-                let parent = self.parts.get(part.parent()?)?;
-                ModelPlacementInput::new(parent, node)
-            });
+            let anchor = if let ModelAnchor::Node(node) = nodes.anchor {
+                part.parent()
+                    .and_then(|parent| self.parts.get(parent))
+                    .and_then(|parent| ModelPlacementInput::new(parent, index(node)?))
+            } else {
+                None
+            };
             let offset = nodes
                 .offset
                 .and_then(|node| ModelPlacementInput::new(part, node));

@@ -216,3 +216,6 @@ mod model_nodes;
 
 #[path = "ui_hologram_mesh_nodes.rs"]
 mod mesh_nodes;
+
+#[path = "ui_hologram_bone_placement.rs"]
+mod bone_placement;

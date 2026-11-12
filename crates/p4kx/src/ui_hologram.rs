@@ -24,6 +24,9 @@ use crate::entity_glb::GlbOutputIsArchive;
 use crate::entity_glb_json::IssueJson;
 use crate::{exit, json};
 
+#[path = "ui_hologram_bone_origins.rs"]
+mod bone_origins;
+
 #[path = "ui_hologram_node_origins.rs"]
 mod node_origins;
 

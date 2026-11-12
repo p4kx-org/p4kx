@@ -6,9 +6,26 @@ use std::ops::Range;
 use p4kx_chunks::{ChunkFile, Container};
 
 use crate::{
-    CompanionResolver, LodSelection, MaterialReading, Model, ModelError, Node, PositionBox,
+    CompanionResolver, LodSelection, MaterialReading, Model, ModelBoneSources, ModelError, Node,
+    PositionBox,
 };
 use crate::{build, crch};
+
+/// Original node and skeleton coordinates for one model read.
+#[derive(Debug, Default)]
+#[non_exhaustive]
+pub struct ModelReadSources {
+    /// Node fields of the primary model.
+    pub nodes: ModelNodeSources,
+    /// Skeleton fields keyed by the file actually read.
+    pub skeletons: Vec<ModelBoneSources>,
+}
+
+#[derive(Default)]
+pub(crate) struct ReadCapture<'a> {
+    pub(crate) nodes: Option<&'a mut ModelNodeSources>,
+    pub(crate) skeletons: Option<&'a mut Vec<ModelBoneSources>>,
+}
 
 /// Coordinates from the primary file of one successfully decoded model.
 #[derive(Debug, Default)]
@@ -113,7 +130,41 @@ impl Model {
             lods,
             position_box,
             materials,
-            Some(&mut captured),
+            ReadCapture {
+                nodes: Some(&mut captured),
+                skeletons: None,
+            },
+        )?;
+        *sources = captured;
+        Ok(model)
+    }
+
+    /// Reads the model with original node and skeleton coordinates.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::read_with_materials`].
+    pub fn read_with_sources<B: AsRef<[u8]>>(
+        name: &str,
+        file: &ChunkFile<B>,
+        companions: &mut dyn CompanionResolver,
+        lods: LodSelection,
+        position_box: PositionBox,
+        materials: MaterialReading,
+        sources: &mut ModelReadSources,
+    ) -> Result<Self, ModelError> {
+        let mut captured = ModelReadSources::default();
+        let model = read(
+            name,
+            file,
+            companions,
+            lods,
+            position_box,
+            materials,
+            ReadCapture {
+                nodes: Some(&mut captured.nodes),
+                skeletons: Some(&mut captured.skeletons),
+            },
         )?;
         *sources = captured;
         Ok(model)
@@ -127,7 +178,7 @@ pub(crate) fn read<B: AsRef<[u8]>>(
     lods: LodSelection,
     position_box: PositionBox,
     materials: MaterialReading,
-    sources: Option<&mut ModelNodeSources>,
+    sources: ReadCapture<'_>,
 ) -> Result<Model, ModelError> {
     match file.container() {
         Container::Ivo => build::build(
@@ -139,6 +190,6 @@ pub(crate) fn read<B: AsRef<[u8]>>(
             position_box,
             sources,
         ),
-        Container::CrCh => crch::build(name, file, companions, lods, materials, sources),
+        Container::CrCh => crch::build(name, file, companions, lods, materials, sources.nodes),
     }
 }
