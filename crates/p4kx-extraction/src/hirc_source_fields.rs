@@ -17,6 +17,8 @@ mod blend;
 mod container_layout;
 #[path = "hirc_dialogue_dto.rs"]
 mod dto;
+#[path = "hirc_music_track_source.rs"]
+mod music_track;
 #[path = "hirc_source_origins.rs"]
 mod origins;
 #[path = "hirc_random_sequence_source.rs"]
@@ -45,6 +47,7 @@ enum SourceFamily {
     RandomSequence,
     Switch,
     Blend,
+    MusicTrack,
 }
 
 impl SourceFamily {
@@ -54,6 +57,7 @@ impl SourceFamily {
             Self::RandomSequence => HircKind::RandomSequenceContainer,
             Self::Switch => HircKind::SwitchContainer,
             Self::Blend => HircKind::LayerContainer,
+            Self::MusicTrack => HircKind::MusicTrack,
         }
     }
 
@@ -63,6 +67,7 @@ impl SourceFamily {
             Self::RandomSequence => "bnkHircRandomSequence",
             Self::Switch => "bnkHircSwitchContainer",
             Self::Blend => "bnkHircBlendContainer",
+            Self::MusicTrack => "bnkHircMusicTrack",
         }
     }
 
@@ -72,6 +77,7 @@ impl SourceFamily {
             Self::RandomSequence => "randomSequenceExtent",
             Self::Switch => "switchContainerExtent",
             Self::Blend => "blendContainerExtent",
+            Self::MusicTrack => "musicTrackExtent",
         }
     }
 }
@@ -91,6 +97,7 @@ impl<'bank> ObjectSourceFields<'bank> {
             HircKind::RandomSequenceContainer => SourceFamily::RandomSequence,
             HircKind::SwitchContainer => SourceFamily::Switch,
             HircKind::LayerContainer => SourceFamily::Blend,
+            HircKind::MusicTrack => SourceFamily::MusicTrack,
             _ => return None,
         };
         Some(Self {
@@ -134,6 +141,9 @@ fn project<R: Read + Seek, S: Serializer>(
         (BankHircSemantic::ContainerWithNode(container), SourceFamily::Blend) => {
             blend::serialize(serializer, origins, header, *container)
         }
+        (BankHircSemantic::MusicTrack(track), SourceFamily::MusicTrack) => {
+            music_track::serialize(serializer, origins, header, *track)
+        }
         (BankHircSemantic::Raw(object), family)
             if object.kind(header.header().version) == family.kind() =>
         {
@@ -146,6 +156,9 @@ fn project<R: Read + Seek, S: Serializer>(
                 }
                 SourceFamily::Switch => switch::unsupported(serializer, origins, header, &object),
                 SourceFamily::Blend => blend::unsupported(serializer, origins, header, &object),
+                SourceFamily::MusicTrack => {
+                    music_track::unsupported(serializer, origins, header, &object)
+                }
             }
         }
         _ => Err(S::Error::custom(

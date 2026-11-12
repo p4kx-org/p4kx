@@ -18,6 +18,8 @@ use serde_json::Value;
 mod blend_source_fields;
 #[path = "bnk_dialogue_source_fields.rs"]
 mod dialogue_source_fields;
+#[path = "bnk_music_track_source_fields.rs"]
+mod music_track_source_fields;
 #[path = "bnk_random_sequence_source_fields.rs"]
 mod random_sequence_source_fields;
 #[path = "bnk_switch_source_fields.rs"]

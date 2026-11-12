@@ -23,3 +23,8 @@ original four bytes separately from the clip's physical position and media ID.
 The MusicTrack and Switch transition layouts follow [wwiser's MusicTrack reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L2225),
 [wwiser's transition reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L2183)
 and [StarBreaker's MusicTrack reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/music.rs#L341).
+
+CLI and MCP ObjectView use the same checked track and automation cursors.
+Source records keep physical order across the media source, clip, automation
+and switch-member tables. Binary64 timing values retain their complete
+original words and expose their finite values in milliseconds when available.

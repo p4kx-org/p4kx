@@ -1727,6 +1727,14 @@ includes its checked complete curves. Crossfade points keep each readable binary
 word and the original interpolation code. Association references carry unchecked
 resolution. Unknown and non-finite words remain available.
 
+Version-154 MusicTrack objects include `source_fields` with original track
+controls, source, clip, automation and switch-member rows. Clip records preserve
+their authored track IDs and exact 16-digit binary64 words. Finite clip start,
+trim and duration values are in milliseconds. Original automation
+points retain readable words when the final point is truncated. Switch transitions
+retain their original signed fade, synchronization and cue words. Each checked
+value links to its original byte range in the owning bank.
+
 Other object details:
 
 - `state`: standalone State versions 128 through 145 expose `property_count`, `count_range`,

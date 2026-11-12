@@ -7,6 +7,7 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 
 use super::blend::BlendSourceSchema;
 use super::dto::DialogueSourceSchema;
+use super::music_track::MusicTrackSourceSchema;
 use super::random_sequence::RandomSequenceSchema;
 use super::switch::SwitchSourceSchema;
 
@@ -23,6 +24,7 @@ impl JsonSchema for ObjectSourceSchema {
             generator.subschema_for::<RandomSequenceSchema>(),
             generator.subschema_for::<SwitchSourceSchema>(),
             generator.subschema_for::<BlendSourceSchema>(),
+            generator.subschema_for::<MusicTrackSourceSchema>(),
         ];
         schemars::json_schema!({ "anyOf": alternatives })
     }
