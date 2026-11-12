@@ -67,7 +67,7 @@ dataforgeRecordHeader; genuine body paths, identity, selection and counts retain
 | #1084 | D.autoSpawns, D.autoSpawnSets, D.encounterIndices, D.npcArchetypes, D.npcClassPools | direct/archetype/pool classes, manual/reference sets, ordered identity branches/weights/delays/assignments/inventory/tags, all declared targets; no chosen NPC |
 | #1085 | D.factionIdentities | name/description/factionTag/Faction/security links, ordered encounter weights and theme tags, multiple identities per Faction; separate identity namespace |
 | #1086 | D.contractScopes, D.locationClasses/functions/sizes, D.locationRegistries; C.missionBoards, C.localContractGenerators | all seven scope members/text/icon, zero-field dictionaries, registry order, source scope/positive-negative DNF/identity list; board variants, inherited required scenarios |
-| #1087 | C.itemPorts, C.itemAttachmentConstraints; P.loadoutItems evidence | port/item attachAxesToAlign independent, ignoredAttachAxis/COM check, original enum/missing/false and owner location; unchanged placement/noRotation behavior |
+| #1087 | C.itemPorts, C.itemAttachmentConstraints; loadout source constraints | Physical port and item alignment declarations, original enum labels and option status, stored center-of-mass check and exact owner links. [Contract](catalog-item-port-alignment.md) |
 
 D.weaponConfigurations above is the reusable referenced recoil/aim/reload definition family; C.weaponConfigurations is the owned weapon component/action tree. They are distinct source owners despite related names and should get clearer concrete Rust names (WeaponConfigDefinition vs WeaponComponentConfiguration). The final field survey decides exact concrete structs, not this naming coincidence.
 

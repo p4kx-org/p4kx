@@ -204,6 +204,7 @@ impl LoadoutResolver<'_> {
         };
         walk.ancestors.push(guid);
         let mut child = self.node(spec, loadout, walk);
+        child.attachment_target = Some(selected.with_xml_use(xml_use));
         walk.ancestors.pop();
         if !self.observation_stopped()
             && let Some(ambiguity) = self.ambiguity(target)
@@ -328,6 +329,8 @@ fn visibility_of(port: &PortNode, vehicle: Option<&VehicleImplementation>) -> Po
 fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode {
     EntityNode {
         record_index: spec.record_index,
+        attachable_component: spec.attachable_component,
+        attachment_target: None,
         guid: spec.guid,
         record_path: spec.record_path.clone(),
         name: spec.name.clone(),

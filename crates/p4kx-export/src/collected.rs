@@ -14,6 +14,7 @@ use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
+use crate::catalog_v3::catalog_item_alignment::ItemAlignmentRows;
 use crate::catalog_v3::catalog_item_components::ItemComponentRows;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
@@ -65,6 +66,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) manufacturers: Vec<Manufacturer<'f>>,
     pub(crate) items: Vec<Item<'f>>,
     pub(crate) item_components: ItemComponentRows<'f>,
+    pub(crate) item_alignment: ItemAlignmentRows<'f>,
     pub(crate) ships: Vec<Ship<'f>>,
     pub(crate) commodities: Vec<Commodity<'f>>,
     pub(crate) blueprints: Vec<BlueprintRow<'f>>,
@@ -162,6 +164,7 @@ impl<'f> Collected<'f> {
             manufacturers: Vec::new(),
             items: Vec::new(),
             item_components: ItemComponentRows::default(),
+            item_alignment: ItemAlignmentRows::default(),
             ships: Vec::new(),
             commodities: Vec::new(),
             blueprints: crafting.blueprints,

@@ -18,7 +18,7 @@ use crate::{CatalogError, ExportAccountingError};
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ComponentOwner {
+pub(crate) struct ComponentOwner {
     owner_guid: SourcedValue<CatalogGuid>,
     owner_record_index: SourcedValue<u32>,
     component_ordinal: SourcedValue<u32>,

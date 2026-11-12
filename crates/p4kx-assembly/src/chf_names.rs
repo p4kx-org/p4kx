@@ -107,8 +107,8 @@ impl<'choices> Names<'choices> {
                     self.add_port(&definition.name, || NameChoice::Port {
                         selector: selector.clone(),
                         record,
-                        component: definition.component_index,
-                        port: definition.port_index,
+                        component: definition.definition.position().component_ordinal(),
+                        port: definition.definition.position().port_ordinal(),
                     });
                 });
             }

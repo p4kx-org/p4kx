@@ -355,6 +355,28 @@
       ],
       "type": "object"
     },
+    "AlignmentAxis": {
+      "properties": {
+        "label": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "optionStatus": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfAttachmentAxisOptionStatus"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "label",
+        "optionStatus"
+      ],
+      "type": "object"
+    },
     "AmmoBinding": {
       "description": "The original ammunition links authored on a physical Item component.",
       "oneOf": [
@@ -1431,6 +1453,83 @@
         "targetPort"
       ],
       "type": "object"
+    },
+    "AttachedItem": {
+      "properties": {
+        "definition": {
+          "$ref": "#/$defs/AttachmentDefinitionLink"
+        },
+        "targetGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        }
+      },
+      "required": [
+        "definition",
+        "targetGuid"
+      ],
+      "type": "object"
+    },
+    "AttachmentAxisOptionStatus": {
+      "enum": [
+        "declared",
+        "undeclared"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "AttachmentDefinitionLink": {
+      "oneOf": [
+        {
+          "description": "The shared physical Record and original Components slot of a configuration.",
+          "properties": {
+            "componentOrdinal": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "ownerGuid": {
+              "$ref": "#/$defs/SourcedValueOfGuid"
+            },
+            "ownerRecordIndex": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "state": {
+              "const": "projected",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "componentOrdinal",
+            "ownerGuid",
+            "ownerRecordIndex"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "notProjected",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "notDeclared",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
     },
     "AudioResource": {
       "properties": {
@@ -3410,6 +3509,12 @@
         "hackingChips": {
           "$ref": "#/$defs/CatalogTableOfHackingChip"
         },
+        "itemAttachmentConstraints": {
+          "$ref": "#/$defs/CatalogTableOfItemAttachmentComponent"
+        },
+        "itemPorts": {
+          "$ref": "#/$defs/CatalogTableOfItemPortContainer"
+        },
         "itemRecoveryEconomy": {
           "$ref": "#/$defs/CatalogTableOfItemRecoveryEconomy"
         },
@@ -3447,6 +3552,8 @@
         "durability",
         "explosives",
         "hackingChips",
+        "itemAttachmentConstraints",
+        "itemPorts",
         "itemRecoveryEconomy",
         "itemRecoveryOverrides",
         "itemRecoveryPolicy",
@@ -4092,6 +4199,44 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/HackingChip"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfItemAttachmentComponent": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ItemAttachmentComponent"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfItemPortContainer": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ItemPortContainer"
           },
           "type": "array"
         }
@@ -12500,6 +12645,92 @@
       ],
       "type": "object"
     },
+    "ItemAttachment": {
+      "properties": {
+        "attachAxesToAlign": {
+          "$ref": "#/$defs/AlignmentAxis"
+        },
+        "attachCheckCenterOfMass": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "ignoredAttachAxis": {
+          "$ref": "#/$defs/AlignmentAxis"
+        }
+      },
+      "required": [
+        "attachAxesToAlign",
+        "attachCheckCenterOfMass",
+        "ignoredAttachAxis"
+      ],
+      "type": "object"
+    },
+    "ItemAttachmentComponent": {
+      "description": "The shared physical Record and original Components slot of a configuration.",
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "definition": {
+          "$ref": "#/$defs/SourcedValueOfItemAttachment"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "definition",
+        "ownerGuid",
+        "ownerRecordIndex"
+      ],
+      "type": "object"
+    },
+    "ItemPort": {
+      "properties": {
+        "attachAxesToAlign": {
+          "$ref": "#/$defs/AlignmentAxis"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "portOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "attachAxesToAlign",
+        "name",
+        "portOrdinal"
+      ],
+      "type": "object"
+    },
+    "ItemPortContainer": {
+      "description": "The shared physical Record and original Components slot of a configuration.",
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ports": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfItemPort"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "ports"
+      ],
+      "type": "object"
+    },
     "ItemRecoveryEconomy": {
       "description": "The selected physical item-recovery policy and its authored economy.",
       "properties": {
@@ -13674,6 +13905,35 @@
       ],
       "type": "object"
     },
+    "LoadoutAlignment": {
+      "properties": {
+        "attachedItem": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AttachedItem"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "portDefinition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PortDefinitionLink"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "attachedItem",
+        "portDefinition"
+      ],
+      "type": "object"
+    },
     "LoadoutPort": {
       "description": "One item port and what the Default Loadout attaches to it.",
       "properties": {
@@ -13760,6 +14020,10 @@
           "description": "Where the attachment comes from: `loadout` (the Entity's own Default Loadout), `override`\n(the Loadout of the entry that attached the Entity), `port_default` (the default item of\nthe port definition), `unset` (the port is defined and holds nothing) or `vehicle` (the\nport is known only from the vehicle implementation and holds nothing). A closed set the\ngame may extend, so the schema keeps a string.",
           "type": "string"
         },
+        "sourceConstraints": {
+          "$ref": "#/$defs/LoadoutAlignment",
+          "description": "Physical source configuration links for the port definition and attached Entity."
+        },
         "types": {
           "description": "The item types the port takes, in stored order; empty when the data names none.",
           "items": {
@@ -13792,6 +14056,7 @@
         "ports",
         "requiredTags",
         "source",
+        "sourceConstraints",
         "types",
         "unresolved",
         "visibility"
@@ -17677,6 +17942,52 @@
         "weight"
       ],
       "type": "object"
+    },
+    "PortDefinitionLink": {
+      "oneOf": [
+        {
+          "description": "The shared physical Record and original Components slot of a configuration.",
+          "properties": {
+            "componentOrdinal": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "ownerGuid": {
+              "$ref": "#/$defs/SourcedValueOfGuid"
+            },
+            "ownerRecordIndex": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "portOrdinal": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "state": {
+              "const": "projected",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "componentOrdinal",
+            "ownerGuid",
+            "ownerRecordIndex",
+            "portOrdinal"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "notProjected",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
     },
     "PortType": {
       "description": "An item type a port takes.",
@@ -29152,6 +29463,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfItemPort": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfItemPort"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfMaelstromEvent": {
       "allOf": [
         {
@@ -33106,6 +33550,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/AttachableEntity"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAttachmentAxisOptionStatus": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AttachmentAxisOptionStatus"
               }
             }
           }
@@ -41816,6 +42390,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/InventoryLine"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfItemAttachment": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ItemAttachment"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfItemPort": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ItemPort"
               }
             }
           }

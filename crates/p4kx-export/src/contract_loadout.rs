@@ -6,6 +6,7 @@ use serde::Serialize;
 
 use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
+use crate::loadout::alignment::LoadoutAlignment;
 
 /// Which kind of entry a loadout belongs to; serialised as the strings `ship` and `item`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -87,6 +88,8 @@ pub(crate) struct LoadoutPort {
     /// The code of the error that kept the attachment from being resolved, e.g.
     /// `dangling_reference` or `unknown_class`; `null` otherwise.
     pub(crate) unresolved: Option<&'static str>,
+    /// Physical source configuration links for the port definition and attached Entity.
+    pub(crate) source_constraints: LoadoutAlignment,
     /// The ports of the attached Entity under this Loadout, or the ports of the nested Loadout of
     /// an empty port; empty for a port without either.
     pub(crate) ports: Vec<Self>,

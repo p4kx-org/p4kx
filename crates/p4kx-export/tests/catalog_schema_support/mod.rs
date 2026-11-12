@@ -167,6 +167,8 @@ pub(crate) fn minimal_catalog() -> Value {
             "weaponActions": absent_table(),
             "quantumDrives": absent_table(),
             "shieldGenerators": absent_table(),
+            "itemPorts": absent_table(),
+            "itemAttachmentConstraints": absent_table(),
             "contractTemplates": absent_table(),
             "missionBrokerEntries": absent_table(),
             "missionFlows": absent_table(),

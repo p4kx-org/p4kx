@@ -34,7 +34,7 @@ impl LoadoutTargetGuid {
         Self { guid, origin: None }
     }
 
-    /// Returns the exact target GUID of this failure.
+    /// Returns the exact target GUID of this selection.
     #[must_use]
     pub const fn guid(&self) -> Guid {
         self.guid
@@ -87,14 +87,12 @@ impl LoadoutTargetGuid {
         }
     }
 
-    pub(crate) fn for_failure(&self, usage: Option<&LoadoutXmlClassUse>) -> Self {
-        let mut target = self.clone();
-        if let (Some(TargetOrigin::Class { xml_use, .. }), Some(usage)) =
-            (&mut target.origin, usage)
+    pub(crate) fn with_xml_use(mut self, usage: Option<&LoadoutXmlClassUse>) -> Self {
+        if let (Some(TargetOrigin::Class { xml_use, .. }), Some(usage)) = (&mut self.origin, usage)
         {
             *xml_use = Some(Arc::new(usage.clone()));
         }
-        target
+        self
     }
 }
 

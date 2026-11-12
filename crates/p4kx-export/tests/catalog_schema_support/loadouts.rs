@@ -15,6 +15,7 @@ pub(super) fn loadouts() -> serde_json::Value {
         "displayNameKey": null, "visibility": "visible",
         "itemGuid": "30000000-0000-4000-8000-000000000001",
         "itemClassName": "POWR_ACAS_S01", "dockedVehicle": false, "unresolved": null,
+        "sourceConstraints": {"portDefinition": null, "attachedItem": null},
         "ports": []
     });
     json!([{
@@ -29,6 +30,7 @@ pub(super) fn loadouts() -> serde_json::Value {
             "displayNameKey": null, "visibility": "unspecified",
             "itemGuid": null, "itemClassName": null, "dockedVehicle": false,
             "unresolved": null,
+            "sourceConstraints": {"portDefinition": null, "attachedItem": null},
             "ports": [gun]
         }]
     }])

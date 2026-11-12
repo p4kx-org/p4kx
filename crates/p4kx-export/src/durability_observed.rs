@@ -18,6 +18,8 @@ use crate::resource_number::ResourceNumber;
 use crate::source_fields::{FieldCapture, FieldError, FieldViolation};
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "authored_alignment.rs"]
+mod alignment;
 #[path = "authored_array.rs"]
 mod array;
 #[path = "authored_field_links.rs"]

@@ -109,7 +109,7 @@ impl<'read, 'source> OriginalCatalogInput<'read, 'source> {
         )?)
     }
 
-    pub(super) fn struct_name(&self, index: u16) -> Option<&str> {
+    pub(crate) fn struct_name(&self, index: u16) -> Option<&str> {
         self.struct_at(u32::from(index))
             .and_then(|structure| structure.name().ok())
     }

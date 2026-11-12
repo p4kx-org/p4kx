@@ -6,7 +6,9 @@ use std::ops::ControlFlow;
 use p4kx_assembly::{LoadoutClassSelection, LoadoutXmlClassUse, XmlLoadoutClassSite};
 use p4kx_extraction::{Guid, Record};
 
-use crate::catalog_read::original::{ExampleBodyReceipt, LoadoutClassNameReceipt};
+use crate::catalog_read::original::{
+    ExampleBodyReceipt, LoadoutClassNameReceipt, LoadoutTargetReceipt,
+};
 use crate::health_diagnostic_observation::ExampleObservation;
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, ExportAccountingError};
@@ -70,6 +72,26 @@ impl Capture<'_> {
         }
     }
 
+    pub(super) fn class_target(
+        &self,
+        selection: &LoadoutClassSelection,
+        guid: Guid,
+        xml_use: Option<&LoadoutXmlClassUse>,
+    ) -> Result<LoadoutTargetReceipt, CatalogError> {
+        let state = self.lock()?;
+        let mut target = state.classes.get(selection, guid)?;
+        let selected = match (target.original_class_xml()?, xml_use) {
+            (Some(original), Some(usage)) => Some(state.graph.selected_xml_use(usage, original)?),
+            (None, None) => None,
+            _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+        };
+        drop(state);
+        if let Some(selected) = selected {
+            target.bind_class_xml(selected)?;
+        }
+        Ok(target)
+    }
+
     pub(super) fn class_example(
         &self,
         admission: &RecordObservation<'_, '_>,
@@ -80,20 +102,7 @@ impl Capture<'_> {
         let input = self
             .input
             .ok_or(ExportAccountingError::UnboundHealthSubject)?;
-        let target = {
-            let state = self.lock()?;
-            let mut target = state.classes.get(selection, guid)?;
-            match (target.original_class_xml()?, xml_use) {
-                (Some(original), Some(usage)) => {
-                    let selected = state.graph.selected_xml_use(usage, original)?;
-                    target.bind_class_xml(selected)?;
-                }
-                (None, None) => {}
-                _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
-            }
-            drop(state);
-            target
-        };
+        let target = self.class_target(selection, guid, xml_use)?;
         let body = ExampleBodyReceipt::loadout_target(input, admission.subject().clone(), target)?;
         let (field, source_type, target_guid) = body.description()?;
         Ok(ExampleObservation::captured(

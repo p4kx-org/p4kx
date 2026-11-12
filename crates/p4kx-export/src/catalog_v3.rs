@@ -51,6 +51,8 @@ pub(crate) mod catalog_declarations;
 pub(crate) mod catalog_explosives;
 #[path = "catalog_hacking_chips.rs"]
 pub(crate) mod catalog_hacking_chips;
+#[path = "catalog_item_alignment.rs"]
+pub(crate) mod catalog_item_alignment;
 #[path = "catalog_item_components.rs"]
 pub(crate) mod catalog_item_components;
 #[path = "catalog_quantum_drive.rs"]
@@ -61,6 +63,8 @@ pub(crate) mod catalog_shield_generator;
 pub(crate) mod catalog_weapon_actions;
 #[path = "catalog_weapon_magazine_slots.rs"]
 mod catalog_weapon_magazine_slots;
+#[path = "item_alignment_options.rs"]
+mod item_alignment_options;
 #[path = "item_component_owner.rs"]
 mod item_component_owner;
 #[path = "ordnance_fields.rs"]

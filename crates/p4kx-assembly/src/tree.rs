@@ -11,8 +11,9 @@ use crate::entities::class_name_of;
 use crate::geometry_choice::GeometryChoice;
 use crate::spec::LoadoutOrigin;
 use crate::{
-    Geometry, Incompatibility, ItemFacts, LandingGear, LoadoutError, ObjectContainerRef,
-    PortConstraints, PortDefinition, PortVisibility, VehicleImplementation, ZoneChunk,
+    Geometry, Incompatibility, ItemFacts, LandingGear, LoadoutError, LoadoutTargetGuid,
+    ObjectContainerRef, PortConstraints, PortDefinition, PortVisibility, VehicleImplementation,
+    ZoneChunk,
 };
 
 #[path = "loadout_target.rs"]
@@ -43,6 +44,8 @@ pub struct EntityNode {
     pub(crate) expanded: bool,
     pub(crate) attach_type: String,
     pub(crate) attach_sub_type: String,
+    pub(crate) attachable_component: Option<usize>,
+    pub(crate) attachment_target: Option<LoadoutTargetGuid>,
     pub(crate) size: Option<u32>,
     pub(crate) container: Option<Guid>,
     pub(crate) object_containers: Arc<[ObjectContainerRef]>,
@@ -133,6 +136,24 @@ impl EntityNode {
     #[must_use]
     pub const fn geometry(&self) -> Option<&Geometry> {
         self.geometry.as_ref()
+    }
+
+    /// Returns the physical Entity Record index, when supplied by DataForge.
+    #[must_use]
+    pub const fn record_index(&self) -> Option<u32> {
+        self.record_index
+    }
+
+    /// Returns the ordinal of the first attachable component selected in this Record.
+    #[must_use]
+    pub const fn attachable_component_ordinal(&self) -> Option<usize> {
+        self.attachable_component
+    }
+
+    /// Returns the original selection of this Entity when attached through a port.
+    #[must_use]
+    pub const fn attachment_target(&self) -> Option<&LoadoutTargetGuid> {
+        self.attachment_target.as_ref()
     }
 
     /// Returns the GUID of the Entity's Record.

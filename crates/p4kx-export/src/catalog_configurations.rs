@@ -35,6 +35,9 @@ pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) weapon_actions: CatalogTable<WeaponActions<'source>>,
     pub(crate) quantum_drives: CatalogTable<QuantumDrive<'source>>,
     pub(crate) shield_generators: CatalogTable<ShieldGenerator<'source>>,
+    #[serde(flatten)]
+    pub(crate) item_alignment:
+        crate::catalog_v3::catalog_item_alignment::ItemAlignmentTables<'source>,
     pub(crate) mission_broker_entries: CatalogTable<BrokerProjection<'source>>,
     pub(crate) item_recovery_economy: CatalogTable<ItemRecoveryEconomy<'source>>,
     pub(crate) item_recovery_overrides: CatalogTable<ItemRecoveryOverrides>,

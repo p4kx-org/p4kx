@@ -147,6 +147,7 @@ impl<'f> LoadoutResolver<'f> {
         self.entries(Some(&loadout))?;
         let spec = EntitySpec {
             record_index: None,
+            attachable_component: None,
             guid: Guid::default(),
             record_path: path.to_owned(),
             origin: crate::spec::LoadoutOrigin::File(path.into()),

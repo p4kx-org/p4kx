@@ -4,6 +4,9 @@
 //! Loadouts of ships and items in the Basetool catalog, through the public API: the selection and
 //! the ports.
 
+#[path = "catalog_item_alignment.rs"]
+mod catalog_item_alignment;
+
 use crate::loadouts_fixture::{
     ALPHA, BROKEN, EMPTY_LOADOUT, GUN, GUN_DEFAULT, GUN_OVERRIDE, LOOP, NESTED, RACK, SNUB, TURRET,
 };

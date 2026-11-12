@@ -5,6 +5,8 @@ use p4kx_extraction::Record;
 
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read_failure::CatalogReadFailure;
+use crate::catalog_v3::catalog_item_alignment::ItemAlignmentRows;
+use crate::catalog_v3::tag_catalog::EntityTags;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::picked::Picked;
@@ -14,14 +16,22 @@ use crate::selection::Kind;
 /// Source observations and rows produced by one Record check.
 pub(crate) struct RecordScan<'f> {
     pub(crate) picked: Option<Picked<'f>>,
-    pub(crate) entity_tags: Option<crate::catalog_v3::tag_catalog::EntityTags<'f>>,
+    pub(crate) entity: RecordEntityRows<'f>,
     pub(crate) ledger: ExportLedger,
+}
+
+/// Independent declarations from one selected Entity Record.
+#[derive(Default)]
+pub(crate) struct RecordEntityRows<'f> {
+    pub(crate) tags: Option<EntityTags<'f>>,
+    pub(crate) alignment: ItemAlignmentRows<'f>,
 }
 
 /// Rows and production accounting of the generic catalog scan.
 pub(crate) struct ScanRead<'f> {
     pub(crate) picked: Vec<Picked<'f>>,
-    pub(crate) entity_tags: Vec<crate::catalog_v3::tag_catalog::EntityTags<'f>>,
+    pub(crate) entity_tags: Vec<EntityTags<'f>>,
+    pub(crate) item_alignment: ItemAlignmentRows<'f>,
     pub(crate) resource_group_members:
         Vec<crate::catalog_v3::resource_group_catalog::ResourceGroupMembers>,
     pub(crate) ledger: ExportLedger,
@@ -65,7 +75,7 @@ pub(crate) fn finish<'f>(
         (picked.is_some() || !ledger.sources.is_empty() || !ledger.field_inspections.is_empty())
             .then_some(RecordScan {
                 picked,
-                entity_tags: None,
+                entity: RecordEntityRows::default(),
                 ledger,
             }),
     )

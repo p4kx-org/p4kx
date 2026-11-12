@@ -222,7 +222,7 @@ pub use palette::{
     PaletteRecords,
 };
 pub use pick::LoadoutPicks;
-pub use port::{PortDefinition, PortTransform, PortType};
+pub use port::{PortDefinition, PortDefinitionPosition, PortTransform, PortType};
 pub use prefab::{
     MAX_PREFAB_DEPTH, MAX_PREFAB_ISSUES, MAX_PREFAB_LIBRARY_LEN, MAX_PREFAB_OBJECTS,
     MAX_PREFAB_VISITS, PrefabError, PrefabFile, PrefabIssue, PrefabIssueKind, PrefabSet,

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "loadout_ledger/alignment.rs"]
+mod alignment;
 #[path = "loadout_ledger/file_dependencies.rs"]
 mod file_dependencies;
 #[path = "loadout_ledger/file_proofs.rs"]
@@ -143,7 +145,7 @@ impl<'f> Capture<'f> {
         crate::export_evidence_lock::lock(&self.state)
     }
 
-    fn record_error(&self, error: CatalogError) {
+    pub(super) fn record_error(&self, error: CatalogError) {
         if let Ok(mut state) = self.lock() {
             state.error.get_or_insert(error);
         }

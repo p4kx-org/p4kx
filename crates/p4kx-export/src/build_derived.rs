@@ -126,7 +126,10 @@ pub(crate) fn add_loadouts<'f>(
         entities,
         &wanted,
         &known,
-        &collected.ledger,
+        crate::loadout::SelectedSources {
+            ledger: &collected.ledger,
+            alignment: &collected.item_alignment,
+        },
         input,
         cancel,
     )?;

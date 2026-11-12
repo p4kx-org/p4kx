@@ -38,7 +38,6 @@ use refusal::CatalogRefusal;
 #[path = "original_catalog_inputs.rs"]
 pub(crate) mod original_input;
 use crate::catalog_read::original::EntryCapture;
-use original_input::OriginalCatalogInput;
 
 #[path = "build_parts.rs"]
 mod parts;
@@ -68,7 +67,7 @@ fn assemble<R>(
     let sources = TextSources::read(archive)?;
     let texts = Texts::parse(&sources)?;
     let origins = CatalogOrigins::new(archive, entry, &sources)?;
-    let input = OriginalCatalogInput::new(&forge, &origins);
+    let input = original_input::OriginalCatalogInput::new(&forge, &origins);
     let projection = CatalogProjection::new(&texts, &input);
     let entry_capture = EntryCapture::for_input(&input);
     let crafting = kinds(
@@ -317,6 +316,7 @@ fn assemble<R>(
             weapon_actions: components.weapon_actions,
             quantum_drives: components.quantum_drives,
             shield_generators: components.shield_generators,
+            item_alignment: collected.item_alignment.into_tables(&forge),
             contract_templates: CatalogTable::new(
                 &forge,
                 &["ContractTemplate"],

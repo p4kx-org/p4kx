@@ -177,26 +177,26 @@ impl LoadoutError {
         match self {
             Self::DanglingReference { guid } if guid.guid() == target.guid() => {
                 Self::DanglingReference {
-                    guid: target.for_failure(xml_use),
+                    guid: target.clone().with_xml_use(xml_use),
                 }
             }
             Self::Cycle { guid } if guid.guid() == target.guid() => Self::Cycle {
-                guid: target.for_failure(xml_use),
+                guid: target.clone().with_xml_use(xml_use),
             },
             Self::UnreadableRecord { guid, reason } if guid.guid() == target.guid() => {
                 Self::UnreadableRecord {
-                    guid: target.for_failure(xml_use),
+                    guid: target.clone().with_xml_use(xml_use),
                     reason,
                 }
             }
             Self::NotAnEntity { guid, type_name } if guid.guid() == target.guid() => {
                 Self::NotAnEntity {
-                    guid: target.for_failure(xml_use),
+                    guid: target.clone().with_xml_use(xml_use),
                     type_name,
                 }
             }
             Self::Assortment { guid, reason } if guid.guid() == target.guid() => Self::Assortment {
-                guid: target.for_failure(xml_use),
+                guid: target.clone().with_xml_use(xml_use),
                 reason,
             },
             other => other,

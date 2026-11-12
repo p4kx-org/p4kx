@@ -127,6 +127,14 @@ impl LoadoutTargetReceipt {
         }
     }
 
+    pub(crate) fn retained_for(
+        &self,
+        input: &OriginalCatalogInput<'_, '_>,
+    ) -> Result<OriginalDatum<Guid>, CatalogError> {
+        self.check_input(input)?;
+        self.retain()
+    }
+
     pub(super) fn retain(&self) -> Result<OriginalDatum<Guid>, CatalogError> {
         match &self.source {
             TargetSource::Reference { frame, guid } => guid.clone().finish(frame),

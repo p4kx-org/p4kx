@@ -13,6 +13,7 @@ use rayon::prelude::*;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read_failure::CatalogReadFailure;
+use crate::catalog_v3::catalog_item_alignment::{self, AlignmentOptions, ItemAlignmentRows};
 use crate::entity_selection::{Selected, select};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -22,7 +23,7 @@ use crate::picked::Picked;
 use crate::playability_rules::Evidence;
 use crate::record_observation::RecordObservation;
 use crate::resource_group::Groups;
-use crate::scan_health::{RecordScan, ScanError, ScanRead, SourceTrace};
+use crate::scan_health::{RecordEntityRows, RecordScan, ScanError, ScanRead, SourceTrace};
 use crate::scan_signature::SignatureSlot;
 use crate::ship_pool::ShipPool;
 use crate::starmap::TypeNames;
@@ -68,6 +69,7 @@ pub(crate) struct Scan<'o, 'a, 'f> {
     groups: Groups,
     evidence: Evidence,
     signature_slot: SignatureSlot,
+    alignment_options: AlignmentOptions<'f>,
     done: AtomicUsize,
     total: usize,
 }
@@ -115,6 +117,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             groups,
             evidence,
             signature_slot,
+            alignment_options: AlignmentOptions::read(forge, options.cancel)?,
             done: AtomicUsize::new(0),
             total: records.len(),
         };
@@ -150,9 +153,11 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
     ) -> Result<ScanRead<'f>, CatalogError> {
         let mut picked = Vec::new();
         let mut entity_tags = Vec::new();
+        let mut item_alignment = ItemAlignmentRows::default();
         for checked in checked {
             picked.extend(checked.picked);
-            entity_tags.extend(checked.entity_tags);
+            entity_tags.extend(checked.entity.tags);
+            item_alignment.extend(checked.entity.alignment);
             ledger.merge(checked.ledger);
         }
         picked.extend(failures.into_iter().map(Picked::Failed));
@@ -176,6 +181,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         Ok(ScanRead {
             picked,
             entity_tags,
+            item_alignment,
             resource_group_members: Vec::new(),
             ledger,
         })
@@ -200,21 +206,21 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             )?,
         );
         trees.set_read_observer(Some(capture.clone()));
-        let mut entity_tags = None;
+        let mut entity = RecordEntityRows::default();
         let result = self.select(
             trees,
             record,
             &mut trace,
             &mut ledger,
             &capture,
-            &mut entity_tags,
+            &mut entity,
         );
         trees.set_read_observer(None);
         ledger.merge(capture.finish()?);
         let mut checked =
             crate::scan_health::finish(self.projection.original(), record, &trace, result, ledger)?;
         if let Some(checked) = &mut checked {
-            checked.entity_tags = entity_tags;
+            checked.entity = entity;
         }
         Ok(checked)
     }
@@ -274,7 +280,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         trace: &mut SourceTrace,
         ledger: &mut ExportLedger,
         capture: &crate::export_builder_capture::BuilderCapture<'_>,
-        entity_tags: &mut Option<crate::catalog_v3::tag_catalog::EntityTags<'f>>,
+        entity: &mut RecordEntityRows<'f>,
     ) -> Result<Option<Picked<'f>>, ScanError> {
         let kind = match select(record, self.options.filter)? {
             None => return Ok(None),
@@ -300,7 +306,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         };
         trace.selected(kind);
         capture.activate(kind)?;
-        self.project_selected(kind, trees, record, trace, ledger, entity_tags)
+        self.project_selected(kind, trees, record, trace, ledger, entity)
     }
 
     fn project_selected(
@@ -310,7 +316,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         record: &Record<'f>,
         trace: &mut SourceTrace,
         ledger: &mut ExportLedger,
-        entity_tags: &mut Option<crate::catalog_v3::tag_catalog::EntityTags<'f>>,
+        entity: &mut RecordEntityRows<'f>,
     ) -> Result<Option<Picked<'f>>, ScanError> {
         if kind == Kind::AmmoDefinitions {
             let definition = self.ammo.selected(record, ledger)?;
@@ -329,12 +335,18 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             self.options.cancel,
         )?);
         if tree.type_name() == "EntityClassDefinition" {
-            let (tags, notes) = crate::catalog_v3::tag_catalog::entity(
+            let input = self.projection.original();
+            let cancel = self.options.cancel;
+            let (tags, mut notes) =
+                crate::catalog_v3::tag_catalog::entity(&tree, input, &admission, cancel)?;
+            let (alignment, alignment_notes) = catalog_item_alignment::read(
                 &tree,
-                self.projection.original(),
+                input,
                 &admission,
-                self.options.cancel,
+                &self.alignment_options,
+                cancel,
             )?;
+            notes.extend(alignment_notes);
             crate::source_projection_notes::record(
                 kind,
                 ExportSourceRole::Selected,
@@ -343,7 +355,8 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
                 notes,
                 ledger,
             )?;
-            *entity_tags = Some(tags);
+            entity.tags = Some(tags);
+            entity.alignment = alignment;
         }
         self.project(kind, trees, &admission, &tree, ledger)
     }
