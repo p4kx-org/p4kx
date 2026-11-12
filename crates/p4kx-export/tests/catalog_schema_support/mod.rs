@@ -76,6 +76,8 @@ pub(crate) fn minimal_catalog() -> Value {
             "ammoDefinitions": {"status": "complete"},
             "factions": {"status": "complete"},
             "reputationPerks": {"status": "complete"},
+            "reputationTriggerRecords": {"status": "complete"},
+            "reputationRewardAmounts": {"status": "complete"},
             "factionReputations": {"status": "complete"},
             "reputationScopes": {"status": "complete"},
             "reputationStandings": {"status": "complete"},
@@ -156,6 +158,8 @@ pub(crate) fn minimal_catalog() -> Value {
             "factions": absent_table(),
             "factionReputations": reputation::factions(),
             "reputationPerks": absent_table(),
+            "reputationTriggerRecords": absent_table(),
+            "reputationRewardAmounts": absent_table(),
             "ammoDefinitions": absent_table(),
             "reputationContexts": reputation::contexts(),
             "reputationScopes": reputation::scopes(),
@@ -187,6 +191,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "contractTemplates": absent_table(),
             "missionBrokerEntries": absent_table(),
             "missionFlows": absent_table(),
+            "reputationTriggers": absent_table(),
             "missionProperties": absent_table()
         },
         "declarations": {

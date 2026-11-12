@@ -38,6 +38,10 @@ fn every_kind_states_its_completeness() -> TestResult {
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one expected entry per exported kind"
+)]
 fn expected_completeness() -> Value {
     json!({
         "manufacturers": {"status": "complete"},
@@ -72,6 +76,8 @@ fn expected_completeness() -> Value {
         "ammoDefinitions": {"status": "complete"},
         "factions": {"status": "complete"},
         "reputationPerks": {"status": "complete"},
+        "reputationTriggerRecords": {"status": "complete"},
+        "reputationRewardAmounts": {"status": "complete"},
         "factionReputations": {"status": "complete"},
         "reputationScopes": {"status": "complete"},
         "reputationStandings": {"status": "complete"},

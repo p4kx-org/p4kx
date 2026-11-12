@@ -13,6 +13,14 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::reputation_perk_list::SOURCE_TYPE,
             },
+            Self::ReputationTriggerRecords => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::sandbox_trigger_record_definition::SOURCE_TYPE,
+            },
+            Self::ReputationRewardAmounts => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::reputation_reward_amount_definition::SOURCE_TYPE,
+            },
             Self::Factions => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::faction_definition::SOURCE_TYPE,

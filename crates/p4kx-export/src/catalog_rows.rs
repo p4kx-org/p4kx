@@ -168,6 +168,24 @@ fn append_reputation_definitions(
 }
 
 fn append_missions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
+    append(
+        emitted,
+        Kind::ReputationTriggerRecords,
+        collected
+            .mission_kinds
+            .trigger_records
+            .iter()
+            .map(|row| (row.physical_guid, row.physical_path)),
+    );
+    append(
+        emitted,
+        Kind::ReputationRewardAmounts,
+        collected
+            .mission_kinds
+            .reward_amounts
+            .iter()
+            .map(|row| (row.physical_guid, row.physical_path)),
+    );
     append_reputation_definitions(emitted, &collected.mission_kinds);
     append(
         emitted,

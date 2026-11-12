@@ -239,6 +239,8 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.reputationScopes` | Physical reputation scope definitions with authored presentation and ordered standing maps |
 | `definitions.reputationStandings` | The physical reputation standings with authored presentation and progression fields, ordered by GUID and original Record index |
 | `definitions.reputationPerks` | The physical perk lists with ordered original scope/standing associations and owned reward or category data |
+| `definitions.reputationTriggerRecords` | Reusable physical sandbox trigger Records with ordered manual trigger definitions |
+| `definitions.reputationRewardAmounts` | Physical reputation reward Records with their authored names and signed amounts |
 | `definitions.reputationContexts` | Physical reputation contexts with authored scope order, original references and display properties |
 | `missionTypes` | The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID |
 | `missionLocalities` | The mission localities, named sets of starmap objects, ordered by GUID |
@@ -1481,8 +1483,9 @@ The progression fields preserve `minReputation` and `driftReputation` with their
 numeric widths and `gated` with its source state. `driftTimeHours` keeps the original
 Single in hours with exact IEEE bits and a nullable finite projection. Each sourced field
 has its original contributors. Additional fields remain in the shared source arena.
-A context (`reputationContexts`) has `primaryScopeGuid` and `scopeGuids`
-(the `scopeContextList`). The scope of a gain in `reputationGains` is an entry of
+Each row in `definitions.reputationContexts` preserves the authored `sortOrderScope`,
+`primaryScopeContext` and ordered `scopeContextList` with their original scope links and
+dynamic display properties. The scope of a gain in `reputationGains` is an entry of
 `definitions.reputationScopes`.
 
 **Reputation perks.** Each row of `definitions.reputationPerks` is an original
@@ -1493,6 +1496,22 @@ the authored discount Single with its exact bits when present. The technical `na
 and `icon` path are sourced strings. The literal `description` and localized
 `displayName` and `displayDescription` carry `x-gameText`. Unclassified concrete perk
 variants retain their original fields in the row's source arena.
+
+**Sandbox triggers.** The `configurations.reputationTriggers` table contains the ordered
+`sandboxTriggers` occurrences owned by each physical faction reputation Record. Join the
+sourced `owner.guid` and `owner.recordIndex` to the faction definition. A trigger
+can contain an inline manual definition or a Reference to a reusable trigger Record.
+Null slots and present empty lists retain their own source state. Unclassified variants
+retain their original fields and produce a coverage diagnostic.
+
+**Sandbox trigger definitions.** Each row in `definitions.reputationTriggerRecords` is a
+physical `SandboxTriggerRecord` with its ordered `triggerManualParams`. A manual trigger
+carries the original event label or infraction Reference, the `triggerOnInnocentsOnly`
+flag and ordered outcomes. Each outcome keeps its scope and reward amount References.
+Faction outcomes also keep the original faction reputation Reference. The
+`definitions.reputationRewardAmounts` table contains the physical
+`SReputationRewardAmount` rows, each with an authored `editorName` and a signed Int32
+`reputationAmount`. Each exported value carries its own source provenance.
 
 **Mission types (`missionTypes`).** `typeName` is the `LocalisedTypeName`, a game text (41 of 42
 have an English one). Every `missionTypeGuid` of `contracts` (26 types on LIVE) is an entry.
@@ -1511,7 +1530,6 @@ the struct, `periodScenarioGuid`), each with `tiers`: `minPoints`, `badgeToAward
 `blueprintPoolGuids`, entries of `blueprintPools`. The progression texts and the multiplier rewards
 (empty on LIVE) are not exported.
 
-Not exported, for want of a consumer: the sandbox triggers and perks of the reputation Records.
 Contract templates are described in "Contract templates", mission broker entries in "Mission broker
 entries", ship spawns and the locations of contracts in "Ship spawns and location queries" and NPC
 and entity spawns in "NPC and entity spawns".
@@ -2714,6 +2732,8 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `reputationScopes` | `libs/foundry/records/reputation/scopes/` | `SReputationScopeParams` |
 | `reputationStandings` | `libs/foundry/records/reputation/standings/` | `SReputationStandingParams` |
 | `reputationPerks` | Any path | `SPerkReputationListParams` |
+| `reputationTriggerRecords` | Any path | `SandboxTriggerRecord` |
+| `reputationRewardAmounts` | Any path | `SReputationRewardAmount` |
 | `reputationContexts` | `libs/foundry/records/reputation/contexts/` | `SReputationContextUI` |
 | `missionTypes` | `libs/foundry/records/missiontype/` | `MissionType` |
 | `missionLocalities` | `libs/foundry/records/missiondata/pu_missionlocality/` | `MissionLocality` |

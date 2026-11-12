@@ -513,6 +513,8 @@ catalog-summary-kind = { $kind ->
     [blueprintCategoryLists] Blueprint category lists
     [factions] Factions
     [reputationPerks] Reputation perks
+    [reputationTriggerRecords] Reputation trigger records
+    [reputationRewardAmounts] Reputation reward amounts
     [paints] Paints
     [loadouts] Loadouts
    *[other] { $kind }

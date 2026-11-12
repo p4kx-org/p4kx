@@ -192,7 +192,7 @@ fn faction_reputation_blackboard_retains_exact_source_storage_and_legacy_literal
         &json!("@shared"),
     )?;
     assert_blackboard(&catalog, owner)?;
-    assert_retained_trigger(owner)?;
+    assert_retained_trigger(&catalog, owner)?;
     check(&catalog, "/exportHealth/status", &json!("complete"))?;
     Ok(())
 }
@@ -270,16 +270,18 @@ fn contract_dependency_consumes_only_the_original_faction_display_name() -> Test
     Ok(())
 }
 
-fn assert_retained_trigger(owner: &Value) -> TestResult {
-    let raw = at(owner, "/authoredFields")?;
-    check(raw, "/roots/0/name/value", &json!("sandboxTriggers"))?;
-    check(
-        raw,
-        "/values/1/value/value/sourceType/value",
-        &json!(fixture::TRIGGER),
-    )?;
-    check(raw, "/values/2/value/value/value", &json!(true))?;
-    Ok(())
+fn assert_retained_trigger(catalog: &Value, owner: &Value) -> TestResult {
+    let guid = at(owner, "/guid/value")?;
+    let configuration = proof::rows(catalog, "/configurations/reputationTriggers/rows")?
+        .iter()
+        .find(|row| row.pointer("/owner/guid/value") == Some(guid))
+        .ok_or("physical sandbox trigger owner")?;
+    let trigger = at(configuration, "/sandboxTriggers/value/0/value")?;
+    check(trigger, "/sourceType/value", &json!(fixture::TRIGGER))?;
+    check(trigger, "/kind", &json!("authored"))?;
+    let raw = at(trigger, "/authoredFields")?;
+    check(raw, "/roots/0/name/value", &json!("fixtureOn"))?;
+    check(raw, "/values/0/value/value/value", &json!(true))
 }
 
 fn faction_reputation(catalog: &Value, record: u128) -> TestResult<&Value> {

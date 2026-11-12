@@ -16,6 +16,8 @@ mod faction_scope;
 mod reputation_context;
 #[path = "reputation_perks.rs"]
 mod reputation_perks;
+#[path = "reputation_sandbox.rs"]
+mod reputation_sandbox;
 #[path = "catalog_reputation_scope.rs"]
 mod reputation_scope;
 

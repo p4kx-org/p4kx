@@ -272,6 +272,8 @@ fn the_kinds_follow_the_existing_ones_in_the_catalog_order() {
             "ammoDefinitions",
             "factions",
             "reputationPerks",
+            "reputationTriggerRecords",
+            "reputationRewardAmounts",
         ],
         "order of the catalog"
     );

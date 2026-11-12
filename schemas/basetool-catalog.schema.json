@@ -3831,6 +3831,9 @@
         "quantumDrives": {
           "$ref": "#/$defs/CatalogTableOfQuantumDrive"
         },
+        "reputationTriggers": {
+          "$ref": "#/$defs/CatalogTableOfReputationTriggerConfiguration"
+        },
         "resourceComponents": {
           "$ref": "#/$defs/CatalogTableOfResourceComponent"
         },
@@ -3873,6 +3876,7 @@
         "missionFlows",
         "missionProperties",
         "quantumDrives",
+        "reputationTriggers",
         "resourceComponents",
         "resourceConnections",
         "resourceContainers",
@@ -3977,11 +3981,17 @@
         "reputationPerks": {
           "$ref": "#/$defs/CatalogTableOfReputationPerkList"
         },
+        "reputationRewardAmounts": {
+          "$ref": "#/$defs/CatalogTableOfReputationRewardAmountDefinition"
+        },
         "reputationScopes": {
           "$ref": "#/$defs/CatalogTableOfScopeDefinition"
         },
         "reputationStandings": {
           "$ref": "#/$defs/CatalogTableOfStandingDefinition"
+        },
+        "reputationTriggerRecords": {
+          "$ref": "#/$defs/CatalogTableOfSandboxTriggerRecordDefinition"
         },
         "resourceGroups": {
           "$ref": "#/$defs/CatalogTableOfResourceGroupDefinition"
@@ -4014,8 +4024,10 @@
         "qualityQuantizations",
         "reputationContexts",
         "reputationPerks",
+        "reputationRewardAmounts",
         "reputationScopes",
         "reputationStandings",
+        "reputationTriggerRecords",
         "resourceGroups",
         "resourceTypes",
         "shopInventories",
@@ -4958,6 +4970,44 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfReputationRewardAmountDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ReputationRewardAmountDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfReputationTriggerConfiguration": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ReputationTriggerConfiguration"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfResourceComponent": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -5195,6 +5245,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/RoomAssociations"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfSandboxTriggerRecordDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/SandboxTriggerRecordDefinition"
           },
           "type": "array"
         }
@@ -6268,6 +6337,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `reputationPerks`."
         },
+        "reputationRewardAmounts": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `reputationRewardAmounts`."
+        },
         "reputationScopes": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `reputationScopes`."
@@ -6275,6 +6348,10 @@
         "reputationStandings": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `reputationStandings`."
+        },
+        "reputationTriggerRecords": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `reputationTriggerRecords`."
         },
         "resourceGroups": {
           "$ref": "#/$defs/KindCompleteness",
@@ -6360,8 +6437,10 @@
         "refiningProcesses",
         "reputationContexts",
         "reputationPerks",
+        "reputationRewardAmounts",
         "reputationScopes",
         "reputationStandings",
+        "reputationTriggerRecords",
         "resourceGroups",
         "resourceTypes",
         "shipStoreSlugs",
@@ -12993,6 +13072,67 @@
       ],
       "type": "object"
     },
+    "InfractionTrigger": {
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "event",
+              "type": "string"
+            },
+            "sandboxTrigger": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "sandboxTrigger"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "definition",
+              "type": "string"
+            },
+            "sandboxInfractionDefinitionTrigger": {
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+            }
+          },
+          "required": [
+            "kind",
+            "sandboxInfractionDefinitionTrigger"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "authored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "InitialDamage": {
       "description": "One authored initial-damage configuration.",
       "properties": {
@@ -14570,6 +14710,14 @@
         {
           "description": "All physically typed reputation perk-list Records.",
           "value": "reputationPerks"
+        },
+        {
+          "description": "All physical sandbox reputation trigger definition Records.",
+          "value": "reputationTriggerRecords"
+        },
+        {
+          "description": "All physical reputation reward amount Records.",
+          "value": "reputationRewardAmounts"
         }
       ]
     },
@@ -22930,6 +23078,89 @@
       ],
       "type": "object"
     },
+    "ReputationRewardAmountDefinition": {
+      "description": "A physical reputation reward amount with its exact signed value.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "editorName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "reputationAmount": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "editorName",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "reputationAmount",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "ReputationTriggerConfiguration": {
+      "description": "Original sandbox trigger occurrences owned by one physical faction reputation Record.",
+      "properties": {
+        "owner": {
+          "$ref": "#/$defs/ReputationTriggerOwner"
+        },
+        "sandboxTriggers": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSandboxTrigger"
+        }
+      },
+      "required": [
+        "owner",
+        "sandboxTriggers"
+      ],
+      "type": "object"
+    },
+    "ReputationTriggerOwner": {
+      "properties": {
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "guid",
+        "recordIndex"
+      ],
+      "type": "object"
+    },
     "RequiredIntro": {
       "description": "A completion tag a contract requires and the intro contracts that grant it.",
       "properties": {
@@ -25062,6 +25293,71 @@
       ],
       "type": "object"
     },
+    "RewardOutcome": {
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "factionReputation": {
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+            },
+            "kind": {
+              "const": "faction",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "factionReputation"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "authored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "reward": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "scope": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "reward",
+        "scope",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "RewardSource": {
       "description": "A place that rewards a blueprint of a pool with a chance: a `BlueprintRewards` result of a\ncontract.",
       "properties": {
@@ -25256,6 +25552,124 @@
         "extractionEfficiency",
         "radiusMultiplier",
         "salvageSpeedMultiplier"
+      ],
+      "type": "object"
+    },
+    "SandboxTrigger": {
+      "description": "An authored sandbox trigger occurrence.",
+      "oneOf": [
+        {
+          "properties": {
+            "infractionTrigger": {
+              "$ref": "#/$defs/SourcedValueOfInfractionTrigger"
+            },
+            "kind": {
+              "const": "manual",
+              "type": "string"
+            },
+            "outcomes": {
+              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRewardOutcome"
+            },
+            "triggerOnInnocentsOnly": {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            }
+          },
+          "required": [
+            "kind",
+            "infractionTrigger",
+            "triggerOnInnocentsOnly",
+            "outcomes"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "record",
+              "type": "string"
+            },
+            "triggerRecord": {
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+            }
+          },
+          "required": [
+            "kind",
+            "triggerRecord"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "authored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "SandboxTriggerRecordDefinition": {
+      "description": "An authored Record with ordered manual reputation trigger declarations.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "triggerManualParams": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSandboxTrigger"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType",
+        "triggerManualParams"
       ],
       "type": "object"
     },
@@ -36756,6 +37170,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfRewardOutcome": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfRewardOutcome"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfRoomAssociation": {
       "allOf": [
         {
@@ -36851,6 +37398,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfRoomAssociation"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfSandboxTrigger": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfSandboxTrigger"
                 },
                 "type": "array"
               }
@@ -48338,6 +49018,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/HitMultiplier"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfInfractionTrigger": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/InfractionTrigger"
               }
             }
           }
@@ -62484,6 +63294,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfRewardOutcome": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RewardOutcome"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfRoomAssociation": {
       "allOf": [
         {
@@ -62838,6 +63778,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/Rtpc"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSandboxTrigger": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SandboxTrigger"
               }
             }
           }

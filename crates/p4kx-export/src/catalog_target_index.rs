@@ -131,30 +131,8 @@ fn origins<'source>(
     let mut origins = Origins::new();
     for source in sources {
         let Some(kind) = source.kind else { continue };
-        if !matches!(
-            kind,
-            Kind::Manufacturers
-                | Kind::Factions
-                | Kind::FactionReputations
-                | Kind::ReputationPerks
-                | Kind::ContractTemplates
-                | Kind::MissionBrokerEntries
-                | Kind::GameplayProperties
-                | Kind::Blueprints
-                | Kind::LootPoolFilters
-                | Kind::ExplosionDefinitions
-                | Kind::AmmoDefinitions
-                | Kind::Tags
-                | Kind::Commodities
-                | Kind::ResourceTypes
-                | Kind::ResourceGroups
-                | Kind::QualityDistributions
-                | Kind::QualityQuantizations
-                | Kind::StarmapObjects
-                | Kind::ReputationContexts
-                | Kind::ReputationScopes
-                | Kind::ReputationStandings
-        ) || !source.disposition.read_succeeded()
+        if !uses_physical_row_identity(kind)
+            || !source.disposition.read_succeeded()
             || (matches!(scope, OriginScope::Emitted)
                 && (source.role != ExportSourceRole::Selected
                     || source.disposition != SourceDisposition::Projected))
@@ -187,6 +165,35 @@ fn origins<'source>(
             .insert(source.record_index);
     }
     Ok(origins)
+}
+
+const fn uses_physical_row_identity(kind: Kind) -> bool {
+    matches!(
+        kind,
+        Kind::Manufacturers
+            | Kind::Factions
+            | Kind::FactionReputations
+            | Kind::ReputationPerks
+            | Kind::ReputationTriggerRecords
+            | Kind::ReputationRewardAmounts
+            | Kind::ContractTemplates
+            | Kind::MissionBrokerEntries
+            | Kind::GameplayProperties
+            | Kind::Blueprints
+            | Kind::LootPoolFilters
+            | Kind::ExplosionDefinitions
+            | Kind::AmmoDefinitions
+            | Kind::Tags
+            | Kind::Commodities
+            | Kind::ResourceTypes
+            | Kind::ResourceGroups
+            | Kind::QualityDistributions
+            | Kind::QualityQuantizations
+            | Kind::StarmapObjects
+            | Kind::ReputationContexts
+            | Kind::ReputationScopes
+            | Kind::ReputationStandings
+    )
 }
 
 #[cfg(test)]

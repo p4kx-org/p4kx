@@ -36,6 +36,14 @@ mod reputation_perk;
 pub(crate) mod reputation_perk_list;
 #[path = "reputation_relation.rs"]
 mod reputation_relation;
+#[path = "reputation_reward_amount_definition.rs"]
+pub(crate) mod reputation_reward_amount_definition;
+#[path = "reputation_trigger_configuration.rs"]
+pub(crate) mod reputation_trigger_configuration;
+#[path = "sandbox_trigger.rs"]
+mod sandbox_trigger;
+#[path = "sandbox_trigger_record_definition.rs"]
+pub(crate) mod sandbox_trigger_record_definition;
 
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;

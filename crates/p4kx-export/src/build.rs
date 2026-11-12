@@ -228,7 +228,7 @@ fn assemble<R>(
             ),
             ammo_definitions: ammo_definition::table(&forge, collected.ammo_definitions),
             reputation_contexts: reputation_tables.contexts,
-            faction_reputations: reputation_tables.factions,
+            faction_reputations: reputation_tables.factions.definitions,
             reputation_scopes: reputation_tables.scopes,
             reputation_standings: reputation_tables.standings,
             contract_generators: CatalogTable::new(
@@ -279,6 +279,8 @@ fn assemble<R>(
             manufacturers: crate::manufacturer::table(&forge, collected.manufacturers),
             factions: crate::catalog_v3::faction_definition::table(&forge, collected.factions),
             reputation_perks: reputation_tables.perks,
+            reputation_trigger_records: reputation_tables.trigger_records,
+            reputation_reward_amounts: reputation_tables.reward_amounts,
         },
         projections: CatalogProjections {
             contracts: CatalogTable::new(&forge, &["ContractGenerator"], collected.contracts),
@@ -300,6 +302,7 @@ fn assemble<R>(
         },
         configurations: crate::catalog_configurations::CatalogConfigurations {
             blueprint_tiers: blueprints.tiers,
+            reputation_triggers: reputation_tables.factions.triggers,
             globals,
             durability: components.durability.health,
             degradation: components.durability.degradation,

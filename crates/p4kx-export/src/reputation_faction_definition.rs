@@ -13,6 +13,7 @@ use super::authored_fields::Observed;
 use super::faction_definition::FactionText;
 use super::reputation_blackboard::BlackboardProperty;
 use super::reputation_relation::{self, ReputationRelation};
+use super::reputation_trigger_configuration::ReputationTriggerConfiguration;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
@@ -55,6 +56,7 @@ impl<'source> FactionReputationDefinition<'source> {
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,
+        sandbox_state: SourceValueState,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         let presentation = FactionReputationPresentation::read(fields, projection, notes)?;
@@ -65,7 +67,10 @@ impl<'source> FactionReputationDefinition<'source> {
                 .projected()
                 .into_iter()
                 .chain(relations.projected())
-                .chain([("propertiesBB", properties_bb.state())]),
+                .chain([
+                    ("propertiesBB", properties_bb.state()),
+                    ("sandboxTriggers", sandbox_state),
+                ]),
         )?;
         Ok(Self {
             source,
@@ -207,6 +212,7 @@ impl<'source> FactionReputationRelations<'source> {
 /// A prepared definition and its physical owner and numeric receipts.
 pub(crate) struct PreparedFactionReputation<'source> {
     definition: FactionReputationDefinition<'source>,
+    triggers: ReputationTriggerConfiguration<'source>,
     pub(crate) physical_guid: Guid,
     pub(crate) physical_index: u32,
     pub(crate) physical_path: &'source str,
@@ -235,15 +241,19 @@ pub(crate) fn read<'source>(
     let numbers = RefCell::new(Vec::new());
     let fields = Observed::definition(&originals, input, &capture, &numbers);
     let mut notes = Vec::new();
+    let triggers =
+        ReputationTriggerConfiguration::read(tree, fields, projection.origins(), &mut notes)?;
     let definition = FactionReputationDefinition::read(
         CanonicalRecordHeader::read(tree, projection.origins())?,
         fields,
         projection,
+        triggers.state(),
         &mut notes,
     )?;
     Ok(FactionReputationRead {
         value: PreparedFactionReputation {
             definition,
+            triggers,
             physical_guid: tree.guid(),
             physical_index: tree.record_index(),
             physical_path: tree.record_path(),
@@ -253,14 +263,23 @@ pub(crate) fn read<'source>(
     })
 }
 
-/// Builds the physical faction reputation table.
-pub(crate) fn table<'source>(
+/// Physical faction definitions and their owned sandbox configurations.
+pub(crate) struct FactionReputationTables<'source> {
+    pub(crate) definitions: CatalogTable<FactionReputationDefinition<'source>>,
+    pub(crate) triggers: CatalogTable<ReputationTriggerConfiguration<'source>>,
+}
+
+/// Builds both tables from the same admitted owner Records.
+pub(crate) fn tables<'source>(
     forge: &DataForge<'_>,
     rows: Vec<PreparedFactionReputation<'source>>,
-) -> CatalogTable<FactionReputationDefinition<'source>> {
-    CatalogTable::new(
-        forge,
-        &[SOURCE_TYPE],
-        rows.into_iter().map(|row| row.definition).collect(),
-    )
+) -> FactionReputationTables<'source> {
+    let (definitions, triggers) = rows
+        .into_iter()
+        .map(|row| (row.definition, row.triggers))
+        .unzip();
+    FactionReputationTables {
+        definitions: CatalogTable::new(forge, &[SOURCE_TYPE], definitions),
+        triggers: CatalogTable::new(forge, &[SOURCE_TYPE], triggers),
+    }
 }

@@ -66,6 +66,7 @@ mod real_archive_quantum_drives;
 mod real_archive_records;
 mod real_archive_reputation;
 mod real_archive_reputation_perks;
+mod real_archive_reputation_sandbox;
 mod real_archive_reputation_standings;
 mod real_archive_resource_components;
 mod real_archive_resource_network;

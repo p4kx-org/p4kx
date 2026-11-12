@@ -172,11 +172,15 @@ pub enum Kind {
     Factions,
     /// All physically typed reputation perk-list Records.
     ReputationPerks,
+    /// All physical sandbox reputation trigger definition Records.
+    ReputationTriggerRecords,
+    /// All physical reputation reward amount Records.
+    ReputationRewardAmounts,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 56] = [
+    pub const ALL: [Self; 58] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -233,6 +237,8 @@ impl Kind {
         Self::AmmoDefinitions,
         Self::Factions,
         Self::ReputationPerks,
+        Self::ReputationTriggerRecords,
+        Self::ReputationRewardAmounts,
     ];
 
     /// Returns the stable kind identifier, independently of its canonical dataset path.
@@ -295,6 +301,8 @@ impl Kind {
             Self::AmmoDefinitions => "ammoDefinitions",
             Self::Factions => "factions",
             Self::ReputationPerks => "reputationPerks",
+            Self::ReputationTriggerRecords => "reputationTriggerRecords",
+            Self::ReputationRewardAmounts => "reputationRewardAmounts",
         }
     }
 }
@@ -354,7 +362,11 @@ pub(crate) fn is_leftover(record_path: &str, name: &str) -> bool {
 #[must_use]
 pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
     match kind {
-        Kind::Tags | Kind::Factions | Kind::ReputationPerks => false,
+        Kind::Tags
+        | Kind::Factions
+        | Kind::ReputationPerks
+        | Kind::ReputationTriggerRecords
+        | Kind::ReputationRewardAmounts => false,
         Kind::ContractTemplates => has_word(record_path, name, &CONTRACT_TEMPLATE_EXCLUDED_TOKENS),
         Kind::Ships => {
             is_leftover(record_path, name) || has_word(record_path, name, &SHIP_EXCLUDED_TOKENS)

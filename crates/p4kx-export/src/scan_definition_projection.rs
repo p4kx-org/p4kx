@@ -6,6 +6,7 @@ use p4kx_extraction::RecordTree;
 use super::Scan;
 use crate::Kind;
 use crate::loot_kinds::LootPick;
+use crate::mission_kinds::MissionPick;
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
@@ -30,11 +31,6 @@ impl<'f> Scan<'_, '_, 'f> {
             }
             Kind::ExplosionDefinitions => self.explosion_definition(admission, tree)?,
             Kind::Factions => self.faction_definition(admission, tree)?,
-            Kind::FactionReputations => self.faction_reputation_definition(admission, tree)?,
-            Kind::ReputationContexts => self.context_definition(admission, tree)?,
-            Kind::ReputationScopes => self.scope_definition(admission, tree)?,
-            Kind::ReputationStandings => self.standing_definition(admission, tree)?,
-            Kind::ReputationPerks => self.perk_definition(admission, tree)?,
             Kind::BlueprintCategoryLists => {
                 let read = crate::catalog_v3::blueprint_category_list_read::read(
                     tree,
@@ -73,6 +69,43 @@ impl<'f> Scan<'_, '_, 'f> {
                 (Picked::ResourceType(Box::new(read.value)), read.notes)
             }
             Kind::ResourceGroups => self.resource_group(admission, tree)?,
+            _ => return self.read_reputation_definition(kind, admission, tree),
+        };
+        Ok(Some(projection))
+    }
+
+    fn read_reputation_definition(
+        &self,
+        kind: Kind,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<Option<(Picked<'f>, Vec<FieldError>)>, ScanError> {
+        let projection = match kind {
+            Kind::FactionReputations => self.faction_reputation_definition(admission, tree)?,
+            Kind::ReputationContexts => self.context_definition(admission, tree)?,
+            Kind::ReputationScopes => self.scope_definition(admission, tree)?,
+            Kind::ReputationStandings => self.standing_definition(admission, tree)?,
+            Kind::ReputationPerks => self.perk_definition(admission, tree)?,
+            Kind::ReputationTriggerRecords => {
+                let read = crate::catalog_v3::sandbox_trigger_record_definition::read(
+                    tree,
+                    self.projection,
+                    admission,
+                    self.options.cancel,
+                )?;
+                let picked = MissionPick::SandboxTriggerRecord(Box::new(read.value));
+                (Picked::Mission(picked), read.notes)
+            }
+            Kind::ReputationRewardAmounts => {
+                let read = crate::catalog_v3::reputation_reward_amount_definition::read(
+                    tree,
+                    self.projection,
+                    admission,
+                    self.options.cancel,
+                )?;
+                let picked = MissionPick::RewardAmount(Box::new(read.value));
+                (Picked::Mission(picked), read.notes)
+            }
             _ => return Ok(None),
         };
         Ok(Some(projection))
@@ -120,7 +153,7 @@ impl<'f> Scan<'_, '_, 'f> {
             admission,
             self.options.cancel,
         )?;
-        let picked = crate::mission_kinds::MissionPick::Context(Box::new(read.value));
+        let picked = MissionPick::Context(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))
     }
 
@@ -135,7 +168,7 @@ impl<'f> Scan<'_, '_, 'f> {
             admission,
             self.options.cancel,
         )?;
-        let picked = crate::mission_kinds::MissionPick::Scope(Box::new(read.value));
+        let picked = MissionPick::Scope(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))
     }
 
@@ -150,7 +183,7 @@ impl<'f> Scan<'_, '_, 'f> {
             admission,
             self.options.cancel,
         )?;
-        let picked = crate::mission_kinds::MissionPick::Standing(Box::new(read.value));
+        let picked = MissionPick::Standing(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))
     }
 
@@ -165,7 +198,7 @@ impl<'f> Scan<'_, '_, 'f> {
             admission,
             self.options.cancel,
         )?;
-        let picked = crate::mission_kinds::MissionPick::Perks(Box::new(read.value));
+        let picked = MissionPick::Perks(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))
     }
 
@@ -180,7 +213,7 @@ impl<'f> Scan<'_, '_, 'f> {
             admission,
             self.options.cancel,
         )?;
-        let picked = crate::mission_kinds::MissionPick::Faction(Box::new(read.value));
+        let picked = MissionPick::Faction(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))
     }
 

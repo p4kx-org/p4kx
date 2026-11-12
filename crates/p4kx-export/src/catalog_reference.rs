@@ -96,6 +96,12 @@ pub(crate) fn actual_kind(type_name: &str) -> Option<Kind> {
             Some(Kind::FactionReputations)
         }
         crate::catalog_v3::reputation_perk_list::SOURCE_TYPE => Some(Kind::ReputationPerks),
+        crate::catalog_v3::sandbox_trigger_record_definition::SOURCE_TYPE => {
+            Some(Kind::ReputationTriggerRecords)
+        }
+        crate::catalog_v3::reputation_reward_amount_definition::SOURCE_TYPE => {
+            Some(Kind::ReputationRewardAmounts)
+        }
         "ResourceType" => Some(Kind::ResourceTypes),
         "ResourceTypeGroup" => Some(Kind::ResourceGroups),
         "CraftingQualityDistributionRecord" | "CraftingQualityLocationOverrideRecord" => {

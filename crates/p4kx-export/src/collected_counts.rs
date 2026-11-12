@@ -54,6 +54,8 @@ impl Collected<'_> {
             | Kind::ReputationScopes
             | Kind::ReputationStandings
             | Kind::ReputationPerks
+            | Kind::ReputationTriggerRecords
+            | Kind::ReputationRewardAmounts
             | Kind::ReputationContexts
             | Kind::MissionTypes
             | Kind::MissionLocalities

@@ -63,6 +63,8 @@ impl Kind {
             Self::AmmoDefinitions => 53,
             Self::Factions => 54,
             Self::ReputationPerks => 55,
+            Self::ReputationTriggerRecords => 56,
+            Self::ReputationRewardAmounts => 57,
         }
     }
 }

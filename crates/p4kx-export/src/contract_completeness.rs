@@ -78,6 +78,10 @@ pub(crate) struct Completeness<'a> {
     pub(crate) factions: KindCompleteness<'a>,
     /// The completeness of `reputationPerks`.
     pub(crate) reputation_perks: KindCompleteness<'a>,
+    /// The completeness of `reputationTriggerRecords`.
+    pub(crate) reputation_trigger_records: KindCompleteness<'a>,
+    /// The completeness of `reputationRewardAmounts`.
+    pub(crate) reputation_reward_amounts: KindCompleteness<'a>,
     /// The completeness of `factionReputations`.
     pub(crate) faction_reputations: KindCompleteness<'a>,
     /// The completeness of `reputationScopes`.
@@ -130,6 +134,7 @@ pub(crate) struct Completeness<'a> {
 
 impl<'a> Completeness<'a> {
     /// Returns the completeness that states `completeness` for every kind.
+    #[expect(clippy::too_many_lines, reason = "one entry per exported kind")]
     pub(crate) const fn of_every_kind(completeness: KindCompleteness<'a>) -> Self {
         Self {
             tags: KindCompleteness::Complete,
@@ -165,6 +170,8 @@ impl<'a> Completeness<'a> {
             shop_inventories: KindCompleteness::Complete,
             factions: completeness,
             reputation_perks: completeness,
+            reputation_trigger_records: completeness,
+            reputation_reward_amounts: completeness,
             faction_reputations: completeness,
             reputation_scopes: completeness,
             reputation_standings: completeness,

@@ -53,7 +53,7 @@ dataforgeRecordHeader; genuine body paths, identity, selection and counts retain
 | #1070 | D.shopInventories; A.shopInventoryResolution | both source JSON shapes, unlinked/placeholder files, ShopID evidence, ordered duplicate lines/all GUID alternatives, price/stock/rental raw units; per-shop resolved/placeholder/ambiguous/missing/unreadable/unscanned/noDeclaredFile |
 | #1071 | C.consumables; D.consumableTypes, D.consumableSubtypes; typed buff links | ordered composition/ratios, typed volume/container flags, typed status/health/buff/resource/gas effects and own links; no totals/dosage |
 | #1072 | D.jurisdictions, D.infractions; C.penaltyRules | one canonical jurisdiction reader, fines/severity/thresholds/timers/prison/exemptions/conditions/scopes/ordered overrides, legal source links; no evaluated outcome |
-| #1073 | D.factionReputations, D.reputationStandings/scopes/contexts; D.reputationPerks, C.reputationTriggers | complete perks/unlocks/rewards/conditions/display/headquarters/founding/leadership/focus/assets; exact String vs Locale; no fabricated reward |
+| #1073 | D.factionReputations, D.reputationStandings/scopes/contexts; D.reputationPerks, D.reputationTriggerRecords, D.reputationRewardAmounts, C.reputationTriggers | complete perks/unlocks/rewards/conditions/display/headquarters/founding/leadership/focus/assets; exact String vs Locale; no fabricated reward |
 | #1074 | C.locationData, C.missionModules, C.missionLimits; D.securityManifests | exact modules/limits/autoSpawnSettings, location-qualified declarations, moduleDeclaration.spawnedEntities, security graph and faction inheritance; independent of current enabled/matched state |
 | #1075 | D.missionItems; A.missionTokenInputs; V.missionTitles | all static definition/candidate/tag/link/config data; debug selections separate; only unambiguous non-debug static expansion, original key/token/unresolved reason retained |
 | #1076 | C.blueprintTiers[].research | absent block/present-empty/present-known/unsupported/unreadable; known CraftingRecipeCosts_Base/CraftingResearchUnlock_Base bases, no invented concrete production payloads |
@@ -105,10 +105,12 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | harvestableLocations | P.harvestableLocations | original preset/container/system/object relation, contextual identity |
 | lootContainers | P.lootContainers | original config/container/system/object relation, contextual identity |
 | shops | D.shops; A.shopInventoryResolution | registry identity/type/brand/place, conservative all-sources-agree resolution |
-| factionReputations | D.factionReputations | physical reputation owners, distinct from Faction/FactionIdentity, with authored presentation, blackboard, relation markers and perk-list links |
+| factionReputations | D.factionReputations; C.reputationTriggers | physical reputation owners, distinct from Faction/FactionIdentity, with authored presentation, blackboard, relation markers and perk-list links |
 | reputationScopes | D.reputationScopes | physical scopes, protected names and descriptions, icon paths, exact standing-map limits and ordered standing links |
 | reputationStandings | D.reputationStandings | authored rank names, descriptions, perk text, icon paths, gating and exact progression values |
 | reputationPerks | D.reputationPerks | physical perk lists, ordered scope/standing bindings, typed item/category rewards, original words and unclassified authored variants |
+| reputationTriggerRecords | D.reputationTriggerRecords | reusable physical sandbox definitions with original ordered manual trigger slots |
+| reputationRewardAmounts | D.reputationRewardAmounts | physical reward amount Records with their exact signed amounts |
 | reputationContexts | D.reputationContexts | physical contexts, authored sort order, ordered scope occurrences, protected and original dynamic display properties |
 | missionTypes | D.missionTypes | mission-type definitions and source text |
 | missionLocalities | D.missionLocalities | stored starmap-object membership |

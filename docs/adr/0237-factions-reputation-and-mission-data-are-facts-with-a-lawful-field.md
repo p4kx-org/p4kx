@@ -73,3 +73,11 @@ additional declarations.
 each primary and listed scope occurrence. Scope references preserve their original identity and
 resolution. Each occurrence retains its original blackboard properties, including protected
 Locale references and exact numeric values. Unclassified dynamic bodies remain in the source arena.
+
+## Catalog v3 sandbox triggers
+
+Each selected physical faction reputation Record owns its ordered triggers in
+`configurations.reputationTriggers`. Each configuration refers to its owner by sourced
+GUID and original Record index. Manual parameters and outcomes preserve authored order,
+while References join the reusable trigger and reward amount definitions by original GUID.
+Unknown concrete types retain their original fields and report their coverage state.

@@ -14,6 +14,7 @@ use crate::catalog_v3::catalog_hacking_chips::HackingChip;
 use crate::catalog_v3::catalog_quantum_drive::QuantumDrive;
 use crate::catalog_v3::catalog_shield_generator::ShieldGenerator;
 use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
+use crate::catalog_v3::reputation_trigger_configuration::ReputationTriggerConfiguration;
 use crate::schema_fields::every_field_required;
 use crate::template_configuration::{MissionFlowConfiguration, MissionPropertyConfiguration};
 use crate::template_projection::TemplateProjection;
@@ -23,6 +24,7 @@ use crate::template_projection::TemplateProjection;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogConfigurations<'source> {
+    pub(crate) reputation_triggers: CatalogTable<ReputationTriggerConfiguration<'source>>,
     pub(crate) blueprint_tiers: CatalogTable<crate::blueprint_tier_contract::BlueprintTier>,
     pub(crate) contract_templates: CatalogTable<TemplateProjection<'source>>,
     pub(crate) durability: CatalogTable<Durability<'source>>,

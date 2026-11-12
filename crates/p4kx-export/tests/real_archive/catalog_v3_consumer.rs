@@ -59,6 +59,12 @@ pub(crate) fn named_rows<'catalog>(
         Kind::Factions => checked_table(catalog, kind, "/definitions/factions"),
         Kind::FactionReputations => checked_table(catalog, kind, "/definitions/factionReputations"),
         Kind::ReputationPerks => checked_table(catalog, kind, "/definitions/reputationPerks"),
+        Kind::ReputationTriggerRecords => {
+            checked_table(catalog, kind, "/definitions/reputationTriggerRecords")
+        }
+        Kind::ReputationRewardAmounts => {
+            checked_table(catalog, kind, "/definitions/reputationRewardAmounts")
+        }
         Kind::QualityDistributions => {
             checked_table(catalog, kind, "/definitions/qualityDistributions")
         }
@@ -103,6 +109,8 @@ fn checked_table<'catalog>(
                 | Kind::LootPoolFilters
                 | Kind::Factions
                 | Kind::FactionReputations
+                | Kind::ReputationTriggerRecords
+                | Kind::ReputationRewardAmounts
                 | Kind::ReputationPerks
         ) {
             record_header(row)?;
@@ -210,6 +218,8 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::Manufacturers
             | Kind::Factions
             | Kind::FactionReputations
+            | Kind::ReputationTriggerRecords
+            | Kind::ReputationRewardAmounts
             | Kind::ReputationPerks
             | Kind::Commodities
             | Kind::ResourceTypes

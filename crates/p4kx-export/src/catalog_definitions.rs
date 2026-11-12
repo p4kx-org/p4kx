@@ -15,8 +15,10 @@ use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
 use crate::catalog_v3::reputation_context_definition::ContextDefinition;
 use crate::catalog_v3::reputation_faction_definition::FactionReputationDefinition;
 use crate::catalog_v3::reputation_perk_list::ReputationPerkList;
+use crate::catalog_v3::reputation_reward_amount_definition::ReputationRewardAmountDefinition;
 use crate::catalog_v3::reputation_scope_definition::ScopeDefinition;
 use crate::catalog_v3::reputation_standing_definition::StandingDefinition;
+use crate::catalog_v3::sandbox_trigger_record_definition::SandboxTriggerRecordDefinition;
 use crate::commodity_contract::CommodityDefinition;
 use crate::manufacturer::ManufacturerDefinition;
 use crate::mission_generator::GeneratorDefinition;
@@ -57,4 +59,6 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) factions: CatalogTable<FactionDefinition<'source>>,
     pub(crate) faction_reputations: CatalogTable<FactionReputationDefinition<'source>>,
     pub(crate) reputation_perks: CatalogTable<ReputationPerkList<'source>>,
+    pub(crate) reputation_trigger_records: CatalogTable<SandboxTriggerRecordDefinition<'source>>,
+    pub(crate) reputation_reward_amounts: CatalogTable<ReputationRewardAmountDefinition<'source>>,
 }
