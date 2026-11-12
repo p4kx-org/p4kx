@@ -31,6 +31,7 @@
 //! model in its own file, as the physics mesh a `Mesh` chunk refers to (docs/crch-models.md).
 
 mod animation;
+mod animation_clip_coordinates;
 mod animation_controller;
 mod animation_dba;
 mod animation_error;
@@ -124,6 +125,10 @@ mod transform;
 mod vector;
 
 pub use animation::{Animation, BoundTracks, Keys, Track};
+pub use animation_clip_coordinates::{
+    AnimationChunkCoordinates, AnimationClipCoordinates, AnimationDatabaseSelection,
+    AnimationFrameChannel, AnimationLastFrame,
+};
 pub use animation_controller::{AnimationChannel, AnimationController, DecodedAnimationChannel};
 pub use animation_dba::{Dba, DbaHeaders, SkippedAnimation};
 pub use animation_error::{AnimationError, CorruptAnimation};

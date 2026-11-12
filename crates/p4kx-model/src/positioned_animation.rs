@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::{Animation, SkippedAnimation};
+use crate::{Animation, AnimationClipCoordinates, AnimationDatabaseSelection, SkippedAnimation};
 
 /// A decoded clip paired with the source positions retained by that decode.
 #[derive(Debug, Clone)]
@@ -9,6 +9,7 @@ pub struct PositionedAnimation {
     animation: Animation,
     clip_ordinal: usize,
     controller_ordinals: Vec<usize>,
+    coordinates: Option<AnimationClipCoordinates>,
 }
 
 impl PositionedAnimation {
@@ -16,11 +17,13 @@ impl PositionedAnimation {
         animation: Animation,
         clip_ordinal: usize,
         controller_ordinals: Vec<usize>,
+        coordinates: Option<AnimationClipCoordinates>,
     ) -> Self {
         Self {
             animation,
             clip_ordinal,
             controller_ordinals,
+            coordinates,
         }
     }
 
@@ -34,6 +37,12 @@ impl PositionedAnimation {
     #[must_use]
     pub const fn clip_ordinal(&self) -> usize {
         self.clip_ordinal
+    }
+
+    /// Returns the original intervals retained by this decode.
+    #[must_use]
+    pub const fn coordinates(&self) -> Option<&AnimationClipCoordinates> {
+        self.coordinates.as_ref()
     }
 
     /// Returns the original controller ordinal of one decoded track.
@@ -51,4 +60,13 @@ pub struct PositionedDba {
     pub animations: Vec<PositionedAnimation>,
     /// The original clips that could not be decoded.
     pub skipped: Vec<SkippedAnimation>,
+    pub(crate) selection: Option<AnimationDatabaseSelection>,
+}
+
+impl PositionedDba {
+    /// Returns the selectors used to read the original database.
+    #[must_use]
+    pub const fn selection(&self) -> Option<&AnimationDatabaseSelection> {
+        self.selection.as_ref()
+    }
 }

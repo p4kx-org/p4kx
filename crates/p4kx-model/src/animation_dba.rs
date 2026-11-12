@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+use std::sync::Arc;
+
 use p4kx_chunks::{ChunkFile, ivo};
 use p4kx_foundation::ByteReader;
 use rayon::prelude::*;
 
+use crate::animation_clip_coordinates::ClipChunks;
 use crate::animation_read::{
-    Block, MAX_ANIMATION_KEYS, MAX_DATABASE_KEYS, RECORD_LEN, build, check_budget, chunk_bytes,
-    corrupt, declared_keys, decode_tracks, listed_tracks, read_block, read_record, stem,
+    AnimationChunk, Block, MAX_ANIMATION_KEYS, MAX_DATABASE_KEYS, RECORD_LEN, TrackPositions,
+    build, check_budget, chunk_bytes, corrupt, declared_keys, decode_tracks, listed_tracks,
+    read_block, read_record, stem,
 };
 use crate::reader::to_usize;
 use crate::{
-    Animation, AnimationError, AnimationHeader, CorruptAnimation, PositionedAnimation,
-    PositionedDba,
+    Animation, AnimationClipCoordinates, AnimationDatabaseSelection, AnimationError,
+    AnimationHeader, CorruptAnimation, PositionedAnimation, PositionedDba,
 };
 
 pub(crate) const DBA_DATA_VERSION: u32 = 0x900;
@@ -95,7 +100,12 @@ impl Dba {
         file_name: &str,
         file: &ChunkFile<B>,
     ) -> Result<Self, AnimationError> {
-        let decoded = read_projected(file_name, file, |animation, _, _| animation, Capture::Off)?;
+        let decoded = read_projected(
+            file_name,
+            file,
+            |animation, _, _, _| animation,
+            Capture::Off,
+        )?;
         Ok(Self {
             animations: decoded.animations,
             skipped: decoded.skipped,
@@ -119,6 +129,7 @@ impl Dba {
         Ok(PositionedDba {
             animations: decoded.animations,
             skipped: decoded.skipped,
+            selection: decoded.selection,
         })
     }
 }
@@ -126,18 +137,20 @@ impl Dba {
 fn read_projected<B: AsRef<[u8]>, T>(
     file_name: &str,
     file: &ChunkFile<B>,
-    project: impl Fn(Animation, usize, Vec<usize>) -> T,
+    project: impl Fn(Animation, usize, Vec<usize>, Option<AnimationClipCoordinates>) -> T,
     capture: Capture,
 ) -> Result<DecodedDatabase<T>, AnimationError> {
-    let metadata = chunk_bytes(
+    let metadata = AnimationChunk::read(
         file_name,
         file,
         ivo::DBA_METADATA,
         DBA_METADATA_VERSION,
         "DbaMetadata",
     )?;
-    let data = chunk_bytes(file_name, file, ivo::DBA_DATA, DBA_DATA_VERSION, "DbaData")?;
-    read_database(metadata, data, project, capture)
+    let data = AnimationChunk::read(file_name, file, ivo::DBA_DATA, DBA_DATA_VERSION, "DbaData")?;
+    let chunks = matches!(capture, Capture::Positions)
+        .then(|| AnimationChunk::observe(file, metadata, data));
+    read_database(metadata, data, project, chunks.as_ref())
         .map_err(|(chunk, source)| corrupt(file_name, chunk, source))
 }
 
@@ -145,8 +158,13 @@ type ChunkFailure = (&'static str, CorruptAnimation);
 
 struct Layout<'a> {
     records: &'a [u8],
-    paths: Vec<String>,
+    paths: Vec<DatabasePath>,
     blocks: Vec<Block>,
+}
+
+struct DatabasePath {
+    name: String,
+    bytes: Range<usize>,
 }
 
 #[derive(Clone, Copy)]
@@ -158,48 +176,69 @@ enum Capture {
 struct DecodedDatabase<T> {
     animations: Vec<T>,
     skipped: Vec<SkippedAnimation>,
+    selection: Option<AnimationDatabaseSelection>,
 }
 
 fn read_database<T>(
-    metadata: &[u8],
-    data: &[u8],
-    project: impl Fn(Animation, usize, Vec<usize>) -> T,
-    capture: Capture,
+    metadata: AnimationChunk<'_>,
+    data: AnimationChunk<'_>,
+    project: impl Fn(Animation, usize, Vec<usize>, Option<AnimationClipCoordinates>) -> T,
+    chunks: Option<&Arc<ClipChunks>>,
 ) -> Result<DecodedDatabase<T>, ChunkFailure> {
     let Layout {
         records,
         paths,
         blocks,
-    } = layout(metadata, data)?;
+    } = layout(metadata.bytes, data.bytes)?;
     let count = blocks.len();
     let decoded: Vec<_> = blocks
         .par_iter()
         .zip(records.par_chunks_exact(RECORD_LEN))
         .map(|(block, record)| {
             let record = read_record(record)?;
-            check_budget(declared_keys(data, block)?, MAX_ANIMATION_KEYS)?;
-            let mut controllers = Vec::new();
-            let tracks = decode_tracks(data, block, |ordinal| {
-                if matches!(capture, Capture::Positions) {
-                    controllers.push(ordinal);
-                }
-            })?;
-            Ok::<_, CorruptAnimation>((record, tracks, controllers))
+            check_budget(declared_keys(data.bytes, block)?, MAX_ANIMATION_KEYS)?;
+            let mut positions = chunks.as_ref().map(|_| TrackPositions::default());
+            let tracks = decode_tracks(data, block, &mut positions)?;
+            Ok::<_, CorruptAnimation>((record, tracks, positions))
         })
         .collect();
     let mut dba = DecodedDatabase {
         animations: Vec::with_capacity(count),
         skipped: Vec::new(),
+        selection: chunks.map(|chunks| AnimationDatabaseSelection {
+            chunks: Arc::clone(chunks),
+            count: metadata.offset..metadata.offset + size_of::<u32>() as u64,
+        }),
     };
-    for (ordinal, (path, result)) in paths.into_iter().zip(decoded).enumerate() {
-        let name = stem(&path).to_owned();
+    for (ordinal, ((path, block), result)) in
+        paths.into_iter().zip(&blocks).zip(decoded).enumerate()
+    {
+        let name = stem(&path.name).to_owned();
         match result {
-            Ok((record, tracks, controllers)) => {
-                let animation = build(name, path, record, tracks);
+            Ok((record, tracks, positions)) => {
+                let (ordinals, coordinates) = positions.zip(chunks).map_or_else(
+                    || (Vec::new(), None),
+                    |(positions, chunks)| {
+                        let timing =
+                            metadata.offset + (METADATA_HEADER_LEN + ordinal * RECORD_LEN) as u64;
+                        let authored = Some(
+                            metadata.offset + path.bytes.start as u64
+                                ..metadata.offset + path.bytes.end as u64,
+                        );
+                        let (ordinals, coordinates) =
+                            positions.project(Arc::clone(chunks), timing, authored, data, block);
+                        (ordinals, Some(coordinates))
+                    },
+                );
+                let animation = build(name, path.name, record, tracks);
                 dba.animations
-                    .push(project(animation, ordinal, controllers));
+                    .push(project(animation, ordinal, ordinals, coordinates));
             }
-            Err(reason) => dba.skipped.push(SkippedAnimation { name, path, reason }),
+            Err(reason) => dba.skipped.push(SkippedAnimation {
+                name,
+                path: path.name,
+                reason,
+            }),
         }
     }
     Ok(dba)
@@ -215,7 +254,7 @@ fn read_headers(metadata: &[u8], data: &[u8]) -> Result<DbaHeaders, ChunkFailure
         animations: Vec::with_capacity(blocks.len()),
         skipped: Vec::new(),
     };
-    for ((path, block), record) in paths
+    for ((DatabasePath { name: path, .. }, block), record) in paths
         .into_iter()
         .zip(&blocks)
         .zip(records.as_chunks::<RECORD_LEN>().0)
@@ -244,7 +283,8 @@ fn layout<'a>(metadata: &'a [u8], data: &[u8]) -> Result<Layout<'a>, ChunkFailur
     let in_data = |source| ("DbaData", source);
     let (records, name_table) = metadata_parts(metadata).map_err(in_metadata)?;
     let count = records.len() / RECORD_LEN;
-    let paths = names(name_table, count).map_err(in_metadata)?;
+    let paths =
+        names(name_table, count, METADATA_HEADER_LEN + records.len()).map_err(in_metadata)?;
 
     let mut blocks = Vec::with_capacity(count);
     let mut position = PREFIX_LEN;
@@ -280,12 +320,22 @@ pub(crate) fn next_name(table: &[u8], count: usize) -> Result<(&[u8], &[u8]), Co
     }
 }
 
-fn names(mut table: &[u8], count: usize) -> Result<Vec<String>, CorruptAnimation> {
+fn names(
+    mut table: &[u8],
+    count: usize,
+    mut offset: usize,
+) -> Result<Vec<DatabasePath>, CorruptAnimation> {
     (0..count)
         .map(|_| {
             let (name, rest) = next_name(table, count)?;
             table = rest;
-            Ok(String::from_utf8_lossy(name).into_owned())
+            let end = offset + name.len() + 1;
+            let path = DatabasePath {
+                name: String::from_utf8_lossy(name).into_owned(),
+                bytes: offset..end,
+            };
+            offset = end;
+            Ok(path)
         })
         .collect()
 }

@@ -71,10 +71,20 @@ impl<'a> Wanted<'a> {
 
 /// Sorts and merges `sources`, reads those the choice wants and collects the animations.
 pub(crate) fn read<T: Described + Send>(
+    sources: Vec<Source>,
+    choice: &AnimationChoice,
+    open: impl Fn(&str) -> Result<ChunkSource, ConversionError> + Sync,
+    load: impl Fn(&ChunkSource, &str, Kind, bool) -> Result<Loaded<T>, ConversionError> + Sync,
+) -> Result<Gathered<T>, ConversionError> {
+    read_observing(sources, choice, open, load, |_, _| {})
+}
+
+pub(crate) fn read_observing<T: Described + Send>(
     mut sources: Vec<Source>,
     choice: &AnimationChoice,
     open: impl Fn(&str) -> Result<ChunkSource, ConversionError> + Sync,
     load: impl Fn(&ChunkSource, &str, Kind, bool) -> Result<Loaded<T>, ConversionError> + Sync,
+    mut observe: impl FnMut(Option<&EntryOrigin>, &Loaded<T>),
 ) -> Result<Gathered<T>, ConversionError> {
     merge_sources(&mut sources);
     let wanted = Wanted::of(choice);
@@ -106,6 +116,7 @@ pub(crate) fn read<T: Described + Send>(
                 continue;
             }
         };
+        observe(origin.as_ref(), &loaded);
         set.files += 1;
         set.unread.extend(loaded.unread);
         keep(

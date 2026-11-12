@@ -76,30 +76,7 @@ impl<'a> Fields<'a> {
         survey: Option<&PrimarySkeletonSelection>,
         skeleton: Option<&ModelBoneSources>,
     ) -> Result<Self, SourceEvidenceError> {
-        let (mut selection, mut complete) = selection_uses(entry, survey)?;
-        if let Some(skeleton) = skeleton {
-            if let Some(row) = skeleton.table_row() {
-                for (name, span) in [("type", &row.kind), ("offset", &row.offset)] {
-                    selection.push(site(
-                        entry,
-                        "cryEngineChunkTable",
-                        name,
-                        vec![skeleton.chunk() as u64, span.start, span.end],
-                        SourceUseRole::Selector,
-                    )?);
-                }
-            } else {
-                complete = false;
-            }
-            let count = skeleton.count_range();
-            selection.push(site(
-                entry,
-                "cryEngineSkeleton",
-                "boneCount",
-                vec![skeleton.chunk() as u64, count.start, count.end],
-                SourceUseRole::Payload,
-            )?);
-        }
+        let (selection, complete) = primary_selection(entry, survey, skeleton)?;
         Ok(Self {
             entry,
             selection,
@@ -257,6 +234,38 @@ impl Pose {
             Self::World => fields.world_pose(),
         }
     }
+}
+
+pub(crate) fn primary_selection(
+    entry: &EntryPageSources,
+    survey: Option<&PrimarySkeletonSelection>,
+    skeleton: Option<&ModelBoneSources>,
+) -> Result<(Vec<SourceUse>, bool), SourceEvidenceError> {
+    let (mut selection, mut complete) = selection_uses(entry, survey)?;
+    if let Some(skeleton) = skeleton {
+        if let Some(row) = skeleton.table_row() {
+            for (name, span) in [("type", &row.kind), ("offset", &row.offset)] {
+                selection.push(site(
+                    entry,
+                    "cryEngineChunkTable",
+                    name,
+                    vec![skeleton.chunk() as u64, span.start, span.end],
+                    SourceUseRole::Selector,
+                )?);
+            }
+        } else {
+            complete = false;
+        }
+        let count = skeleton.count_range();
+        selection.push(site(
+            entry,
+            "cryEngineSkeleton",
+            "boneCount",
+            vec![skeleton.chunk() as u64, count.start, count.end],
+            SourceUseRole::Payload,
+        )?);
+    }
+    Ok((selection, complete))
 }
 
 fn selection_uses(

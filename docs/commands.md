@@ -870,6 +870,20 @@ cells. The parser's default selectors account for identity matrices and the synt
 The generated root name also uses the selected model's directory path. The same response budget
 and cursor apply to node pages.
 
+For `list_model_items` with `section: "animations"`, each row has source and encryption
+markers for its values. CAF names use the selected directory path. DBA names use the original
+database name bytes. Timing and counts use the admitted chunk and controller records.
+The duration also identifies the original encoded frame if it extends past the stored end.
+The bound track count includes the selected skeleton's controller IDs. The item collection
+aggregates the returned rows. The total and cursor use the original database count and clip
+admission flags actually evaluated, including flags that exclude an additive clip. A readable
+empty database contributes its authored zero count. Unread files and databases with only failed
+clips appear in the unread list.
+Each `clipFlags` range is `[chunkOrdinal, firstClipOrdinal, start, endExclusive, stride, count]`.
+When the full navigation evidence cannot fit in the existing response budget, the total and
+cursor report incomplete provenance and retain a proved encrypted contribution when one exists.
+The cursor resumes after the last returned animation.
+
 For `mtl_summary`, `fieldOrigins` addresses the fields of the returned page, including each
 admitted texture, parameter and layer. `materialXmlElement` locations are zero-based element
 child ordinals from the original XML root. `materialXmlAttribute` appends the original attribute

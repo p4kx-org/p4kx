@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+use std::sync::Arc;
+
 use p4kx_chunks::{Chunk, ChunkFile, ChunkType, Container, ivo};
 use p4kx_foundation::ByteReader;
 
+use crate::animation_clip_coordinates::{
+    AnimationChunkCoordinates, AnimationClipCoordinates, AnimationLastFrame, ClipChunks,
+};
 use crate::animation_controller::{CHANNEL_LEN, CONTROLLER_LEN};
 use crate::animation_keys::bytes_at;
 use crate::reader::to_usize;
@@ -101,18 +107,63 @@ pub(crate) fn listed_tracks(
 }
 
 pub(crate) fn decode_tracks(
-    data: &[u8],
+    chunk: AnimationChunk<'_>,
     block: &Block,
-    mut observe: impl FnMut(usize),
+    positions: &mut Option<TrackPositions>,
 ) -> Result<Vec<Track>, CorruptAnimation> {
     let mut tracks = Vec::with_capacity(block.count);
-    for controller in controllers(data, block, 0)? {
-        if let Some(track) = controller.decode()? {
-            observe(controller.ordinal());
-            tracks.push(track);
-        }
+    for controller in controllers(chunk.bytes, block, chunk.offset)? {
+        let track = if let Some(positions) = positions.as_mut() {
+            controller
+                .decode_observing(Some(|last| positions.record(controller.ordinal(), last)))?
+        } else {
+            controller.decode()?
+        };
+        tracks.extend(track);
     }
     Ok(tracks)
+}
+
+#[derive(Default)]
+pub(crate) struct TrackPositions {
+    ordinals: Vec<usize>,
+    last: Option<AnimationLastFrame>,
+}
+
+impl TrackPositions {
+    fn record(&mut self, ordinal: usize, last: Option<AnimationLastFrame>) {
+        self.ordinals.push(ordinal);
+        if let Some(last) = last
+            && self
+                .last
+                .as_ref()
+                .is_none_or(|previous| last.frame() >= previous.frame())
+        {
+            self.last = Some(last);
+        }
+    }
+
+    pub(crate) fn project(
+        self,
+        chunks: Arc<ClipChunks>,
+        timing: u64,
+        name: Option<Range<u64>>,
+        data: AnimationChunk<'_>,
+        block: &Block,
+    ) -> (Vec<usize>, AnimationClipCoordinates) {
+        let first_id = data.offset + block.ids_at() as u64;
+        (
+            self.ordinals,
+            AnimationClipCoordinates {
+                chunks,
+                timing,
+                name,
+                block: data.offset + block.at as u64..data.offset + block.end as u64,
+                ids: first_id..first_id + block.count as u64 * size_of::<u32>() as u64,
+                last: self.last,
+            },
+        )
+    }
 }
 
 pub(crate) fn controllers<'a>(
@@ -189,12 +240,48 @@ pub(crate) fn chunk_bytes<'f, B: AsRef<[u8]>>(
     version: u32,
     name: &'static str,
 ) -> Result<&'f [u8], AnimationError> {
-    let (index, _) = animation_chunk(file_name, file, chunk_type, version, name)?;
-    file.chunk_data_to_end(index)
-        .ok_or_else(|| AnimationError::MissingChunk {
-            file: file_name.to_owned(),
-            chunk: name,
+    AnimationChunk::read(file_name, file, chunk_type, version, name).map(|chunk| chunk.bytes)
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct AnimationChunk<'a> {
+    pub(crate) bytes: &'a [u8],
+    pub(crate) offset: u64,
+    index: usize,
+}
+
+impl<'a> AnimationChunk<'a> {
+    pub(crate) fn read<B: AsRef<[u8]>>(
+        file_name: &str,
+        file: &'a ChunkFile<B>,
+        chunk_type: ChunkType,
+        version: u32,
+        name: &'static str,
+    ) -> Result<Self, AnimationError> {
+        let (index, chunk) = animation_chunk(file_name, file, chunk_type, version, name)?;
+        let bytes = file
+            .chunk_data_to_end(index)
+            .ok_or_else(|| AnimationError::MissingChunk {
+                file: file_name.to_owned(),
+                chunk: name,
+            })?;
+        Ok(Self {
+            bytes,
+            index,
+            offset: chunk.offset(),
         })
+    }
+
+    pub(crate) fn observe<B: AsRef<[u8]>>(
+        file: &ChunkFile<B>,
+        metadata: Self,
+        data: Self,
+    ) -> Arc<ClipChunks> {
+        Arc::new(ClipChunks {
+            metadata: AnimationChunkCoordinates::of(file, metadata.index),
+            data: AnimationChunkCoordinates::of(file, data.index),
+        })
+    }
 }
 
 pub(crate) fn animation_chunk<'a, B: AsRef<[u8]>>(
@@ -242,7 +329,7 @@ impl Animation {
         file_name: &str,
         file: &ChunkFile<B>,
     ) -> Result<Self, AnimationError> {
-        Self::read_caf_observing(file_name, file, |_| {})
+        Self::read_caf_projected(file_name, file, None, |animation, _, _, _| animation)
     }
 
     /// Reads a CAF and retains each successful track's original controller ordinal.
@@ -253,38 +340,54 @@ impl Animation {
         file_name: &str,
         file: &ChunkFile<B>,
     ) -> Result<PositionedAnimation, AnimationError> {
-        let mut controllers = Vec::new();
-        let animation =
-            Self::read_caf_observing(file_name, file, |ordinal| controllers.push(ordinal))?;
-        Ok(PositionedAnimation::new(animation, 0, controllers))
+        Self::read_caf_projected(
+            file_name,
+            file,
+            Some(TrackPositions::default()),
+            PositionedAnimation::new,
+        )
     }
 
-    fn read_caf_observing<B: AsRef<[u8]>>(
+    fn read_caf_projected<B: AsRef<[u8]>, T>(
         file_name: &str,
         file: &ChunkFile<B>,
-        observe: impl FnMut(usize),
-    ) -> Result<Self, AnimationError> {
-        let info = chunk_bytes(
+        mut positions: Option<TrackPositions>,
+        project: impl FnOnce(Self, usize, Vec<usize>, Option<AnimationClipCoordinates>) -> T,
+    ) -> Result<T, AnimationError> {
+        let info = AnimationChunk::read(
             file_name,
             file,
             ivo::ANIM_INFO,
             ANIM_INFO_VERSION,
             "AnimInfo",
         )?;
-        let record = read_record(info.get(..RECORD_LEN).unwrap_or(info))
+        let record = read_record(info.bytes.get(..RECORD_LEN).unwrap_or(info.bytes))
             .map_err(|source| corrupt(file_name, "AnimInfo", source))?;
-        let data = chunk_bytes(file_name, file, ivo::CAF_DATA, CAF_DATA_VERSION, "CafData")?;
-        let tracks = read_block(data, 0, CAF_SIGNATURE)
-            .and_then(|block| {
-                check_budget(declared_keys(data, &block)?, MAX_ANIMATION_KEYS)?;
-                decode_tracks(data, &block, observe)
+        let data =
+            AnimationChunk::read(file_name, file, ivo::CAF_DATA, CAF_DATA_VERSION, "CafData")?;
+        let block = read_block(data.bytes, 0, CAF_SIGNATURE)
+            .map_err(|source| corrupt(file_name, "CafData", source))?;
+        let tracks = declared_keys(data.bytes, &block)
+            .and_then(|keys| {
+                check_budget(keys, MAX_ANIMATION_KEYS)?;
+                decode_tracks(data, &block, &mut positions)
             })
             .map_err(|source| corrupt(file_name, "CafData", source))?;
-        Ok(build(
+        let animation = build(
             stem(file_name).to_owned(),
             file_name.to_owned(),
             record,
             tracks,
-        ))
+        );
+        let (ordinals, coordinates) = positions.map_or_else(
+            || (Vec::new(), None),
+            |positions| {
+                let chunks = AnimationChunk::observe(file, info, data);
+                let (ordinals, coordinates) =
+                    positions.project(chunks, info.offset, None, data, &block);
+                (ordinals, Some(coordinates))
+            },
+        );
+        Ok(project(animation, 0, ordinals, coordinates))
     }
 }

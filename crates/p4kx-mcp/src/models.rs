@@ -3,20 +3,20 @@
 
 use p4kx_extraction::model::{LodSelection, MaterialReading, PositionBox};
 use p4kx_extraction::{
-    AnimationChoice, AnimationInfo, AnimationSet, ChunkInfo, ConversionError, LibraryInfo, LodInfo,
-    MaterialInfo, MeshInfo, ModelSource, TextureVerdicts, UnreadInfo,
+    AnimationChoice, AnimationSet, ChunkInfo, ConversionError, LibraryInfo, LodInfo, MaterialInfo,
+    MeshInfo, ModelSource, TextureVerdicts, UnreadInfo,
 };
 use serde::Serialize;
 
 use crate::archives::Opened;
 use crate::budget::{MAX_RESPONSE_LEN, fill_within, json_len};
 use crate::error::ToolError;
-use crate::model_bone_items;
 use crate::model_item_page::ModelItemPage;
 use crate::model_node_items;
 use crate::model_params::Section;
 use crate::model_shapes::{LodShape, ModelCounts, ModelItemsResult, ModelOverview};
 use crate::page::Page;
+use crate::{model_animation_items, model_bone_items};
 
 /// Returns the summary of the model Entry at `path`.
 pub(crate) fn overview(opened: &Opened, path: &str) -> Result<ModelOverview, ToolError> {
@@ -106,16 +106,7 @@ pub(crate) fn items(
             paged(&meshes, page, what, reserved, |item| item)?
         }
         Section::Bones => return model_bone_items::list(&observed),
-        Section::Animations => {
-            let read: Vec<_> = animations
-                .animations
-                .iter()
-                .zip(&animations.origins)
-                .collect();
-            paged(&read, page, what, reserved, |&(animation, origin)| {
-                AnimationInfo::of(model, animation, origin)
-            })?
-        }
+        Section::Animations => return model_animation_items::list(&observed, path),
         Section::UnreadAnimations => {
             paged(&animations.unread, page, what, reserved, UnreadInfo::of)?
         }
@@ -182,7 +173,9 @@ fn read(
 ) -> Result<(ModelSource, AnimationSet), ToolError> {
     let index = opened.index();
     let load = match request {
-        ModelRead::Section(Section::Bones) => ModelSource::from_index_observing_model_sources,
+        ModelRead::Section(Section::Bones | Section::Animations) => {
+            ModelSource::from_index_observing_model_sources
+        }
         ModelRead::Section(Section::Nodes) => ModelSource::from_index_observing_nodes,
         _ => ModelSource::from_index_reading,
     };
@@ -195,10 +188,10 @@ fn read(
         &TextureVerdicts::new(),
     )
     .map_err(|error| converted(path, "a model", error))?;
-    let with_animations = match request {
-        ModelRead::Overview => true,
-        ModelRead::Section(section) => section.needs_animations(),
-    };
+    let with_animations = matches!(
+        request,
+        ModelRead::Overview | ModelRead::Section(Section::UnreadAnimations)
+    );
     let animations = if with_animations {
         AnimationSet::from_archive(&index, source.name(), &AnimationChoice::All, &[])
             .map_err(|error| converted(path, "a model with its animations", error))?

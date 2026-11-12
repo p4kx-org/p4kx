@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_foundation::ParseError;
 
 use crate::CorruptAnimation;
@@ -100,6 +102,14 @@ pub(crate) fn read_times(
         return Err(CorruptAnimation::TimesNotIncreasing { controller_id });
     }
     Ok(frames)
+}
+
+pub(crate) const fn last_frame_bytes(frames: Range<u64>, encoding: u8) -> Range<u64> {
+    match encoding {
+        TIME_BYTES => frames.end - 1..frames.end,
+        TIME_SHORTS => frames.end - 2..frames.end,
+        _ => frames,
+    }
 }
 
 fn read_bitmap(

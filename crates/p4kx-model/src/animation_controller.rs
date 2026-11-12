@@ -3,7 +3,10 @@
 
 use std::ops::Range;
 
-use crate::animation_keys::{EncodedValues, read_rotations, read_times, read_translations};
+use crate::animation_clip_coordinates::{AnimationFrameChannel, AnimationLastFrame};
+use crate::animation_keys::{
+    EncodedValues, last_frame_bytes, read_rotations, read_times, read_translations,
+};
 use crate::reader::to_usize;
 use crate::{CorruptAnimation, Keys, Track};
 
@@ -212,14 +215,63 @@ impl<'a> AnimationController<'a> {
     ///
     /// Returns the format or data error of a channel that cannot be decoded.
     pub fn decode(&self) -> Result<Option<Track>, CorruptAnimation> {
-        let rotations = self.decode_rotation()?.map(|channel| channel.keys);
-        let translations = self.decode_translation()?.map(|channel| channel.keys);
-        Ok(
-            (rotations.is_some() || translations.is_some()).then_some(Track {
-                controller_id: self.id,
-                rotations,
-                translations,
-            }),
-        )
+        self.decode_observing(None::<fn(Option<AnimationLastFrame>)>)
+    }
+
+    pub(crate) fn decode_observing(
+        &self,
+        observe: Option<impl FnOnce(Option<AnimationLastFrame>)>,
+    ) -> Result<Option<Track>, CorruptAnimation> {
+        let rotation = self.decode_rotation()?;
+        let translation = self.decode_translation()?;
+        if rotation.is_none() && translation.is_none() {
+            return Ok(None);
+        }
+        if let Some(observe) = observe {
+            let last_rotation = self.last_frame(
+                rotation.as_ref(),
+                self.rotation,
+                AnimationFrameChannel::Rotation,
+            );
+            let last_translation = self.last_frame(
+                translation.as_ref(),
+                self.translation,
+                AnimationFrameChannel::Translation,
+            );
+            observe(
+                last_rotation
+                    .into_iter()
+                    .chain(last_translation)
+                    .max_by_key(AnimationLastFrame::frame),
+            );
+        }
+        Ok(Some(Track {
+            controller_id: self.id,
+            rotations: rotation.map(|channel| channel.keys),
+            translations: translation.map(|channel| channel.keys),
+        }))
+    }
+
+    fn last_frame<const N: usize>(
+        &self,
+        decoded: Option<&DecodedAnimationChannel<N>>,
+        channel: AnimationChannel,
+        kind: AnimationFrameChannel,
+    ) -> Option<AnimationLastFrame> {
+        let decoded = decoded?;
+        let [encoding, _] = channel.packed_format.to_le_bytes();
+        let at = self.file_offset
+            + self.entry_at as u64
+            + match kind {
+                AnimationFrameChannel::Rotation => 0,
+                AnimationFrameChannel::Translation => CHANNEL_LEN as u64,
+            };
+        Some(AnimationLastFrame {
+            frame: *decoded.keys.frames.last()?,
+            controller: self.ordinal,
+            bytes: last_frame_bytes(decoded.frame_range.clone(), encoding),
+            descriptor: at..at + CHANNEL_LEN as u64,
+            kind,
+        })
     }
 }

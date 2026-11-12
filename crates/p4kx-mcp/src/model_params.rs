@@ -72,11 +72,6 @@ impl Section {
             Self::Chunks => "chunks",
         }
     }
-
-    /// Returns whether the section needs the animations read.
-    pub(crate) const fn needs_animations(self) -> bool {
-        matches!(self, Self::Animations | Self::UnreadAnimations)
-    }
 }
 
 /// The arguments of `list_model_items`.

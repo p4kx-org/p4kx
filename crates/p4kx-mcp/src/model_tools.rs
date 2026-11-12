@@ -82,7 +82,7 @@ impl Server {
     #[tool(
         description = "List one section of a model Entry, page by page: materials, nodes, meshes (of all levels of \
         detail, each with its lod), bones, animations, unread_animations or chunks. Each item is shaped as in \
-        `p4kx model info --json`. Bone and node pages also report their original field origins. Use get_model_info first for the counts. The content may be forwarded by the \
+        `p4kx model info --json`. Bone, node and animation pages also report original field origins. Use get_model_info first for the counts. The content may be forwarded by the \
         client to third parties; game texts and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<ModelItemsResult>(),
         annotations(

@@ -76,6 +76,7 @@ impl BytesFieldOrigins {
 pub(crate) struct EntryPageSources {
     pub(crate) uses: SourceUses,
     pub(crate) path: FieldOrigin,
+    pub(crate) path_uses: Vec<SourceUse>,
     payload: SourceScope,
     directory: SourceScope,
     complete: bool,
@@ -106,15 +107,17 @@ impl EntryPageSources {
     }
 
     pub(crate) fn from_origin(origin: Option<&EntryOrigin>) -> Result<Self, SourceEvidenceError> {
+        Self::from_origin_into(origin, SourceUses::with_compact_use_refs())
+    }
+
+    pub(crate) fn from_origin_into(
+        origin: Option<&EntryOrigin>,
+        uses: SourceUses,
+    ) -> Result<Self, SourceEvidenceError> {
         let input = origin.map_or(SourceInput::Unknown, SourceInput::Archive);
         let ancestors = origin.map_or(0, |entry| entry.ancestors().len());
         let complete = origin.is_some_and(|entry| entry.ancestors().all(|step| step.is_some()));
-        Self::bind(
-            SourceUses::with_compact_use_refs(),
-            input,
-            ancestors,
-            complete,
-        )
+        Self::bind(uses, input, ancestors, complete)
     }
 
     fn bind(
@@ -125,14 +128,24 @@ impl EntryPageSources {
     ) -> Result<Self, SourceEvidenceError> {
         let payload = uses.observe(input, InputScope::Payload)?;
         let directory = payload.for_scope(InputScope::ArchiveDirectoryMetadata);
-        let path = path_origin(&uses, &directory, ancestors, complete)?;
+        let (path_uses, complete_path) = path_uses(&directory, ancestors, complete)?;
+        let path = uses.origin(&path_uses, complete_path);
         Ok(Self {
             uses,
             path,
+            path_uses,
             payload,
             directory,
             complete,
         })
+    }
+
+    pub(crate) const fn payload_scope(&self) -> &SourceScope {
+        &self.payload
+    }
+
+    pub(crate) const fn complete(&self) -> bool {
+        self.complete
     }
 
     pub(crate) fn leaf_path(&self) -> Result<SourceUse, SourceEvidenceError> {
@@ -194,12 +207,11 @@ impl EntryPageSources {
     }
 }
 
-fn path_origin(
-    uses: &SourceUses,
+fn path_uses(
     directory: &SourceScope,
     ancestors: usize,
     mut complete: bool,
-) -> Result<FieldOrigin, SourceEvidenceError> {
+) -> Result<(Vec<SourceUse>, bool), SourceEvidenceError> {
     let mut path = Vec::new();
     for index in 0..ancestors {
         if let Some(ancestor) = directory.ancestor(index)? {
@@ -209,7 +221,7 @@ fn path_origin(
         }
     }
     path.push(directory.at(metadata("path"), SourceUseRole::Payload)?);
-    Ok(uses.origin(&path, complete))
+    Ok((path, complete))
 }
 
 fn metadata(field: &str) -> SourceLocation {
