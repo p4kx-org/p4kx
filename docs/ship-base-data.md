@@ -113,7 +113,7 @@ is read from the `InventoryContainer` Record its `SCItemInventoryContainerCompon
 `containerParams`:
 
 - an open container (`InventoryOpenContainerType`) from its `interiorDimensions` in metres:
-  `scu` is x · y · z / 1.953125 (1.25 m cubed), `cells` the product of `floor(side / 1.25)` per
+  `scu` is x · y · z / 1.953125 (1.25 m cubed), `cells` the product of `floor(side / 1.25 + 0.0001)` per
   side;
 - a closed container (`InventoryClosedContainerType`) from its `capacity`:
   `SStandardCargoUnit` as it is, `SCentiCargoUnit` divided by 100, `SMicroCargoUnit` divided by
@@ -121,10 +121,12 @@ is read from the `InventoryContainer` Record its `SCItemInventoryContainerCompon
 
 Each grid lists `port` path, `className`, `guid`, `container`, `shape` (`open` or `closed`), `scu`,
 `cells`, `dimensions`, its `source` (the container Record and field) and an `issue` when its
-capacity cannot be read. The ship's `scu` and `cells` sum the readable grids, rounded to four
-decimals; `gridsWithIssue` counts the others, and when it is not 0 the sums are a lower bound. A
-container with a side that is not a positive length up to 1000 m, or a capacity outside 0 to 10^9
-SCU, is not readable (an `issue`); sums saturate and never overflow.
+capacity cannot be read. Open dimensions must be finite and positive. Closed capacity must be
+finite and nonnegative. The ship's `scu` sums the readable grid capacities and rounds the
+result to four decimals. `gridsWithIssue` counts the unreadable capacities, making the
+reported SCU a lower bound when this count is positive. The open-grid and ship `cells`
+counts are `null` if the count exceeds the `u64` range. Readable SCU stays available
+independently of the cell count.
 On LIVE, 76 grids carry an `issue`, in two kinds that are facts of the game data, not of the
 reading: the Javelin's and the Hornet F7C's grids refer to `InventoryContainer` Records that do not
 exist (dangling References, so no capacity), and `MISC_Hull_A_CargoPlate` is a `CargoGrid` item

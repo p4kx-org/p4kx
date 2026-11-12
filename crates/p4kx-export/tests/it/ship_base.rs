@@ -3,6 +3,9 @@
 
 //! The base data of ships through the public API.
 
+#[path = "ship_base_cargo_bounds.rs"]
+mod cargo_bounds;
+
 use crate::ship_base_fixture::{
     ALPHA, ALPHA_XML, BETA, BROKEN, CAR, GROUND, MIXED, ROLLING, UNKNOWN, write_archive,
 };
@@ -262,7 +265,7 @@ fn cargo_sums_the_grids_of_the_loadout_but_not_templates_or_docked_vehicles() ->
 }
 
 #[test]
-fn absurd_or_negative_dimensions_are_unreadable_and_never_overflow() -> TestResult {
+fn nonfinite_or_negative_dimensions_are_unreadable() -> TestResult {
     let built = build(None)?;
     let mixed = &ship(&built, MIXED)?.cargo;
     assert_eq!(mixed.grids_with_issue, 2);

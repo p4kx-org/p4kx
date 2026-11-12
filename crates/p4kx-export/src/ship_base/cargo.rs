@@ -4,19 +4,20 @@
 use std::collections::HashMap;
 
 use p4kx_assembly::{EntityNode, LoadoutEntry};
-use p4kx_extraction::{DataForge, Guid, RecordTree, StructValue, TreeBuilder};
+use p4kx_extraction::{DataForge, Guid, RecordTree, StructValue, TreeBuilder, Value};
 
 use super::model::{Cargo, CargoGrid, Source, SourceKind};
 use crate::catalog_v3::cargo_source::{self, CargoUnit};
-use crate::record_fields::{number, structure};
+use crate::record_fields::{number, number_value, structure};
 
 const GRID_TYPE: &str = "CargoGrid";
 const TEMPLATE_SUFFIX: &str = "_template";
 const CUBIC_METRES_PER_SCU: f64 = 1.953_125;
-const CELL_METRES: f64 = 1.25;
+const CELL_METRES_NUMERATOR: u32 = 5;
+const CELL_METRES_DENOMINATOR: f64 = 4.0;
 const CELL_TOLERANCE: f64 = 1e-4;
-const MAX_SIDE_METRES: f64 = 1000.0;
-const MAX_CLOSED_SCU: f64 = 1e9;
+#[expect(clippy::cast_precision_loss, reason = "a power of two is exact in f64")]
+const CELL_COUNT_LIMIT: f64 = (1_u128 << u64::BITS) as f64;
 
 /// What an `InventoryContainer` Record states of its capacity.
 #[derive(Debug, Clone)]
@@ -65,13 +66,9 @@ impl<'f> CargoReader<'f> {
         let with_issue = grids.iter().filter(|grid| grid.scu.is_none()).count();
         let known = grids.is_empty() || grids.len() > with_issue;
         let scu = grids.iter().filter_map(|grid| grid.scu).sum::<f64>();
-        let cells = grids
-            .iter()
-            .filter_map(|grid| grid.cells)
-            .fold(0_u64, u64::saturating_add);
         Cargo {
             scu: known.then(|| round(scu)),
-            cells: known.then_some(cells),
+            cells: known.then(|| total_cells(&grids)).flatten(),
             grids_with_issue: with_issue,
             grids,
         }
@@ -143,7 +140,7 @@ fn fill(grid: &mut CargoGrid, container: &Container) {
             grid.shape = Some("open");
             grid.dimensions = Some(*dimensions);
             grid.scu = Some(round(volume(*dimensions) / CUBIC_METRES_PER_SCU));
-            grid.cells = Some(cells(*dimensions));
+            grid.cells = cells(*dimensions);
             grid.source = Some(field("interiorDimensions".to_owned()));
         }
         Shape::Closed { scu, unit } => {
@@ -182,12 +179,12 @@ fn read_container(tree: &RecordTree<'_>) -> Container {
 fn open(dimensions: [f64; 3]) -> Shape {
     if dimensions
         .iter()
-        .all(|side| *side > 0.0 && *side <= MAX_SIDE_METRES)
+        .all(|side| side.is_finite() && *side > 0.0)
     {
         Shape::Open { dimensions }
     } else {
         Shape::Unknown(format!(
-            "the interior dimensions {dimensions:?} are not lengths between 0 and {MAX_SIDE_METRES} m"
+            "the interior dimensions {dimensions:?} must be finite, positive lengths"
         ))
     }
 }
@@ -204,10 +201,16 @@ fn closed(root: &StructValue<'_>) -> Shape {
         CargoUnit::Centi => 100.0,
         CargoUnit::Micro => 1_000_000.0,
     };
-    match number(capacity, field).map(|value| f64::from(value) / divisor) {
-        Some(scu) if (0.0..=MAX_CLOSED_SCU).contains(&scu) => Shape::Closed { scu, unit },
+    let amount = match capacity.and_then(|capacity| capacity.field(field)) {
+        Some(Value::Int32(value)) => Some(f64::from(*value)),
+        Some(Value::UInt32(value)) => Some(f64::from(*value)),
+        Some(value) => number_value(value).map(f64::from),
+        None => None,
+    };
+    match amount.map(|value| value / divisor) {
+        Some(scu) if scu.is_finite() && scu >= 0.0 => Shape::Closed { scu, unit },
         Some(scu) => Shape::Unknown(format!(
-            "the capacity {scu} SCU of {name} is not between 0 and {MAX_CLOSED_SCU}"
+            "the capacity {scu} SCU of {name} must be finite and nonnegative"
         )),
         None => Shape::Unknown(format!("the capacity {name} states no {field}")),
     }
@@ -217,16 +220,45 @@ fn volume([x, y, z]: [f64; 3]) -> f64 {
     x * y * z
 }
 
+fn cells(dimensions: [f64; 3]) -> Option<u64> {
+    let counts = dimensions.map(axis_cells);
+    if counts.contains(&Some(0)) {
+        return Some(0);
+    }
+    counts
+        .into_iter()
+        .try_fold(1_u64, |total, count| total.checked_mul(count?))
+}
+
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
-    reason = "a floored, non-negative, finite number of cells"
+    reason = "the bounded nonnegative scaled length is split at its integer boundary"
 )]
-fn cells(dimensions: [f64; 3]) -> u64 {
-    dimensions
-        .iter()
-        .map(|side| ((side / CELL_METRES) + CELL_TOLERANCE).floor().max(0.0) as u64)
-        .fold(1_u64, u64::saturating_mul)
+fn axis_cells(side: f64) -> Option<u64> {
+    let scaled = side * CELL_METRES_DENOMINATOR;
+    let numerator = f64::from(CELL_METRES_NUMERATOR);
+    if scaled >= CELL_COUNT_LIMIT * numerator {
+        return None;
+    }
+    // Integer division retains whole cells that the floating quotient cannot distinguish.
+    let whole = scaled as u128;
+    let divisor = u128::from(CELL_METRES_NUMERATOR);
+    let remainder = u32::try_from(whole % divisor).ok()?;
+    let fraction = f64::from(remainder) + scaled.fract();
+    let within_tolerance = fraction >= numerator * (1.0 - CELL_TOLERANCE);
+    u64::try_from(whole / divisor + u128::from(within_tolerance)).ok()
+}
+
+fn total_cells(grids: &[CargoGrid]) -> Option<u64> {
+    grids.iter().try_fold(0_u64, |total, grid| {
+        let cells = if grid.dimensions.is_some() {
+            grid.cells?
+        } else {
+            0
+        };
+        total.checked_add(cells)
+    })
 }
 
 fn round(value: f64) -> f64 {
