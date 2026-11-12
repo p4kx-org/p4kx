@@ -855,6 +855,15 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | `mtl_summary` | A `.mtl` Entry (`path`), paged by sub-material: name, shader, surface type, flags, colours, opacity, glow, complete admitted texture-slot, shader-parameter and layer lists; retained strings are complete, paging observes the 256 KiB response budget, and an item that cannot fit alone is explicitly refused |
 | `entity_loadout` | The default Loadout of an Entity (`entity`: class name, record path or GUID) as a list of ports, parents first: path, depth, source, what the port takes, the Entity attached and for each unresolved port the reason; each Entity states its `issues` and, only when it has any, its `notes` (all admitted undecidable spawn requirements, such as an `assortment_requirement`, as in the CLI JSON); `max_depth` (16 by default, at most 32) and a cursor bound it; retained identities, paths, values and reasons are complete within the 256 KiB response budget, with explicit refusal for an item that cannot fit first |
 
+For `search_records`, `fieldOrigins` addresses the existing Record fields in each returned
+row. Record coordinates are the original DCB definition positions. A type name also identifies
+the Struct definition selected by that Record. The total and cursor use the original Record
+count, path survey and applicable type checks. The survey's index runs are pairs of original
+start and end-exclusive definition positions. Provenance is part of the 256 KiB response
+budget. When the complete survey cannot fit, the original Record count retains its encryption
+proof and the navigation contributor set is marked incomplete. A standalone DCB supplies its
+own physical evidence and has unknown P4K encryption.
+
 For `list_model_items` with `section: "bones"`, `fieldOrigins` addresses the returned bone fields,
 including each rotation and translation component. `cryEngineSkeleton` coordinates on a bone
 field are `[chunkOrdinal, boneOrdinal, start, endExclusive]` in the original decoded model Entry.

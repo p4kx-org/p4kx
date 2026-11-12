@@ -3,7 +3,7 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use p4kx_extraction::{DataForge, DataForgeLoadError, LoadedDataForge};
+use p4kx_extraction::{DataForge, DataForgeLoadError, DataForgeOrigin, LoadedDataForge};
 
 use crate::error::{ToolError, chain};
 
@@ -21,7 +21,7 @@ pub(crate) struct ForgeState {
 impl ForgeState {
     /// Runs `work` against the DataForge with the input path as text, reading the DataForge with
     /// `read` on first use.
-    pub(crate) fn with<T, F>(
+    pub(crate) fn with_origin<T, F>(
         &self,
         read: impl FnOnce() -> Result<LoadedDataForge, DataForgeLoadError>,
         path: String,
@@ -29,10 +29,12 @@ impl ForgeState {
     ) -> Result<T, ToolError>
     where
         T: Send + 'static,
-        F: FnOnce(&DataForge<'_>, String) -> Result<T, ToolError> + Send + 'static,
+        F: FnOnce(&DataForge<'_>, String, &DataForgeOrigin) -> Result<T, ToolError>
+            + Send
+            + 'static,
     {
         self.dataforge(read)?
-            .with(move |forge| work(forge, path))
+            .with_origin(move |forge, origin| work(forge, path, origin))
             .map_err(|_| ToolError::Stopped)?
     }
 

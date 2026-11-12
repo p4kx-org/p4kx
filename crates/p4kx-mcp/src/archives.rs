@@ -8,8 +8,8 @@ use std::time::SystemTime;
 use p4kx_assembly::audio::{ArchiveAudio, AudioIndex};
 use p4kx_channels::ChannelKind;
 use p4kx_extraction::{
-    Archive, DataForge, DataForgeSource, EntryTree, FileStamp, PathIndex, PathKeys,
-    is_dataforge_file,
+    Archive, DataForge, DataForgeOrigin, DataForgeSource, EntryTree, FileStamp, PathIndex,
+    PathKeys, is_dataforge_file,
 };
 
 use crate::container::Containers;
@@ -151,12 +151,23 @@ impl Opened {
         T: Send + 'static,
         F: FnOnce(&DataForge<'_>, String) -> Result<T, ToolError> + Send + 'static,
     {
+        self.with_dataforge_origin(move |forge, archive, _| work(forge, archive))
+    }
+
+    /// Runs work against the DataForge and its retained original input.
+    pub(crate) fn with_dataforge_origin<T, F>(&self, work: F) -> Result<T, ToolError>
+    where
+        T: Send + 'static,
+        F: FnOnce(&DataForge<'_>, String, &DataForgeOrigin) -> Result<T, ToolError>
+            + Send
+            + 'static,
+    {
         let archive = self.archive.path().display().to_string();
         let carry = key_report::carry();
-        self.forge.with(
+        self.forge.with_origin(
             || self.forge_source().load(),
             archive,
-            move |forge, archive| key_report::adopt(carry, || work(forge, archive)),
+            move |forge, archive, origin| key_report::adopt(carry, || work(forge, archive, origin)),
         )
     }
 

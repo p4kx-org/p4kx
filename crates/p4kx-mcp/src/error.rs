@@ -114,6 +114,9 @@ pub(crate) enum ToolError {
     /// A model field's source evidence could not be represented.
     #[error("cannot retain the model field source evidence")]
     ModelEvidence(#[from] ModelEvidenceError),
+    /// The Record search's original input or field addresses could not be retained.
+    #[error("cannot retain the Record search source evidence")]
+    RecordSearchEvidence(#[from] crate::record_search_origins::EvidenceError),
     /// A material library cannot be read.
     #[error("cannot read the material library {path}")]
     Material {

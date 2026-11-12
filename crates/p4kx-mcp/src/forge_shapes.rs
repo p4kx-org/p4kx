@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{FieldOrigins, SourceInventory};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::value::RawValue;
@@ -38,16 +39,26 @@ pub(crate) struct RecordShape {
 
 /// The Records a search matched.
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct RecordSearchResult {
+pub(crate) struct RecordSearchResult<Records = Vec<RecordShape>> {
     /// The path of the Archive.
     pub(crate) archive: String,
     /// The number of matching Records.
     pub(crate) total: usize,
     /// The matching Records on this page, in Record order.
-    pub(crate) records: Vec<RecordShape>,
+    #[schemars(with = "Vec<RecordShape>")]
+    pub(crate) records: Records,
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: RecordSearchOrigins,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub(crate) struct RecordSearchOrigins {
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) fields: FieldOrigins,
+    pub(crate) provenance: SourceInventory,
 }
 
 /// One field a struct declares.

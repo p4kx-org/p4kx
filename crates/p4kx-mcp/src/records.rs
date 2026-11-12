@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, Filter, Guid, JsonLayout, Record, RecordJson, TreeBuilder};
-use rayon::prelude::*;
+use p4kx_extraction::{DataForge, Guid, JsonLayout, Record, RecordJson, TreeBuilder};
 use serde_json::value::RawValue;
 
-use crate::budget::{Budget, Capped, MAX_RESPONSE_LEN, fill_within, json_len};
+use crate::budget::{Budget, Capped, MAX_RESPONSE_LEN, json_len};
 use crate::error::ToolError;
-use crate::forge_shapes::{RecordResult, RecordSearchResult, RecordShape};
+use crate::forge_shapes::RecordResult;
 use crate::page::Page;
 
 /// How `get_record` names its Records.
@@ -91,60 +90,4 @@ fn select<'f>(forge: &'f DataForge<'f>, selector: &Selector) -> Result<Vec<Recor
             Ok(records)
         }
     }
-}
-
-/// Returns one page of the Records whose record path matches `path` and whose type name
-/// matches `type_name`, both Filters, in Record order.
-pub(crate) fn search(
-    forge: &DataForge<'_>,
-    archive: String,
-    (path, type_name): (Option<&str>, Option<&str>),
-    page: Page,
-) -> Result<RecordSearchResult, ToolError> {
-    let path = path.map(Filter::parse).transpose()?;
-    let type_name = type_name.map(Filter::parse).transpose()?;
-    let matches: Vec<u32> = forge
-        .path_order()
-        .par_iter()
-        .copied()
-        .filter(|&index| {
-            forge.record(index).is_some_and(|record| {
-                path.as_ref().is_none_or(|filter| {
-                    record.record_path().is_ok_and(|text| filter.matches(text))
-                }) && type_name
-                    .as_ref()
-                    .is_none_or(|filter| record.type_name().is_ok_and(|text| filter.matches(text)))
-            })
-        })
-        .collect();
-    let items = page
-        .slice(&matches)
-        .iter()
-        .filter_map(|&index| forge.record(index))
-        .map(|record| shape(&record));
-    let mut result = RecordSearchResult {
-        archive,
-        total: matches.len(),
-        records: Vec::new(),
-        next_cursor: None,
-    };
-    let (records, next_cursor) = fill_within(
-        page,
-        matches.len(),
-        json_len(&result),
-        items,
-        |record: &RecordShape| format!("Record {}", record.name),
-    )?;
-    result.records = records;
-    result.next_cursor = next_cursor;
-    Ok(result)
-}
-
-fn shape(record: &Record<'_>) -> Result<RecordShape, ToolError> {
-    Ok(RecordShape {
-        guid: record.guid().to_string(),
-        name: record.name()?.to_owned(),
-        type_name: record.type_name()?.to_owned(),
-        path: record.record_path()?.to_owned(),
-    })
 }

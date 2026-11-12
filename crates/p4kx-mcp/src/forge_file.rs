@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use p4kx_extraction::{DataForge, DataForgeSource, FileStamp};
+use p4kx_extraction::{DataForge, DataForgeOrigin, DataForgeSource, FileStamp};
 
 use crate::archives::Opened;
 use crate::error::ToolError;
@@ -72,9 +72,20 @@ impl ForgeSource {
         T: Send + 'static,
         F: FnOnce(&DataForge<'_>, String) -> Result<T, ToolError> + Send + 'static,
     {
+        self.with_dataforge_origin(move |forge, path, _| work(forge, path))
+    }
+
+    /// Runs work against the DataForge with the original input kept by its worker.
+    pub(crate) fn with_dataforge_origin<T, F>(&self, work: F) -> Result<T, ToolError>
+    where
+        T: Send + 'static,
+        F: FnOnce(&DataForge<'_>, String, &DataForgeOrigin) -> Result<T, ToolError>
+            + Send
+            + 'static,
+    {
         match self {
-            Self::Archive(opened) => opened.with_dataforge(work),
-            Self::File(file) => file.forge.with(
+            Self::Archive(opened) => opened.with_dataforge_origin(work),
+            Self::File(file) => file.forge.with_origin(
                 || file.forge_source().load(),
                 file.path.display().to_string(),
                 work,
