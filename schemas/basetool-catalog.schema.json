@@ -1648,6 +1648,22 @@
       ],
       "required": []
     },
+    "AttachmentIdentity": {
+      "description": "The exact attached Record selected by the resolved Loadout.",
+      "properties": {
+        "targetGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "targetRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "targetGuid",
+        "targetRecordIndex"
+      ],
+      "type": "object"
+    },
     "AudioResource": {
       "properties": {
         "audioTrigger": {
@@ -1778,6 +1794,28 @@
         "proximityTriggerParams"
       ],
       "type": "object"
+    },
+    "AuthoredRestrictionOfResourceNumber": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ResourceNumber"
+        },
+        {
+          "$ref": "#/$defs/SourceArenaOutput"
+        }
+      ],
+      "description": "A stored restriction with its typed value or exact original storage shape."
+    },
+    "AuthoredRestrictionOfstring": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "$ref": "#/$defs/SourceArenaOutput"
+        }
+      ],
+      "description": "A stored restriction with its typed value or exact original storage shape."
     },
     "AutoSpawnSettings": {
       "description": "The `AutoSpawnSettings` of an NPC option: how many NPCs spawn, where and with what.",
@@ -4014,6 +4052,26 @@
       ],
       "type": "object"
     },
+    "CatalogPlacements": {
+      "description": "Contextual placements referring to authored definitions and declarations.",
+      "properties": {
+        "resourceNetworkLinkBindings": {
+          "$ref": "#/$defs/CatalogTableOfResourceNetworkLinkBinding"
+        },
+        "resourceNetworkNodes": {
+          "$ref": "#/$defs/CatalogTableOfResourceNetworkNode"
+        },
+        "roomAssociationBindings": {
+          "$ref": "#/$defs/CatalogTableOfRoomAssociationBinding"
+        }
+      },
+      "required": [
+        "resourceNetworkLinkBindings",
+        "resourceNetworkNodes",
+        "roomAssociationBindings"
+      ],
+      "type": "object"
+    },
     "CatalogProjections": {
       "description": "Explicit choices and derived values, separate from authored definitions.",
       "properties": {
@@ -5010,6 +5068,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfResourceNetworkLinkBinding": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ResourceNetworkLinkBinding"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfResourceNetworkLinks": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -5029,6 +5106,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfResourceNetworkNode": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ResourceNetworkNode"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfResourceType": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -5038,6 +5134,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ResourceType"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfRoomAssociationBinding": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/RoomAssociationBinding"
           },
           "type": "array"
         }
@@ -8752,6 +8867,34 @@
         }
       ]
     },
+    "EndpointCandidate": {
+      "description": "One physical declaration or published Loadout occurrence matching an endpoint.",
+      "properties": {
+        "loadoutPortOrdinal": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "physicalPort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhysicalPort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "loadoutPortOrdinal",
+        "physicalPort"
+      ],
+      "type": "object"
+    },
     "EntitySpawnGroup": {
       "description": "A group of entities that spawn together (`SpawnDescription_EntityGroup`).",
       "properties": {
@@ -11350,6 +11493,13 @@
       ],
       "type": "object"
     },
+    "FuseEvidence": {
+      "enum": [
+        "unestablished"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
+    },
     "GameTextRef": {
       "description": "A reference into the protected description domain.",
       "type": "string",
@@ -12946,6 +13096,30 @@
       ],
       "type": "object"
     },
+    "InstalledResourceComponent": {
+      "description": "The selected physical resource component and its original relay discriminator.",
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "isRelay": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "isRelay",
+        "ownerGuid",
+        "ownerRecordIndex"
+      ],
+      "type": "object"
+    },
     "IntegerOption": {
       "description": "An exact signed integer option.",
       "properties": {
@@ -13653,12 +13827,32 @@
         },
         "ignoredAttachAxis": {
           "$ref": "#/$defs/AlignmentAxis"
+        },
+        "itemSubtype": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredRestrictionOfstring"
+        },
+        "itemType": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredRestrictionOfstring"
+        },
+        "requiredTags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "size": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredRestrictionOfResourceNumber"
+        },
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
         "attachAxesToAlign",
         "attachCheckCenterOfMass",
-        "ignoredAttachAxis"
+        "ignoredAttachAxis",
+        "itemSubtype",
+        "itemType",
+        "requiredTags",
+        "size",
+        "tags"
       ],
       "type": "object"
     },
@@ -13696,12 +13890,16 @@
         },
         "portOrdinal": {
           "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "restrictions": {
+          "$ref": "#/$defs/PortRestrictions"
         }
       },
       "required": [
         "attachAxesToAlign",
         "name",
-        "portOrdinal"
+        "portOrdinal",
+        "restrictions"
       ],
       "type": "object"
     },
@@ -14845,6 +15043,14 @@
         }
       ]
     },
+    "LinkFamily": {
+      "enum": [
+        "hardpoint",
+        "resource"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
+    },
     "LinkedInteraction": {
       "properties": {
         "additionalFields": {
@@ -15057,6 +15263,29 @@
         "types",
         "unresolved",
         "visibility"
+      ],
+      "type": "object"
+    },
+    "LoadoutPosition": {
+      "description": "A position in the published ship Loadout and its nested port arrays.",
+      "properties": {
+        "loadoutOrdinal": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "portOrdinals": {
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "loadoutOrdinal",
+        "portOrdinals"
       ],
       "type": "object"
     },
@@ -17654,6 +17883,117 @@
         }
       ]
     },
+    "NetworkEndpoint": {
+      "oneOf": [
+        {
+          "properties": {
+            "candidate": {
+              "$ref": "#/$defs/EndpointCandidate"
+            },
+            "state": {
+              "const": "resolved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "candidate"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "candidates": {
+              "items": {
+                "$ref": "#/$defs/EndpointCandidate"
+              },
+              "type": "array"
+            },
+            "state": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "candidates"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "candidate": {
+              "$ref": "#/$defs/EndpointCandidate"
+            },
+            "state": {
+              "const": "unplaced",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "candidate"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "missing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "candidates": {
+              "items": {
+                "$ref": "#/$defs/EndpointCandidate"
+              },
+              "type": "array"
+            },
+            "state": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "candidates"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "unspecified",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "state": {
+              "const": "outsideDeclaringContext",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
     "NoteInterpretation": {
       "description": "The original note's interpretation without copying or expanding its source text.",
       "enum": [
@@ -18909,6 +19249,32 @@
       ],
       "type": "object"
     },
+    "PhysicalPort": {
+      "description": "The coordinates of an original port in the canonical item-port table.",
+      "properties": {
+        "componentOrdinal": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ownerRecordIndex": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "portOrdinal": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "ownerRecordIndex",
+        "portOrdinal"
+      ],
+      "type": "object"
+    },
     "PhysicalSource": {
       "description": "One physical source, independent of the roles in which data values use it.",
       "oneOf": [
@@ -19126,6 +19492,66 @@
         }
       ],
       "required": []
+    },
+    "PortItemType": {
+      "description": "One declared accepted item type and its exact authored subtype array.",
+      "properties": {
+        "subTypes": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "type": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredRestrictionOfstring"
+        }
+      },
+      "required": [
+        "subTypes",
+        "type"
+      ],
+      "type": "object"
+    },
+    "PortRestrictions": {
+      "description": "The physical port restrictions and network-to-parent flag.",
+      "properties": {
+        "flags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "itemPortRules": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "maxSize": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredRestrictionOfResourceNumber"
+        },
+        "minSize": {
+          "$ref": "#/$defs/SourcedValueOfAuthoredRestrictionOfResourceNumber"
+        },
+        "portTags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "requiredPortTags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "resourceLinkToParent": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "tagReferences": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "types": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfPortItemType"
+        }
+      },
+      "required": [
+        "flags",
+        "itemPortRules",
+        "maxSize",
+        "minSize",
+        "portTags",
+        "requiredPortTags",
+        "resourceLinkToParent",
+        "tagReferences",
+        "types"
+      ],
+      "type": "object"
     },
     "PortType": {
       "description": "An item type a port takes.",
@@ -23848,6 +24274,46 @@
       ],
       "type": "object"
     },
+    "ResourceNetworkLinkBinding": {
+      "description": "One original link applied to a single declaring Loadout context.",
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "context": {
+          "$ref": "#/$defs/LoadoutPosition"
+        },
+        "family": {
+          "$ref": "#/$defs/LinkFamily"
+        },
+        "linkOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "port1": {
+          "$ref": "#/$defs/SourcedValueOfNetworkEndpoint"
+        },
+        "port2": {
+          "$ref": "#/$defs/SourcedValueOfNetworkEndpoint"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "context",
+        "family",
+        "linkOrdinal",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "port1",
+        "port2"
+      ],
+      "type": "object"
+    },
     "ResourceNetworkLinks": {
       "description": "The two independent ordered link families declared by a physical port container.",
       "properties": {
@@ -23881,6 +24347,62 @@
         "ownerGuid",
         "ownerRecordIndex",
         "resourceNetworkPowerPools"
+      ],
+      "type": "object"
+    },
+    "ResourceNetworkNode": {
+      "description": "A contextual port or ship root backed by an installed or authored network fact.",
+      "properties": {
+        "attachedItem": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AttachmentIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fuseEvidence": {
+          "$ref": "#/$defs/FuseEvidence"
+        },
+        "originalPort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhysicalPort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "position": {
+          "$ref": "#/$defs/LoadoutPosition"
+        },
+        "resourceComponents": {
+          "items": {
+            "$ref": "#/$defs/InstalledResourceComponent"
+          },
+          "type": "array"
+        },
+        "vehicleBoundary": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "attachedItem",
+        "fuseEvidence",
+        "originalPort",
+        "position",
+        "resourceComponents",
+        "vehicleBoundary"
       ],
       "type": "object"
     },
@@ -24558,6 +25080,38 @@
         "guid",
         "resourceNetworkItemportName",
         "shouldRequestNavMeshRegenerationOnLoad"
+      ],
+      "type": "object"
+    },
+    "RoomAssociationBinding": {
+      "description": "One original room declaration applied to a single declaring Loadout context.",
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "containerOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "context": {
+          "$ref": "#/$defs/LoadoutPosition"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "port": {
+          "$ref": "#/$defs/SourcedValueOfNetworkEndpoint"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "containerOrdinal",
+        "context",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "port"
       ],
       "type": "object"
     },
@@ -33880,6 +34434,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfPortItemType": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfPortItemType"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfProjectileBeamEffect": {
       "allOf": [
         {
@@ -38750,6 +39437,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/AuthoredProjectile"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAuthoredRestrictionOfResourceNumber": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AuthoredRestrictionOfResourceNumber"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAuthoredRestrictionOfstring": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AuthoredRestrictionOfstring"
               }
             }
           }
@@ -49839,6 +50786,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfNetworkEndpoint": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/NetworkEndpoint"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfNullable_CatalogRecordReference": {
       "allOf": [
         {
@@ -51950,6 +53027,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/PhysicalEntryRef"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfPortItemType": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/PortItemType"
               }
             }
           }
@@ -70399,6 +71606,10 @@
       },
       "type": "array"
     },
+    "placements": {
+      "$ref": "#/$defs/CatalogPlacements",
+      "description": "Physical loadout placements and their contextual bindings."
+    },
     "projections": {
       "$ref": "#/$defs/CatalogProjections",
       "description": "Explicit derived choices using the canonical definitions' source facts."
@@ -70500,6 +71711,7 @@
     "missionPropertySets",
     "missionTypes",
     "paints",
+    "placements",
     "projections",
     "provenance",
     "refiningProcesses",

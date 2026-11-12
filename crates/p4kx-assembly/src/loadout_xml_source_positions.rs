@@ -7,28 +7,65 @@ use p4kx_cryxml::SourceAttributePosition;
 
 use super::{Node, Owner, Scope};
 
+pub(super) struct OriginalAttribute<'node> {
+    pub(super) ordinal: usize,
+    pub(super) name: &'node str,
+    pub(super) value: &'node str,
+    position: SourceAttributePosition,
+}
+
 impl Scope<'_, '_> {
+    pub(super) fn original_node_index(&self, node: Node<'_, '_>) -> Option<u32> {
+        match (&self.owner, node) {
+            (Owner::Cry(document), Node::Cry(node)) if node.is_from(document) => Some(node.index()),
+            (Owner::Text(document), Node::Text(node)) if ptr::eq(*document, node.document()) => {
+                Some(node.id().get())
+            }
+            _ => None,
+        }
+    }
+
+    pub(super) fn original_attribute<'node>(
+        &self,
+        node: Node<'node, '_>,
+        mut matches: impl FnMut(&str) -> bool,
+    ) -> Option<OriginalAttribute<'node>> {
+        match node {
+            Node::Cry(node) => node
+                .source_attributes()
+                .enumerate()
+                .find(|(_, attribute)| matches(attribute.name()))
+                .map(|(ordinal, attribute)| OriginalAttribute {
+                    ordinal,
+                    name: attribute.name(),
+                    value: attribute.value(),
+                    position: attribute.position().clone(),
+                }),
+            Node::Text(node) => node
+                .attributes()
+                .enumerate()
+                .find(|(_, attribute)| matches(attribute.name()))
+                .map(|(ordinal, attribute)| {
+                    let range = attribute.range();
+                    OriginalAttribute {
+                        ordinal,
+                        name: attribute.name(),
+                        value: attribute.value(),
+                        position: SourceAttributePosition::Text(
+                            range.start + self.text_prefix..range.end + self.text_prefix,
+                        ),
+                    }
+                }),
+        }
+    }
+
     pub(crate) fn attribute_ascii_position(
         &self,
         node: Node<'_, '_>,
         name: &str,
     ) -> Option<SourceAttributePosition> {
-        match (&self.owner, node) {
-            (Owner::Cry(document), Node::Cry(node)) if node.is_from(document) => node
-                .source_attributes()
-                .find(|attribute| attribute.name().eq_ignore_ascii_case(name))
-                .map(|attribute| attribute.position().clone()),
-            (Owner::Text(document), Node::Text(node)) if ptr::eq(*document, node.document()) => {
-                node.attributes()
-                    .find(|attribute| attribute.name().eq_ignore_ascii_case(name))
-                    .map(|attribute| {
-                        let range = attribute.range();
-                        SourceAttributePosition::Text(
-                            range.start + self.text_prefix..range.end + self.text_prefix,
-                        )
-                    })
-            }
-            _ => None,
-        }
+        self.original_node_index(node)?;
+        self.original_attribute(node, |actual| actual.eq_ignore_ascii_case(name))
+            .map(|attribute| attribute.position)
     }
 }

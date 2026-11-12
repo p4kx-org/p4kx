@@ -31,7 +31,11 @@ impl XmlEntrySite<'_, '_> {
             Self::Path(site) => XmlDatum {
                 operation: site.observation(),
                 node: site.node_index(),
-                attribute: None,
+                attribute: if matches!(site.operation(), LoadoutPathOperation::PortName) {
+                    Some(site.attribute_index())
+                } else {
+                    None
+                },
                 name: site.attribute_name(),
                 value: site.value(),
             },

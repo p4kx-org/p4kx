@@ -245,6 +245,7 @@ fn overlay_children(
             .and_then(VecDeque::pop_front);
         let mut element = Element {
             name: source.name.clone(),
+            port_name: source.port_name.clone(),
             attributes: source.attributes.clone(),
             children: Vec::new(),
             origins: Vec::new(),
@@ -258,6 +259,9 @@ fn overlay_children(
                     if element.attribute(name).is_none() {
                         budget.charge_set(element.attributes.len(), name, value)?;
                         element.set_attribute(name, value);
+                        if name.eq_ignore_ascii_case("name") {
+                            element.port_name.clone_from(&partner.port_name);
+                        }
                         match partner.origin_of(name) {
                             ValueOrigin::Base => {}
                             origin => element.mark(name, origin),
@@ -297,6 +301,9 @@ fn merge_by_id(
             for (name, value) in &patch.attributes {
                 budget.charge_set(child.attributes.len(), name, value)?;
                 child.set_attribute(name, value);
+                if name.eq_ignore_ascii_case("name") {
+                    child.port_name.clone_from(&patch.port_name);
+                }
                 child.mark(name, ValueOrigin::Patch);
             }
             let old = std::mem::take(&mut child.children);
@@ -350,6 +357,9 @@ fn set_elems<'e>(
         for elem in elems {
             budget.charge_set(element.attributes.len(), &elem.name, &elem.value)?;
             element.set_attribute(&elem.name, &elem.value);
+            if elem.name.eq_ignore_ascii_case("name") {
+                element.port_name = elem.port_name.clone();
+            }
             element.mark(&elem.name, ValueOrigin::Elem);
         }
     }

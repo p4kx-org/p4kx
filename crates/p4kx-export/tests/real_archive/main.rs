@@ -112,3 +112,5 @@ mod commodity_v3_fixture;
 mod commodity_v3_fixture_records;
 #[path = "../it/commodity_v3_fixture_schema.rs"]
 mod commodity_v3_fixture_schema;
+
+mod real_archive_resource_topology;

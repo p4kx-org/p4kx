@@ -15,6 +15,7 @@ pub(crate) struct Element {
     pub(crate) name: String,
     pub(crate) attributes: Vec<(String, String)>,
     pub(crate) origins: Vec<(String, ValueOrigin)>,
+    pub(crate) port_name: Option<crate::LoadoutPath>,
     pub(crate) children: Vec<Self>,
 }
 
@@ -30,6 +31,7 @@ impl Element {
             name,
             attributes,
             origins: Vec::new(),
+            port_name: None,
             children,
         }
     }
@@ -257,7 +259,7 @@ pub(crate) fn too_deep() -> String {
 
 /// Reads the root element within the supplied budget without source-authorship claims.
 pub(crate) fn parse(bytes: &[u8], budget: &mut Budget) -> Result<Element, String> {
-    crate::loadout_xml::parse_unbound(bytes, |root, _| from_node(root, 0, budget))
+    crate::loadout_xml::parse_unbound(bytes, |root, scope| from_node(root, scope, 0, budget))
 }
 
 pub(crate) fn parse_with_source<T>(
@@ -270,7 +272,7 @@ pub(crate) fn parse_with_source<T>(
     ) -> Result<T, String>,
 ) -> Result<T, String> {
     crate::loadout_xml::parse_unbound(bytes, |root, scope| {
-        project(from_node(root, 0, budget)?, root, scope)
+        project(from_node(root, scope, 0, budget)?, root, scope)
     })
 }
 
@@ -285,12 +287,13 @@ pub(crate) fn parse_observed<T>(
     ) -> Result<T, String>,
 ) -> Result<T, String> {
     crate::loadout_xml::parse(document, observation, |root, scope| {
-        project(from_node(root, 0, budget)?, root, scope)
+        project(from_node(root, scope, 0, budget)?, root, scope)
     })
 }
 
 fn from_node(
     node: crate::loadout_xml::Node<'_, '_>,
+    scope: &crate::loadout_xml::Scope<'_, '_>,
     depth: usize,
     budget: &mut Budget,
 ) -> Result<Element, String> {
@@ -308,10 +311,19 @@ fn from_node(
     })?;
     let mut children = Vec::new();
     node.try_for_each_child(|child| {
-        children.push(from_node(child, depth.saturating_add(1), budget)?);
+        children.push(from_node(child, scope, depth.saturating_add(1), budget)?);
         Ok(())
     })?;
+    let port_name = if scope.observes_port_names()
+        && (node.name().eq_ignore_ascii_case("Part") || node.attribute_ascii("id").is_some())
+        && let Some((attribute, _)) = node.attribute_ascii("name")
+    {
+        scope.port_name(node, attribute)?
+    } else {
+        None
+    };
     Ok(Element {
+        port_name,
         name: node.name().to_owned(),
         attributes,
         children,

@@ -206,6 +206,8 @@ fn read_with<'f: 'worker, 'worker>(
         return Ok(None);
     }
     Ok(Some(Loadout {
+        root_record_index: want.record_index,
+        port_inventory_complete: node.issues().is_empty(),
         entity_guid: want.guid,
         entity_kind: want.kind,
         issues,

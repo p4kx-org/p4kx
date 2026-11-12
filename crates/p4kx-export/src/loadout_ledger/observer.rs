@@ -146,6 +146,10 @@ impl Capture<'_> {
 }
 
 impl LoadoutReadObserver for Capture<'_> {
+    fn observes_port_names(&self) -> bool {
+        self.input.is_some() && self.kind == crate::Kind::Loadouts
+    }
+
     fn with_record_paths(
         &self,
         record: &Record<'_>,

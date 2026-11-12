@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::Archive;
 use p4kx_testkit::{
-    DataForgeBuilder, TestEntity, TestInstance, TestLoadout, TestLoadoutEntry, TestRecord,
-    TestStruct, TestType, TestValue,
+    ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, TestInstance, TestLoadout,
+    TestLoadoutEntry, TestRecord, TestStruct, TestType, TestValue,
 };
+
+use crate::commodity_v3_fixture::TestResult;
 
 pub(super) const SHIP: u128 = 0x1064_0001;
 pub(super) const RELAY: u128 = 0x1064_0002;
@@ -23,10 +26,77 @@ const COMPONENT: &str = "DataForgeComponentParams";
 const MANUAL_LOADOUT: &str = "SItemPortLoadoutManualParams";
 const LOADOUT: &str = "SItemPortLoadoutBaseParams";
 const ENTRY: &str = "SItemPortLoadoutEntryParams";
+const SHIP_XML: &str = "Scripts/Entities/Vehicles/Implementations/Xml/fixture_topology.xml";
+const DOCKED_XML: &str = "Scripts/Entities/Vehicles/Implementations/Xml/fixture_docked.xml";
+const LOADOUT_XML: &str = "Scripts/Entities/Vehicles/Loadouts/fixture_topology_loadout.xml";
+const PATCH_XML: &str = "Scripts/Entities/Vehicles/Implementations/Xml/fixture_topology_patch.xml";
+const SHIP_XML_BYTES: &[u8] = br#"<Vehicle name="FixtureTopology"><Parts><Part name="mount_a" class="ItemPort"><ItemPort flags="invisible"/></Part><Part name="vehicle_only" class="ItemPort"><ItemPort/></Part></Parts></Vehicle>"#;
+const DOCKED_XML_BYTES: &[u8] = br#"<Vehicle name="FixtureDocked"><Parts><Part name="docked_port" class="ItemPort"><ItemPort/></Part></Parts></Vehicle>"#;
+const LOADOUT_XML_BYTES: &[u8] = br#"<Loadout xmlns:fixture="urn:fixture"><Items><Item fixture:portName="mount_a" portName="unused_alias" itemName="SyntheticRelay"/><Item portName="mount_b" itemName="SyntheticRelay"/><Item portName="deck" itemName="RELAY_2slot"/><Item portName="loose" itemName="RELAY_2slot"/><Item portName="hangar" itemName="FixtureDocked"/></Items></Loadout>"#;
+const PATCH_XML_BYTES: &[u8] = br#"<Modifications><Part id="vehicle-id" name="vehicle_only"><ItemPort/></Part></Modifications>"#;
+const SHIP_PATCH_BASE: &[u8] = br#"<Vehicle name="FixtureTopology"><Parts><Part id="vehicle-id" name="old_vehicle_port" class="ItemPort"><ItemPort/></Part></Parts><Modifications><Modification name="variant" patchFile="fixture_topology_patch.xml"/></Modifications></Vehicle>"#;
+const SHIP_ELEM_BASE: &[u8] = br#"<Vehicle name="FixtureTopology"><Parts><Part id="vehicle-id" name="old_vehicle_port" class="ItemPort"><ItemPort/></Part></Parts><Modifications><Modification name="variant"><Elems><Elem idRef="vehicle-id" name="name" value="vehicle_only"/></Elems></Modification></Modifications></Vehicle>"#;
+
+#[derive(Clone, Copy)]
+pub(super) enum GraphSource {
+    Database,
+    Vehicle,
+    Loadout,
+    Patch,
+    Elem,
+}
+
+pub(super) fn graph_archive() -> TestResult<(tempfile::TempDir, Archive)> {
+    graph_archive_for(GraphSource::Database)
+}
+
+pub(super) fn graph_archive_for(source: GraphSource) -> TestResult<(tempfile::TempDir, Archive)> {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("topology.p4k");
+    let database = TestEntry::zstd("Data\\Game2.dcb", database_for(source).build());
+    let database = if matches!(source, GraphSource::Database) {
+        database.encrypted()
+    } else {
+        database
+    };
+    let vehicle = match source {
+        GraphSource::Patch => SHIP_PATCH_BASE,
+        GraphSource::Elem => SHIP_ELEM_BASE,
+        _ => SHIP_XML_BYTES,
+    };
+    let mut archive = ArchiveBuilder::new()
+        .entry(database)
+        .entry(xml_entry(
+            SHIP_XML,
+            vehicle,
+            matches!(source, GraphSource::Vehicle | GraphSource::Elem),
+        ))
+        .entry(xml_entry(DOCKED_XML, DOCKED_XML_BYTES, false));
+    match source {
+        GraphSource::Loadout => {
+            archive = archive.entry(xml_entry(LOADOUT_XML, LOADOUT_XML_BYTES, true));
+        }
+        GraphSource::Patch => archive = archive.entry(xml_entry(PATCH_XML, PATCH_XML_BYTES, true)),
+        _ => {}
+    }
+    archive.write_to(&path)?;
+    let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
+    Ok((directory, archive))
+}
+
+fn xml_entry(relative: &str, contents: &[u8], encrypted: bool) -> TestEntry {
+    let path = format!("Data\\{}", relative.replace('/', "\\"));
+    let entry = TestEntry::stored(path, contents.to_vec());
+    if encrypted { entry.encrypted() } else { entry }
+}
 
 pub(super) fn database() -> DataForgeBuilder {
+    database_for(GraphSource::Database)
+}
+
+fn database_for(source: GraphSource) -> DataForgeBuilder {
     entity_schema()
-        .record(ship())
+        .record(ship(source))
         .record(item(RELAY, "SyntheticRelay", true, true))
         .record(item(ACTOR, "RELAY_2slot", false, false))
         .record(docked())
@@ -43,6 +113,11 @@ fn entity_schema() -> DataForgeBuilder {
                 .field("loadout", pointer(LOADOUT)),
         )
         .structure(TestStruct::new(LOADOUT))
+        .structure(
+            TestStruct::new("SItemPortLoadoutXMLParams")
+                .parent(LOADOUT)
+                .field("loadoutPath", TestType::String),
+        )
         .structure(
             TestStruct::new(MANUAL_LOADOUT)
                 .parent(LOADOUT)
@@ -82,11 +157,21 @@ fn entity_schema() -> DataForgeBuilder {
 
 fn resource_schema(builder: DataForgeBuilder) -> DataForgeBuilder {
     builder
+        .enumeration("EItemType", ["FixtureDevice"])
+        .enumeration("EItemSubType", ["FixtureSubtype"])
+        .structure(
+            TestStruct::new("SItemPortDefTypes")
+                .field("Type", TestType::Enum("EItemType".to_owned()))
+                .array("SubTypes", TestType::Enum("EItemSubType".to_owned())),
+        )
         .structure(
             TestStruct::new(PORT)
                 .field("Name", TestType::String)
                 .field("Flags", TestType::String)
-                .field("resourceLinkToParent", TestType::Bool),
+                .field("resourceLinkToParent", TestType::Bool)
+                .field("RequiredPortTags", TestType::String)
+                .field("MinSize", TestType::Int32)
+                .array("Types", class("SItemPortDefTypes")),
         )
         .structure(
             TestStruct::new(HARDPOINT_LINK)
@@ -133,9 +218,9 @@ fn port_container_schema() -> TestStruct {
         .field("LinkAllItemsToResourceNetwork", TestType::Bool)
 }
 
-fn ship() -> TestRecord {
+fn ship(source: GraphSource) -> TestRecord {
     let ports = [
-        "mount_a", "mount_b", "deck", "loose", "hangar", "same", "same",
+        "mount_a", "mount_b", "deck", "loose", "hangar", "same", "SAME",
     ]
     .into_iter()
     .enumerate()
@@ -147,6 +232,8 @@ fn ship() -> TestRecord {
         ("mount_b", "mount_a"),
         ("mount_a", "deck"),
         ("same", "missing"),
+        ("hangar", "deck"),
+        ("vehicle_only", "deck"),
     ]
     .into_iter()
     .map(|(port1, port2)| hardpoint(port1, port2))
@@ -172,12 +259,28 @@ fn ship() -> TestRecord {
         "libs/foundry/records/entities/spaceships/fixture_topology.xml",
     )
     .component(node(container))
-    .component(node(TestInstance::new(VEHICLE).value(
-        "objectContainers",
-        TestValue::Array(vec![room("mount_a", "bridge"), room("missing", "unused")]),
-    )))
-    .loadout(loadout)
+    .component(node(vehicle(source)))
+    .loadout(if matches!(source, GraphSource::Loadout) {
+        TestLoadout::Xml(LOADOUT_XML.to_owned())
+    } else {
+        loadout
+    })
     .record()
+}
+
+fn vehicle(source: GraphSource) -> TestInstance {
+    let modification = if matches!(source, GraphSource::Patch | GraphSource::Elem) {
+        "variant"
+    } else {
+        ""
+    };
+    TestInstance::new(VEHICLE)
+        .value("vehicleDefinition", TestValue::text(SHIP_XML))
+        .value("modification", TestValue::text(modification))
+        .value(
+            "objectContainers",
+            TestValue::Array(vec![room("mount_a", "bridge"), room("missing", "unused")]),
+        )
 }
 
 fn item(guid: u128, name: &str, relay: bool, with_ports: bool) -> TestRecord {
@@ -210,8 +313,12 @@ fn docked() -> TestRecord {
         "FixtureDocked",
         "libs/foundry/records/entities/spaceships/fixture_docked.xml",
     )
-    .attach_type("Docking")
-    .component(node(TestInstance::new(VEHICLE)))
+    .attach_type("NOITEM_Vehicle")
+    .component(node(
+        TestInstance::new(VEHICLE)
+            .value("vehicleDefinition", TestValue::text(DOCKED_XML))
+            .value("modification", TestValue::text("")),
+    ))
     .component(node(container(
         vec![port("docked_port", "docked-port", false)],
         vec![hardpoint("docked_port", "docked_port")],
@@ -230,6 +337,20 @@ fn port(name: &str, identity: &str, invisible: bool) -> TestValue {
         TestInstance::new(PORT)
             .named(identity)
             .value("Name", TestValue::text(name))
+            .value("resourceLinkToParent", TestValue::Bool(invisible))
+            .value("RequiredPortTags", TestValue::text("fixture-required"))
+            .value("MinSize", TestValue::Int32(1))
+            .value(
+                "Types",
+                TestValue::Array(vec![node(
+                    TestInstance::new("SItemPortDefTypes")
+                        .value("Type", TestValue::text("FixtureDevice"))
+                        .value(
+                            "SubTypes",
+                            TestValue::Array(vec![TestValue::text("FixtureSubtype")]),
+                        ),
+                )]),
+            )
             .value(
                 "Flags",
                 TestValue::text(if invisible { "invisible" } else { "" }),

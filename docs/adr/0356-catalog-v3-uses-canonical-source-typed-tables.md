@@ -164,3 +164,18 @@ className/recordPath retain their actual name/type/filename contributors and bra
 authored Reference GUIDs remain at their original body slots. Correcting colliding coordinates
 may change SourceUse IDs within unreleased v3, while catalog identities, values, selection,
 order, counts, the origin protocol union and standalone Record serialization stay unchanged.
+
+## Contextual resource-network placements
+
+Original link and room rows use the physical owner Record, component ordinal
+and authored slot. Contextual bindings use the published Loadout array
+position and nested port ordinals. The root or nested owner determines the
+admissible direct endpoints. Original weak targets match their admitted
+physical port coordinates. Each physical name candidate survives if Loadout
+selection collapses a duplicate. Nodes reference selected resource components
+and retain stored relay evidence. A docked vehicle keeps its own root context.
+Derived bindings retain their actual original selector and same-context name
+uses in their immediate source cell. Physical pointer matches retain their
+own selected candidate evidence.
+[Declared resource-network topology](../catalog-resource-topology.md) defines
+the placement and resolution states.

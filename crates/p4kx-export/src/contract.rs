@@ -71,6 +71,8 @@ pub(crate) struct Catalog<'a> {
     pub(crate) configurations: crate::catalog_configurations::CatalogConfigurations<'a>,
     /// Ordered authored declarations from selected physical Records.
     pub(crate) declarations: crate::catalog_v3::catalog_declarations::CatalogDeclarations<'a>,
+    /// Physical loadout placements and their contextual bindings.
+    pub(crate) placements: crate::catalog_v3::resource_network_placements::CatalogPlacements,
     /// Explicit derived choices using the canonical definitions' source facts.
     pub(crate) projections: CatalogProjections<'a>,
     /// Physical source observations and actual contribution uses.

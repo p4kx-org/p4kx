@@ -11,7 +11,8 @@ use crate::resolver::{Entries, EntriesResult, LoadoutResolver};
 use crate::spec::{EntrySpec, LoadoutSpec, TargetSpec};
 
 /// Returns the key a port name is matched by: the name in ASCII lower case.
-pub(crate) fn port_key(name: &str) -> String {
+#[must_use]
+pub fn port_key(name: &str) -> String {
     name.to_ascii_lowercase()
 }
 

@@ -7,7 +7,7 @@ use p4kx_extraction::{Guid, SourceUseRole, SourceValue};
 use super::Capture;
 use crate::catalog_read::original::OriginalDatum;
 use crate::guid_text::CatalogGuid;
-use crate::loadout::alignment::AttachmentIdentity;
+use crate::loadout::alignment::{AttachmentIdentity, AttachmentProof};
 use crate::record_header_field::RecordHeaderField;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -17,7 +17,7 @@ impl Capture<'_> {
         guid: Guid,
         record: u32,
         selection: Option<&LoadoutTargetGuid>,
-    ) -> Result<AttachmentIdentity, CatalogError> {
+    ) -> Result<(AttachmentIdentity, AttachmentProof), CatalogError> {
         let input = self
             .input
             .ok_or(ExportAccountingError::UnboundHealthSubject)?;
@@ -30,25 +30,38 @@ impl Capture<'_> {
             .map(|selection| self.retained_target(guid, selection))
             .transpose()?
             .flatten();
-        let (target_guid, target_record_index) = if let Some(original) = original {
+        let (target_guid, source_uses, source_set_complete) = if let Some(original) = original {
             let (selected, complete) = original.contributions();
             let mut inputs = Vec::with_capacity(selected.len() + 1);
             inputs.extend_from_slice(selected);
             inputs.push(index);
             (
                 original.map(CatalogGuid)?.into_cell(sources),
-                sources.value(SourceValue::Present(record), &inputs, complete),
+                inputs,
+                complete,
             )
         } else {
             (
                 sources.value(SourceValue::Present(CatalogGuid(guid)), &[], false),
-                sources.value(SourceValue::Present(record), &[index], false),
+                vec![index],
+                false,
             )
         };
-        Ok(AttachmentIdentity {
+        let identity = AttachmentIdentity {
             target_guid,
-            target_record_index,
-        })
+            target_record_index: sources.value(
+                SourceValue::Present(record),
+                &source_uses,
+                source_set_complete,
+            ),
+        };
+        Ok((
+            identity,
+            AttachmentProof {
+                source_uses,
+                source_set_complete,
+            },
+        ))
     }
 
     fn retained_target(

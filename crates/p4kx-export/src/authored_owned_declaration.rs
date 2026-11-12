@@ -9,6 +9,8 @@ use p4kx_extraction::{
 use super::{Fact, Observed};
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_read::original::{OriginalDatum, OriginalValuePart};
+use crate::catalog_v3::authored_fields::AuthoredRestriction;
+use crate::resource_number::ResourceNumber;
 use crate::source_fields::{FieldError, FieldViolation};
 use crate::source_value_catalog::{self, SourceArenaOutput};
 use crate::{CatalogError, ExportAccountingError};
@@ -196,6 +198,50 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
             state,
             SourceUseRole::Selector,
         )
+    }
+
+    pub(in crate::catalog_v3) fn restriction_label(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<AuthoredRestriction<'source, &'source str>>, CatalogError> {
+        self.restriction(name, notes, |value| match value {
+            Value::String(label) | Value::Enum(label) => Some(*label),
+            _ => None,
+        })
+    }
+
+    pub(in crate::catalog_v3) fn restriction_number(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<AuthoredRestriction<'source, ResourceNumber>>, CatalogError> {
+        self.restriction(name, notes, ResourceNumber::read)
+    }
+
+    fn restriction<T>(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+        decode: impl FnOnce(&Value<'source>) -> Option<T>,
+    ) -> Result<SourcedValue<AuthoredRestriction<'source, T>>, CatalogError> {
+        self.scalar(name, "a readable original restriction", notes, |fact| {
+            let value = fact.value();
+            if matches!(value, Value::Null | Value::Error(_)) {
+                return Ok(None);
+            }
+            let retained = if let Some(typed) = decode(value) {
+                self.retain_raw_number(fact)?;
+                AuthoredRestriction::Typed(typed)
+            } else {
+                AuthoredRestriction::Original(source_value_catalog::read_subtree(
+                    self.originals,
+                    fact,
+                    |original| self.retain_raw_number(original),
+                )?)
+            };
+            Ok(Some(retained))
+        })
     }
 
     fn retain_raw_number(

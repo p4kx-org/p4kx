@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::ptr;
-
 use p4kx_cryxml::{ByteOrder, Document as CryDocument, Element, Signature, Xml};
 
 #[path = "loadout_xml_source_positions.rs"]
@@ -44,6 +42,12 @@ pub struct XmlLoadoutPathSite<'parse> {
 }
 
 impl XmlLoadoutPathSite<'_> {
+    /// Returns the winning ordinal in the original attribute list.
+    #[must_use]
+    pub const fn attribute_index(&self) -> u64 {
+        self.attribute.attribute_index()
+    }
+
     /// Borrows the genuine original read operation of this parse.
     #[must_use]
     pub const fn observation(&self) -> &LoadoutFileObservation {
@@ -198,41 +202,23 @@ impl Scope<'_, '_> {
         name: &str,
         selection: AttributeSelection,
     ) -> Result<Option<Attribute<'node>>, String> {
-        let attribute = match node {
-            Node::Cry(node) => node
-                .attributes()
-                .enumerate()
-                .find(|(_, attribute)| attribute.name() == name)
-                .map(|(index, attribute)| (index, attribute.name(), attribute.value())),
-            Node::Text(node) => node
-                .attributes()
-                .enumerate()
-                .find(|(_, attribute)| attribute.name() == name)
-                .map(|(index, attribute)| (index, attribute.name(), attribute.value())),
-        };
-        let Some((attribute_index, name, value)) = attribute else {
+        let Some(attribute) = self.original_attribute(node, |actual| actual == name) else {
             return Ok(None);
         };
-        let node_index = match (&self.owner, node) {
-            (Owner::Cry(document), Node::Cry(node)) if node.is_from(document) => node.index(),
-            (Owner::Text(document), Node::Text(node)) if ptr::eq(*document, node.document()) => {
-                node.id().get()
+        let node_index = self.original_node_index(node).ok_or_else(|| {
+            match selection {
+                AttributeSelection::Path => "the XML path datum belongs to another parse",
+                AttributeSelection::Class => "the XML class datum belongs to another parse",
             }
-            _ => {
-                return Err(match selection {
-                    AttributeSelection::Path => "the XML path datum belongs to another parse",
-                    AttributeSelection::Class => "the XML class datum belongs to another parse",
-                }
-                .to_owned());
-            }
-        };
-        let attribute_index = u64::try_from(attribute_index)
+            .to_owned()
+        })?;
+        let attribute_index = u64::try_from(attribute.ordinal)
             .map_err(|_| "the XML attribute ordinal is not representable".to_owned())?;
         Ok(Some(Attribute {
             node_index,
             ordinal: attribute_index,
-            name,
-            value,
+            name: attribute.name,
+            value: attribute.value,
         }))
     }
 
@@ -242,6 +228,24 @@ impl Scope<'_, '_> {
         name: &str,
     ) -> Result<Option<LoadoutPath>, String> {
         self.path_attribute(node, name, LoadoutPathOperation::Copy)
+    }
+
+    pub(crate) fn port_name(
+        &self,
+        node: Node<'_, '_>,
+        name: &str,
+    ) -> Result<Option<LoadoutPath>, String> {
+        if !self.observes_port_names() {
+            return Ok(None);
+        }
+        self.path_attribute(node, name, LoadoutPathOperation::PortName)
+    }
+
+    pub(crate) fn observes_port_names(&self) -> bool {
+        self.source.is_some()
+            && self
+                .observation
+                .is_some_and(Observation::observes_port_names)
     }
 
     pub(crate) fn modification_name(

@@ -247,6 +247,7 @@ impl EntityNode {
 #[derive(Debug, Clone, PartialEq)]
 pub struct PortNode {
     pub(crate) name: String,
+    pub(crate) name_proof: Option<crate::LoadoutPath>,
     pub(crate) source: PortSource,
     pub(crate) definition: Option<Arc<PortDefinition>>,
     pub(crate) constraints: Option<Arc<PortConstraints>>,
@@ -257,6 +258,12 @@ pub struct PortNode {
 }
 
 impl PortNode {
+    /// Borrows the original selection of the published port name.
+    #[must_use]
+    pub const fn name_proof(&self) -> Option<&crate::LoadoutPath> {
+        self.name_proof.as_ref()
+    }
+
     /// Returns what supplied the port's attachment: the Record or XML Loadout file of the
     /// Loadout entry, or the Record of the port definition for a port default. `None` for a port
     /// no entry or default names, and for a port the changes excluded or replaced.

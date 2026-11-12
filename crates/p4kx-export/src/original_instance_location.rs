@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::Location;
+use p4kx_extraction::{Location, Step};
 use serde::{Serialize, Serializer};
 
 /// A retained view of the decoder's immutable original instance location text.
@@ -15,6 +15,10 @@ pub(crate) struct OriginalInstanceLocation<'source> {
 impl<'source> OriginalInstanceLocation<'source> {
     pub(super) const fn new(location: Arc<Location<'source>>) -> Self {
         Self { location }
+    }
+
+    pub(crate) fn steps(&self) -> &[Step<'source>] {
+        self.location.steps()
     }
 }
 

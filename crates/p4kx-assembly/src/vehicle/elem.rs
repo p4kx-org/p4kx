@@ -37,23 +37,31 @@ pub(super) fn find_modification(
         }),
         _ => None,
     };
-    let elems = named_children(node, "Elems")
-        .flat_map(|node| named_children(node, "Elem"))
-        .filter_map(|node| {
-            Some(ElemOverride {
-                id_ref: node
-                    .attribute_ascii("idRef")
-                    .map(|(_, value)| value)
-                    .filter(|value| !value.is_empty())?
-                    .to_owned(),
-                name: node.attribute_ascii("name")?.1.to_owned(),
-                value: node
-                    .attribute_ascii("value")
-                    .map_or("", |(_, value)| value)
-                    .to_owned(),
-            })
-        })
-        .collect();
+    let mut elems = Vec::new();
+    for node in named_children(node, "Elems").flat_map(|node| named_children(node, "Elem")) {
+        let Some((_, id_ref)) = node
+            .attribute_ascii("idRef")
+            .filter(|(_, id)| !id.is_empty())
+        else {
+            continue;
+        };
+        let Some((_, name)) = node.attribute_ascii("name") else {
+            continue;
+        };
+        let value = node.attribute_ascii("value");
+        let port_name = match value {
+            Some((attribute, _)) if name.eq_ignore_ascii_case("name") => {
+                scope.port_name(node, attribute)?
+            }
+            _ => None,
+        };
+        elems.push(ElemOverride {
+            id_ref: id_ref.to_owned(),
+            name: name.to_owned(),
+            value: value.map_or("", |(_, value)| value).to_owned(),
+            port_name,
+        });
+    }
     Ok(Some(Modification { patch, elems }))
 }
 
@@ -94,6 +102,7 @@ pub struct ElemOverride {
     pub(super) id_ref: String,
     pub(super) name: String,
     pub(super) value: String,
+    pub(super) port_name: Option<LoadoutPath>,
 }
 
 impl ElemOverride {

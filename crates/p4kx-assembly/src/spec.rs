@@ -79,6 +79,7 @@ impl LoadoutOrigin {
 pub(crate) struct EntrySpec {
     pub(crate) origin: LoadoutOrigin,
     pub(crate) port: String,
+    pub(crate) port_proof: Option<LoadoutPath>,
     pub(crate) target: TargetSpec,
     pub(crate) loadout: Option<LoadoutSpec>,
     pub(crate) xml_route: Option<Arc<XmlRoute>>,
@@ -89,6 +90,7 @@ pub(crate) struct EntrySpec {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PortSpec {
     pub(crate) name: String,
+    pub(crate) name_proof: LoadoutPath,
     pub(crate) definition: Arc<PortDefinition>,
     pub(crate) default_item: TargetSpec,
 }
@@ -265,22 +267,26 @@ fn read_ports(tree: &RecordTree<'_>, paths: &PathRead<'_>) -> (Vec<PortSpec>, Ve
         || component_slots(tree).filter(|(_, component)| component.type_name() == PORT_CONTAINER);
     let ports = containers()
         .flat_map(|(component_index, component)| {
-            indexed_struct_items(component, "Ports").map(move |(port_index, port)| PortSpec {
-                name: text(port, "Name").to_owned(),
-                definition: Arc::new(read_definition(
-                    port,
-                    PortDefinitionPosition {
-                        record: record_index,
-                        component: component_index,
-                        port: port_index,
-                    },
-                )),
-                default_item: struct_field(port, "defaultItem")
-                    .and_then(|item| {
-                        item.field("entityClass")
-                            .map(|value| target_spec::reference_target_at(item, value, paths))
-                    })
-                    .unwrap_or(TargetSpec::None),
+            indexed_struct_items(component, "Ports").map(move |(port_index, port)| {
+                let name_proof = paths.field(port, "Name", LoadoutPathOperation::PortName);
+                PortSpec {
+                    name: name_proof.value().to_owned(),
+                    name_proof,
+                    definition: Arc::new(read_definition(
+                        port,
+                        PortDefinitionPosition {
+                            record: record_index,
+                            component: component_index,
+                            port: port_index,
+                        },
+                    )),
+                    default_item: struct_field(port, "defaultItem")
+                        .and_then(|item| {
+                            item.field("entityClass")
+                                .map(|value| target_spec::reference_target_at(item, value, paths))
+                        })
+                        .unwrap_or(TargetSpec::None),
+                }
             })
         })
         .collect();

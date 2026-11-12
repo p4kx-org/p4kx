@@ -71,6 +71,8 @@ mod tests {
 
     fn loadout(host: u128, kind: EntityKind, ports: Vec<LoadoutPort>) -> Loadout {
         Loadout {
+            root_record_index: 0,
+            port_inventory_complete: true,
             entity_guid: guid(host),
             entity_kind: kind,
             issues: Vec::new(),

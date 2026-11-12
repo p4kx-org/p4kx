@@ -42,6 +42,10 @@ pub(crate) struct EntityConfigurationRows<'source> {
 }
 
 impl<'source> EntityConfigurationRows<'source> {
+    pub(super) fn resources(&self) -> &[ResourceComponent<'source>] {
+        &self.resources
+    }
+
     pub(crate) fn extend(&mut self, other: Self) {
         self.alignment.extend(other.alignment);
         self.topology.extend(other.topology);

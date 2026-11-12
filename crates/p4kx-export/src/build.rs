@@ -174,6 +174,7 @@ fn assemble<R>(
             CatalogProvenance::new(origins.uses.freeze()?),
         )));
     }
+    let topology = collected.resource_topology(&forge, &origins.uses, options.cancel)?;
     let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
     let resolved = store_slugs.resolve(
@@ -191,8 +192,6 @@ fn assemble<R>(
     );
     let reputation_tables = collected.mission_kinds.take_reputation_tables(&forge);
     let components = collected.item_components.into_tables(&forge);
-    let topology =
-        std::mem::take(&mut collected.entity_configurations.topology).into_tables(&forge);
     let patches = options.public_patches;
     let source = source(archive, options.exported_at, patches, key_use);
     let catalog = Catalog {
@@ -209,8 +208,8 @@ fn assemble<R>(
             ),
             resource_group_members: group_tables.members,
             ammo_bindings: components.ammo_bindings,
-            resource_network_links: topology.resource_network_links,
-            room_associations: topology.room_associations,
+            resource_network_links: topology.declarations.resource_network_links,
+            room_associations: topology.declarations.room_associations,
             shop_inventory_resolution: collected.shop_inventory_resolution,
             tag_roots: CatalogTable::new(&forge, &["TagDatabase"], collected.tags.roots),
             entity_tags: CatalogTable::new(
@@ -219,6 +218,7 @@ fn assemble<R>(
                 collected.tags.entity_tags,
             ),
         },
+        placements: topology.placements,
         definitions: CatalogDefinitions {
             blueprints: blueprints.definitions,
             shop_inventories: collected.shop_inventories,

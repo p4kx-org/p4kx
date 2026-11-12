@@ -84,6 +84,7 @@ impl LoadoutResolver<'_> {
             walk.enter(&entry.port);
             let mut node = PortNode {
                 name: entry.port.clone(),
+                name_proof: entry.port_proof.clone(),
                 source: PortSource::Override,
                 definition: None,
                 constraints: None,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{SourceValueState, SourcedValue};
+use p4kx_extraction::{SourceUse, SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -70,6 +70,22 @@ impl<'source> ResourceNetworkLinks<'source> {
         Ok(declared.then_some(row))
     }
 
+    pub(super) fn hardpoints(&self) -> impl Iterator<Item = &HardpointLink<'source>> {
+        self.internal_hardpoint_links
+            .value()
+            .into_iter()
+            .flatten()
+            .filter_map(SourcedValue::value)
+    }
+
+    pub(super) fn resources(&self) -> impl Iterator<Item = &ResourcePortLink<'source>> {
+        self.internal_resource_links
+            .value()
+            .into_iter()
+            .flatten()
+            .filter_map(SourcedValue::value)
+    }
+
     pub(super) const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
@@ -78,10 +94,14 @@ impl<'source> ResourceNetworkLinks<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct HardpointLink<'source> {
-    link_ordinal: SourcedValue<u32>,
-    port1: SourcedValue<&'source str>,
-    port2: SourcedValue<&'source str>,
+pub(super) struct HardpointLink<'source> {
+    pub(super) link_ordinal: SourcedValue<u32>,
+    #[serde(skip)]
+    pub(super) port1_use: Option<SourceUse>,
+    #[serde(skip)]
+    pub(super) port2_use: Option<SourceUse>,
+    pub(super) port1: SourcedValue<&'source str>,
+    pub(super) port2: SourcedValue<&'source str>,
     additional_fields: SourceArenaOutput<'source>,
 }
 
@@ -96,6 +116,8 @@ impl<'source> HardpointLink<'source> {
             source.authored_members_except([("port1", port1.state()), ("port2", port2.state())])?;
         Ok(Self {
             link_ordinal: source.owned_element_ordinal()?,
+            port1_use: source.selector_use("port1")?,
+            port2_use: source.selector_use("port2")?,
             port1,
             port2,
             additional_fields,
@@ -106,10 +128,14 @@ impl<'source> HardpointLink<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ResourcePortLink<'source> {
-    link_ordinal: SourcedValue<u32>,
-    port1: SourcedValue<Box<SourceWeakReference<'source>>>,
-    port2: SourcedValue<Box<SourceWeakReference<'source>>>,
+pub(super) struct ResourcePortLink<'source> {
+    pub(super) link_ordinal: SourcedValue<u32>,
+    #[serde(skip)]
+    pub(super) port1_use: Option<SourceUse>,
+    #[serde(skip)]
+    pub(super) port2_use: Option<SourceUse>,
+    pub(super) port1: SourcedValue<Box<SourceWeakReference<'source>>>,
+    pub(super) port2: SourcedValue<Box<SourceWeakReference<'source>>>,
     additional_fields: SourceArenaOutput<'source>,
 }
 
@@ -124,6 +150,8 @@ impl<'source> ResourcePortLink<'source> {
             source.authored_members_except([("port1", port1.state()), ("port2", port2.state())])?;
         Ok(Self {
             link_ordinal: source.owned_element_ordinal()?,
+            port1_use: source.selector_use("port1")?,
+            port2_use: source.selector_use("port2")?,
             port1,
             port2,
             additional_fields,

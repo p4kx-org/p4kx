@@ -23,6 +23,10 @@ pub(crate) enum EntityKind {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct Loadout {
+    #[serde(skip)]
+    pub(crate) root_record_index: u32,
+    #[serde(skip)]
+    pub(crate) port_inventory_complete: bool,
     /// The `guid` of the entry in `ships` or `items` the ports belong to; loadouts are ordered by
     /// it.
     pub(crate) entity_guid: CatalogGuid,
@@ -44,6 +48,10 @@ pub(crate) struct Loadout {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct LoadoutPort {
+    #[serde(skip)]
+    pub(crate) name_proof: Option<crate::catalog_read::original::AuthoredEntryPath>,
+    #[serde(skip)]
+    pub(crate) attachment_port_inventory_complete: bool,
     /// The port name, as the Loadout or the port definition spells it.
     pub(crate) name: String,
     /// Where the attachment comes from: `loadout` (the Entity's own Default Loadout), `override`

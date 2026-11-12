@@ -79,7 +79,7 @@ impl<'scope, 'read, 'source> RecordPaths<'_, '_, 'scope, 'read, 'source> {
         let ancestors = self.fields.ancestors(fact)?;
         let path = self.paths.value_fact(original_parent, fact, &ancestors)?;
         let path = match selection.operation() {
-            LoadoutPathOperation::Copy => path,
+            LoadoutPathOperation::Copy | LoadoutPathOperation::PortName => path,
             LoadoutPathOperation::Trim => self.capture.trim_path(path)?,
             _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
         };

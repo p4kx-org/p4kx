@@ -101,6 +101,11 @@ pub trait LoadoutReadObserver: Send + Sync {
     /// Returns `Break` to stop the observed resolution.
     fn observe(&self, event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()>;
 
+    /// Enables original port-name selections in the resolver's read callbacks.
+    fn observes_port_names(&self) -> bool {
+        false
+    }
+
     /// Runs the actual Record projection exactly once within a borrowed path scope.
     fn with_record_paths(
         &self,
@@ -160,6 +165,10 @@ impl<'f> Observation<'f> {
             observer,
             stopped: AtomicBool::new(false),
         }
+    }
+
+    pub(crate) fn observes_port_names(&self) -> bool {
+        self.observer.observes_port_names()
     }
 
     pub(crate) fn stopped(&self) -> bool {

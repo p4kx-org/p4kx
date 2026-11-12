@@ -224,6 +224,7 @@ pub use loadout_request::LoadoutRequest;
 pub use loadout_xml::{LoadoutXmlDecoding, XmlLoadoutPathSite};
 pub use loadout_xml_use::LoadoutXmlClassUse;
 pub use material_variant::MaterialVariant;
+pub use merge::port_key;
 pub use model_cache::{CachedModels, DEFAULT_MODEL_CACHE_BYTES, ModelCache};
 pub use model_placement_sources::ModelPlacementInput;
 pub use node_body::CharacterBody;

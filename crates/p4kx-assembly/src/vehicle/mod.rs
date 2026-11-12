@@ -76,6 +76,7 @@ pub enum PartKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VehiclePart {
     pub(crate) name: String,
+    pub(crate) name_proof: Option<crate::LoadoutPath>,
     pub(crate) class: String,
     pub(crate) kind: PartKind,
     pub(crate) mass: Option<f64>,

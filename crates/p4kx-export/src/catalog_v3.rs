@@ -122,8 +122,12 @@ mod catalog_weapon_magazine_slots;
 mod item_alignment_options;
 #[path = "item_component_owner.rs"]
 mod item_component_owner;
+#[path = "network_endpoint.rs"]
+mod network_endpoint;
 #[path = "ordnance_fields.rs"]
 mod ordnance_fields;
+#[path = "port_restrictions.rs"]
+mod port_restrictions;
 #[path = "projectile_range.rs"]
 mod projectile_range;
 #[path = "quantum_boost.rs"]
@@ -136,8 +140,14 @@ mod quantum_heat;
 mod quantum_profile;
 #[path = "resource_network_links.rs"]
 mod resource_network_links;
+#[path = "resource_network_placements.rs"]
+pub(crate) mod resource_network_placements;
 #[path = "resource_topology_declarations.rs"]
 mod resource_topology_declarations;
+#[path = "resource_topology_index.rs"]
+mod resource_topology_index;
+#[path = "resource_topology_projection.rs"]
+pub(crate) mod resource_topology_projection;
 #[path = "room_associations.rs"]
 mod room_associations;
 #[path = "sensor_mine.rs"]

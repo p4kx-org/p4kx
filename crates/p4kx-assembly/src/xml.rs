@@ -327,6 +327,7 @@ fn read_items(
         entries.push(EntrySpec {
             origin: origin.clone(),
             port: item.attribute("portName").unwrap_or_default().to_owned(),
+            port_proof: scope.port_name(item, "portName")?,
             target: class_name.map_or(TargetSpec::None, TargetSpec::ClassName),
             loadout: (!nested.is_empty())
                 .then(|| LoadoutSpec::Manual(ManualLoadout::new(Arc::from(nested)))),

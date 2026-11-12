@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{SourceUse, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -42,6 +42,14 @@ impl<'source> RoomAssociations<'source> {
         })
     }
 
+    pub(super) fn containers(&self) -> impl Iterator<Item = &RoomAssociation<'source>> {
+        self.object_containers
+            .value()
+            .into_iter()
+            .flatten()
+            .filter_map(SourcedValue::value)
+    }
+
     pub(super) const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
@@ -50,9 +58,11 @@ impl<'source> RoomAssociations<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct RoomAssociation<'source> {
-    container_ordinal: SourcedValue<u32>,
-    resource_network_itemport_name: SourcedValue<&'source str>,
+pub(super) struct RoomAssociation<'source> {
+    pub(super) container_ordinal: SourcedValue<u32>,
+    #[serde(skip)]
+    pub(super) port_use: Option<SourceUse>,
+    pub(super) resource_network_itemport_name: SourcedValue<&'source str>,
     bone_name: SourcedValue<&'source str>,
     file_name: SourcedValue<&'source str>,
     guid: SourcedValue<&'source str>,
@@ -87,6 +97,7 @@ impl<'source> RoomAssociation<'source> {
         ])?;
         Ok(Self {
             container_ordinal: source.owned_element_ordinal()?,
+            port_use: source.selector_use("resourceNetworkItemportName")?,
             resource_network_itemport_name,
             bone_name,
             file_name,

@@ -39,6 +39,16 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         })
     }
 
+    pub(in crate::catalog_v3) fn selector_use(
+        &self,
+        name: &str,
+    ) -> Result<Option<SourceUse>, CatalogError> {
+        self.originals
+            .field(self.owner, name)?
+            .map(|(_, fact)| fact.observe(OriginalValuePart::Value, SourceUseRole::Selector))
+            .transpose()
+    }
+
     pub(in crate::catalog_v3) fn link(
         &self,
         name: &str,

@@ -33,6 +33,15 @@ mod unsigned;
 
 type Fact<'scope, 'read, 'source> = OriginalValueFact<'scope, 'read, 'source>;
 
+/// A stored restriction with its typed value or exact original storage shape.
+#[derive(Debug, serde::Serialize, schemars::JsonSchema)]
+#[serde(untagged)]
+#[schemars(rename = "AuthoredRestrictionOf{T}")]
+pub(super) enum AuthoredRestriction<'source, T> {
+    Typed(T),
+    Original(crate::source_value_catalog::SourceArenaOutput<'source>),
+}
+
 pub(super) struct ReadHealth {
     pub(super) value: SourcedValue<ResourceFloat32>,
     pub(super) legacy_value: Option<f32>,

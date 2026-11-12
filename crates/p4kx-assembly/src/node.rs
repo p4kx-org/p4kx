@@ -19,9 +19,9 @@ use crate::spec::{EntitySpec, EntrySpec, LoadoutOrigin, LoadoutSpec, TargetSpec}
 use crate::vehicle::flags_contain;
 use crate::walk::Walk;
 use crate::{
-    Attachment, EntityNode, LoadoutError, LoadoutReferenceSelection, LoadoutTargetGuid,
-    LoadoutXmlClassUse, PortConstraints, PortNode, PortSource, PortVisibility, Target, Unresolved,
-    VehicleImplementation,
+    Attachment, EntityNode, LoadoutError, LoadoutPath, LoadoutReferenceSelection,
+    LoadoutTargetGuid, LoadoutXmlClassUse, PortConstraints, PortNode, PortSource, PortVisibility,
+    Target, Unresolved, VehicleImplementation,
 };
 
 /// Returns the flags `spec`'s port container gives all its ports when they choose a sub-geometry:
@@ -37,6 +37,7 @@ fn shared_port_flags(spec: &EntitySpec) -> &[String] {
 /// One port of an Entity before it is resolved.
 struct Pending<'s> {
     name: &'s str,
+    name_proof: Option<&'s LoadoutPath>,
     source: PortSource,
     definition: Option<Arc<PortDefinition>>,
     target: &'s TargetSpec,
@@ -126,6 +127,7 @@ impl LoadoutResolver<'_> {
             .map(Arc::new);
         let mut node = PortNode {
             name: pending.name.to_owned(),
+            name_proof: pending.name_proof.cloned(),
             source: pending.source,
             definition: pending.definition,
             constraints,
@@ -266,6 +268,7 @@ fn pending_ports<'s>(
         .filter(move |part| !taken.contains(&port_key(part.name())))
         .map(|part| Pending {
             name: part.name(),
+            name_proof: part.name_proof.as_ref(),
             source: PortSource::Empty,
             definition: None,
             target: &TargetSpec::None,
@@ -275,6 +278,7 @@ fn pending_ports<'s>(
         });
     let from_entries = entries.iter().map(|(entry, source)| Pending {
         name: &entry.port,
+        name_proof: entry.port_proof.as_ref(),
         source: *source,
         definition: spec
             .port(&entry.port)
@@ -290,6 +294,7 @@ fn pending_ports<'s>(
         .filter(move |port| !named.contains(&port_key(&port.name)))
         .map(|port| Pending {
             name: &port.name,
+            name_proof: Some(&port.name_proof),
             source: if port.default_item == TargetSpec::None {
                 PortSource::Unset
             } else {

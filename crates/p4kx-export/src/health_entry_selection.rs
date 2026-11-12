@@ -65,7 +65,7 @@ impl AuthoredEntryPath {
             value,
         )?))
     }
-    pub(super) fn selector_inputs(&self) -> Result<(Vec<SourceUse>, bool), CatalogError> {
+    pub(crate) fn selector_inputs(&self) -> Result<(Vec<SourceUse>, bool), CatalogError> {
         self.inner.selector_inputs()
     }
     pub(crate) fn convert(

@@ -41,6 +41,55 @@ pub(crate) enum AttachmentDefinitionLink {
     NotDeclared,
 }
 
+/// The coordinates of an original port in the canonical item-port table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub(crate) struct PhysicalPort {
+    pub(crate) owner_record_index: u32,
+    pub(crate) component_ordinal: u32,
+    pub(crate) port_ordinal: u32,
+}
+
+impl PhysicalPort {
+    pub(super) fn read(
+        owner: &ComponentOwner,
+        port: &SourcedValue<u32>,
+    ) -> Result<Self, CatalogError> {
+        let (owner_record_index, component_ordinal) = physical_key(owner)?;
+        let port_ordinal = port
+            .value()
+            .copied()
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        Ok(Self {
+            owner_record_index,
+            component_ordinal,
+            port_ordinal,
+        })
+    }
+}
+
+impl AttachmentDefinitionLink {
+    pub(crate) fn physical_key(&self) -> Result<Option<(u32, u32)>, CatalogError> {
+        match self {
+            Self::Projected { owner } => Ok(Some(physical_key(owner)?)),
+            Self::NotProjected | Self::NotDeclared => Ok(None),
+        }
+    }
+}
+
+impl PortDefinitionLink {
+    pub(crate) fn physical_port(&self) -> Result<Option<PhysicalPort>, CatalogError> {
+        match self {
+            Self::Projected {
+                owner,
+                port_ordinal,
+            } => PhysicalPort::read(owner, port_ordinal).map(Some),
+            Self::NotProjected => Ok(None),
+        }
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct AlignmentIndex<'rows> {
     ports: HashMap<(u32, u32, u32), PortOwner<'rows>>,

@@ -19,6 +19,8 @@ use crate::{LoadoutClassName, LoadoutClassSelection, LoadoutError, LoadoutRefere
 pub enum LoadoutPathOperation {
     /// Copies the accepted source datum unchanged.
     Copy,
+    /// Selects the original name of a Loadout port.
+    PortName,
     /// Trims the accepted source datum.
     Trim,
     /// Confines the requested vehicle definition to its implementation directory.
@@ -237,8 +239,22 @@ impl<'scope> PathRead<'scope> {
             LoadoutPathOperation::Trim => raw.trim(),
             _ => raw,
         };
-        let selection = match (self.observer, value) {
-            (Some(observer), Some(value)) if !raw.is_empty() && !self.stopped() => {
+        let observer = self.observer.filter(|_| {
+            operation != LoadoutPathOperation::PortName
+                || self
+                    .observation
+                    .is_some_and(Observation::observes_port_names)
+        });
+        let selection = match (observer, value) {
+            (Some(observer), Some(value))
+                if (!raw.is_empty()
+                    || operation == LoadoutPathOperation::PortName
+                        && matches!(
+                            value,
+                            Value::String(_) | Value::Locale(_) | Value::Enum(_)
+                        ))
+                    && !self.stopped() =>
+            {
                 let selection = LoadoutSelection::new(operation);
                 if observer.record_path(&selection, parent, value).is_break() {
                     self.stop();

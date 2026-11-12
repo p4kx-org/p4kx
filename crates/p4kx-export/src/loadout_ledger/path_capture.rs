@@ -17,6 +17,28 @@ use super::Capture;
 use super::path_observer::RecordPaths;
 
 impl Capture<'_> {
+    pub(crate) fn port_name_proof(
+        &self,
+        name: &str,
+        path: Option<&LoadoutPath>,
+    ) -> Result<Option<AuthoredEntryPath>, CatalogError> {
+        let Some(path) = path.filter(|path| path.selection().is_some()) else {
+            return Ok(None);
+        };
+        if path.value() != name
+            || path.selection().map(LoadoutSelection::operation)
+                != Some(LoadoutPathOperation::PortName)
+        {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        let input = self
+            .input
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
+        let proof = self.lock()?.paths.get(path)?;
+        proof.check_input(input)?;
+        Ok(Some(proof))
+    }
+
     pub(super) fn retain_path(
         &self,
         selection: &LoadoutSelection,
@@ -91,7 +113,9 @@ impl Capture<'_> {
             let path = capture.loadout_xml(site)?;
             if !matches!(
                 selection.operation(),
-                LoadoutPathOperation::Copy | LoadoutPathOperation::VehicleModificationName
+                LoadoutPathOperation::Copy
+                    | LoadoutPathOperation::PortName
+                    | LoadoutPathOperation::VehicleModificationName
             ) || selection.operation() != site.operation()
             {
                 return Err(ExportAccountingError::ConflictingSourceDatum.into());

@@ -82,6 +82,7 @@ impl<'rows> PortReader<'rows> {
         };
         let mut shape = LoadoutPort {
             name: port.name().to_owned(),
+            name_proof: capture.port_name_proof(port.name(), port.name_proof())?,
             source,
             visibility,
             source_constraints: self.alignment.map_or_else(
@@ -102,6 +103,7 @@ impl<'rows> PortReader<'rows> {
                 shape.item_guid = Some(CatalogGuid(child.guid()));
                 shape.item_class_name = Some(child.class_name().to_owned());
                 shape.docked_vehicle = child.is_docked_vehicle();
+                shape.attachment_port_inventory_complete = child.issues().is_empty();
                 if child.is_expanded() {
                     shape.ports = self.ports(child, capture)?;
                 }

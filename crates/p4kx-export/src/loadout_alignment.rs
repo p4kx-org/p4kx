@@ -2,14 +2,14 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{Attachment, PortNode};
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{SourceUse, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::ledger::Capture;
 use crate::CatalogError;
 use crate::catalog_v3::catalog_item_alignment::{
-    AlignmentIndex, AttachmentDefinitionLink, PortDefinitionLink,
+    AlignmentIndex, AttachmentDefinitionLink, PhysicalPort, PortDefinitionLink,
 };
 use crate::guid_text::CatalogGuid;
 use crate::schema_fields::every_field_required;
@@ -29,10 +29,12 @@ struct AttachedItem {
     #[serde(flatten)]
     identity: AttachmentIdentity,
     definition: AttachmentDefinitionLink,
+    #[serde(skip)]
+    proof: AttachmentProof,
 }
 
 /// The exact attached Record selected by the resolved Loadout.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct AttachmentIdentity {
@@ -40,7 +42,37 @@ pub(crate) struct AttachmentIdentity {
     pub(crate) target_record_index: SourcedValue<u32>,
 }
 
+#[derive(Debug)]
+pub(crate) struct AttachmentProof {
+    pub(crate) source_uses: Vec<SourceUse>,
+    pub(crate) source_set_complete: bool,
+}
+
 impl LoadoutAlignment {
+    pub(crate) fn physical_port(&self) -> Result<Option<PhysicalPort>, CatalogError> {
+        self.port_definition
+            .as_ref()
+            .map_or(Ok(None), PortDefinitionLink::physical_port)
+    }
+
+    pub(crate) fn attachment_component(&self) -> Result<Option<(u32, u32)>, CatalogError> {
+        self.attached_item
+            .as_ref()
+            .map_or(Ok(None), |item| item.definition.physical_key())
+    }
+
+    pub(crate) fn attachment_proof(&self) -> Option<&AttachmentProof> {
+        self.attached_item
+            .as_ref()
+            .map(|attachment| &attachment.proof)
+    }
+
+    pub(crate) fn attachment(&self) -> Option<&AttachmentIdentity> {
+        self.attached_item
+            .as_ref()
+            .map(|attachment| &attachment.identity)
+    }
+
     pub(crate) fn read(
         port: &PortNode,
         index: &AlignmentIndex<'_>,
@@ -53,12 +85,11 @@ impl LoadoutAlignment {
         let attached_item = if let Attachment::Entity(child) = port.attachment()
             && let Some(record) = child.record_index()
         {
+            let (identity, proof) =
+                capture.attachment_identity(child.guid(), record, child.attachment_target())?;
             Some(AttachedItem {
-                identity: capture.attachment_identity(
-                    child.guid(),
-                    record,
-                    child.attachment_target(),
-                )?,
+                identity,
+                proof,
                 definition: index.attachment(record, child.attachable_component_ordinal())?,
             })
         } else {

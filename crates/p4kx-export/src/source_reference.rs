@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{SourcedValue, Step};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -33,6 +33,12 @@ pub(crate) struct SourceWeakReference<'source> {
 }
 
 impl<'source> SourceWeakReference<'source> {
+    pub(crate) fn instance_steps(&self) -> Option<&[Step<'source>]> {
+        match &self.target {
+            SourceWeakTarget::Instance { location, .. } => Some(location.value()?.steps()),
+            SourceWeakTarget::Record { .. } => None,
+        }
+    }
     /// Returns a Record link when the pointer targeted a Record header.
     pub(crate) fn into_record(self) -> Option<SourceRecordReference<'source>> {
         let SourceWeakTarget::Record { source_type } = self.target else {

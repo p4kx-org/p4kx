@@ -85,6 +85,10 @@ impl<'source> ResourceComponent<'source> {
         })
     }
 
+    pub(super) const fn is_relay(&self) -> &SourcedValue<bool> {
+        &self.is_relay
+    }
+
     pub(super) const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
