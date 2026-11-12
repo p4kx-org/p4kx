@@ -693,7 +693,8 @@ expose source capacity and the physical item or vehicle components that select i
 physical owners and per-value provenance.
 
 [Ship facility configurations and placements](catalog-ship-facilities.md) link the authored
-seat and medical components and storage configurations to their resolved Loadout contexts.
+seat, medical and cargo grid components and storage configurations to their resolved
+Loadout contexts. Each placement row groups its configuration links in original component order.
 Medical tier and resource consumption definitions retain their own physical Record identity.
 
 #### Playability

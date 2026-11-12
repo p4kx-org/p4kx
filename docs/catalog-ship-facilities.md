@@ -50,6 +50,19 @@ Regeneration and resource costs use the shared cargo-unit representation. Stored
 values retain their own source units, exact Single bits and signed integer amounts.
 The ranges and timing fields retain the original scalar values.
 
+## Cargo grid facilities
+
+The `cargoGrid` kind carries the physical `SCItemCargoGridParams` component.
+`dimensions` retains the original `Vec3` Single coordinates and their IEEE bits.
+`crateGenPercentageOnDestroy`, `crateMaxOnDestroy`, `invisible`, `miningOnly`,
+`transformDependant` and `minVolatilePowerToExplode` retain their source values.
+`damageConfiguration` carries the original `CommodityDamageConfiguration`
+Reference with target identity and resolution status. The component's
+`additionalFields` arena retains other authored members.
+
+Cargo capacity in ShipBase comes from the selected `InventoryContainer` Record.
+[Ship base data](ship-base-data.md) describes the capacity and cell projections.
+
 ## Ship Loadout placements
 
 `placements.facilityInstances` links physical facility and inventory configurations to their
@@ -60,12 +73,13 @@ addresses the root. Attached rows carry the selected physical Entity Record and 
 port coordinates when a port definition is available. Each path retains the observed port
 and attachment contributors from the root to the component's owner.
 
-Join `configuration.owner` by Record index and component ordinal. The `facility` kind
-addresses `configurations.facilities`. The `inventory` kind addresses
-`configurations.inventoryConfigurations`, whose stored selector leads to
-`definitions.inventoryContainers`. Components at separate port paths remain separate
-instances even where they share an owner. The resolver keeps docked vehicles in their own
-root contexts. The catalog selection determines which configuration rows can be joined.
+Each occupied port with a linked configuration has one row. Its `configurations`
+array follows original component order. Join each `configurations[].owner` by Record index and component
+ordinal. The `facility` kind addresses `configurations.facilities`. The `inventory`
+kind addresses `configurations.inventoryConfigurations`, whose stored selector leads
+to `definitions.inventoryContainers`. Separate port paths retain separate rows even
+where they share an Entity. Docked vehicles retain their own root contexts. The
+catalog selection determines which configuration rows can be joined.
 Failed attachment resolution stays visible in the published Loadout.
 A loadout path identifies a contextual occurrence. Spatial transforms and placements found
 only in interior object containers require their own source observations.

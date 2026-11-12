@@ -3668,6 +3668,50 @@
         }
       ]
     },
+    "CargoGrid": {
+      "description": "Original configuration of one cargo grid component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "crateGenPercentageOnDestroy": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "crateMaxOnDestroy": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "damageConfiguration": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "dimensions": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "invisible": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "minVolatilePowerToExplode": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "miningOnly": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "transformDependant": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "crateGenPercentageOnDestroy",
+        "crateMaxOnDestroy",
+        "damageConfiguration",
+        "dimensions",
+        "invisible",
+        "minVolatilePowerToExplode",
+        "miningOnly",
+        "transformDependant"
+      ],
+      "type": "object"
+    },
     "CargoManifest": {
       "description": "A cargo manifest: a `CargoManifest` Record under `cargomanifest`, which tells the game how to\nfill the cargo grid of a ship it spawns.",
       "properties": {
@@ -11239,6 +11283,19 @@
             "kind"
           ],
           "type": "object"
+        },
+        {
+          "$ref": "#/$defs/CargoGrid",
+          "properties": {
+            "kind": {
+              "const": "cargoGrid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
         }
       ],
       "properties": {
@@ -11300,10 +11357,14 @@
       ]
     },
     "FacilityInstance": {
-      "description": "One authored facility component in its resolved ship context.",
+      "description": "One resolved ship placement and its authored configurations.",
       "properties": {
-        "configuration": {
-          "$ref": "#/$defs/FacilityConfiguration"
+        "configurations": {
+          "items": {
+            "$ref": "#/$defs/FacilityConfiguration"
+          },
+          "minItems": 1,
+          "type": "array"
         },
         "shipGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -11316,7 +11377,7 @@
         }
       },
       "required": [
-        "configuration",
+        "configurations",
         "shipGuid",
         "shipRecordIndex",
         "source"

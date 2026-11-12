@@ -23,6 +23,7 @@ mod bnk_classes;
 mod bnk_objects;
 mod bnk_objects_limits;
 mod catalog;
+mod catalog_facility_cargo_grid;
 mod catalog_failures;
 mod catalog_health_origins;
 mod catalog_key;

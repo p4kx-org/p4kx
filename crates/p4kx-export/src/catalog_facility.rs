@@ -14,12 +14,20 @@ use crate::catalog_projection::CatalogProjection;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
-pub(super) const SOURCE_TYPES: &[&str] = &[catalog_seat::COMPONENT, med_bed::COMPONENT];
+#[path = "facility_cargo_grid.rs"]
+mod cargo_grid;
+
+pub(super) const SOURCE_TYPES: &[&str] = &[
+    catalog_seat::COMPONENT,
+    med_bed::COMPONENT,
+    cargo_grid::COMPONENT,
+];
 
 #[derive(Clone, Copy)]
 pub(super) enum FacilityKind {
     Seat,
     MedBed,
+    CargoGrid,
 }
 
 impl FacilityKind {
@@ -27,6 +35,7 @@ impl FacilityKind {
         match source_type {
             catalog_seat::COMPONENT => Some(Self::Seat),
             med_bed::COMPONENT => Some(Self::MedBed),
+            cargo_grid::COMPONENT => Some(Self::CargoGrid),
             _ => None,
         }
     }
@@ -49,6 +58,7 @@ pub(super) struct Facility<'source> {
 enum FacilityFields<'source> {
     Seat(Box<Seat<'source>>),
     MedBed(Box<MedBed<'source>>),
+    CargoGrid(Box<cargo_grid::CargoGrid<'source>>),
 }
 
 impl<'source> Facility<'source> {
@@ -63,6 +73,9 @@ impl<'source> Facility<'source> {
             FacilityKind::Seat => FacilityFields::Seat(Box::new(Seat::read(source, notes)?)),
             FacilityKind::MedBed => {
                 FacilityFields::MedBed(Box::new(MedBed::read(source, projection, notes)?))
+            }
+            FacilityKind::CargoGrid => {
+                FacilityFields::CargoGrid(Box::new(cargo_grid::CargoGrid::read(source, notes)?))
             }
         };
         Ok(Self {

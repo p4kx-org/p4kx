@@ -24,6 +24,8 @@ mod ammo_containers;
 mod ammo_definitions;
 #[path = "catalog_item_ammo_source.rs"]
 mod ammo_source;
+#[path = "catalog_facility_cargo_grid.rs"]
+mod cargo_grid;
 #[path = "catalog_durability.rs"]
 mod durability;
 #[path = "catalog_facility_instances.rs"]

@@ -12,7 +12,7 @@ use crate::guid_text::CatalogGuid;
 use crate::loadout::alignment::AttachmentIdentity;
 use crate::schema_fields::every_field_required;
 
-/// One authored facility component in its resolved ship context.
+/// One resolved ship placement and its authored configurations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
@@ -20,7 +20,8 @@ pub(super) struct FacilityInstance {
     #[serde(flatten)]
     pub(super) ship: ShipContext,
     pub(super) source: FacilityPlacementSource,
-    pub(super) configuration: FacilityConfiguration,
+    #[schemars(length(min = 1))]
+    pub(super) configurations: Vec<FacilityConfiguration>,
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -31,13 +32,13 @@ pub(super) struct ShipContext {
     pub(super) ship_record_index: SourcedValue<u32>,
 }
 
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub(super) enum FacilityPlacementSource {
     Loadout(LoadoutFacilityPlacement),
 }
 
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(super) struct LoadoutFacilityPlacement {
@@ -46,7 +47,7 @@ pub(super) struct LoadoutFacilityPlacement {
     pub(super) attached_item: Option<AttachmentIdentity>,
 }
 
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "kind", content = "owner", rename_all = "camelCase")]
 pub(super) enum FacilityConfiguration {
     Facility(ComponentOwner),

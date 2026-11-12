@@ -36,11 +36,19 @@ impl<T> CatalogTable<T> {
     }
 
     pub(crate) fn new(forge: &DataForge<'_>, source_types: &[&str], rows: Vec<T>) -> Self {
+        Self::matching_source_types(forge, |name| source_types.contains(&name), rows)
+    }
+
+    pub(crate) fn matching_source_types(
+        forge: &DataForge<'_>,
+        matches_source_type: impl Fn(&str) -> bool,
+        rows: Vec<T>,
+    ) -> Self {
         let mut unavailable = false;
         let mut declared = !rows.is_empty();
         for structure in forge.structs() {
             match structure.name() {
-                Ok(name) if source_types.contains(&name) => declared = true,
+                Ok(name) if matches_source_type(name) => declared = true,
                 Ok(_) => {}
                 Err(_) => unavailable = true,
             }

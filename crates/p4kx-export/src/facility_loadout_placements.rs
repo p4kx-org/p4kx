@@ -8,7 +8,7 @@ use std::slice::Iter;
 use p4kx_extraction::{CancelToken, DataForge, SourceUse, SourceUseRole, SourceValue};
 
 use super::catalog_entity_configurations::EntityConfigurationRows;
-use super::catalog_seat;
+use super::catalog_facility;
 use super::facility_instance::{
     FacilityConfiguration, FacilityInstance, FacilityPlacementSource, LoadoutFacilityPlacement,
     ShipContext,
@@ -16,7 +16,6 @@ use super::facility_instance::{
 use super::inventory_owner_storage;
 use super::item_component_owner::ComponentOwner;
 use super::loadout_position::{self, LoadoutPosition};
-use super::medical::med_bed;
 use super::room_associations;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_table::CatalogTable;
@@ -42,14 +41,15 @@ pub(super) fn table(
             }
         }
     }
-    Ok(CatalogTable::new(
+    Ok(CatalogTable::matching_source_types(
         forge,
-        &[
-            catalog_seat::COMPONENT,
-            med_bed::COMPONENT,
-            inventory_owner_storage::ITEM_COMPONENT,
-            room_associations::VEHICLE,
-        ],
+        |name| {
+            catalog_facility::SOURCE_TYPES.contains(&name)
+                || matches!(
+                    name,
+                    inventory_owner_storage::ITEM_COMPONENT | room_associations::VEHICLE
+                )
+        },
         project.rows,
     ))
 }
@@ -197,14 +197,16 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             original_port,
             attached_item,
         });
+        let mut configurations = Vec::with_capacity(definitions.len());
         for definition in definitions {
             self.check_cancel()?;
-            self.rows.push(FacilityInstance {
-                ship: ship.clone(),
-                source: source.clone(),
-                configuration: definition.link(),
-            });
+            configurations.push(definition.link());
         }
+        self.rows.push(FacilityInstance {
+            ship: ship.clone(),
+            source,
+            configurations,
+        });
         Ok(())
     }
 

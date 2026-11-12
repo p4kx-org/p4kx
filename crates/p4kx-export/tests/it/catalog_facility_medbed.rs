@@ -132,7 +132,7 @@ fn check_placement(catalog: &Value) -> TestResult {
         &json!([0]),
         "the facility belongs to the original host port"
     );
-    let owner = proof::at(instance, "/configuration/owner")?;
+    let owner = proof::at(instance, "/configurations/0/owner")?;
     proof::present(
         owner,
         "ownerGuid",

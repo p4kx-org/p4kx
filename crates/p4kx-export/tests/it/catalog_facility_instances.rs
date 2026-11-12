@@ -79,7 +79,7 @@ fn facility_path_keeps_encrypted_ancestor_separate_from_clear_child_and_definiti
         Some(false),
     )?;
     proof::present(
-        proof::at(nested, "/configuration/owner")?,
+        proof::at(nested, "/configurations/0/owner")?,
         "ownerGuid",
         &json!(common::guid(fixture::SEAT)),
         Some(false),
@@ -101,12 +101,12 @@ fn check_ship_instances(instances: &[Value]) -> TestResult {
         "one storage instance at the deck port"
     );
     assert_eq!(
-        proof::at(storage, "/configuration/kind")?,
+        proof::at(storage, "/configurations/0/kind")?,
         "inventory",
         "the occurrence links to the canonical storage configuration"
     );
     proof::present(
-        proof::at(storage, "/configuration/owner")?,
+        proof::at(storage, "/configurations/0/owner")?,
         "ownerGuid",
         &json!(common::guid(fixture::DECK)),
         Some(true),
@@ -162,11 +162,11 @@ fn check_seat(row: &Value, position: &Value) -> TestResult {
         "the whole original port path is retained"
     );
     assert_eq!(
-        proof::at(row, "/configuration/kind")?,
+        proof::at(row, "/configurations/0/kind")?,
         "facility",
         "the occurrence links to a physical seat component"
     );
-    let owner = proof::at(row, "/configuration/owner")?;
+    let owner = proof::at(row, "/configurations/0/owner")?;
     proof::present(
         owner,
         "ownerGuid",
