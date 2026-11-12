@@ -29,7 +29,16 @@ pub(crate) enum ModelAnchor {
     #[default]
     None,
     Node(usize),
-    Bone(BoneSelection),
+    Bone {
+        owner: BoneOwner,
+        selection: BoneSelection,
+    },
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum BoneOwner {
+    Parent,
+    Root,
 }
 
 fn index(ordinal: usize) -> Option<NonZeroUsize> {

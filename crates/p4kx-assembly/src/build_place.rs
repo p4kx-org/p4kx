@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_model::{Bone, Model, Transform};
+use p4kx_model::{Model, Transform};
 
 use crate::build::issue;
 use crate::build_models::Loaded;
 use crate::creature_rig;
 use crate::flatten::Draft;
-use crate::model_placement_sources::{ModelAnchor, ModelPlacement};
-use crate::placement::{self, BonePlacement, NodePlacement, offset};
+use crate::model_placement_sources::{BoneOwner, ModelAnchor, ModelPlacement};
+use crate::placement::{self, BonePlacement, NodePlacement, PlacementSkeleton, offset};
 use crate::{
     Issue, IssueKind, Part, Placement, PortDefinition, PortNode, PortPlacementSource, PortTransform,
 };
@@ -54,11 +54,14 @@ impl Anchor {
         }
     }
 
-    const fn bone(kind: Placement, placement: BonePlacement) -> Self {
+    const fn bone(kind: Placement, placement: BonePlacement, owner: BoneOwner) -> Self {
         Self {
             kind,
             transform: placement.transform,
-            source: ModelAnchor::Bone(placement.selection),
+            source: ModelAnchor::Bone {
+                owner,
+                selection: placement.selection,
+            },
         }
     }
 
@@ -98,7 +101,7 @@ pub(crate) fn place(
     draft: &Draft<'_>,
     parts: &[Part],
     model: Option<&Loaded>,
-    rig: Option<&[Bone]>,
+    rig: Option<PlacementSkeleton<'_>>,
     prop: bool,
     issues: &mut Vec<Issue>,
 ) -> PlacedPart {
@@ -129,13 +132,14 @@ pub(crate) fn place(
         .map(PortTransform::helper)
         .filter(|helper| !helper.is_empty());
     let on_rig = || {
-        rig.zip(helper)
-            .and_then(|(rig, helper)| creature_rig::skin_port_anchor(rig, parent, helper))
-            .map(|(kind, transform)| Anchor {
-                kind,
-                transform,
-                source: ModelAnchor::None,
-            })
+        rig.zip(helper).and_then(|(rig, helper)| {
+            let found = creature_rig::skin_port_anchor(rig, parent, helper)?;
+            Some(Anchor::bone(
+                Placement::Helper(helper.to_owned()),
+                found,
+                BoneOwner::Root,
+            ))
+        })
     };
     let anchored = if port_definition.is_some_and(PortDefinition::is_skin) {
         match prop.then(on_rig).flatten() {
@@ -207,7 +211,11 @@ fn anchor(parent: Option<&Model>, helper: Option<&str>, port: &PortNode) -> Anch
             return Anchor::node(Placement::Helper(helper.to_owned()), found);
         }
         if let Some(found) = placement::bone_placement(parent, helper) {
-            return Anchor::bone(Placement::Helper(helper.to_owned()), found);
+            return Anchor::bone(
+                Placement::Helper(helper.to_owned()),
+                found,
+                BoneOwner::Parent,
+            );
         }
     }
     placement::node_placement(parent, port.name()).map_or_else(Anchor::origin, |found| {

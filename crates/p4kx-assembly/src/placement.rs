@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_model::{Bone, Model, ModelFile, Transform, chained_world_poses};
+use p4kx_model::{Bone, Lod, Model, ModelFile, Transform, chained_world_poses};
 
 /// Returns the transform of a port's offset from its helper: the rotation `rotation` in degrees,
 /// about X first, then Y, then Z, and the translation `position` in metres.
@@ -106,24 +106,46 @@ pub(crate) struct BonePlacement {
 }
 
 pub(crate) fn bone_placement(model: &Model, name: &str) -> Option<BonePlacement> {
-    let (file, bones) = model
-        .lods
-        .first()
-        .and_then(|lod| Some((ModelFile::LodModel(lod.level), lod.bones.as_deref()?)))
-        .unwrap_or((ModelFile::Model, model.bones.as_slice()));
-    let (ordinal, transform) = named_bone_pose(bones, name)?;
-    Some(BonePlacement {
-        transform,
-        selection: BoneSelection { file, ordinal },
-    })
+    PlacementSkeleton::of(model, model.lods.first()).find(name)
 }
 
-/// Returns the bind pose of the bone of `bones` named `name`, ignoring ASCII case, in the space of
-/// the skeleton, or `None` when there is no such bone or its pose is not finite.
-pub(crate) fn bone_pose(bones: &[Bone], name: &str) -> Option<Transform> {
-    named_bone_pose(bones, name).map(|(_, transform)| transform)
+#[derive(Clone, Copy)]
+pub(crate) struct PlacementSkeleton<'a> {
+    file: ModelFile,
+    bones: &'a [Bone],
 }
 
+impl<'a> PlacementSkeleton<'a> {
+    pub(crate) fn of(model: &'a Model, lod: Option<&'a Lod>) -> Self {
+        lod.and_then(|lod| {
+            Some(Self {
+                file: ModelFile::LodModel(lod.level),
+                bones: lod.bones.as_deref()?,
+            })
+        })
+        .unwrap_or(Self {
+            file: ModelFile::Model,
+            bones: model.bones.as_slice(),
+        })
+    }
+
+    pub(crate) const fn bones(self) -> &'a [Bone] {
+        self.bones
+    }
+
+    pub(crate) fn find(self, name: &str) -> Option<BonePlacement> {
+        let (ordinal, transform) = named_bone_pose(self.bones, name)?;
+        Some(BonePlacement {
+            transform,
+            selection: BoneSelection {
+                file: self.file,
+                ordinal,
+            },
+        })
+    }
+}
+
+/// Returns the selected original bone ordinal and its pose in skeleton space.
 fn named_bone_pose(bones: &[Bone], name: &str) -> Option<(usize, Transform)> {
     let at = bones
         .iter()

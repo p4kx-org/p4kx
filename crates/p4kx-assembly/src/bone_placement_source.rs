@@ -4,11 +4,11 @@
 use p4kx_extraction::{EntryOrigin, SourceLocation};
 use p4kx_model::{Bone, ModelBoneSource, ModelBoneSources, ModelFile};
 
-use crate::model_placement_sources::ModelAnchor;
+use crate::model_placement_sources::{BoneOwner, ModelAnchor};
 use crate::placement::BoneSelection;
 use crate::{Assembly, Part};
 
-/// Original parent skeleton fields used by one part's bind-pose placement.
+/// Original skeleton fields used by one part's bind-pose placement.
 #[derive(Debug)]
 pub struct BonePlacementSource<'a> {
     owner: &'a Part,
@@ -75,13 +75,17 @@ impl<'a> BonePlacementSource<'a> {
 }
 
 impl Assembly {
-    /// Returns the observed skeleton used to place this part at a parent model bone.
+    /// Returns the parent or character-root skeleton used to place this part.
     #[must_use]
     pub fn bone_placement_source(&self, part: usize) -> Option<BonePlacementSource<'_>> {
         let part = self.parts.get(part)?;
-        let ModelAnchor::Bone(selection) = part.model_placement.anchor else {
+        let ModelAnchor::Bone { owner, selection } = part.model_placement.anchor else {
             return None;
         };
-        BonePlacementSource::new(self.parts.get(part.parent()?)?, selection)
+        let owner = match owner {
+            BoneOwner::Parent => self.parts.get(part.parent()?)?,
+            BoneOwner::Root => self.parts.first()?,
+        };
+        BonePlacementSource::new(owner, selection)
     }
 }

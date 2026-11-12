@@ -30,14 +30,21 @@ fn write_archive(dir: &Path, entries: Vec<TestEntry>) -> Result<PathBuf, Box<dyn
 }
 
 fn hologram(archive: &Path, out: &Path, extra: &[&str], json: bool) -> Result<Run, Box<dyn Error>> {
+    hologram_for(archive, out, "TEST_Ship", extra, json)
+}
+
+fn hologram_for(
+    archive: &Path,
+    out: &Path,
+    class: &str,
+    extra: &[&str],
+    json: bool,
+) -> Result<Run, Box<dyn Error>> {
     let mut command = p4kx_testkit::p4kx()?;
     if json {
         command.arg("--json");
     }
-    command
-        .args(["ui", "hologram"])
-        .arg(archive)
-        .arg("TEST_Ship");
+    command.args(["ui", "hologram"]).arg(archive).arg(class);
     if !cfg!(target_os = "macos") {
         command.arg("--software");
     }

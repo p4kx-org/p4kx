@@ -98,7 +98,7 @@ impl Assembly {
             let (palette, unresolved) = palettes.of_part(draft, *model, &materials.status);
             issues.extend(unresolved.into_iter().map(|kind| issue(draft, kind)));
             let rig = under_skin(draft, &parts)
-                .then(|| creature_rig::anchor_bones_of(&parts, &issues, options.lod))
+                .then(|| creature_rig::anchor_skeleton(&parts, &issues, options.lod))
                 .flatten();
             let prop = is_prop(draft, *model, options.lod);
             let placement = place(draft, &parts, *model, rig, prop, &mut issues);

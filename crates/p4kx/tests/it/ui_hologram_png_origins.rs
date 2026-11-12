@@ -219,3 +219,6 @@ mod mesh_nodes;
 
 #[path = "ui_hologram_bone_placement.rs"]
 mod bone_placement;
+
+#[path = "ui_hologram_root_rig.rs"]
+mod root_rig;

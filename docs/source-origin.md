@@ -164,8 +164,10 @@ incomplete.
 A port anchored to a parent model bone uses `modelBonePlacementBytes`.
 Its indices identify the physical skeleton chunk, bone ordinal and byte
 range in the selected Entry. The selected name and the parent and
-relative-pose fields belong to the effective main or LOD skeleton. Root
-character rig and CDF attachment bind poses are separate evidence paths.
+relative-pose fields belong to the effective main or LOD skeleton.
+Equipment anchored through a parent skin uses the original character-root
+rig when that rig supplied its placement. CDF attachments have their own
+bind-pose route.
 
 Direct mesh conversion uses `modelMeshNodeBytes` for the node matrices,
 parent links and CrCh parent IDs that supply the bounds of an admitted
