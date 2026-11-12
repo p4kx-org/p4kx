@@ -38,6 +38,8 @@ mod resource_connections;
 mod resource_network;
 #[path = "catalog_shield.rs"]
 mod shield;
+#[path = "catalog_vehicle_armor.rs"]
+mod vehicle_armor;
 
 fn catalog() -> Result<Value, Box<dyn Error>> {
     let (_directory, archive) = ammo_source::archive(ammo_source::AmmoSource::CyclicMembers)?;

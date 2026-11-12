@@ -132,3 +132,11 @@ Global resource rules have their own GameMode-owned rows. The original
 `params.resourceNetworkParams` declaration supplies the typed settings and
 their per-value origin. Component and placement rows continue to describe
 their own authored settings.
+
+## Catalog schema 3 vehicle armour
+
+Each original SCItemVehicleArmorParams occurrence owns its configuration
+row. Vehicle armour shares the raw damage and curve readers while preserving
+its own physical component identity. An installed attachment uses the
+resolved loadout's physical target Record index.
+[Vehicle armour](../catalog-vehicle-armor.md) lists the original fields.

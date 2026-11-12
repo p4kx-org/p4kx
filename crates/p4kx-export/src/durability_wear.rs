@@ -8,6 +8,7 @@ use serde::Serialize;
 use super::observed::Observed;
 use crate::CatalogError;
 use crate::catalog_v3::authored_effect_resource::Rtpc;
+use crate::catalog_v3::degradation_curve::DegradationCurve;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -145,48 +146,6 @@ impl DegradeFromParent {
             resource_delta_type: source.enumeration("resourceDeltaType", notes)?,
             resource_type: source.enumeration("resourceType", notes)?,
             resource_to_degradation_rate: source.single("resourceToDegradationRate", notes)?,
-        })
-    }
-}
-
-/// The original curve controls and authored point slots.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct DegradationCurve {
-    use_lut: SourcedValue<bool>,
-    points: SourcedValue<Vec<SourcedValue<CurvePoint>>>,
-}
-
-impl DegradationCurve {
-    fn read(
-        source: Observed<'_, '_, '_, '_>,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<Self, CatalogError> {
-        Ok(Self {
-            use_lut: source.boolean("useLUT", notes)?,
-            points: source.array("points", &["Vec2"], notes, CurvePoint::read)?,
-        })
-    }
-}
-
-/// The exact stored coordinates of an authored curve point.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct CurvePoint {
-    x: SourcedValue<ResourceFloat32>,
-    y: SourcedValue<ResourceFloat32>,
-}
-
-impl CurvePoint {
-    pub(super) fn read(
-        source: Observed<'_, '_, '_, '_>,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<Self, CatalogError> {
-        Ok(Self {
-            x: source.single("x", notes)?,
-            y: source.single("y", notes)?,
         })
     }
 }

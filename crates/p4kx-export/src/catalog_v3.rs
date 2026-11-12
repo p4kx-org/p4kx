@@ -124,8 +124,16 @@ mod sensor_mine;
 
 #[path = "catalog_durability.rs"]
 pub(crate) mod catalog_durability;
+#[path = "catalog_vehicle_armor.rs"]
+mod catalog_vehicle_armor;
+#[path = "degradation_curve.rs"]
+mod degradation_curve;
 #[path = "tag_catalog.rs"]
 pub(crate) mod tag_catalog;
+#[path = "vehicle_armor_damage.rs"]
+mod vehicle_armor_damage;
+#[path = "vehicle_armor_resistance.rs"]
+mod vehicle_armor_resistance;
 
 #[path = "catalog_definitions.rs"]
 pub(crate) mod catalog_definitions;

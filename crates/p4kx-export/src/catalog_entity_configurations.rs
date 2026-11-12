@@ -14,6 +14,7 @@ use super::catalog_fuel_configurations::{
 use super::catalog_item_alignment::{ItemAlignmentKind, ItemAlignmentRows, ItemAlignmentTables};
 use super::catalog_resource_component::{self, ResourceComponent};
 use super::catalog_resource_connection::{self, ConnectionKind, ResourceConnection};
+use super::catalog_vehicle_armor::{self, VehicleArmor};
 use super::item_alignment_options::AlignmentOptions;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
@@ -32,6 +33,7 @@ pub(crate) struct EntityConfigurationRows<'source> {
     fuel: FuelConfigurationRows<'source>,
     resources: Vec<ResourceComponent<'source>>,
     connections: Vec<ResourceConnection<'source>>,
+    vehicle_armor: Vec<VehicleArmor<'source>>,
     pub(crate) numbers: Vec<CapturedNumber>,
 }
 
@@ -41,6 +43,7 @@ impl<'source> EntityConfigurationRows<'source> {
         self.fuel.extend(other.fuel);
         self.resources.extend(other.resources);
         self.connections.extend(other.connections);
+        self.vehicle_armor.extend(other.vehicle_armor);
         self.numbers.extend(other.numbers);
     }
 
@@ -50,6 +53,7 @@ impl<'source> EntityConfigurationRows<'source> {
     ) -> EntityConfigurationTables<'source> {
         self.resources.sort_by_key(|row| row.owner().key());
         self.connections.sort_by_key(|row| row.owner().key());
+        self.vehicle_armor.sort_by_key(|row| row.owner().key());
         EntityConfigurationTables {
             alignment: self.alignment.into_tables(forge),
             fuel: self.fuel.into_tables(forge),
@@ -62,6 +66,11 @@ impl<'source> EntityConfigurationRows<'source> {
                 forge,
                 catalog_resource_connection::SOURCE_TYPES,
                 self.connections,
+            ),
+            vehicle_armor: CatalogTable::new(
+                forge,
+                &[catalog_vehicle_armor::COMPONENT],
+                self.vehicle_armor,
             ),
         }
     }
@@ -77,6 +86,7 @@ pub(crate) struct EntityConfigurationTables<'source> {
     fuel: FuelConfigurationTables<'source>,
     resource_components: CatalogTable<ResourceComponent<'source>>,
     resource_connections: CatalogTable<ResourceConnection<'source>>,
+    vehicle_armor: CatalogTable<VehicleArmor<'source>>,
 }
 
 enum ConfigurationKind {
@@ -84,12 +94,15 @@ enum ConfigurationKind {
     Fuel(FuelConfigurationKind),
     Resource,
     Connection(ConnectionKind),
+    VehicleArmor,
 }
 
 impl ConfigurationKind {
     fn of(value: &StructValue<'_>, input: &OriginalCatalogInput<'_, '_>) -> Option<Self> {
-        if value.type_name() == catalog_resource_component::COMPONENT {
-            return Some(Self::Resource);
+        match value.type_name() {
+            catalog_resource_component::COMPONENT => return Some(Self::Resource),
+            catalog_vehicle_armor::COMPONENT => return Some(Self::VehicleArmor),
+            _ => {}
         }
         ItemAlignmentKind::of(value, input)
             .map(Self::Alignment)
@@ -147,6 +160,9 @@ pub(crate) fn read<'source>(
             ConfigurationKind::Connection(kind) => rows
                 .connections
                 .push(ResourceConnection::read(kind, owner, source, &mut notes)?),
+            ConfigurationKind::VehicleArmor => rows
+                .vehicle_armor
+                .push(VehicleArmor::read(owner, source, &mut notes)?),
         }
     }
     rows.numbers = numbers.into_inner();

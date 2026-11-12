@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -77,6 +77,17 @@ impl DamageInfo {
             stun: source.single("DamageStun", notes)?,
         })
     }
+
+    pub(super) const fn projected(&self) -> [(&'static str, SourceValueState); 6] {
+        [
+            ("DamagePhysical", self.physical.state()),
+            ("DamageEnergy", self.energy.state()),
+            ("DamageDistortion", self.distortion.state()),
+            ("DamageThermal", self.thermal.state()),
+            ("DamageBiochemical", self.biochemical.state()),
+            ("DamageStun", self.stun.state()),
+        ]
+    }
 }
 
 /// The original macro link and declared total.
@@ -97,6 +108,13 @@ impl<'source> DamageParameters<'source> {
             damage_macro: source.link("damageMacro", notes)?,
             damage_total: source.single("damageTotal", notes)?,
         })
+    }
+
+    pub(super) const fn projected(&self) -> [(&'static str, SourceValueState); 2] {
+        [
+            ("damageMacro", self.damage_macro.state()),
+            ("damageTotal", self.damage_total.state()),
+        ]
     }
 }
 

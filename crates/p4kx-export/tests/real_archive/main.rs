@@ -80,6 +80,7 @@ mod real_archive_texts;
 mod real_archive_variant_groups;
 mod real_archive_variant_keys;
 mod real_archive_variants;
+mod real_archive_vehicle_armor;
 mod real_archive_verification;
 mod real_archive_weapon_actions;
 mod shield_generators;
