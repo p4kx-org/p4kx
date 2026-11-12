@@ -125,7 +125,7 @@ impl Kind {
             },
             Self::FactionReputations => KindRule {
                 prefixes: &["libs/foundry/records/factions/factionreputation/"],
-                type_name: "FactionReputation",
+                type_name: crate::catalog_v3::reputation_faction_definition::SOURCE_TYPE,
             },
             Self::ReputationScopes => KindRule {
                 prefixes: &["libs/foundry/records/reputation/scopes/"],

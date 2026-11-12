@@ -79,7 +79,10 @@ fn factions_export_exact_legal_behavior_ordered_links_and_unprojected_fields() -
     assert_eq!(summary.count, rows.len());
     assert!(summary.complete, "unfiltered Faction selection");
     assert_eq!(
-        at(&catalog, "/factionReputations/0/guid")?,
+        at(
+            &catalog,
+            "/definitions/factionReputations/rows/0/guid/value"
+        )?,
         &json!(guid(fixture::REPUTATION))
     );
     assert!(

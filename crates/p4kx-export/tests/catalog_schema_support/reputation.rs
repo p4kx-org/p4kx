@@ -12,19 +12,36 @@ const SCOPE: &str = "61000000-0000-4000-8000-000000000001";
 const STANDING: &str = "62000000-0000-4000-8000-000000000001";
 
 pub(super) fn factions() -> serde_json::Value {
-    json!([{
-        "guid": "60000000-0000-4000-8000-000000000001",
-        "className": "FactionReputation_Acme",
-        "recordPath": "libs/foundry/records/factions/factionreputation/factionreputation_acme",
-        "displayName": {"key": "@faction_acme", "en": "Acme Emporium", "de": null},
-        "isNpc": false,
-        "lawful": true,
-        "contextGuid": "63000000-0000-4000-8000-000000000001",
-        "allyGuids": [],
-        "enemyGuids": ["60000000-0000-4000-8000-000000000002"],
-        "hostility": {"scopeGuid": SCOPE, "standingGuid": STANDING},
-        "allied": null
-    }])
+    let absent = || values::source(SourceValue::Absent);
+    let empty = || values::present(json!([]));
+    json!({"availability":"available","rows":[{
+        "guid":values::present(json!("60000000-0000-4000-8000-000000000001")),
+        "recordName":values::present(json!("FactionReputation.FactionReputation_Acme")),
+        "className":values::present(json!("FactionReputation_Acme")),
+        "recordPath":values::present(json!("libs/foundry/records/factions/factionreputation/factionreputation_acme")),
+        "recordIndex":values::present(json!(3)),
+        "sourceType":values::present(json!("FactionReputation")),
+        "fileName":values::present(json!("libs/foundry/records/factions/factionreputation/factionreputation_acme.xml")),
+        "metadataTag":absent(),
+        "name":absent(),
+        "displayName":absent(),
+        "description":absent(),
+        "background":absent(),
+        "geid":values::present(json!("18446744073709551610")),
+        "logo":absent(),
+        "missionBoardLogo":absent(),
+        "guildBanner":absent(),
+        "hideInDelpihApp":absent(),
+        "isNpc":values::present(json!(false)),
+        "reputationContextPropertiesUi":absent(),
+        "allies":empty(),
+        "enemies":empty(),
+        "hostilityParams":absent(),
+        "alliedParams":absent(),
+        "perkReputationRewardList":empty(),
+        "propertiesBb":empty(),
+        "authoredFields":{"roots":[],"values":[]}
+    }]})
 }
 
 pub(super) fn scopes() -> serde_json::Value {

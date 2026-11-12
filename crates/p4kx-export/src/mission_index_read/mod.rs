@@ -168,14 +168,7 @@ pub(super) fn read<'f>(
             .map(Some);
         }
     };
-    let ledger = crate::export_field_walk::inspect_observed(
-        input,
-        &tree,
-        &admission,
-        Some(Kind::Contracts),
-        ExportSourceRole::Dependency,
-        cancel,
-    )?;
+    let ledger = inspect_dependency(action, input, &tree, &admission, cancel)?;
     let projected = project(
         action,
         &admission,
@@ -186,6 +179,34 @@ pub(super) fn read<'f>(
         cancel,
     );
     finish_projection(projected, ledger, action, &admission, input).map(Some)
+}
+
+fn inspect_dependency<'source>(
+    action: Action,
+    input: Option<&OriginalCatalogInput<'_, '_>>,
+    tree: &p4kx_extraction::RecordTree<'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ExportLedger, CatalogError> {
+    if let (Action::Faction, Some(input)) = (action, input) {
+        crate::export_field_walk::inspect_record_field(
+            input,
+            tree,
+            admission,
+            Kind::Contracts,
+            projection::FACTION_DISPLAY_NAME,
+            cancel,
+        )
+    } else {
+        crate::export_field_walk::inspect_observed(
+            input,
+            tree,
+            admission,
+            Some(Kind::Contracts),
+            ExportSourceRole::Dependency,
+            cancel,
+        )
+    }
 }
 
 fn finish_projection<'source>(

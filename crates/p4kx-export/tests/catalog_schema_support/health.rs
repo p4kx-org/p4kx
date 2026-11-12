@@ -70,6 +70,7 @@ fn row_count(kind: Kind, catalog: &Value) -> usize {
         Kind::ShopInventories => catalog.pointer("/definitions/shopInventories/rows"),
         Kind::ExplosionDefinitions => catalog.pointer("/definitions/explosionDefinitions/rows"),
         Kind::Factions => catalog.pointer("/definitions/factions/rows"),
+        Kind::FactionReputations => catalog.pointer("/definitions/factionReputations/rows"),
         Kind::ReputationPerks => catalog.pointer("/definitions/reputationPerks/rows"),
         Kind::AmmoDefinitions => catalog.pointer("/definitions/ammoDefinitions/rows"),
         Kind::ContractTemplates => catalog.pointer("/definitions/contractTemplates/rows"),

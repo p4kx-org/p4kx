@@ -187,6 +187,7 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
                 | Kind::BlueprintCategoryLists
                 | Kind::GameplayProperties
                 | Kind::ReputationContexts
+                | Kind::FactionReputations
                 | Kind::ReputationScopes
                 | Kind::ReputationStandings
                 | Kind::QualityDistributions

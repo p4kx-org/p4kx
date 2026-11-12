@@ -8,23 +8,23 @@ use crate::cargo_manifest::cargo_manifest;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::reputation_context_definition::{self, ContextDefinition, PreparedContext};
+use crate::catalog_v3::reputation_faction_definition::{
+    self, FactionReputationDefinition, PreparedFactionReputation,
+};
 use crate::catalog_v3::reputation_perk_list::{self, PreparedPerkList, ReputationPerkList};
 use crate::catalog_v3::reputation_scope_definition::{self, PreparedScope, ScopeDefinition};
 use crate::catalog_v3::reputation_standing_definition::{
     self, PreparedStanding, StandingDefinition,
 };
-use crate::contract::{
-    CargoManifest, ContractScenario, FactionReputation, MissionLocality, MissionType,
-};
+use crate::contract::{CargoManifest, ContractScenario, MissionLocality, MissionType};
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::mission_data::{contract_scenario, mission_locality, mission_type};
-use crate::reputation::faction_reputation;
 use crate::texts::Texts;
 
 /// An entity of one of the mission and reputation kinds.
 pub(crate) enum MissionPick<'f> {
     /// A faction.
-    Faction(FactionReputation<'f>),
+    Faction(Box<PreparedFactionReputation<'f>>),
     /// A reputation scope.
     Scope(Box<PreparedScope<'f>>),
     /// A reputation standing.
@@ -48,7 +48,6 @@ impl<'f> MissionPick<'f> {
     /// not a mission or reputation kind.
     pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>, texts: &Texts<'f>) -> Option<Self> {
         Some(match kind {
-            Kind::FactionReputations => Self::Faction(faction_reputation(tree, texts)),
             Kind::MissionTypes => Self::Type(mission_type(tree, texts)),
             Kind::MissionLocalities => Self::Locality(mission_locality(tree)),
             Kind::ContractScenarios => Self::Scenario(contract_scenario(tree)),
@@ -61,7 +60,7 @@ impl<'f> MissionPick<'f> {
 /// The entities of the mission and reputation kinds, each ordered by the text of the GUID.
 #[derive(Default)]
 pub(crate) struct MissionKinds<'f> {
-    pub(crate) factions: Vec<FactionReputation<'f>>,
+    pub(crate) factions: Vec<PreparedFactionReputation<'f>>,
     pub(crate) scopes: Vec<PreparedScope<'f>>,
     pub(crate) standings: Vec<PreparedStanding<'f>>,
     pub(crate) perks: Vec<PreparedPerkList<'f>>,
@@ -73,6 +72,7 @@ pub(crate) struct MissionKinds<'f> {
 }
 
 pub(crate) struct ReputationTables<'source> {
+    pub(crate) factions: CatalogTable<FactionReputationDefinition<'source>>,
     pub(crate) contexts: CatalogTable<ContextDefinition<'source>>,
     pub(crate) scopes: CatalogTable<ScopeDefinition<'source>>,
     pub(crate) standings: CatalogTable<StandingDefinition<'source>>,
@@ -83,7 +83,7 @@ impl<'f> MissionKinds<'f> {
     /// Stores `pick` under its kind.
     pub(crate) fn push(&mut self, pick: MissionPick<'f>) {
         match pick {
-            MissionPick::Faction(entity) => self.factions.push(entity),
+            MissionPick::Faction(entity) => self.factions.push(*entity),
             MissionPick::Scope(entity) => self.scopes.push(*entity),
             MissionPick::Standing(entity) => self.standings.push(*entity),
             MissionPick::Perks(entity) => self.perks.push(*entity),
@@ -97,7 +97,8 @@ impl<'f> MissionKinds<'f> {
 
     /// Orders every kind by the text of the GUID.
     pub(crate) fn order(&mut self) {
-        sort_by_guid(&mut self.factions, |entity| entity.guid);
+        self.factions
+            .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         self.scopes
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         self.standings
@@ -115,6 +116,10 @@ impl<'f> MissionKinds<'f> {
     /// Takes the physical reputation definitions into their canonical catalog tables.
     pub(crate) fn take_reputation_tables(&mut self, forge: &DataForge<'_>) -> ReputationTables<'f> {
         ReputationTables {
+            factions: reputation_faction_definition::table(
+                forge,
+                std::mem::take(&mut self.factions),
+            ),
             contexts: reputation_context_definition::table(
                 forge,
                 std::mem::take(&mut self.contexts),
@@ -132,9 +137,14 @@ impl<'f> MissionKinds<'f> {
     pub(crate) fn reputation_number_groups(
         &self,
     ) -> impl Iterator<Item = (Kind, &[CapturedNumber])> {
-        self.scopes
+        self.factions
             .iter()
-            .map(|row| (Kind::ReputationScopes, row.numbers.as_slice()))
+            .map(|row| (Kind::FactionReputations, row.numbers.as_slice()))
+            .chain(
+                self.scopes
+                    .iter()
+                    .map(|row| (Kind::ReputationScopes, row.numbers.as_slice())),
+            )
             .chain(
                 self.standings
                     .iter()

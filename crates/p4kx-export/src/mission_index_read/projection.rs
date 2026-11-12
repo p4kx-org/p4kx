@@ -18,6 +18,8 @@ use crate::spawn_pools::SpawnPools;
 use super::super::{Broker, MissionTypeName, Piece, RewardDependency, Template, TemplateFacts};
 use super::selection::Action;
 
+pub(super) const FACTION_DISPLAY_NAME: &str = "displayName";
+
 pub(super) struct TextInputs<'fields, 'scope, 'read, 'catalog, 'source> {
     pub(super) fields: &'fields OriginalFlowFields<'scope, 'read, 'source>,
     pub(super) origins: &'fields CatalogOrigins,
@@ -75,7 +77,7 @@ pub(super) fn project<'f>(
         )),
         Action::Faction => Some(Piece::Faction(
             guid,
-            mission_layers::key(root, "displayName"),
+            mission_layers::key(root, FACTION_DISPLAY_NAME),
         )),
         Action::Reward => Some(Piece::Reward(guid, tree.record_index(), reward()?)),
     })

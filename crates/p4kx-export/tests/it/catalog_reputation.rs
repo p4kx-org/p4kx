@@ -8,6 +8,8 @@
 mod catalog_faction;
 #[path = "catalog_faction_modifier.rs"]
 mod faction_modifier;
+#[path = "reputation_faction_owner.rs"]
+mod faction_reputation_owner;
 #[path = "catalog_scenario_faction_scope.rs"]
 mod faction_scope;
 #[path = "catalog_reputation_context.rs"]
@@ -18,8 +20,8 @@ mod reputation_perks;
 mod reputation_scope;
 
 use crate::reputation_fixture::{
-    CONTEXT, FACTION, FACTION_BARE, LEGACY_FACTION, LOCALITY, MISSION_TYPE, PLAIN_A, PLAIN_B,
-    SCENARIO, SCOPE, STANDING_HIGH, STANDING_LOW, write_archive, write_archive_with_drift,
+    CONTEXT, FACTION, LEGACY_FACTION, LOCALITY, MISSION_TYPE, PLAIN_A, PLAIN_B, SCENARIO, SCOPE,
+    STANDING_HIGH, STANDING_LOW, write_archive, write_archive_with_drift,
 };
 
 use crate::health_origin_assertions as proof;
@@ -77,46 +79,6 @@ fn counts(built: &BuiltCatalog, kind: Kind) -> Option<(usize, usize)> {
         .summary()
         .kind(kind)
         .map(|kind| (kind.count, kind.skipped))
-}
-
-#[test]
-fn a_faction_lists_its_links_and_reads_lawful_from_the_property() -> TestResult {
-    let (built, catalog) = build(None)?;
-    assert_eq!(
-        *entry(&catalog, "factionReputations", FACTION)?,
-        json!({
-            "guid": guid(FACTION),
-            "className": "FactionReputation_Acme",
-            "recordPath": "libs/foundry/records/factions/factionreputation/factionreputation_acme",
-            "displayName": {"key": "@faction_acme", "en": "Acme Emporium", "de": null},
-            "isNpc": false,
-            "lawful": true,
-            "contextGuid": guid(CONTEXT),
-            "allyGuids": [guid(FACTION_BARE)],
-            "enemyGuids": [],
-            "hostility": {"scopeGuid": guid(SCOPE), "standingGuid": guid(STANDING_LOW)},
-            "allied": {"scopeGuid": guid(SCOPE), "standingGuid": guid(STANDING_HIGH)}
-        })
-    );
-    assert_eq!(
-        counts(&built, Kind::FactionReputations),
-        Some((2, 1)),
-        "the test faction is a leftover"
-    );
-    Ok(())
-}
-
-#[test]
-fn a_faction_without_the_fields_has_null_and_empty_values() -> TestResult {
-    let (_, catalog) = build(None)?;
-    let bare = entry(&catalog, "factionReputations", FACTION_BARE)?;
-    for field in ["lawful", "contextGuid", "hostility", "allied"] {
-        assert_eq!(bare[field], Value::Null, "{field}");
-    }
-    assert_eq!(bare["isNpc"], false, "the DataForge stores a default");
-    assert_eq!(bare["allyGuids"], json!([]));
-    assert_eq!(bare["enemyGuids"], json!([]));
-    Ok(())
 }
 
 #[test]
@@ -337,7 +299,10 @@ fn a_filter_marks_the_kinds_partial_and_selects_by_record_path() -> TestResult {
     let filter = Filter::new("*/missiontype/*");
     let (built, catalog) = build(Some(&filter))?;
     assert_eq!(catalog["missionTypes"].as_array().map(Vec::len), Some(1));
-    assert_eq!(catalog["factionReputations"], json!([]));
+    assert_eq!(
+        proof::at(&catalog, "/definitions/factionReputations/rows")?,
+        &json!([])
+    );
     assert_eq!(
         catalog["completeness"]["factionReputations"],
         json!({"status": "partial", "filter": "*/missiontype/*"})

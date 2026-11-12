@@ -61,13 +61,13 @@ pub(crate) struct FactionDefinition<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 #[schemars(rename = "FactionTextOf{Reference}", transform = every_field_required)]
-enum FactionText<'source, Reference> {
+pub(super) enum FactionText<'source, Reference> {
     Localized { reference: Reference },
     Literal { text: &'source str },
 }
 
 impl<'source, Reference> FactionText<'source, Reference> {
-    fn read<'scope, 'read>(
+    pub(super) fn read<'scope, 'read>(
         fields: Observed<'_, 'scope, 'read, 'source>,
         name: &str,
         notes: &mut Vec<FieldError>,

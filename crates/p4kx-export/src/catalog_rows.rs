@@ -121,12 +121,22 @@ fn template_numbers(collected: &Collected<'_>) -> Vec<TemplateNumbers> {
         .collect()
 }
 
-fn append_missions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
+fn append_reputation_definitions(
+    emitted: &mut Vec<CatalogRow>,
+    missions: &crate::mission_kinds::MissionKinds<'_>,
+) {
+    append(
+        emitted,
+        Kind::FactionReputations,
+        missions
+            .factions
+            .iter()
+            .map(|row| (row.physical_guid, row.physical_path)),
+    );
     append(
         emitted,
         Kind::ReputationContexts,
-        collected
-            .mission_kinds
+        missions
             .contexts
             .iter()
             .map(|row| (row.physical_guid, row.physical_path)),
@@ -134,8 +144,7 @@ fn append_missions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
     append(
         emitted,
         Kind::ReputationPerks,
-        collected
-            .mission_kinds
+        missions
             .perks
             .iter()
             .map(|row| (row.physical_guid, row.physical_path)),
@@ -143,8 +152,7 @@ fn append_missions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
     append(
         emitted,
         Kind::ReputationScopes,
-        collected
-            .mission_kinds
+        missions
             .scopes
             .iter()
             .map(|row| (row.physical_guid, row.physical_path)),
@@ -152,12 +160,15 @@ fn append_missions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
     append(
         emitted,
         Kind::ReputationStandings,
-        collected
-            .mission_kinds
+        missions
             .standings
             .iter()
             .map(|row| (row.physical_guid, row.physical_path)),
     );
+}
+
+fn append_missions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
+    append_reputation_definitions(emitted, &collected.mission_kinds);
     append(
         emitted,
         Kind::ContractTemplates,

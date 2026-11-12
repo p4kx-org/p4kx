@@ -300,6 +300,7 @@ impl Coverage<'_, '_> {
                     | Kind::ExplosionDefinitions
                     | Kind::AmmoDefinitions
                     | Kind::Factions
+                    | Kind::FactionReputations
                     | Kind::ReputationScopes
                     | Kind::ReputationStandings
                     | Kind::ReputationContexts
@@ -366,6 +367,7 @@ impl Coverage<'_, '_> {
             (
                 Some(
                     Kind::Factions
+                    | Kind::FactionReputations
                     | Kind::ReputationScopes
                     | Kind::ReputationStandings
                     | Kind::ReputationContexts
@@ -377,6 +379,7 @@ impl Coverage<'_, '_> {
                 Some(
                     Kind::ExplosionDefinitions
                     | Kind::AmmoDefinitions
+                    | Kind::FactionReputations
                     | Kind::ReputationStandings
                     | Kind::ReputationContexts
                     | Kind::ReputationPerks,

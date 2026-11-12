@@ -15,6 +15,7 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
     check_family_aliases(catalog, Kind::BlueprintCategoryLists)?;
     check_family_aliases(catalog, Kind::GameplayProperties)?;
     check_family_aliases(catalog, Kind::ReputationContexts)?;
+    check_family_aliases(catalog, Kind::FactionReputations)?;
     check_family_aliases(catalog, Kind::ReputationScopes)?;
     check_family_aliases(catalog, Kind::ReputationStandings)?;
     let mut seen: HashMap<&str, (Kind, &Value)> = HashMap::new();
@@ -33,6 +34,7 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
                 | Kind::ExplosionDefinitions
                 | Kind::AmmoDefinitions
                 | Kind::ReputationContexts
+                | Kind::FactionReputations
                 | Kind::ReputationScopes
                 | Kind::ReputationStandings
                 | Kind::QualityDistributions

@@ -30,6 +30,7 @@ impl<'f> Scan<'_, '_, 'f> {
             }
             Kind::ExplosionDefinitions => self.explosion_definition(admission, tree)?,
             Kind::Factions => self.faction_definition(admission, tree)?,
+            Kind::FactionReputations => self.faction_reputation_definition(admission, tree)?,
             Kind::ReputationContexts => self.context_definition(admission, tree)?,
             Kind::ReputationScopes => self.scope_definition(admission, tree)?,
             Kind::ReputationStandings => self.standing_definition(admission, tree)?,
@@ -165,6 +166,21 @@ impl<'f> Scan<'_, '_, 'f> {
             self.options.cancel,
         )?;
         let picked = crate::mission_kinds::MissionPick::Perks(Box::new(read.value));
+        Ok((Picked::Mission(picked), read.notes))
+    }
+
+    fn faction_reputation_definition(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let read = crate::catalog_v3::reputation_faction_definition::read(
+            tree,
+            self.projection,
+            admission,
+            self.options.cancel,
+        )?;
+        let picked = crate::mission_kinds::MissionPick::Faction(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))
     }
 

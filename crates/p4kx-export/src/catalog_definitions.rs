@@ -13,6 +13,7 @@ use crate::catalog_v3::faction_definition::FactionDefinition;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
 use crate::catalog_v3::reputation_context_definition::ContextDefinition;
+use crate::catalog_v3::reputation_faction_definition::FactionReputationDefinition;
 use crate::catalog_v3::reputation_perk_list::ReputationPerkList;
 use crate::catalog_v3::reputation_scope_definition::ScopeDefinition;
 use crate::catalog_v3::reputation_standing_definition::StandingDefinition;
@@ -54,5 +55,6 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) commodities: CatalogTable<CommodityDefinition<'source>>,
     pub(crate) manufacturers: CatalogTable<ManufacturerDefinition<'source>>,
     pub(crate) factions: CatalogTable<FactionDefinition<'source>>,
+    pub(crate) faction_reputations: CatalogTable<FactionReputationDefinition<'source>>,
     pub(crate) reputation_perks: CatalogTable<ReputationPerkList<'source>>,
 }

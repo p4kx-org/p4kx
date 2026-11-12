@@ -228,6 +228,7 @@ fn assemble<R>(
             ),
             ammo_definitions: ammo_definition::table(&forge, collected.ammo_definitions),
             reputation_contexts: reputation_tables.contexts,
+            faction_reputations: reputation_tables.factions,
             reputation_scopes: reputation_tables.scopes,
             reputation_standings: reputation_tables.standings,
             contract_generators: CatalogTable::new(
@@ -348,7 +349,6 @@ fn assemble<R>(
         harvestable_locations: collected.harvestable_locations,
         loot_containers: collected.loot_containers,
         shops: collected.shops,
-        faction_reputations: collected.mission_kinds.factions,
         mission_types: collected.mission_kinds.types,
         mission_localities: collected.mission_kinds.localities,
         contract_scenarios: collected.mission_kinds.scenarios,

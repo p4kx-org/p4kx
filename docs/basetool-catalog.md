@@ -235,7 +235,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `subHarvestableMultiConfigs` | What the slots of an object can hold by tag, ordered by GUID |
 | `harvestableLocations` | The containers whose `.soc` names a provider preset, with the starmap object each hangs below, ordered by preset, container, system and object |
 | `shops` | The shops of the shop registry with kind, brand, location and the link to a starmap object, ordered by `key` |
-| `factionReputations` | The factions of the reputation system with their allies, enemies and relation standings, ordered by GUID |
+| `definitions.factionReputations` | Physical faction reputation records, presentation, relations, blackboard values and original perk-list links |
 | `definitions.reputationScopes` | Physical reputation scope definitions with authored presentation and ordered standing maps |
 | `definitions.reputationStandings` | The physical reputation standings with authored presentation and progression fields, ordered by GUID and original Record index |
 | `definitions.reputationPerks` | The physical perk lists with ordered original scope/standing associations and owned reward or category data |
@@ -1429,25 +1429,24 @@ the template (53) and the sub contract (18); the items are 2,587 resources, 647 
 
 ### Factions, reputation and missions
 
-Seven kinds (ADR-0237) hold what the contracts refer to. Each is the
-Records of one type under one folder (see "Selection"), ordered by GUID, with `guid`, `className`
-(the Record name without its type) and `recordPath`. Facts only: identifiers, short names, numbers
-and links. A Reference to no Record is left out (`null`, or missing from the list); a GUID of an existing Record that the catalog does not list is kept, so `missionLocalities[].starmapObjectGuids` may name an object missing from `starmapObjects` under a Filter.
-Descriptions, perk texts, logos, icons and the faction property texts (headquarters, founding,
-leadership, focus) are not exported.
+Each reputation definition table keeps original Record identity and per-value origins.
+Record links preserve the original GUID and expose the state of unresolved source references.
+Catalog filters can omit a linked target while retaining its stored identity.
 
-On LIVE 4.10 (2026-10-28) the kinds hold 39 factions, 46 scopes, 380 standings, 27 contexts, 42
-mission types, 20 localities and 2 scenarios, none skipped.
+**Faction reputation.** The `definitions.factionReputations.rows` table holds physical
+`FactionReputation` Records in GUID and physical Record order. The technical `name`, the
+logo paths, the original flags and the decimal `geid` value are sourced fields. `background`
+retains its original String and carries `x-gameText`. `displayName` refers to the protected
+text registry. `description` distinguishes an authored Locale reference from literal String
+content and carries `x-gameText`.
 
-**Faction reputation (`factionReputations`).** `displayName` is a game text (37 of 39 have an English text).
-`isNpc` is the Record's flag (false for all 39). `lawful` is the value of the boolean property
-`entityLawful` among the `propertiesBB` of the Record, `null` for a faction without it
-(`FactionReputation_IASI`): 29 are lawful, 9 not. It is a field and not the class name, so
-`FactionReputation_Wikelo` is lawful and `FactionReputation_Ruto` is not although neither name says
-so. `contextGuid` is the `reputationContextPropertiesUI`; `allyGuids` and `enemyGuids` are the
-References as stored (two factions have enemies on LIVE, none has allies); `hostility` and
-`allied` hold the `scopeGuid` and `standingGuid` of the `hostilityParams` and `alliedParams`, `null`
-when both are absent.
+The `allies`, `enemies`, `reputationContextPropertiesUi` and `perkReputationRewardList`
+fields retain their original Record links. Each `hostilityParams` and `alliedParams` body keeps
+its scope, standing and owned relation marker. The marker retains its protected description and
+icon path. In `propertiesBb`, the original `entityLawful` property carries a Boolean
+`dynamicProperty` value. The table preserves the other typed blackboard values in source order,
+including the exact Single bits and protected Locale references. Original unprojected fields
+remain in `authoredFields`.
 
 #### Faction definitions
 

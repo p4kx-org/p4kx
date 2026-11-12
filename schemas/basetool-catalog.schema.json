@@ -3947,6 +3947,9 @@
         "explosionDefinitions": {
           "$ref": "#/$defs/CatalogTableOfExplosionDefinition"
         },
+        "factionReputations": {
+          "$ref": "#/$defs/CatalogTableOfFactionReputationDefinition"
+        },
         "factions": {
           "$ref": "#/$defs/CatalogTableOfFactionDefinition"
         },
@@ -4001,6 +4004,7 @@
         "contractGenerators",
         "contractTemplates",
         "explosionDefinitions",
+        "factionReputations",
         "factions",
         "gameplayProperties",
         "lootPoolFilters",
@@ -4545,6 +4549,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/FactionDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfFactionReputationDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/FactionReputationDefinition"
           },
           "type": "array"
         }
@@ -10365,100 +10388,118 @@
         }
       ]
     },
-    "FactionReputation": {
-      "description": "A faction: a `FactionReputation` Record under `factions/factionreputation`.",
+    "FactionReputationDefinition": {
+      "description": "An original faction reputation Record with its presentation and relationship fields.",
       "properties": {
-        "allied": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/RelationStanding"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The scope and standing a member of the faction holds towards an allied faction\n(`alliedParams`), `null` when the Record has none."
+        "alliedParams": {
+          "$ref": "#/$defs/SourcedValueOfReputationRelation"
         },
-        "allyGuids": {
-          "description": "The factions it counts as allies, as stored.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
+        "allies": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
         },
-        "className": {
-          "description": "The Record name without its type, e.g. `FactionReputation_Wikelo`.",
-          "type": "string"
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
-        "contextGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The `SReputationContextUI` Record the faction is shown with (`reputationContextPropertiesUI`),\n`null` when it names none."
-        },
-        "displayName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The `displayName`.",
+        "background": {
+          "$ref": "#/$defs/SourcedValueOfstring",
           "x-gameText": true
         },
-        "enemyGuids": {
-          "description": "The factions it counts as enemies, as stored.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "description": {
+          "$ref": "#/$defs/SourcedValueOfFactionTextOfGameTextRef",
+          "x-gameText": true
+        },
+        "displayName": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "enemies": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "geid": {
+          "$ref": "#/$defs/SourcedValueOfDecimalU64"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
         },
-        "hostility": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/RelationStanding"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The scope and standing a member of the faction holds towards a hostile faction\n(`hostilityParams`), `null` when the Record has none."
+        "guildBanner": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "hideInDelpihApp": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "hostilityParams": {
+          "$ref": "#/$defs/SourcedValueOfReputationRelation"
         },
         "isNpc": {
-          "description": "The `isNPC` flag.",
-          "type": [
-            "boolean",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfboolean"
         },
-        "lawful": {
-          "description": "Whether the faction is lawful: the value of the boolean `entityLawful` property of its\n`propertiesBB`, `null` when it has none.",
-          "type": [
-            "boolean",
-            "null"
-          ]
+        "logo": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "missionBoardLogo": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "perkReputationRewardList": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "propertiesBb": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfBlackboardProperty"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "reputationContextPropertiesUi": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
-        "allied",
-        "allyGuids",
+        "alliedParams",
+        "allies",
+        "authoredFields",
+        "background",
         "className",
-        "contextGuid",
+        "description",
         "displayName",
-        "enemyGuids",
+        "enemies",
+        "fileName",
+        "geid",
         "guid",
-        "hostility",
+        "guildBanner",
+        "hideInDelpihApp",
+        "hostilityParams",
         "isNpc",
-        "lawful",
-        "recordPath"
+        "logo",
+        "metadataTag",
+        "missionBoardLogo",
+        "name",
+        "perkReputationRewardList",
+        "propertiesBb",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "reputationContextPropertiesUi",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -22602,35 +22643,27 @@
       ],
       "type": "object"
     },
-    "RelationStanding": {
-      "description": "The scope and standing a faction relation assigns.",
+    "RelationMarker": {
       "properties": {
-        "scopeGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The `SReputationScopeParams` Record, `null` when the relation names none."
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
-        "standingGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The `SReputationStandingParams` Record, `null` when the relation names none."
+        "description": {
+          "$ref": "#/$defs/SourcedValueOfFactionTextOfGameTextRef",
+          "x-gameText": true
+        },
+        "icon": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
-        "scopeGuid",
-        "standingGuid"
+        "authoredFields",
+        "description",
+        "icon",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -22866,6 +22899,34 @@
         "recordName",
         "recordPath",
         "sourceType"
+      ],
+      "type": "object"
+    },
+    "ReputationRelation": {
+      "description": "An original allied or hostile standing rule with its authored marker.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "markerParams": {
+          "$ref": "#/$defs/SourcedValueOfRelationMarker"
+        },
+        "scope": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "standing": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "markerParams",
+        "scope",
+        "sourceType",
+        "standing"
       ],
       "type": "object"
     },
@@ -59043,6 +59104,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfRelationMarker": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RelationMarker"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfReputationPerk": {
       "allOf": [
         {
@@ -59267,6 +59458,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ReputationPerkEntry"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfReputationRelation": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ReputationRelation"
               }
             }
           }
@@ -71473,13 +71794,6 @@
       "$ref": "#/$defs/ExportHealth",
       "description": "The measured source-read and projection health, separately from Filter selection scope."
     },
-    "factionReputations": {
-      "description": "The factions with their reputation links, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/FactionReputation"
-      },
-      "type": "array"
-    },
     "harvestableLocations": {
       "description": "The containers whose `.soc` names a provider preset, with the starmap object they hang\nbelow, ordered by preset GUID, container, system and object GUID.",
       "items": {
@@ -71692,7 +72006,6 @@
     "definitions",
     "dismantleProcesses",
     "exportHealth",
-    "factionReputations",
     "harvestableLocations",
     "harvestableProviderPresets",
     "items",
