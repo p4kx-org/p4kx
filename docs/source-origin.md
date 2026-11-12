@@ -161,6 +161,14 @@ also contributes when the helper's own mesh is absent from the scene.
 Successful child offset inversions also retain their node route. Bone and
 animation inputs outside these routes keep the artifact's contributor set
 incomplete.
+Direct mesh conversion uses `modelMeshNodeBytes` for the node matrices,
+parent links and CrCh parent IDs that supply the bounds of an admitted
+piece or the vertices of a visible draw range. The first two indices
+identify the actual LOD and decoded mesh ordinal, followed by the chunk
+ordinal, node ordinal and decoded-Entry range. A suppressed mesh counts
+only where it sets an admitted bound. A mesh that uses its skin skips its
+node matrix.
+
 The receipt also records the original library slots that suppress a piece
 or a visible range. A whole-piece suppression affects the scene bounds and
 counts. Suppressing one range of a drawn piece affects the PNG.

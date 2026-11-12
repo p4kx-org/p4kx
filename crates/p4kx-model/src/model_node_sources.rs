@@ -5,7 +5,9 @@ use std::ops::Range;
 
 use p4kx_chunks::{ChunkFile, Container};
 
-use crate::{CompanionResolver, LodSelection, MaterialReading, Model, ModelError, PositionBox};
+use crate::{
+    CompanionResolver, LodSelection, MaterialReading, Model, ModelError, Node, PositionBox,
+};
 use crate::{build, crch};
 
 /// Coordinates from the primary file of one successfully decoded model.
@@ -17,6 +19,17 @@ impl ModelNodeSources {
     #[must_use]
     pub fn node(&self, ordinal: usize) -> Option<&ModelNodeSource> {
         self.0.get(ordinal)
+    }
+
+    /// Returns original fields along the selected node's parent route.
+    pub fn lineage<'a>(
+        &'a self,
+        model: &'a Model,
+        node: usize,
+    ) -> impl Iterator<Item = (usize, &'a ModelNodeSource)> {
+        model
+            .node_ancestors(node)
+            .map_while(|(ordinal, _)| Some((ordinal, self.node(ordinal)?)))
     }
 
     pub(crate) fn push(&mut self, node: ModelNodeSource) {
@@ -67,6 +80,17 @@ impl ModelNodeSource {
 }
 
 impl Model {
+    /// Returns the selected node and its parents, nearest first.
+    pub fn node_ancestors(&self, node: usize) -> impl Iterator<Item = (usize, &Node)> {
+        let mut at = Some(node);
+        (0..self.nodes.len()).map_while(move |_| {
+            let index = at?;
+            let node = self.nodes.get(index)?;
+            at = node.parent;
+            Some((index, node))
+        })
+    }
+
     /// Reads the model with original node coordinates in its primary file.
     ///
     /// # Errors

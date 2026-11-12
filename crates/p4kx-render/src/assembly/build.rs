@@ -11,7 +11,8 @@ use p4kx_settings::ModelMaterials;
 use rayon::prelude::*;
 use thiserror::Error;
 
-use super::flatten::{Range, flatten};
+use super::flatten::{self, Range};
+use super::mesh_node_input::{MeshNodeCapture, MeshNodeInputs, MeshNodeTrace};
 use super::pieces::pieces_of;
 use super::surface::{SceneSurfaces, surfaces_of};
 use super::{
@@ -76,6 +77,7 @@ pub(super) struct SharedMesh {
     pub(super) ranges: Vec<Range>,
     pub(super) bounds: Bounds,
     pub(super) triangles: usize,
+    pub(super) mesh_node_trace: Option<MeshNodeTrace>,
 }
 
 fn address<T>(value: &T) -> usize {
@@ -98,7 +100,7 @@ impl AssemblyScene {
         Self::build_inner(assembly, options, hooks, None)
     }
 
-    /// Builds the scene and retains actual selected material suppressions.
+    /// Builds the scene and retains material suppressions and consumed mesh node inputs.
     ///
     /// # Errors
     /// Returns a cancellation or empty-scene error.
@@ -137,6 +139,9 @@ impl AssemblyScene {
             items: Vec::new(),
             draws: Vec::new(),
             parts: Vec::new(),
+            mesh_node_inputs: material_suppressions
+                .as_ref()
+                .map(|_| MeshNodeInputs::default()),
             material_suppressions,
             textures: Vec::new(),
             meshes: 0,
@@ -149,6 +154,15 @@ impl AssemblyScene {
         let wanted = surfaces_of(&pieces, &model_of, &meshes, options.materials);
         let textures = scene.read_textures(&wanted, options, hooks)?;
         scene.place(&pieces, (&model_of, &meshes), (&wanted.surfaces, &textures));
+        if let Some(inputs) = scene.mesh_node_inputs.as_mut() {
+            inputs.bounds = meshes
+                .into_iter()
+                .map(|mesh| {
+                    mesh.and_then(|mesh| mesh.mesh_node_trace)
+                        .map_or_else(Vec::new, MeshNodeTrace::into_bound_inputs)
+                })
+                .collect();
+        }
         if scene.draws.is_empty() || !scene.bounds.is_valid() {
             return Err(BuildError::Empty);
         }
@@ -161,12 +175,20 @@ impl AssemblyScene {
         lod: u32,
         hooks: &Hooks<'_>,
     ) -> Result<Vec<Option<SharedMesh>>, BuildError> {
+        let capture = if self.mesh_node_inputs.is_some() {
+            MeshNodeCapture::Enabled
+        } else {
+            MeshNodeCapture::Disabled
+        };
         let mut meshes = Vec::with_capacity(distinct.len());
         for wave in distinct.chunks(WAVE) {
             if (hooks.cancelled)() {
                 return Err(BuildError::Cancelled);
             }
-            let flats: Vec<_> = wave.par_iter().map(|model| flatten(model, lod)).collect();
+            let flats: Vec<_> = wave
+                .par_iter()
+                .map(|model| flatten::flatten(model, lod, capture))
+                .collect();
             for flat in flats {
                 let mesh = flat.and_then(|flat| {
                     let vertices = self.vertices.len().checked_add(flat.vertices.len())?;
@@ -191,6 +213,7 @@ impl AssemblyScene {
                             .collect(),
                         bounds: flat.bounds,
                         triangles: count,
+                        mesh_node_trace: flat.mesh_node_trace,
                     })
                 });
                 meshes.push(mesh);

@@ -11,6 +11,7 @@ mod draw;
 mod flatten;
 mod frustum;
 mod material_suppression;
+mod mesh_node_input;
 mod mips;
 mod pieces;
 mod source_inputs;
@@ -30,6 +31,7 @@ pub use draw::{DrawList, GroupDraw, Instance, ObservedDrawList};
 pub use material_suppression::{
     MaterialSuppression, MaterialSuppressionEffect, MaterialSuppressionReason,
 };
+pub use mesh_node_input::MeshNodeInput;
 pub(crate) use mips::{Level, chain, level_count};
 pub use source_inputs::{AssemblyPieceSource, PlacedPieceInput};
 pub use visibility::hidden_mask;
@@ -179,6 +181,7 @@ pub struct AssemblyScene {
     draws: Vec<PartDraw>,
     parts: Vec<PartInfo>,
     material_suppressions: Option<Vec<MaterialSuppression>>,
+    mesh_node_inputs: Option<mesh_node_input::MeshNodeInputs>,
     textures: Vec<ViewTexture>,
     meshes: usize,
     bounds: Bounds,

@@ -6,7 +6,6 @@ use std::num::NonZeroUsize;
 use p4kx_extraction::{EntryOrigin, SourceLocation};
 use p4kx_model::{Model, ModelFile, ModelNodeSource, ModelNodeSources};
 
-use crate::placement;
 use crate::{Assembly, Part};
 
 #[derive(Debug, Clone, Copy, Default)]
@@ -76,9 +75,7 @@ impl<'a> ModelPlacementInput<'a> {
 
     /// Returns source coordinates along the transform's actual selected-node-to-root route.
     pub fn nodes(&self) -> impl Iterator<Item = (usize, &'a ModelNodeSource)> {
-        let sources = self.sources;
-        placement::node_ancestors(self.model, self.selected)
-            .map_while(move |(ordinal, _)| Some((ordinal, sources.node(ordinal)?)))
+        self.sources.lineage(self.model, self.selected)
     }
 }
 

@@ -7,7 +7,7 @@ use std::path::Path;
 
 use anyhow::{Context, Result};
 use p4kx_assembly::{Assembly, AttachedModel, Part};
-use p4kx_extraction::model::ModelFile;
+use p4kx_extraction::model::{Model, ModelFile};
 use p4kx_extraction::{
     ArchiveWriteProtection, CancelToken, ConversionError, EntryOrigin, FieldOrigin, FileReceipt,
     InputScope, MaterialArchiveOrigins, ModelArchiveSource, OriginArtifactBinding,
@@ -16,7 +16,7 @@ use p4kx_extraction::{
 };
 use p4kx_render::{
     AssemblyPieceSource, AssemblyScene, MaterialSuppressionEffect, MaterialSuppressionReason,
-    Picture,
+    Picture, PlacedPieceInput,
 };
 
 use super::node_origins;
@@ -42,9 +42,11 @@ pub(super) fn publish(
     let SceneInputs {
         placed: mut sources,
         suppressed_ranges,
+        drawn_nodes,
     } = scene_inputs(original.projection, assembly, scene, visible)?;
     let scene = uses.origin(&sources, false);
     sources.extend(suppressed_ranges);
+    sources.extend(drawn_nodes);
     sources.extend(
         original
             .settings
@@ -96,13 +98,43 @@ fn write_error(output: &Path, source: io::Error) -> ConversionError {
 struct SceneInputs {
     placed: Vec<SourceUse>,
     suppressed_ranges: Vec<SourceUse>,
+    drawn_nodes: Vec<SourceUse>,
 }
 
 struct PieceInputs<'a> {
+    model: Option<&'a Model>,
     models: &'a [ModelArchiveSource],
     definition: Option<&'a EntryOrigin>,
     material: MaterialInputs<'a>,
     ancestry: usize,
+}
+
+impl PieceInputs<'_> {
+    fn mesh_nodes(
+        &self,
+        projection: &Projection,
+        piece: &PlacedPieceInput<'_>,
+        drawn: bool,
+        sources: &mut SceneInputs,
+    ) -> Result<()> {
+        node_origins::mesh(
+            projection,
+            self.model,
+            self.models,
+            piece.bound_mesh_nodes(),
+            &mut sources.placed,
+        )?;
+        if drawn {
+            node_origins::mesh(
+                projection,
+                self.model,
+                self.models,
+                piece.drawn_mesh_nodes(),
+                &mut sources.drawn_nodes,
+            )?;
+        }
+        Ok(())
+    }
 }
 
 fn piece_inputs<'a>(
@@ -114,6 +146,7 @@ fn piece_inputs<'a>(
         AssemblyPieceSource::Part(index) => {
             let part = assembly.parts().get(index)?;
             Some(PieceInputs {
+                model: part.model(),
                 models: part.model_archive_sources(),
                 definition: part.model_definition_origin(),
                 material: MaterialInputs {
@@ -126,6 +159,7 @@ fn piece_inputs<'a>(
         AssemblyPieceSource::BoneAttachment(index) => {
             let &(parent, attachment) = attachments.get(index)?;
             Some(PieceInputs {
+                model: Some(attachment.model()),
                 models: attachment.model_archive_sources(),
                 definition: attachment.model_definition_origin(),
                 material: MaterialInputs {
@@ -148,11 +182,13 @@ fn scene_inputs(
     let mut sources = SceneInputs {
         placed: Vec::new(),
         suppressed_ranges: Vec::new(),
+        drawn_nodes: Vec::new(),
     };
     let attachments: Vec<_> = assembly.attached_models().collect();
     let mut placed_ancestry = HashSet::new();
     for piece in scene.placed_inputs() {
-        let role = if visible.binary_search(&piece.ordinal()).is_ok() {
+        let drawn = visible.binary_search(&piece.ordinal()).is_ok();
+        let role = if drawn {
             SourceUseRole::Payload
         } else {
             SourceUseRole::Conversion
@@ -174,6 +210,7 @@ fn scene_inputs(
         input
             .material
             .selected(projection, piece.material_slots(), &mut sources.placed)?;
+        input.mesh_nodes(projection, &piece, drawn, &mut sources)?;
         let mut at = Some(input.ancestry);
         while let Some(index) = at.filter(|index| placed_ancestry.insert(*index)) {
             let Some(part) = assembly.parts().get(index) else {

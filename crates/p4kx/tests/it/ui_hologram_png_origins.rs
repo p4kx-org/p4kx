@@ -213,3 +213,6 @@ mod suppression;
 
 #[path = "ui_hologram_model_nodes.rs"]
 mod model_nodes;
+
+#[path = "ui_hologram_mesh_nodes.rs"]
+mod mesh_nodes;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use super::{AssemblyScene, Item};
+use super::{AssemblyScene, Item, MeshNodeInput};
 
 /// The actual Assembly piece from which a renderer part was built.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,6 +26,8 @@ pub struct PlacedPieceInput<'scene> {
     ordinal: usize,
     source: AssemblyPieceSource,
     items: &'scene [Item],
+    bound_nodes: &'scene [MeshNodeInput],
+    group_nodes: &'scene [Option<MeshNodeInput>],
 }
 
 impl PlacedPieceInput<'_> {
@@ -39,6 +41,18 @@ impl PlacedPieceInput<'_> {
     #[must_use]
     pub const fn source(&self) -> AssemblyPieceSource {
         self.source
+    }
+
+    /// Returns the mesh node transforms that set this piece's local bounds.
+    pub fn bound_mesh_nodes(&self) -> impl Iterator<Item = MeshNodeInput> + '_ {
+        self.bound_nodes.iter().copied()
+    }
+
+    /// Returns the mesh node transforms of the accepted draw ranges.
+    pub fn drawn_mesh_nodes(&self) -> impl Iterator<Item = MeshNodeInput> + '_ {
+        self.items
+            .iter()
+            .filter_map(|item| self.group_nodes.get(item.group as usize).copied().flatten())
     }
 
     /// Returns the actual library slots of the admitted draw ranges in order.
@@ -55,10 +69,15 @@ impl AssemblyScene {
             let items = self
                 .items
                 .get(draw.items.start as usize..draw.items.end as usize)?;
+            let observed = self.mesh_node_inputs.as_ref();
             Some(PlacedPieceInput {
                 ordinal: draw.part,
                 source: part.source,
                 items,
+                bound_nodes: observed
+                    .and_then(|inputs| inputs.bounds.get(draw.mesh))
+                    .map_or(&[], Vec::as_slice),
+                group_nodes: observed.map_or(&[], |inputs| inputs.groups.as_slice()),
             })
         })
     }

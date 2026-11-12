@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_model::{Bone, Model, Node, Transform, chained_world_poses};
+use p4kx_model::{Bone, Model, Transform, chained_world_poses};
 
 /// Returns the transform of a port's offset from its helper: the rotation `rotation` in degrees,
 /// about X first, then Y, then Z, and the translation `position` in metres.
@@ -55,23 +55,13 @@ pub(crate) fn node_placement(model: &Model, name: &str) -> Option<NodePlacement>
         .iter()
         .position(|node| node.name.eq_ignore_ascii_case(name))?;
     let mut transform = Transform::IDENTITY;
-    for (_, ancestor) in node_ancestors(model, node) {
+    for (_, ancestor) in model.node_ancestors(node) {
         transform = ancestor.transform.then(&transform);
         if ancestor.parent.is_none() {
             return Some(NodePlacement { transform, node });
         }
     }
     None
-}
-
-pub(crate) fn node_ancestors(model: &Model, node: usize) -> impl Iterator<Item = (usize, &Node)> {
-    let mut at = Some(node);
-    (0..model.nodes.len()).map_while(move |_| {
-        let index = at?;
-        let node = model.nodes.get(index)?;
-        at = node.parent;
-        Some((index, node))
-    })
 }
 
 /// Returns whether the model has a level of detail near `level` and none of its meshes is skinned;

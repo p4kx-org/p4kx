@@ -201,6 +201,7 @@ pub(crate) fn ship() -> AssemblyScene {
         draws,
         parts,
         material_suppressions: None,
+        mesh_node_inputs: None,
         textures: Vec::new(),
         meshes: 2,
         bounds,
