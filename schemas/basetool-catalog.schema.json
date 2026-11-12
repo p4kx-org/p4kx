@@ -4040,6 +4040,9 @@
         "blueprintCategoryLists": {
           "$ref": "#/$defs/CatalogTableOfBlueprintCategoryList"
         },
+        "contractScenarioRequirements": {
+          "$ref": "#/$defs/CatalogTableOfContractScenarioRequirements"
+        },
         "entityTags": {
           "$ref": "#/$defs/CatalogTableOfEntityTags"
         },
@@ -4062,6 +4065,7 @@
       "required": [
         "ammoBindings",
         "blueprintCategoryLists",
+        "contractScenarioRequirements",
         "entityTags",
         "resourceGroupMembers",
         "resourceNetworkLinks",
@@ -4628,6 +4632,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ContractEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfContractScenarioRequirements": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ContractScenarioRequirements"
           },
           "type": "array"
         }
@@ -7925,6 +7948,22 @@
         "factionRewardTiers",
         "guid",
         "recordPath"
+      ],
+      "type": "object"
+    },
+    "ContractScenarioRequirements": {
+      "description": "One ordered, authored scenario-reference list at its original owner.",
+      "properties": {
+        "scenarios": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "source": {
+          "$ref": "#/$defs/RequirementSource"
+        }
+      },
+      "required": [
+        "scenarios",
+        "source"
       ],
       "type": "object"
     },
@@ -25765,6 +25804,39 @@
         "introContracts",
         "level",
         "tagGuid"
+      ],
+      "type": "object"
+    },
+    "RequirementSource": {
+      "description": "The physical generator arena and occurrence that declared the scenario list.",
+      "properties": {
+        "inputRef": {
+          "$ref": "#/$defs/PhysicalSourceRef"
+        },
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceValueRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "recordIndex": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "scenariosValue": {
+          "$ref": "#/$defs/SourceValueRef"
+        }
+      },
+      "required": [
+        "inputRef",
+        "owner",
+        "recordIndex",
+        "scenariosValue"
       ],
       "type": "object"
     },

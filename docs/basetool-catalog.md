@@ -229,6 +229,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `placements.starmapPlacements` | The selected world placement of each physical starmap object |
 | `definitions.contractGenerators`, `projections.contracts`, `projections.missionTitles` | Physical Generator definitions, logical contract and sub-contract rows, and their sourced titles and descriptions ([contract](catalog-contract-generators.md)) |
 | `configurations.missionBoards` | Authored mission-board components with physical Entity and component identity, declared board type, and ordered faction reputation links. [Mission location vocabulary](catalog-location-vocabulary.md) |
+| `declarations.contractScenarioRequirements` | Ordered authored scenario references at their original Generator, Handler and Contract slots. [Contract generator sources](catalog-contract-generators.md#authored-scenario-requirements) |
 | `mineableElements` | The mineable elements with their instability and other plain numbers, each linked to a `ResourceType`, ordered by GUID |
 | `refiningProcesses` | The refining processes (speed and quality pairs of a refinery), ordered by GUID |
 | `mineableCompositions` | The elements a rock or deposit is made of, with the range and chance of each, ordered by GUID |
@@ -2734,7 +2735,6 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `loadouts` | Those of `ships`, and of `items` whose Record defines ports or names a default Loadout | `EntityClassDefinition` |
 | `starmapObjects` | `libs/foundry/records/starmap/pu/` | `StarMapObject` |
 | `contracts` | `libs/foundry/records/contracts/contractgenerator/` | `ContractGenerator` |
-| `configurations.missionBoards` | Authored mission-board components with physical Entity and component identity, declared board type, and ordered faction reputation links. [Mission location vocabulary](catalog-location-vocabulary.md) |
 | `mineableElements` | `libs/foundry/records/mining/mineableelements/` | `MineableElement` |
 | `refiningProcesses` | `libs/foundry/records/refiningprocess/` | `RefiningProcess` |
 | `mineableCompositions` | `libs/foundry/records/mining/rockcompositionpresets/` | `MineableComposition` |

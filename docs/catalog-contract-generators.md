@@ -21,6 +21,20 @@ The parent row has an absent `subContractGuid`. The projections follow the estab
 contract ID, sub-contract ID and Generator Record GUID. The first logical ID pair wins. All
 selected physical Generator rows and their original slots remain available in the definition table.
 
+## Authored scenario requirements
+
+`declarations.contractScenarioRequirements` contains each original
+`required_active_scenarios` Reference array on a selected Generator, Handler or Contract.
+Join `source.inputRef` and `source.recordIndex` to `definitions.contractGenerators`.
+`source.owner` selects the original Handler or Contract occurrence, with null for the Generator
+root. `source.scenariosValue` selects the corresponding raw array occurrence in `source.values`.
+
+`scenarios` preserves the authored order, repeated references, empty arrays, null slots and
+unresolved targets. Its target type is `MissionScenario`. Each stored slot has immediate source
+evidence. The declaration stays with its original owner when the logical contract projection
+excludes or deduplicates a row. The table describes authored requirements independently of any runtime scenario
+availability.
+
 ## Run terms
 
 `timeToComplete` and `buyInAmount` are sourced values on `projections.contracts.rows`. Both

@@ -21,11 +21,38 @@ use crate::missions;
 use crate::paint::paints;
 use crate::{CatalogError, CatalogOptions, LoadoutSummary, PaintSummary};
 
+/// The captured tag inputs used by the mission projection.
+pub(crate) struct MissionTags<'context, 'source> {
+    context: CapturedTags<'context, 'source>,
+    dependencies: Option<TagDependencies<'source>>,
+}
+
+/// Reads original tags and applies their rows and diagnostics to the catalog.
+pub(crate) fn add_tags<'context, 'source>(
+    forge: &'source DataForge<'source>,
+    input: &'context OriginalCatalogInput<'context, 'source>,
+    options: &CatalogOptions<'_>,
+    collected: &mut Collected<'source>,
+) -> Result<MissionTags<'context, 'source>, CatalogError> {
+    let need_mission_tags =
+        crate::mission_index::MissionIndex::needs_index(forge, options.filter, options.cancel)?;
+    let mut tags =
+        crate::catalog_v3::tag_catalog::read(forge, input, options.cancel, need_mission_tags)?;
+    tags.rows.entity_tags = std::mem::take(&mut collected.tags.entity_tags);
+    collected.tags = tags.rows;
+    collected.ledger.merge(tags.ledger);
+    collected.add_failures(tags.failures);
+    Ok(MissionTags {
+        context: tags.context,
+        dependencies: tags.dependencies,
+    })
+}
+
 /// Reads the contracts and sub contracts into `collected`.
 pub(crate) fn add_contracts<'f>(
     forge: &'f DataForge<'f>,
     projection: &CatalogProjection<'_, 'f>,
-    (tags, dependencies): (&CapturedTags<'_, 'f>, Option<TagDependencies<'f>>),
+    tags: MissionTags<'_, 'f>,
     options: &CatalogOptions<'_>,
     collected: &mut Collected<'f>,
 ) -> Result<(), CatalogError> {
@@ -33,7 +60,7 @@ pub(crate) fn add_contracts<'f>(
     let missions = missions::read(
         forge,
         projection,
-        (tags, dependencies),
+        (&tags.context, tags.dependencies),
         &collected.starmap_objects,
         options.filter,
         options.cancel,
@@ -41,6 +68,7 @@ pub(crate) fn add_contracts<'f>(
     collected.ledger.merge(missions.ledger);
     collected.add_contracts(missions.contracts, missions.skipped, missions.failures);
     collected.contract_generators = missions.generators;
+    collected.contract_scenario_requirements = missions.scenario_requirements;
     collected.mission_property_sets = missions.property_sets.into_rows();
     let ContractTemplates {
         read,

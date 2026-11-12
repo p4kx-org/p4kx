@@ -20,6 +20,8 @@ use p4kx_export::{
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
+#[path = "catalog_contract_scenarios.rs"]
+mod scenarios;
 #[path = "catalog_contract_success_rewards.rs"]
 mod success_rewards;
 #[path = "../contract_v3/mod.rs"]

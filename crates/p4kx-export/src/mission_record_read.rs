@@ -9,6 +9,7 @@ use crate::blueprint;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_v3::contract_scenario_requirements;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::mission_entry_source::MissionEntryContext;
@@ -25,7 +26,7 @@ use crate::{CatalogError, CatalogReadFailure};
 /// Reads each of `records` in parallel; a Record that cannot be read is a failure.
 pub(super) fn read<'f>(
     records: &[Record<'f>],
-    input: &OriginalCatalogInput<'_, '_>,
+    input: &OriginalCatalogInput<'_, 'f>,
     context: &MissionEntryContext<'_, 'f>,
     cancel: Option<&CancelToken>,
 ) -> Result<Vec<ObservedPiece<'f>>, CatalogError> {
@@ -44,7 +45,7 @@ pub(super) fn read<'f>(
 fn piece<'f>(
     trees: &mut TreeBuilder<'f>,
     record: &Record<'f>,
-    input: &OriginalCatalogInput<'_, '_>,
+    input: &OriginalCatalogInput<'_, 'f>,
     context: &MissionEntryContext<'_, 'f>,
     cancel: Option<&CancelToken>,
 ) -> Result<Option<ObservedPiece<'f>>, CatalogError> {
@@ -79,7 +80,7 @@ fn piece<'f>(
 }
 
 fn project_tree<'source>(
-    input: &OriginalCatalogInput<'_, '_>,
+    input: &OriginalCatalogInput<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     tree: &RecordTree<'source>,
     context: &MissionEntryContext<'_, 'source>,
@@ -102,6 +103,17 @@ fn project_tree<'source>(
         source: indexed.source,
     };
     let capture = TemplateFieldCapture::new(fields, input, admission)?;
+    let mut scenario_notes = Vec::new();
+    let scenario_requirements =
+        contract_scenario_requirements::read(input, tree, fields, &capture, &mut scenario_notes)?;
+    crate::source_projection_notes::record(
+        Kind::Contracts,
+        ExportSourceRole::Selected,
+        admission,
+        tree,
+        scenario_notes,
+        &mut ledger,
+    )?;
     match project(admission, tree, context, fields, &capture) {
         Ok(piece) => {
             crate::mission_ledger::observe(
@@ -114,6 +126,7 @@ fn project_tree<'source>(
             Ok(ObservedPiece {
                 piece: Piece::Contracts(Box::new(piece)),
                 definition: Some(definition),
+                scenario_requirements,
                 ledger,
             })
         }
@@ -128,6 +141,7 @@ fn project_tree<'source>(
                     ledger,
                 )?;
                 observed.definition = Some(definition);
+                observed.scenario_requirements = scenario_requirements;
                 Ok(observed)
             }
         },
@@ -145,6 +159,7 @@ fn failed<'f>(
     Ok(ObservedPiece {
         piece: Piece::Failed(CatalogReadFailure::of(admission.record(), error)),
         definition: None,
+        scenario_requirements: Vec::new(),
         ledger,
     })
 }

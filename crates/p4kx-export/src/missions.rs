@@ -9,6 +9,7 @@ use crate::blueprint::as_struct;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_v3::contract_scenario_requirements::ContractScenarioRequirements;
 use crate::catalog_v3::tag_catalog::{CapturedTags, TagDependencies};
 use crate::contract_missions::ContractWithTitles;
 use crate::contract_starmap::StarmapObject;
@@ -48,6 +49,7 @@ pub(crate) struct Missions<'f> {
     pub(crate) ledger: ExportLedger,
     pub(crate) contracts: Vec<ContractWithTitles<'f>>,
     pub(crate) generators: Vec<GeneratorDefinition<'f>>,
+    pub(crate) scenario_requirements: Vec<ContractScenarioRequirements<'f>>,
     pub(crate) skipped: usize,
     pub(crate) failures: Vec<CatalogReadFailure<'f>>,
     pub(crate) pools: SpawnPools<'f>,
@@ -163,6 +165,7 @@ enum Piece<'f> {
 struct ObservedPiece<'f> {
     piece: Piece<'f>,
     definition: Option<GeneratorDefinition<'f>>,
+    scenario_requirements: Vec<ContractScenarioRequirements<'f>>,
     ledger: ExportLedger,
 }
 
@@ -194,6 +197,7 @@ pub(crate) fn read<'f>(
         ledger,
         contracts: Vec::new(),
         generators: Vec::new(),
+        scenario_requirements: Vec::new(),
         skipped: 0,
         failures,
         pools,
@@ -275,6 +279,8 @@ impl<'f> Missions<'f> {
         grants: &mut Grants,
     ) -> Result<(), CatalogError> {
         self.ledger.merge(observed.ledger);
+        self.scenario_requirements
+            .extend(observed.scenario_requirements);
         if let Some(definition) = observed.definition {
             self.generators.push(definition);
         }

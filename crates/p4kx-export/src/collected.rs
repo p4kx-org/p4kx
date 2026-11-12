@@ -98,6 +98,8 @@ pub(crate) struct Collected<'f> {
     pub(crate) contracts: Vec<ContractEntry<'f>>,
     pub(crate) mission_titles: Vec<MissionTitles<'f>>,
     pub(crate) contract_generators: Vec<GeneratorDefinition<'f>>,
+    pub(crate) contract_scenario_requirements:
+        Vec<crate::catalog_v3::contract_scenario_requirements::ContractScenarioRequirements<'f>>,
     pub(crate) mission_location_templates: Vec<MissionLocationTemplate<'f>>,
     pub(crate) contract_ship_spawns: Vec<ShipSpawnPool>,
     pub(crate) contract_location_queries: Vec<LocationQuery>,
@@ -198,6 +200,7 @@ impl<'f> Collected<'f> {
             contracts: Vec::new(),
             mission_titles: Vec::new(),
             contract_generators: Vec::new(),
+            contract_scenario_requirements: Vec::new(),
             mission_location_templates: Vec::new(),
             contract_ship_spawns: Vec::new(),
             contract_location_queries: Vec::new(),

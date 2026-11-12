@@ -23,6 +23,8 @@ pub(crate) struct CatalogDeclarations<'source> {
     pub(crate) shop_inventory_resolution: CatalogTable<ShopInventoryResolution>,
     pub(crate) entity_tags: CatalogTable<EntityTags<'source>>,
     pub(crate) ammo_bindings: CatalogTable<AmmoBinding<'source>>,
+    pub(crate) contract_scenario_requirements:
+        CatalogTable<super::contract_scenario_requirements::ContractScenarioRequirements<'source>>,
     pub(crate) resource_network_links: CatalogTable<ResourceNetworkLinks<'source>>,
     pub(crate) room_associations: CatalogTable<RoomAssociations<'source>>,
     pub(crate) resource_group_members:

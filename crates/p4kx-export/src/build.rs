@@ -7,7 +7,7 @@ use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
 use crate::archive_key_use::ArchiveKeyUse;
-use crate::build_derived::{add_contracts, add_loadouts, add_paints};
+use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags};
 use crate::build_harvest::add_harvest_locations;
 use crate::build_loot::add_loot_containers;
 use crate::build_starmap::add_starmap;
@@ -93,14 +93,7 @@ fn assemble<R>(
         &projection,
         crafting,
     )?;
-    let need_mission_tags =
-        crate::mission_index::MissionIndex::needs_index(&forge, options.filter, options.cancel)?;
-    let mut tags =
-        crate::catalog_v3::tag_catalog::read(&forge, &input, options.cancel, need_mission_tags)?;
-    tags.rows.entity_tags = std::mem::take(&mut collected.tags.entity_tags);
-    collected.tags = tags.rows;
-    collected.ledger.merge(tags.ledger);
-    collected.add_failures(tags.failures);
+    let tags = add_tags(&forge, &input, options, &mut collected)?;
     collected.ledger.archive_inventory_problem = crate::export_archive_health::inventory(archive);
     let paint_summary = add_paints(&forge, &input, &mut collected, options.cancel)?;
     let loadout_summary = add_loadouts(archive, &entities, &mut collected, &input, options.cancel)?;
@@ -120,13 +113,7 @@ fn assemble<R>(
         options.cancel,
         &entry_capture,
     )?;
-    add_contracts(
-        &forge,
-        &projection,
-        (&tags.context, tags.dependencies),
-        options,
-        &mut collected,
-    )?;
+    add_contracts(&forge, &projection, tags, options, &mut collected)?;
     collected.ledger.merge(link_scenario_factions(
         &forge,
         &mut collected.mission_kinds.scenarios,
@@ -210,6 +197,11 @@ fn assemble<R>(
             ),
             resource_group_members: group_tables.members,
             ammo_bindings: components.ammo_bindings,
+            contract_scenario_requirements:
+                crate::catalog_v3::contract_scenario_requirements::table(
+                    &forge,
+                    collected.contract_scenario_requirements,
+                ),
             resource_network_links: resource_declarations.resource_network_links,
             room_associations: resource_declarations.room_associations,
             shop_inventory_resolution: collected.shop_inventory_resolution,

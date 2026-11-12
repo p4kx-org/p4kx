@@ -192,6 +192,8 @@ mod catalog_unit_source;
 pub(crate) mod catalog_weapon_actions;
 #[path = "catalog_weapon_magazine_slots.rs"]
 mod catalog_weapon_magazine_slots;
+#[path = "contract_scenario_requirements.rs"]
+pub(crate) mod contract_scenario_requirements;
 #[path = "interactable_configuration.rs"]
 mod interactable_configuration;
 #[path = "interaction_conditions.rs"]
