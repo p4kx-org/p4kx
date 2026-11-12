@@ -12,6 +12,9 @@ use super::{AuthoredEntryPath, LoadoutBodyReceipt, OriginalDatum};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::{CatalogError, ExportAccountingError, HealthText};
 
+#[path = "health_entry_reference.rs"]
+mod reference;
+
 #[derive(Debug, Clone)]
 enum PathRecipe {
     Directory,
@@ -313,27 +316,6 @@ impl EntryReceipt {
     pub(crate) fn physical_path(&self) -> Result<OriginalDatum<HealthText>, CatalogError> {
         self.outer_directory()?;
         self.directory_path()
-    }
-
-    pub(crate) fn physical_reference(
-        &self,
-        capture: &EntryCapture<'_>,
-    ) -> Result<OriginalDatum<PhysicalEntryRef>, CatalogError> {
-        self.check_capture(capture)?;
-        let origin = self.outer_directory()?;
-        let value = PhysicalEntryRef {
-            input_ref: origin.source_ref().clone(),
-            entry_index: origin.index(),
-        };
-        let uses = vec![
-            origin.metadata("path", SourceUseRole::Selector)?,
-            origin.metadata("entryIndex", SourceUseRole::Selector)?,
-        ];
-        Ok(OriginalDatum::observed(
-            SourceValue::Present(value),
-            uses,
-            true,
-        ))
     }
 
     fn outer_directory(&self) -> Result<&EntryMetadata, ExportAccountingError> {

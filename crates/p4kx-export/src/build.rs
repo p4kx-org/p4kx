@@ -148,6 +148,9 @@ fn assemble<R>(
         &forge,
         &origins,
     )?;
+    let instances = placements.take_instances();
+    let (catalog_placements, resource_declarations) =
+        collected.catalog_placements(archive, &forge, &input, instances, options.cancel)?;
     let health = crate::export_health_prepare::compile_captured(
         std::mem::take(&mut collected.ledger),
         &kinds,
@@ -163,9 +166,6 @@ fn assemble<R>(
             CatalogProvenance::new(origins.uses.freeze()?),
         )));
     }
-    let instances = placements.take_instances();
-    let (catalog_placements, resource_declarations) =
-        collected.catalog_placements(&forge, &origins, instances, options.cancel)?;
     let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
     let resolved = store_slugs.resolve(

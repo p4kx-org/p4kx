@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::iter::Enumerate;
 use std::slice::Iter;
 
-use p4kx_extraction::{CancelToken, DataForge, SourceUse, SourceUseRole, SourceValue};
+use p4kx_extraction::{Archive, CancelToken, DataForge, SourceUse, SourceUseRole, SourceValue};
 
 use super::catalog_entity_configurations::EntityConfigurationRows;
 use super::catalog_facility;
@@ -17,31 +17,50 @@ use super::inventory_owner_storage;
 use super::item_component_owner::ComponentOwner;
 use super::loadout_position::{self, LoadoutPosition};
 use super::room_associations;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::CatalogTable;
+use crate::contract_entities::Ship;
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
 use crate::loadout::alignment::AttachmentIdentity;
 use crate::record_header_field::RecordHeaderField;
 use crate::{CatalogError, ExportAccountingError};
 
-/// Links resolved ship Loadout occurrences to their physical configuration rows.
+#[path = "facility_interior_placements.rs"]
+mod interior;
+#[path = "facility_interior_routes.rs"]
+mod routes;
+#[path = "facility_interior_types.rs"]
+mod types;
+
+pub(super) use types::{InteriorFacilityPlacement, InteriorRoomCoverage};
+
+/// Links resolved ship occurrences to their physical configuration rows.
 pub(super) fn table(
+    archive: &Archive,
     forge: &DataForge<'_>,
+    ships: &[Ship<'_>],
     loadouts: &[Loadout],
     declarations: &EntityConfigurationRows<'_>,
-    origins: &CatalogOrigins,
+    input: &OriginalCatalogInput<'_, '_>,
     cancel: Option<&CancelToken>,
-) -> Result<CatalogTable<FacilityInstance>, CatalogError> {
-    let mut project = Projection::new(declarations, origins, cancel)?;
-    if !project.definitions.is_empty() {
+) -> Result<(CatalogTable<FacilityInstance>, Vec<InteriorRoomCoverage>), CatalogError> {
+    input.check_forge(forge)?;
+    let mut project = Projection::new(declarations, input.origins(), cancel)?;
+    let coverage = if project.definitions.is_empty() {
+        Vec::new()
+    } else {
         for (ordinal, loadout) in loadouts.iter().enumerate() {
             project.check_cancel()?;
             if loadout.entity_kind == EntityKind::Ship {
                 project.loadout(loadout, loadout_position::ordinal(ordinal)?)?;
             }
         }
-    }
-    Ok(CatalogTable::matching_source_types(
+        let capture = EntryCapture::for_input(input);
+        interior::project(&mut project, archive, forge, ships, declarations, &capture)?
+    };
+    let instances = CatalogTable::matching_source_types(
         forge,
         |name| {
             catalog_facility::SOURCE_TYPES.contains(&name)
@@ -51,7 +70,8 @@ pub(super) fn table(
                 )
         },
         project.rows,
-    ))
+    );
+    Ok((instances, coverage))
 }
 
 #[derive(Clone, Copy)]
@@ -118,14 +138,7 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
     fn loadout(&mut self, loadout: &Loadout, ordinal: u32) -> Result<(), CatalogError> {
         let root = loadout.root_record_index;
         let record = self.origins.record(root);
-        let ship = ShipContext {
-            ship_guid: record.header_value(
-                RecordHeaderField::Guid,
-                SourceValue::Present(loadout.entity_guid),
-            )?,
-            ship_record_index: record
-                .header_selector(RecordHeaderField::RecordIndex, SourceValue::Present(root))?,
-        };
+        let ship = ShipContext::read(self.origins, loadout.entity_guid, root)?;
         let selector =
             record.observe_header(RecordHeaderField::RecordIndex, SourceUseRole::Selector)?;
         let mut walk = Path::new(ordinal, selector);
@@ -177,7 +190,7 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
         path: &Path,
         attachment: Option<(&LoadoutPort, &AttachmentIdentity)>,
     ) -> Result<(), CatalogError> {
-        let Some(definitions) = self.definitions.get(&record) else {
+        let Some(configurations) = self.configuration_links(record)? else {
             return Ok(());
         };
         let (original_port, attached_item) = if let Some((port, attachment)) = attachment {
@@ -197,17 +210,27 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             original_port,
             attached_item,
         });
-        let mut configurations = Vec::with_capacity(definitions.len());
-        for definition in definitions {
-            self.check_cancel()?;
-            configurations.push(definition.link());
-        }
         self.rows.push(FacilityInstance {
             ship: ship.clone(),
             source,
             configurations,
         });
         Ok(())
+    }
+
+    fn configuration_links(
+        &self,
+        record: u32,
+    ) -> Result<Option<Vec<FacilityConfiguration>>, CatalogError> {
+        let Some(definitions) = self.definitions.get(&record) else {
+            return Ok(None);
+        };
+        let mut configurations = Vec::with_capacity(definitions.len());
+        for definition in definitions {
+            self.check_cancel()?;
+            configurations.push(definition.link());
+        }
+        Ok(Some(configurations))
     }
 
     fn check_cancel(&self) -> Result<(), CatalogError> {

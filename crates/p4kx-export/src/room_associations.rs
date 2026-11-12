@@ -62,6 +62,8 @@ pub(super) struct RoomAssociation<'source> {
     pub(super) container_ordinal: SourcedValue<u32>,
     #[serde(skip)]
     pub(super) port_use: Option<SourceUse>,
+    #[serde(skip)]
+    pub(super) file_use: Option<SourceUse>,
     pub(super) resource_network_itemport_name: SourcedValue<&'source str>,
     bone_name: SourcedValue<&'source str>,
     file_name: SourcedValue<&'source str>,
@@ -71,6 +73,10 @@ pub(super) struct RoomAssociation<'source> {
 }
 
 impl<'source> RoomAssociation<'source> {
+    pub(super) const fn file_name(&self) -> Option<&'source str> {
+        self.file_name.value().copied()
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -98,6 +104,7 @@ impl<'source> RoomAssociation<'source> {
         Ok(Self {
             container_ordinal: source.owned_element_ordinal()?,
             port_use: source.selector_use("resourceNetworkItemportName")?,
+            file_use: source.selector_use("fileName")?,
             resource_network_itemport_name,
             bone_name,
             file_name,

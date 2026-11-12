@@ -118,6 +118,7 @@ mod skeleton_source;
 mod skin;
 mod smooth_normals;
 mod soc_entities;
+mod soc_entity_source;
 mod soc_geometry;
 mod soc_light;
 mod streams;
@@ -202,5 +203,6 @@ pub use soc_entities::{
     MAX_SOC_ENTITIES, MAX_SOC_PLACED, SocClassEntity, SocEntities, SocEntitiesError, SocPalette,
     SocProp,
 };
+pub use soc_entity_source::{SocEntity, SocEntityChunk, SocEntityFile, SocEntitySourceError};
 pub use soc_light::{LightState, SocLight};
 pub use transform::Transform;

@@ -170,6 +170,8 @@ mod health_entry_read;
 mod health_entry_receipt;
 #[path = "health_entry_retention.rs"]
 mod health_entry_retention;
+#[path = "health_entry_soc.rs"]
+mod health_entry_soc;
 #[path = "health_entry_xml.rs"]
 mod health_entry_xml;
 #[path = "health_failed_entry.rs"]
@@ -182,6 +184,7 @@ pub(crate) use health_entry_json::{EntryJson, JsonEvent};
 pub(crate) use health_entry_observation::FailedEntryObservation;
 pub(crate) use health_entry_read::{EntryRead, EntryReadError};
 pub(crate) use health_entry_receipt::{EntryReceipt, PhysicalEntryIdentity, PhysicalEntryRef};
+pub(crate) use health_entry_soc::{EntrySoc, EntrySocEntity, SocSourceFields};
 pub(crate) use health_entry_xml::{EntryXml, XmlAttributeSource, XmlNodeSource};
 pub use health_failed_entry::FailedExportEntry;
 

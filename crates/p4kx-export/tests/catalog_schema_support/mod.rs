@@ -249,6 +249,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "roomAssociationBindings": absent_table(),
             "starmapPlacements": absent_table(),
             "facilityInstances": absent_table(),
+            "facilityInteriorCoverage": [],
             "containerInstances": absent_table()
         },
         "texts": {"publicNames": public_names(), "gameTexts": []},

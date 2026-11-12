@@ -81,5 +81,35 @@ to `definitions.inventoryContainers`. Separate port paths retain separate rows e
 where they share an Entity. Docked vehicles retain their own root contexts. The
 catalog selection determines which configuration rows can be joined.
 Failed attachment resolution stays visible in the published Loadout.
-A loadout path identifies a contextual occurrence. Spatial transforms and placements found
-only in interior object containers require their own source observations.
+A Loadout path identifies a contextual occurrence.
+
+## Direct SOC room placements
+
+The `interior` source in `placements.facilityInstances` joins an original
+`EntityClassGUID` from a streamed SOC to a uniquely identified physical
+DataForge Record. The resulting row links that Record's published facility and
+storage components. Entity slots that supply their own geometry or have an
+invalid transform can still carry a class and its configuration links.
+
+Use `source.room` to join the physical owner and array slot in
+`declarations.roomAssociations`. The sourced `source.position` identifies the
+actual outer SOCpak, descriptor and SOC Entry, the descriptor's original OC
+node, the CrCh chunk-table index and the Entity's original direct element slot.
+Repeated OC declarations keep separate positions even when they use one SOC Entry.
+
+`source.entityAttributes` retains authored names and values in source order.
+Binary XML provenance locates the original chunk, node and attribute-table
+indexes. Text XML provenance locates the original lexical byte span within the
+decoded SOC Entry. `localTransform` is a row-major 3x4 transform in the containing
+room's coordinates, with a distinct invalid state for malformed or ambiguous inputs.
+The original attributes are available in either case.
+
+`placements.facilityInteriorCoverage` records findings by inspected direct room
+slot. Missing, ambiguous or unreadable source paths have separate codes. A
+declared Child container outside the direct inspection is reported as
+`unexaminedChild`. The direct observation uses authored `StreamingOCs` paths.
+A descriptor with repaired string-table bytes is unreadable for stream
+selection. A repaired SOC entity chunk records `lossyEntityChunk`. Its usable
+slots retain their original coordinates and incomplete source sets.
+Attached-item rooms and ship-frame transforms require separate Loadout,
+Child and bone evidence.

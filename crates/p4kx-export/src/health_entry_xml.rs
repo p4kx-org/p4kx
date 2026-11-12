@@ -45,6 +45,10 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
         self.receipt.containing_entry()
     }
 
+    pub(crate) const fn is_lossy(&self) -> bool {
+        matches!(&self.document, Document::Cry(document) if document.is_lossy())
+    }
+
     pub(crate) fn root(&self) -> Root<'_> {
         self.document.root()
     }

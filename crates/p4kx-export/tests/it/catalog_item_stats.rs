@@ -36,6 +36,8 @@ mod facility_medbed;
 mod facility_seats;
 #[path = "catalog_fuel_capacity.rs"]
 mod fuel_capacity;
+#[path = "catalog_facility_interior.rs"]
+mod interior;
 #[path = "catalog_inventory_interactions.rs"]
 mod inventory_interactions;
 

@@ -10,7 +10,7 @@ use crate::mtl_xml::XmlElement;
 use crate::soc_geometry::{EntityGeometry, read_geometry};
 use crate::soc_light::{SocLight, read_light};
 
-const ENTITIES: ChunkType = ChunkType::new(Container::CrCh, 0x0004);
+pub(crate) const ENTITIES: ChunkType = ChunkType::new(Container::CrCh, 0x0004);
 
 /// The most entities one `.soc` file lists.
 pub const MAX_SOC_ENTITIES: usize = 1 << 20;
@@ -210,16 +210,27 @@ pub(crate) fn number<'a>(element: impl XmlElement<'a>, name: &str) -> Option<f32
 /// Returns the transform of an entity element from its `Pos`, `Rotate` and `Scale`; a missing
 /// attribute is the identity, a malformed one or a degenerate rotation gives `None`.
 pub(crate) fn entity_transform<'a>(entity: impl XmlElement<'a>) -> Option<Transform> {
-    let attribute = |name: &str| entity.attribute(name);
-    let position = match attribute("Pos") {
+    transform_fields(
+        entity.attribute("Pos"),
+        entity.attribute("Rotate"),
+        entity.attribute("Scale"),
+    )
+}
+
+pub(crate) fn transform_fields(
+    position: Option<&str>,
+    rotation: Option<&str>,
+    scale: Option<&str>,
+) -> Option<Transform> {
+    let position = match position {
         None => [0.0; 3],
         Some(text) => numbers::<3>(Some(text))?,
     };
-    let rotation = match attribute("Rotate") {
+    let rotation = match rotation {
         None => [1.0, 0.0, 0.0, 0.0],
         Some(text) => numbers::<4>(Some(text))?,
     };
-    let scale = match attribute("Scale") {
+    let scale = match scale {
         None => [1.0; 3],
         Some(text) => numbers::<3>(Some(text))?,
     };

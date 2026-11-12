@@ -4341,6 +4341,12 @@
         "facilityInstances": {
           "$ref": "#/$defs/CatalogTableOfFacilityInstance"
         },
+        "facilityInteriorCoverage": {
+          "items": {
+            "$ref": "#/$defs/InteriorRoomCoverage"
+          },
+          "type": "array"
+        },
         "resourceNetworkLinkBindings": {
           "$ref": "#/$defs/CatalogTableOfResourceNetworkLinkBinding"
         },
@@ -4357,6 +4363,7 @@
       "required": [
         "containerInstances",
         "facilityInstances",
+        "facilityInteriorCoverage",
         "resourceNetworkLinkBindings",
         "resourceNetworkNodes",
         "roomAssociationBindings",
@@ -11479,6 +11486,19 @@
             "kind"
           ],
           "type": "object"
+        },
+        {
+          "$ref": "#/$defs/InteriorFacilityPlacement",
+          "properties": {
+            "kind": {
+              "const": "interior",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -15275,6 +15295,154 @@
         "interaction",
         "nextState",
         "sourceType"
+      ],
+      "type": "object"
+    },
+    "InteriorFacilityPlacement": {
+      "properties": {
+        "classRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "entityAttributes": {
+          "items": {
+            "$ref": "#/$defs/SocAttribute"
+          },
+          "type": "array"
+        },
+        "localTransform": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfInteriorSocPosition"
+        },
+        "room": {
+          "$ref": "#/$defs/InteriorRoomRef"
+        },
+        "streamName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "classRecordIndex",
+        "entityAttributes",
+        "localTransform",
+        "position",
+        "room",
+        "streamName"
+      ],
+      "type": "object"
+    },
+    "InteriorFinding": {
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/InteriorFindingKind"
+        },
+        "stream": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "stream"
+      ],
+      "type": "object"
+    },
+    "InteriorFindingKind": {
+      "enum": [
+        "missingContainer",
+        "ambiguousContainer",
+        "unreadableContainer",
+        "missingDescriptor",
+        "ambiguousDescriptor",
+        "unreadableDescriptor",
+        "unexaminedChild",
+        "ambiguousStreamName",
+        "missingStream",
+        "ambiguousStream",
+        "unreadableStream",
+        "unreadableEntityChunk",
+        "lossyEntityChunk",
+        "ambiguousClass",
+        "invalidClass"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "InteriorRoomCoverage": {
+      "description": "Scope and findings for one inspected direct room declaration.",
+      "properties": {
+        "findings": {
+          "items": {
+            "$ref": "#/$defs/InteriorFinding"
+          },
+          "type": "array"
+        },
+        "room": {
+          "$ref": "#/$defs/InteriorRoomRef"
+        }
+      },
+      "required": [
+        "findings",
+        "room"
+      ],
+      "type": "object"
+    },
+    "InteriorRoomRef": {
+      "properties": {
+        "objectContainerOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "owner": {
+          "$ref": "#/$defs/ComponentOwner"
+        }
+      },
+      "required": [
+        "objectContainerOrdinal",
+        "owner"
+      ],
+      "type": "object"
+    },
+    "InteriorSocPosition": {
+      "properties": {
+        "chunkIndex": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "container": {
+          "$ref": "#/$defs/PhysicalEntryRef"
+        },
+        "descriptor": {
+          "$ref": "#/$defs/PhysicalEntryRef"
+        },
+        "descriptorNodeIndex": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "entityOrdinal": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "stream": {
+          "$ref": "#/$defs/PhysicalEntryRef"
+        }
+      },
+      "required": [
+        "chunkIndex",
+        "container",
+        "descriptor",
+        "descriptorNodeIndex",
+        "entityOrdinal",
+        "stream"
       ],
       "type": "object"
     },
@@ -31146,6 +31314,21 @@
       ],
       "type": "object"
     },
+    "SocAttribute": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "value": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
     "Source": {
       "description": "Where a catalog came from.",
       "properties": {
@@ -45877,6 +46060,147 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_size_3_of_Array_size_4_of_float": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "items": {
+                    "format": "float",
+                    "type": "number"
+                  },
+                  "maxItems": 4,
+                  "minItems": 4,
+                  "type": "array"
+                },
+                "maxItems": 3,
+                "minItems": 3,
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_size_3_of_double": {
       "allOf": [
         {
@@ -58853,6 +59177,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/InteractionTransition"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfInteriorSocPosition": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/InteriorSocPosition"
               }
             }
           }

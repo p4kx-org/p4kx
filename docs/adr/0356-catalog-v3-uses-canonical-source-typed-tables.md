@@ -186,3 +186,12 @@ A facility definition is identified by the original Entity Record index and
 `SCItemSeatParams` member data and its owned ejection and actor-attachment
 definitions. Placement consumers can use the physical component key with
 their contextual placement identity. See [ship facility configurations](../catalog-ship-facilities.md).
+
+A direct ship-room placement uses the physical RoomAssociation slot, the
+actual SOCpak and descriptor Entry, the original streaming declaration node,
+and the SOC Entry, chunk and Entity slot. This key preserves repeated authored
+placements even when the same class and SOC Entry are shared. The original
+Entity class selector joins to one physical DataForge Record before linking
+its published component definitions. The original coordinates remain
+container-local. Room coverage records incomplete or unexamined branches
+so an empty result can be interpreted within its inspected scope.

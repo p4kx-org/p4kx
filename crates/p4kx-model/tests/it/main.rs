@@ -41,6 +41,7 @@ mod rig_logic_chunk;
 mod skeleton;
 mod skin_levels;
 mod soc_entities;
+mod soc_entity_source;
 mod structured;
 mod transform;
 mod unresolved_layers;
