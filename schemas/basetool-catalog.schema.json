@@ -4263,6 +4263,9 @@
     "CatalogPlacements": {
       "description": "Contextual placements and relationships keyed by their physical definitions.",
       "properties": {
+        "facilityInstances": {
+          "$ref": "#/$defs/CatalogTableOfFacilityInstance"
+        },
         "resourceNetworkLinkBindings": {
           "$ref": "#/$defs/CatalogTableOfResourceNetworkLinkBinding"
         },
@@ -4277,6 +4280,7 @@
         }
       },
       "required": [
+        "facilityInstances",
         "resourceNetworkLinkBindings",
         "resourceNetworkNodes",
         "roomAssociationBindings",
@@ -4757,6 +4761,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/Facility"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfFacilityInstance": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/FacilityInstance"
           },
           "type": "array"
         }
@@ -11037,6 +11060,83 @@
         "sourceType"
       ],
       "type": "object"
+    },
+    "FacilityConfiguration": {
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "facility",
+              "type": "string"
+            },
+            "owner": {
+              "$ref": "#/$defs/ComponentOwner"
+            }
+          },
+          "required": [
+            "kind",
+            "owner"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "inventory",
+              "type": "string"
+            },
+            "owner": {
+              "$ref": "#/$defs/ComponentOwner"
+            }
+          },
+          "required": [
+            "kind",
+            "owner"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "FacilityInstance": {
+      "description": "One authored facility component in its resolved ship context.",
+      "properties": {
+        "configuration": {
+          "$ref": "#/$defs/FacilityConfiguration"
+        },
+        "shipGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "shipRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "source": {
+          "$ref": "#/$defs/FacilityPlacementSource"
+        }
+      },
+      "required": [
+        "configuration",
+        "shipGuid",
+        "shipRecordIndex",
+        "source"
+      ],
+      "type": "object"
+    },
+    "FacilityPlacementSource": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/LoadoutFacilityPlacement",
+          "properties": {
+            "kind": {
+              "const": "loadout",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "FactLayer": {
       "description": "The level that states a value of a contract; the variants run from the nearest level to the\nfarthest.",
@@ -17485,6 +17585,39 @@
       "required": [
         "attachedItem",
         "portDefinition"
+      ],
+      "type": "object"
+    },
+    "LoadoutFacilityPlacement": {
+      "properties": {
+        "attachedItem": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AttachmentIdentity"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "originalPort": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PhysicalPort"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfLoadoutPosition"
+        }
+      },
+      "required": [
+        "attachedItem",
+        "originalPort",
+        "position"
       ],
       "type": "object"
     },
@@ -59178,6 +59311,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/LinkedInteraction"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfLoadoutPosition": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/LoadoutPosition"
               }
             }
           }

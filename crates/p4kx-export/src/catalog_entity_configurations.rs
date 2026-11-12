@@ -52,6 +52,14 @@ pub(crate) struct EntityConfigurationRows<'source> {
 }
 
 impl<'source> EntityConfigurationRows<'source> {
+    pub(super) fn facility_owners(&self) -> impl Iterator<Item = &ComponentOwner> {
+        self.facilities.iter().map(Facility::owner)
+    }
+
+    pub(super) fn storage_owners(&self) -> impl Iterator<Item = &ComponentOwner> {
+        self.inventory.storage_owners()
+    }
+
     pub(super) fn resources(&self) -> &[ResourceComponent<'source>] {
         &self.resources
     }

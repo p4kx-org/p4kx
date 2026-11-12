@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::catalog_item_alignment::PhysicalPort;
+use super::loadout_position::LoadoutPosition;
 use super::network_endpoint::NetworkEndpoint;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
@@ -53,15 +54,6 @@ pub(crate) struct ResourceNetworkPlacementTables {
     resource_network_nodes: CatalogTable<ResourceNetworkNode>,
     resource_network_link_bindings: CatalogTable<ResourceNetworkLinkBinding>,
     room_association_bindings: CatalogTable<RoomAssociationBinding>,
-}
-
-/// A position in the published ship Loadout and its nested port arrays.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(super) struct LoadoutPosition {
-    pub(super) loadout_ordinal: u32,
-    pub(super) port_ordinals: Vec<u32>,
 }
 
 /// A contextual port or ship root backed by an installed or authored network fact.

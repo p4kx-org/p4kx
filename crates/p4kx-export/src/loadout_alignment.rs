@@ -67,6 +67,12 @@ impl LoadoutAlignment {
             .map(|attachment| &attachment.proof)
     }
 
+    pub(crate) fn placement_attachment(&self) -> Option<(&AttachmentIdentity, &AttachmentProof)> {
+        self.attached_item
+            .as_ref()
+            .map(|attachment| (&attachment.identity, &attachment.proof))
+    }
+
     pub(crate) fn attachment(&self) -> Option<&AttachmentIdentity> {
         self.attached_item
             .as_ref()

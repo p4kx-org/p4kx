@@ -242,7 +242,8 @@ pub(crate) fn minimal_catalog() -> Value {
             "resourceNetworkNodes": absent_table(),
             "resourceNetworkLinkBindings": absent_table(),
             "roomAssociationBindings": absent_table(),
-            "starmapPlacements": absent_table()
+            "starmapPlacements": absent_table(),
+            "facilityInstances": absent_table()
         },
         "texts": {"publicNames": public_names(), "gameTexts": []},
         "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table()},

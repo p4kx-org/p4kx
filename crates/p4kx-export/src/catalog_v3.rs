@@ -49,6 +49,10 @@ pub(crate) mod sandbox_trigger_record_definition;
 pub(crate) mod catalog_placements;
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;
+#[path = "facility_instance.rs"]
+mod facility_instance;
+#[path = "facility_loadout_placements.rs"]
+mod facility_loadout_placements;
 #[path = "infraction_definition.rs"]
 pub(crate) mod infraction_definition;
 #[path = "infraction_parameters.rs"]
@@ -57,6 +61,8 @@ mod infraction_parameters;
 pub(crate) mod jurisdiction_definition;
 #[path = "law_kinds.rs"]
 pub(crate) mod law_kinds;
+#[path = "loadout_position.rs"]
+mod loadout_position;
 #[path = "location_classification.rs"]
 pub(crate) mod location_classification;
 #[path = "location_vocabulary.rs"]

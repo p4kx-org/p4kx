@@ -6,17 +6,18 @@ use std::collections::HashSet;
 use p4kx_extraction::{CancelToken, DataForge, SourceUses, SourceValue, SourcedValue};
 
 use super::catalog_entity_configurations::EntityConfigurationRows;
+use super::loadout_position::{self, LoadoutPosition};
 use super::network_endpoint::{LocalPorts, NetworkEndpoint};
 use super::resource_network_placements::{
-    FuseEvidence, InstalledResourceComponent, LinkFamily, LoadoutPosition,
-    ResourceNetworkLinkBinding, ResourceNetworkNode, ResourceNetworkPlacementTables,
-    ResourceNetworkPlacements, RoomAssociationBinding,
+    FuseEvidence, InstalledResourceComponent, LinkFamily, ResourceNetworkLinkBinding,
+    ResourceNetworkNode, ResourceNetworkPlacementTables, ResourceNetworkPlacements,
+    RoomAssociationBinding,
 };
 use super::resource_topology_index::{TopologyIndex, TopologySource};
+use crate::CatalogError;
 use crate::collected::Collected;
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
 use crate::loadout::alignment::AttachmentIdentity;
-use crate::{CatalogError, ExportAccountingError};
 
 struct Context<'loadout> {
     position: LoadoutPosition,
@@ -70,7 +71,7 @@ fn project(
             continue;
         }
         let position = LoadoutPosition {
-            loadout_ordinal: to_ordinal(ordinal)?,
+            loadout_ordinal: loadout_position::ordinal(ordinal)?,
             port_ordinals: Vec::new(),
         };
         let record = loadout.root_record_index;
@@ -103,7 +104,7 @@ fn project(
                     continue;
                 }
                 stack.push(Context {
-                    position: context.child(to_ordinal(ordinal)?),
+                    position: context.child(loadout_position::ordinal(ordinal)?),
                     record,
                     ports: &port.ports,
                     complete: port.attachment_port_inventory_complete,
@@ -137,7 +138,7 @@ impl ResourceNetworkPlacements {
         }
         for (ordinal, port) in context.ports.iter().enumerate() {
             check_cancel(cancel)?;
-            let ordinal = to_ordinal(ordinal)?;
+            let ordinal = loadout_position::ordinal(ordinal)?;
             let attachment = port.source_constraints.attachment();
             let resource_components = components(index, target_record(attachment));
             if referenced.contains(&ordinal) || !resource_components.is_empty() {
@@ -254,10 +255,6 @@ fn components(
             is_relay: component.is_relay().clone(),
         })
         .collect()
-}
-
-fn to_ordinal(ordinal: usize) -> Result<u32, ExportAccountingError> {
-    u32::try_from(ordinal).map_err(|_| ExportAccountingError::CounterOverflow)
 }
 
 fn check_cancel(cancel: Option<&CancelToken>) -> Result<(), CatalogError> {

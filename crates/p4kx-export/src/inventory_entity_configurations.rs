@@ -24,6 +24,10 @@ pub(super) struct InventoryEntityRows<'source> {
 }
 
 impl<'source> InventoryEntityRows<'source> {
+    pub(super) fn storage_owners(&self) -> impl Iterator<Item = &ComponentOwner> {
+        self.storage.iter().map(|row| &row.owner)
+    }
+
     pub(super) fn extend(&mut self, other: Self) {
         self.storage.extend(other.storage);
         self.bounds.extend(other.bounds);

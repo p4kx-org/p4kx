@@ -5,6 +5,8 @@ use p4kx_extraction::{CancelToken, DataForge};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::facility_instance::FacilityInstance;
+use super::facility_loadout_placements;
 use super::resource_network_placements::ResourceNetworkPlacementTables;
 use super::resource_topology_declarations::ResourceTopologyTables;
 use super::starmap_placement::{self, StarmapPlacement};
@@ -22,6 +24,7 @@ pub(crate) struct CatalogPlacements {
     #[serde(flatten)]
     resource_network: ResourceNetworkPlacementTables,
     starmap_placements: CatalogTable<StarmapPlacement>,
+    facility_instances: CatalogTable<FacilityInstance>,
 }
 
 impl<'source> Collected<'source> {
@@ -36,6 +39,13 @@ impl<'source> Collected<'source> {
         let placements = CatalogPlacements {
             resource_network: topology.placements,
             starmap_placements: starmap_placement::table(forge, starmap, origins)?,
+            facility_instances: facility_loadout_placements::table(
+                forge,
+                &self.loadouts,
+                &self.entity_configurations,
+                origins,
+                cancel,
+            )?,
         };
         Ok((placements, topology.declarations))
     }

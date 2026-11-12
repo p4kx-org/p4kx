@@ -7,7 +7,7 @@ use p4kx_assembly::{
     Attachment, EntityNode, LoadoutError, PortDefinition, PortNode, PortSource, Target,
     VehicleItemPort,
 };
-use p4kx_extraction::is_placeholder_key;
+use p4kx_extraction::{SourceUse, is_placeholder_key};
 
 use crate::CatalogError;
 use crate::catalog_v3::catalog_item_alignment::AlignmentIndex;
@@ -16,6 +16,17 @@ use crate::guid_text::CatalogGuid;
 use crate::loadout::{alignment::LoadoutAlignment, ledger::Capture};
 
 const VEHICLE_SOURCE: &str = "vehicle";
+
+impl LoadoutPort {
+    pub(crate) fn append_name_uses(&self, uses: &mut Vec<SourceUse>) -> Result<bool, CatalogError> {
+        let Some(proof) = &self.name_proof else {
+            return Ok(false);
+        };
+        let (original, complete) = proof.selector_inputs()?;
+        uses.extend(original);
+        Ok(complete)
+    }
+}
 
 /// Turns the tree of an Entity into catalog ports and collects the codes of the issues found.
 pub(crate) struct PortReader<'rows> {

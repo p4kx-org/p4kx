@@ -191,7 +191,7 @@ impl<'scope, 'rows> LocalPorts<'scope, 'rows> {
                 .ports
                 .get(ordinal)
                 .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-            complete &= append_name_uses(port, &mut uses)?;
+            complete &= port.append_name_uses(&mut uses)?;
         }
         let result = self.select(candidates);
         Ok(self.sources.value(
@@ -257,7 +257,7 @@ fn name_inventory_origin(
     let mut complete = read_complete;
     let mut uses: Vec<_> = inventory.iter().copied().cloned().collect();
     for port in ports {
-        complete &= append_name_uses(port, &mut uses)?;
+        complete &= port.append_name_uses(&mut uses)?;
     }
     for definition in definitions {
         if let Some(original) = definition.name_use {
@@ -267,15 +267,6 @@ fn name_inventory_origin(
         }
     }
     Ok(sources.shared_origin(&uses, complete && !uses.is_empty()))
-}
-
-fn append_name_uses(port: &LoadoutPort, uses: &mut Vec<SourceUse>) -> Result<bool, CatalogError> {
-    let Some(proof) = &port.name_proof else {
-        return Ok(false);
-    };
-    let (original, complete) = proof.selector_inputs()?;
-    uses.extend(original);
-    Ok(complete)
 }
 
 fn weak_target(
