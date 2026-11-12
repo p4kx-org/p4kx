@@ -12,7 +12,7 @@ use crate::query::reader::Reader;
 use crate::query::schema::{StructFields, ancestors_include};
 use crate::query::shared::Groups;
 use crate::query::suggest::closest;
-use crate::query::syntax::{Name, Query};
+use crate::query::syntax::{Name, Path, Query, Segment};
 use crate::query::{Comparison, QueryError, QueryErrorKind};
 use crate::{DataForge, DataForgeError, DataType, ReferenceIndex};
 
@@ -44,14 +44,38 @@ pub struct SharedPrefix {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColumnKind {
     multi_valued: bool,
+    follows_references: bool,
     data_types: Box<[DataType]>,
 }
 
 impl ColumnKind {
+    fn of(path: &Path, plan: &PathPlan) -> Self {
+        let mut data_types: Vec<DataType> = Vec::new();
+        for leaf in plan.leaves() {
+            if !data_types.contains(&leaf) {
+                data_types.push(leaf);
+            }
+        }
+        Self {
+            multi_valued: path.is_multi_valued(),
+            follows_references: path
+                .tail()
+                .iter()
+                .any(|step| matches!(step, Segment::Follow { .. })),
+            data_types: data_types.into_boxed_slice(),
+        }
+    }
+
     /// Returns whether every cell is a list, for a path through `[*]` or `[TypeName]`.
     #[must_use]
     pub const fn is_multi_valued(&self) -> bool {
         self.multi_valued
+    }
+
+    /// Returns whether the selected path can follow a Reference or weak pointer.
+    #[must_use]
+    pub const fn follows_references(&self) -> bool {
+        self.follows_references
     }
 
     /// Returns the types of the scalars the path ends at: one with `from`, without `from` one per
@@ -120,6 +144,26 @@ impl<'f> CompiledQuery<'f> {
                     })
             })
             .collect()
+    }
+
+    /// Returns the original Struct positions in which the compiled column resolves.
+    pub fn column_structs(&self, column: usize) -> impl Iterator<Item = u32> + '_ {
+        self.plans
+            .iter()
+            .enumerate()
+            .filter_map(move |(index, plan)| {
+                let Plan::Read { columns, .. } = plan.as_ref()? else {
+                    return None;
+                };
+                columns.get(column)?.as_ref()?;
+                u32::try_from(index).ok()
+            })
+    }
+
+    /// Returns whether selection consults the DataForge Reference index.
+    #[must_use]
+    pub const fn has_reference_filter(&self) -> bool {
+        self.referrers.is_some()
     }
 
     /// Returns the DataForge the Query was compiled for.
@@ -204,18 +248,7 @@ impl Query {
             .select
             .iter()
             .zip(&columns)
-            .map(|(path, plan)| {
-                let mut data_types: Vec<DataType> = Vec::new();
-                for leaf in plan.leaves() {
-                    if !data_types.contains(&leaf) {
-                        data_types.push(leaf);
-                    }
-                }
-                ColumnKind {
-                    multi_valued: path.is_multi_valued(),
-                    data_types: data_types.into_boxed_slice(),
-                }
-            })
+            .map(|(path, plan)| ColumnKind::of(path, plan))
             .collect();
         let referrers = self.referrers(forge, references)?;
         Ok(CompiledQuery {

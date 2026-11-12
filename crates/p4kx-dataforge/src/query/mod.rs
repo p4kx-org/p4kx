@@ -8,6 +8,7 @@
 //! the condition, and builds the rows page by page from the Records' instances.
 //! [`QuerySchema::complete`] offers the type and field names that fit at a cursor.
 
+mod array_walk;
 mod comparison;
 mod compile;
 mod complete;
@@ -31,6 +32,7 @@ mod selection_error;
 mod shared;
 mod short_text;
 mod sink;
+mod source;
 mod span;
 mod state;
 mod suggest;
@@ -47,6 +49,7 @@ pub use output::{RECORD_PATH_COLUMN, ResultFormat, ResultWriter};
 pub use run::{Pages, QueryRun, Row};
 pub use selection_error::SelectionError;
 pub use short_text::{LIST_SHOWN, write_short_text};
+pub use source::{QueryByteUse, QueryCellSources, QuerySource};
 pub use span::Span;
 pub use syntax::{Glob, Name, Path, Query, Referent, Segment};
 

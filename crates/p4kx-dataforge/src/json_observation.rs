@@ -225,7 +225,7 @@ impl<'observer, 'source> Observation<'observer, 'source> {
         bytes: Option<&[u8]>,
         kind: RecordJsonBytes,
     ) -> Option<RecordJsonSource<'static>> {
-        let span = self.input.span(bytes?)?;
+        let span = self.input.forge.byte_span(bytes?)?;
         Some(RecordJsonSource::Bytes {
             start: span.start,
             end: span.end,

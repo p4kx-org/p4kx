@@ -21,6 +21,7 @@ use crate::key_report;
 use crate::key_stamp::Replaceable;
 use crate::keys::KeyChoice;
 use crate::loadout_cache::LoadoutCache;
+use crate::query_selection_sources::SelectionReceipt;
 
 /// How many opened Archives stay in memory.
 const CAPACITY: usize = 2;
@@ -172,12 +173,12 @@ impl Opened {
     }
 
     /// Returns the selection of the last Query run if it was of `query`.
-    pub(crate) fn selection(&self, query: &str) -> Option<Arc<[u32]>> {
+    pub(crate) fn selection(&self, query: &str) -> Option<Arc<SelectionReceipt>> {
         self.forge.selection(query)
     }
 
     /// Keeps `records` as the selection of the last Query run, which was of `query`.
-    pub(crate) fn keep_selection(&self, query: &str, records: Arc<[u32]>) {
+    pub(crate) fn keep_selection(&self, query: &str, records: Arc<SelectionReceipt>) {
         self.forge.keep_selection(query, records);
     }
 

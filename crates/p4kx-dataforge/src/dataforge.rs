@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
 use std::sync::{Mutex, OnceLock};
 
 use p4kx_foundation::ByteReader;
@@ -116,6 +117,19 @@ impl<'a> DataForge<'a> {
     #[must_use]
     pub const fn byte_len(&self) -> usize {
         self.bytes.len()
+    }
+
+    pub(crate) fn byte_span(&self, bytes: &[u8]) -> Option<Range<u64>> {
+        if bytes.is_empty() {
+            return None;
+        }
+        let start = bytes
+            .as_ptr()
+            .addr()
+            .checked_sub(self.bytes.as_ptr().addr())?;
+        let end = start.checked_add(bytes.len())?;
+        self.bytes.get(start..end)?;
+        Some(start as u64..end as u64)
     }
 
     /// Returns the number of Records.

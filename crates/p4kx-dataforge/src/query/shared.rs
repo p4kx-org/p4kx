@@ -101,10 +101,11 @@ impl Groups {
     }
 
     /// Readies `recordings` for a new row of a plan with these groups, keeping the buffers.
-    pub(crate) fn reset(&self, recordings: &mut Recordings<'_>) {
+    pub(crate) fn reset(&self, recordings: &mut Recordings<'_>, observe: bool) {
         recordings.resize_with(self.prefixes.len(), Recording::default);
         for recording in recordings.iter_mut() {
             recording.clear();
+            recording.observe_sources(observe);
         }
     }
 

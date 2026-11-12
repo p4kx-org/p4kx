@@ -147,7 +147,7 @@ pub(crate) fn fit_prefix<T: Serialize>(
 }
 
 // MCP serializes a JSON Value, which preserves f32 fields as f64 numbers.
-fn structured_len(item: &impl Serialize) -> usize {
+pub(crate) fn structured_len(item: &impl Serialize) -> usize {
     serde_json::to_value(item).map_or(usize::MAX, |value| json_len(&value))
 }
 

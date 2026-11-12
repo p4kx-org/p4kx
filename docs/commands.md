@@ -855,6 +855,12 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | `mtl_summary` | A `.mtl` Entry (`path`), paged by sub-material: name, shader, surface type, flags, colours, opacity, glow, complete admitted texture-slot, shader-parameter and layer lists; retained strings are complete, paging observes the 256 KiB response budget, and an item that cannot fit alone is explicitly refused |
 | `entity_loadout` | The default Loadout of an Entity (`entity`: class name, record path or GUID) as a list of ports, parents first: path, depth, source, what the port takes, the Entity attached and for each unresolved port the reason; each Entity states its `issues` and, only when it has any, its `notes` (all admitted undecidable spawn requirements, such as an `assortment_requirement`, as in the CLI JSON); `max_depth` (16 by default, at most 32) and a cursor bound it; retained identities, paths, values and reasons are complete within the 256 KiB response budget, with explicit refusal for an item that cannot fit first |
 
+For `run_query`, `fieldOrigins` addresses the actual JSON columns and list elements. Scalar
+payloads, followed Reference slots and selected instances identify their original decoded DCB
+positions. The total retains the WHERE inputs actually read, including short-circuit evaluation.
+Pages charge provenance to the 256 KiB response budget. A selection survey that cannot fit retains
+an original source witness and marks its contributor set incomplete.
+
 For `get_record`, `fieldOrigins` follows the exact canonical Record JSON, including reserved or
 duplicate field wrappers, nested array elements and Reference members. `dataforgeDecodedBytes`
 uses `[start, endExclusive]` within the decoded DCB. Links identify the selecting slot and the

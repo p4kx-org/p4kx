@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
-use std::ops::Range;
 
 use crate::build;
 use crate::layout::Layout;
@@ -70,19 +69,6 @@ impl<'source> PositionedRecord<'source> {
             });
         }
         Ok(slots)
-    }
-
-    pub(crate) fn span(&self, bytes: &[u8]) -> Option<Range<u64>> {
-        if bytes.is_empty() {
-            return None;
-        }
-        let start = bytes
-            .as_ptr()
-            .addr()
-            .checked_sub(self.forge.bytes.as_ptr().addr())?;
-        let end = start.checked_add(bytes.len())?;
-        self.forge.bytes.get(start..end)?;
-        Some(start as u64..end as u64)
     }
 
     pub(crate) fn array_element(

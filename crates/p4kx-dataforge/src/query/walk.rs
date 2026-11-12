@@ -3,10 +3,11 @@
 
 use std::ops::ControlFlow;
 
-use crate::build::{element_bytes, pointer, reference_guid, words};
-use crate::query::reader::{Elements, Link, Select, Step, Walk};
+use crate::build::{pointer, reference_guid};
+use crate::query::reader::{Link, Step, Walk};
 use crate::query::schema::ancestors_include;
 use crate::query::sink::{Live, Reached, Sink};
+use crate::query::source::{CellTrace, QueryByteUse, QuerySource};
 use crate::query::state::WalkState;
 use crate::{DataForge, Value, ValueError, ValueKind};
 
@@ -52,7 +53,12 @@ impl<'f> Place<'f> {
     }
 
     /// Returns the `len` bytes at `at`, or the error that the place ends before them.
-    fn field(&self, forge: &DataForge<'_>, at: u64, len: u64) -> Result<&'f [u8], ValueError> {
+    pub(super) fn field(
+        &self,
+        forge: &DataForge<'_>,
+        at: u64,
+        len: u64,
+    ) -> Result<&'f [u8], ValueError> {
         let end = at.checked_add(len);
         end.and_then(|end| {
             let range = usize::try_from(at).ok()?..usize::try_from(end).ok()?;
@@ -63,7 +69,7 @@ impl<'f> Place<'f> {
 }
 
 /// The bytes of a pointer and of an array header.
-const HEADER_LEN: u64 = 8;
+pub(super) const HEADER_LEN: u64 = 8;
 
 impl Walk {
     /// Calls `emit` with each value the path reaches in order; a null pointer or an index out of
@@ -73,18 +79,22 @@ impl Walk {
     ///
     /// Returns [`ValueError::PathTooWide`] when the paths of the Record reach more than
     /// [`MAX_PATH_VALUES`](crate::query::MAX_PATH_VALUES) elements together.
-    pub(crate) fn visit<'f>(
+    pub(super) fn visit<'f>(
         &self,
         forge: &'f DataForge<'f>,
         place: Place<'f>,
         state: &mut WalkState,
         emit: &mut dyn FnMut(Value<'f>) -> ControlFlow<()>,
+        trace: Option<&mut CellTrace>,
     ) -> Result<(), ValueError> {
+        let last_follow = trace.as_ref().and_then(|_| self.last_follow());
         let mut live = Live {
             forge,
             leaf: &self.leaf,
             state,
             emit,
+            trace,
+            last_follow,
         };
         self.step(forge, 0, self.steps.len(), place, &mut live)
             .map(|_| ())
@@ -92,6 +102,22 @@ impl Walk {
 
     /// Walks the steps from `index` up to `end` and gives the sink what the last of them reaches.
     pub(super) fn step<'f, S: Sink<'f>>(
+        &self,
+        forge: &'f DataForge<'f>,
+        index: usize,
+        end: usize,
+        place: Place<'f>,
+        sink: &mut S,
+    ) -> Result<ControlFlow<()>, ValueError> {
+        let depth = sink.source_depth();
+        let flow = self.step_inner(forge, index, end, place, sink);
+        if let Some(depth) = depth {
+            sink.restore_sources(depth);
+        }
+        flow
+    }
+
+    fn step_inner<'f, S: Sink<'f>>(
         &self,
         forge: &'f DataForge<'f>,
         index: usize,
@@ -110,16 +136,29 @@ impl Walk {
         let (at, elements, select) = match step {
             Step::Pointer { at, declared } => {
                 let reached = match place.field(forge, *at, HEADER_LEN) {
-                    Ok(bytes) => deref(forge, bytes, declared),
+                    Ok(bytes) => {
+                        sink.route_bytes(forge, bytes, QueryByteUse::Pointer);
+                        deref(forge, bytes, declared, sink)
+                    }
                     Err(error) => Reached::Value(Value::Error(error)),
                 };
+                sink.follow_decision(index);
                 return self.continue_from(forge, next, end, reached, sink);
             }
             Step::Follow { at, link, declared } => {
                 let reached = match place.field(forge, *at, link.len()) {
-                    Ok(bytes) => follow(forge, *link, bytes, declared, sink),
+                    Ok(bytes) => {
+                        let kind = if *link == Link::Weak {
+                            QueryByteUse::WeakLink
+                        } else {
+                            QueryByteUse::Reference
+                        };
+                        sink.route_bytes(forge, bytes, kind);
+                        follow(forge, *link, bytes, declared, sink)
+                    }
                     Err(error) => Reached::Value(Value::Error(error)),
                 };
+                sink.follow_decision(index);
                 return self.continue_from(forge, next, end, reached, sink);
             }
             Step::Array {
@@ -128,38 +167,11 @@ impl Walk {
                 select,
             } => (*at, elements, select),
         };
-        let header = place.field(forge, at, HEADER_LEN);
-        let [count, first] = match header {
-            Ok(bytes) => words(bytes),
-            Err(error) => return Ok(sink.reached(Reached::Value(Value::Error(error)))),
-        };
-        if let Err(error) = check_range(forge, elements, first, count) {
-            return Ok(sink.reached(Reached::Value(Value::Error(error))));
-        }
-        let indices = match select {
-            Select::Index(element) if *element < count => *element..element.saturating_add(1),
-            Select::Index(_) => return Ok(sink.reached(Reached::Value(Value::Null))),
-            Select::All | Select::Type(_) => 0..count,
-        };
-        sink.charge(indices.len())?;
-        for element in indices {
-            if sink.proceed().is_break() {
-                return Ok(ControlFlow::Break(()));
-            }
-            let flow = match element_of(forge, elements, select, first.saturating_add(element)) {
-                Some(Reached::Place(target)) => self.step(forge, next, end, target, sink)?,
-                Some(Reached::Value(value)) => sink.reached(Reached::Value(value)),
-                None => ControlFlow::Continue(()),
-            };
-            if flow.is_break() {
-                return Ok(flow);
-            }
-        }
-        Ok(ControlFlow::Continue(()))
+        self.array(forge, next..end, place, (at, elements, select), sink)
     }
 
     /// Continues at the step `next` from what a pointer or link reached.
-    fn continue_from<'f, S: Sink<'f>>(
+    pub(super) fn continue_from<'f, S: Sink<'f>>(
         &self,
         forge: &'f DataForge<'f>,
         next: usize,
@@ -190,26 +202,22 @@ impl Link {
 fn follow<'f>(
     forge: &'f DataForge<'f>,
     link: Link,
-    bytes: &[u8],
+    bytes: &'f [u8],
     declared: &[usize],
     sink: &mut impl Sink<'f>,
 ) -> Reached<'f> {
     if link == Link::Weak {
-        return pointer(bytes).map_or_else(
-            || unresolved(sink, bytes),
-            |(struct_index, instance_index)| {
-                instance(forge, struct_index, instance_index, declared, |declared| {
-                    ValueError::UnexpectedPointerType {
-                        struct_index,
-                        declared,
-                    }
-                })
-            },
-        );
+        let Some((structure, index)) = pointer(bytes) else {
+            return unresolved(sink, bytes);
+        };
+        return pointed_instance(forge, structure, index, declared, sink);
     }
     let Some(record) = reference_guid(bytes).and_then(|guid| forge.record_by_guid(guid)) else {
         return unresolved(sink, bytes);
     };
+    sink.route(QuerySource::Record {
+        index: record.index(),
+    });
     let struct_index = record.def.struct_index;
     instance(
         forge,
@@ -221,26 +229,47 @@ fn follow<'f>(
             struct_index,
             declared,
         },
+        sink,
     )
 }
 
 /// Counts the link in `bytes` in the sink and returns the null it reaches.
-fn unresolved<'f>(sink: &mut impl Sink<'f>, bytes: &[u8]) -> Reached<'f> {
+fn unresolved<'f>(sink: &mut impl Sink<'f>, bytes: &'f [u8]) -> Reached<'f> {
     sink.unresolved(bytes);
     Reached::Value(Value::Null)
 }
 
 /// Follows a strong pointer to an instance of `declared` or of a struct deriving from it.
-fn deref<'f>(forge: &'f DataForge<'f>, bytes: &[u8], declared: &[usize]) -> Reached<'f> {
+pub(super) fn deref<'f>(
+    forge: &'f DataForge<'f>,
+    bytes: &[u8],
+    declared: &[usize],
+    sink: &mut impl Sink<'f>,
+) -> Reached<'f> {
     let Some((struct_index, instance_index)) = pointer(bytes) else {
         return Reached::Value(Value::Null);
     };
-    instance(forge, struct_index, instance_index, declared, |declared| {
-        ValueError::UnexpectedPointerType {
+    pointed_instance(forge, struct_index, instance_index, declared, sink)
+}
+
+fn pointed_instance<'f>(
+    forge: &'f DataForge<'f>,
+    struct_index: u32,
+    instance_index: u32,
+    declared: &[usize],
+    sink: &mut impl Sink<'f>,
+) -> Reached<'f> {
+    instance(
+        forge,
+        struct_index,
+        instance_index,
+        declared,
+        |declared| ValueError::UnexpectedPointerType {
             struct_index,
             declared,
-        }
-    })
+        },
+        sink,
+    )
 }
 
 /// Reaches the instance when it exists and is of `declared` or of a struct deriving from it;
@@ -251,6 +280,7 @@ fn instance<'f>(
     instance_index: u32,
     declared: &[usize],
     mismatch: impl FnOnce(u32) -> ValueError,
+    sink: &mut impl Sink<'f>,
 ) -> Reached<'f> {
     let Some(target) = forge.instance(struct_index, instance_index) else {
         return Reached::Value(Value::Error(ValueError::InvalidPointer {
@@ -258,102 +288,25 @@ fn instance<'f>(
             instance_index,
         }));
     };
+    sink.route(QuerySource::Structure {
+        index: struct_index,
+    });
     if !derives(forge, struct_index, declared) {
         let declared = declared.first().copied().unwrap_or_default();
         return Reached::Value(Value::Error(mismatch(
             u32::try_from(declared).unwrap_or(u32::MAX),
         )));
     }
+    sink.route(QuerySource::Instance {
+        structure: struct_index,
+        instance: instance_index,
+    });
     Reached::Place(Place::Instance {
         struct_index,
         bytes: target,
     })
 }
 
-fn derives(forge: &DataForge<'_>, struct_index: u32, targets: &[usize]) -> bool {
+pub(super) fn derives(forge: &DataForge<'_>, struct_index: u32, targets: &[usize]) -> bool {
     usize::try_from(struct_index).is_ok_and(|index| ancestors_include(forge, index, targets))
-}
-
-/// Checks that the elements from `first` lie inside the pool or instance block they are read
-/// from.
-fn check_range(
-    forge: &DataForge<'_>,
-    elements: &Elements,
-    first: u32,
-    count: u32,
-) -> Result<(), ValueError> {
-    let (len, pool) = match elements {
-        Elements::Values(kind) => (forge.value_count(*kind) as u64, kind.name()),
-        Elements::Pointers(_) => (
-            forge.value_count(ValueKind::StrongPointer) as u64,
-            ValueKind::StrongPointer.name(),
-        ),
-        Elements::Instances(target) => match forge.instance_counts.get(*target as usize) {
-            Some(count) => (u64::from(*count), "instance block"),
-            None => {
-                return Err(ValueError::UnknownStruct {
-                    index: u16::try_from(*target).unwrap_or(u16::MAX),
-                });
-            }
-        },
-    };
-    if u64::from(first).saturating_add(u64::from(count)) > len {
-        return Err(ValueError::ArrayOutOfRange {
-            first,
-            count,
-            len,
-            pool,
-        });
-    }
-    Ok(())
-}
-
-/// Returns what the element at `element` in its pool or block reaches, or `None` when
-/// `[TypeName]` does not select it.
-fn element_of<'f>(
-    forge: &'f DataForge<'f>,
-    elements: &Elements,
-    select: &Select,
-    element: u32,
-) -> Option<Reached<'f>> {
-    let wanted = match select {
-        Select::Type(wanted) => Some(&wanted[..]),
-        Select::Index(_) | Select::All => None,
-    };
-    Some(match elements {
-        Elements::Values(kind) => Reached::Place(Place::Element {
-            kind: *kind,
-            element,
-            bytes: element_bytes(forge, *kind, element),
-        }),
-        Elements::Instances(target) => {
-            if wanted.is_some_and(|wanted| !derives(forge, *target, wanted)) {
-                return None;
-            }
-            forge.instance(*target, element).map_or(
-                Reached::Value(Value::Error(ValueError::InvalidPointer {
-                    struct_index: *target,
-                    instance_index: element,
-                })),
-                |bytes| {
-                    Reached::Place(Place::Instance {
-                        struct_index: *target,
-                        bytes,
-                    })
-                },
-            )
-        }
-        Elements::Pointers(declared) => {
-            let bytes = element_bytes(forge, ValueKind::StrongPointer, element);
-            if let Some(wanted) = wanted {
-                let (struct_index, instance_index) = pointer(bytes)?;
-                if forge.instance(struct_index, instance_index).is_some()
-                    && !derives(forge, struct_index, wanted)
-                {
-                    return None;
-                }
-            }
-            deref(forge, bytes, declared)
-        }
-    })
 }

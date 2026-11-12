@@ -72,6 +72,7 @@ mod models;
 mod mtl_summary;
 mod mtl_summary_origins;
 mod query;
+mod query_origins;
 mod query_selection;
 mod read;
 mod read_bytes_origins;

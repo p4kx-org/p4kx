@@ -6,9 +6,10 @@ use std::sync::{Arc, Mutex, PoisonError};
 use p4kx_extraction::{DataForge, DataForgeLoadError, DataForgeOrigin, LoadedDataForge};
 
 use crate::error::{ToolError, chain};
+use crate::query_selection_sources::SelectionReceipt;
 
-/// The selection of the last Query run: the Query text and the indexes of the Records it chose.
-type Selection = Option<(String, Arc<[u32]>)>;
+/// The last Query text and its selected Record positions and observed inputs.
+type Selection = Option<(String, Arc<SelectionReceipt>)>;
 
 /// The DataForge of one input, read on first use, and the selection of the last Query run over
 /// it.
@@ -48,7 +49,7 @@ impl ForgeState {
     }
 
     /// Returns the selection of the last Query run if it was of `query`.
-    pub(crate) fn selection(&self, query: &str) -> Option<Arc<[u32]>> {
+    pub(crate) fn selection(&self, query: &str) -> Option<Arc<SelectionReceipt>> {
         let selection = self
             .selection
             .lock()
@@ -60,7 +61,7 @@ impl ForgeState {
     }
 
     /// Keeps `records` as the selection of the last Query run, which was of `query`.
-    pub(crate) fn keep_selection(&self, query: &str, records: Arc<[u32]>) {
+    pub(crate) fn keep_selection(&self, query: &str, records: Arc<SelectionReceipt>) {
         *self
             .selection
             .lock()

@@ -1,20 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex, PoisonError};
 use std::time::{Duration, Instant};
 
 use p4kx_extraction::query::{
     CompiledQuery, Condition, Query, QueryError, ResultFormat, ResultWriter, Row,
 };
-use p4kx_extraction::{CancelToken, DataForge};
+use p4kx_extraction::{CancelToken, DataForge, DataForgeOrigin};
 use serde_json::value::RawValue;
 
-use crate::budget::{Counter, MAX_RESPONSE_LEN, json_len};
+use crate::budget::{Counter, MAX_RESPONSE_LEN, fit_prefix, json_len};
 use crate::error::{ToolError, chain};
 use crate::forge_file::ForgeSource;
 use crate::forge_shapes::{ColumnShape, FailedRow, QueryResult};
 use crate::page::Page;
+use crate::query_origins::{self, PageEvidence};
+use crate::query_selection_sources::{SelectionReceipt, Survey, SurveyMode};
 
 /// The bytes the end of the rows adds: the closing bracket and a line ending.
 const CLOSING_LEN: usize = 2;
@@ -32,6 +34,7 @@ pub(crate) const TIME_LIMIT: Duration = Duration::from_secs(30);
 pub(crate) struct Target<'a> {
     pub(crate) forge: &'a DataForge<'a>,
     pub(crate) archive: String,
+    pub(crate) origin: &'a DataForgeOrigin,
     pub(crate) opened: &'a ForgeSource,
 }
 
@@ -54,21 +57,53 @@ pub(crate) fn run(
         .map_err(|error| invalid(&error, text))?;
     let canonical = query.to_string();
     let records = selection(target.opened, &compiled, &canonical, cancel)?;
-    let selected = compiled.resume(records.to_vec());
+    let selected = compiled.resume(records.records.to_vec());
     let total = selected.len();
-    let rows = selected.rows(page.offset()..page.offset().saturating_add(page.limit()));
-    let written = write_rows(&compiled, &rows)?;
-    let next_cursor = page.next_cursor_after(written.taken, total)?;
-    Ok(QueryResult {
-        archive: target.archive.clone(),
-        query: canonical,
-        columns: columns(&compiled),
-        total,
-        rows: RawValue::from_string(String::from_utf8(written.json)?)?,
-        failed: written.failed,
-        unresolved_references: written.unresolved,
-        next_cursor,
-    })
+    page.check(total)?;
+    let rows = selected.rows_observed(page.offset()..page.offset().saturating_add(page.limit()));
+    let maximum = write_rows(&compiled, &rows)?.taken;
+    let response = |count, mode| {
+        let prefix = rows.split_at(count).0;
+        let written = write_rows(&compiled, prefix)?;
+        let next_cursor = page.next_cursor_after(count, total)?;
+        let origins = query_origins::project(&PageEvidence {
+            origin: target.origin,
+            compiled: &compiled,
+            rows: prefix,
+            examined: &rows,
+            columns: &written.column_positions,
+            survey: &records.survey,
+            mode,
+            cursor: next_cursor.is_some(),
+        })?;
+        Ok(QueryResult {
+            archive: target.archive.clone(),
+            query: canonical.clone(),
+            columns: columns(&compiled),
+            total,
+            rows: RawValue::from_string(String::from_utf8(written.json)?)?,
+            failed: written.failed,
+            unresolved_references: written.unresolved,
+            next_cursor,
+            origins,
+        })
+    };
+    let (keep, witness) = fit_prefix(
+        maximum,
+        |count| response(count, SurveyMode::Witness),
+        || {
+            rows.first().map_or_else(
+                || "query result".to_owned(),
+                |row| format!("row of {}", row.record_path()),
+            )
+        },
+    )?;
+    let complete = response(keep, SurveyMode::Complete)?;
+    if crate::budget::structured_len(&complete) <= MAX_RESPONSE_LEN {
+        Ok(complete)
+    } else {
+        Ok(witness)
+    }
 }
 
 fn selection(
@@ -76,17 +111,29 @@ fn selection(
     compiled: &CompiledQuery<'_>,
     canonical: &str,
     cancel: &CancelToken,
-) -> Result<Arc<[u32]>, ToolError> {
+) -> Result<Arc<SelectionReceipt>, ToolError> {
     if let Some(records) = opened.selection(canonical) {
         return Ok(records);
     }
     let deadline = Instant::now() + TIME_LIMIT;
+    let survey = Mutex::new(Survey::default());
     let run = compiled
-        .run_while(|| !cancel.is_cancelled() && Instant::now() < deadline)?
+        .run_observed(
+            || !cancel.is_cancelled() && Instant::now() < deadline,
+            |source| {
+                survey
+                    .lock()
+                    .unwrap_or_else(PoisonError::into_inner)
+                    .record(source);
+            },
+        )?
         .ok_or(ToolError::QueryStopped(TIME_LIMIT.as_secs()))?;
-    let records: Arc<[u32]> = run.indexes().into();
-    opened.keep_selection(canonical, Arc::clone(&records));
-    Ok(records)
+    let receipt = Arc::new(SelectionReceipt {
+        records: run.indexes().into(),
+        survey: survey.into_inner().unwrap_or_else(PoisonError::into_inner),
+    });
+    opened.keep_selection(canonical, Arc::clone(&receipt));
+    Ok(receipt)
 }
 
 fn check_size(query: &Query) -> Result<(), ToolError> {
@@ -145,6 +192,7 @@ struct Written {
     taken: usize,
     failed: Vec<FailedRow>,
     unresolved: usize,
+    column_positions: Vec<usize>,
 }
 
 /// Writes `rows` as JSON while they and the failed Records fit the response cap; a counting
@@ -198,10 +246,12 @@ fn write_rows(compiled: &CompiledQuery<'_>, rows: &[Row<'_>]) -> Result<Written,
         }
         taken += 1;
     }
+    let column_positions = out.json_columns().collect();
     Ok(Written {
         json: out.finish()?,
         taken,
         failed,
         unresolved,
+        column_positions,
     })
 }

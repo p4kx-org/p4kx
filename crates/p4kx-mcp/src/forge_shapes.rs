@@ -179,4 +179,6 @@ pub(crate) struct QueryResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: ForgeFieldOrigins,
 }

@@ -5,6 +5,7 @@ use std::ops::ControlFlow;
 
 use crate::query::reader::{Column, Reader};
 use crate::query::sink::{Reached, Sink};
+use crate::query::source::{self, QuerySource};
 use crate::query::walk::Place;
 use crate::{DataForge, Value, ValueError};
 
@@ -16,6 +17,7 @@ struct Matching<'s, 'f> {
     test: &'s dyn Fn(&Value<'f>) -> Option<bool>,
     result: Option<bool>,
     error: Option<ValueError>,
+    observer: Option<&'s (dyn Fn(QuerySource) + Sync)>,
 }
 
 impl Matching<'_, '_> {
@@ -40,10 +42,29 @@ impl<'f> Sink<'f> for Matching<'_, 'f> {
         Ok(())
     }
 
-    fn unresolved(&mut self, _link: &[u8]) {}
+    fn source_depth(&self) -> Option<usize> {
+        self.observer.map(|_| 0)
+    }
+
+    fn route(&mut self, source: QuerySource) {
+        if let Some(observer) = self.observer {
+            observer(source);
+        }
+    }
+
+    fn unresolved(&mut self, _link: &'f [u8]) {}
 
     fn reached(&mut self, reached: Reached<'f>) -> ControlFlow<()> {
+        let bytes = self.observer.and_then(|_| reached.bytes(self.leaf));
         let value = reached.read(self.forge, self.leaf);
+        if let Some(observer) = self.observer {
+            for source in source::value_sources(self.forge, bytes, &value)
+                .into_iter()
+                .flatten()
+            {
+                observer(source);
+            }
+        }
         if let Value::Error(error) = value {
             self.error.get_or_insert(error);
             return ControlFlow::Continue(());
@@ -69,6 +90,7 @@ impl Reader {
         forge: &'f DataForge<'f>,
         place: Place<'f>,
         proceed: &dyn Fn() -> bool,
+        observer: Option<&(dyn Fn(QuerySource) + Sync)>,
         test: impl Fn(&Value<'f>) -> Option<bool>,
     ) -> Result<Option<bool>, ValueError> {
         let leaf = match self {
@@ -82,6 +104,7 @@ impl Reader {
             test: &test,
             result: Some(false),
             error: None,
+            observer,
         };
         match self {
             Self::Column(_) if sink.proceed().is_continue() => {

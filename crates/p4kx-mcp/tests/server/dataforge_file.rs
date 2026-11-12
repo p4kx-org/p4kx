@@ -42,7 +42,7 @@ fn every_dataforge_tool_reads_a_file_like_the_archive() -> TestResult {
 
         if matches!(
             tool,
-            "get_record" | "search_records" | "list_structs" | "list_enums"
+            "get_record" | "search_records" | "list_structs" | "list_enums" | "run_query"
         ) {
             take_forge_origin(&mut read, "file", &Value::Null)?;
             take_forge_origin(&mut expected, "archiveEntry", &json!(false))?;

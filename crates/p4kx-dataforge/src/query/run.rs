@@ -11,6 +11,7 @@ use crate::dataforge::out_of_range;
 use crate::query::CompiledQuery;
 use crate::query::compile::Plan;
 use crate::query::shared::Recordings;
+use crate::query::source::{CellTrace, QueryCellSources};
 use crate::query::state::WalkState;
 use crate::query::walk::Place;
 use crate::{DataForgeError, Record, Value};
@@ -77,7 +78,16 @@ impl<'f> QueryRun<'_, 'f> {
         let end = range.end.min(self.records.len());
         let start = range.start.min(end);
         self.query
-            .rows_of(self.records.get(start..end).unwrap_or_default())
+            .rows_of(self.records.get(start..end).unwrap_or_default(), false)
+    }
+
+    /// Returns rows with the original inputs used by each selected cell.
+    #[must_use]
+    pub fn rows_observed(&self, range: Range<usize>) -> Vec<Row<'f>> {
+        let end = range.end.min(self.records.len());
+        let start = range.start.min(end);
+        self.query
+            .rows_of(self.records.get(start..end).unwrap_or_default(), true)
     }
 
     /// Returns the rows in pages of at most `page_size`; each page is built in parallel when it
@@ -103,7 +113,7 @@ impl<'f> Iterator for Pages<'_, 'f> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let chunk = self.chunks.next()?;
-        Some(self.query.rows_of(chunk))
+        Some(self.query.rows_of(chunk, false))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -118,6 +128,7 @@ pub struct Row<'f> {
     record_path: &'f str,
     cells: Result<Vec<Option<Value<'f>>>, DataForgeError>,
     unresolved: usize,
+    sources: Option<Vec<QueryCellSources>>,
 }
 
 impl<'f> Row<'f> {
@@ -142,6 +153,12 @@ impl<'f> Row<'f> {
     /// instance cannot be read.
     pub fn cells(&self) -> Result<&[Option<Value<'f>>], &DataForgeError> {
         self.cells.as_deref()
+    }
+
+    /// Returns evidence by selected column position when built with original inputs.
+    #[must_use]
+    pub fn cell_sources(&self) -> Option<&[QueryCellSources]> {
+        self.sources.as_deref()
     }
 
     /// Returns how many distinct links the columns followed with `->` to no Record or instance:
@@ -170,19 +187,22 @@ impl Scratch<'_> {
 }
 
 impl<'f> CompiledQuery<'f> {
-    fn rows_of(&self, records: &[u32]) -> Vec<Row<'f>> {
+    fn rows_of(&self, records: &[u32], observe: bool) -> Vec<Row<'f>> {
         records
             .par_iter()
-            .map_init(Scratch::new, |scratch, &record| self.row(record, scratch))
+            .map_init(Scratch::new, |scratch, &record| {
+                self.row(record, scratch, observe)
+            })
             .flatten()
             .collect()
     }
 
-    fn row(&self, index: u32, scratch: &mut Scratch<'f>) -> Option<Row<'f>> {
+    fn row(&self, index: u32, scratch: &mut Scratch<'f>, observe: bool) -> Option<Row<'f>> {
         let record = self.forge.record(index)?;
         let record_path = self.forge.path_of(index)?;
         let Scratch { state, recordings } = scratch;
         state.reset();
+        let mut sources = observe.then(Vec::new);
         let cells = match self.plan_of(index)? {
             _ if self.columns.is_empty() && self.predicate.is_none() => Ok(Vec::new()),
             Plan::Broken(error) => Err(error.clone()),
@@ -191,17 +211,23 @@ impl<'f> CompiledQuery<'f> {
             } => self.instance_of(index).map(|place| {
                 let groups = self.share_prefixes.then_some(shared);
                 if let Some(groups) = groups {
-                    groups.reset(recordings);
+                    groups.reset(recordings, observe);
                 }
                 columns
                     .iter()
                     .enumerate()
                     .map(|(at, column)| {
-                        let reader = column.as_ref()?;
-                        let prefix = groups.and_then(|groups| {
-                            groups.prefix_of(at, reader, self.forge, place, recordings)
+                        let mut trace = observe.then(CellTrace::default);
+                        let value = column.as_ref().map(|reader| {
+                            let prefix = groups.and_then(|groups| {
+                                groups.prefix_of(at, reader, self.forge, place, recordings)
+                            });
+                            reader.cell(self.forge, place, state, prefix, trace.as_mut())
                         });
-                        Some(reader.cell(self.forge, place, state, prefix))
+                        if let Some((sources, trace)) = sources.as_mut().zip(trace) {
+                            sources.push(trace.finish());
+                        }
+                        value
                     })
                     .collect()
             }),
@@ -211,6 +237,7 @@ impl<'f> CompiledQuery<'f> {
             record_path,
             cells,
             unresolved: state.unresolved(),
+            sources,
         })
     }
 

@@ -7,6 +7,7 @@ use rayon::prelude::*;
 
 use crate::query::compile::Plan;
 use crate::query::selection_control::{Control, EvaluationError};
+use crate::query::source::QuerySource;
 use crate::query::{CompiledQuery, QueryRun, SelectionError};
 
 impl<'f> CompiledQuery<'f> {
@@ -17,7 +18,7 @@ impl<'f> CompiledQuery<'f> {
     /// Returns [`SelectionError`] when a demanded value cannot be read to decide the condition.
     pub fn run(&self) -> Result<QueryRun<'_, 'f>, SelectionError> {
         let proceed = || true;
-        self.select(&Control::new(&proceed))
+        self.select(&Control::new(&proceed, None))
             .map(|records| self.resume(records))
     }
 
@@ -31,8 +32,26 @@ impl<'f> CompiledQuery<'f> {
         &self,
         proceed: impl Fn() -> bool + Sync,
     ) -> Result<Option<QueryRun<'_, 'f>>, SelectionError> {
-        let control = Control::new(&proceed);
-        let records = self.select(&control);
+        self.run_controlled(&Control::new(&proceed, None))
+    }
+
+    /// Selects Records and observes the actual inputs read while evaluating their conditions.
+    ///
+    /// # Errors
+    /// Returns the same selection error as the ordinary controlled run.
+    pub fn run_observed(
+        &self,
+        proceed: impl Fn() -> bool + Sync,
+        observer: impl Fn(QuerySource) + Sync,
+    ) -> Result<Option<QueryRun<'_, 'f>>, SelectionError> {
+        self.run_controlled(&Control::new(&proceed, Some(&observer)))
+    }
+
+    fn run_controlled(
+        &self,
+        control: &Control<'_>,
+    ) -> Result<Option<QueryRun<'_, 'f>>, SelectionError> {
+        let records = self.select(control);
         if control.proceed() {
             records.map(|records| Some(self.resume(records)))
         } else {
