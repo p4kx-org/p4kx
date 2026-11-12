@@ -51,6 +51,7 @@ fn observe(ledger: &mut ExportLedger, source: SourceObservation) {
                 subject: source.subject().clone(),
                 role: source.role,
                 complete: true,
+                root_field: None,
                 diagnostics: Vec::new(),
                 number_requirements: Vec::new(),
                 unresolved_references: Vec::new(),

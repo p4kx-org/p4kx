@@ -5,6 +5,11 @@ Filter restricted each kind. Health describes whether the selected sources and r
 dependencies were successfully read and projected. A filtered catalog can be healthy; an
 unfiltered diagnostic catalog can be incomplete.
 
+A scenario reads the original Faction's reputation link through the authored
+`factionReputationRef` field. The scenario dependency records that field's
+receipt and any unresolved target. The same physical Faction can independently contribute its
+complete field inventory when selected for the Faction table.
+
 Normal export refuses incomplete data before opening the destination. Explicit diagnostic export
 uses `--diagnostic-partial` in the CLI or the separate diagnostic action in the desktop window.
 The resulting file records `publicationMode: "diagnosticPartial"` and its actual health. A

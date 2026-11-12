@@ -14,6 +14,8 @@ use crate::record_fields::{
 };
 use crate::texts::Texts;
 
+const FACTION_REPUTATION: &str = "factionReputationRef";
+
 /// The `badgeToAward` the game stores for a tier without a badge.
 const NO_BADGE: &str = "None";
 
@@ -99,9 +101,10 @@ pub(crate) fn link_scenario_factions<'f>(
     cancel: Option<&p4kx_extraction::CancelToken>,
 ) -> Result<crate::export_ledger::ExportLedger, crate::CatalogError> {
     let capture = std::sync::Arc::new(
-        crate::export_builder_capture::BuilderCapture::for_input_kind(
+        crate::export_builder_capture::BuilderCapture::for_input_record_field(
             input,
             crate::Kind::ContractScenarios,
+            FACTION_REPUTATION,
             cancel,
         ),
     );
@@ -114,7 +117,7 @@ pub(crate) fn link_scenario_factions<'f>(
             .faction_guid
             .and_then(|faction| forge.record_by_guid(faction.0))
             .and_then(|record| trees.build(&record).ok())
-            .and_then(|tree| reference(Some(tree.root()), "factionReputationRef"));
+            .and_then(|tree| reference(Some(tree.root()), FACTION_REPUTATION));
     }
     capture.finish()
 }

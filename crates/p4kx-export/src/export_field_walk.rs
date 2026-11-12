@@ -21,6 +21,12 @@ use crate::record_observation::RecordObservation;
 use crate::resource_raw_policy::ResourceNumberContract;
 use crate::selection::Kind;
 
+#[path = "export_field_selection.rs"]
+mod selection;
+
+use selection::FieldSelection;
+pub(crate) use selection::inspect_record_field;
+
 /// Inspects only materialized owned values, retaining field failures independently of row mapping.
 #[cfg(test)]
 pub(crate) fn inspect(
@@ -79,25 +85,6 @@ pub(crate) fn inspect_configuration<'source>(
     )
 }
 
-enum FieldSelection {
-    All,
-    Subtree(Option<Range<usize>>),
-}
-
-impl FieldSelection {
-    fn includes(&self, ordinal: u64) -> Result<bool, ExportAccountingError> {
-        match self {
-            Self::All => Ok(true),
-            Self::Subtree(None) => Ok(false),
-            Self::Subtree(Some(span)) => {
-                let index =
-                    usize::try_from(ordinal).map_err(|_| ExportAccountingError::CounterOverflow)?;
-                Ok(span.contains(&index))
-            }
-        }
-    }
-}
-
 fn inspect_values<'source>(
     input: Option<&OriginalCatalogInput<'_, '_>>,
     tree: &RecordTree<'source>,
@@ -105,7 +92,7 @@ fn inspect_values<'source>(
     kind: Option<Kind>,
     role: ExportSourceRole,
     cancel: Option<&CancelToken>,
-    selection: &FieldSelection,
+    selection: &FieldSelection<'_, '_>,
 ) -> Result<ExportLedger, CatalogError> {
     admission.check_tree(tree)?;
     if cancel.is_some_and(CancelToken::is_cancelled) {
@@ -123,7 +110,9 @@ fn inspect_values<'source>(
         inspector.accounting(tree, admission.record(), cancel)?;
     }
     let mut ledger = ExportLedger::default();
-    ledger.field_inspections.push(inspector.collector.finish());
+    let mut inspection = inspector.collector.finish();
+    inspection.root_field = selection.root_field();
+    ledger.field_inspections.push(inspection);
     Ok(ledger)
 }
 
@@ -138,9 +127,9 @@ impl Inspector<'_, '_> {
         scope: &OriginalRecordScope<'_, '_>,
         capture: &mut ReferenceCapture<'_, '_, '_>,
         cancel: Option<&CancelToken>,
-        selection: &FieldSelection,
+        selection: &FieldSelection<'_, '_>,
     ) -> Result<(), CatalogError> {
-        if matches!(selection, FieldSelection::Subtree(None)) {
+        if selection.is_empty() {
             return Ok(());
         }
         let mut walk = scope.walk(cancel);
@@ -150,7 +139,7 @@ impl Inspector<'_, '_> {
                     self.visit(
                         site.neutral(),
                         Some((capture, &site)),
-                        selection.includes(site.ordinal())?,
+                        selection.includes(&site)?,
                     )?;
                     if matches!(site.value(), Value::Struct(_) | Value::Array(_)) {
                         capture.enter(&site)?;

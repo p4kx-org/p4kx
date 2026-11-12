@@ -9,6 +9,7 @@ use p4kx_extraction::{CancelToken, CanonicalReadObserver, DataForgeError, Record
 use crate::build::original_input::OriginalCatalogInput;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_evidence_lock;
+use crate::export_field_walk;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, Kind};
@@ -35,6 +36,7 @@ pub(crate) struct BuilderCapture<'f> {
     context: Mutex<Context>,
     state: Mutex<State>,
     cancel: Option<CancelToken>,
+    root_field: Option<&'static str>,
 }
 
 impl<'f> BuilderCapture<'f> {
@@ -95,6 +97,17 @@ impl<'f> BuilderCapture<'f> {
         .with_input(input)
     }
 
+    pub(crate) fn for_input_record_field(
+        input: &'f OriginalCatalogInput<'f, 'f>,
+        kind: Kind,
+        field: &'static str,
+        cancel: Option<&CancelToken>,
+    ) -> Self {
+        let mut capture = Self::for_input_kind(input, kind, cancel);
+        capture.root_field = Some(field);
+        capture
+    }
+
     const fn with_input(mut self, input: &'f OriginalCatalogInput<'f, 'f>) -> Self {
         self.input = Some(input);
         self
@@ -106,6 +119,7 @@ impl<'f> BuilderCapture<'f> {
             context: Mutex::new(context),
             state: Mutex::new(State::default()),
             cancel: cancel.cloned(),
+            root_field: None,
         }
     }
 
@@ -127,6 +141,29 @@ impl<'f> BuilderCapture<'f> {
         Ok(std::mem::take(&mut state.ledger))
     }
 
+    fn inspect<'source>(
+        &self,
+        kind: Option<Kind>,
+        tree: &RecordTree<'source>,
+        admission: &RecordObservation<'_, 'source>,
+    ) -> Result<ExportLedger, CatalogError> {
+        let cancel = self.cancel.as_ref();
+        match (self.input, kind, self.root_field) {
+            (Some(input), Some(kind), Some(field)) => {
+                export_field_walk::inspect_record_field(input, tree, admission, kind, field, cancel)
+            }
+            (input, kind, None) => export_field_walk::inspect_observed(
+                input,
+                tree,
+                admission,
+                kind,
+                ExportSourceRole::Dependency,
+                cancel,
+            ),
+            _ => Err(crate::ExportAccountingError::ConflictingSourceDatum.into()),
+        }
+    }
+
     fn record(
         &self,
         context: Context,
@@ -140,14 +177,7 @@ impl<'f> BuilderCapture<'f> {
         let mut ledger = ExportLedger::default();
         let disposition = match outcome {
             Ok(tree) => {
-                ledger.merge(crate::export_field_walk::inspect_observed(
-                    self.input,
-                    tree,
-                    &admission,
-                    context.kind,
-                    ExportSourceRole::Dependency,
-                    self.cancel.as_ref(),
-                )?);
+                ledger.merge(self.inspect(context.kind, tree, &admission)?);
                 SourceDisposition::Projected
             }
             Err(_) => SourceDisposition::ReadFailed,

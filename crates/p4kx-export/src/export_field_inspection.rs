@@ -1,18 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::BTreeMap;
+
 use p4kx_extraction::Guid;
 
-use crate::HealthText;
 use crate::catalog_number_health::NumberRequirement;
 use crate::catalog_read::original::RecordSubject;
 use crate::catalog_read::original::ReferenceObservation;
 use crate::catalog_reference::CatalogReference;
 use crate::export_diagnostic::ExportSourceRole;
+use crate::export_ledger::SourceObservation;
 use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
 use crate::selection::Kind;
+use crate::{ExportAccountingError, HealthText};
 
-/// One inspection of every materialized canonical value, independently of its emitted rows.
+/// Inspection of the canonical values relevant to one source scope.
 #[derive(Debug, Clone)]
 #[must_use]
 pub(crate) struct FieldInspection {
@@ -23,6 +26,7 @@ pub(crate) struct FieldInspection {
     pub(crate) subject: RecordSubject,
     pub(crate) role: ExportSourceRole,
     pub(crate) complete: bool,
+    pub(crate) root_field: Option<&'static str>,
     pub(crate) diagnostics: Vec<ExportDiagnostic>,
     /// Conditional failures until the exact physical source has an emitted lossless row.
     pub(crate) number_requirements: Vec<NumberRequirement>,
@@ -49,9 +53,9 @@ impl FieldInspection {
 }
 
 impl FieldInspection {
-    pub(crate) fn merge(&mut self, other: Self) -> Result<(), crate::ExportAccountingError> {
+    pub(crate) fn merge(&mut self, other: Self) -> Result<(), ExportAccountingError> {
         if self != &other {
-            return Err(crate::ExportAccountingError::ConflictingFieldInspection);
+            return Err(ExportAccountingError::ConflictingFieldInspection);
         }
         self.subject.merge(other.subject)?;
         for (required, other) in self
@@ -89,6 +93,7 @@ impl PartialEq for FieldInspection {
             && self.record_path == other.record_path
             && self.role == other.role
             && self.complete == other.complete
+            && self.root_field == other.root_field
             && self.diagnostics == other.diagnostics
             && self.number_requirements == other.number_requirements
             && self.unresolved_references == other.unresolved_references
@@ -97,3 +102,72 @@ impl PartialEq for FieldInspection {
 }
 
 impl Eq for FieldInspection {}
+
+/// Immutable field receipts indexed by whole Record or the exact field consumed by a reader.
+#[derive(Default)]
+pub(crate) struct FieldInspections {
+    whole: BTreeMap<u32, FieldInspection>,
+    scoped: BTreeMap<(u32, usize, ExportSourceRole), FieldInspection>,
+}
+
+impl FieldInspections {
+    pub(crate) fn index(inspections: Vec<FieldInspection>) -> Result<Self, ExportAccountingError> {
+        let mut indexed = Self::default();
+        for mut inspection in inspections {
+            if inspection.root_field.is_some() {
+                let kind = inspection
+                    .kind
+                    .ok_or(ExportAccountingError::ConflictingFieldInspection)?;
+                if inspection.role != ExportSourceRole::Dependency {
+                    return Err(ExportAccountingError::ConflictingFieldInspection);
+                }
+                let key = (inspection.record_index, kind.index(), inspection.role);
+                Self::merge(indexed.scoped.entry(key), inspection)?;
+            } else {
+                inspection.contextualize(None, ExportSourceRole::Dependency);
+                Self::merge(indexed.whole.entry(inspection.record_index), inspection)?;
+            }
+        }
+        Ok(indexed)
+    }
+
+    fn merge<Key>(
+        entry: std::collections::btree_map::Entry<'_, Key, FieldInspection>,
+        inspection: FieldInspection,
+    ) -> Result<(), ExportAccountingError>
+    where
+        Key: Ord,
+    {
+        match entry {
+            std::collections::btree_map::Entry::Vacant(entry) => {
+                entry.insert(inspection);
+                Ok(())
+            }
+            std::collections::btree_map::Entry::Occupied(mut entry) => {
+                entry.get_mut().merge(inspection)
+            }
+        }
+    }
+
+    pub(crate) const fn whole(&self) -> &BTreeMap<u32, FieldInspection> {
+        &self.whole
+    }
+
+    pub(crate) fn all(&self) -> impl Iterator<Item = &FieldInspection> {
+        self.whole.values().chain(self.scoped.values())
+    }
+
+    pub(crate) fn for_source(
+        &self,
+        source: &SourceObservation,
+    ) -> Result<&FieldInspection, ExportAccountingError> {
+        source
+            .kind
+            .and_then(|kind| {
+                self.scoped
+                    .get(&(source.record_index, kind.index(), source.role))
+            })
+            .or_else(|| self.whole.get(&source.record_index))
+            .ok_or(ExportAccountingError::MissingFieldInspection)
+    }
+}

@@ -7,6 +7,12 @@
 #[path = "catalog_faction.rs"]
 mod catalog_faction;
 
+#[path = "catalog_faction_modifier.rs"]
+mod faction_modifier;
+
+#[path = "catalog_scenario_faction_scope.rs"]
+mod faction_scope;
+
 use crate::reputation_fixture::{
     CONTEXT, FACTION, FACTION_BARE, LEGACY_FACTION, LOCALITY, MISSION_TYPE, PLAIN_A, PLAIN_B,
     SCENARIO, SCOPE, STANDING_HIGH, STANDING_LOW, write_archive,

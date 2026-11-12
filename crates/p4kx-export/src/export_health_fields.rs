@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 
-use crate::ExportSourceRole;
 use crate::catalog_number_health::NumberCaptures;
 use crate::catalog_read::original::ReferenceObservation;
 use crate::catalog_target_index::TargetIndex;
 use crate::export_diagnostic::ExportDiagnosticSeverity;
-use crate::export_field_inspection::FieldInspection;
+use crate::export_field_inspection::{FieldInspection, FieldInspections};
 use crate::export_ledger::{ExportAccountingError, SourceObservation};
 use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
 use crate::health_failed_observation::FailedRecordObservation as FailedExportRecord;
@@ -28,9 +27,9 @@ pub(crate) fn resolve(
     rows: Option<&crate::catalog_row::CatalogRows>,
     excluded: &[crate::catalog_row::ExcludedCatalogRow],
 ) -> Result<Fields, ExportAccountingError> {
-    let canonical = canonical_inspections(inspections)?;
+    let canonical = FieldInspections::index(inspections)?;
     let targets = rows
-        .map(|rows| TargetIndex::new(&rows.emitted, excluded, sources, &canonical))
+        .map(|rows| TargetIndex::new(&rows.emitted, excluded, sources, canonical.whole()))
         .transpose()?;
     let captured = NumberCaptures::new(rows, targets.as_ref());
     let mut fields = Fields {
@@ -43,9 +42,7 @@ pub(crate) fn resolve(
         .iter()
         .filter(|source| source.disposition.read_succeeded())
     {
-        let inspection = canonical
-            .get(&source.record_index)
-            .ok_or(ExportAccountingError::MissingFieldInspection)?;
+        let inspection = canonical.for_source(source)?;
         if inspection.guid != source.guid
             || source
                 .record_path
@@ -85,24 +82,6 @@ pub(crate) fn resolve(
         fields.diagnostics.iter().skip(reference_diagnostics),
     )?);
     Ok(fields)
-}
-
-fn canonical_inspections(
-    inspections: Vec<FieldInspection>,
-) -> Result<BTreeMap<u32, FieldInspection>, ExportAccountingError> {
-    let mut canonical = BTreeMap::<u32, FieldInspection>::new();
-    for mut inspection in inspections {
-        inspection.contextualize(None, ExportSourceRole::Dependency);
-        match canonical.entry(inspection.record_index) {
-            std::collections::btree_map::Entry::Vacant(entry) => {
-                entry.insert(inspection);
-            }
-            std::collections::btree_map::Entry::Occupied(mut entry) => {
-                entry.get_mut().merge(inspection)?;
-            }
-        }
-    }
-    Ok(canonical)
 }
 
 fn retain(

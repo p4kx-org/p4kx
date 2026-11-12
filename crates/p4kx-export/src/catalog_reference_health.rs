@@ -12,7 +12,7 @@ use crate::export_diagnostic::{
     ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
     ExportSourceRole,
 };
-use crate::export_field_inspection::FieldInspection;
+use crate::export_field_inspection::{FieldInspection, FieldInspections};
 use crate::export_health_fields::Fields;
 use crate::export_ledger::{ExportAccountingError, SourceDisposition, SourceObservation};
 use crate::export_reference_issue::ExportReferenceStatus;
@@ -22,7 +22,7 @@ use crate::health_diagnostic_observation::{
 
 /// Resolves captured source links using final emitted rows and exact physical source outcomes.
 pub(crate) fn resolve(
-    canonical: &BTreeMap<u32, FieldInspection>,
+    canonical: &FieldInspections,
     sources: &[SourceObservation],
     rows: Option<&CatalogRows>,
     targets: Option<&TargetIndex>,
@@ -30,14 +30,14 @@ pub(crate) fn resolve(
 ) -> Result<(), ExportAccountingError> {
     let (Some(rows), Some(targets)) = (rows, targets) else {
         if canonical
-            .values()
+            .all()
             .any(|proof| !proof.catalog_references.is_empty())
         {
             return Err(ExportAccountingError::MissingCatalogRows);
         }
         return Ok(());
     };
-    ambiguous_rows(targets, canonical, fields)?;
+    ambiguous_rows(targets, canonical.whole(), fields)?;
     let mut by_target = BTreeMap::<u32, Vec<&SourceObservation>>::new();
     for source in sources {
         by_target
@@ -49,9 +49,7 @@ pub(crate) fn resolve(
         .iter()
         .filter(|source| source.disposition.read_succeeded())
     {
-        let proof = canonical
-            .get(&source.record_index)
-            .ok_or(ExportAccountingError::MissingFieldInspection)?;
+        let proof = canonical.for_source(source)?;
         for reference in &proof.catalog_references {
             let target = reference.target()?;
             let target_sources = by_target.get(&target.index).map_or(&[][..], Vec::as_slice);
