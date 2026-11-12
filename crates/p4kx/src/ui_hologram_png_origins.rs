@@ -22,7 +22,7 @@ use super::material_origins::{self, MaterialInputs};
 use super::origins::CameraInput;
 
 use super::{HologramInputs, Projection};
-use super::{bone_origins, cdf_origins, node_origins};
+use super::{bone_origins, cdf_origins, gear_origins, node_origins};
 use crate::json;
 
 pub(super) struct Published {
@@ -240,6 +240,7 @@ fn scene_inputs(
                 break;
             };
             port_placement(projection, part, &mut sources.placed)?;
+            gear_origins::placement(projection, part, &mut sources.placed)?;
             node_origins::placement(projection, assembly, index, &mut sources.placed)?;
             bone_origins::placement(projection, assembly, index, &mut sources.placed)?;
             at = part.parent();

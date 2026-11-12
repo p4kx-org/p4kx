@@ -343,6 +343,11 @@ fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode 
         own_skin: None,
         vehicle: None,
         landing_gear: Arc::from([]),
+        landing_system_component: spec
+            .vehicle
+            .as_ref()
+            .filter(|vehicle| vehicle.landing_system.is_some())
+            .map(|vehicle| vehicle.component),
         docked_vehicle,
         loadout_file: match &spec.loadout {
             Some(LoadoutSpec::Xml(path)) => Some(Arc::clone(path.text())),

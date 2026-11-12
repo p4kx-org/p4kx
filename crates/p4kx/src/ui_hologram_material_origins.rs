@@ -8,7 +8,7 @@ use p4kx_extraction::{
     SourceUseRole,
 };
 
-use super::{Projection, cdf_origins};
+use super::{Projection, cdf_origins, gear_origins};
 
 pub(super) struct MaterialInputs<'a> {
     pub(super) archive: &'a MaterialArchiveOrigins,
@@ -45,6 +45,7 @@ impl MaterialInputs<'_> {
     ) -> Result<()> {
         if let Some(part) = self.owner {
             cdf_origins::model(projection, part, sources)?;
+            gear_origins::model(projection, part, sources)?;
         }
         if let Some((_, attachment)) = self.attachment {
             cdf_origins::whole_piece_selection(projection, attachment, sources)?;

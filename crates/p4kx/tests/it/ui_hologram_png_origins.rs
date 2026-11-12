@@ -225,3 +225,6 @@ mod root_rig;
 
 #[path = "ui_hologram_cdf_attachments.rs"]
 mod cdf_attachments;
+
+#[path = "ui_hologram_gear_selectors.rs"]
+mod gear_selectors;

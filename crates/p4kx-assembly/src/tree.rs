@@ -39,6 +39,7 @@ pub struct EntityNode {
     pub(crate) own_skin: Option<OwnSkin>,
     pub(crate) vehicle: Option<Arc<VehicleImplementation>>,
     pub(crate) landing_gear: Arc<[LandingGear]>,
+    pub(crate) landing_system_component: Option<usize>,
     pub(crate) docked_vehicle: bool,
     pub(crate) loadout_file: Option<Arc<str>>,
     pub(crate) expanded: bool,

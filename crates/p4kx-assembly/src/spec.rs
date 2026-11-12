@@ -100,6 +100,7 @@ pub(crate) struct VehicleSpec {
     pub(crate) modification: LoadoutPath,
     pub(crate) class_name: Option<LoadoutPath>,
     pub(crate) landing_system: Option<LoadoutReference>,
+    pub(crate) component: usize,
 }
 
 impl PartialEq for VehicleSpec {
@@ -163,10 +164,9 @@ impl EntitySpec {
         let variants = geometry_component
             .map(|(ordinal, component)| Geometry::read_variants(component, position(ordinal)))
             .unwrap_or_default();
-        let vehicle = components
-            .iter()
-            .find(|component| component.type_name() == VEHICLE_PARAMS)
-            .map(|component| read_vehicle(component, tree, paths));
+        let vehicle = component_slots(tree)
+            .find(|(_, component)| component.type_name() == VEHICLE_PARAMS)
+            .map(|(ordinal, component)| read_vehicle(component, ordinal, tree, paths));
         let attachable = attachable_component(tree);
         let definition = attachable.and_then(|(_, component)| struct_field(component, "AttachDef"));
         let attach_type = definition.map_or("", |definition| text(definition, "Type"));
@@ -337,10 +337,12 @@ pub(crate) fn read_item_facts(tree: &RecordTree<'_>) -> ItemFacts {
 
 fn read_vehicle(
     component: &StructValue<'_>,
+    ordinal: usize,
     tree: &RecordTree<'_>,
     paths: &PathRead<'_>,
 ) -> VehicleSpec {
     VehicleSpec {
+        component: ordinal,
         definition: paths.field(component, "vehicleDefinition", LoadoutPathOperation::Trim),
         modification: paths.field(component, "modification", LoadoutPathOperation::Trim),
         class_name: paths.record_name(tree),

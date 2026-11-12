@@ -19,6 +19,7 @@ mod totals;
 
 use std::collections::HashMap;
 
+use crate::gear_placement_source::GearDeclaration;
 use crate::merge::port_key;
 use crate::{LoadoutError, LoadoutFiles};
 
@@ -173,11 +174,18 @@ impl VehiclePart {
 }
 
 /// One landing gear of the `VehicleLandingGearSystem` Record an Entity's vehicle component names.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct LandingGear {
     pub(crate) bone: String,
     pub(crate) geometry: String,
     pub(crate) mass: Option<f64>,
+    pub(crate) source: GearDeclaration,
+}
+
+impl PartialEq for LandingGear {
+    fn eq(&self, other: &Self) -> bool {
+        self.bone == other.bone && self.geometry == other.geometry && self.mass == other.mass
+    }
 }
 
 impl LandingGear {

@@ -6,9 +6,9 @@ use std::sync::Arc;
 use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource, SourceLocation};
 
 use super::Part;
-use crate::PortPlacementSource;
 use crate::build_models::Loaded;
 use crate::cdf_model_sources::CdfModelSources;
+use crate::{GearPlacementSource, PortPlacementSource};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ModelDefinition {
@@ -41,6 +41,12 @@ impl Part {
     #[must_use]
     pub fn material_selector(&self) -> Option<SourceLocation> {
         self.geometry_selectors.material_field()
+    }
+
+    /// Returns the selectors of this part's original landing gear declaration.
+    #[must_use]
+    pub fn landing_gear_source(&self) -> Option<&GearPlacementSource> {
+        self.model.as_ref().and(self.landing_gear.as_ref())
     }
 
     /// Returns authored port fields used by this part's placement, when retained.

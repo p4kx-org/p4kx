@@ -168,6 +168,12 @@ relative-pose fields belong to the effective main or LOD skeleton.
 Equipment anchored through a parent skin uses the original character-root
 rig when that rig supplied its placement.
 
+For a landing gear used by the scene, the receipt records the Entity's
+`landingSystem` reference and the original `gears` array slot's
+`geometry.path`. The authored `bone` contributes when placement
+evaluates it against the parent model, including when the name chooses
+the origin fallback.
+
 The actual CDF main model selection is recorded as the winning attachment
 `Binding` or fallback `Model.File`. A `CA_SKIN` preference also records the
 winning attachment's `Type`. A CDF `Material` attribute contributes when

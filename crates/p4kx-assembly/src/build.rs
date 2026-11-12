@@ -111,7 +111,7 @@ impl Assembly {
                 path: draft.path.clone(),
                 guid: draft.node.guid(),
                 class_name: draft.class_name().to_owned(),
-                landing_gear: draft.gear.is_some(),
+                landing_gear: placement.gear,
                 parent: draft.parent,
                 local: placement.local,
                 world,

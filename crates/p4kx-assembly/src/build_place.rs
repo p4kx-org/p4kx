@@ -10,7 +10,8 @@ use crate::flatten::Draft;
 use crate::model_placement_sources::{BoneOwner, ModelAnchor, ModelPlacement};
 use crate::placement::{self, BonePlacement, NodePlacement, PlacementSkeleton, offset};
 use crate::{
-    Issue, IssueKind, Part, Placement, PortDefinition, PortNode, PortPlacementSource, PortTransform,
+    GearPlacementSource, Issue, IssueKind, LandingGear, Part, Placement, PortDefinition, PortNode,
+    PortPlacementSource, PortTransform,
 };
 
 pub(crate) struct PlacedPart {
@@ -18,6 +19,7 @@ pub(crate) struct PlacedPart {
     pub(crate) kind: Placement,
     pub(crate) port: Option<PortPlacementSource>,
     pub(crate) nodes: ModelPlacement,
+    pub(crate) gear: Option<GearPlacementSource>,
 }
 
 impl PlacedPart {
@@ -27,6 +29,7 @@ impl PlacedPart {
             kind,
             port,
             nodes: ModelPlacement::default(),
+            gear: None,
         }
     }
 }
@@ -78,6 +81,7 @@ impl Anchor {
             kind: self.kind,
             port: source,
             nodes: ModelPlacement::new(self.source, offset),
+            gear: None,
         }
     }
 }
@@ -115,13 +119,7 @@ pub(crate) fn place(
         return PlacedPart::unanchored(Placement::Root, None);
     };
     if let Some(gear) = draft.gear {
-        let gear = place_gear(draft, gear.bone(), parent, issues);
-        return PlacedPart {
-            local: gear.transform,
-            kind: gear.kind,
-            port: None,
-            nodes: ModelPlacement::new(gear.source, None),
-        };
+        return place_gear(draft, gear, parent, issues);
     }
     let Some(port) = draft.port else {
         return PlacedPart::unanchored(Placement::Origin, None);
@@ -188,10 +186,35 @@ fn with_offset(
 }
 
 /// Returns the transform of a landing gear: the node `bone` of its Entity's model.
-fn place_gear(draft: &Draft<'_>, bone: &str, parent: &Part, issues: &mut Vec<Issue>) -> Anchor {
-    let Some(parent_model) = parent.model() else {
-        return Anchor::origin();
-    };
+fn place_gear(
+    draft: &Draft<'_>,
+    gear: &LandingGear,
+    parent: &Part,
+    issues: &mut Vec<Issue>,
+) -> PlacedPart {
+    let parent_model = parent.model();
+    let anchor = parent_model.map_or_else(Anchor::origin, |model| {
+        gear_anchor(draft, gear.bone(), model, issues)
+    });
+    PlacedPart {
+        local: anchor.transform,
+        kind: anchor.kind,
+        port: None,
+        nodes: ModelPlacement::new(anchor.source, None),
+        gear: Some(GearPlacementSource::of(
+            draft.node,
+            gear,
+            parent_model.is_some(),
+        )),
+    }
+}
+
+fn gear_anchor(
+    draft: &Draft<'_>,
+    bone: &str,
+    parent_model: &Model,
+    issues: &mut Vec<Issue>,
+) -> Anchor {
     if let Some(found) = placement::node_placement(parent_model, bone) {
         return Anchor::node(Placement::Helper(bone.to_owned()), found);
     }

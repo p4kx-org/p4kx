@@ -15,7 +15,7 @@ use p4kx_model::{MaterialStatus, Model, TintPalette, Transform, UnresolvedLayers
 pub(crate) use self::part_inputs::ModelDefinition;
 use crate::geometry::GeometrySelectors;
 use crate::model_placement_sources::ModelPlacement;
-use crate::{AttachedModel, Issue, PortPlacementSource, creature_rig};
+use crate::{AttachedModel, GearPlacementSource, Issue, PortPlacementSource, creature_rig};
 
 #[path = "assembly_part_inputs.rs"]
 mod part_inputs;
@@ -113,7 +113,7 @@ pub struct Part {
     pub(crate) path: String,
     pub(crate) guid: Guid,
     pub(crate) class_name: String,
-    pub(crate) landing_gear: bool,
+    pub(crate) landing_gear: Option<GearPlacementSource>,
     pub(crate) parent: Option<usize>,
     pub(crate) local: Transform,
     pub(crate) world: Transform,
@@ -162,7 +162,7 @@ impl Part {
     /// Returns whether the part is a landing gear of the Entity it hangs below, not an Entity.
     #[must_use]
     pub const fn is_landing_gear(&self) -> bool {
-        self.landing_gear
+        self.landing_gear.is_some()
     }
 
     /// Returns the index of the parent part, or `None` for the root. A parent comes before its
