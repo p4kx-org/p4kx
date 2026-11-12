@@ -686,6 +686,9 @@ exports original AttachDef occupancy, vehicle box size and metadata bounds flags
 `configurations.itemBounds`. These fields describe authored inventory and definition-space
 bounds. `definitions.inventoryContainers` and `configurations.inventoryConfigurations`
 expose source capacity and the physical item or vehicle components that select it.
+[Authored inventory interactions](catalog-inventory-interactions.md) are in
+`configurations.interactions`. Their original condition lists, tasks and state links retain
+physical owners and per-value provenance.
 
 #### Playability
 

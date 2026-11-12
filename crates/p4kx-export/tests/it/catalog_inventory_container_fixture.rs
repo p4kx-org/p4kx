@@ -8,6 +8,7 @@ pub(super) const STANDARD: u128 = 0x1057_0011;
 pub(super) const CENTI: u128 = 0x1057_0012;
 pub(super) const MICRO: u128 = 0x1057_0013;
 pub(super) const FUTURE: u128 = 0x1057_0014;
+pub(super) const METER_GRID: u128 = 0x1057_0015;
 
 const CONTAINER: &str = "InventoryContainer";
 const TYPE_BASE: &str = "InventoryContainerTypeBase";
@@ -22,7 +23,16 @@ const CARGO_BASE: &str = "SBaseCargoUnit";
 pub(super) fn database() -> DataForgeBuilder {
     let builder = units(container_schema(DataForgeBuilder::new().version(8)));
     builder
-        .record(record(OPEN, "fixture_open", open()))
+        .record(record(
+            OPEN,
+            "fixture_open",
+            open(TestInstance::new(GRID_CM).value("centimeters", TestValue::Int32(0))),
+        ))
+        .record(record(
+            METER_GRID,
+            "fixture_meters",
+            open(TestInstance::new(GRID_M).value("meters", TestValue::Int32(3))),
+        ))
         .record(record(
             STANDARD,
             "fixture_standard",
@@ -139,12 +149,9 @@ fn record(guid: u128, name: &str, storage: TestInstance) -> TestRecord {
     .value("inventoryType", TestValue::Struct(storage))
 }
 
-fn open() -> TestInstance {
+fn open(grid_size: TestInstance) -> TestInstance {
     TestInstance::new(OPEN_TYPE)
-        .value(
-            "gridCellSize",
-            TestValue::Struct(TestInstance::new(GRID_CM).value("centimeters", TestValue::Int32(0))),
-        )
+        .value("gridCellSize", TestValue::Struct(grid_size))
         .value("minPermittedItemSize", vec3([0.0, 1.0, 2.0]))
         .value("maxPermittedItemSize", vec3([3.0, 4.0, 5.0]))
         .value("isExternalContainer", TestValue::Bool(false))

@@ -147,6 +147,7 @@ impl<'read, 'source> Verification<'read, 'source> {
 
     fn verify_bounds(&self) -> TestResult {
         let rows = components::component_rows(self.catalog, "/configurations/itemBounds/rows")?;
+        let ships = proof::rows(self.catalog, "/ships")?;
         let mut wearable = false;
         let mut vehicle = false;
         let mut trees = TreeBuilder::new();
@@ -178,6 +179,13 @@ impl<'read, 'source> Verification<'read, 'source> {
                 owned(component, row, "AttachDef", compare_occupancy)?;
                 wearable = true;
             } else {
+                let guid = tree.guid().to_string();
+                if !ships
+                    .iter()
+                    .any(|ship| ship["guid"] == guid && ship["recordPath"] == tree.record_path())
+                {
+                    continue;
+                }
                 self.check_owner(row, &tree, original, component)?;
                 owned(component, row, "maxBoundingBoxSize", compare_vector)?;
                 vehicle = true;

@@ -21,13 +21,18 @@ fn inventory_records_keep_original_open_restrictions_and_closed_units() -> TestR
         let rows = proof::rows(&catalog, "/definitions/inventoryContainers/rows")?;
         assert_eq!(
             rows.len(),
-            5,
+            6,
             "one definition for each physical source Record"
         );
         validator
             .validate(&catalog)
             .map_err(|error| format!("schema: {error}"))?;
         check_open(row(rows, fixture::OPEN)?, encrypted)?;
+        let meter_grid = proof::at(
+            row(rows, fixture::METER_GRID)?,
+            "/inventoryType/value/gridCellSize/value",
+        )?;
+        proof::present(meter_grid, "meters", &json!(3), Some(encrypted))?;
         check_closed(rows, encrypted)?;
         proof::closure(&catalog)?;
     }
@@ -169,6 +174,40 @@ fn inventory_owner_rows_keep_references_bounds_and_storage_policies_separate() -
         .map_err(|error| format!("schema: {error}"))?;
     proof::closure(&catalog)?;
     Ok(())
+}
+
+#[test]
+fn inventory_dimensions_keep_valid_ui_override_beside_invalid_and_absent_members() -> TestResult {
+    let (_directory, archive) =
+        common::open(&entities::wrong_dimension_type(), DcbOrigin::Encrypted)?;
+    let options = p4kx_export::CatalogOptions {
+        publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+        ..common::options()
+    };
+    let built = p4kx_export::build_catalog(&archive, &options)?;
+    assert!(
+        !built.summary().export_health().is_complete(),
+        "the invalid original dimension is accounted for"
+    );
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    let rows = proof::rows(&catalog, "/configurations/itemBounds/rows")?;
+    let source = proof::at(component(rows, entities::WEARABLE, 0)?, "/attachDef/value")?;
+    proof::cell(source, "inventoryOccupancyDimensions", "invalid")?;
+    proof::cell(source, "inventoryOccupancyLocalBoundsMin", "absent")?;
+    proof::cell(source, "inventoryOccupancyLocalBoundsMax", "absent")?;
+    let override_cell = proof::cell(source, "inventoryOccupancyDimensionsUIOverride", "present")?;
+    assert_eq!(
+        override_cell["containsEncryptedSource"], true,
+        "the admitted original StrongPointer"
+    );
+    let ui = proof::at(override_cell, "/value")?;
+    single(ui, "x", 4.0, true)?;
+    single(ui, "y", -0.0, true)?;
+    single(ui, "z", 2.0, true)?;
+    jsonschema::validator_for(&p4kx_export::catalog_schema())?
+        .validate(&catalog)
+        .map_err(|error| format!("schema: {error}"))?;
+    proof::closure(&catalog)
 }
 
 fn check_storage_owners(catalog: &Value) -> TestResult {

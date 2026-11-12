@@ -21,7 +21,7 @@ const INTERACTION: &str = "SSharedInteractionParams";
 const CONTAINER: &str = "InventoryContainer";
 
 pub(super) fn database() -> DataForgeBuilder {
-    definitions(fixture::database())
+    definitions(fixture::database(), item_definition())
         .record(
             TestEntity::new(
                 WEARABLE,
@@ -54,7 +54,7 @@ pub(super) fn database() -> DataForgeBuilder {
         )
 }
 
-fn definitions(builder: DataForgeBuilder) -> DataForgeBuilder {
+fn definitions(builder: DataForgeBuilder, item: TestStruct) -> DataForgeBuilder {
     builder
         .structure(
             TestStruct::new("EntityClassDefinition")
@@ -73,16 +73,7 @@ fn definitions(builder: DataForgeBuilder) -> DataForgeBuilder {
                 .parent(COMPONENT)
                 .field("AttachDef", class(ITEM)),
         )
-        .structure(
-            TestStruct::new(ITEM)
-                .field("Type", TestType::String)
-                .field("inventoryOccupancyVolume", pointer("SBaseCargoUnit"))
-                .field("inventoryOccupancyDimensions", class("Vec3"))
-                .field("inventoryOccupancyLocalBoundsMin", class("Vec3"))
-                .field("inventoryOccupancyLocalBoundsMax", class("Vec3"))
-                .field("inventoryOccupancyDimensionsUIOverride", pointer("Vec3"))
-                .field("inventoryOccupancyFixedGridDimensionsUIV4", class("Vec2")),
-        )
+        .structure(item)
         .structure(
             TestStruct::new(STORAGE)
                 .parent(COMPONENT)
@@ -115,6 +106,45 @@ fn definitions(builder: DataForgeBuilder) -> DataForgeBuilder {
                 .parent(COMPONENT)
                 .field("hasLocalBounds", TestType::Bool),
         )
+}
+
+fn item_definition() -> TestStruct {
+    TestStruct::new(ITEM)
+        .field("Type", TestType::String)
+        .field("inventoryOccupancyVolume", pointer("SBaseCargoUnit"))
+        .field("inventoryOccupancyDimensions", class("Vec3"))
+        .field("inventoryOccupancyLocalBoundsMin", class("Vec3"))
+        .field("inventoryOccupancyLocalBoundsMax", class("Vec3"))
+        .field("inventoryOccupancyDimensionsUIOverride", pointer("Vec3"))
+        .field("inventoryOccupancyFixedGridDimensionsUIV4", class("Vec2"))
+}
+
+pub(super) fn wrong_dimension_type() -> DataForgeBuilder {
+    let declaration = TestStruct::new(ITEM)
+        .field("Type", TestType::String)
+        .field("inventoryOccupancyDimensions", TestType::String)
+        .field("inventoryOccupancyDimensionsUIOverride", pointer("Vec3"));
+    let definition = TestInstance::new(ITEM)
+        .value("Type", TestValue::text("Clothing"))
+        .value(
+            "inventoryOccupancyDimensions",
+            TestValue::text("FixtureWrongType"),
+        )
+        .value(
+            "inventoryOccupancyDimensionsUIOverride",
+            vec3([4.0, -0.0, 2.0]),
+        );
+    let component = TestInstance::new(ATTACHABLE).value("AttachDef", TestValue::Struct(definition));
+    definitions(fixture::database(), declaration).record(
+        TestEntity::new(
+            WEARABLE,
+            "FixtureWearable",
+            "libs/foundry/records/entities/scitem/fixture/wearable.xml",
+        )
+        .component(TestValue::Struct(component))
+        .component(metadata(false))
+        .record(),
+    )
 }
 
 fn wearable() -> TestValue {
