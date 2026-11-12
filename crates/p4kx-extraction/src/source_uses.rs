@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fmt;
+use std::ops::Range;
 use std::sync::{Arc, Mutex};
 
 use p4kx_archive::Archive;
@@ -52,19 +53,53 @@ impl SourceUses {
         &self,
         archive: &Archive,
     ) -> Result<Option<SourceUse>, SourceEvidenceError> {
+        self.observe_root_directory(archive, |count| {
+            Ok(SourceLocation::ArchiveDirectoryPaths {
+                start_entry_index: DecimalU64::new(0),
+                end_entry_index: count,
+            })
+        })
+    }
+
+    /// Retains the actual folder tree path range of a root Archive.
+    /// Pass positions from the owning root Archive's `EntryTree`.
+    ///
+    /// # Errors
+    /// Returns an error for a reversed or out-of-bounds range or interrupted evidence registry.
+    pub fn observe_root_directory_tree_paths(
+        &self,
+        archive: &Archive,
+        paths: Range<u32>,
+    ) -> Result<Option<SourceUse>, SourceEvidenceError> {
+        self.observe_root_directory(archive, |count| {
+            let start = u64::from(paths.start);
+            let end = u64::from(paths.end);
+            if start > end || end > count.get() {
+                return Err(SourceEvidenceError::InvalidDirectoryRange);
+            }
+            Ok(SourceLocation::ArchiveDirectoryTreePaths {
+                start_entry_index: DecimalU64::new(start),
+                end_entry_index: DecimalU64::new(end),
+            })
+        })
+    }
+
+    fn observe_root_directory(
+        &self,
+        archive: &Archive,
+        location: impl FnOnce(DecimalU64) -> Result<SourceLocation, SourceEvidenceError>,
+    ) -> Result<Option<SourceUse>, SourceEvidenceError> {
         let Some(count) = archive.root_directory_entry_count() else {
             return Ok(None);
         };
-        let end_entry_index = DecimalU64::new(count as u64);
+        let count = DecimalU64::new(count as u64);
+        let location = location(count)?;
         let mut registry = source_evidence_error::lock(&self.registry)?;
-        let source = registry.root_directory(archive.input_origin(), end_entry_index);
+        let source = registry.root_directory(archive.input_origin(), count);
         Ok(Some(registry.register_use(
             &source,
             InputScope::ArchiveDirectoryMetadata,
-            SourceLocation::ArchiveDirectoryPaths {
-                start_entry_index: DecimalU64::new(0),
-                end_entry_index,
-            },
+            location,
             SourceUseRole::Selector,
             SourceEncryptionState::Unencrypted,
         )))

@@ -55,6 +55,11 @@ separate occurrences of repeated paths. A successfully opened empty directory ha
 `[0, 0)`. The source uses Archive directory metadata and has no containing Entries.
 Returned field values continue to identify their physical Entry records individually.
 
+The `archiveDirectoryTreePaths` selector uses the same owning root directory with a
+half-open range in EntryTree path order. This order folds ASCII case and path separators,
+then compares original path bytes. A folder's descendants occupy one contiguous range in
+this order. Entry receipts identify any individual physical occurrences returned from it.
+
 `SourceUses::shared_origin` captures the original contributors common to several values.
 `value_with_shared_origin` adds each value's own contributors from the same inventory.
 Each value still serializes its complete sorted, deduplicated `sourceUsesRefs` array

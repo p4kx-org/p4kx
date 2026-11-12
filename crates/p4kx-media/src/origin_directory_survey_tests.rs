@@ -88,3 +88,50 @@ fn write_row(root: &Path, name: &str, row: &Value) -> TestResult<Artifact> {
     artifact.digest.hex = crate::hashing::hex(Sha256::digest(&bytes).into());
     Ok(artifact)
 }
+
+#[test]
+fn a_path_order_subtree_is_bounded_by_the_admitted_root_directory() -> TestResult {
+    use p4kx_extraction::EntryTree;
+    use p4kx_testkit::{ArchiveBuilder, TestEntry};
+
+    origin_index_test_support::run(|root, checkpoint| {
+        let path = root.join("tree.p4k");
+        ArchiveBuilder::new()
+            .entry(TestEntry::stored("Folder/b.txt", b"b"))
+            .entry(TestEntry::stored("a.txt", b"a"))
+            .entry(TestEntry::stored("Folder/c.txt", b"c"))
+            .write_to(&path)?;
+        let archive = Archive::open(path)?;
+        let tree = EntryTree::build(&archive);
+        let folder = tree.find_folder("Folder").ok_or("fixture folder")?;
+        let range = tree.folder(folder).entries();
+        assert_eq!(range, 1..3);
+        let sources = SourceUses::new();
+        let used = sources
+            .observe_root_directory_tree_paths(&archive, range)?
+            .ok_or("original folder range")?;
+        let inventory = sources.freeze()?;
+        let source = inventory.sources().first().ok_or("directory source")?;
+        let source = serde_json::to_value(source)?;
+        let usage = serde_json::to_value(used.description())?;
+        check(root, checkpoint, &source, &usage)?;
+        for (pointer, value) in [
+            ("/location/startEntryIndex", json!("4")),
+            ("/location/endEntryIndex", json!("4")),
+            ("/location/type", json!("archiveDirectoryPaths")),
+        ] {
+            let mut forged = usage.clone();
+            *forged.pointer_mut(pointer).ok_or("original use field")? = value;
+            assert!(
+                check(root, checkpoint, &source, &forged).is_err(),
+                "{pointer}"
+            );
+        }
+        assert!(
+            sources
+                .observe_root_directory_tree_paths(&archive, 1..4)
+                .is_err()
+        );
+        Ok(())
+    })
+}

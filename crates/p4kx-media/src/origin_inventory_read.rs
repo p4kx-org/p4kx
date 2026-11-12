@@ -161,9 +161,16 @@ impl ReadInventory {
     fn validate_directory_paths(used: &UseFacts, source: &SourceFacts) -> Result<(), MediaError> {
         match (source.kind, used.location.directory_paths) {
             (SourceKind::ArchiveDirectory, Some([start, end]))
-                if start.is_start()
-                    && source.admitted_entry_count == Some(end)
-                    && used.role == Role::Selector =>
+                if used.role == Role::Selector
+                    && source.admitted_entry_count.is_some_and(|count| {
+                        match used.location.kind {
+                            LocationKind::ArchiveDirectoryPaths => start.get() == 0 && end == count,
+                            LocationKind::ArchiveDirectoryTreePaths => {
+                                start.get() <= end.get() && end.get() <= count.get()
+                            }
+                            _ => false,
+                        }
+                    }) =>
             {
                 Ok(())
             }

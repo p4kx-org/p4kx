@@ -3,9 +3,11 @@
 
 use p4kx_extraction::{
     Archive, DosCalendarInfo, Entry, EntryMetadataInfo, FieldOrigin, FieldOrigins,
-    FieldOriginsError, FieldPath, FieldPathError, MetadataRange, SourceEvidenceError,
-    SourceLocation, SourceUse, SourceUseRole, SourceUses,
+    FieldOriginsError, FieldPath, FieldPathError, MetadataRange, SourceCoordinateOmission,
+    SourceEvidenceError, SourceInventory, SourceLocation, SourceUse, SourceUseRole, SourceUses,
 };
+use schemars::JsonSchema;
+use serde::Serialize;
 use thiserror::Error;
 
 use crate::content_origin::EntryPageSources;
@@ -182,6 +184,10 @@ impl EntryDirectoryOrigins {
         Ok(())
     }
 
+    pub(crate) const fn path_origin(&self) -> &FieldOrigin {
+        &self.facts.path
+    }
+
     pub(crate) const fn complete(&self) -> bool {
         self.facts.complete()
     }
@@ -209,4 +215,53 @@ pub(crate) fn put(
     origin: FieldOrigin,
 ) -> Result<(), EvidenceError> {
     Ok(fields.insert(FieldPath::parse(address)?, origin)?)
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub(crate) struct DirectoryOrigins {
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    pub(crate) provenance: SourceInventory,
+}
+
+#[derive(Clone)]
+pub(crate) struct PathUses {
+    pub(crate) sources: Vec<SourceUse>,
+    pub(crate) complete: bool,
+}
+
+pub(crate) fn container_directory_paths(
+    archive: &Archive,
+    owner: &EntryPageSources,
+) -> Result<PathUses, EvidenceError> {
+    let mut sources = owner.path_uses.clone();
+    let layout = archive.metadata().zip_directory();
+    if let Some(layout) = layout {
+        let payload = owner.payload_scope();
+        for (name, extent) in [
+            ("recordPaths", layout.records()),
+            ("zipEnd", layout.end().fixed()),
+        ]
+        .into_iter()
+        .chain(layout.zip64().map(|end| ("zip64End", end.fixed())))
+        .chain(
+            layout
+                .locator()
+                .map(|locator| ("zip64Locator", locator.range())),
+        ) {
+            sources.push(payload.at(
+                directory_range("containerDirectory", name, extent),
+                SourceUseRole::Selector,
+            )?);
+        }
+    } else {
+        sources.push(owner.payload_scope().at_opaque(
+            SourceUseRole::Selector,
+            SourceCoordinateOmission::Unavailable,
+        )?);
+    }
+    Ok(PathUses {
+        sources,
+        complete: layout.is_some() && owner.complete(),
+    })
 }

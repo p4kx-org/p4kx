@@ -119,6 +119,13 @@ pub enum SourceLocation {
         /// Position after the last consulted Entry path.
         end_entry_index: DecimalU64,
     },
+    /// Half-open Entry positions in an original root Archive's path-ordered folder tree.
+    ArchiveDirectoryTreePaths {
+        /// First path-order Entry position.
+        start_entry_index: DecimalU64,
+        /// Position after the last contributing path-order Entry.
+        end_entry_index: DecimalU64,
+    },
     /// One exact logical field inside an already observed structured source subresource.
     Subresource {
         /// Format-owned namespace for the original source object.
@@ -153,6 +160,10 @@ impl SourceLocation {
                 start_entry_index,
                 end_entry_index,
             } => format!("a{}:{}", start_entry_index.get(), end_entry_index.get()),
+            Self::ArchiveDirectoryTreePaths {
+                start_entry_index,
+                end_entry_index,
+            } => format!("t{}:{}", start_entry_index.get(), end_entry_index.get()),
             Self::Subresource {
                 namespace,
                 indices,

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::entry_search_origins::SearchOrigins;
 use p4kx_channels::Channel;
 use p4kx_extraction::{ArchiveLayoutInfo, Build, Entry, EntryMetadataInfo};
 use schemars::JsonSchema;
 use serde::Serialize;
+
+use crate::entry_directory_origins::DirectoryOrigins;
 
 /// The detected Channels.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -145,6 +146,8 @@ impl EntryShape {
 /// The content of one folder of an Archive: its subfolders first, then its Entries.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct FolderResult {
+    #[serde(flatten)]
+    pub(crate) origins: DirectoryOrigins,
     /// The path of the Archive.
     pub(crate) archive: String,
     /// The folder listed; empty for the top level. Inside a container it begins with the
@@ -181,7 +184,7 @@ pub(crate) enum FolderItem {
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct SearchResult {
     #[serde(flatten)]
-    pub(crate) origins: SearchOrigins,
+    pub(crate) origins: DirectoryOrigins,
     /// The path of the Archive.
     pub(crate) archive: String,
     /// The Filter.

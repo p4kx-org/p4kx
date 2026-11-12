@@ -227,7 +227,7 @@ pub use entry_text::{
     EntryText, MIN_TEXT_LEN, ObservedEntryText, TextEncoding, TextReadEvidence, read_text,
     read_text_observed,
 };
-pub use entry_tree::{EntryTree, Folder, FolderId};
+pub use entry_tree::{EntryTree, Folder, FolderId, FolderLookupSite};
 pub use exclusion::{Exclusion, LeftOut, MAX_EXCLUSIONS};
 pub use extract::extract;
 pub use filter::{Filter, FilterError, MAX_FILTER_LEN, MAX_FILTER_WILDCARDS};

@@ -31741,6 +31741,29 @@
           "type": "object"
         },
         {
+          "description": "Half-open Entry positions in an original root Archive's path-ordered folder tree.",
+          "properties": {
+            "endEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Position after the last contributing path-order Entry."
+            },
+            "startEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First path-order Entry position."
+            },
+            "type": {
+              "const": "archiveDirectoryTreePaths",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "startEntryIndex",
+            "endEntryIndex"
+          ],
+          "type": "object"
+        },
+        {
           "description": "One exact logical field inside an already observed structured source subresource.",
           "properties": {
             "field": {

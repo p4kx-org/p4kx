@@ -864,6 +864,14 @@ Entry contributes to its decoded child directory, including a zero-match count.
 A root Archive uses one original directory receipt with half-open admitted path positions,
 including an empty range for an empty Archive.
 
+
+For `list_entries`, a returned folder's path retains the physical Entry that supplies its
+spelling. Its `entry_count` refers to the half-open range of descendants in path order.
+`total` and `next_cursor` retain the relevant directory range and the folder names actually
+compared during lookup. The echoed `folder` value uses the request spelling and, for a
+container, its observed prefix. An empty folder selection has a directory receipt and an
+empty list of returned items.
+
 For `run_query`, `fieldOrigins` addresses the actual JSON columns and list elements. Scalar
 payloads, followed Reference slots and selected instances identify their original decoded DCB
 positions. The total retains the WHERE inputs actually read, including short-circuit evaluation.

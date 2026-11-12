@@ -5,8 +5,9 @@ use p4kx_channels::PublicPatches;
 use p4kx_extraction::{Archive, ArchiveLayoutInfo, Filter};
 
 use crate::container::Place;
-use crate::entry_search_origins::SearchOrigins;
+use crate::entry_search_origins;
 use crate::error::ToolError;
+use crate::folder_listing_origins::{FolderListingOrigins, FolderLookup};
 use crate::page::Page;
 use crate::shapes::{
     ArchiveInfo, BuildShape, EntryShape, FolderItem, FolderResult, IssueShape, SearchResult,
@@ -82,7 +83,7 @@ pub(crate) fn search(
         .into_iter()
         .zip(&entries)
         .map(|(entry, shape)| (entry, &shape.metadata));
-    let origins = SearchOrigins::capture(archive, rows, next_cursor.is_some())?;
+    let origins = entry_search_origins::capture(archive, rows, next_cursor.is_some())?;
     Ok(SearchResult {
         origins,
         archive: archive.path().display().to_string(),
@@ -99,8 +100,9 @@ pub(crate) fn search(
 pub(crate) fn list(place: &Place<'_>, folder: &str, page: Page) -> Result<FolderResult, ToolError> {
     let archive = place.archive();
     let tree = place.tree();
-    let (folders, files) = tree
-        .find_folder(folder)
+    let lookup = FolderLookup::run(tree, folder);
+    let (folders, files) = lookup
+        .selected
         .map(|id| (tree.folder(id).children(), tree.files(id)))
         .unwrap_or_default();
     let total = folders.len() + files.len();
@@ -111,28 +113,30 @@ pub(crate) fn list(place: &Place<'_>, folder: &str, page: Page) -> Result<Folder
         .unwrap_or_default()
         .iter()
         .take(page.limit() - folder_page.len());
-    let items = folder_page
-        .iter()
-        .map(|&child| {
-            let child = tree.folder(child);
-            FolderItem::Folder {
-                path: place.shown(child.path()),
-                entry_count: child.entry_count(),
-            }
-        })
-        .chain(
-            file_page
-                .filter_map(|&id| tree.entry(archive, id))
-                .map(|entry| FolderItem::Entry(EntryShape::at(entry, place.shown(entry.path())))),
-        )
-        .collect();
+    let next_cursor = page.next_cursor(total)?;
+    let mut origins = FolderListingOrigins::observe(archive, tree, &lookup, next_cursor.is_some())?;
+    let mut items = Vec::new();
+    for &child in folder_page {
+        let child = tree.folder(child);
+        origins.folder_item(items.len(), tree, child)?;
+        items.push(FolderItem::Folder {
+            path: place.shown(child.path()),
+            entry_count: child.entry_count(),
+        });
+    }
+    for entry in file_page.filter_map(|&id| tree.entry(archive, id)) {
+        let shape = EntryShape::at(entry, place.shown(entry.path()));
+        origins.entry_item(items.len(), entry, &shape.metadata)?;
+        items.push(FolderItem::Entry(shape));
+    }
     Ok(FolderResult {
+        origins: origins.finish()?,
         archive: archive.path().display().to_string(),
         container: place.chain().map(str::to_owned),
         folder: place.shown(folder.trim_matches(['/', '\\'])),
         total,
         items,
-        next_cursor: page.next_cursor(total)?,
+        next_cursor,
     })
 }
 

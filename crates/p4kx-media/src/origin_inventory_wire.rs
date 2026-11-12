@@ -144,14 +144,17 @@ pub(crate) struct DirectoryOrdinal(
 );
 
 impl DirectoryOrdinal {
-    pub(crate) const fn is_start(self) -> bool {
-        self.0.get() == 0
+    pub(crate) const fn get(self) -> u64 {
+        self.0.get()
     }
 }
 
 impl Location {
     pub(crate) fn directory_paths(&self) -> Option<[DirectoryOrdinal; 2]> {
-        if self.kind == LocationKind::ArchiveDirectoryPaths {
+        if matches!(
+            self.kind,
+            LocationKind::ArchiveDirectoryPaths | LocationKind::ArchiveDirectoryTreePaths
+        ) {
             Some([self.start_entry_index?, self.end_entry_index?])
         } else {
             None
@@ -164,7 +167,9 @@ impl Location {
             LocationKind::Metadata => self.field.is_some(),
             LocationKind::DataForge => self.record_index.is_some() && self.field.is_some(),
             LocationKind::LocalizationLookup => self.language.is_some() && self.selector.is_some(),
-            LocationKind::ArchiveDirectoryPaths => self.directory_paths().is_some(),
+            LocationKind::ArchiveDirectoryPaths | LocationKind::ArchiveDirectoryTreePaths => {
+                self.directory_paths().is_some()
+            }
             LocationKind::Subresource => {
                 self.namespace.is_some() && self.indices.is_some() && self.field.is_some()
             }
@@ -185,6 +190,7 @@ pub(crate) enum LocationKind {
     LocalizationLookup,
     Subresource,
     ArchiveDirectoryPaths,
+    ArchiveDirectoryTreePaths,
     Metadata,
 }
 

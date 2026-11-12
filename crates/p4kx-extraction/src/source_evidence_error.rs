@@ -12,6 +12,9 @@ pub enum SourceEvidenceError {
     /// A runtime use does not belong to this original evidence authority.
     #[error("source evidence belongs to another authority")]
     ForeignEvidence,
+    /// A directory path range falls outside its original parsed Entry positions.
+    #[error("directory path range exceeds its owning Archive")]
+    InvalidDirectoryRange,
     /// An owner unwound while mutating the protected evidence.
     #[error("source evidence was interrupted during mutation")]
     PoisonedEvidence,

@@ -52,7 +52,7 @@ fn collect_pages(
 fn the_top_level_lists_folders_then_entries() -> TestResult {
     let install = Install::standard()?;
     let mut server = install.serve(&["--archive", "LIVE"])?;
-    let top = server.ok("list_entries", &json!({}))?;
+    let top = directory_payload(server.ok("list_entries", &json!({}))?)?;
     assert_eq!(
         top,
         json!({
@@ -181,7 +181,7 @@ fn search_follows_the_filter_rules() -> TestResult {
     let install = Install::standard()?;
     let mut server = install.serve(&["--archive", "LIVE"])?;
     let glob =
-        search_payload(server.ok("search_entries", &json!({ "filter": r"data\libs\*.XML" }))?)?;
+        directory_payload(server.ok("search_entries", &json!({ "filter": r"data\libs\*.XML" }))?)?;
     assert_eq!(
         glob,
         json!({
@@ -217,7 +217,7 @@ fn search_follows_the_filter_rules() -> TestResult {
     );
     let glob_whole = server.ok("search_entries", &json!({ "filter": "*.xm?" }))?;
     assert_eq!(glob_whole["total"], 2, "? matches one character");
-    let nothing = search_payload(server.ok("search_entries", &json!({ "filter": "nothing" }))?)?;
+    let nothing = directory_payload(server.ok("search_entries", &json!({ "filter": "nothing" }))?)?;
     assert_eq!(
         nothing,
         json!({
@@ -231,8 +231,8 @@ fn search_follows_the_filter_rules() -> TestResult {
     Ok(())
 }
 
-fn search_payload(mut reply: Value) -> TestResult<Value> {
-    let object = reply.as_object_mut().ok_or("structured search result")?;
+fn directory_payload(mut reply: Value) -> TestResult<Value> {
+    let object = reply.as_object_mut().ok_or("structured directory result")?;
     for name in ["fieldOrigins", "provenance"] {
         assert!(
             object.remove(name).is_some_and(|value| value.is_object()),

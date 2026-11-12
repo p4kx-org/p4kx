@@ -61,6 +61,7 @@ mod forge;
 mod image_preview;
 mod image_preview_origins;
 mod legal_notice;
+mod list_entries_origins;
 mod model_animation_fixture;
 mod model_animation_navigation;
 mod model_animation_origins;
