@@ -116,6 +116,14 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
             .iter()
             .map(|row| (row.physical_guid.0, row.physical_path)),
     );
+    append(
+        emitted,
+        Kind::InventoryContainers,
+        collected
+            .inventory_containers
+            .iter()
+            .map(|row| (row.physical_guid, row.physical_path)),
+    );
 }
 
 fn template_numbers(collected: &Collected<'_>) -> Vec<TemplateNumbers> {
@@ -297,6 +305,27 @@ fn numbers(collected: &Collected<'_>) -> Vec<EmittedNumber> {
     numbers
 }
 
+fn physical_definition_number_groups<'rows>(
+    collected: &'rows Collected<'_>,
+) -> impl Iterator<Item = (Kind, &'rows [CapturedNumber])> {
+    collected
+        .inventory_containers
+        .iter()
+        .map(|row| (Kind::InventoryContainers, row.numbers.as_slice()))
+        .chain(
+            collected
+                .explosion_definitions
+                .iter()
+                .map(|row| (Kind::ExplosionDefinitions, row.numbers.as_slice())),
+        )
+        .chain(
+            collected
+                .ammo_definitions
+                .iter()
+                .map(|row| (Kind::AmmoDefinitions, row.numbers.as_slice())),
+        )
+}
+
 fn definition_number_groups<'rows>(
     collected: &'rows Collected<'_>,
 ) -> impl Iterator<Item = (Kind, &'rows [CapturedNumber])> {
@@ -313,18 +342,7 @@ fn definition_number_groups<'rows>(
         .chain(collected.mission_kinds.reputation_number_groups())
         .chain(collected.law.number_groups())
         .chain(collected.location_vocabulary.number_groups())
-        .chain(
-            collected
-                .explosion_definitions
-                .iter()
-                .map(|row| (Kind::ExplosionDefinitions, row.numbers.as_slice())),
-        )
-        .chain(
-            collected
-                .ammo_definitions
-                .iter()
-                .map(|row| (Kind::AmmoDefinitions, row.numbers.as_slice())),
-        )
+        .chain(physical_definition_number_groups(collected))
         .chain(
             collected
                 .blueprints

@@ -10,7 +10,7 @@ use crate::CatalogError;
 use crate::schema_fields::every_field_required;
 use crate::source_value_catalog::SourceArenaOutput;
 
-/// Concrete unit identity and the original members outside its typed amount.
+/// Concrete source type and the original members outside its typed fields.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]

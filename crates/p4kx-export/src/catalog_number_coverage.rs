@@ -14,6 +14,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
             | Kind::Items
             | Kind::ExplosionDefinitions
             | Kind::AmmoDefinitions
+            | Kind::InventoryContainers
             | Kind::Factions
             | Kind::FactionReputations
             | Kind::ReputationScopes
@@ -50,7 +51,8 @@ pub(super) const fn expected_owned_number(
         (Kind::Items, ItemComponentRawValue { .. }) => (ItemComponentRawValue { ordinal }, Number),
         (Kind::Items, _) => (ItemComponentValue { ordinal }, Single),
         (
-            Kind::Factions
+            Kind::InventoryContainers
+            | Kind::Factions
             | Kind::FactionReputations
             | Kind::ReputationScopes
             | Kind::ReputationStandings
@@ -70,6 +72,7 @@ pub(super) const fn expected_owned_number(
         (
             Kind::ExplosionDefinitions
             | Kind::AmmoDefinitions
+            | Kind::InventoryContainers
             | Kind::FactionReputations
             | Kind::ReputationStandings
             | Kind::ReputationContexts

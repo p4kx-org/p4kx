@@ -54,7 +54,8 @@ pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
         | Kind::LocationSizes
         | Kind::LocationClassRegistries
         | Kind::LocationFunctionRegistries
-        | Kind::LocationSizeRegistries => false,
+        | Kind::LocationSizeRegistries
+        | Kind::InventoryContainers => false,
         Kind::ContractTemplates => has_word(record_path, name, &CONTRACT_TEMPLATE_EXCLUDED_TOKENS),
         Kind::Ships => {
             is_leftover(record_path, name) || has_word(record_path, name, &SHIP_EXCLUDED_TOKENS)

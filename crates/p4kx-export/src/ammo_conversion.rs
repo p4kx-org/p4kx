@@ -12,10 +12,7 @@ use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
-const BASE: &str = "SBaseCargoUnit";
-const STANDARD: &str = "SStandardCargoUnit";
-const CENTI: &str = "SCentiCargoUnit";
-const MICRO: &str = "SMicroCargoUnit";
+use crate::catalog_v3::cargo_source::{BASE, CENTI, CargoUnit, MICRO, STANDARD};
 
 /// The authored conversion variant and its original quantity.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -45,18 +42,23 @@ impl AmmoConversion {
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
-        Ok(match source.source_type()? {
-            BASE => Self::Base,
-            STANDARD => Self::Standard {
-                standard_cargo_units: source.single("standardCargoUnits", notes)?,
+        let name = source.source_type()?;
+        if name == BASE {
+            return Ok(Self::Base);
+        }
+        let unit =
+            CargoUnit::from_source(name).ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let field = unit.amount_field();
+        Ok(match unit {
+            CargoUnit::Standard => Self::Standard {
+                standard_cargo_units: source.single(field, notes)?,
             },
-            CENTI => Self::Centi {
-                centi_scu: source.int32("centiSCU", notes)?,
+            CargoUnit::Centi => Self::Centi {
+                centi_scu: source.int32(field, notes)?,
             },
-            MICRO => Self::Micro {
-                micro_scu: source.int32("microSCU", notes)?,
+            CargoUnit::Micro => Self::Micro {
+                micro_scu: source.int32(field, notes)?,
             },
-            _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
         })
     }
 }

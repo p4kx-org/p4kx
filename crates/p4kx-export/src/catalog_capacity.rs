@@ -12,7 +12,7 @@ use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
-pub(super) const BASE: &str = "SBaseCargoUnit";
+use super::cargo_source::{BASE, CargoUnit};
 
 /// A capacity retains the concrete unit and its own stored numeric member.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -55,34 +55,35 @@ impl<'source> ResourceCapacity<'source> {
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
-        Ok(match source.source_type()? {
-            BASE => Self::Base {
-                source: UnitSource::read(source, [])?,
-            },
-            "SCentiCargoUnit" => {
-                let centi_scu = source.int32("centiSCU", notes)?;
-                let source = UnitSource::read(source, [("centiSCU", centi_scu.state())])?;
+        let name = source.source_type()?;
+        let Some(unit) = CargoUnit::from_source(name) else {
+            let source = UnitSource::read(source, [])?;
+            return Ok(if name == BASE {
+                Self::Base { source }
+            } else {
+                Self::UnknownUnit { source }
+            });
+        };
+        let field = unit.amount_field();
+        Ok(match unit {
+            CargoUnit::Centi => {
+                let centi_scu = source.int32(field, notes)?;
+                let source = UnitSource::read(source, [(field, centi_scu.state())])?;
                 Self::CentiCargoUnit { source, centi_scu }
             }
-            "SMicroCargoUnit" => {
-                let micro_scu = source.int32("microSCU", notes)?;
-                let source = UnitSource::read(source, [("microSCU", micro_scu.state())])?;
+            CargoUnit::Micro => {
+                let micro_scu = source.int32(field, notes)?;
+                let source = UnitSource::read(source, [(field, micro_scu.state())])?;
                 Self::MicroCargoUnit { source, micro_scu }
             }
-            "SStandardCargoUnit" => {
-                let standard_cargo_units = source.single("standardCargoUnits", notes)?;
-                let source = UnitSource::read(
-                    source,
-                    [("standardCargoUnits", standard_cargo_units.state())],
-                )?;
+            CargoUnit::Standard => {
+                let standard_cargo_units = source.single(field, notes)?;
+                let source = UnitSource::read(source, [(field, standard_cargo_units.state())])?;
                 Self::StandardCargoUnit {
                     source,
                     standard_cargo_units,
                 }
             }
-            _ => Self::UnknownUnit {
-                source: UnitSource::read(source, [])?,
-            },
         })
     }
 }

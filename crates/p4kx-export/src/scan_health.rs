@@ -105,6 +105,10 @@ impl SourceTrace {
                 .ok()
                 .and_then(|type_name| match type_name {
                     crate::catalog_v3::faction_definition::SOURCE_TYPE => Some(Kind::Factions),
+                    crate::catalog_v3::inventory_container_definition::SOURCE_TYPE => {
+                        Some(Kind::InventoryContainers)
+                    }
+
                     crate::catalog_v3::reputation_perk_list::SOURCE_TYPE => {
                         Some(Kind::ReputationPerks)
                     }

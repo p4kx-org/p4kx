@@ -30,6 +30,8 @@ mod durability;
 mod facility_seats;
 #[path = "catalog_fuel_capacity.rs"]
 mod fuel_capacity;
+#[path = "catalog_inventory_containers.rs"]
+mod inventory_containers;
 #[path = "catalog_quantum.rs"]
 mod quantum;
 #[path = "catalog_resource_components.rs"]

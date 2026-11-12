@@ -180,11 +180,13 @@ pub enum Kind {
     LocationFunctionRegistries,
     /// Physical mission location size registries.
     LocationSizeRegistries,
+    /// All physical inventory storage Records.
+    InventoryContainers,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 67] = [
+    pub const ALL: [Self; 68] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -252,6 +254,7 @@ impl Kind {
         Self::LocationClassRegistries,
         Self::LocationFunctionRegistries,
         Self::LocationSizeRegistries,
+        Self::InventoryContainers,
     ];
 
     /// Returns the stable kind identifier, independently of its canonical dataset path.
@@ -329,6 +332,7 @@ impl Kind {
             Self::LocationClassRegistries => "locationClassRegistries",
             Self::LocationFunctionRegistries => "locationFunctionRegistries",
             Self::LocationSizeRegistries => "locationSizeRegistries",
+            Self::InventoryContainers => "inventoryContainers",
         }
     }
 }

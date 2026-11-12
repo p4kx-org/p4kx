@@ -87,6 +87,7 @@ fn expected_completeness() -> Value {
         "locationClassRegistries": {"status": "complete"},
         "locationFunctionRegistries": {"status": "complete"},
         "locationSizeRegistries": {"status": "complete"},
+        "inventoryContainers": {"status": "complete"},
         "factionReputations": {"status": "complete"},
         "reputationScopes": {"status": "complete"},
         "reputationStandings": {"status": "complete"},

@@ -12,6 +12,7 @@ use crate::catalog_v3::explosion_definition::ExplosionDefinition;
 use crate::catalog_v3::faction_definition::FactionDefinition;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::infraction_definition::{InfractionDefinition, InfractionSetDefinition};
+use crate::catalog_v3::inventory_container_definition::InventoryContainerDefinition;
 use crate::catalog_v3::jurisdiction_definition::JurisdictionDefinition;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyTables;
 use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
@@ -50,6 +51,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) tags: CatalogTable<super::tag_catalog::TagDefinition<'source>>,
     pub(crate) shop_inventories: ShopInventoryTable,
     pub(crate) explosion_definitions: CatalogTable<ExplosionDefinition<'source>>,
+    pub(crate) inventory_containers: CatalogTable<InventoryContainerDefinition<'source>>,
     pub(crate) ammo_definitions: CatalogTable<AmmoDefinition<'source>>,
     pub(crate) reputation_contexts: CatalogTable<ContextDefinition<'source>>,
     pub(crate) reputation_scopes: CatalogTable<ScopeDefinition<'source>>,

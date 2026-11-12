@@ -679,11 +679,11 @@ finds only `crewSize` (on `VehicleComponentParams` and on `StaticEntityClassData
 `crewManifest` (the NPC crew of AI variants, used by `playability`). No field named minimum, seat
 or crew minimum exists, so `crewSize` stays the only crew value.
 
-**Outer dimensions.** No field states the outer size of a ship in metres. The survey finds the
-item-inventory fields `AttachDef/inventoryOccupancyDimensions` and
-`inventoryOccupancyLocalBoundsMin` / `Max` on every ship Record, plus `maxBoundingBoxSize` and
-`hasLocalBounds`. They describe how a ship takes up inventory space, not its hull, and their values
-for ships are not verified, so the catalog exports no dimensions.
+**Inventory dimensions.** The [inventory storage and item bounds contract](catalog-inventory-storage.md)
+exports original AttachDef occupancy, vehicle box size and metadata bounds flags in
+`configurations.itemBounds`. These fields describe authored inventory and definition-space
+bounds. `definitions.inventoryContainers` and `configurations.inventoryConfigurations`
+expose source capacity and the physical item or vehicle components that select it.
 
 #### Playability
 

@@ -8,6 +8,8 @@ impl Collected<'_> {
     /// Orders the failures and the picked kinds by the text of the GUID.
     pub(super) fn order(&mut self) {
         self.order_failures();
+        self.inventory_containers
+            .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         self.explosion_definitions
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         self.ammo_definitions

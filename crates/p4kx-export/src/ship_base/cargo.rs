@@ -7,6 +7,7 @@ use p4kx_assembly::{EntityNode, LoadoutEntry};
 use p4kx_extraction::{DataForge, Guid, RecordTree, StructValue, TreeBuilder};
 
 use super::model::{Cargo, CargoGrid, Source, SourceKind};
+use crate::catalog_v3::cargo_source::{self, CargoUnit};
 use crate::record_fields::{number, structure};
 
 const GRID_TYPE: &str = "CargoGrid";
@@ -27,7 +28,7 @@ struct Container {
 #[derive(Debug, Clone)]
 enum Shape {
     Open { dimensions: [f64; 3] },
-    Closed { scu: f64, field: &'static str },
+    Closed { scu: f64, unit: CargoUnit },
     Unknown(String),
 }
 
@@ -132,10 +133,10 @@ fn is_grid(node: &EntityNode) -> bool {
 }
 
 fn fill(grid: &mut CargoGrid, container: &Container) {
-    let field = |path: &str| Source {
+    let field = |path| Source {
         kind: SourceKind::Record,
         file: container.record_path.clone(),
-        field: path.to_owned(),
+        field: path,
     };
     match &container.shape {
         Shape::Open { dimensions } => {
@@ -143,12 +144,16 @@ fn fill(grid: &mut CargoGrid, container: &Container) {
             grid.dimensions = Some(*dimensions);
             grid.scu = Some(round(volume(*dimensions) / CUBIC_METRES_PER_SCU));
             grid.cells = Some(cells(*dimensions));
-            grid.source = Some(field("interiorDimensions"));
+            grid.source = Some(field("interiorDimensions".to_owned()));
         }
-        Shape::Closed { scu, field: path } => {
+        Shape::Closed { scu, unit } => {
             grid.shape = Some("closed");
             grid.scu = Some(round(*scu));
-            grid.source = Some(field(path));
+            grid.source = Some(field(format!(
+                "inventoryType/capacity/{}/{}",
+                unit.source_type(),
+                unit.amount_field()
+            )));
         }
         Shape::Unknown(reason) => grid.issue = Some(reason.clone()),
     }
@@ -157,14 +162,14 @@ fn fill(grid: &mut CargoGrid, container: &Container) {
 fn read_container(tree: &RecordTree<'_>) -> Container {
     let root = tree.root();
     let shape = match structure(Some(root), "inventoryType").map(StructValue::type_name) {
-        Some("InventoryOpenContainerType") => structure(Some(root), "interiorDimensions")
+        Some(cargo_source::OPEN) => structure(Some(root), "interiorDimensions")
             .map(|size| ["x", "y", "z"].map(|axis| number(Some(size), axis).map(f64::from)))
             .and_then(|[x, y, z]| Some([x?, y?, z?]))
             .map_or_else(
                 || Shape::Unknown("the container states no interior dimensions".to_owned()),
                 open,
             ),
-        Some("InventoryClosedContainerType") => closed(root),
+        Some(cargo_source::CLOSED) => closed(root),
         Some(other) => Shape::Unknown(format!("the container type {other} states no capacity")),
         None => Shape::Unknown("the container has no inventory type".to_owned()),
     };
@@ -189,32 +194,18 @@ fn open(dimensions: [f64; 3]) -> Shape {
 
 fn closed(root: &StructValue<'_>) -> Shape {
     let capacity = structure(structure(Some(root), "inventoryType"), "capacity");
-    let unit = capacity.map(StructValue::type_name);
-    let (name, field, divisor, path) = match unit {
-        Some("SStandardCargoUnit") => (
-            "SStandardCargoUnit",
-            "standardCargoUnits",
-            1.0,
-            "inventoryType/capacity/SStandardCargoUnit/standardCargoUnits",
-        ),
-        Some("SCentiCargoUnit") => (
-            "SCentiCargoUnit",
-            "centiSCU",
-            100.0,
-            "inventoryType/capacity/SCentiCargoUnit/centiSCU",
-        ),
-        Some("SMicroCargoUnit") => (
-            "SMicroCargoUnit",
-            "microSCU",
-            1_000_000.0,
-            "inventoryType/capacity/SMicroCargoUnit/microSCU",
-        ),
-        _ => {
-            return Shape::Unknown("the container states no capacity in cargo units".to_owned());
-        }
+    let Some(unit) = capacity.and_then(|value| CargoUnit::from_source(value.type_name())) else {
+        return Shape::Unknown("the container states no capacity in cargo units".to_owned());
+    };
+    let name = unit.source_type();
+    let field = unit.amount_field();
+    let divisor = match unit {
+        CargoUnit::Standard => 1.0,
+        CargoUnit::Centi => 100.0,
+        CargoUnit::Micro => 1_000_000.0,
     };
     match number(capacity, field).map(|value| f64::from(value) / divisor) {
-        Some(scu) if (0.0..=MAX_CLOSED_SCU).contains(&scu) => Shape::Closed { scu, field: path },
+        Some(scu) if (0.0..=MAX_CLOSED_SCU).contains(&scu) => Shape::Closed { scu, unit },
         Some(scu) => Shape::Unknown(format!(
             "the capacity {scu} SCU of {name} is not between 0 and {MAX_CLOSED_SCU}"
         )),

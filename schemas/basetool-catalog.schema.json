@@ -3807,8 +3807,14 @@
         "hackingChips": {
           "$ref": "#/$defs/CatalogTableOfHackingChip"
         },
+        "inventoryConfigurations": {
+          "$ref": "#/$defs/CatalogTableOfInventoryOwnerStorage"
+        },
         "itemAttachmentConstraints": {
           "$ref": "#/$defs/CatalogTableOfItemAttachmentComponent"
+        },
+        "itemBounds": {
+          "$ref": "#/$defs/CatalogTableOfInventoryOwnerBounds"
         },
         "itemPorts": {
           "$ref": "#/$defs/CatalogTableOfItemPortContainer"
@@ -3871,7 +3877,9 @@
         "fuelIntakes",
         "fuelTanks",
         "hackingChips",
+        "inventoryConfigurations",
         "itemAttachmentConstraints",
+        "itemBounds",
         "itemPorts",
         "itemRecoveryEconomy",
         "itemRecoveryOverrides",
@@ -3970,6 +3978,9 @@
         "infractions": {
           "$ref": "#/$defs/CatalogTableOfInfractionDefinition"
         },
+        "inventoryContainers": {
+          "$ref": "#/$defs/CatalogTableOfInventoryContainerDefinition"
+        },
         "jurisdictions": {
           "$ref": "#/$defs/CatalogTableOfJurisdictionDefinition"
         },
@@ -4044,6 +4055,7 @@
         "gameplayProperties",
         "infractionSets",
         "infractions",
+        "inventoryContainers",
         "jurisdictions",
         "locationClasses",
         "locationFunctions",
@@ -4764,6 +4776,63 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/InfractionSetDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfInventoryContainerDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/InventoryContainerDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfInventoryOwnerBounds": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/InventoryOwnerBounds"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfInventoryOwnerStorage": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/InventoryOwnerStorage"
           },
           "type": "array"
         }
@@ -6414,6 +6483,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The physical infraction definition selection."
         },
+        "inventoryContainers": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `inventoryContainers`."
+        },
         "items": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `items`."
@@ -6610,6 +6683,7 @@
         "harvestableProviderPresets",
         "infractionSets",
         "infractions",
+        "inventoryContainers",
         "items",
         "jurisdictions",
         "legacyLootArchetypes",
@@ -14001,6 +14075,290 @@
       ],
       "type": "object"
     },
+    "InventoryContainerDefinition": {
+      "description": "One physical authored inventory storage definition.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "excludedItemSubTypes": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInventoryItemTypeFilter"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "interiorDimensions": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "inventoryType": {
+          "$ref": "#/$defs/SourcedValueOfInventoryContainerType"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "className",
+        "excludedItemSubTypes",
+        "fileName",
+        "guid",
+        "interiorDimensions",
+        "inventoryType",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "InventoryContainerType": {
+      "description": "Concrete authored storage policy.",
+      "oneOf": [
+        {
+          "description": "The authored open storage grid and its independent restrictions.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "appliedForceOnParentDestruction": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "gridCellSize": {
+              "$ref": "#/$defs/SourcedValueOfInventoryGridCellSize"
+            },
+            "gridPosOffset": {
+              "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+            },
+            "isExternalContainer": {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            },
+            "kind": {
+              "const": "open",
+              "type": "string"
+            },
+            "maxPercentageErasedOnParentDestruction": {
+              "$ref": "#/$defs/SourcedValueOfint32"
+            },
+            "maxPermittedItemSize": {
+              "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+            },
+            "minPermittedItemSize": {
+              "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+            },
+            "overrideStorableItemTypes": {
+              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInventoryItemTypeFilter"
+            },
+            "randomDestructionDistributionExponent": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "appliedForceOnParentDestruction",
+            "gridCellSize",
+            "gridPosOffset",
+            "isExternalContainer",
+            "maxPercentageErasedOnParentDestruction",
+            "maxPermittedItemSize",
+            "minPermittedItemSize",
+            "overrideStorableItemTypes",
+            "randomDestructionDistributionExponent",
+            "sourceType"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Concrete source type and the original members outside its typed fields.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "capacity": {
+              "$ref": "#/$defs/SourcedValueOfResourceCapacity"
+            },
+            "kind": {
+              "const": "closed",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType",
+            "capacity"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Concrete source type and the original members outside its typed fields.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "base",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Concrete source type and the original members outside its typed fields.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "unknownType",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "InventoryGridCellSize": {
+      "description": "One stored grid-cell unit and its original integer amount.",
+      "oneOf": [
+        {
+          "description": "Concrete source type and the original members outside its typed fields.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "centimeters": {
+              "$ref": "#/$defs/SourcedValueOfint32"
+            },
+            "kind": {
+              "const": "centimeters",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType",
+            "centimeters"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Concrete source type and the original members outside its typed fields.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "meters",
+              "type": "string"
+            },
+            "meters": {
+              "$ref": "#/$defs/SourcedValueOfint32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType",
+            "meters"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Concrete source type and the original members outside its typed fields.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "base",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Concrete source type and the original members outside its typed fields.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "unknownUnit",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
     "InventoryId": {
       "properties": {
         "alternatives": {
@@ -14009,6 +14367,62 @@
       },
       "required": [
         "alternatives"
+      ],
+      "type": "object"
+    },
+    "InventoryItemOccupancy": {
+      "description": "The authored storage occupancy of one item definition.",
+      "properties": {
+        "inventoryOccupancyDimensions": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "inventoryOccupancyDimensionsUIOverride": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "inventoryOccupancyFixedGridDimensionsUIV4": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector2"
+        },
+        "inventoryOccupancyLocalBoundsMax": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "inventoryOccupancyLocalBoundsMin": {
+          "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+        },
+        "inventoryOccupancyVolume": {
+          "$ref": "#/$defs/SourcedValueOfResourceCapacity"
+        }
+      },
+      "required": [
+        "inventoryOccupancyDimensions",
+        "inventoryOccupancyDimensionsUIOverride",
+        "inventoryOccupancyFixedGridDimensionsUIV4",
+        "inventoryOccupancyLocalBoundsMax",
+        "inventoryOccupancyLocalBoundsMin",
+        "inventoryOccupancyVolume"
+      ],
+      "type": "object"
+    },
+    "InventoryItemTypeFilter": {
+      "description": "One authored item-type filter and its ordered subtype enum members.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "itemSubTypes": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring"
+        },
+        "itemType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "itemSubTypes",
+        "itemType",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -14053,6 +14467,187 @@
       ],
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
+    },
+    "InventoryOwnerBounds": {
+      "description": "A storage occupancy or bound field at its original component slot.",
+      "oneOf": [
+        {
+          "properties": {
+            "attachDef": {
+              "$ref": "#/$defs/SourcedValueOfInventoryItemOccupancy"
+            },
+            "kind": {
+              "const": "itemOccupancy",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "attachDef"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "vehicleBounds",
+              "type": "string"
+            },
+            "maxBoundingBoxSize": {
+              "$ref": "#/$defs/SourcedValueOfInventoryVector3"
+            }
+          },
+          "required": [
+            "kind",
+            "maxBoundingBoxSize"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "hasLocalBounds": {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            },
+            "kind": {
+              "const": "objectMetadata",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "hasLocalBounds"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "InventoryOwnerStorage": {
+      "description": "One physical owner's authored reference to a storage definition.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ItemStorage",
+          "properties": {
+            "kind": {
+              "const": "itemStorage",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "inventoryContainerParams": {
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+            },
+            "kind": {
+              "const": "vehicleStorage",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "inventoryContainerParams"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "InventoryVector2": {
+      "description": "A physical two-coordinate inventory dimension.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "x": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "y": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "sourceType",
+        "x",
+        "y"
+      ],
+      "type": "object"
+    },
+    "InventoryVector3": {
+      "description": "Physical three-coordinate inventory dimensions or offsets.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "x": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "y": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "z": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "sourceType",
+        "x",
+        "y",
+        "z"
+      ],
+      "type": "object"
     },
     "Investigation": {
       "description": "Authored investigation configuration without computing runtime suspects or locations.",
@@ -14840,6 +15435,33 @@
       ],
       "type": "object"
     },
+    "ItemStorage": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "canAutoStoreRestrictedItems": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "containerParams": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "openInventoryInteraction": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "openLootingInteraction": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "canAutoStoreRestrictedItems",
+        "containerParams",
+        "openInventoryInteraction",
+        "openLootingInteraction"
+      ],
+      "type": "object"
+    },
     "JsonMember": {
       "properties": {
         "name": {
@@ -15385,6 +16007,10 @@
         {
           "description": "Physical mission location size registries.",
           "value": "locationSizeRegistries"
+        },
+        {
+          "description": "All physical inventory storage Records.",
+          "value": "inventoryContainers"
         }
       ]
     },
@@ -24107,7 +24733,7 @@
       "description": "A capacity retains the concrete unit and its own stored numeric member.",
       "oneOf": [
         {
-          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "description": "Concrete source type and the original members outside its typed fields.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -24128,7 +24754,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "description": "Concrete source type and the original members outside its typed fields.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -24153,7 +24779,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "description": "Concrete source type and the original members outside its typed fields.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -24178,7 +24804,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "description": "Concrete source type and the original members outside its typed fields.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -24203,7 +24829,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "description": "Concrete source type and the original members outside its typed fields.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -25018,7 +25644,7 @@
       "description": "The original unit of a resource amount per second.",
       "oneOf": [
         {
-          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "description": "Concrete source type and the original members outside its typed fields.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -25039,7 +25665,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "description": "Concrete source type and the original members outside its typed fields.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -25064,7 +25690,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "description": "Concrete source type and the original members outside its typed fields.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -25089,7 +25715,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "description": "Concrete source type and the original members outside its typed fields.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -25114,7 +25740,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "description": "Concrete source type and the original members outside its typed fields.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -25139,7 +25765,7 @@
           "type": "object"
         },
         {
-          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "description": "Concrete source type and the original members outside its typed fields.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -35319,6 +35945,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfInventoryCandidate"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfInventoryItemTypeFilter": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfInventoryItemTypeFilter"
                 },
                 "type": "array"
               }
@@ -51736,6 +52495,266 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfInventoryContainerType": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/InventoryContainerType"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfInventoryGridCellSize": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/InventoryGridCellSize"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfInventoryId": {
       "allOf": [
         {
@@ -51866,6 +52885,266 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfInventoryItemOccupancy": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/InventoryItemOccupancy"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfInventoryItemTypeFilter": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/InventoryItemTypeFilter"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfInventoryLine": {
       "allOf": [
         {
@@ -51960,6 +53239,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/InventoryLine"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfInventoryVector2": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/InventoryVector2"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfInventoryVector3": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/InventoryVector3"
               }
             }
           }

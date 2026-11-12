@@ -65,6 +65,10 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::ammo_definition::SOURCE_TYPE,
             },
+            Self::InventoryContainers => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::inventory_container_definition::SOURCE_TYPE,
+            },
             Self::ExplosionDefinitions => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::explosion_definition::SOURCE_TYPE,

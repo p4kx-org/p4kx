@@ -283,6 +283,7 @@ fn the_kinds_follow_the_existing_ones_in_the_catalog_order() {
             "locationClassRegistries",
             "locationFunctionRegistries",
             "locationSizeRegistries",
+            "inventoryContainers",
         ],
         "order of the catalog"
     );

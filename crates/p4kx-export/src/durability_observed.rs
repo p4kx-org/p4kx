@@ -227,6 +227,10 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         })
     }
 
+    pub(super) fn has_member(&self, name: &str) -> Result<bool, CatalogError> {
+        Ok(self.originals.field(self.owner, name)?.is_some())
+    }
+
     pub(super) fn check_cancel(&self) -> Result<(), CatalogError> {
         self.originals.check_cancel()
     }

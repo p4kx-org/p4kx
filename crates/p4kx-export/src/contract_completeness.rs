@@ -32,6 +32,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) blueprint_categories: KindCompleteness<'a>,
     /// The ordinary filtered selection of authored category databases.
     pub(crate) blueprint_category_lists: KindCompleteness<'a>,
+    /// The completeness of `inventoryContainers`.
+    pub(crate) inventory_containers: KindCompleteness<'a>,
     /// The filtered physical `ExplosionRecord` selection.
     pub(crate) explosion_definitions: KindCompleteness<'a>,
     /// The filtered physical `AmmoParams` selection.
@@ -160,6 +162,7 @@ impl<'a> Completeness<'a> {
             blueprint_categories: completeness,
             blueprint_category_lists: completeness,
             explosion_definitions: completeness,
+            inventory_containers: completeness,
             ammo_definitions: completeness,
             gameplay_properties: completeness,
             quality_distributions: completeness,

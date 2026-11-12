@@ -10,6 +10,7 @@ use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
+use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyPick;
 use crate::contract::{
@@ -59,6 +60,7 @@ pub(crate) enum Picked<'f> {
     /// One original explosion definition.
     ExplosionDefinition(Box<PreparedExplosionDefinition<'f>>),
     AmmoDefinition(Box<PreparedAmmoDefinition<'f>>),
+    InventoryContainer(Box<PreparedInventoryContainer<'f>>),
     Faction(Box<PreparedFaction<'f>>),
     Law(LawPick<'f>),
     LocationVocabulary(LocationVocabularyPick<'f>),
@@ -139,6 +141,7 @@ impl<'f> Picked<'f> {
             | Kind::ReputationStandings
             | Kind::ExplosionDefinitions
             | Kind::AmmoDefinitions
+            | Kind::InventoryContainers
             | Kind::Factions
             | Kind::ReputationPerks
             | Kind::ReputationTriggerRecords

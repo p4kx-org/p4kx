@@ -524,6 +524,7 @@ catalog-summary-kind = { $kind ->
     [locationClassRegistries] Register der Ortsklassen
     [locationFunctionRegistries] Register der Ortsfunktionen
     [locationSizeRegistries] Register der Ortsgrößen
+    [inventoryContainers] Inventarbehälter
     [paints] Lackierungen
     [loadouts] Loadouts
    *[other] { $kind }

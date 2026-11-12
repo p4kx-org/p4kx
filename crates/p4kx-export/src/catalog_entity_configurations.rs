@@ -17,11 +17,14 @@ use super::catalog_resource_component::{self, ResourceComponent};
 use super::catalog_resource_connection::{self, ConnectionKind, ResourceConnection};
 use super::catalog_seat;
 use super::catalog_vehicle_armor::{self, VehicleArmor};
+use super::inventory_entity_configurations::{InventoryEntityRows, InventoryEntityTables};
+use super::inventory_item_occupancy::InventoryItemOccupancy;
 use super::item_alignment_options::AlignmentOptions;
 use super::item_component_owner::ComponentOwner;
 use super::resource_network_links::ResourceNetworkLinks;
 use super::resource_topology_declarations::ResourceTopologyDeclarations;
 use super::room_associations::{self, RoomAssociations};
+use super::{inventory_owner_bounds, inventory_owner_storage};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
@@ -37,6 +40,7 @@ pub(crate) struct EntityConfigurationRows<'source> {
     pub(crate) alignment: ItemAlignmentRows<'source>,
     pub(crate) topology: ResourceTopologyDeclarations<'source>,
     fuel: FuelConfigurationRows<'source>,
+    inventory: InventoryEntityRows<'source>,
     facilities: Vec<Facility<'source>>,
     resources: Vec<ResourceComponent<'source>>,
     connections: Vec<ResourceConnection<'source>>,
@@ -58,7 +62,13 @@ impl<'source> EntityConfigurationRows<'source> {
         notes: &mut Vec<FieldError>,
     ) -> Result<(), CatalogError> {
         match configuration {
-            ConfigurationKind::Alignment(alignment) => {
+            ConfigurationKind::Alignment {
+                alignment,
+                occupancy,
+            } => {
+                if occupancy {
+                    self.inventory.occupancy(owner.clone(), source, notes)?;
+                }
                 if matches!(alignment, ItemAlignmentKind::Port)
                     && let Some(links) = ResourceNetworkLinks::read(owner.clone(), source, notes)?
                 {
@@ -67,10 +77,16 @@ impl<'source> EntityConfigurationRows<'source> {
                 self.alignment
                     .push(alignment, owner, source, options, notes)?;
             }
-            ConfigurationKind::RoomAssociations => self
-                .topology
-                .rooms
-                .push(RoomAssociations::read(owner, source, notes)?),
+            ConfigurationKind::RoomAssociations => {
+                self.inventory.vehicle(&owner, source, notes)?;
+                self.topology
+                    .rooms
+                    .push(RoomAssociations::read(owner, source, notes)?);
+            }
+            ConfigurationKind::InventoryStorage => self.inventory.storage(owner, source, notes)?,
+            ConfigurationKind::ObjectMetadataBounds => {
+                self.inventory.metadata(owner, source, notes)?;
+            }
             ConfigurationKind::Fuel(fuel) => self.fuel.push(fuel, owner, source, notes)?,
             ConfigurationKind::Resource => self
                 .resources
@@ -90,6 +106,7 @@ impl<'source> EntityConfigurationRows<'source> {
         self.alignment.extend(other.alignment);
         self.topology.extend(other.topology);
         self.fuel.extend(other.fuel);
+        self.inventory.extend(other.inventory);
         self.facilities.extend(other.facilities);
         self.resources.extend(other.resources);
         self.connections.extend(other.connections);
@@ -108,6 +125,7 @@ impl<'source> EntityConfigurationRows<'source> {
         EntityConfigurationTables {
             alignment: self.alignment.into_tables(forge),
             fuel: self.fuel.into_tables(forge),
+            inventory: self.inventory.into_tables(forge),
             facilities: CatalogTable::new(forge, &[catalog_seat::COMPONENT], self.facilities),
             resource_components: CatalogTable::new(
                 forge,
@@ -136,6 +154,8 @@ pub(crate) struct EntityConfigurationTables<'source> {
     alignment: ItemAlignmentTables<'source>,
     #[serde(flatten)]
     fuel: FuelConfigurationTables<'source>,
+    #[serde(flatten)]
+    inventory: InventoryEntityTables<'source>,
     facilities: CatalogTable<Facility<'source>>,
     resource_components: CatalogTable<ResourceComponent<'source>>,
     resource_connections: CatalogTable<ResourceConnection<'source>>,
@@ -144,7 +164,12 @@ pub(crate) struct EntityConfigurationTables<'source> {
 
 #[derive(Clone, Copy)]
 enum ConfigurationKind {
-    Alignment(ItemAlignmentKind),
+    Alignment {
+        alignment: ItemAlignmentKind,
+        occupancy: bool,
+    },
+    InventoryStorage,
+    ObjectMetadataBounds,
     Fuel(FuelConfigurationKind),
     Resource,
     Connection(ConnectionKind),
@@ -158,6 +183,8 @@ impl ConfigurationKind {
         match value.type_name() {
             catalog_resource_component::COMPONENT => return Some(Self::Resource),
             catalog_seat::COMPONENT => return Some(Self::Seat),
+            inventory_owner_storage::ITEM_COMPONENT => return Some(Self::InventoryStorage),
+            inventory_owner_bounds::METADATA_COMPONENT => return Some(Self::ObjectMetadataBounds),
             catalog_vehicle_armor::COMPONENT => return Some(Self::VehicleArmor),
             _ => {}
         }
@@ -165,7 +192,11 @@ impl ConfigurationKind {
             return Some(Self::RoomAssociations);
         }
         ItemAlignmentKind::of(value, input)
-            .map(Self::Alignment)
+            .map(|alignment| Self::Alignment {
+                alignment,
+                occupancy: matches!(alignment, ItemAlignmentKind::Attachment)
+                    && InventoryItemOccupancy::applies(value),
+            })
             .or_else(|| FuelConfigurationKind::of(value.type_name()).map(Self::Fuel))
             .or_else(|| ConnectionKind::of(value.type_name()).map(Self::Connection))
     }

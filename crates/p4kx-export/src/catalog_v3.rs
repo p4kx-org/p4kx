@@ -82,6 +82,8 @@ mod authored_effect_resource;
 mod authored_projectile;
 #[path = "authored_rgb.rs"]
 mod authored_rgb;
+#[path = "cargo_source.rs"]
+pub(crate) mod cargo_source;
 #[path = "catalog_ammo_bindings.rs"]
 pub(crate) mod catalog_ammo_bindings;
 #[path = "catalog_ammo_containers.rs"]
@@ -150,6 +152,26 @@ mod catalog_unit_source;
 pub(crate) mod catalog_weapon_actions;
 #[path = "catalog_weapon_magazine_slots.rs"]
 mod catalog_weapon_magazine_slots;
+#[path = "inventory_container_definition.rs"]
+pub(crate) mod inventory_container_definition;
+#[path = "inventory_container_type.rs"]
+mod inventory_container_type;
+#[path = "inventory_dimensions.rs"]
+mod inventory_dimensions;
+#[path = "inventory_entity_configurations.rs"]
+mod inventory_entity_configurations;
+#[path = "inventory_grid_cell.rs"]
+mod inventory_grid_cell;
+#[path = "inventory_item_occupancy.rs"]
+mod inventory_item_occupancy;
+#[path = "inventory_item_type_filter.rs"]
+mod inventory_item_type_filter;
+#[path = "inventory_open_container.rs"]
+mod inventory_open_container;
+#[path = "inventory_owner_bounds.rs"]
+mod inventory_owner_bounds;
+#[path = "inventory_owner_storage.rs"]
+mod inventory_owner_storage;
 #[path = "item_alignment_options.rs"]
 mod item_alignment_options;
 #[path = "item_component_owner.rs"]

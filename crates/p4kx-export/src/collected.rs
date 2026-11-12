@@ -19,6 +19,7 @@ use crate::catalog_v3::catalog_item_components::ItemComponentRows;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
+use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
 use crate::catalog_v3::law_kinds::LawKinds;
 use crate::catalog_v3::location_vocabulary::LocationVocabulary;
 use crate::contract::{
@@ -84,6 +85,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) blueprint_categories: Vec<BlueprintCategory<'f>>,
     pub(crate) blueprint_category_lists: Vec<PreparedBlueprintCategoryList<'f>>,
     pub(crate) explosion_definitions: Vec<PreparedExplosionDefinition<'f>>,
+    pub(crate) inventory_containers: Vec<PreparedInventoryContainer<'f>>,
     pub(crate) ammo_definitions: Vec<PreparedAmmoDefinition<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayPropertyDefinition<'f>>,
     pub(crate) quality: QualityRows<'f>,
@@ -182,6 +184,7 @@ impl<'f> Collected<'f> {
             blueprint_categories: Vec::new(),
             blueprint_category_lists: Vec::new(),
             explosion_definitions: Vec::new(),
+            inventory_containers: Vec::new(),
             ammo_definitions: Vec::new(),
             gameplay_properties: crafting.properties,
             quality: crafting.quality,
@@ -269,6 +272,7 @@ impl<'f> Collected<'f> {
             Picked::BlueprintCategoryList(entity) => self.blueprint_category_lists.push(entity),
             Picked::ExplosionDefinition(entity) => self.explosion_definitions.push(*entity),
             Picked::AmmoDefinition(entity) => self.ammo_definitions.push(*entity),
+            Picked::InventoryContainer(entity) => self.inventory_containers.push(*entity),
             Picked::Starmap(entity) => self.starmap_objects.push(entity),
             Picked::Mineable(entity) => self.mineable_elements.push(entity),
             Picked::Refining(entity) => self.refining_processes.push(entity),

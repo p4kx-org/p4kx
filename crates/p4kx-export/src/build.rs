@@ -19,6 +19,7 @@ use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition;
 use crate::catalog_v3::catalog_global_configurations::{self, GlobalConfigurations};
+use crate::catalog_v3::inventory_container_definition::table as inventory_table;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
 use crate::mission_data::link_scenario_factions;
@@ -195,10 +196,9 @@ fn assemble<R>(
     let location_vocabulary = collected.location_vocabulary.into_tables(&forge);
     let components = collected.item_components.into_tables(&forge);
     let patches = options.public_patches;
-    let source = source(archive, options.exported_at, patches, key_use);
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
-        source,
+        source: source(archive, options.exported_at, patches, key_use),
         completeness: Completeness::of_every_kind(KindCompleteness::for_filter(options.filter)),
         export_health: health.clone(),
         items: collected.items,
@@ -224,6 +224,7 @@ fn assemble<R>(
         definitions: CatalogDefinitions {
             blueprints: blueprints.definitions,
             shop_inventories: collected.shop_inventories,
+            inventory_containers: inventory_table(&forge, collected.inventory_containers),
             explosion_definitions: crate::catalog_v3::explosion_definition::table(
                 &forge,
                 collected.explosion_definitions,

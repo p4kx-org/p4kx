@@ -6,7 +6,8 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
-use super::catalog_capacity::{self, ResourceCapacity};
+use super::cargo_source;
+use super::catalog_capacity::ResourceCapacity;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
@@ -65,7 +66,7 @@ impl<'source> ResourceContainer<'source> {
     ) -> Result<Self, CatalogError> {
         let capacity = source.strong_pointer_family_to(
             "capacity",
-            catalog_capacity::BASE,
+            cargo_source::BASE,
             notes,
             ResourceCapacity::read,
         )?;
