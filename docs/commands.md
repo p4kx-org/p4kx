@@ -378,6 +378,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   are written. `--txtp` also writes one vgmstream `<event>.txtp` text file per Wwise event of the
   trigger next to the sounds (ADR-0254). It writes text for vgmstream. A generated choice of
   several alternatives reports `select-first-alternative` in its header and the JSON report.
+  A rendered MusicTrack reports `omit-music-clip-timing` for finite nonzero clip start or trim
+  times, `omit-music-clip-events` for authored posted Events and
+  `nonfinite-music-clip-timing` for nonfinite timing words.
   `p4kx entity audio --extract <folder>` does the same for every trigger of an Entity.
 - `p4kx loc languages <archive>` lists the languages the Archive holds a `global.ini` for, with
   their codes (`en`, `de`, `fr`, `it`, `es-ES`, `es-419`, `pt-BR`, `ja`, `ko`, `zh-Hans`,

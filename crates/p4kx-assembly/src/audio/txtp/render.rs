@@ -6,6 +6,8 @@ use std::fmt::Write;
 
 use p4kx_audio::Loop;
 
+use crate::audio::music_clip_features::MusicClipFeatures;
+
 use super::TxtpApproximation;
 use super::tree::{Combine, Group, Leaf, Node};
 
@@ -44,6 +46,18 @@ impl RenderedTxtp {
     fn note(&mut self, approximation: TxtpApproximation) {
         if !self.approximations.contains(&approximation) {
             self.approximations.push(approximation);
+        }
+    }
+
+    fn note_music_clips(&mut self, clips: MusicClipFeatures) {
+        if clips.timing {
+            self.note(TxtpApproximation::OmitMusicClipTiming);
+        }
+        if clips.posted_events {
+            self.note(TxtpApproximation::OmitMusicClipEvents);
+        }
+        if clips.nonfinite_timing {
+            self.note(TxtpApproximation::NonfiniteMusicClipTiming);
         }
     }
 
@@ -94,7 +108,7 @@ fn group_lines(
     let [only] = group.children.as_slice() else {
         for child in &group.children {
             match child {
-                Node::Leaf(leaf) => leaf_line(&mut rendered.text, leaf, depth + 1, files)?,
+                Node::Leaf(leaf) => leaf_line(rendered, leaf, depth + 1, files)?,
                 Node::Group(inner) => group_lines(rendered, inner, depth + 1, files)?,
             }
         }
@@ -102,13 +116,13 @@ fn group_lines(
         return Ok(());
     };
     match only {
-        Node::Leaf(leaf) => leaf_line(&mut rendered.text, leaf, depth, files),
+        Node::Leaf(leaf) => leaf_line(rendered, leaf, depth, files),
         Node::Group(inner) => group_lines(rendered, inner, depth, files),
     }
 }
 
 fn leaf_line(
-    text: &mut String,
+    rendered: &mut RenderedTxtp,
     leaf: &Leaf,
     depth: usize,
     files: &HashMap<u32, SoundFile<'_>>,
@@ -124,6 +138,8 @@ fn leaf_line(
             leaf.source_id
         ));
     }
+    rendered.note_music_clips(leaf.music_clip_features);
+    let text = &mut rendered.text;
     let _ = write!(text, "{:indent$}{}", "", file.name, indent = depth * INDENT);
     if let Some(points) = file.loop_points {
         let _ = write!(text, " #I {} {}", points.start, points.end);
@@ -182,6 +198,7 @@ mod tests {
             wem_id: Some(wem_id),
             source_id: wem_id,
             kind: SourceKind::Embedded,
+            music_clip_features: MusicClipFeatures::default(),
         })
     }
 

@@ -7,6 +7,12 @@
 pub enum TxtpApproximation {
     /// The rendered choice selects its first available alternative.
     SelectFirstAlternative,
+    /// The rendered track omits authored nonzero clip start or trim times.
+    OmitMusicClipTiming,
+    /// The rendered track omits authored Events posted by clips.
+    OmitMusicClipEvents,
+    /// The owning track contains a nonfinite clip start or trim value.
+    NonfiniteMusicClipTiming,
 }
 
 impl TxtpApproximation {
@@ -15,6 +21,9 @@ impl TxtpApproximation {
     pub const fn code(self) -> &'static str {
         match self {
             Self::SelectFirstAlternative => "select-first-alternative",
+            Self::OmitMusicClipTiming => "omit-music-clip-timing",
+            Self::OmitMusicClipEvents => "omit-music-clip-events",
+            Self::NonfiniteMusicClipTiming => "nonfinite-music-clip-timing",
         }
     }
 }

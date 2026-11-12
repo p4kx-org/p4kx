@@ -77,3 +77,8 @@ decoding) and ADR-0250 (the object kinds). The format is that of vgmstream's `do
 The render tree groups sounds by the open visits of the resolved source
 walk. Repeated authored edges contribute distinct visits in source order.
 Separate physical holders of one logical Event contribute independent groups.
+
+MusicTrack leaves carry the observed clip features of their owning track.
+The report and header identify omitted finite nonzero start and trim times
+in milliseconds, omitted posted Events and nonfinite timing words. The
+source duration is a separate authored value.

@@ -3,6 +3,7 @@
 
 use p4kx_audio::HircKind;
 
+use crate::audio::music_clip_features::MusicClipFeatures;
 use crate::audio::{NodeKind, PathStep, SoundVariant, SourceKind};
 
 /// How the children of a group play together.
@@ -36,6 +37,7 @@ pub(super) struct Leaf {
     /// The media ID the Sound object states.
     pub(super) source_id: u32,
     pub(super) kind: SourceKind,
+    pub(super) music_clip_features: MusicClipFeatures,
 }
 
 /// A child of a group: a sound or another group.
@@ -117,6 +119,7 @@ fn build_holder(root: PathStep, variants: &[SoundVariant<'_>]) -> Group {
                 wem_id: variant.wem_id(),
                 source_id: variant.source().source_id,
                 kind: variant.source_kind(),
+                music_clip_features: variant.music_clip_features,
             },
         );
     }

@@ -3,6 +3,7 @@
 
 use p4kx_audio::{ContainerKind, HircKind, MediaStorage, SoundSource};
 
+use super::music_clip_features::MusicClipFeatures;
 use super::{AtlTrigger, BrokenLink, IndexedSoundbank, LanguageChoice, WemSelection, WwiseEvent};
 
 /// The kind of a `HIRC` object on the way from a Wwise event to a sound.
@@ -209,6 +210,7 @@ pub struct SoundVariant<'i> {
     pub(crate) path: Box<[PathStep]>,
     /// Number of visits still shared with the previous emitted variant in this Event walk.
     pub(crate) shared_path_prefix: usize,
+    pub(super) music_clip_features: MusicClipFeatures,
     pub(crate) source: SoundSource,
     pub(crate) location: Option<WemLocation<'i>>,
     pub(crate) selection: WemSelection,

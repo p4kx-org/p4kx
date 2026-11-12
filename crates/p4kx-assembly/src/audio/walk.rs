@@ -6,6 +6,7 @@ use std::rc::Rc;
 use p4kx_audio::{HircKind, HircObject, HircValue, SoundSource, Soundbank};
 
 use super::locate::locate;
+use super::music_clip_features::MusicClipFeatures;
 use super::walk_banks::{Banks, Loaded, Via, select_holders};
 use super::{
     AudioIndex, BreakReason, BrokenLink, IndexedSoundbank, LanguageChoice, MAX_ACTION_CHAIN,
@@ -167,11 +168,12 @@ impl<'i> Walk<'_, 'i> {
             HircValue::MusicSwitch(switch) => self.children(&switch.node.children),
             HircValue::MusicPlaylist(playlist) => self.children(&playlist.node.children),
             HircValue::MusicTrack(track) => {
+                let music_clips = MusicClipFeatures::observe(&track.clips);
                 for source in track.sources.iter().take(MAX_CONTAINER_CHILDREN) {
                     if !self.spend() {
                         break;
                     }
-                    self.sound(*source);
+                    self.sound(*source, music_clips);
                 }
                 if track.sources.len() > MAX_CONTAINER_CHILDREN {
                     self.broke(BreakReason::TooManyChildren {
@@ -180,7 +182,7 @@ impl<'i> Walk<'_, 'i> {
                     });
                 }
             }
-            HircValue::Sound(source) => self.sound(*source),
+            HircValue::Sound(source) => self.sound(*source, MusicClipFeatures::default()),
             HircValue::ActorMixer(_)
             | HircValue::State(_)
             | HircValue::Malformed(_)
@@ -270,7 +272,7 @@ impl<'i> Walk<'_, 'i> {
         }
     }
 
-    fn sound(&mut self, source: SoundSource) {
+    fn sound(&mut self, source: SoundSource, music_clip_features: MusicClipFeatures) {
         let located = locate(self.index, self.current.soundbank, self.choice, &source);
         if located.missing_localisation {
             self.broke(self.choice.no_localisation());
@@ -281,6 +283,7 @@ impl<'i> Walk<'_, 'i> {
             sound_id: self.path.last().map_or(0, |step| step.step.id),
             path: self.public_path(),
             shared_path_prefix: self.shared_path_prefix,
+            music_clip_features,
             source,
             location: located.location,
             selection: located.selection,

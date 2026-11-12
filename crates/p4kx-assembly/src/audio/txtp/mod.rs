@@ -104,7 +104,8 @@ impl TxtpReport {
 /// in [`TxtpReport::skipped`] with the reason. Objects the walk does not tell apart are combined
 /// as follows: an Event's actions, blend containers, music segments and music tracks as layers;
 /// sequence containers and music playlists as segments; random and switch containers and music
-/// switches as a choice. Music timing, transitions and container loop counts are not reproduced.
+/// switches as a choice. Music timing, transitions and container loop counts are omitted.
+/// Observed clip start and trim times and posted Events carry stable approximation codes.
 ///
 /// An event with broken links is written with a header comment that says it is incomplete, and
 /// [`TxtpFile::breaks`] counts them. A file that cannot be written, e.g. because its path is too
