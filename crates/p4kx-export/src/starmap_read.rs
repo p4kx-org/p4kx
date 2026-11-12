@@ -22,17 +22,27 @@ pub(crate) struct MainXml {
     pub(crate) fallback: Option<String>,
 }
 
-/// Returns the first XML entry that is no editor or metadata file.
+/// Returns the normalized path of a main placement XML candidate.
+fn placement_xml_path(entry: &Entry) -> Option<String> {
+    let path = key(entry.path());
+    let root = path
+        .split('\\')
+        .find(|component| !matches!(*component, "" | "."));
+    (root != Some("hcd")).then_some(path)
+}
+
+/// Returns the first eligible fallback XML Entry.
 fn first_xml(entries: &[Entry]) -> Result<&Entry, String> {
     entries
         .iter()
         .find(|inner| {
-            let name = key(inner.path());
-            Path::new(&name)
-                .extension()
-                .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
-                && !name.contains("_editor")
-                && !name.contains("metadata")
+            placement_xml_path(inner).is_some_and(|name| {
+                Path::new(&name)
+                    .extension()
+                    .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
+                    && !name.contains("_editor")
+                    && !name.contains("metadata")
+            })
         })
         .ok_or_else(|| {
             let first: Vec<&str> = entries.iter().map(Entry::path).take(8).collect();
@@ -107,10 +117,10 @@ fn selected_xml<'archive>(
         .and_then(|name| name.strip_suffix(SOCPAK))
         .ok_or("not a socpak name")?;
     let main = format!("{stem}.xml");
-    let named = container
-        .entries()
-        .iter()
-        .find(|inner| key(inner.path()).rsplit('\\').next() == Some(main.as_str()));
+    let named = container.entries().iter().find(|inner| {
+        placement_xml_path(inner)
+            .is_some_and(|path| path.rsplit('\\').next() == Some(main.as_str()))
+    });
     let xml = match named {
         Some(xml) => xml,
         None => first_xml(container.entries())?,

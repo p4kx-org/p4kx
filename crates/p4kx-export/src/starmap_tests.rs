@@ -367,3 +367,6 @@ fn a_legacy_wrapped_child_list_is_read_when_there_is_no_direct_list() {
 
 #[path = "starmap_child_path_tests.rs"]
 mod child_paths;
+
+#[path = "starmap_hcd_tests.rs"]
+mod hcd;
