@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::layout::Layout;
+use crate::positioned_record::InstanceSpans;
 use crate::{DataForge, DataForgeError, Field, Value};
 
 use super::TreeBuilder;
@@ -15,6 +16,7 @@ pub(super) fn fields<'source>(
     struct_index: u32,
     layout: Layout<'source>,
     bytes: &'source [u8],
+    mut instances: Option<&mut InstanceSpans<'source>>,
 ) -> Result<Vec<Field<'source>>, DataForgeError> {
     let root = Structure::new(
         layout,
@@ -46,7 +48,7 @@ pub(super) fn fields<'source>(
                 let completed = frames
                     .pop()
                     .ok_or(DataForgeError::CanonicalTreeInvariant)?
-                    .finish();
+                    .finish(instances.as_deref_mut())?;
                 if let Some(inline) = completed.inline {
                     reader.leave(inline);
                 }

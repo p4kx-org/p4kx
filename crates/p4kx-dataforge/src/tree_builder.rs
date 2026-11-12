@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::dataforge;
 use crate::layout::Layouts;
+use crate::positioned_record::{InstanceSpans, PositionedRecord};
 use crate::read_observer::ReadObserver;
 use crate::strings;
 use crate::tree_owner::TreeOwner;
@@ -75,7 +76,7 @@ impl<'source> TreeBuilder<'source> {
         &mut self,
         record: &Record<'source>,
     ) -> Result<RecordTree<'source>, DataForgeError> {
-        self.build_observed(record, None)
+        self.build_with_sources(record, None, None)
     }
 
     /// Builds one complete tree with a caller-owned limit on Field and Array-element Value slots.
@@ -91,15 +92,29 @@ impl<'source> TreeBuilder<'source> {
         record: &Record<'source>,
         maximum_values: u64,
     ) -> Result<RecordTree<'source>, DataForgeError> {
-        self.build_observed(record, Some(maximum_values))
+        self.build_with_sources(record, Some(maximum_values), None)
     }
 
-    fn build_observed(
+    /// Builds a canonical Record with the original instance bytes used by its decoder.
+    ///
+    /// # Errors
+    /// Returns the same construction or observer error as [`Self::build`].
+    pub fn build_positioned(
+        &mut self,
+        record: &Record<'source>,
+    ) -> Result<PositionedRecord<'source>, DataForgeError> {
+        let mut instances = InstanceSpans::default();
+        let tree = self.build_with_sources(record, None, Some(&mut instances))?;
+        Ok(PositionedRecord::new(tree, record.forge, instances))
+    }
+
+    fn build_with_sources(
         &mut self,
         record: &Record<'source>,
         maximum_values: Option<u64>,
+        instances: Option<&mut InstanceSpans<'source>>,
     ) -> Result<RecordTree<'source>, DataForgeError> {
-        let outcome = self.build_tree(record, maximum_values);
+        let outcome = self.build_tree(record, maximum_values, instances);
         if let Some(observer) = &self.read_observer
             && observer.0.observe(record, outcome.as_ref()).is_break()
         {
@@ -112,6 +127,7 @@ impl<'source> TreeBuilder<'source> {
         &mut self,
         record: &Record<'source>,
         maximum_values: Option<u64>,
+        instances: Option<&mut InstanceSpans<'source>>,
     ) -> Result<RecordTree<'source>, DataForgeError> {
         let forge = record.forge;
         self.start(forge, maximum_values);
@@ -129,7 +145,7 @@ impl<'source> TreeBuilder<'source> {
         self.owned
             .insert((def.struct_index, instance), Position::ROOT);
         let type_name = layout.type_name;
-        let fields = driver::fields(self, forge, def.struct_index, layout, bytes)?;
+        let fields = driver::fields(self, forge, def.struct_index, layout, bytes, instances)?;
         let mut tree = RecordTree {
             record_index: record.index(),
             metadata,

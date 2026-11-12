@@ -49,6 +49,9 @@ pub use model_material_origins::{
     ArchiveMaterialRead, ArchiveMaterialReads, MaterialArchiveOrigins, MaterialLayerOrigin,
 };
 pub use p4kx_archive::EncryptionFieldEvidence;
+pub use p4kx_dataforge::{
+    PositionedRecord, RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField, RecordJsonSource,
+};
 pub use p4kx_gltf::{
     RiggedBufferSource, RiggedBufferView, RiggedGlbEmission, RiggedJsonAddress, RiggedPartEmission,
     TextureMaterialSource,

@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use super::observation::Observation;
 use super::sink::{self, Out};
+use super::source::RecordJsonObserver;
 use super::tasks::{Fields, Items, Selected, Task};
-use crate::{Annotations, Field, RecordTree, Value};
+use crate::positioned_record::ValueSlot;
+use crate::{Annotations, PositionedRecord, RecordTree, StructValue, Value};
 use crate::{field_escapes, value_json, xml};
 use std::io::{self, Write};
 
@@ -60,24 +63,55 @@ impl RecordJson {
         annotations: Annotations<'_>,
         out: &mut W,
     ) -> io::Result<()> {
+        self.write_inner(
+            tree,
+            Out {
+                sink: out,
+                pretty: self.layout == JsonLayout::Pretty,
+                annotations,
+                observation: None,
+            },
+        )
+    }
+
+    /// Writes canonical JSON and observes the original input for each emitted value.
+    ///
+    /// # Errors
+    /// Returns the first output or observation error.
+    pub fn write_observed<W: Write>(
+        &mut self,
+        input: &PositionedRecord<'_>,
+        out: &mut W,
+        observer: &mut dyn RecordJsonObserver,
+    ) -> io::Result<()> {
+        self.write_inner(
+            input.tree(),
+            Out {
+                sink: out,
+                pretty: self.layout == JsonLayout::Pretty,
+                annotations: Annotations::none(),
+                observation: Some(Observation::new(input, observer)),
+            },
+        )
+    }
+
+    fn write_inner<'source, W: Write>(
+        &mut self,
+        tree: &RecordTree<'source>,
+        mut out: Out<'_, 'source, W>,
+    ) -> io::Result<()> {
         self.attribute.clear();
         self.escaped.clear();
-        let pretty = self.layout == JsonLayout::Pretty;
-        let mut out = Out {
-            sink: out,
-            pretty,
-            annotations,
-        };
         let mut pending = vec![Task::Structure {
             record: Some(tree),
-            type_name: tree.type_name(),
-            fields: tree.fields(),
+            structure: tree.root(),
+            slot: None,
             depth: 0,
         }];
         while let Some(task) = pending.pop() {
             self.step(&mut out, task, &mut pending)?;
         }
-        if pretty {
+        if out.pretty {
             out.sink.write_all(b"\n")?;
         }
         Ok(())
@@ -85,22 +119,22 @@ impl RecordJson {
 
     fn step<'tree, 'source, W: Write>(
         &mut self,
-        out: &mut Out<'_, W>,
+        out: &mut Out<'_, 'source, W>,
         task: Task<'tree, 'source>,
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
         match task {
             Task::Structure {
                 record,
-                type_name,
-                fields,
+                structure,
+                slot,
                 depth,
             } => {
-                self.structure(out, record, type_name, fields, depth, pending)?;
+                self.structure(out, record, structure, slot, depth, pending)?;
             }
             Task::Fields(fields) => self.fields(out, fields, pending)?,
             Task::Items(items) => Self::items(out, items, pending)?,
-            Task::Value(value, depth) => Self::value(out, value, depth, pending)?,
+            Task::Value(value, depth, slot) => Self::value(out, value, slot, depth, pending)?,
             Task::CloseWrapper(depth) => out.close(depth, b"}")?,
         }
         Ok(())
@@ -108,14 +142,18 @@ impl RecordJson {
 
     fn structure<'tree, 'source, W: Write>(
         &mut self,
-        out: &mut Out<'_, W>,
+        out: &mut Out<'_, 'source, W>,
         record: Option<&'tree RecordTree<'source>>,
-        type_name: &'source str,
-        fields: &'tree [Field<'source>],
+        structure: &'tree StructValue<'source>,
+        slot: Option<ValueSlot<'source>>,
         depth: usize,
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
-        sink::header(out, record, type_name, depth)?;
+        if let Some(observation) = &mut out.observation {
+            observation.structure(depth, structure)?;
+        }
+        sink::header(out, record, structure, slot, depth)?;
+        let fields = structure.fields();
         let attributes = self.attribute.len();
         xml::classify(fields, &mut self.attribute, &mut self.order);
         let escaped = self.escaped.len();
@@ -128,7 +166,7 @@ impl RecordJson {
 
     fn fields<'tree, 'source, W: Write>(
         &mut self,
-        out: &mut Out<'_, W>,
+        out: &mut Out<'_, 'source, W>,
         mut fields: Fields<'tree, 'source>,
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
@@ -145,16 +183,26 @@ impl RecordJson {
     }
 
     fn items<'tree, 'source, W: Write>(
-        out: &mut Out<'_, W>,
+        out: &mut Out<'_, 'source, W>,
         mut items: Items<'tree, 'source>,
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
-        if let Some(value) = items.next() {
+        if let Some((original, value)) = items.next() {
             out.separator(items.first, items.depth + 1)?;
             items.first = false;
             let depth = items.depth + 1;
+            let slot = if let Some(observation) = &mut out.observation {
+                observation.index(depth, items.emitted);
+                items
+                    .slot
+                    .zip(original)
+                    .map(|(slot, index)| observation.element(slot, index))
+            } else {
+                None
+            };
+            items.emitted += 1;
             pending.push(Task::Items(items));
-            pending.push(Task::Value(value, depth));
+            pending.push(Task::Value(value, depth, slot));
         } else if items.first {
             out.sink.write_all(b"]")?;
         } else {
@@ -164,45 +212,57 @@ impl RecordJson {
     }
 
     fn value<'tree, 'source, W: Write>(
-        out: &mut Out<'_, W>,
+        out: &mut Out<'_, 'source, W>,
         value: &'tree Value<'source>,
+        slot: Option<ValueSlot<'source>>,
         depth: usize,
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
+        if let Some(observation) = &mut out.observation {
+            observation.value(slot, Some(value))?;
+        }
         match value {
             Value::Struct(structure) => pending.push(Task::Structure {
                 record: None,
-                type_name: structure.type_name(),
-                fields: structure.fields(),
+                structure,
+                slot,
                 depth,
             }),
             Value::Array(items) => {
                 out.sink.write_all(b"[")?;
-                pending.push(Task::Items(Items::new(items, depth)));
+                pending.push(Task::Items(Items::new(items, depth, slot)));
             }
-            leaf => sink::leaf(out, leaf, depth)?,
+            leaf => sink::leaf(out, leaf, slot, depth)?,
         }
         Ok(())
     }
     fn field<'tree, 'source, W: Write>(
-        out: &mut Out<'_, W>,
+        out: &mut Out<'_, 'source, W>,
         selected: Selected<'tree, 'source>,
         depth: usize,
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
+        let slot = out
+            .observation
+            .as_ref()
+            .and_then(|observation| observation.field(depth, selected.index));
         if selected.escaped {
-            out.separator(false, depth + 1)?;
-            write!(out.sink, "\"${}\":", selected.index)?;
-            out.space()?;
+            out.key(false, depth + 1, &format!("${}", selected.index))?;
+            if let Some(observation) = &mut out.observation {
+                observation.value(slot, Some(selected.field.value()))?;
+            }
             out.sink.write_all(b"{")?;
             out.key(true, depth + 2, "name")?;
             value_json::write_json_string(out.sink, selected.field.name())?;
+            if let Some(observation) = &mut out.observation {
+                observation.property_name(slot, selected.field.name())?;
+            }
             out.key(false, depth + 2, "value")?;
             pending.push(Task::CloseWrapper(depth + 1));
-            pending.push(Task::Value(selected.field.value(), depth + 2));
+            pending.push(Task::Value(selected.field.value(), depth + 2, slot));
         } else {
             out.key(false, depth + 1, selected.field.name())?;
-            pending.push(Task::Value(selected.field.value(), depth + 1));
+            pending.push(Task::Value(selected.field.value(), depth + 1, slot));
         }
         Ok(())
     }

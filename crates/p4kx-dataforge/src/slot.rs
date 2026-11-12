@@ -40,6 +40,10 @@ impl Slot {
         })
     }
 
+    pub(crate) const fn property_index(self) -> usize {
+        self.property
+    }
+
     /// Returns the type of the field's values.
     pub(crate) const fn data_type(&self) -> DataType {
         self.data_type

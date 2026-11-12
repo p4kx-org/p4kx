@@ -3,6 +3,7 @@
 
 use crate::field_storage::FieldStorage;
 use crate::layout::{FieldSlot, Layout, LayoutCursor};
+use crate::positioned_record::InstanceSpans;
 use crate::{DataForge, DataForgeError, Field, StructValue, Value};
 
 use super::array::Array;
@@ -135,20 +136,29 @@ impl<'source> Frame<'source> {
         }
     }
 
-    pub(super) fn finish(self) -> Completed<'source> {
-        match self {
-            Self::Structure(frame) => Completed {
-                value: Value::Struct(StructValue {
-                    type_name: frame.type_name,
-                    struct_index: frame.struct_index,
-                    fields: frame.fields,
-                }),
-                inline: Some((frame.group, frame.struct_index)),
-            },
+    pub(super) fn finish(
+        self,
+        instances: Option<&mut InstanceSpans<'source>>,
+    ) -> Result<Completed<'source>, DataForgeError> {
+        let completed = match self {
+            Self::Structure(frame) => {
+                if let Some(instances) = instances {
+                    instances.insert(&frame.fields, frame.bytes)?;
+                }
+                Completed {
+                    value: Value::Struct(StructValue {
+                        type_name: frame.type_name,
+                        struct_index: frame.struct_index,
+                        fields: frame.fields,
+                    }),
+                    inline: Some((frame.group, frame.struct_index)),
+                }
+            }
             Self::Array(frame) => Completed {
                 value: frame.finish(),
                 inline: None,
             },
-        }
+        };
+        Ok(completed)
     }
 }

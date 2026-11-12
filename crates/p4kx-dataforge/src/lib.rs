@@ -40,6 +40,7 @@ mod layout_cursor;
 mod location;
 mod nested;
 mod pointer_offsets;
+mod positioned_record;
 mod probe;
 pub mod query;
 mod read_observer;
@@ -94,10 +95,14 @@ pub use flat_cells::{CSV_BYTE_ORDER_MARK, write_csv_cell};
 pub use guid::{Guid, InvalidGuid};
 pub use header::{SNIFF_LEN, SUPPORTED_VERSIONS, looks_like_dataforge};
 pub use issues::{DataForgeIssue, MAX_DATAFORGE_ISSUES};
-pub use json::{JsonLayout, RecordJson};
+pub use json::{
+    JsonLayout, RecordJson, RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField,
+    RecordJsonSource,
+};
 pub use kinds::{DataType, ValueKind};
 pub use location::{Location, Step};
 pub use nested::{Reference, StructValue};
+pub use positioned_record::PositionedRecord;
 pub use probe::PointerProbe;
 pub use read_observer::CanonicalReadObserver;
 pub use record::Record;

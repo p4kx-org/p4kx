@@ -23,7 +23,7 @@ pub struct DataForge<'a> {
     pub(crate) version: u32,
     pub(crate) header_words: [u32; 2],
     pub(crate) issues: Issues,
-    pub(crate) byte_len: usize,
+    pub(crate) bytes: &'a [u8],
     pub(crate) structs: Table<'a, StructDef>,
     pub(crate) properties: Table<'a, PropertyDef>,
     pub(crate) enums: Table<'a, EnumDef>,
@@ -83,7 +83,7 @@ impl<'a> DataForge<'a> {
             version: header.version,
             header_words: header.words,
             issues,
-            byte_len: bytes.len(),
+            bytes,
             structs,
             properties,
             enums,
@@ -115,7 +115,7 @@ impl<'a> DataForge<'a> {
     /// Returns the number of bytes the DataForge was opened over.
     #[must_use]
     pub const fn byte_len(&self) -> usize {
-        self.byte_len
+        self.bytes.len()
     }
 
     /// Returns the number of Records.

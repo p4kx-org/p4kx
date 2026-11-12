@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::{Field, RecordTree, Value};
+use crate::positioned_record::ValueSlot;
+use crate::{Field, RecordTree, StructValue, Value};
 use std::slice::Iter;
 
 pub(super) enum Task<'tree, 'source> {
     Structure {
         record: Option<&'tree RecordTree<'source>>,
-        type_name: &'source str,
-        fields: &'tree [Field<'source>],
+        structure: &'tree StructValue<'source>,
+        slot: Option<ValueSlot<'source>>,
         depth: usize,
     },
     Fields(Fields<'tree, 'source>),
-    Value(&'tree Value<'source>, usize),
+    Value(&'tree Value<'source>, usize, Option<ValueSlot<'source>>),
     Items(Items<'tree, 'source>),
     CloseWrapper(usize),
 }
@@ -85,30 +86,42 @@ impl<'tree, 'source> Fields<'tree, 'source> {
 }
 
 pub(super) struct Items<'tree, 'source> {
-    pending: Vec<Iter<'tree, Value<'source>>>,
+    pending: Vec<std::iter::Enumerate<Iter<'tree, Value<'source>>>>,
+    pub(super) slot: Option<ValueSlot<'source>>,
+    pub(super) emitted: usize,
     pub(super) depth: usize,
     pub(super) first: bool,
 }
 
 impl<'tree, 'source> Items<'tree, 'source> {
-    pub(super) fn new(items: &'tree [Value<'source>], depth: usize) -> Self {
+    pub(super) fn new(
+        items: &'tree [Value<'source>],
+        depth: usize,
+        slot: Option<ValueSlot<'source>>,
+    ) -> Self {
         Self {
-            pending: vec![items.iter()],
+            pending: vec![items.iter().enumerate()],
+            slot,
+            emitted: 0,
             depth,
             first: true,
         }
     }
 
-    pub(super) fn next(&mut self) -> Option<&'tree Value<'source>> {
-        while let Some(items) = self.pending.last_mut() {
+    pub(super) fn next(&mut self) -> Option<(Option<u32>, &'tree Value<'source>)> {
+        loop {
+            let direct = self.pending.len() == 1;
+            let items = self.pending.last_mut()?;
             match items.next() {
-                Some(Value::Array(inner)) => self.pending.push(inner.iter()),
-                Some(item) => return Some(item),
+                Some((_, Value::Array(inner))) => self.pending.push(inner.iter().enumerate()),
+                Some((position, item)) => {
+                    let original = direct.then(|| u32::try_from(position).ok()).flatten();
+                    return Some((original, item));
+                }
                 None => {
                     self.pending.pop();
                 }
             }
         }
-        None
     }
 }

@@ -23,7 +23,7 @@ impl Server {
     #[tool(
         description = "Get a Record of the Archive's DataForge by GUID, or every Record with a record path, as Record JSON: \
         $type, $guid, $path and the fields; References are links with guid, path and type, never the linked Record. \
-        Large results page: pass next_cursor back as cursor. The content may be forwarded by the client to \
+        Large results page: pass next_cursor back as cursor. Field origins address the canonical emitted values and their original inputs. The content may be forwarded by the client to \
         third parties; game texts and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<RecordResult>(),
         annotations(
@@ -50,8 +50,9 @@ impl Server {
             let opened = state.forge(params.archive.as_deref())?;
             let listing = ("get_record", opened.version(), &selector);
             let page = Page::new(&listing, params.cursor.as_deref(), None)?;
-            opened
-                .with_dataforge(move |forge, archive| records::get(forge, archive, &selector, page))
+            opened.with_dataforge_origin(move |forge, archive, origin| {
+                records::get(forge, &archive, origin, &selector, page)
+            })
         })
         .await
     }

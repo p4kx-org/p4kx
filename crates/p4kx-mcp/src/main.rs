@@ -75,6 +75,7 @@ mod params;
 mod picture;
 mod query;
 mod query_tools;
+mod record_origins;
 mod record_search;
 mod record_search_origins;
 mod record_tools;

@@ -81,6 +81,7 @@ mod real_archive;
 mod real_archive_audio;
 mod real_archive_model;
 mod real_archive_query;
+mod record_origins;
 mod record_search_origins;
 mod records;
 mod reopen;

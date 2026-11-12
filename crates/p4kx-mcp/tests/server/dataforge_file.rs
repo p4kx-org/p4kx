@@ -40,7 +40,10 @@ fn every_dataforge_tool_reads_a_file_like_the_archive() -> TestResult {
         read["archive"] = json!("");
         expected["archive"] = json!("");
 
-        if matches!(tool, "search_records" | "list_structs" | "list_enums") {
+        if matches!(
+            tool,
+            "get_record" | "search_records" | "list_structs" | "list_enums"
+        ) {
             take_forge_origin(&mut read, "file", &Value::Null)?;
             take_forge_origin(&mut expected, "archiveEntry", &json!(false))?;
         }
