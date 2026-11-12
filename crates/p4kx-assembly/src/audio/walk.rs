@@ -29,6 +29,7 @@ pub(crate) fn event<'i>(banks: Banks<'_, 'i>, event: &'i WwiseEvent, budget: usi
         banks,
         event,
         path: Vec::new(),
+        shared_path_prefix: 0,
         objects: 0,
         budget,
         chain: 0,
@@ -51,6 +52,7 @@ struct Walk<'w, 'i> {
     current: Loaded<'i>,
     event: &'i WwiseEvent,
     path: Vec<ResolvedPathStep<'i>>,
+    shared_path_prefix: usize,
     objects: usize,
     budget: usize,
     chain: usize,
@@ -132,9 +134,14 @@ impl<'i> Walk<'_, 'i> {
             },
         });
         self.visit(object);
+        self.leave(left);
+    }
+
+    fn leave(&mut self, previous: Option<Loaded<'i>>) {
         self.path.pop();
-        if let Some(left) = left {
-            self.current = left;
+        self.shared_path_prefix = self.shared_path_prefix.min(self.path.len());
+        if let Some(previous) = previous {
+            self.current = previous;
         }
     }
 
@@ -273,6 +280,7 @@ impl<'i> Walk<'_, 'i> {
             soundbank: self.current.soundbank,
             sound_id: self.path.last().map_or(0, |step| step.step.id),
             path: self.public_path(),
+            shared_path_prefix: self.shared_path_prefix,
             source,
             location: located.location,
             selection: located.selection,
@@ -280,6 +288,7 @@ impl<'i> Walk<'_, 'i> {
             language: located.language,
             fallback: located.fallback,
         });
+        self.shared_path_prefix = self.path.len();
     }
 
     fn public_path(&self) -> Box<[PathStep]> {

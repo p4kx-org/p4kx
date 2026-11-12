@@ -42,6 +42,7 @@ mod audio_streamed_localised;
 mod audio_trigger_fields;
 mod audio_txtp;
 mod audio_txtp_edges;
+mod audio_txtp_physical_owner;
 mod audio_txtp_support;
 mod audio_wem_selection;
 mod body_restyle;

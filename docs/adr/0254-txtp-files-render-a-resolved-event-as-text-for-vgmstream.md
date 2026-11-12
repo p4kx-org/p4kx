@@ -73,3 +73,7 @@ decoding) and ADR-0250 (the object kinds). The format is that of vgmstream's `do
   section; not done.
 - Writing a silent `?.` entry for a source without a file: plays a rendition that differs from
   the game without saying so; not done.
+
+The render tree groups sounds by the open visits of the resolved source
+walk. Repeated authored edges contribute distinct visits in source order.
+Separate physical holders of one logical Event contribute independent groups.

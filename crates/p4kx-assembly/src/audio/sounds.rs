@@ -207,6 +207,8 @@ pub struct SoundVariant<'i> {
     pub(crate) soundbank: &'i IndexedSoundbank,
     pub(crate) sound_id: u32,
     pub(crate) path: Box<[PathStep]>,
+    /// Number of visits still shared with the previous emitted variant in this Event walk.
+    pub(crate) shared_path_prefix: usize,
     pub(crate) source: SoundSource,
     pub(crate) location: Option<WemLocation<'i>>,
     pub(crate) selection: WemSelection,
