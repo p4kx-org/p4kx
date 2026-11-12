@@ -1455,17 +1455,22 @@
       "type": "object"
     },
     "AttachedItem": {
+      "description": "The exact attached Record selected by the resolved Loadout.",
       "properties": {
         "definition": {
           "$ref": "#/$defs/AttachmentDefinitionLink"
         },
         "targetGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "targetRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
         }
       },
       "required": [
         "definition",
-        "targetGuid"
+        "targetGuid",
+        "targetRecordIndex"
       ],
       "type": "object"
     },
@@ -3506,6 +3511,12 @@
         "explosives": {
           "$ref": "#/$defs/CatalogTableOfExplosive"
         },
+        "fuelIntakes": {
+          "$ref": "#/$defs/CatalogTableOfFuelIntake"
+        },
+        "fuelTanks": {
+          "$ref": "#/$defs/CatalogTableOfFuelTank"
+        },
         "hackingChips": {
           "$ref": "#/$defs/CatalogTableOfHackingChip"
         },
@@ -3536,6 +3547,9 @@
         "quantumDrives": {
           "$ref": "#/$defs/CatalogTableOfQuantumDrive"
         },
+        "resourceContainers": {
+          "$ref": "#/$defs/CatalogTableOfResourceContainer"
+        },
         "shieldGenerators": {
           "$ref": "#/$defs/CatalogTableOfShieldGenerator"
         },
@@ -3551,6 +3565,8 @@
         "distortion",
         "durability",
         "explosives",
+        "fuelIntakes",
+        "fuelTanks",
         "hackingChips",
         "itemAttachmentConstraints",
         "itemPorts",
@@ -3561,6 +3577,7 @@
         "missionFlows",
         "missionProperties",
         "quantumDrives",
+        "resourceContainers",
         "shieldGenerators",
         "weaponActions"
       ],
@@ -4152,6 +4169,44 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfFuelIntake": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/FuelIntake"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfFuelTank": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/FuelTank"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfGameplayPropertyDefinition": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -4465,6 +4520,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/QuantumDrive"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfResourceContainer": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ResourceContainer"
           },
           "type": "array"
         }
@@ -5153,7 +5227,7 @@
           "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCommodityPurchasable"
         },
         "resourceContainers": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCommodityContainer"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCommodityContainerLink"
         }
       },
       "required": [
@@ -5163,27 +5237,11 @@
       ],
       "type": "object"
     },
-    "CommodityComposition": {
-      "description": "One original composition slot without selecting or following its target.",
+    "CommodityContainerLink": {
+      "description": "A physical link to the `ResourceContainer` configuration of this Commodity Entity.",
       "properties": {
-        "entry": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
-        },
-        "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
-        }
-      },
-      "required": [
-        "entry",
-        "sourceType"
-      ],
-      "type": "object"
-    },
-    "CommodityContainer": {
-      "description": "One original resource-container component with ordered composition slots.",
-      "properties": {
-        "defaultComposition": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCommodityComposition"
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
         },
         "sourcePosition": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -5193,7 +5251,7 @@
         }
       },
       "required": [
-        "defaultComposition",
+        "ownerRecordIndex",
         "sourcePosition",
         "sourceType"
       ],
@@ -5666,6 +5724,29 @@
         "starmapObjects",
         "subHarvestableMultiConfigs",
         "tags"
+      ],
+      "type": "object"
+    },
+    "CompositionEntry": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "entry": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "weight": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "entry",
+        "sourceType",
+        "weight"
       ],
       "type": "object"
     },
@@ -10249,6 +10330,144 @@
         "mass",
         "radius",
         "surfaceTypeOverride"
+      ],
+      "type": "object"
+    },
+    "FuelAudioRtpc": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "rtpc": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "rtpc",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "FuelAudioTrigger": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "audioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "audioTrigger",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "FuelIntake": {
+      "description": "Authored rate parameters of a physical fuel intake.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "fuelPushRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minimumRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "componentOrdinal",
+        "fuelPushRate",
+        "minimumRate",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "FuelTank": {
+      "description": "Authored flow, interaction and audio parameters of a physical fuel tank.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "closedState": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "fuelFillDrainRateAudioRtpc": {
+          "$ref": "#/$defs/SourcedValueOfFuelAudioRtpc"
+        },
+        "fuelFillLevelAudioRtpc": {
+          "$ref": "#/$defs/SourcedValueOfFuelAudioRtpc"
+        },
+        "fuelFlowLoopStartAudioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfFuelAudioTrigger"
+        },
+        "fuelFlowLoopStopAudioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfFuelAudioTrigger"
+        },
+        "hydrogenMaxFlowMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "openState": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "pumpingState": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "quantumMaxFlowMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "closedState",
+        "componentOrdinal",
+        "fuelFillDrainRateAudioRtpc",
+        "fuelFillLevelAudioRtpc",
+        "fuelFlowLoopStartAudioTrigger",
+        "fuelFlowLoopStopAudioTrigger",
+        "hydrogenMaxFlowMultiplier",
+        "openState",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "pumpingState",
+        "quantumMaxFlowMultiplier",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -21470,6 +21689,124 @@
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
+    "ResourceCapacity": {
+      "description": "A capacity retains the concrete unit and its own stored numeric member.",
+      "oneOf": [
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "base",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "centiSCU": {
+              "$ref": "#/$defs/SourcedValueOfint32"
+            },
+            "kind": {
+              "const": "centiCargoUnit",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType",
+            "centiSCU"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "microCargoUnit",
+              "type": "string"
+            },
+            "microSCU": {
+              "$ref": "#/$defs/SourcedValueOfint32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType",
+            "microSCU"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "standardCargoUnit",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "standardCargoUnits": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType",
+            "standardCargoUnits"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "unknownUnit",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
     "ResourceCargoSlot": {
       "description": "One named authored cargo slot without a derived capacity.",
       "properties": {
@@ -21483,6 +21820,78 @@
       "required": [
         "entityClass",
         "slot"
+      ],
+      "type": "object"
+    },
+    "ResourceContainer": {
+      "description": "Authored contents and policy of a physical `ResourceContainer` component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "capacity": {
+          "$ref": "#/$defs/SourcedValueOfResourceCapacity"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "defaultComposition": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCompositionEntry"
+        },
+        "defaultCompositionFillFactor": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "exclusiveGroups": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "exclusiveResources": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "generateRandomQuality": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "hideFromUi": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "immutable": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "inclusiveGroups": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "inclusiveResources": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "mutabilityLevel": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "capacity",
+        "componentOrdinal",
+        "defaultComposition",
+        "defaultCompositionFillFactor",
+        "exclusiveGroups",
+        "exclusiveResources",
+        "generateRandomQuality",
+        "hideFromUi",
+        "immutable",
+        "inclusiveGroups",
+        "inclusiveResources",
+        "mutabilityLevel",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -27468,7 +27877,7 @@
       ],
       "type": "object"
     },
-    "SourcedValueOfArray_of_SourcedValueOfCommodityComposition": {
+    "SourcedValueOfArray_of_SourcedValueOfCommodityContainerLink": {
       "allOf": [
         {
           "allOf": [
@@ -27562,140 +27971,7 @@
             "properties": {
               "value": {
                 "items": {
-                  "$ref": "#/$defs/SourcedValueOfCommodityComposition"
-                },
-                "type": "array"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfArray_of_SourcedValueOfCommodityContainer": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "items": {
-                  "$ref": "#/$defs/SourcedValueOfCommodityContainer"
+                  "$ref": "#/$defs/SourcedValueOfCommodityContainerLink"
                 },
                 "type": "array"
               }
@@ -27962,6 +28238,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfCommodityPurchasable"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfCompositionEntry": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfCompositionEntry"
                 },
                 "type": "array"
               }
@@ -35406,7 +35815,7 @@
       ],
       "type": "object"
     },
-    "SourcedValueOfCommodityComposition": {
+    "SourcedValueOfCommodityContainerLink": {
       "allOf": [
         {
           "allOf": [
@@ -35499,137 +35908,7 @@
           "then": {
             "properties": {
               "value": {
-                "$ref": "#/$defs/CommodityComposition"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
-    "SourcedValueOfCommodityContainer": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/CommodityContainer"
+                "$ref": "#/$defs/CommodityContainerLink"
               }
             }
           }
@@ -36020,6 +36299,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/CommoditySelection"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCompositionEntry": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CompositionEntry"
               }
             }
           }
@@ -38880,6 +39289,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/Fragments"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfFuelAudioRtpc": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/FuelAudioRtpc"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfFuelAudioTrigger": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/FuelAudioTrigger"
               }
             }
           }
@@ -51820,6 +52489,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ResolutionStatus"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfResourceCapacity": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ResourceCapacity"
               }
             }
           }

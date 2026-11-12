@@ -144,7 +144,7 @@ fn assemble<R>(
     collected.ledger.merge(ledger);
     collected.add_failures(failures);
     let kinds = collected.summary(options.filter.is_none());
-    let mut catalog_rows = crate::catalog_rows::snapshot(&collected, options.filter);
+    let mut catalog_rows = crate::catalog_rows::snapshot(&mut collected, options.filter);
     catalog_rows.recovery_numbers = recovery_numbers;
     if collected
         .ledger
@@ -316,7 +316,7 @@ fn assemble<R>(
             weapon_actions: components.weapon_actions,
             quantum_drives: components.quantum_drives,
             shield_generators: components.shield_generators,
-            item_alignment: collected.item_alignment.into_tables(&forge),
+            entity_configurations: collected.entity_configurations.into_tables(&forge),
             contract_templates: CatalogTable::new(
                 &forge,
                 &["ContractTemplate"],

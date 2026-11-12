@@ -9,12 +9,13 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::{CatalogFields, CatalogRecordContext};
 use crate::commodity_authoring_contract::{
-    CommodityAuthoring, CommodityContainer, CommodityDisplay, CommodityPurchasable,
+    CommodityAuthoring, CommodityContainerLink, CommodityDisplay, CommodityPurchasable,
 };
 use crate::commodity_authoring_inputs;
 use crate::commodity_binding_read::{self, BindingArray, BindingAt, BindingFacts, BindingRead};
 use crate::commodity_inputs::CommodityInputs;
 use crate::commodity_text_input::CommodityTextInput;
+use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -65,9 +66,9 @@ pub(crate) fn entity<'source>(
         &components,
         "ResourceContainer",
         notes,
-        |source, at, notes| {
+        |source, at, _| {
             Ok((
-                container(source, at, tree.record_index(), projection, &context, notes)?,
+                container_link(source, at, tree.record_index(), projection, &context)?,
                 (),
             ))
         },
@@ -85,7 +86,7 @@ pub(crate) fn entity<'source>(
 struct AuthoredBindings<'source> {
     purchases: BindingRead<'source, CommodityPurchasable<'source>, PurchasableInputs<'source>>,
     displays: BindingRead<'source, CommodityDisplay<'source>, CommodityTextInput<'source>>,
-    containers: BindingRead<'source, CommodityContainer<'source>, ()>,
+    containers: BindingRead<'source, CommodityContainerLink<'source>, ()>,
     crafter_inputs: Vec<SourceUse>,
     crafter_complete: bool,
 }
@@ -208,30 +209,28 @@ fn display<'source>(
     Ok((BindingFacts::new(value, inputs), input))
 }
 
-fn container<'source>(
+fn container_link<'source>(
     source: &StructValue<'source>,
     at: &BindingAt<'_>,
     record_index: u32,
     projection: &CatalogProjection<'_, 'source>,
     context: &CatalogRecordContext<'_>,
-    notes: &mut Vec<FieldError>,
-) -> Result<BindingFacts<CommodityContainer<'source>>, CatalogError> {
+) -> Result<BindingFacts<CommodityContainerLink<'source>>, CatalogError> {
     let fields = CatalogFields::new(source, at.path, context);
-    let composition = crate::commodity_composition_read::read(
-        source,
-        at.path,
-        record_index,
-        projection.origins(),
-        context,
-        notes,
-    )?;
     let mut inputs = binding_inputs(projection, record_index, at)?;
-    inputs.extend(composition.inputs, composition.complete);
+    inputs.header_input(
+        record_index,
+        RecordHeaderInput::Field(RecordHeaderField::RecordIndex),
+        SourceUseRole::Selector,
+    )?;
     Ok(BindingFacts::new(
-        CommodityContainer {
+        CommodityContainerLink {
+            owner_record_index: context.header_selector(
+                RecordHeaderField::RecordIndex,
+                SourceValue::Present(record_index),
+            )?,
             source_position: position(context, at)?,
             source_type: fields.source_type()?,
-            default_composition: composition.value,
         },
         inputs,
     ))

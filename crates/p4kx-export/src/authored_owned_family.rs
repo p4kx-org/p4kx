@@ -43,28 +43,52 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         name: &str,
         target: &str,
         notes: &mut Vec<FieldError>,
-        mut decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+        decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
         self.family_field(name, target, PointerShape::Array, notes, |fact, notes| {
-            let state = self.array_elements(
-                fact,
-                name,
-                PointerShape::Array.expectation(),
-                notes,
-                |index, element, notes| {
-                    let path = format!("{name}[{index}]");
-                    let mut cell = self.family_value(&path, element, notes, &mut decode)?;
-                    cell.contribute(self.kind()?);
-                    Ok(cell.into_cell(self.originals.sources()))
-                },
-            )?;
-            fact.bind(
-                OriginalValuePart::Value,
-                state,
-                SourceUseRole::Selector,
-                true,
-            )
+            self.family_array(name, fact, notes, decode)
         })
+    }
+
+    pub(super) fn declared_pointer_array<T>(
+        &self,
+        name: &str,
+        fact: &'reader Fact<'scope, 'read, 'source>,
+        notes: &mut Vec<FieldError>,
+        decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
+        let declared = fact.observe_declared_target(self.input)?;
+        let expected = declared.0.as_ref().ok().copied();
+        self.read_declared_value(fact, expected.as_slice(), declared, notes, |notes| {
+            self.family_array(name, fact, notes, decode)
+        })
+    }
+
+    fn family_array<T>(
+        &self,
+        name: &str,
+        fact: &'reader Fact<'scope, 'read, 'source>,
+        notes: &mut Vec<FieldError>,
+        mut decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<OriginalDatum<Vec<SourcedValue<T>>>, CatalogError> {
+        let state = self.array_elements(
+            fact,
+            name,
+            PointerShape::Array.expectation(),
+            notes,
+            |index, element, notes| {
+                let path = format!("{name}[{index}]");
+                let mut cell = self.family_value(&path, element, notes, &mut decode)?;
+                cell.contribute(self.kind()?);
+                Ok(cell.into_cell(self.originals.sources()))
+            },
+        )?;
+        fact.bind(
+            OriginalValuePart::Value,
+            state,
+            SourceUseRole::Selector,
+            true,
+        )
     }
 
     fn family_field<T>(

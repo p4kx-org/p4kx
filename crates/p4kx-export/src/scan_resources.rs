@@ -8,7 +8,7 @@ use p4kx_extraction::{CancelToken, Guid, Record, TreeBuilder};
 use super::{RESOURCE_TYPE, Scan};
 use crate::blueprint_catalog_rows::BlueprintRow;
 use crate::catalog_crafting::CraftingKinds;
-use crate::catalog_v3::catalog_item_alignment::ItemAlignmentRows;
+use crate::catalog_v3::catalog_entity_configurations::EntityConfigurationRows;
 use crate::commodity;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -60,7 +60,7 @@ impl<'f> Scan<'_, '_, 'f> {
         let mut read = ScanRead {
             picked: Vec::new(),
             entity_tags: Vec::new(),
-            item_alignment: ItemAlignmentRows::default(),
+            entity_configurations: EntityConfigurationRows::default(),
             resource_group_members: Vec::new(),
             ledger: ExportLedger::default(),
         };

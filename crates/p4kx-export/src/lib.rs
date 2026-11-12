@@ -384,15 +384,14 @@ pub(crate) use catalog_v3::{
     catalog_number_diagnostics, catalog_number_health, catalog_origins, catalog_projection,
     catalog_projections, catalog_read, catalog_record_reference, catalog_table,
     catalog_text_contract, commodity, commodity_authoring_contract, commodity_authoring_inputs,
-    commodity_authoring_read, commodity_backfill, commodity_binding_read,
-    commodity_composition_read, commodity_contract, commodity_inputs, commodity_presentation,
-    commodity_resource, commodity_resource_presentation, commodity_source, commodity_text_choice,
-    commodity_text_input, number_position, quality_bands_read, quality_curve_source_read,
-    quality_source, quality_source_read, record_header_field, resource_density_read,
-    resource_density_source, resource_float, resource_group, resource_group_read, resource_integer,
-    resource_memberships, resource_number, resource_property_contract, resource_property_read,
-    resource_raw_policy, resource_read, resource_type_contract, resource_value_read, source_header,
-    source_value_catalog,
+    commodity_authoring_read, commodity_backfill, commodity_binding_read, commodity_contract,
+    commodity_inputs, commodity_presentation, commodity_resource, commodity_resource_presentation,
+    commodity_source, commodity_text_choice, commodity_text_input, number_position,
+    quality_bands_read, quality_curve_source_read, quality_source, quality_source_read,
+    record_header_field, resource_density_read, resource_density_source, resource_float,
+    resource_group, resource_group_read, resource_integer, resource_memberships, resource_number,
+    resource_property_contract, resource_property_read, resource_raw_policy, resource_read,
+    resource_type_contract, resource_value_read, source_header, source_value_catalog,
 };
 
 pub use export_health_api::*;

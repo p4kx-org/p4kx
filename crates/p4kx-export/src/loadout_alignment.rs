@@ -26,8 +26,18 @@ pub(crate) struct LoadoutAlignment {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 struct AttachedItem {
-    target_guid: SourcedValue<CatalogGuid>,
+    #[serde(flatten)]
+    identity: AttachmentIdentity,
     definition: AttachmentDefinitionLink,
+}
+
+/// The exact attached Record selected by the resolved Loadout.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub(crate) struct AttachmentIdentity {
+    pub(crate) target_guid: SourcedValue<CatalogGuid>,
+    pub(crate) target_record_index: SourcedValue<u32>,
 }
 
 impl LoadoutAlignment {
@@ -44,7 +54,11 @@ impl LoadoutAlignment {
             && let Some(record) = child.record_index()
         {
             Some(AttachedItem {
-                target_guid: capture.attachment_target(child.guid(), child.attachment_target())?,
+                identity: capture.attachment_identity(
+                    child.guid(),
+                    record,
+                    child.attachment_target(),
+                )?,
                 definition: index.attachment(record, child.attachable_component_ordinal())?,
             })
         } else {

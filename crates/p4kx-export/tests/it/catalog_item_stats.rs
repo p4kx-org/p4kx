@@ -26,6 +26,8 @@ mod ammo_definitions;
 mod ammo_source;
 #[path = "catalog_durability.rs"]
 mod durability;
+#[path = "catalog_fuel_capacity.rs"]
+mod fuel_capacity;
 #[path = "catalog_quantum.rs"]
 mod quantum;
 #[path = "catalog_shield.rs"]

@@ -34,11 +34,11 @@ is independent of game-text protection, selection completeness and publication h
 `entity.value` contains ordered `purchasableParameters`, `displayParameters` and
 `resourceContainers` lists. Every proved matching component retains `sourcePosition` and
 `sourceType`. Purchasable bindings retain their authored `displayName` and `displayType`;
-display bindings retain `displayDescription`. Resource-container bindings retain ordered
-`defaultComposition` slots with their concrete type and original `entry` reference, including
-null positions, repeated references, dangling GUIDs and incompatible targets. These fields own
-the typed inputs of Commodity presentation; unrelated Entity component settings are not copied
-into this dataset.
+display bindings retain `displayDescription`. Resource-container bindings retain their
+physical owner index and source position. Join those fields to the canonical
+`configurations.resourceContainers` rows for the ordered composition, original entries
+and other container settings. The presentation's source selection still reads the
+first authored entry under its existing rules. [Fuel and resource capacity](catalog-fuel-capacity.md)
 
 Matching bindings keep the original `Components[i]` or `StaticEntityClassData[i]` position.
 Nonmatching components are selection inputs, not fabricated Commodity bindings. Unreadable

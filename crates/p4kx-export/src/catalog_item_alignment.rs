@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
-
-use p4kx_extraction::{
-    CancelToken, DataForge, DataType, RecordTree, SourcedValue, StructValue, Value,
-};
+use p4kx_extraction::{DataForge, DataType, SourcedValue, StructValue, Value};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -15,12 +11,9 @@ pub(crate) use super::item_alignment_options::AlignmentOptions;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
-use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
-use crate::template_field_capture::TemplateFieldCapture;
 
 #[path = "item_alignment_index.rs"]
 mod index;
@@ -42,6 +35,28 @@ impl<'source> ItemAlignmentRows<'source> {
     pub(crate) fn extend(&mut self, other: Self) {
         self.ports.extend(other.ports);
         self.attachments.extend(other.attachments);
+    }
+
+    pub(super) fn push(
+        &mut self,
+        kind: ItemAlignmentKind,
+        owner: ComponentOwner,
+        source: Observed<'_, '_, '_, 'source>,
+        options: &AlignmentOptions<'_>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<(), CatalogError> {
+        match kind {
+            ItemAlignmentKind::Port => {
+                self.ports
+                    .push(ItemPortContainer::read(owner, source, options, notes)?);
+            }
+            ItemAlignmentKind::Attachment => {
+                self.attachments.push(ItemAttachmentComponent::read(
+                    owner, source, options, notes,
+                )?);
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn into_tables(mut self, forge: &DataForge<'_>) -> ItemAlignmentTables<'source> {
@@ -98,56 +113,23 @@ struct ItemAttachment<'source> {
     attach_check_center_of_mass: SourcedValue<bool>,
 }
 
-pub(crate) fn read<'source>(
-    tree: &RecordTree<'source>,
-    input: &OriginalCatalogInput<'_, 'source>,
-    admission: &RecordObservation<'_, 'source>,
-    options: &AlignmentOptions<'_>,
-    cancel: Option<&CancelToken>,
-) -> Result<(ItemAlignmentRows<'source>, Vec<FieldError>), CatalogError> {
-    let mut rows = ItemAlignmentRows::default();
-    let mut notes = Vec::new();
-    let Some(Value::Array(components)) = tree.field("Components") else {
-        return Ok((rows, notes));
-    };
-    let mut components = components
-        .iter()
-        .filter_map(|component| match component {
-            Value::Struct(value) if value.type_name() == CONTAINER => Some((component, CONTAINER)),
-            Value::Struct(value)
-                if value.type_name() == ATTACHABLE && owns_item_definition(value, input) =>
-            {
-                Some((component, ATTACHABLE))
-            }
+#[derive(Clone, Copy)]
+pub(super) enum ItemAlignmentKind {
+    Port,
+    Attachment,
+}
+
+impl ItemAlignmentKind {
+    pub(super) fn of(
+        value: &StructValue<'_>,
+        input: &OriginalCatalogInput<'_, '_>,
+    ) -> Option<Self> {
+        match value.type_name() {
+            CONTAINER => Some(Self::Port),
+            ATTACHABLE if owns_item_definition(value, input) => Some(Self::Attachment),
             _ => None,
-        })
-        .peekable();
-    if components.peek().is_none() {
-        return Ok((rows, notes));
-    }
-    let scope = input.record_scope(admission.record(), tree)?;
-    let originals = OriginalFlowFields::read(&scope, cancel)?;
-    let capture = TemplateFieldCapture::new(&originals, input, admission)?;
-    let context = input
-        .origins()
-        .record(tree.record_index())
-        .with_cancel(cancel);
-    let numbers = RefCell::new(Vec::new());
-    for (component, kind) in components {
-        originals.check_cancel()?;
-        let component = originals.fact(component)?;
-        let owner = ComponentOwner::read(tree, &context, &originals, component)?;
-        let source = Observed::new(&originals, input, component, &capture, &numbers);
-        if kind == CONTAINER {
-            rows.ports
-                .push(ItemPortContainer::read(owner, source, options, &mut notes)?);
-        } else {
-            rows.attachments.push(ItemAttachmentComponent::read(
-                owner, source, options, &mut notes,
-            )?);
         }
     }
-    Ok((rows, notes))
 }
 
 fn owns_item_definition(source: &StructValue<'_>, input: &OriginalCatalogInput<'_, '_>) -> bool {

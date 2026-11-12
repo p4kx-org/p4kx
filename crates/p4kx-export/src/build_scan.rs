@@ -63,7 +63,7 @@ pub(super) fn scan<'f>(
         .resource_group_members
         .sort_by_cached_key(|row| (row.physical.guid.text(), row.physical.record_index));
     collected.tags.entity_tags = scanned.entity_tags;
-    collected.item_alignment = scanned.item_alignment;
+    collected.entity_configurations = scanned.entity_configurations;
     collected.tags.order_entities();
 
     collected.ledger.merge(placements.ledger.clone());

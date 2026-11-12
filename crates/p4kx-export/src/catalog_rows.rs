@@ -11,7 +11,7 @@ use crate::selection::Kind;
 use crate::template_number_capture::TemplateNumbers;
 
 /// Captures the actual final row selection independently of successful source projections.
-pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> CatalogRows {
+pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -> CatalogRows {
     let mut emitted = Vec::new();
     append(
         &mut emitted,
@@ -54,6 +54,7 @@ pub(crate) fn snapshot(collected: &Collected<'_>, filter: Option<&Filter>) -> Ca
         emitted,
         filter: filter.cloned(),
         numbers: numbers(collected),
+        entity_configuration_numbers: std::mem::take(&mut collected.entity_configurations.numbers),
         template_numbers: template_numbers(collected),
         recovery_numbers: Vec::new(),
     }

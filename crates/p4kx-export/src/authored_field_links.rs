@@ -74,6 +74,34 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         )
     }
 
+    /// Reads an authored Reference or a weak pointer whose admitted target is a Record.
+    pub(in crate::catalog_v3) fn record_or_weak_record_link(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<ReferenceCell<'source>, CatalogError> {
+        self.read_link(
+            name,
+            "a nullable Reference or weak Record pointer",
+            None,
+            notes,
+            |fact, sources, selectors| {
+                if fact.field().storage().data_type() != DataType::WeakPointer {
+                    return self.decode_record_link(fact, sources, selectors);
+                }
+                let Some((part, HealthLink::WeakReference { value })) = link::read(fact, sources)?
+                else {
+                    return Ok(None);
+                };
+                let Some(record) = value.into_record() else {
+                    return Ok(None);
+                };
+                selectors.push(fact.observe(OriginalValuePart::DataType, SourceUseRole::Selector)?);
+                Ok(Some((part, Box::new(record))))
+            },
+        )
+    }
+
     pub(in crate::catalog_v3) fn record_link_array_to(
         &self,
         name: &str,

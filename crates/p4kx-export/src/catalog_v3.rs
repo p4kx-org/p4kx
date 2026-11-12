@@ -45,10 +45,18 @@ mod authored_rgb;
 pub(crate) mod catalog_ammo_bindings;
 #[path = "catalog_ammo_containers.rs"]
 pub(crate) mod catalog_ammo_containers;
+#[path = "catalog_capacity.rs"]
+mod catalog_capacity;
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
+#[path = "catalog_entity_configurations.rs"]
+pub(crate) mod catalog_entity_configurations;
 #[path = "catalog_explosives.rs"]
 pub(crate) mod catalog_explosives;
+#[path = "catalog_fuel.rs"]
+mod catalog_fuel;
+#[path = "catalog_fuel_configurations.rs"]
+mod catalog_fuel_configurations;
 #[path = "catalog_hacking_chips.rs"]
 pub(crate) mod catalog_hacking_chips;
 #[path = "catalog_item_alignment.rs"]
@@ -57,6 +65,8 @@ pub(crate) mod catalog_item_alignment;
 pub(crate) mod catalog_item_components;
 #[path = "catalog_quantum_drive.rs"]
 pub(crate) mod catalog_quantum_drive;
+#[path = "catalog_resource_container.rs"]
+mod catalog_resource_container;
 #[path = "catalog_shield_generator.rs"]
 pub(crate) mod catalog_shield_generator;
 #[path = "catalog_weapon_actions.rs"]
@@ -169,9 +179,6 @@ pub(crate) mod commodity_backfill;
 
 #[path = "commodity_binding_read.rs"]
 pub(crate) mod commodity_binding_read;
-
-#[path = "commodity_composition_read.rs"]
-pub(crate) mod commodity_composition_read;
 
 #[path = "commodity_contract.rs"]
 pub(crate) mod commodity_contract;

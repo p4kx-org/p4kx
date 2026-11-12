@@ -32,6 +32,22 @@ pub(crate) struct SourceWeakReference<'source> {
     pub(crate) target: SourceWeakTarget<'source>,
 }
 
+impl<'source> SourceWeakReference<'source> {
+    /// Returns a Record link when the pointer targeted a Record header.
+    pub(crate) fn into_record(self) -> Option<SourceRecordReference<'source>> {
+        let SourceWeakTarget::Record { source_type } = self.target else {
+            return None;
+        };
+        Some(SourceRecordReference {
+            target_record_index: self.target_record_index,
+            guid: self.record_guid,
+            record_path: self.record_path,
+            target_type: source_type,
+            status: DefinitionStatus::Present,
+        })
+    }
+}
+
 /// Actual Record versus owned-instance applicability from the original admission.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(

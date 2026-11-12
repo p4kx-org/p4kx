@@ -2,39 +2,72 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::LoadoutTargetGuid;
-use p4kx_extraction::{Guid, SourceValue, SourcedValue};
+use p4kx_extraction::{Guid, SourceUseRole, SourceValue};
 
 use super::Capture;
+use crate::catalog_read::original::OriginalDatum;
 use crate::guid_text::CatalogGuid;
+use crate::loadout::alignment::AttachmentIdentity;
+use crate::record_header_field::RecordHeaderField;
 use crate::{CatalogError, ExportAccountingError};
 
 impl Capture<'_> {
-    pub(in crate::loadout) fn attachment_target(
+    pub(in crate::loadout) fn attachment_identity(
         &self,
         guid: Guid,
+        record: u32,
         selection: Option<&LoadoutTargetGuid>,
-    ) -> Result<SourcedValue<CatalogGuid>, CatalogError> {
+    ) -> Result<AttachmentIdentity, CatalogError> {
         let input = self
             .input
             .ok_or(ExportAccountingError::UnboundHealthSubject)?;
         let sources = &input.origins().uses;
-        let Some(selection) = selection else {
-            return Ok(sources.value(SourceValue::Present(CatalogGuid(guid)), &[], false));
+        let index = input.origins().dataforge.at(
+            RecordHeaderField::RecordIndex.location(record),
+            SourceUseRole::Selector,
+        )?;
+        let original = selection
+            .map(|selection| self.retained_target(guid, selection))
+            .transpose()?
+            .flatten();
+        let (target_guid, target_record_index) = if let Some(original) = original {
+            let (selected, complete) = original.contributions();
+            let mut inputs = Vec::with_capacity(selected.len() + 1);
+            inputs.extend_from_slice(selected);
+            inputs.push(index);
+            (
+                original.map(CatalogGuid)?.into_cell(sources),
+                sources.value(SourceValue::Present(record), &inputs, complete),
+            )
+        } else {
+            (
+                sources.value(SourceValue::Present(CatalogGuid(guid)), &[], false),
+                sources.value(SourceValue::Present(record), &[index], false),
+            )
         };
+        Ok(AttachmentIdentity {
+            target_guid,
+            target_record_index,
+        })
+    }
+
+    fn retained_target(
+        &self,
+        guid: Guid,
+        selection: &LoadoutTargetGuid,
+    ) -> Result<Option<OriginalDatum<Guid>>, CatalogError> {
+        let input = self
+            .input
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
         if selection.guid() != guid {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
         let receipt = match (selection.selection(), selection.class_selection()) {
             (Some(reference), None) => self.lock()?.references.get(reference, guid)?,
             (None, Some(class)) => self.class_target(class, guid, selection.class_xml_use())?,
-            (None, None) => {
-                return Ok(sources.value(SourceValue::Present(CatalogGuid(guid)), &[], false));
-            }
+            (None, None) => return Ok(None),
             (Some(_), Some(_)) => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
         };
-        Ok(receipt
-            .retained_for(input)?
-            .map(CatalogGuid)?
-            .into_cell(sources))
+        receipt.retained_for(input).map(Some)
     }
 }

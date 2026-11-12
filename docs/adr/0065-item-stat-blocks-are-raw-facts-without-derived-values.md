@@ -104,3 +104,15 @@ The previous compact flat values continue to feed variant identity in their orig
 Their mode-specific meanings map to the standard block sourced from `params`. The public
 configuration is the source-typed row. Source paths and units are documented in
 [Quantum drive configurations](../catalog-quantum-drives.md).
+
+## Catalog schema 3 fuel and resource capacity
+
+Under ADR-0356, fuel tanks, fuel intakes and ResourceContainer components have independent
+configuration tables keyed by their physical owning Record and component slot. A capacity
+retains the concrete unit and its stored member. A new unit retains its original type and
+members so no canonical unit or magnitude is inferred.
+
+Commodity authoring links each original ResourceContainer slot to the canonical row. Its
+first-entry presentation choice still reads the original authored order. Resolved loadouts
+join by the actual selected target Record index and keep one placement for each port.
+[Fuel and resource capacity](../catalog-fuel-capacity.md) specifies the field paths.

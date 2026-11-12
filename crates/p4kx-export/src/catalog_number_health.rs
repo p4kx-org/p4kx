@@ -64,6 +64,7 @@ pub(crate) struct EmittedNumber {
 struct RecordNumbers<'source> {
     named: BTreeMap<&'source str, &'source CapturedNumber>,
     original: BTreeMap<u64, &'source CapturedNumber>,
+    configurations: BTreeMap<u64, &'source CapturedNumber>,
     ammo_definition: bool,
 }
 
@@ -79,6 +80,7 @@ fn emitted_record_numbers<'source>(
 ) -> BTreeMap<u32, RecordNumbers<'source>> {
     let mut records = BTreeMap::<u32, RecordNumbers<'source>>::new();
     if let Some((rows, targets)) = sources {
+        index_configurations(&mut records, &rows.entity_configuration_numbers);
         for number in &rows.numbers {
             let actual = &number.value;
             // Item component receipts come from the emitted component rows.
@@ -137,6 +139,24 @@ fn emitted_record_numbers<'source>(
         }
     }
     records
+}
+
+fn index_configurations<'source>(
+    records: &mut BTreeMap<u32, RecordNumbers<'source>>,
+    numbers: &'source [CapturedNumber],
+) {
+    for number in numbers {
+        let (NumberOccurrence::ItemComponentValue { ordinal }
+        | NumberOccurrence::ItemComponentRawValue { ordinal }) = number.occurrence
+        else {
+            continue;
+        };
+        records
+            .entry(number.record_index)
+            .or_default()
+            .configurations
+            .insert(ordinal, number);
+    }
 }
 
 impl<'source> NumberCaptures<'source> {
@@ -266,6 +286,9 @@ impl Coverage<'_, '_> {
                     && self.consumed_owned.insert(required.original_ordinal)
             });
         }
+        if let Some(matched) = self.configuration(required) {
+            return matched;
+        }
         if matches!(
             self.kind,
             Some(
@@ -290,6 +313,23 @@ impl Coverage<'_, '_> {
         scalar_matches(required, actual)
             && actual.contract == contract
             && self.consumed_named.insert(*field)
+    }
+
+    fn configuration(&mut self, required: &NumberRequirement) -> Option<bool> {
+        let actual = self
+            .available?
+            .configurations
+            .get(&required.original_ordinal)?;
+        let contract = match actual.occurrence {
+            NumberOccurrence::ItemComponentValue { .. } => ResourceNumberContract::Single,
+            NumberOccurrence::ItemComponentRawValue { .. } => ResourceNumberContract::Number,
+            _ => return None,
+        };
+        Some(
+            scalar_matches(required, actual)
+                && actual.contract == contract
+                && self.consumed_owned.insert(required.original_ordinal),
+        )
     }
 
     fn owned(&mut self, required: &NumberRequirement) -> bool {

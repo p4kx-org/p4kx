@@ -55,6 +55,23 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         })
     }
 
+    /// Reads original owned slots stored inline or as pointers to their declared family.
+    pub(in crate::catalog_v3) fn declared_owned_array<T>(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+        decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
+            return self.absent();
+        };
+        let storage = fact.field().storage();
+        if storage.is_array() && storage.data_type() == DataType::StrongPointer {
+            return self.declared_pointer_array(name, fact, notes, decode);
+        }
+        self.declared_class_array(name, notes, decode)
+    }
+
     fn read_class<T>(
         &self,
         name: &str,

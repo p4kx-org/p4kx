@@ -13,7 +13,8 @@ use rayon::prelude::*;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read_failure::CatalogReadFailure;
-use crate::catalog_v3::catalog_item_alignment::{self, AlignmentOptions, ItemAlignmentRows};
+use crate::catalog_v3::catalog_entity_configurations::{self, EntityConfigurationRows};
+use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
 use crate::entity_selection::{Selected, select};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -153,11 +154,11 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
     ) -> Result<ScanRead<'f>, CatalogError> {
         let mut picked = Vec::new();
         let mut entity_tags = Vec::new();
-        let mut item_alignment = ItemAlignmentRows::default();
+        let mut entity_configurations = EntityConfigurationRows::default();
         for checked in checked {
             picked.extend(checked.picked);
             entity_tags.extend(checked.entity.tags);
-            item_alignment.extend(checked.entity.alignment);
+            entity_configurations.extend(checked.entity.configurations);
             ledger.merge(checked.ledger);
         }
         picked.extend(failures.into_iter().map(Picked::Failed));
@@ -181,7 +182,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         Ok(ScanRead {
             picked,
             entity_tags,
-            item_alignment,
+            entity_configurations,
             resource_group_members: Vec::new(),
             ledger,
         })
@@ -339,14 +340,14 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             let cancel = self.options.cancel;
             let (tags, mut notes) =
                 crate::catalog_v3::tag_catalog::entity(&tree, input, &admission, cancel)?;
-            let (alignment, alignment_notes) = catalog_item_alignment::read(
+            let (configurations, configuration_notes) = catalog_entity_configurations::read(
                 &tree,
                 input,
                 &admission,
                 &self.alignment_options,
                 cancel,
             )?;
-            notes.extend(alignment_notes);
+            notes.extend(configuration_notes);
             crate::source_projection_notes::record(
                 kind,
                 ExportSourceRole::Selected,
@@ -356,7 +357,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
                 ledger,
             )?;
             entity.tags = Some(tags);
-            entity.alignment = alignment;
+            entity.configurations = configurations;
         }
         self.project(kind, trees, &admission, &tree, ledger)
     }

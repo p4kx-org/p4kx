@@ -37,8 +37,10 @@ DataForge input.
 
 Each nested Loadout port carries `sourceConstraints`. Its `portDefinition`
 joins the DataForge definition the shared resolver selected. Its
-`attachedItem.targetGuid` retains the original Reference or class selection,
-including the XML attribute and file selectors when XML supplies that choice.
+`attachedItem.targetGuid` and `attachedItem.targetRecordIndex` retain the original
+Reference or class selection, including the XML attribute and file selectors
+when XML supplies that choice. The physical Record index also joins the
+attached Entity's fuel and resource configurations.
 The attached item's `definition` joins the first attachable component that
 supplies the item's definition. A `projected` link uses the canonical physical
 row coordinates. `notProjected` means the source row is outside the available
