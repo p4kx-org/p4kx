@@ -38,8 +38,9 @@ companion describes the tool's observation of the input and output.
 
 ## File publication
 
-Cooperating writers share one persistent `.p4kx-origin.lock` per destination
-directory. The tool stages each file independently. Once the artifact is ready
+Cooperating writers use `.p4kx-origin.lock` to serialize publication in each
+destination directory. Receipt writers that create the lock retain it there.
+The tool stages each file independently. Once the artifact is ready
 to replace its previous version, the tool removes the previous companion before
 replacing the artifact, even when the emitted bytes are identical. An interruption
 can leave an artifact with unknown origin until a later successful run publishes
@@ -49,6 +50,19 @@ Explicit stdout companion paths may replace a prior stdout companion. Canonical
 file companion names, publication lock names and unrelated existing files are
 reserved. The write guards reject destinations that alias the observed input or
 lie inside a protected installation.
+
+Ordinary atomic replacements retire proven companions for the replaced file
+before rename and preserve unrelated files. A replacement shares an existing
+publication lock or creates a temporary lock in a fresh destination. The
+temporary lock is moved out of the shared name before it is removed. Successful
+ordinary writes leave only their requested outputs in fresh destinations.
+Existing receipt locks remain in place. If temporary lock retirement fails,
+the error says whether the artifact was committed. A counted write that keeps
+the existing bytes keeps their proof and needs no publication lock.
+
+An ordinary replacement of a symbolic link changes its directory entry. The
+writer preserves the referent and receipts proven to address other names.
+A directory receipt with an ambiguous lexical match is retired.
 
 ## Directory publication
 

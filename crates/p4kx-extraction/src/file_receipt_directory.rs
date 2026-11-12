@@ -158,7 +158,7 @@ impl<'source> DirectoryReceipt<'source> {
                 Ok((result, digest))
             },
             |staged| {
-                self.before_replace(&reservation, staged)
+                self.before_replace(&reservation, staged.temporary())
                     .map_err(|source| write_error(actual, source))
             },
         );
@@ -225,7 +225,7 @@ impl<'source> DirectoryReceipt<'source> {
             self.protection,
             Some(&self.cancel),
             |writer| directory_wire::write(writer, &artifacts, inventory, fields),
-            || {
+            |_| {
                 self.lock.check(&self.cancel)?;
                 if regular_file(&self.receipt)?.is_some() {
                     return Err(invalid("a directory companion appeared during publication"));

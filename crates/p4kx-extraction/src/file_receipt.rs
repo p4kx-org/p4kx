@@ -22,14 +22,26 @@ mod directory_wire;
 mod header;
 #[path = "file_receipt_lock.rs"]
 mod lock;
+#[path = "file_receipt_lock_retirement.rs"]
+mod lock_retirement;
+#[path = "file_receipt_ordinary.rs"]
+mod ordinary;
+#[path = "file_receipt_target.rs"]
+mod target_path;
 
+#[cfg(test)]
+#[path = "file_receipt_ordinary_tests.rs"]
+mod ordinary_tests;
 #[cfg(test)]
 #[path = "file_receipt_tests.rs"]
 mod tests;
 
 pub use directory::{DirectoryCommit, DirectoryReceipt};
+use directory_table::ReplacementPath;
 use header::ReceiptOwner;
-use lock::{ReceiptLock, invalid, protection_error, regular_file};
+use lock::{Contention, ReceiptLock, invalid, protection_error, regular_file};
+pub(crate) use ordinary::OrdinaryReplacement;
+use target_path::{BindTarget, TargetLeaf, bind_target, lexical_receipt, sibling_receipt, target};
 
 const COMPANION_SUFFIX: &str = ".p4kx-origin.jsonl";
 const DIRECTORY_NAME: &str = COMPANION_SUFFIX;
@@ -37,6 +49,7 @@ const DIRECTORY_NAME: &str = COMPANION_SUFFIX;
 /// Bound file paths and guard policy for one ordinary artifact publication.
 pub struct FileReceipt<'source> {
     artifact: PathBuf,
+    leaf: TargetLeaf,
     receipt: PathBuf,
     artifact_name: OriginArtifactName,
     protection: Option<&'source ArchiveWriteProtection>,
@@ -69,16 +82,39 @@ impl<'source> FileReceipt<'source> {
         receipt_protection: Option<&'source ArchiveWriteProtection>,
         cancel: CancelToken,
     ) -> io::Result<Self> {
-        let artifact = target(output, protection, &cancel)?;
+        let binding = Self::bind(
+            output,
+            protection,
+            receipt_protection,
+            cancel,
+            BindTarget::Receipt,
+        )?;
+        check(
+            &binding.receipt,
+            binding.receipt_protection,
+            &binding.cancel,
+        )?;
+        regular_file(&binding.receipt)?;
+        Ok(binding)
+    }
+
+    fn bind(
+        output: &Path,
+        protection: Option<&'source ArchiveWriteProtection>,
+        receipt_protection: Option<&'source ArchiveWriteProtection>,
+        cancel: CancelToken,
+        mode: BindTarget,
+    ) -> io::Result<Self> {
+        let bound = bind_target(output, protection, &cancel, mode)?;
+        let artifact = bound.path;
         let name = artifact
             .file_name()
             .ok_or_else(|| invalid("the output names no file"))?;
         let receipt = sibling_receipt(&artifact)?;
-        check(&receipt, receipt_protection, &cancel)?;
-        regular_file(&receipt)?;
         let artifact_name = OriginArtifactName::from_basename(name)?;
         Ok(Self {
             artifact,
+            leaf: bound.leaf,
             receipt,
             artifact_name,
             protection,
@@ -113,9 +149,11 @@ impl<'source> FileReceipt<'source> {
                 let result = write(&mut measured)?;
                 Ok((result, measured.finish()?))
             },
-            || {
-                let lock = self.acquire()?;
-                self.invalidate()?;
+            |staged| {
+                let lock = self.acquire(Contention::Refuse)?;
+                self.check_target()?;
+                staged.check().map_err(protection_error)?;
+                self.invalidate(ExistingCompanions::RequireOwned)?;
                 held = Some(lock);
                 Ok(())
             },
@@ -131,43 +169,104 @@ impl<'source> FileReceipt<'source> {
             self.receipt_protection,
             Some(&self.cancel),
             |writer| describe(writer, &binding, &result),
-            || held.check(&self.cancel),
+            |_| held.check(&self.cancel),
         )?;
         Ok(result)
     }
 
-    fn acquire(&self) -> io::Result<ReceiptLock> {
+    fn acquire(&self, contention: Contention) -> io::Result<ReceiptLock> {
         let directory = self
             .artifact
             .parent()
             .ok_or_else(|| invalid("the output has no directory"))?;
-        let held = ReceiptLock::acquire(
+        ReceiptLock::acquire_with(
             directory,
             self.receipt_protection.or(self.protection),
             &self.cancel,
-        )?;
-        let actual = target(&self.artifact, self.protection, &self.cancel)?;
-        if actual != self.artifact {
-            return Err(invalid("the artifact spelling changed before publication"));
-        }
-        Ok(held)
+            contention,
+        )
     }
 
-    fn invalidate(&self) -> io::Result<()> {
-        check(&self.receipt, self.receipt_protection, &self.cancel)?;
-        let previous =
-            header::check_existing(&self.receipt, ReceiptOwner::File(&self.artifact_name))?;
-        let aggregate = self.artifact.with_file_name(DIRECTORY_NAME);
-        check(&aggregate, self.receipt_protection, &self.cancel)?;
-        let touches_aggregate =
-            directory_table::lookup(&aggregate, Some(&self.artifact))? == Some(true);
-        if touches_aggregate {
-            fs::remove_file(&aggregate)?;
+    fn check_target(&self) -> io::Result<()> {
+        let mode = match self.leaf {
+            TargetLeaf::File => BindTarget::Receipt,
+            TargetLeaf::SymbolicLink => BindTarget::Replacement,
+        };
+        let actual = bind_target(&self.artifact, self.protection, &self.cancel, mode)?;
+        if actual.path != self.artifact {
+            return Err(invalid("the artifact spelling changed before publication"));
         }
-        if previous {
-            fs::remove_file(&self.receipt)?;
+        if actual.leaf != self.leaf {
+            return Err(invalid("the artifact type changed before publication"));
         }
         Ok(())
+    }
+
+    fn invalidate(&self, existing: ExistingCompanions) -> io::Result<()> {
+        let aggregate = self.artifact.with_file_name(DIRECTORY_NAME);
+        if existing == ExistingCompanions::RequireOwned {
+            check(&self.receipt, self.receipt_protection, &self.cancel)?;
+            check(&aggregate, self.receipt_protection, &self.cancel)?;
+        }
+        let lexical = if self.leaf == TargetLeaf::SymbolicLink {
+            lexical_receipt(&self.receipt)?
+        } else {
+            None
+        };
+        let previous = match (&self.leaf, &lexical) {
+            (TargetLeaf::File, _) => Some((self.receipt.as_path(), &self.artifact_name)),
+            (TargetLeaf::SymbolicLink, Some(owner)) => Some((self.receipt.as_path(), owner)),
+            (TargetLeaf::SymbolicLink, None) => None,
+        };
+        let previous = previous.map_or(Ok(None), |(path, owner)| {
+            existing
+                .owned(header::check_existing(path, ReceiptOwner::File(owner)))
+                .map(|owned| owned.then_some(path))
+        })?;
+        let replacement = match self.leaf {
+            TargetLeaf::File => ReplacementPath::File(&self.artifact),
+            TargetLeaf::SymbolicLink => ReplacementPath::SymbolicLink(&self.artifact),
+        };
+        let aggregate_owned = existing.owned(
+            directory_table::lookup(&aggregate, Some(replacement))
+                .map(|overlap| overlap == Some(true)),
+        )?;
+        if existing == ExistingCompanions::PreserveForeign {
+            if aggregate_owned {
+                check(&aggregate, self.receipt_protection, &self.cancel)?;
+            }
+            if let Some(previous) = previous {
+                check(previous, self.receipt_protection, &self.cancel)?;
+            }
+        }
+        if aggregate_owned {
+            fs::remove_file(&aggregate)?;
+        }
+        if let Some(previous) = previous {
+            fs::remove_file(previous)?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ExistingCompanions {
+    RequireOwned,
+    PreserveForeign,
+}
+
+impl ExistingCompanions {
+    fn owned(self, observed: io::Result<bool>) -> io::Result<bool> {
+        match observed {
+            Err(error)
+                if self == Self::PreserveForeign
+                    && error.kind() == io::ErrorKind::InvalidInput
+                    && error.raw_os_error().is_none() =>
+            {
+                Ok(false)
+            }
+            result => result,
+        }
     }
 }
 
@@ -213,7 +312,7 @@ impl<'source> StdoutReceipt<'source> {
             self.protection,
             Some(&self.cancel),
             |writer| describe(writer),
-            || {
+            |_| {
                 let directory = self
                     .path
                     .parent()
@@ -238,59 +337,6 @@ fn check_stdout_target(path: &Path) -> io::Result<()> {
     }
     header::check_existing(path, ReceiptOwner::Stdout)?;
     Ok(())
-}
-
-fn sibling_receipt(path: &Path) -> io::Result<PathBuf> {
-    let mut name = path
-        .file_name()
-        .ok_or_else(|| invalid("the artifact has no basename"))?
-        .to_os_string();
-    name.push(COMPANION_SUFFIX);
-    Ok(path.with_file_name(name))
-}
-
-fn target(
-    path: &Path,
-    protection: Option<&ArchiveWriteProtection>,
-    cancel: &CancelToken,
-) -> io::Result<PathBuf> {
-    check(path, protection, cancel)?;
-    let name = path
-        .file_name()
-        .ok_or_else(|| invalid("the output names no file"))?;
-    let parent = path
-        .parent()
-        .filter(|path| !path.as_os_str().is_empty())
-        .unwrap_or_else(|| Path::new("."));
-    let parent = fs::canonicalize(parent)?;
-    let target = parent.join(name);
-    let actual = if regular_file(&target)?.is_some() {
-        fs::canonicalize(target)?
-    } else {
-        target
-    };
-    let name = actual
-        .file_name()
-        .ok_or_else(|| invalid("the output names no file"))?;
-    if name
-        .to_str()
-        .is_some_and(|name| name.eq_ignore_ascii_case(lock::LOCK_NAME))
-    {
-        return Err(invalid("the output names the origin publication lock"));
-    }
-    if name
-        .to_string_lossy()
-        .to_ascii_lowercase()
-        .ends_with(COMPANION_SUFFIX)
-    {
-        return Err(invalid("the output names a reserved origin companion"));
-    }
-    #[cfg(windows)]
-    if name.to_string_lossy().contains(':') {
-        return Err(invalid("the origin target names an alternate data stream"));
-    }
-    check(&actual, protection, cancel)?;
-    Ok(actual)
 }
 
 fn check(

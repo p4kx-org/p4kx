@@ -6,9 +6,12 @@ use std::io::{self, BufWriter, Write};
 use std::path::{Path, PathBuf};
 use std::process;
 
-use crate::{ArchiveWriteProtection, CancelToken, check_protected_output};
+use crate::file_receipt::OrdinaryReplacement;
+use crate::output_file::StagedOutput;
+use crate::{ArchiveWriteProtection, CancelToken, WriteProtectionError, check_protected_output};
 
 /// Atomically writes an I/O stream under the job's source protection.
+/// A committed replacement retires owned origin companions under the directory lock.
 ///
 /// # Errors
 ///
@@ -19,7 +22,17 @@ pub fn write_replacing_io_protected<T>(
     cancel: Option<&CancelToken>,
     write: impl FnOnce(&mut BufWriter<File>) -> io::Result<T>,
 ) -> io::Result<T> {
-    write_replacing_before(out, protection, cancel, write, || Ok(()))
+    let mut held = None;
+    let result = write_replacing_before(out, protection, cancel, write, |staged| {
+        let replacement = held.insert(OrdinaryReplacement::new(out, protection, cancel)?);
+        staged.check().map_err(protection_error)?;
+        replacement.invalidate()
+    });
+    if let Some(replacement) = held {
+        replacement.finish_io(result)
+    } else {
+        result
+    }
 }
 
 /// Stages a replacement and runs one guarded action just before the final rename.
@@ -28,14 +41,12 @@ pub(crate) fn write_replacing_before<T>(
     protection: Option<&ArchiveWriteProtection>,
     cancel: Option<&CancelToken>,
     write: impl FnOnce(&mut BufWriter<File>) -> io::Result<T>,
-    before_publish: impl FnOnce() -> io::Result<()>,
+    before_publish: impl FnOnce(&StagedOutput<'_>) -> io::Result<()>,
 ) -> io::Result<T> {
     let uncancelled = CancelToken::new();
     let actual_cancel = cancel.unwrap_or(&uncancelled);
-    let check = |path: &Path| {
-        check_protected_output(path, protection, cancel)
-            .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))
-    };
+    let check =
+        |path: &Path| check_protected_output(path, protection, cancel).map_err(protection_error);
     check(out)?;
     let temporary = temporary_path(out)?;
     check(&temporary)?;
@@ -49,15 +60,10 @@ pub(crate) fn write_replacing_before<T>(
             .into_inner()
             .map_err(io::IntoInnerError::into_error)?
             .sync_all()?;
-        ownership
-            .ensure_writable(&temporary, actual_cancel.flag())
-            .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
-        check(out)?;
-        before_publish()?;
-        ownership
-            .ensure_writable(&temporary, actual_cancel.flag())
-            .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
-        check(out)?;
+        let staged = StagedOutput::new(&temporary, out, &ownership, protection, cancel);
+        staged.check().map_err(protection_error)?;
+        before_publish(&staged)?;
+        staged.check().map_err(protection_error)?;
         fs::rename(&temporary, out)?;
         Ok(value)
     });
@@ -76,6 +82,10 @@ pub(crate) fn write_replacing_before<T>(
         });
     }
     result
+}
+
+fn protection_error(error: WriteProtectionError) -> io::Error {
+    io::Error::new(io::ErrorKind::PermissionDenied, error)
 }
 
 /// Returns `<name>.p4kx-<process id>.part` next to `out`.
