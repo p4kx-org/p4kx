@@ -5,6 +5,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use crate::reference_origin::ReferenceOrigin;
+use crate::tree_cursor::{Cursor, ValueVisit};
 use crate::tree_owner::TreeOwner;
 use crate::{Field, Guid, Location, Value};
 
@@ -37,6 +38,15 @@ impl<'f> StructValue<'f> {
     #[must_use]
     pub fn fields(&self) -> &[Field<'f>] {
         &self.fields
+    }
+
+    /// Visits each owned value in preorder, with fields and arrays in stored order.
+    /// References are leaves and do not traverse into their targets.
+    pub fn visit_owned_values(&self, mut visit: impl FnMut(ValueVisit<'_, '_, 'f>)) {
+        let mut cursor = Cursor::new(self.fields());
+        while let Some(value) = cursor.next() {
+            visit(value);
+        }
     }
 
     /// Returns the value of the first field called `name`, or `None` when there is none.

@@ -107,24 +107,14 @@ impl<const OBSERVED: bool> Walker<'_, OBSERVED> {
 
     fn fields(&mut self, fields: &[Field<'_>]) {
         let mut cursor = Cursor::new(fields);
-        let mut ordinal = 0_u64;
         while let Some(visit) = cursor.next() {
-            let current = ordinal;
-            if OBSERVED {
-                let Some(next) = ordinal.checked_add(1) else {
-                    if let Some(evidence) = &mut self.chunk.evidence {
-                        evidence.fail(ReferenceIndexError::Inconsistent);
-                    }
+            let current = visit.ordinal() as u64;
+            if let Value::Error(error) = visit.value
+                && let Some(evidence) = &mut self.chunk.evidence
+            {
+                evidence.value_error(self.source, current, visit.data_type, *error);
+                if evidence.failed() {
                     break;
-                };
-                ordinal = next;
-                if let Value::Error(error) = visit.value
-                    && let Some(evidence) = &mut self.chunk.evidence
-                {
-                    evidence.value_error(self.source, current, visit.data_type, *error);
-                    if evidence.failed() {
-                        break;
-                    }
                 }
             }
             let (target, guid) = match visit.value {

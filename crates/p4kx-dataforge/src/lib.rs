@@ -121,6 +121,7 @@ pub use tags::{
 };
 pub use texts::{Resolution, TextResolver};
 pub use tree::RecordTree;
+pub use tree_cursor::ValueVisit;
 pub use value::{Field, Value};
 pub use value_error::ValueError;
 pub use xml::{RECORD_XML_NAMESPACE, RecordXml};

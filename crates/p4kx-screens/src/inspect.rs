@@ -11,8 +11,6 @@ use crate::canvas::CanvasStore;
 use crate::elements::is_rendered;
 use crate::style::{CanvasStyles, StyleCache};
 
-const MAX_CANVASES: usize = 4096;
-
 /// How many widgets of one element type a screen holds and whether P4KX draws them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ElementCount {
@@ -34,7 +32,7 @@ pub(crate) fn inspect(
     let mut cache = StyleCache::new();
     let mut queue = vec![root];
     while let Some(guid) = queue.pop() {
-        if !seen.insert(guid) || seen.len() > MAX_CANVASES {
+        if !seen.insert(guid) {
             continue;
         }
         let Some(canvas) = store.get(guid) else {
@@ -119,5 +117,42 @@ mod tests {
         let (assets, _) = inspect(&mut CanvasStore::new(&forge), root);
         assert_eq!(assets.canvases.len(), 2, "{:?}", assets.canvases);
         assert_eq!(assets.textures, ["UI/Test/swapped.dds"]);
+    }
+
+    #[test]
+    fn more_than_4096_distinct_canvases_are_listed_and_cycles_terminate()
+    -> Result<(), Box<dyn std::error::Error>> {
+        const COUNT: usize = 4101;
+        let source = (0..COUNT).fold(
+            screens_schema(entity_schema(DataForgeBuilder::new())),
+            |source, index| {
+                let next = OUTER + ((index + 1) % COUNT) as u128;
+                let mut canvas =
+                    TestCanvas::new(OUTER + index as u128, format!("chain{index}"), 1.0, 1.0)
+                        .widget(
+                            TestWidget::new("BuildingBlocks_WidgetCanvas", "next")
+                                .with("canvas", TestValue::Reference(next)),
+                        );
+                if index + 1 == COUNT {
+                    canvas = canvas.widget(
+                        TestWidget::new("BuildingBlocks_WidgetImage", "last")
+                            .with("imagePath", TestValue::text("UI/Test/final.tif")),
+                    );
+                }
+                source.record(canvas.record())
+            },
+        );
+        let bytes = source.build();
+        let forge = DataForge::open(&bytes)?;
+        let root = find_canvas(&forge, &guid_text(OUTER))?;
+        let (assets, kinds) = inspect(&mut CanvasStore::new(&forge), root);
+        assert_eq!(assets.canvases.len(), COUNT);
+        assert_eq!(assets.textures, ["UI/Test/final.dds"]);
+        assert!(
+            kinds
+                .iter()
+                .any(|kind| kind.element == "WidgetCanvas" && kind.count == COUNT)
+        );
+        Ok(())
     }
 }

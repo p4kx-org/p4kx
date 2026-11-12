@@ -58,17 +58,45 @@ impl<'tree, 'source> Frame<'tree, 'source> {
 }
 
 /// Borrows one original-order occurrence and the cursor's current semantic path.
-pub(crate) struct Visit<'visit, 'tree, 'source> {
+pub struct ValueVisit<'visit, 'tree, 'source> {
+    ordinal: usize,
     pub(crate) value: &'tree Value<'source>,
     pub(crate) field: &'source str,
     pub(crate) steps: &'visit [Step<'source>],
     pub(crate) data_type: DataType,
 }
 
+impl<'visit, 'tree, 'source> ValueVisit<'visit, 'tree, 'source> {
+    /// Returns the zero-based preorder position within the visited struct.
+    #[must_use]
+    pub const fn ordinal(&self) -> usize {
+        self.ordinal
+    }
+
+    /// Returns the semantic path from the visited struct to this occurrence.
+    #[must_use]
+    pub const fn steps(&self) -> &'visit [Step<'source>] {
+        self.steps
+    }
+
+    /// Returns the authored name of this field or its containing array field.
+    #[must_use]
+    pub const fn field_name(&self) -> &'source str {
+        self.field
+    }
+
+    /// Returns the actual value or its read error.
+    #[must_use]
+    pub const fn value(&self) -> &'tree Value<'source> {
+        self.value
+    }
+}
+
 /// Traverses canonical owned values without recursively borrowing child iterators.
 pub(crate) struct Cursor<'tree, 'source> {
     pending: Vec<Frame<'tree, 'source>>,
     steps: Vec<Step<'source>>,
+    ordinal: usize,
 }
 
 impl<'tree, 'source> Cursor<'tree, 'source> {
@@ -79,10 +107,11 @@ impl<'tree, 'source> Cursor<'tree, 'source> {
                 prefix: 0,
             }],
             steps: Vec::new(),
+            ordinal: 0,
         }
     }
 
-    pub(crate) fn next(&mut self) -> Option<Visit<'_, 'tree, 'source>> {
+    pub(crate) fn next(&mut self) -> Option<ValueVisit<'_, 'tree, 'source>> {
         while let Some(frame) = self.pending.last_mut() {
             self.steps.truncate(frame.prefix);
             let Some(Item {
@@ -111,7 +140,10 @@ impl<'tree, 'source> Cursor<'tree, 'source> {
                     prefix: self.steps.len(),
                 });
             }
-            return Some(Visit {
+            let ordinal = self.ordinal;
+            self.ordinal += 1;
+            return Some(ValueVisit {
+                ordinal,
                 value,
                 field,
                 steps: &self.steps,

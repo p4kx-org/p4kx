@@ -6,8 +6,6 @@ use std::collections::BTreeSet;
 use p4kx_dataforge::{StructValue, Value};
 use serde::Serialize;
 
-const MAX_SCAN_DEPTH: usize = 64;
-
 #[derive(Debug, Clone, Default)]
 pub(crate) struct WidgetAssets {
     pub(crate) textures: Vec<String>,
@@ -19,31 +17,12 @@ pub(crate) struct WidgetAssets {
 impl WidgetAssets {
     pub(crate) fn scan(structure: &StructValue<'_>) -> Self {
         let mut assets = Self::default();
-        assets.scan_struct(structure, 0);
-        assets
-    }
-
-    fn scan_struct(&mut self, structure: &StructValue<'_>, depth: usize) {
-        for field in structure.fields() {
-            self.scan_value(field.value(), depth + 1);
-        }
-    }
-
-    fn scan_value(&mut self, value: &Value<'_>, depth: usize) {
-        if depth > MAX_SCAN_DEPTH {
-            return;
-        }
-        match value {
-            Value::String(text) => self.classify(text),
-            Value::Locale(key) => self.key(key),
-            Value::Struct(structure) => self.scan_struct(structure, depth),
-            Value::Array(items) => {
-                for item in items {
-                    self.scan_value(item, depth + 1);
-                }
-            }
+        structure.visit_owned_values(|visit| match visit.value() {
+            Value::String(text) => assets.classify(text),
+            Value::Locale(key) => assets.key(key),
             _ => {}
-        }
+        });
+        assets
     }
 
     fn key(&mut self, key: &str) {

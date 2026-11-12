@@ -2,15 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::EntityNode;
-use p4kx_dataforge::{Guid, Location, Step, StructValue, Value};
+use p4kx_dataforge::{Guid, Location, StructValue, Value};
 use serde::Serialize;
 
 use crate::assets::ScreenAssets;
 use crate::canvas::CANVAS_TYPE;
 use crate::compose::ScreenComposer;
 use crate::inspect::{ElementCount, inspect};
-
-const MAX_WALK_DEPTH: usize = 64;
 
 /// One `BuildingBlocks` screen an Entity of a Loadout shows.
 #[derive(Debug, Clone, PartialEq, Serialize)]
@@ -141,51 +139,78 @@ fn find(root: &StructValue<'_>) -> Found {
         canvases: Vec::new(),
         movies: Vec::new(),
     };
-    let mut steps = Vec::new();
-    visit_struct(root, &mut steps, &mut found, 0);
-    found
-}
-
-fn visit_struct<'f>(
-    structure: &StructValue<'f>,
-    steps: &mut Vec<Step<'f>>,
-    found: &mut Found,
-    depth: usize,
-) {
-    for field in structure.fields() {
-        steps.push(Step::Field(field.name()));
-        visit(field.name(), field.value(), steps, found, depth + 1);
-        steps.pop();
-    }
-}
-
-fn visit<'f>(
-    name: &str,
-    value: &Value<'f>,
-    steps: &mut Vec<Step<'f>>,
-    found: &mut Found,
-    depth: usize,
-) {
-    if depth > MAX_WALK_DEPTH {
-        return;
-    }
-    match value {
+    root.visit_owned_values(|visit| match visit.value() {
         Value::Reference(reference) if reference.type_name() == CANVAS_TYPE => {
             found
                 .canvases
-                .push((Location::new(steps).to_string(), reference.guid()));
+                .push((Location::new(visit.steps()).to_string(), reference.guid()));
         }
-        Value::String(text) if name == "moviePath" && !text.is_empty() => {
+        Value::String(text) if visit.field_name() == "moviePath" && !text.is_empty() => {
             found.movies.push((*text).to_owned());
         }
-        Value::Struct(structure) => visit_struct(structure, steps, found, depth),
-        Value::Array(items) => {
-            for (index, item) in (0_u32..).zip(items.iter()) {
-                steps.push(Step::Element(index));
-                visit(name, item, steps, found, depth + 1);
-                steps.pop();
-            }
-        }
         _ => {}
+    });
+    found
+}
+
+#[cfg(test)]
+mod tests {
+    use p4kx_dataforge::DataForge;
+    use p4kx_testkit::{
+        DataForgeBuilder, TestCanvas, TestInstance, TestRecord, TestStruct, TestType, TestValue,
+        entity_schema, screens_schema,
+    };
+
+    use super::find;
+    use crate::assets::WidgetAssets;
+
+    #[test]
+    fn deep_owned_fields_still_supply_screen_references_and_asset_paths()
+    -> Result<(), Box<dyn std::error::Error>> {
+        const DEPTH: usize = 96;
+        const CANVAS: u128 = 0x2a8c_7d22_ee36_478c_8fa2_af44_b63f_c7a3;
+        const MOVIE: &str = "Data/UI/synthetic/deep.gfx";
+        let mut source = screens_schema(entity_schema(DataForgeBuilder::new()))
+            .structure(
+                TestStruct::new("Leaf")
+                    .field("moviePath", TestType::String)
+                    .field("canvas", TestType::Reference),
+            )
+            .record(TestCanvas::new(CANVAS, "deep", 9.0, 7.0).record());
+        let mut nested = TestInstance::new("Leaf")
+            .value("moviePath", TestValue::text(MOVIE))
+            .value("canvas", TestValue::Reference(CANVAS));
+        let mut type_name = "Leaf".to_owned();
+        for depth in 0..DEPTH {
+            let parent = format!("Owned{depth}");
+            source = source
+                .structure(TestStruct::new(&parent).field("child", TestType::Class(type_name)));
+            nested = TestInstance::new(&parent).value("child", TestValue::Struct(nested));
+            type_name = parent;
+        }
+        let bytes = source
+            .structure(TestStruct::new("Owner").field("child", TestType::Class(type_name)))
+            .record(
+                TestRecord::new(CANVAS + 1, "Owner", "Owner.Sample", "synthetic/owner.xml")
+                    .value("child", TestValue::Struct(nested)),
+            )
+            .build();
+        let forge = DataForge::open(&bytes)?;
+        let record = forge
+            .records_at_path("synthetic/owner")
+            .next()
+            .ok_or("owner")?;
+        let tree = record.tree()?;
+
+        let found = find(tree.root());
+        assert_eq!(found.movies, [MOVIE]);
+        assert_eq!(
+            found.canvases.first().map(|(field, _)| field.as_str()),
+            Some(format!("{}canvas", "child.".repeat(DEPTH + 1)).as_str()),
+        );
+        assert_eq!(found.canvases.len(), 1);
+        let assets = WidgetAssets::scan(tree.root());
+        assert_eq!(assets.movies, [MOVIE]);
+        Ok(())
     }
 }
