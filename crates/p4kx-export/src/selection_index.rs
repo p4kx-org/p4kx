@@ -62,6 +62,7 @@ impl Kind {
             Self::ExplosionDefinitions => 52,
             Self::AmmoDefinitions => 53,
             Self::Factions => 54,
+            Self::ReputationPerks => 55,
         }
     }
 }

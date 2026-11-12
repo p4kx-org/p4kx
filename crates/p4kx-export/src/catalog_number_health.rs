@@ -302,6 +302,7 @@ impl Coverage<'_, '_> {
                     | Kind::Factions
                     | Kind::ReputationScopes
                     | Kind::ReputationStandings
+                    | Kind::ReputationPerks
             )
         ) {
             return self.owned(required);
@@ -340,6 +341,12 @@ impl Coverage<'_, '_> {
     }
 
     fn owned(&mut self, required: &NumberRequirement) -> bool {
+        use NumberOccurrence::{
+            AuthoredDefinitionRawValue, AuthoredDefinitionValue, BlueprintValue,
+            ItemComponentRawValue, ItemComponentValue, LootValue,
+        };
+        use ResourceNumberContract::{Number, Single};
+
         let Some(actual) = self
             .available
             .and_then(|values| values.original.get(&required.original_ordinal))
@@ -348,44 +355,31 @@ impl Coverage<'_, '_> {
         };
         let ordinal = required.original_ordinal;
         let captured = actual.occurrence;
-        let (occurrence, contract) = match self.kind {
-            Some(Kind::LootPoolFilters) => (
-                NumberOccurrence::LootValue { ordinal },
-                ResourceNumberContract::Number,
-            ),
-            Some(Kind::Blueprints) => (
-                NumberOccurrence::BlueprintValue { ordinal },
-                ResourceNumberContract::Number,
-            ),
-            Some(Kind::Items)
-                if matches!(captured, NumberOccurrence::ItemComponentRawValue { .. }) =>
-            {
-                (
-                    NumberOccurrence::ItemComponentRawValue { ordinal },
-                    ResourceNumberContract::Number,
-                )
+        let (occurrence, contract) = match (self.kind, captured) {
+            (Some(Kind::LootPoolFilters), _) => (LootValue { ordinal }, Number),
+            (Some(Kind::Blueprints), _) => (BlueprintValue { ordinal }, Number),
+            (Some(Kind::Items), ItemComponentRawValue { .. }) => {
+                (ItemComponentRawValue { ordinal }, Number)
             }
-            Some(Kind::Items) => (
-                NumberOccurrence::ItemComponentValue { ordinal },
-                ResourceNumberContract::Single,
-            ),
-            Some(Kind::Factions | Kind::ReputationScopes | Kind::ReputationStandings)
-                if matches!(
-                    captured,
-                    NumberOccurrence::AuthoredDefinitionRawValue { .. }
-                ) =>
-            {
-                (
-                    NumberOccurrence::AuthoredDefinitionRawValue { ordinal },
-                    ResourceNumberContract::Number,
-                )
-            }
-            Some(
-                Kind::ExplosionDefinitions | Kind::AmmoDefinitions | Kind::ReputationStandings,
-            ) => (
-                NumberOccurrence::AuthoredDefinitionValue { ordinal },
-                ResourceNumberContract::Single,
-            ),
+            (Some(Kind::Items), _) => (ItemComponentValue { ordinal }, Single),
+            (
+                Some(
+                    Kind::Factions
+                    | Kind::ReputationScopes
+                    | Kind::ReputationStandings
+                    | Kind::ReputationPerks,
+                ),
+                AuthoredDefinitionRawValue { .. },
+            ) => (AuthoredDefinitionRawValue { ordinal }, Number),
+            (
+                Some(
+                    Kind::ExplosionDefinitions
+                    | Kind::AmmoDefinitions
+                    | Kind::ReputationStandings
+                    | Kind::ReputationPerks,
+                ),
+                _,
+            ) => (AuthoredDefinitionValue { ordinal }, Single),
             _ => return false,
         };
         scalar_matches(required, actual)

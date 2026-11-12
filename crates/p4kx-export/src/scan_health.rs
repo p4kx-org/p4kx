@@ -100,16 +100,19 @@ impl SourceTrace {
     /// Creates a selection candidate without claiming that it is a selected source.
     pub(crate) fn new(record: &Record<'_>) -> Self {
         Self {
-            kind: record.type_name().ok().and_then(|type_name| {
-                if type_name == crate::catalog_v3::faction_definition::SOURCE_TYPE {
-                    Some(Kind::Factions)
-                } else {
-                    record
+            kind: record
+                .type_name()
+                .ok()
+                .and_then(|type_name| match type_name {
+                    crate::catalog_v3::faction_definition::SOURCE_TYPE => Some(Kind::Factions),
+                    crate::catalog_v3::reputation_perk_list::SOURCE_TYPE => {
+                        Some(Kind::ReputationPerks)
+                    }
+                    _ => record
                         .record_path()
                         .ok()
-                        .and_then(|path| Kind::by_record(path, type_name))
-                }
-            }),
+                        .and_then(|path| Kind::by_record(path, type_name)),
+                }),
             stage: Stage::Selection,
             selected: false,
         }

@@ -53,6 +53,7 @@ impl Collected<'_> {
             Kind::FactionReputations
             | Kind::ReputationScopes
             | Kind::ReputationStandings
+            | Kind::ReputationPerks
             | Kind::ReputationContexts
             | Kind::MissionTypes
             | Kind::MissionLocalities

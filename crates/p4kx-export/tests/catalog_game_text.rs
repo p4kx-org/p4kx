@@ -110,7 +110,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 56,
+        marked, 59,
         "every protected field in the canonical schema is accounted for"
     );
 

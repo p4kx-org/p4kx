@@ -3796,6 +3796,9 @@
         "qualityQuantizations": {
           "$ref": "#/$defs/CatalogTableOfQualityQuantizationDefinition"
         },
+        "reputationPerks": {
+          "$ref": "#/$defs/CatalogTableOfReputationPerkList"
+        },
         "reputationScopes": {
           "$ref": "#/$defs/CatalogTableOfScopeDefinition"
         },
@@ -3830,6 +3833,7 @@
         "missionBrokerEntries",
         "qualityDistributions",
         "qualityQuantizations",
+        "reputationPerks",
         "reputationScopes",
         "reputationStandings",
         "resourceGroups",
@@ -4687,6 +4691,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/QuantumDrive"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfReputationPerkList": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ReputationPerkList"
           },
           "type": "array"
         }
@@ -5946,6 +5969,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `reputationContexts`."
         },
+        "reputationPerks": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `reputationPerks`."
+        },
         "reputationScopes": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `reputationScopes`."
@@ -6037,6 +6064,7 @@
         "qualityQuantizations",
         "refiningProcesses",
         "reputationContexts",
+        "reputationPerks",
         "reputationScopes",
         "reputationStandings",
         "resourceGroups",
@@ -14086,6 +14114,10 @@
         {
           "description": "All physically typed Faction Records.",
           "value": "factions"
+        },
+        {
+          "description": "All physically typed reputation perk-list Records.",
+          "value": "reputationPerks"
         }
       ]
     },
@@ -18480,6 +18512,132 @@
       ],
       "type": "object"
     },
+    "PerkCategory": {
+      "description": "Original selectors for a shop item category.",
+      "properties": {
+        "franchise": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "id": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "requiredTag": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "subType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "type": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "franchise",
+        "id",
+        "requiredTag",
+        "subType",
+        "type"
+      ],
+      "type": "object"
+    },
+    "PerkDetails": {
+      "description": "Source discriminator and the directly authored fields of that alternative.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "rewardItem": {
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+            },
+            "type": {
+              "const": "item",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "rewardItem"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "category": {
+              "$ref": "#/$defs/PerkCategory"
+            },
+            "type": {
+              "const": "shopItemCategory",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "category"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "category": {
+              "$ref": "#/$defs/PerkCategory"
+            },
+            "type": {
+              "const": "enabledItemCategory",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "category"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "category": {
+              "$ref": "#/$defs/PerkCategory"
+            },
+            "discountPercentage": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "type": {
+              "const": "discountItemCategory",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "category",
+            "discountPercentage"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "authored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
     "PhysicalBlueprintRef": {
       "description": "Structural navigation to one emitted physical Blueprint Record.",
       "properties": {
@@ -21993,6 +22151,125 @@
         "factionReputationName",
         "scopeGuid",
         "scopeName"
+      ],
+      "type": "object"
+    },
+    "ReputationPerk": {
+      "description": "One physically admitted owned perk with the original common and concrete fields.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "description": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "details": {
+          "$ref": "#/$defs/PerkDetails"
+        },
+        "displayDescription": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "displayName": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "icon": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "description",
+        "details",
+        "displayDescription",
+        "displayName",
+        "icon",
+        "name",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "ReputationPerkEntry": {
+      "description": "One original association from a scope and standing to an owned perk.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "perk": {
+          "$ref": "#/$defs/SourcedValueOfReputationPerk"
+        },
+        "scope": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "standing": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "perk",
+        "scope",
+        "sourceType",
+        "standing"
+      ],
+      "type": "object"
+    },
+    "ReputationPerkList": {
+      "description": "One physical reputation-perk list and its ordered owned entries.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "perks": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfReputationPerkEntry"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "perks",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -34303,6 +34580,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfRecoveryOverride"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfReputationPerkEntry": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfReputationPerkEntry"
                 },
                 "type": "array"
               }
@@ -56671,6 +57081,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/RecoveryRepair"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfReputationPerk": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ReputationPerk"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfReputationPerkEntry": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ReputationPerkEntry"
               }
             }
           }

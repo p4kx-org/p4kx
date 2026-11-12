@@ -135,6 +135,7 @@ fn origins<'source>(
             kind,
             Kind::Manufacturers
                 | Kind::Factions
+                | Kind::ReputationPerks
                 | Kind::ContractTemplates
                 | Kind::MissionBrokerEntries
                 | Kind::GameplayProperties

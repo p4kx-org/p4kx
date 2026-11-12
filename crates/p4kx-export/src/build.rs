@@ -19,7 +19,8 @@ use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_global_configurations::{self, GlobalConfigurations};
 use crate::catalog_v3::{
-    ammo_definition, reputation_scope_definition, reputation_standing_definition,
+    ammo_definition, reputation_perk_list, reputation_scope_definition,
+    reputation_standing_definition,
 };
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
@@ -283,6 +284,7 @@ fn assemble<R>(
             commodities: commodity_tables.definitions,
             manufacturers: crate::manufacturer::table(&forge, collected.manufacturers),
             factions: crate::catalog_v3::faction_definition::table(&forge, collected.factions),
+            reputation_perks: reputation_perk_list::table(&forge, collected.mission_kinds.perks),
         },
         projections: CatalogProjections {
             contracts: CatalogTable::new(&forge, &["ContractGenerator"], collected.contracts),

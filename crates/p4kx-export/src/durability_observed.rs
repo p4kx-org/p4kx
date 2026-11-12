@@ -284,16 +284,36 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         source: &StructValue<'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<SourceValue<T>, CatalogError> {
+        notes.push(self.variant_note(fact, source, |source_type, field| {
+            FieldError::Unsupported { source_type, field }
+        })?);
+        Ok(SourceValue::Unsupported)
+    }
+
+    pub(super) fn note_retained_variant(
+        &self,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<(), CatalogError> {
+        let owner = self
+            .owner
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        notes.push(
+            self.variant_note(owner, self.structure()?, |source_type, field| {
+                FieldError::RetainedVariant { source_type, field }
+            })?,
+        );
+        Ok(())
+    }
+
+    fn variant_note(
+        &self,
+        fact: &Fact<'scope, 'read, 'source>,
+        source: &StructValue<'source>,
+        note: impl FnOnce(String, String) -> FieldError,
+    ) -> Result<FieldError, CatalogError> {
         let path = self.originals.logical_path(fact)?;
         let body = self.capture.unsupported_type(source, &path)?;
-        notes.push(
-            FieldError::Unsupported {
-                source_type: source.type_name().to_owned(),
-                field: path,
-            }
-            .with_body(body),
-        );
-        Ok(SourceValue::Unsupported)
+        Ok(note(source.type_name().to_owned(), path).with_body(body))
     }
 
     fn structure(&self) -> Result<&'read StructValue<'source>, CatalogError> {

@@ -28,6 +28,10 @@ mod authored_nodes;
 
 #[path = "faction_definition.rs"]
 pub(crate) mod faction_definition;
+#[path = "reputation_perk.rs"]
+mod reputation_perk;
+#[path = "reputation_perk_list.rs"]
+pub(crate) mod reputation_perk_list;
 
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;

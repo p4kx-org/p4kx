@@ -45,6 +45,8 @@ pub(crate) const fn code(issue: FieldIssue) -> ExportDiagnosticCode {
     match issue {
         FieldIssue::Malformed => ExportDiagnosticCode::MalformedSource,
         FieldIssue::Unreadable => ExportDiagnosticCode::UnreadableSource,
-        FieldIssue::Unsupported => ExportDiagnosticCode::UnsupportedValue,
+        FieldIssue::Unsupported | FieldIssue::RetainedVariant => {
+            ExportDiagnosticCode::UnsupportedValue
+        }
     }
 }

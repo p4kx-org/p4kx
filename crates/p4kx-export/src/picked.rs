@@ -136,6 +136,7 @@ impl<'f> Picked<'f> {
             | Kind::ExplosionDefinitions
             | Kind::AmmoDefinitions
             | Kind::Factions
+            | Kind::ReputationPerks
             | Kind::GameplayProperties
             | Kind::QualityDistributions
             | Kind::QualityQuantizations

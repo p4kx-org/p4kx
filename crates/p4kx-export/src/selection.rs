@@ -170,11 +170,13 @@ pub enum Kind {
     AmmoDefinitions,
     /// All physically typed Faction Records.
     Factions,
+    /// All physically typed reputation perk-list Records.
+    ReputationPerks,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 55] = [
+    pub const ALL: [Self; 56] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -230,6 +232,7 @@ impl Kind {
         Self::ExplosionDefinitions,
         Self::AmmoDefinitions,
         Self::Factions,
+        Self::ReputationPerks,
     ];
 
     /// Returns the stable kind identifier, independently of its canonical dataset path.
@@ -291,6 +294,7 @@ impl Kind {
             Self::ExplosionDefinitions => "explosionDefinitions",
             Self::AmmoDefinitions => "ammoDefinitions",
             Self::Factions => "factions",
+            Self::ReputationPerks => "reputationPerks",
         }
     }
 }
@@ -346,11 +350,11 @@ pub(crate) fn is_leftover(record_path: &str, name: &str) -> bool {
 /// Returns whether a source Record is excluded by the kind's development-leftover policy.
 ///
 /// Contract templates permit `template`; ships also exclude [`SHIP_EXCLUDED_TOKENS`].
-/// Tags and Factions retain every source Record of their exact type.
+/// Type-only kinds retain every source Record of their exact type.
 #[must_use]
 pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
     match kind {
-        Kind::Tags | Kind::Factions => false,
+        Kind::Tags | Kind::Factions | Kind::ReputationPerks => false,
         Kind::ContractTemplates => has_word(record_path, name, &CONTRACT_TEMPLATE_EXCLUDED_TOKENS),
         Kind::Ships => {
             is_leftover(record_path, name) || has_word(record_path, name, &SHIP_EXCLUDED_TOKENS)

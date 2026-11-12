@@ -9,6 +9,7 @@ use super::{Fact, Observed};
 use crate::catalog_read::original::OriginalValuePart;
 use crate::catalog_v3::authored_link::{self as link, HealthLink};
 use crate::definition_reference::DefinitionStatus;
+use crate::guid_text::CatalogGuid;
 use crate::source_fields::{FieldError, FieldViolation};
 use crate::source_value_catalog::{
     SourcePayload, SourceRecordReference, SourceWeakReference, read_reference_payload,
@@ -25,6 +26,19 @@ enum ReferenceCardinality {
 }
 
 impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
+    pub(in crate::catalog_v3) fn guid(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<CatalogGuid>, CatalogError> {
+        self.scalar(name, "a nullable Guid", notes, |fact| {
+            Ok(match fact.value() {
+                Value::Guid(value) => Some(CatalogGuid(*value)),
+                _ => None,
+            })
+        })
+    }
+
     pub(in crate::catalog_v3) fn link(
         &self,
         name: &str,

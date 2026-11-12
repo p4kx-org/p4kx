@@ -10,6 +10,8 @@ mod catalog_faction;
 mod faction_modifier;
 #[path = "catalog_scenario_faction_scope.rs"]
 mod faction_scope;
+#[path = "reputation_perks.rs"]
+mod reputation_perks;
 #[path = "catalog_reputation_scope.rs"]
 mod reputation_scope;
 

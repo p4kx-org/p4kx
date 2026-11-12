@@ -40,6 +40,8 @@ pub(crate) enum FieldError {
     },
     #[error("{source_type}.{field} has an unsupported source declaration")]
     Unsupported { source_type: String, field: String },
+    #[error("{source_type}.{field} has a concrete variant retained as authored fields")]
+    RetainedVariant { source_type: String, field: String },
     #[error(transparent)]
     Captured(Box<CapturedFieldError>),
 }

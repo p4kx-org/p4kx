@@ -63,7 +63,8 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 Kind::BlueprintCategoryLists
                 | Kind::ExplosionDefinitions
                 | Kind::AmmoDefinitions
-                | Kind::Factions => {
+                | Kind::Factions
+                | Kind::ReputationPerks => {
                     assert_eq!(
                         by_path,
                         Some(Kind::Tags),

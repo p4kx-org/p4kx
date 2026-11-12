@@ -71,6 +71,7 @@ fn expected_completeness() -> Value {
         "explosionDefinitions": {"status": "complete"},
         "ammoDefinitions": {"status": "complete"},
         "factions": {"status": "complete"},
+        "reputationPerks": {"status": "complete"},
         "factionReputations": {"status": "complete"},
         "reputationScopes": {"status": "complete"},
         "reputationStandings": {"status": "complete"},

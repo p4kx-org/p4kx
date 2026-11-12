@@ -5,6 +5,8 @@ use p4kx_extraction::RecordTree;
 
 use crate::Kind;
 use crate::cargo_manifest::cargo_manifest;
+use crate::catalog_number_capture::CapturedNumber;
+use crate::catalog_v3::reputation_perk_list::PreparedPerkList;
 use crate::catalog_v3::reputation_scope_definition::PreparedScope;
 use crate::catalog_v3::reputation_standing_definition::PreparedStanding;
 use crate::contract::{
@@ -24,6 +26,8 @@ pub(crate) enum MissionPick<'f> {
     Scope(Box<PreparedScope<'f>>),
     /// A reputation standing.
     Standing(Box<PreparedStanding<'f>>),
+    /// A physical list of reputation perks.
+    Perks(Box<PreparedPerkList<'f>>),
     /// A reputation context.
     Context(ReputationContext<'f>),
     /// A mission type.
@@ -58,6 +62,7 @@ pub(crate) struct MissionKinds<'f> {
     pub(crate) factions: Vec<FactionReputation<'f>>,
     pub(crate) scopes: Vec<PreparedScope<'f>>,
     pub(crate) standings: Vec<PreparedStanding<'f>>,
+    pub(crate) perks: Vec<PreparedPerkList<'f>>,
     pub(crate) contexts: Vec<ReputationContext<'f>>,
     pub(crate) types: Vec<MissionType<'f>>,
     pub(crate) localities: Vec<MissionLocality<'f>>,
@@ -72,6 +77,7 @@ impl<'f> MissionKinds<'f> {
             MissionPick::Faction(entity) => self.factions.push(entity),
             MissionPick::Scope(entity) => self.scopes.push(*entity),
             MissionPick::Standing(entity) => self.standings.push(*entity),
+            MissionPick::Perks(entity) => self.perks.push(*entity),
             MissionPick::Context(entity) => self.contexts.push(entity),
             MissionPick::Type(entity) => self.types.push(entity),
             MissionPick::Locality(entity) => self.localities.push(entity),
@@ -87,11 +93,32 @@ impl<'f> MissionKinds<'f> {
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         self.standings
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
+        self.perks
+            .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         sort_by_guid(&mut self.contexts, |entity| entity.guid);
         sort_by_guid(&mut self.types, |entity| entity.guid);
         sort_by_guid(&mut self.localities, |entity| entity.guid);
         sort_by_guid(&mut self.scenarios, |entity| entity.guid);
         sort_by_guid(&mut self.manifests, |entity| entity.guid);
+    }
+
+    /// Returns original numeric receipts attached to emitted reputation definitions.
+    pub(crate) fn reputation_number_groups(
+        &self,
+    ) -> impl Iterator<Item = (Kind, &[CapturedNumber])> {
+        self.scopes
+            .iter()
+            .map(|row| (Kind::ReputationScopes, row.numbers.as_slice()))
+            .chain(
+                self.standings
+                    .iter()
+                    .map(|row| (Kind::ReputationStandings, row.numbers.as_slice())),
+            )
+            .chain(
+                self.perks
+                    .iter()
+                    .map(|row| (Kind::ReputationPerks, row.numbers.as_slice())),
+            )
     }
 
     /// Returns how many entities `kind` holds, 0 for a kind that is not one of these.
@@ -100,6 +127,7 @@ impl<'f> MissionKinds<'f> {
             Kind::FactionReputations => self.factions.len(),
             Kind::ReputationScopes => self.scopes.len(),
             Kind::ReputationStandings => self.standings.len(),
+            Kind::ReputationPerks => self.perks.len(),
             Kind::ReputationContexts => self.contexts.len(),
             Kind::MissionTypes => self.types.len(),
             Kind::MissionLocalities => self.localities.len(),

@@ -512,6 +512,7 @@ catalog-summary-kind = { $kind ->
     [blueprintCategories] Blaupausenkategorien
     [blueprintCategoryLists] Blaupausenkategorielisten
     [factions] Fraktionen
+    [reputationPerks] Rufvorteile
     [paints] Lackierungen
     [loadouts] Loadouts
    *[other] { $kind }

@@ -8,6 +8,7 @@ pub(crate) enum FieldIssue {
     Malformed,
     Unreadable,
     Unsupported,
+    RetainedVariant,
 }
 
 /// Borrowed technical classification, independently of the original body receipt.
@@ -44,6 +45,13 @@ impl FieldError {
                 Self::Unsupported { source_type, field } => {
                     return FieldDescription {
                         issue: FieldIssue::Unsupported,
+                        source_type: Some(source_type),
+                        field,
+                    };
+                }
+                Self::RetainedVariant { source_type, field } => {
+                    return FieldDescription {
+                        issue: FieldIssue::RetainedVariant,
                         source_type: Some(source_type),
                         field,
                     };

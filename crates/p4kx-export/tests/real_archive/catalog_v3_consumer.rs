@@ -56,6 +56,7 @@ pub(crate) fn named_rows<'catalog>(
         }
         Kind::Manufacturers => checked_table(catalog, kind, "/definitions/manufacturers"),
         Kind::Factions => checked_table(catalog, kind, "/definitions/factions"),
+        Kind::ReputationPerks => checked_table(catalog, kind, "/definitions/reputationPerks"),
         Kind::QualityDistributions => {
             checked_table(catalog, kind, "/definitions/qualityDistributions")
         }
@@ -98,6 +99,7 @@ fn checked_table<'catalog>(
                 | Kind::GameplayProperties
                 | Kind::LootPoolFilters
                 | Kind::Factions
+                | Kind::ReputationPerks
         ) {
             record_header(row)?;
         }
@@ -202,6 +204,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::GameplayProperties
             | Kind::Manufacturers
             | Kind::Factions
+            | Kind::ReputationPerks
             | Kind::Commodities
             | Kind::ResourceTypes
             | Kind::ResourceGroups
