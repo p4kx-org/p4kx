@@ -1607,7 +1607,9 @@ not part of the kind): `guid`, `className`, `recordPath`, `disabled`, `isSecurit
 `tags` (`generalTags`) a query matches, `producesTags`, `consumesTags` (`positiveTags` and
 `negativeTags`), `aiSpawnTags`, `names` (the `stringVariants`: `tag` and `displayName`, a game
 text; the German file lacks 3,246 of the 3,297 variants on LIVE, so `de` is `null` and the Basetool
-falls back to `en`) and `entityClusterMemberGuid`. Not exported of a location template: the NPC auto spawn settings of its
+falls back to `en`) and `entityClusterMemberGuid`. The sourced `classification` holds the three
+original location class, function and size References. See [the location vocabulary contract](catalog-location-vocabulary.md).
+Not exported of a location template: the NPC auto spawn settings of its
 `locationData` (not the NPC spawn descriptions of contracts, see "NPC and entity spawns"), the
 mission modules and limits and the security network manifest.
 

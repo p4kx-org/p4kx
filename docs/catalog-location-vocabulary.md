@@ -25,6 +25,14 @@ A null position stays null. A dangling or incompatible target retains its origin
 and link state. Export health identifies targets excluded by a Filter. Table availability
 is based on the source declaration, independently of the count of emitted rows.
 
+Each `missionLocationTemplates` row carries `classification` from its scalar
+`MissionLocationTemplate.locationData` Class of `MissionLocationData`. The value contains
+the three independent original References `locationClass`, `locationFunction` and
+`locationSize`. Each link identifies the original GUID and the selected physical target
+when available. Null and dangling links retain their own states and evidence. An absent
+or incompatible Class has its own outer state. The existing general, produce, consume
+and AI tag values still describe their original tag fields.
+
 Mission location filters that reference these definitions join to their original GUID
 and physical Record identity when available. The registry membership and visible scopes
 describe configuration stored in the Archive.

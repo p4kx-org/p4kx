@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
+use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
 pub(super) const CLASS_A: u128 = 0x1086_0001;
 pub(super) const CLASS_B: u128 = 0x1086_0002;
@@ -75,4 +75,49 @@ fn record(guid: u128, source_type: &str, path: &str) -> TestRecord {
         format!("{source_type}.Fixture"),
         format!("libs/foundry/records/fixture_location/{path}.xml"),
     )
+}
+
+pub(super) fn template_database(data_type: &str) -> DataForgeBuilder {
+    database()
+        .structure(
+            TestStruct::new("MissionLocationTemplate")
+                .field("locationData", TestType::Class(data_type.to_owned())),
+        )
+        .structure(
+            TestStruct::new(data_type)
+                .field("disabled", TestType::Bool)
+                .field("locationClass", TestType::ReferenceTo(CLASS.to_owned()))
+                .field("locationSize", TestType::ReferenceTo(SIZE_TYPE.to_owned()))
+                .field(
+                    "locationFunction",
+                    TestType::ReferenceTo(FUNCTION_TYPE.to_owned()),
+                ),
+        )
+        .record(template(
+            0x1086_1000,
+            "complete",
+            TestInstance::new(data_type)
+                .value("disabled", TestValue::Bool(true))
+                .value("locationClass", TestValue::Reference(CLASS_A))
+                .value("locationSize", TestValue::Reference(SIZE))
+                .value("locationFunction", TestValue::Reference(FUNCTION)),
+        ))
+        .record(template(
+            0x1086_1001,
+            "sparse",
+            TestInstance::new(data_type)
+                .value("locationClass", TestValue::Null)
+                .value("locationSize", TestValue::Reference(MISSING))
+                .value("locationFunction", TestValue::Reference(FUNCTION)),
+        ))
+}
+
+fn template(guid: u128, name: &str, data: TestInstance) -> TestRecord {
+    TestRecord::new(
+        guid,
+        "MissionLocationTemplate",
+        format!("MissionLocationTemplate.{name}"),
+        format!("libs/foundry/records/missiondata/pu_locations/fixture/{name}.xml"),
+    )
+    .value("locationData", TestValue::Struct(data))
 }

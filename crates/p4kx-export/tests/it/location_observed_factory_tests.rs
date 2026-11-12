@@ -69,10 +69,11 @@ fn check(input: &Fixture) -> TestResult {
 fn database() -> Vec<u8> {
     DataForgeBuilder::new()
         .version(8)
-        .structure(
-            TestStruct::new(TYPE).field("locationData", TestType::Class("LocationData".to_owned())),
-        )
-        .structure(TestStruct::new("LocationData").field("disabled", TestType::Bool))
+        .structure(TestStruct::new(TYPE).field(
+            "locationData",
+            TestType::Class("MissionLocationData".to_owned()),
+        ))
+        .structure(TestStruct::new("MissionLocationData").field("disabled", TestType::Bool))
         .record(
             TestRecord::new(
                 GUID,
@@ -83,7 +84,8 @@ fn database() -> Vec<u8> {
             .value(
                 "locationData",
                 TestValue::Struct(
-                    TestInstance::new("LocationData").value("disabled", TestValue::Bool(true)),
+                    TestInstance::new("MissionLocationData")
+                        .value("disabled", TestValue::Bool(true)),
                 ),
             ),
         )

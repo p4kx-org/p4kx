@@ -10,6 +10,7 @@ use crate::export_ledger::{ExportLedger, SourceDisposition, SourceObservation};
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::record_observation::RecordObservation;
 use crate::selection::{Kind, is_kind_leftover};
+use crate::source_fields::FieldError;
 use crate::{CatalogError, CatalogReadFailure};
 
 /// The entities of one kind of a DataForge and what was left out.
@@ -22,6 +23,12 @@ pub(crate) struct KindRead<'f, T> {
 
 /// A Record that cannot be read: the error of the DataForge or of an identifier of a description.
 pub(crate) type ReadError = Box<dyn std::error::Error + Send + Sync>;
+
+/// A selected Record projection and the diagnostics of its typed fields.
+pub(crate) struct RecordProjection<T> {
+    pub(crate) value: T,
+    pub(crate) notes: Vec<FieldError>,
+}
 
 enum Piece<'f, T> {
     Item(Box<T>),
@@ -49,6 +56,35 @@ pub(crate) fn read_kind<'f, T: Send>(
     kind: Kind,
     (filter, cancel): (Option<&Filter>, Option<&CancelToken>),
     build: impl Fn(&Record<'f>, &RecordTree<'f>) -> Result<T, ReadError> + Sync,
+    guid: impl Fn(&T) -> CatalogGuid,
+) -> Result<KindRead<'f, T>, CatalogError> {
+    read_kind_with_notes(
+        forge,
+        input,
+        kind,
+        (filter, cancel),
+        |admission, tree| {
+            let value = build(admission.record(), tree)?;
+            Ok(RecordProjection {
+                value,
+                notes: Vec::new(),
+            })
+        },
+        guid,
+    )
+}
+
+/// Reads selected Records and records each typed field diagnosis on its original admission.
+pub(crate) fn read_kind_with_notes<'f, T: Send>(
+    forge: &'f DataForge<'f>,
+    input: &OriginalCatalogInput<'_, '_>,
+    kind: Kind,
+    (filter, cancel): (Option<&Filter>, Option<&CancelToken>),
+    build: impl Fn(
+        &RecordObservation<'_, 'f>,
+        &RecordTree<'f>,
+    ) -> Result<RecordProjection<T>, ReadError>
+    + Sync,
     guid: impl Fn(&T) -> CatalogGuid,
 ) -> Result<KindRead<'f, T>, CatalogError> {
     input.check_forge(forge)?;
@@ -96,7 +132,10 @@ fn piece<'f, T>(
     kind: Kind,
     trees: &mut TreeBuilder<'f>,
     record: &Record<'f>,
-    build: &impl Fn(&Record<'f>, &RecordTree<'f>) -> Result<T, ReadError>,
+    build: &impl Fn(
+        &RecordObservation<'_, 'f>,
+        &RecordTree<'f>,
+    ) -> Result<RecordProjection<T>, ReadError>,
     cancel: Option<&CancelToken>,
 ) -> Result<Option<Observed<'f, T>>, CatalogError> {
     let rule = kind.records();
@@ -141,7 +180,10 @@ fn project<'f, T>(
     kind: Kind,
     trees: &mut TreeBuilder<'f>,
     record: &Record<'f>,
-    build: &impl Fn(&Record<'f>, &RecordTree<'f>) -> Result<T, ReadError>,
+    build: &impl Fn(
+        &RecordObservation<'_, 'f>,
+        &RecordTree<'f>,
+    ) -> Result<RecordProjection<T>, ReadError>,
     cancel: Option<&CancelToken>,
 ) -> Result<Observed<'f, T>, CatalogError> {
     let admission = RecordObservation::capture(input, record)?;
@@ -157,7 +199,7 @@ fn project<'f, T>(
             );
         }
     };
-    let fields = crate::export_field_walk::inspect_observed(
+    let mut fields = crate::export_field_walk::inspect_observed(
         Some(input),
         &tree,
         &admission,
@@ -165,16 +207,26 @@ fn project<'f, T>(
         ExportSourceRole::Selected,
         cancel,
     )?;
-    let mut observed = match build(record, &tree) {
-        Ok(item) => Observed {
-            piece: Piece::Item(Box::new(item)),
-            source: admission.source(
-                Some(kind),
+    let mut observed = match build(&admission, &tree) {
+        Ok(projected) => {
+            crate::source_projection_notes::record(
+                kind,
                 ExportSourceRole::Selected,
-                SourceDisposition::Projected,
-            )?,
-            fields: ExportLedger::default(),
-        },
+                &admission,
+                &tree,
+                projected.notes,
+                &mut fields,
+            )?;
+            Observed {
+                piece: Piece::Item(Box::new(projected.value)),
+                source: admission.source(
+                    Some(kind),
+                    ExportSourceRole::Selected,
+                    SourceDisposition::Projected,
+                )?,
+                fields: ExportLedger::default(),
+            }
+        }
         Err(error) => match error.downcast::<CatalogError>() {
             Ok(error) => return Err(*error),
             Err(error) => failed(

@@ -11,6 +11,10 @@ pub(super) fn location_templates() -> serde_json::Value {
         "className": "AEGS_Reclaimer_Space_Stanton2c",
         "recordPath": "libs/foundry/records/missiondata/pu_locations/templates/aegs_reclaimer_space_stanton2c",
         "disabled": false,
+        "classification": {
+            "state": "absent", "value": null, "sourceUsesRefs": [],
+            "sourceSetComplete": true, "containsEncryptedSource": false
+        },
         "isSecurityNetworkHost": null,
         "tags": ["Missions.LocationType.HijackedShip"],
         "producesTags": {"positiveTags": [], "negativeTags": []},

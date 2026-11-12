@@ -63,11 +63,7 @@ fn location_definitions_keep_identity_without_payload_fields() -> TestResult {
             "no authored payload fields"
         );
     }
-    let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
-    if let Err(error) = validator.validate(&catalog) {
-        return Err(format!("{}: {}", error.instance_path(), error).into());
-    }
-    crate::commodity_v3_source_inventory::reference_closure(&catalog)
+    verify_document(&catalog)
 }
 
 #[test]
@@ -161,4 +157,85 @@ fn array<'a>(root: &'a Value, path: &str) -> TestResult<&'a Vec<Value>> {
     at(root, path)?
         .as_array()
         .ok_or_else(|| format!("array at {path}").into())
+}
+
+#[test]
+fn mission_location_templates_link_to_the_physical_classification() -> TestResult {
+    let (_directory, archive) = common::open(
+        &fixture::template_database("MissionLocationData"),
+        DcbOrigin::Encrypted,
+    )?;
+    let built = build_catalog(&archive, &common::options())?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    let row = at(&catalog, "/missionLocationTemplates/0")?;
+    let classification = at(row, "/classification")?;
+    assert_eq!(at(classification, "/state")?, "present");
+    assert_eq!(at(classification, "/containsEncryptedSource")?, true);
+    for (field, table, target) in [
+        ("locationClass", "locationClasses", fixture::CLASS_A),
+        ("locationFunction", "locationFunctions", fixture::FUNCTION),
+        ("locationSize", "locationSizes", fixture::SIZE),
+    ] {
+        let link = at(classification, &format!("/value/{field}"))?;
+        assert_eq!(at(link, "/containsEncryptedSource")?, true, "{field}");
+        assert_eq!(
+            at(link, "/value/guid/value")?,
+            &json!(guid(target)),
+            "{field}"
+        );
+        let index = at(link, "/value/targetRecordIndex/value")?;
+        let exported = array(&catalog, &format!("/definitions/{table}/rows"))?;
+        assert!(
+            exported
+                .iter()
+                .any(|row| row.pointer("/recordIndex/value") == Some(index)),
+            "{field} joins the exact target Record"
+        );
+    }
+    let sparse = at(&catalog, "/missionLocationTemplates/1/classification/value")?;
+    assert_eq!(at(sparse, "/locationClass/state")?, "null");
+    assert_eq!(at(sparse, "/locationSize/value/status")?, "dangling");
+    assert_eq!(
+        at(sparse, "/locationSize/value/guid/value")?,
+        &json!(guid(fixture::MISSING))
+    );
+    verify_document(&catalog)
+}
+
+#[test]
+fn mission_location_templates_report_the_rejected_class_declaration() -> TestResult {
+    let (_directory, archive) = common::open(
+        &fixture::template_database("OtherLocationData"),
+        DcbOrigin::Plain,
+    )?;
+    let mut options = common::options();
+    options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
+    let built = build_catalog(&archive, &options)?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    let row = at(&catalog, "/missionLocationTemplates/0")?;
+    assert_eq!(at(row, "/classification/state")?, "unsupported");
+    assert_eq!(at(row, "/classification/containsEncryptedSource")?, false);
+    assert_eq!(
+        at(row, "/disabled")?,
+        true,
+        "the existing flag still uses its source"
+    );
+    let diagnostics = array(&catalog, "/exportHealth/diagnostics")?;
+    assert!(
+        diagnostics
+            .iter()
+            .any(|row| row["kind"] == "missionLocationTemplates"
+                && row["stage"] == "projection"
+                && row["code"] == "unsupportedValue"),
+        "typed projection diagnosis belongs to the template"
+    );
+    Ok(())
+}
+
+fn verify_document(catalog: &Value) -> TestResult {
+    let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
+    if let Err(error) = validator.validate(catalog) {
+        return Err(format!("{}: {}", error.instance_path(), error).into());
+    }
+    crate::commodity_v3_source_inventory::reference_closure(catalog)
 }

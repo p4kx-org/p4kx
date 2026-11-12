@@ -55,6 +55,8 @@ mod infraction_parameters;
 pub(crate) mod jurisdiction_definition;
 #[path = "law_kinds.rs"]
 pub(crate) mod law_kinds;
+#[path = "location_classification.rs"]
+pub(crate) mod location_classification;
 #[path = "location_vocabulary.rs"]
 pub(crate) mod location_vocabulary;
 #[path = "location_vocabulary_definition.rs"]
