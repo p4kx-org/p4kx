@@ -3,6 +3,7 @@
 
 //! Synthetic media contract, source preservation and provider integration tests.
 
+mod animation_provider;
 mod archive;
 mod archive_layout;
 mod audio_bank_action_properties_provider;

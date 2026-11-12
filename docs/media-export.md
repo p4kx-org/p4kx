@@ -27,8 +27,8 @@ p4kx media schema --source
 
 Repeat `--kind` for an explicit selection. The known names are `archive`, `model`, `material`,
 `texture`, `shader`, `animation`, `animation-definition`, `audio` and `audio-control`. Omission
-selects every registered provider. The built-in providers are `archive`, `shader`, `material`
-`audio` and `audio-control`. An explicitly requested kind without an available provider returns a typed
+selects every registered provider. The built-in providers are `archive`, `shader`, `material`,
+`animation`, `audio` and `audio-control`. An explicitly requested kind without an available provider returns a typed
 capability failure and a non-zero exit status, even when the selection is empty.
 
 `--kind shader` exports nested `.ext` declarations and ordered Property fields, with exact raw
@@ -41,6 +41,10 @@ defines its precise typed fields, statuses and counting units.
 ordered authored fields, layer/texture references and existing interpreted surfaces without
 geometry conversion. [Material source metadata](media-material-metadata.md) defines raw
 preservation, physical candidate resolution, bounds and the separate target-readability contract.
+
+`--kind animation` retains CAF, DBA and AIM sources with chunk and clip inventory, original
+metadata and controller words, and typed decoded frame and key chunks.
+[Animation source export](media-animation-source.md) describes the layouts and dispositions.
 
 `--kind audio` exports standalone and complete embedded WEM summaries, ordered RIFF chunks,
 cue and LIST annotations, physical soundbank sections, original DIDX and HIRC occurrences,

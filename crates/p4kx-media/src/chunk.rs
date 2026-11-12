@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::artifact_placement;
 use crate::chunk_copy;
+use crate::origin_prepared::PreparedRecordOrigins;
 use crate::{Artifact, MediaError, MediaWriter};
 
 /// Element representation of a typed payload chunk.
@@ -170,8 +171,8 @@ impl SourceRange {
 }
 
 #[derive(Clone, Copy)]
-enum ChunkAccounting {
-    Converted,
+enum ChunkAccounting<'a> {
+    Converted(Option<&'a PreparedRecordOrigins>),
     RetainedMetadata,
 }
 
@@ -185,7 +186,17 @@ impl MediaWriter<'_> {
         layout: ChunkLayout,
         input: &mut dyn Read,
     ) -> Result<ChunkReference, MediaError> {
-        self.write_chunk(layout, input, ChunkAccounting::Converted)
+        self.write_chunk(layout, input, ChunkAccounting::Converted(None))
+    }
+
+    pub(crate) fn chunk_with_origins(
+        &mut self,
+        layout: ChunkLayout,
+        input: &mut dyn Read,
+        origins: &PreparedRecordOrigins,
+    ) -> Result<ChunkReference, MediaError> {
+        origins.require_writer(self)?;
+        self.write_chunk(layout, input, ChunkAccounting::Converted(Some(origins)))
     }
 
     pub(crate) fn metadata_chunk(
@@ -200,7 +211,7 @@ impl MediaWriter<'_> {
         &mut self,
         layout: ChunkLayout,
         input: &mut dyn Read,
-        accounting: ChunkAccounting,
+        accounting: ChunkAccounting<'_>,
     ) -> Result<ChunkReference, MediaError> {
         self.checkpoint()?;
         let size = chunk_size(&layout, self.limits.chunk_bytes)?;
@@ -226,10 +237,12 @@ impl MediaWriter<'_> {
                 && let Some(input) = self.origins.directory().cloned()
             {
                 self.artifact_with_input(&artifact, &input, p4kx_extraction::InputScope::Payload)?;
+            } else if let ChunkAccounting::Converted(Some(origins)) = accounting {
+                self.artifact_with_origins(&artifact, origins)?;
             } else {
                 self.artifact(&artifact)?;
             }
-            if matches!(accounting, ChunkAccounting::Converted) {
+            if matches!(accounting, ChunkAccounting::Converted(_)) {
                 self.converted_output(created)?;
             }
             Ok(ChunkReference { artifact, layout })

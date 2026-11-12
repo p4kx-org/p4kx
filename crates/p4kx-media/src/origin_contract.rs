@@ -74,6 +74,8 @@ pub enum OriginProfile {
     AudioBank,
     /// Original ATL XML and CryXml source observations.
     AudioControl,
+    /// Original CAF, DBA and AIM inventory and decoded channels.
+    Animation,
     /// Successfully parsed material library and its actually used companions.
     MaterialLibrary,
     /// Material parser failure after actual source-content inspection.

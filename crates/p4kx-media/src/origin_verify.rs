@@ -164,6 +164,12 @@ fn verify_profile(stream: OriginStream, profile: OriginProfile) -> Result<(), Me
             )
             | (
                 OriginStream::Records {
+                    kind: MediaKind::Animation
+                },
+                OriginProfile::Animation
+            )
+            | (
+                OriginStream::Records {
                     kind: MediaKind::Material
                 },
                 OriginProfile::MaterialLibrary

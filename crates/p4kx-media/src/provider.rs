@@ -4,6 +4,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::animation::AnimationProvider;
 use crate::audio_control_provider::AudioControlProvider;
 use crate::audio_provider::AudioProvider;
 use crate::{
@@ -169,6 +170,7 @@ impl Default for ProviderRegistry {
                 Box::new(ArchiveProvider),
                 Box::new(ShaderProvider::default()),
                 Box::new(MaterialProvider::default()),
+                Box::new(AnimationProvider),
                 Box::new(AudioProvider),
                 Box::new(AudioControlProvider),
             ],

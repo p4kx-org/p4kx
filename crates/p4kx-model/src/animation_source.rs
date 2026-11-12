@@ -52,14 +52,25 @@ impl<'a> DbaAnimationName<'a> {
 /// The original 48-byte animation metadata and its enclosing chunk version.
 #[derive(Debug, Clone, Copy)]
 pub struct AnimationMetadata<'a> {
+    chunk_index: usize,
     at: u64,
     version: u32,
     bytes: &'a [u8; RECORD_LEN],
 }
 
 impl<'a> AnimationMetadata<'a> {
-    pub(crate) const fn of(at: u64, version: u32, bytes: &'a [u8; RECORD_LEN]) -> Self {
-        Self { at, version, bytes }
+    pub(crate) const fn of(
+        chunk_index: usize,
+        at: u64,
+        version: u32,
+        bytes: &'a [u8; RECORD_LEN],
+    ) -> Self {
+        Self {
+            chunk_index,
+            at,
+            version,
+            bytes,
+        }
     }
 
     /// Returns the original metadata bytes.
@@ -72,6 +83,12 @@ impl<'a> AnimationMetadata<'a> {
     #[must_use]
     pub const fn range(&self) -> Range<u64> {
         self.at..self.at + RECORD_LEN as u64
+    }
+
+    /// Returns the original chunk table ordinal.
+    #[must_use]
+    pub const fn chunk_index(&self) -> usize {
+        self.chunk_index
     }
 
     /// Returns the metadata chunk version.
@@ -157,7 +174,7 @@ impl<'a> AnimationSource<'a> {
             .map_err(|err| corrupt(file_name, "CafData", err))?;
         Ok(Self::of(
             0,
-            AnimationMetadata::of(metadata.at, metadata.version, record),
+            AnimationMetadata::of(metadata.index, metadata.at, metadata.version, record),
             None,
             data,
             block,
@@ -180,6 +197,12 @@ impl<'a> AnimationSource<'a> {
     #[must_use]
     pub const fn database_name(&self) -> Option<DbaAnimationName<'a>> {
         self.database_name
+    }
+
+    /// Returns the original chunk table ordinal for the controller block.
+    #[must_use]
+    pub const fn data_chunk_index(&self) -> usize {
+        self.data.index
     }
 
     /// Returns the version of the chunk with the controller block.
@@ -208,6 +231,7 @@ impl<'a> AnimationSource<'a> {
 
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct SourceChunk<'a> {
+    pub(crate) index: usize,
     pub(crate) at: u64,
     pub(crate) version: u32,
     pub(crate) bytes: &'a [u8],
@@ -228,6 +252,7 @@ impl<'a> SourceChunk<'a> {
             chunk: name,
         };
         Ok(Self {
+            index,
             at: chunk.offset(),
             version,
             bytes: file.chunk_data(index).ok_or_else(missing)?,

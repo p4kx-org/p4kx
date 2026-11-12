@@ -75,7 +75,12 @@ impl<'a> DbaAnimationSources<'a> {
             self.metadata.at + METADATA_HEADER_LEN as u64 + ordinal as u64 * RECORD_LEN as u64;
         let clip = AnimationSource::of(
             ordinal,
-            AnimationMetadata::of(record_at, self.metadata.version, record),
+            AnimationMetadata::of(
+                self.metadata.index,
+                record_at,
+                self.metadata.version,
+                record,
+            ),
             Some(DbaAnimationName::of(self.name_at, name)),
             self.data,
             block,

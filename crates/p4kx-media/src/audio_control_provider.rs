@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{self, Read};
-use std::path::Path;
-
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::cryxml::{SourceDocument, SourceReadError, SourceReadOptions};
 use p4kx_extraction::sound::wwise_path;
@@ -12,10 +9,10 @@ use crate::audio_control_origin as origins;
 use crate::audio_control_payload::{self as wire, AtlDocument, AtlFailure, AtlPayload};
 use crate::audio_control_projection::{Failure, Projection as AtlProjection};
 use crate::audio_record_origins as records;
-use crate::required_reader::RequiredReader;
+use crate::required_reader;
 use crate::{
     Capability, DirectoryContext, FieldGroup, MediaError, MediaIssue, MediaKind, MediaWriter,
-    Projection, Provider, Severity, SourceContext, Status, Subresource, error,
+    Projection, Provider, Severity, SourceContext, Status, Subresource,
 };
 
 pub(crate) struct AudioControlProvider;
@@ -65,7 +62,7 @@ impl Provider for AudioControlProvider {
             directory: context.directory,
             entry: context.entry.index(),
         };
-        let bytes = read(context, writer)?;
+        let bytes = required_reader::read_all(context, writer)?;
         let source = match SourceDocument::parse(&bytes, SourceReadOptions::default()) {
             Ok(source) => source,
             Err(cause) => {
@@ -93,40 +90,6 @@ impl Provider for AudioControlProvider {
         }
         Ok(Projection::Written)
     }
-}
-
-fn read(context: &SourceContext<'_>, writer: &MediaWriter<'_>) -> Result<Vec<u8>, MediaError> {
-    let budget = &context.directory.input_state()?.budget;
-    let limits = writer.limits();
-    let size = context.source.size;
-    if size > budget.remaining_bytes(limits) {
-        return Err(MediaError::Limit {
-            budget: "source_bytes",
-            limit: limits.source_bytes,
-        });
-    }
-    let native_size = usize::try_from(size)
-        .map_err(|_| MediaError::Contract("ATL source exceeds native address width".into()))?;
-    let mut bytes = Vec::new();
-    bytes.try_reserve_exact(native_size).map_err(|cause| {
-        error::io(
-            Path::new(context.entry.path()),
-            io::Error::new(io::ErrorKind::OutOfMemory, cause),
-        )
-    })?;
-    bytes.resize(native_size, 0);
-    let mut reader = RequiredReader::open(
-        context.payload,
-        context.entry.path(),
-        size,
-        budget,
-        writer.checkpoint,
-        limits,
-    )?;
-    reader
-        .read_exact(&mut bytes)
-        .map_err(|cause| error::io(Path::new(context.entry.path()), cause))?;
-    Ok(bytes)
 }
 
 fn document(

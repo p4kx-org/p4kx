@@ -402,7 +402,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   [--exclude <filter>] [--conflict skip|overwrite|if-changed] [--audio-format raw|wav|ogg] [--diagnostic]` writes the
   versioned `p4kx-media` inventory as JSONL streams, exact decoded raw payloads and an atomic
   `media-index.json`. Repeat `--kind` and `--exclude` for explicit selections. Omission selects
-  all registered providers (`archive`, `shader`, `material` and `audio`). The shader stream preserves
+  all registered providers. The shader stream preserves
   nested `.ext` declarations and inventories `.cfib`/`.cfxb`/`.shcb` caches with explicit coverage.
   The material stream includes standalone/unused .mtl libraries without geometry conversion;
   [material source metadata](media-material-metadata.md) describes its exact retained fields.

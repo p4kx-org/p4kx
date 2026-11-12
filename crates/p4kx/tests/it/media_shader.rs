@@ -155,6 +155,7 @@ fn omission_selects_all_registered_providers() -> TestResult {
             MediaKind::Archive,
             MediaKind::Shader,
             MediaKind::Material,
+            MediaKind::Animation,
             MediaKind::Audio,
             MediaKind::AudioControl,
         ],

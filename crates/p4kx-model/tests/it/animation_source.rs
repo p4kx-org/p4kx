@@ -84,6 +84,31 @@ fn caf_reports_original_words_and_all_controller_rows() -> TestResult {
 }
 
 fn assert_bitmap_keys(keyed: &AnimationController<'_>) -> TestResult {
+    let rotation = keyed.decode_rotation()?.ok_or("rotation ranges")?;
+    let translation = keyed.decode_translation()?.ok_or("translation ranges")?;
+    let at = keyed.table_range().start;
+    let rotation_source = keyed.rotation();
+    let translation_source = keyed.translation();
+    assert_range(
+        &rotation.frame_range,
+        at + u64::from(rotation_source.time_offset),
+        9,
+    );
+    assert_range(
+        &rotation.value_range,
+        at + u64::from(rotation_source.value_offset),
+        18,
+    );
+    assert_range(
+        &translation.frame_range,
+        at + u64::from(translation_source.time_offset),
+        8,
+    );
+    assert_range(
+        &translation.value_range,
+        at + u64::from(translation_source.value_offset),
+        36,
+    );
     let decoded = keyed.decode()?.ok_or("decoded controller")?;
     assert_eq!(
         decoded.rotations.ok_or("rotations")?.frames,
@@ -166,7 +191,7 @@ fn assert_independent_channels(controller: &AnimationController<'_>) -> TestResu
         .decode_translation()?
         .ok_or("usable translation")?;
     assert_eq!(
-        translations.frames,
+        translations.keys.frames,
         [1, 7],
         "independent translation frames"
     );
@@ -288,4 +313,8 @@ fn the_source_inventory_can_visit_counts_above_the_eager_decoder_limit() -> Test
         })
     ));
     Ok(())
+}
+
+fn assert_range(range: &std::ops::Range<u64>, start: u64, len: u64) {
+    assert_eq!(*range, start..start + len, "exact encoded interval");
 }

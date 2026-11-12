@@ -3,12 +3,24 @@
 
 use std::ops::Range;
 
-use crate::animation_keys::{read_rotations, read_times, read_translations};
+use crate::animation_keys::{EncodedValues, read_rotations, read_times, read_translations};
 use crate::reader::to_usize;
 use crate::{CorruptAnimation, Keys, Track};
 
 pub(crate) const CHANNEL_LEN: usize = 12;
 pub(crate) const CONTROLLER_LEN: usize = 2 * CHANNEL_LEN;
+
+/// Decoded keys and the encoded byte intervals read to produce them.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct DecodedAnimationChannel<const N: usize> {
+    /// Original frame indices and decoded values.
+    pub keys: Keys<[f32; N]>,
+    /// The original frame-encoding interval, relative to the Entry start.
+    pub frame_range: Range<u64>,
+    /// The original value-encoding interval, relative to the Entry start.
+    pub value_range: Range<u64>,
+}
 
 /// The stored encoding and offsets of one controller channel.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,9 +64,15 @@ impl AnimationChannel {
         self,
         data: &[u8],
         entry_at: usize,
+        file_offset: u64,
         controller_id: u32,
-        values: impl FnOnce(&[u8], usize, u8, usize) -> Result<Vec<[f32; N]>, CorruptAnimation>,
-    ) -> Result<Option<Keys<[f32; N]>>, CorruptAnimation> {
+        values: impl FnOnce(
+            &[u8],
+            usize,
+            u8,
+            usize,
+        ) -> Result<EncodedValues<[f32; N]>, CorruptAnimation>,
+    ) -> Result<Option<DecodedAnimationChannel<N>>, CorruptAnimation> {
         if self.key_count == 0 {
             return Ok(None);
         }
@@ -62,9 +80,19 @@ impl AnimationChannel {
         let count = usize::from(self.key_count);
         let time_at = entry_at.saturating_add(to_usize(self.time_offset));
         let data_at = entry_at.saturating_add(to_usize(self.value_offset));
-        Ok(Some(Keys {
-            frames: read_times(data, time_at, times, count, controller_id)?,
-            values: values(data, data_at, format, count)?,
+        let frames = read_times(data, time_at, times, count, controller_id)?;
+        let values = values(data, data_at, format, count)?;
+        let range = |at: usize, len: usize| {
+            let start = file_offset + at as u64;
+            start..start + len as u64
+        };
+        Ok(Some(DecodedAnimationChannel {
+            frame_range: range(time_at, frames.bytes),
+            value_range: range(data_at, values.bytes),
+            keys: Keys {
+                frames: frames.values,
+                values: values.values,
+            },
         }))
     }
 }
@@ -151,10 +179,11 @@ impl<'a> AnimationController<'a> {
     /// # Errors
     ///
     /// Returns the rotation channel's format or data error.
-    pub fn decode_rotation(&self) -> Result<Option<Keys<[f32; 4]>>, CorruptAnimation> {
+    pub fn decode_rotation(&self) -> Result<Option<DecodedAnimationChannel<4>>, CorruptAnimation> {
         self.rotation.decode(
             self.data,
             self.entry_at,
+            self.file_offset,
             self.id,
             |data, start, format, count| read_rotations(data, start, format, count, self.id),
         )
@@ -165,9 +194,16 @@ impl<'a> AnimationController<'a> {
     /// # Errors
     ///
     /// Returns the translation channel's format or data error.
-    pub fn decode_translation(&self) -> Result<Option<Keys<[f32; 3]>>, CorruptAnimation> {
-        self.translation
-            .decode(self.data, self.entry_at, self.id, read_translations)
+    pub fn decode_translation(
+        &self,
+    ) -> Result<Option<DecodedAnimationChannel<3>>, CorruptAnimation> {
+        self.translation.decode(
+            self.data,
+            self.entry_at,
+            self.file_offset,
+            self.id,
+            read_translations,
+        )
     }
 
     /// Decodes the controller's original frame indices and numeric keys.
@@ -176,8 +212,8 @@ impl<'a> AnimationController<'a> {
     ///
     /// Returns the format or data error of a channel that cannot be decoded.
     pub fn decode(&self) -> Result<Option<Track>, CorruptAnimation> {
-        let rotations = self.decode_rotation()?;
-        let translations = self.decode_translation()?;
+        let rotations = self.decode_rotation()?.map(|channel| channel.keys);
+        let translations = self.decode_translation()?.map(|channel| channel.keys);
         Ok(
             (rotations.is_some() || translations.is_some()).then_some(Track {
                 controller_id: self.id,

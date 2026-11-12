@@ -536,6 +536,408 @@
         }
       ]
     },
+    "AnimationChannel": {
+      "additionalProperties": false,
+      "properties": {
+        "key_count": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "packed_format": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "samples": {
+          "$ref": "#/$defs/AnimationSamples"
+        },
+        "time_offset": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "value_offset": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "key_count",
+        "packed_format",
+        "time_offset",
+        "value_offset",
+        "samples"
+      ],
+      "type": "object"
+    },
+    "AnimationChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_order": {
+          "$ref": "#/$defs/ByteOrder"
+        },
+        "chunk_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "type_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type_id",
+        "type_name",
+        "version",
+        "chunk_id",
+        "byte_order",
+        "range"
+      ],
+      "type": "object"
+    },
+    "AnimationClip": {
+      "additionalProperties": false,
+      "properties": {
+        "controller_block_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "data_chunk_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "database_name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnimationDatabaseName"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "flags": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "metadata_bytes": {
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 48,
+          "minItems": 48,
+          "type": "array"
+        },
+        "metadata_chunk_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "metadata_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "timing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnimationTiming"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "metadata_chunk_version",
+        "data_chunk_version",
+        "metadata_range",
+        "metadata_bytes",
+        "controller_block_range",
+        "flags",
+        "timing",
+        "database_name"
+      ],
+      "type": "object"
+    },
+    "AnimationController": {
+      "additionalProperties": false,
+      "properties": {
+        "controller_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "id_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "rotation": {
+          "$ref": "#/$defs/AnimationChannel"
+        },
+        "table_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "translation": {
+          "$ref": "#/$defs/AnimationChannel"
+        }
+      },
+      "required": [
+        "controller_id",
+        "id_range",
+        "table_range",
+        "rotation",
+        "translation"
+      ],
+      "type": "object"
+    },
+    "AnimationDatabaseName": {
+      "additionalProperties": false,
+      "properties": {
+        "range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "utf8": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "utf8",
+        "range"
+      ],
+      "type": "object"
+    },
+    "AnimationEntry": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "family": {
+          "$ref": "#/$defs/AnimationFamily"
+        },
+        "layout": {
+          "$ref": "#/$defs/AnimationEntryLayout"
+        }
+      },
+      "required": [
+        "family",
+        "layout",
+        "chunk_count"
+      ],
+      "type": "object"
+    },
+    "AnimationEntryLayout": {
+      "enum": [
+        "clip-inventory",
+        "opaque-aim",
+        "invalid-container"
+      ],
+      "type": "string"
+    },
+    "AnimationFamily": {
+      "enum": [
+        "caf",
+        "dba",
+        "aim"
+      ],
+      "type": "string"
+    },
+    "AnimationPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationEntry"
+            },
+            "record_type": {
+              "const": "entry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationChunk"
+            },
+            "record_type": {
+              "const": "chunk",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationClip"
+            },
+            "record_type": {
+              "const": "clip",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationController"
+            },
+            "record_type": {
+              "const": "controller",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "AnimationPayload"
+    },
+    "AnimationSamples": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "empty",
+              "type": "string"
+            }
+          },
+          "required": [
+            "layout"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "frames": {
+              "$ref": "#/$defs/ChunkReference"
+            },
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "values": {
+              "$ref": "#/$defs/ChunkReference"
+            }
+          },
+          "required": [
+            "layout",
+            "frames",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unsupported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "layout"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "layout"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AnimationTiming": {
+      "additionalProperties": false,
+      "properties": {
+        "additive": {
+          "type": "boolean"
+        },
+        "end_frame": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "frames_per_second": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "frames_per_second",
+        "end_frame",
+        "additive"
+      ],
+      "type": "object"
+    },
     "AnnotationFailure": {
       "additionalProperties": false,
       "properties": {
@@ -32114,6 +32516,226 @@
         "required": [
           "data",
           "status"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-entry"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "entry"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 0,
+                "minItems": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-chunk"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "chunk"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-clip"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "clip"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-controller"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "controller"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
         ]
       }
     }

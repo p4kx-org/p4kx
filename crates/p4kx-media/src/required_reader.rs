@@ -8,7 +8,44 @@ use std::path::Path;
 use crate::checkpoint::{Checkpoint, IO_BLOCK_BYTES};
 use crate::error;
 use crate::input_budget::InputBudget;
-use crate::{Limits, MediaError};
+use crate::{Limits, MediaError, MediaWriter, SourceContext};
+
+pub(crate) fn read_all(
+    context: &SourceContext<'_>,
+    writer: &MediaWriter<'_>,
+) -> Result<Vec<u8>, MediaError> {
+    let budget = &context.directory.input_state()?.budget;
+    let limits = writer.limits();
+    let size = context.source.size;
+    if size > budget.remaining_bytes(limits) {
+        return Err(MediaError::Limit {
+            budget: "source_bytes",
+            limit: limits.source_bytes,
+        });
+    }
+    let native_size = usize::try_from(size)
+        .map_err(|_| MediaError::Contract("retained input exceeds native address width".into()))?;
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(native_size).map_err(|cause| {
+        error::io(
+            Path::new(context.entry.path()),
+            io::Error::new(io::ErrorKind::OutOfMemory, cause),
+        )
+    })?;
+    bytes.resize(native_size, 0);
+    let mut reader = RequiredReader::open(
+        context.payload,
+        context.entry.path(),
+        size,
+        budget,
+        writer.checkpoint,
+        limits,
+    )?;
+    reader
+        .read_exact(&mut bytes)
+        .map_err(|cause| error::io(Path::new(context.entry.path()), cause))?;
+    Ok(bytes)
+}
 
 pub(crate) struct RequiredReader<'input> {
     file: File,

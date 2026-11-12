@@ -3,6 +3,7 @@
 
 //! Bounded media export with physical identities and atomic generation publication.
 
+mod animation;
 mod archive_extras_read;
 mod archive_layout_consistency_schema;
 mod archive_layout_projection;

@@ -155,6 +155,7 @@ const fn known_members(profile: OriginProfile) -> &'static [&'static str] {
         | OriginProfile::AudioWem
         | OriginProfile::AudioBank
         | OriginProfile::AudioControl
+        | OriginProfile::Animation
         | OriginProfile::ArchiveBuild
         | OriginProfile::IndexBuild => &[],
     }
@@ -182,7 +183,10 @@ fn audio(resolver: &OriginResolver<'_>) -> bool {
     resolver.builtin.is_some_and(|builtin| {
         matches!(
             builtin.profile,
-            OriginProfile::AudioWem | OriginProfile::AudioBank | OriginProfile::AudioControl
+            OriginProfile::AudioWem
+                | OriginProfile::AudioBank
+                | OriginProfile::AudioControl
+                | OriginProfile::Animation
         )
     })
 }
