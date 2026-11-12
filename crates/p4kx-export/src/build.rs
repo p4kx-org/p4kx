@@ -191,6 +191,7 @@ fn assemble<R>(
         collected.resource_group_members,
     );
     let reputation_tables = collected.mission_kinds.take_reputation_tables(&forge);
+    let law_tables = collected.law.into_tables(&forge);
     let components = collected.item_components.into_tables(&forge);
     let patches = options.public_patches;
     let source = source(archive, options.exported_at, patches, key_use);
@@ -281,6 +282,9 @@ fn assemble<R>(
             reputation_perks: reputation_tables.perks,
             reputation_trigger_records: reputation_tables.trigger_records,
             reputation_reward_amounts: reputation_tables.reward_amounts,
+            infractions: law_tables.infractions,
+            infraction_sets: law_tables.infraction_sets,
+            jurisdictions: law_tables.jurisdictions,
         },
         projections: CatalogProjections {
             contracts: CatalogTable::new(&forge, &["ContractGenerator"], collected.contracts),

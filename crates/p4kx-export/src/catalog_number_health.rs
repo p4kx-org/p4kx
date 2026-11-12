@@ -14,6 +14,9 @@ use crate::resource_raw_policy::ResourceNumberContract;
 use crate::selection::Kind;
 use crate::template_number_capture::TemplateNumbers;
 
+#[path = "catalog_number_coverage.rs"]
+mod coverage;
+
 /// One original nonfinite token awaiting exact actual emitted raw coverage.
 #[derive(Debug, Clone)]
 pub(crate) struct NumberRequirement {
@@ -291,22 +294,7 @@ impl Coverage<'_, '_> {
         if let Some(matched) = self.configuration(required) {
             return matched;
         }
-        if matches!(
-            self.kind,
-            Some(
-                Kind::LootPoolFilters
-                    | Kind::Blueprints
-                    | Kind::Items
-                    | Kind::ExplosionDefinitions
-                    | Kind::AmmoDefinitions
-                    | Kind::Factions
-                    | Kind::FactionReputations
-                    | Kind::ReputationScopes
-                    | Kind::ReputationStandings
-                    | Kind::ReputationContexts
-                    | Kind::ReputationPerks
-            )
-        ) {
+        if self.kind.is_some_and(coverage::uses_owned_number) {
             return self.owned(required);
         }
         let Some(contract) = required.contract else {
@@ -343,12 +331,6 @@ impl Coverage<'_, '_> {
     }
 
     fn owned(&mut self, required: &NumberRequirement) -> bool {
-        use NumberOccurrence::{
-            AuthoredDefinitionRawValue, AuthoredDefinitionValue, BlueprintValue,
-            ItemComponentRawValue, ItemComponentValue, LootValue,
-        };
-        use ResourceNumberContract::{Number, Single};
-
         let Some(actual) = self
             .available
             .and_then(|values| values.original.get(&required.original_ordinal))
@@ -357,40 +339,15 @@ impl Coverage<'_, '_> {
         };
         let ordinal = required.original_ordinal;
         let captured = actual.occurrence;
-        let (occurrence, contract) = match (self.kind, captured) {
-            (Some(Kind::LootPoolFilters), _) => (LootValue { ordinal }, Number),
-            (Some(Kind::Blueprints), _) => (BlueprintValue { ordinal }, Number),
-            (Some(Kind::Items), ItemComponentRawValue { .. }) => {
-                (ItemComponentRawValue { ordinal }, Number)
-            }
-            (Some(Kind::Items), _) => (ItemComponentValue { ordinal }, Single),
-            (
-                Some(
-                    Kind::Factions
-                    | Kind::FactionReputations
-                    | Kind::ReputationScopes
-                    | Kind::ReputationStandings
-                    | Kind::ReputationContexts
-                    | Kind::ReputationPerks,
-                ),
-                AuthoredDefinitionRawValue { .. },
-            ) => (AuthoredDefinitionRawValue { ordinal }, Number),
-            (
-                Some(
-                    Kind::ExplosionDefinitions
-                    | Kind::AmmoDefinitions
-                    | Kind::FactionReputations
-                    | Kind::ReputationStandings
-                    | Kind::ReputationContexts
-                    | Kind::ReputationPerks,
-                ),
-                _,
-            ) => (AuthoredDefinitionValue { ordinal }, Single),
-            _ => return false,
+        let Some((occurrence, contract)) = self
+            .kind
+            .and_then(|kind| coverage::expected_owned_number(kind, captured, ordinal))
+        else {
+            return false;
         };
-        scalar_matches(required, actual)
-            && captured == occurrence
+        captured == occurrence
             && actual.contract == contract
+            && scalar_matches(required, actual)
             && self.consumed_owned.insert(required.original_ordinal)
     }
 }

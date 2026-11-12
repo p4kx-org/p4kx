@@ -35,6 +35,7 @@ impl Collected<'_> {
             entity.guid
         });
         self.mission_kinds.order();
+        self.law.order();
         self.loot_kinds.order();
         self.tags.order_entities();
     }

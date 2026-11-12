@@ -515,6 +515,9 @@ catalog-summary-kind = { $kind ->
     [reputationPerks] Reputation perks
     [reputationTriggerRecords] Reputation trigger records
     [reputationRewardAmounts] Reputation reward amounts
+    [infractions] Infractions
+    [infractionSets] Infraction sets
+    [jurisdictions] Jurisdictions
     [paints] Paints
     [loadouts] Loadouts
    *[other] { $kind }

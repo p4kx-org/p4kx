@@ -5,6 +5,7 @@ use p4kx_extraction::RecordTree;
 
 use super::Scan;
 use crate::Kind;
+use crate::catalog_v3::law_kinds::LawPick;
 use crate::loot_kinds::LootPick;
 use crate::mission_kinds::MissionPick;
 use crate::picked::Picked;
@@ -31,6 +32,11 @@ impl<'f> Scan<'_, '_, 'f> {
             }
             Kind::ExplosionDefinitions => self.explosion_definition(admission, tree)?,
             Kind::Factions => self.faction_definition(admission, tree)?,
+            Kind::Infractions | Kind::InfractionSets | Kind::Jurisdictions => {
+                let (value, notes) =
+                    LawPick::read(kind, tree, self.projection, admission, self.options.cancel)?;
+                (Picked::Law(value), notes)
+            }
             Kind::BlueprintCategoryLists => {
                 let read = crate::catalog_v3::blueprint_category_list_read::read(
                     tree,

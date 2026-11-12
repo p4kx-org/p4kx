@@ -114,10 +114,12 @@ impl SourceTrace {
                     crate::catalog_v3::reputation_reward_amount_definition::SOURCE_TYPE => {
                         Some(Kind::ReputationRewardAmounts)
                     }
-                    _ => record
-                        .record_path()
-                        .ok()
-                        .and_then(|path| Kind::by_record(path, type_name)),
+                    _ => crate::catalog_v3::law_kinds::kind_for_type(type_name).or_else(|| {
+                        record
+                            .record_path()
+                            .ok()
+                            .and_then(|path| Kind::by_record(path, type_name))
+                    }),
                 }),
             stage: Stage::Selection,
             selected: false,

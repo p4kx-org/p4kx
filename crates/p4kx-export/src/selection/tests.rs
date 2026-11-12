@@ -66,7 +66,10 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::Factions
                 | Kind::ReputationPerks
                 | Kind::ReputationTriggerRecords
-                | Kind::ReputationRewardAmounts => {
+                | Kind::ReputationRewardAmounts
+                | Kind::Infractions
+                | Kind::InfractionSets
+                | Kind::Jurisdictions => {
                     assert_eq!(
                         by_path,
                         Some(Kind::Tags),

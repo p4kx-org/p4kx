@@ -515,6 +515,9 @@ catalog-summary-kind = { $kind ->
     [reputationPerks] Rufvorteile
     [reputationTriggerRecords] Rufauslöser-Definitionen
     [reputationRewardAmounts] Rufbelohnungswerte
+    [infractions] Verstöße
+    [infractionSets] Verstoßsammlungen
+    [jurisdictions] Rechtsgebiete
     [paints] Lackierungen
     [loadouts] Loadouts
    *[other] { $kind }

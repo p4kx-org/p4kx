@@ -274,6 +274,9 @@ fn the_kinds_follow_the_existing_ones_in_the_catalog_order() {
             "reputationPerks",
             "reputationTriggerRecords",
             "reputationRewardAmounts",
+            "infractions",
+            "infractionSets",
+            "jurisdictions",
         ],
         "order of the catalog"
     );

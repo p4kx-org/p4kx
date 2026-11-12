@@ -63,6 +63,7 @@ mod catalog_group_edges;
 mod catalog_groups;
 mod catalog_harvest;
 mod catalog_hauling;
+mod catalog_infractions;
 mod catalog_insurance;
 mod catalog_item_stats;
 mod catalog_items;
@@ -386,7 +387,6 @@ mod tag_duplicate_body;
 mod mission_template_original;
 
 mod mission_canonical_health;
-
 mod scoped_canonical_failures;
 
 mod quality_field_capture;

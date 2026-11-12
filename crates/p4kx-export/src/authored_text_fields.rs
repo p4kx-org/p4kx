@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{SourceUseRole, SourceValue, SourcedValue, Value};
+use p4kx_extraction::{DataType, SourceUseRole, SourceValue, SourcedValue, Value};
 
 use super::{Fact, Observed};
 use crate::CatalogError;
@@ -27,6 +27,30 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         notes: &mut Vec<FieldError>,
     ) -> Result<SourcedValue<GameTextRef>, CatalogError> {
         self.locale(name, notes, |fact| projection.protected_locale_fact(fact))
+    }
+
+    /// Reads ordered authored Locale occurrences in the protected text domain.
+    pub(in crate::catalog_v3) fn protected_locale_array(
+        &self,
+        name: &str,
+        projection: &CatalogProjection<'_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<Vec<SourcedValue<GameTextRef>>>, CatalogError> {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
+            return self.absent();
+        };
+        let storage = fact.field().storage();
+        let expected = "a nullable Locale array";
+        let state = if storage.data_type() == DataType::Locale && storage.is_array() {
+            self.array_elements(fact, name, expected, notes, |index, element, notes| {
+                self.locale_cell(&format!("{name}[{index}]"), element, notes, |fact| {
+                    projection.protected_locale_fact(fact)
+                })
+            })?
+        } else {
+            self.failure(name, fact.value(), expected, notes)?
+        };
+        self.bind_storage(fact, state)
     }
 
     /// Reads an authored Locale or a legacy String localization key in the protected domain.
@@ -79,6 +103,16 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         let Some((_, fact)) = self.originals.field(self.owner, name)? else {
             return self.absent();
         };
+        self.locale_cell(name, fact, notes, retain)
+    }
+
+    fn locale_cell<T>(
+        &self,
+        name: &str,
+        fact: &Fact<'scope, 'read, 'source>,
+        notes: &mut Vec<FieldError>,
+        retain: impl FnOnce(&Fact<'scope, 'read, 'source>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
         let (state, role) = match fact.value() {
             Value::Locale(_) => (
                 SourceValue::Present(retain(fact)?),

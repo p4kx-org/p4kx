@@ -110,6 +110,6 @@ pub(crate) fn actual_kind(type_name: &str) -> Option<Kind> {
         "CraftingQualityQuantizationRecord" => Some(Kind::QualityQuantizations),
         "StarMapObject" => Some(Kind::StarmapObjects),
         "AmmoParams" => Some(Kind::AmmoDefinitions),
-        _ => None,
+        _ => crate::catalog_v3::law_kinds::kind_for_type(type_name),
     }
 }

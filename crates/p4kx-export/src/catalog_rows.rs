@@ -88,6 +88,16 @@ fn append_explosions_and_ammo(emitted: &mut Vec<CatalogRow>, collected: &Collect
 }
 
 fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
+    emitted.extend(
+        collected
+            .law
+            .sources()
+            .map(|(kind, guid, path, _)| CatalogRow {
+                kind,
+                guid,
+                record_path: path.to_owned(),
+            }),
+    );
     append(
         emitted,
         Kind::LootPoolFilters,
@@ -300,6 +310,7 @@ fn definition_number_groups<'rows>(
                 .map(|row| (Kind::Factions, row.numbers.as_slice())),
         )
         .chain(collected.mission_kinds.reputation_number_groups())
+        .chain(collected.law.number_groups())
         .chain(
             collected
                 .explosion_definitions

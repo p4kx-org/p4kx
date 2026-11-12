@@ -82,6 +82,12 @@ pub(crate) struct Completeness<'a> {
     pub(crate) reputation_trigger_records: KindCompleteness<'a>,
     /// The completeness of `reputationRewardAmounts`.
     pub(crate) reputation_reward_amounts: KindCompleteness<'a>,
+    /// The physical infraction definition selection.
+    pub(crate) infractions: KindCompleteness<'a>,
+    /// The physical infraction set selection.
+    pub(crate) infraction_sets: KindCompleteness<'a>,
+    /// The physical jurisdiction selection.
+    pub(crate) jurisdictions: KindCompleteness<'a>,
     /// The completeness of `factionReputations`.
     pub(crate) faction_reputations: KindCompleteness<'a>,
     /// The completeness of `reputationScopes`.
@@ -172,6 +178,9 @@ impl<'a> Completeness<'a> {
             reputation_perks: completeness,
             reputation_trigger_records: completeness,
             reputation_reward_amounts: completeness,
+            infractions: completeness,
+            infraction_sets: completeness,
+            jurisdictions: completeness,
             faction_reputations: completeness,
             reputation_scopes: completeness,
             reputation_standings: completeness,

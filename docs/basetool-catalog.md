@@ -241,6 +241,9 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.reputationPerks` | The physical perk lists with ordered original scope/standing associations and owned reward or category data |
 | `definitions.reputationTriggerRecords` | Reusable physical sandbox trigger Records with ordered manual trigger definitions |
 | `definitions.reputationRewardAmounts` | Physical reputation reward Records with their authored names and signed amounts |
+| `definitions.infractions` | Physical infraction definitions with ordered source triggers and authored defaults. [Law definitions](catalog-law.md) |
+| `definitions.infractionSets` | Physical reusable sets of ordered infraction links and overrides. [Law definitions](catalog-law.md) |
+| `definitions.jurisdictions` | Physical jurisdictions with authored parent links, fines, limits, prison and penalty configuration. [Law definitions](catalog-law.md) |
 | `definitions.reputationContexts` | Physical reputation contexts with authored scope order, original references and display properties |
 | `missionTypes` | The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID |
 | `missionLocalities` | The mission localities, named sets of starmap objects, ordered by GUID |
@@ -2734,6 +2737,9 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `reputationPerks` | Any path | `SPerkReputationListParams` |
 | `reputationTriggerRecords` | Any path | `SandboxTriggerRecord` |
 | `reputationRewardAmounts` | Any path | `SReputationRewardAmount` |
+| `infractions` | Any path | `InfractionDefinition` |
+| `infractionSets` | Any path | `InfractionSet` |
+| `jurisdictions` | Any path | `Jurisdiction` |
 | `reputationContexts` | `libs/foundry/records/reputation/contexts/` | `SReputationContextUI` |
 | `missionTypes` | `libs/foundry/records/missiontype/` | `MissionType` |
 | `missionLocalities` | `libs/foundry/records/missiondata/pu_missionlocality/` | `MissionLocality` |

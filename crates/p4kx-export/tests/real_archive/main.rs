@@ -53,6 +53,7 @@ mod real_archive_item_durability;
 mod real_archive_item_recovery;
 mod real_archive_item_stats;
 mod real_archive_items;
+mod real_archive_law_definitions;
 mod real_archive_leftovers;
 mod real_archive_loadouts;
 mod real_archive_loot;

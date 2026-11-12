@@ -176,6 +176,9 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
             | Kind::ReputationPerks
             | Kind::ReputationTriggerRecords
             | Kind::ReputationRewardAmounts
+            | Kind::Infractions
+            | Kind::InfractionSets
+            | Kind::Jurisdictions
             | Kind::ContractTemplates
             | Kind::MissionBrokerEntries
             | Kind::GameplayProperties

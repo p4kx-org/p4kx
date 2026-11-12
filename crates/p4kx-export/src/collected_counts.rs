@@ -6,11 +6,16 @@ use crate::selection::Kind;
 
 impl Collected<'_> {
     /// Returns the number of written rows for one catalog kind.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one exhaustive row count per catalog kind"
+    )]
     pub(super) const fn count(&self, kind: Kind) -> usize {
         match kind {
             Kind::Tags => self.tags.count(),
             Kind::Manufacturers => self.manufacturers.len(),
             Kind::Factions => self.factions.len(),
+            Kind::Infractions | Kind::InfractionSets | Kind::Jurisdictions => self.law.count(kind),
             Kind::Items => self.items.len(),
             Kind::Ships => self.ships.len(),
             Kind::Commodities => self.commodities.len(),

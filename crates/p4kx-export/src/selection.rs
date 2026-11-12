@@ -176,11 +176,17 @@ pub enum Kind {
     ReputationTriggerRecords,
     /// All physical reputation reward amount Records.
     ReputationRewardAmounts,
+    /// Physical authored infraction definitions.
+    Infractions,
+    /// Physical reusable sets of ordered infraction uses.
+    InfractionSets,
+    /// Physical jurisdiction definitions.
+    Jurisdictions,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 58] = [
+    pub const ALL: [Self; 61] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -239,9 +245,16 @@ impl Kind {
         Self::ReputationPerks,
         Self::ReputationTriggerRecords,
         Self::ReputationRewardAmounts,
+        Self::Infractions,
+        Self::InfractionSets,
+        Self::Jurisdictions,
     ];
 
     /// Returns the stable kind identifier, independently of its canonical dataset path.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one stable wire name per catalog kind"
+    )]
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
@@ -303,6 +316,9 @@ impl Kind {
             Self::ReputationPerks => "reputationPerks",
             Self::ReputationTriggerRecords => "reputationTriggerRecords",
             Self::ReputationRewardAmounts => "reputationRewardAmounts",
+            Self::Infractions => "infractions",
+            Self::InfractionSets => "infractionSets",
+            Self::Jurisdictions => "jurisdictions",
         }
     }
 }
@@ -366,7 +382,10 @@ pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
         | Kind::Factions
         | Kind::ReputationPerks
         | Kind::ReputationTriggerRecords
-        | Kind::ReputationRewardAmounts => false,
+        | Kind::ReputationRewardAmounts
+        | Kind::Infractions
+        | Kind::InfractionSets
+        | Kind::Jurisdictions => false,
         Kind::ContractTemplates => has_word(record_path, name, &CONTRACT_TEMPLATE_EXCLUDED_TOKENS),
         Kind::Ships => {
             is_leftover(record_path, name) || has_word(record_path, name, &SHIP_EXCLUDED_TOKENS)

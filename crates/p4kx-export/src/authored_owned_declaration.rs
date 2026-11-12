@@ -15,6 +15,8 @@ use crate::source_fields::{FieldError, FieldViolation};
 use crate::source_value_catalog::{self, SourceArenaOutput};
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "authored_enum_fields.rs"]
+mod enumeration;
 #[path = "authored_owned_family.rs"]
 mod family;
 
@@ -254,71 +256,6 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
             self.numbers.borrow_mut().push(number);
         }
         Ok(())
-    }
-
-    /// Reads a declared Enum label or a directly stored String label.
-    pub(in crate::catalog_v3) fn borrowed_enum_or_string(
-        &self,
-        name: &str,
-        target: &str,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<SourcedValue<&'source str>, CatalogError> {
-        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
-            return self.absent();
-        };
-        let storage = fact.field().storage();
-        if storage.data_type() == DataType::String && !storage.is_array() {
-            return self.borrowed_string(name, notes);
-        }
-        self.read_enum(name, target, fact, notes)
-    }
-
-    /// Reads the stored label of a scalar Enum with the expected original declaration.
-    pub(in crate::catalog_v3) fn borrowed_enum_to(
-        &self,
-        name: &str,
-        target: &str,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<SourcedValue<&'source str>, CatalogError> {
-        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
-            return self.absent();
-        };
-        self.read_enum(name, target, fact, notes)
-    }
-
-    fn read_enum(
-        &self,
-        name: &str,
-        target: &str,
-        fact: &Fact<'scope, 'read, 'source>,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<SourcedValue<&'source str>, CatalogError> {
-        let storage = fact.field().storage();
-        if storage.data_type() != DataType::Enum || storage.is_array() {
-            let state = self.failure(name, fact.value(), "a nullable scalar Enum", notes)?;
-            return self.bind_storage(fact, state);
-        }
-        fact.check_input(self.input)?;
-        let (declared, declaration) = self.input.declared_enum_name(storage.target())?;
-        self.read_declared_value(
-            fact,
-            &[target],
-            (declared, fact.declaration_selectors(declaration)?),
-            notes,
-            |notes| {
-                let state = match fact.value() {
-                    Value::Enum(label) => SourceValue::Present(*label),
-                    Value::Null => SourceValue::Null,
-                    other => self.failure(name, other, "a nullable Enum", notes)?,
-                };
-                let role = if matches!(state, SourceValue::Present(_)) {
-                    SourceUseRole::Payload
-                } else {
-                    SourceUseRole::Selector
-                };
-                fact.bind(OriginalValuePart::Value, state, role, true)
-            },
-        )
     }
 
     pub(super) fn read_declared_owned<T>(

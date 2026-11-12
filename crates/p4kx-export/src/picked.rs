@@ -10,6 +10,7 @@ use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
+use crate::catalog_v3::law_kinds::LawPick;
 use crate::contract::{
     Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
     MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup, ResourceType, Ship,
@@ -58,6 +59,7 @@ pub(crate) enum Picked<'f> {
     ExplosionDefinition(Box<PreparedExplosionDefinition<'f>>),
     AmmoDefinition(Box<PreparedAmmoDefinition<'f>>),
     Faction(Box<PreparedFaction<'f>>),
+    Law(LawPick<'f>),
     /// A starmap object.
     Starmap(StarmapObject<'f>),
     /// A mineable element.
@@ -139,6 +141,9 @@ impl<'f> Picked<'f> {
             | Kind::ReputationPerks
             | Kind::ReputationTriggerRecords
             | Kind::ReputationRewardAmounts
+            | Kind::Infractions
+            | Kind::InfractionSets
+            | Kind::Jurisdictions
             | Kind::GameplayProperties
             | Kind::QualityDistributions
             | Kind::QualityQuantizations

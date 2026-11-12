@@ -47,6 +47,14 @@ pub(crate) mod sandbox_trigger_record_definition;
 
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;
+#[path = "infraction_definition.rs"]
+pub(crate) mod infraction_definition;
+#[path = "infraction_parameters.rs"]
+mod infraction_parameters;
+#[path = "jurisdiction_definition.rs"]
+pub(crate) mod jurisdiction_definition;
+#[path = "law_kinds.rs"]
+pub(crate) mod law_kinds;
 #[path = "reputation_blackboard.rs"]
 mod reputation_blackboard;
 #[path = "reputation_context_definition.rs"]

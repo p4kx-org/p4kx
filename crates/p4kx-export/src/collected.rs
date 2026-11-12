@@ -19,6 +19,7 @@ use crate::catalog_v3::catalog_item_components::ItemComponentRows;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
+use crate::catalog_v3::law_kinds::LawKinds;
 use crate::contract::{
     BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
     HarvestableLocation, HarvestableProviderPreset, Item, Loadout, LootContainer,
@@ -66,6 +67,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) tags: crate::catalog_v3::tag_catalog::TagRows<'f>,
     pub(crate) manufacturers: Vec<Manufacturer<'f>>,
     pub(crate) factions: Vec<PreparedFaction<'f>>,
+    pub(crate) law: LawKinds<'f>,
     pub(crate) items: Vec<Item<'f>>,
     pub(crate) item_components: ItemComponentRows<'f>,
     pub(crate) entity_configurations: EntityConfigurationRows<'f>,
@@ -215,6 +217,7 @@ impl<'f> Collected<'f> {
             shop_inventory_resolution: CatalogTable::empty(DatasetAvailability::Absent),
             crafters: Vec::new(),
             mission_kinds: MissionKinds::default(),
+            law: LawKinds::default(),
             loot_kinds: LootKinds::default(),
             vehicles: Vec::new(),
             item_classes: ItemClassSummary::default(),
@@ -272,6 +275,7 @@ impl<'f> Collected<'f> {
             Picked::Provider(entity) => self.harvestable_provider_presets.push(entity),
             Picked::MultiConfig(entity) => self.sub_harvestable_multi_configs.push(entity),
             Picked::Mission(entity) => self.mission_kinds.push(entity),
+            Picked::Law(entity) => self.law.push(entity),
             Picked::Loot(entity) => self.loot_kinds.push(entity),
             Picked::Crafter(entity) => self.crafters.push(entity),
             Picked::Crafted(pick, entity) => {

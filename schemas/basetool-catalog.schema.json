@@ -3964,6 +3964,15 @@
         "gameplayProperties": {
           "$ref": "#/$defs/CatalogTableOfGameplayPropertyDefinition"
         },
+        "infractionSets": {
+          "$ref": "#/$defs/CatalogTableOfInfractionSetDefinition"
+        },
+        "infractions": {
+          "$ref": "#/$defs/CatalogTableOfInfractionDefinition"
+        },
+        "jurisdictions": {
+          "$ref": "#/$defs/CatalogTableOfJurisdictionDefinition"
+        },
         "lootPoolFilters": {
           "$ref": "#/$defs/CatalogTableOfLootFilterDefinition"
         },
@@ -4021,6 +4030,9 @@
         "factionReputations",
         "factions",
         "gameplayProperties",
+        "infractionSets",
+        "infractions",
+        "jurisdictions",
         "lootPoolFilters",
         "manufacturers",
         "missionBrokerEntries",
@@ -4708,6 +4720,44 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfInfractionDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/InfractionDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfInfractionSetDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/InfractionSetDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfItemAttachmentComponent": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -4793,6 +4843,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ItemRecoveryPolicy"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfJurisdictionDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/JurisdictionDefinition"
           },
           "type": "array"
         }
@@ -6264,9 +6333,21 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `harvestableProviderPresets`."
         },
+        "infractionSets": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The physical infraction set selection."
+        },
+        "infractions": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The physical infraction definition selection."
+        },
         "items": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `items`."
+        },
+        "jurisdictions": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The physical jurisdiction selection."
         },
         "legacyLootArchetypes": {
           "$ref": "#/$defs/KindCompleteness",
@@ -6436,7 +6517,10 @@
         "gameplayProperties",
         "harvestableLocations",
         "harvestableProviderPresets",
+        "infractionSets",
+        "infractions",
         "items",
+        "jurisdictions",
         "legacyLootArchetypes",
         "legacyLootTables",
         "loadouts",
@@ -7327,6 +7411,33 @@
         "factionRewardTiers",
         "guid",
         "recordPath"
+      ],
+      "type": "object"
+    },
+    "ControlledSubstanceClass": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "commodities": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "maxPossessionScu": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "resources": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "commodities",
+        "maxPossessionScu",
+        "resources",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -13134,6 +13245,235 @@
       ],
       "type": "object"
     },
+    "ImpoundingDefinition": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "ignoreIfAgainstPartyMember": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "impoundingFineUec": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "impoundingTimeSeconds": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "trigger": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "ignoreIfAgainstPartyMember",
+        "impoundingFineUec",
+        "impoundingTimeSeconds",
+        "name",
+        "sourceType",
+        "trigger"
+      ],
+      "type": "object"
+    },
+    "InfractionDefinition": {
+      "description": "One physical definition of an authored infraction.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "defaultParameters": {
+          "$ref": "#/$defs/SourcedValueOfInfractionParameters"
+        },
+        "description": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "triggers": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "defaultParameters",
+        "description",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "name",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType",
+        "triggers"
+      ],
+      "type": "object"
+    },
+    "InfractionParameters": {
+      "description": "One original default or override occurrence of the declared penalty parameters.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "coolOffTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "displayGraceTime": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "earlyPaymentPeriod": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "escalatedPaymentFineMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "felonyMerits": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "graceAllowance": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "graceAllowanceCooldown": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "graceCooloffScale": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "gracePeriod": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "graceWarnings": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "hideCrimeInJournal": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "hideCrimeNotification": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "ignoreIfAgainstPartyMember": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "isFelony": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "lifetime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "pressChargesNotificationTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "removeTimeSeconds": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "coolOffTime",
+        "displayGraceTime",
+        "earlyPaymentPeriod",
+        "escalatedPaymentFineMultiplier",
+        "felonyMerits",
+        "graceAllowance",
+        "graceAllowanceCooldown",
+        "graceCooloffScale",
+        "gracePeriod",
+        "graceWarnings",
+        "hideCrimeInJournal",
+        "hideCrimeNotification",
+        "ignoreIfAgainstPartyMember",
+        "isFelony",
+        "lifetime",
+        "pressChargesNotificationTime",
+        "removeTimeSeconds",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "InfractionSetDefinition": {
+      "description": "One reusable physical set of ordered infraction uses.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "infractions": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInfractionUse"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "fileName",
+        "guid",
+        "infractions",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "InfractionTrigger": {
       "oneOf": [
         {
@@ -13191,6 +13531,30 @@
       },
       "required": [
         "authoredFields",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "InfractionUse": {
+      "description": "A declared infraction link with its own parameters.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "definition": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "parameterOverrides": {
+          "$ref": "#/$defs/SourcedValueOfInfractionParameters"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "definition",
+        "parameterOverrides",
         "sourceType"
       ],
       "type": "object"
@@ -14544,6 +14908,114 @@
         }
       ]
     },
+    "JurisdictionDefinition": {
+      "description": "A physical jurisdiction and the law facts authored directly on it.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "baseFine": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "controlledSubstanceClasses": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfControlledSubstanceClass"
+        },
+        "earlyPaymentPeriod": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "impoundingDefinitions": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfImpoundingDefinition"
+        },
+        "infractionSets": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "infractions": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInfractionUse"
+        },
+        "isPrison": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "journalEntry": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "logoPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "maxStolenGoodsPossessionScu": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+        },
+        "parentJurisdiction": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "prohibitedGoods": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "prohibitedResources": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "respectsParentJurisdictionLaws": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "subsumptionJurisdiction": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "baseFine",
+        "className",
+        "controlledSubstanceClasses",
+        "earlyPaymentPeriod",
+        "fileName",
+        "guid",
+        "impoundingDefinitions",
+        "infractionSets",
+        "infractions",
+        "isPrison",
+        "journalEntry",
+        "logoPath",
+        "maxStolenGoodsPossessionScu",
+        "metadataTag",
+        "name",
+        "parentJurisdiction",
+        "prohibitedGoods",
+        "prohibitedResources",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "respectsParentJurisdictionLaws",
+        "sourceType",
+        "subsumptionJurisdiction"
+      ],
+      "type": "object"
+    },
     "Kind": {
       "description": "A kind of entity in the Basetool catalog.",
       "type": "string",
@@ -14780,6 +15252,18 @@
         {
           "description": "All physical reputation reward amount Records.",
           "value": "reputationRewardAmounts"
+        },
+        {
+          "description": "Physical authored infraction definitions.",
+          "value": "infractions"
+        },
+        {
+          "description": "Physical reusable sets of ordered infraction uses.",
+          "value": "infractionSets"
+        },
+        {
+          "description": "Physical jurisdiction definitions.",
+          "value": "jurisdictions"
         }
       ]
     },
@@ -32598,6 +33082,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfControlledSubstanceClass": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfControlledSubstanceClass"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfCurvePoint": {
       "allOf": [
         {
@@ -33092,6 +33709,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfFriendlyFireOverride"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfGameTextRef": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfGameTextRef"
                 },
                 "type": "array"
               }
@@ -33757,6 +34507,272 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfHideAttachment"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfImpoundingDefinition": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfImpoundingDefinition"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfInfractionUse": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfInfractionUse"
                 },
                 "type": "array"
               }
@@ -43030,6 +44046,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfControlledSubstanceClass": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ControlledSubstanceClass"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfCountermeasureKind": {
       "allOf": [
         {
@@ -49270,6 +50416,266 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfImpoundingDefinition": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ImpoundingDefinition"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfInfractionParameters": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/InfractionParameters"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfInfractionTrigger": {
       "allOf": [
         {
@@ -49364,6 +50770,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/InfractionTrigger"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfInfractionUse": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/InfractionUse"
               }
             }
           }

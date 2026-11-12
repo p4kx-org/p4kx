@@ -65,6 +65,9 @@ pub(crate) fn named_rows<'catalog>(
         Kind::ReputationRewardAmounts => {
             checked_table(catalog, kind, "/definitions/reputationRewardAmounts")
         }
+        Kind::Infractions => checked_table(catalog, kind, "/definitions/infractions"),
+        Kind::InfractionSets => checked_table(catalog, kind, "/definitions/infractionSets"),
+        Kind::Jurisdictions => checked_table(catalog, kind, "/definitions/jurisdictions"),
         Kind::QualityDistributions => {
             checked_table(catalog, kind, "/definitions/qualityDistributions")
         }
@@ -112,6 +115,9 @@ fn checked_table<'catalog>(
                 | Kind::ReputationTriggerRecords
                 | Kind::ReputationRewardAmounts
                 | Kind::ReputationPerks
+                | Kind::Infractions
+                | Kind::InfractionSets
+                | Kind::Jurisdictions
         ) {
             record_header(row)?;
         }
@@ -221,6 +227,9 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::ReputationTriggerRecords
             | Kind::ReputationRewardAmounts
             | Kind::ReputationPerks
+            | Kind::Infractions
+            | Kind::InfractionSets
+            | Kind::Jurisdictions
             | Kind::Commodities
             | Kind::ResourceTypes
             | Kind::ResourceGroups
