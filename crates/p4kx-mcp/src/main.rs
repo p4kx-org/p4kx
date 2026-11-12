@@ -28,6 +28,8 @@ mod definition_origins;
 mod definitions;
 mod discovery_notes;
 mod entries;
+mod entry_directory_origins;
+mod entry_search_origins;
 mod error;
 mod forge_file;
 mod forge_origins;

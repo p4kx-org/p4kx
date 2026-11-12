@@ -48,6 +48,13 @@ it does not replace that marker or restore runtime authority. Absence means unkn
 only where the governing older output format permits omission; current descriptions
 require the field. Catalog v3 does not accept a missing current field as a legacy default.
 
+An `archiveDirectory` source represents the admitted directory of a successfully opened root
+Archive. Its `archiveDirectoryPaths` selector covers the complete half-open range of consulted
+path positions, from zero through the directory's admitted Entry count. The positions include
+separate occurrences of repeated paths. A successfully opened empty directory has range
+`[0, 0)`. The source uses Archive directory metadata and has no containing Entries.
+Returned field values continue to identify their physical Entry records individually.
+
 `SourceUses::shared_origin` captures the original contributors common to several values.
 `value_with_shared_origin` adds each value's own contributors from the same inventory.
 Each value still serializes its complete sorted, deduplicated `sourceUsesRefs` array

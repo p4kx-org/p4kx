@@ -265,3 +265,38 @@ fn assert_archive_file_source_kinds(sources: &SourceUses) -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn a_root_directory_survey_cannot_be_created_from_an_opened_container() -> TestResult {
+    use crate::{Archive, SourceLocation};
+    use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry};
+
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("Data.p4k");
+    let nested = TestContainer::new()
+        .entry(TestEntry::stored("child.txt", b"content"))
+        .build();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("nested.socpak", nested))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    let entry = archive
+        .entries()
+        .first()
+        .ok_or("original container Entry")?;
+    let container = archive.open_container(entry)?;
+    let sources = SourceUses::new();
+    assert!(
+        sources.observe_root_directory_paths(&container)?.is_none(),
+        "a child directory uses its container payload's ancestry"
+    );
+    let root = sources
+        .observe_root_directory_paths(&archive)?
+        .ok_or("successfully parsed root directory")?;
+    assert!(matches!(
+        root.description().location(),
+        SourceLocation::ArchiveDirectoryPaths { start_entry_index, end_entry_index }
+            if start_entry_index.get() == 0 && end_entry_index.get() == 1
+    ));
+    Ok(())
+}

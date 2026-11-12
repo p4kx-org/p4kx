@@ -28,6 +28,26 @@ impl Archive {
         self.observed_entry(entry).map(|view| view.snapshot())
     }
 
+    /// Returns the admitted directory size of a successfully opened root Archive.
+    #[must_use]
+    pub fn root_directory_entry_count(&self) -> Option<usize> {
+        (self.depth == 0).then_some(self.entries.len())
+    }
+
+    /// Returns the original Entry that supplied this opened container.
+    #[must_use]
+    pub fn container_input_origin(&self) -> Option<EntryOrigin> {
+        let (last, parents) = self.origin_ancestors.split_last()?;
+        let OriginAncestor::Proven(last) = last else {
+            return None;
+        };
+        Some(EntryOrigin::new(
+            self.input_origin.clone(),
+            Arc::from(parents),
+            Arc::clone(last),
+        ))
+    }
+
     /// Returns this view's opaque root-input identity, shared with all its containers.
     #[must_use]
     pub const fn input_origin(&self) -> &ArchiveInputOrigin {

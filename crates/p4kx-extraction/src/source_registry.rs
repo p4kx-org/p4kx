@@ -6,12 +6,14 @@ use std::sync::Arc;
 
 use p4kx_archive::{ArchiveInputOrigin, ObservedEntryBinding};
 
+use crate::DecimalU64;
 use crate::field_origin::FieldOrigin;
 use crate::source_archive_binding::ArchiveSourceBinding;
 use crate::source_details::SourceDetails;
 use crate::source_file_input::{FileInput, FileInputRef};
 use crate::source_inventory::{
-    PhysicalSource, PhysicalSourceKind, PhysicalSourceRef, SourceEncryptionState,
+    ArchiveDirectorySource, PhysicalSource, PhysicalSourceKind, PhysicalSourceRef,
+    SourceEncryptionState,
 };
 use crate::source_registration;
 use crate::source_scope::SourceInput;
@@ -95,6 +97,27 @@ impl SourceRegistry {
                 }
             }
         }
+    }
+
+    pub(crate) fn root_directory(
+        &mut self,
+        origin: &ArchiveInputOrigin,
+        admitted_entry_count: DecimalU64,
+    ) -> PhysicalSourceRef {
+        let input = self.archive_input(origin);
+        let id = PhysicalSourceRef(format!("a{input}:directory"));
+        self.sources
+            .entry(id.clone())
+            .or_insert_with(|| PhysicalSource {
+                id: id.clone(),
+                ancestors: Vec::new(),
+                stored_encryption: SourceEncryptionState::Unencrypted,
+                binding: None,
+                source: PhysicalSourceKind::ArchiveDirectory(ArchiveDirectorySource {
+                    admitted_entry_count,
+                }),
+            });
+        id
     }
 
     pub(crate) fn archive_input(&mut self, origin: &ArchiveInputOrigin) -> usize {

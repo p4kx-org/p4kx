@@ -1,5 +1,17 @@
 {
   "$defs": {
+    "ArchiveDirectorySource": {
+      "description": "Admitted Entry positions from the original root Archive directory.",
+      "properties": {
+        "admittedEntryCount": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "admittedEntryCount"
+      ],
+      "type": "object"
+    },
     "ArchiveEntryProof": {
       "description": "Minimal original Entry proof when optional stored details were not retained.",
       "properties": {
@@ -478,6 +490,20 @@
           "type": "object"
         },
         {
+          "$ref": "#/$defs/ArchiveDirectorySource",
+          "description": "The original root Archive's parsed directory.",
+          "properties": {
+            "kind": {
+              "const": "archiveDirectory",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
           "$ref": "#/$defs/ArchiveFileSource",
           "description": "The completed whole-file read of an observed Archive input.",
           "properties": {
@@ -712,6 +738,29 @@
             "type",
             "language",
             "selector"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Half-open admitted Entry positions in a parsed root Archive directory.",
+          "properties": {
+            "endEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Position after the last consulted Entry path."
+            },
+            "startEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First admitted Entry path position."
+            },
+            "type": {
+              "const": "archiveDirectoryPaths",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "startEntryIndex",
+            "endEntryIndex"
           ],
           "type": "object"
         },

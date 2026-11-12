@@ -855,6 +855,15 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | `mtl_summary` | A `.mtl` Entry (`path`), paged by sub-material: name, shader, surface type, flags, colours, opacity, glow, complete admitted texture-slot, shader-parameter and layer lists; retained strings are complete, paging observes the 256 KiB response budget, and an item that cannot fit alone is explicitly refused |
 | `entity_loadout` | The default Loadout of an Entity (`entity`: class name, record path or GUID) as a list of ports, parents first: path, depth, source, what the port takes, the Entity attached and for each unresolved port the reason; each Entity states its `issues` and, only when it has any, its `notes` (all admitted undecidable spawn requirements, such as an `assortment_requirement`, as in the CLI JSON); `max_depth` (16 by default, at most 32) and a cursor bound it; retained identities, paths, values and reasons are complete within the 256 KiB response budget, with explicit refusal for an item that cannot fit first |
 
+
+For `search_entries`, `fieldOrigins` covers each returned directory field and its original
+physical Entry, including repeated paths and ZIP or v2 header facts. Leaf encryption
+and the enclosing directory's encryption are separate facts. An encrypted containing
+Entry contributes to its decoded child directory, including a zero-match count.
+`total` and `next_cursor` use the entire consulted directory independently of the returned page.
+A root Archive uses one original directory receipt with half-open admitted path positions,
+including an empty range for an empty Archive.
+
 For `run_query`, `fieldOrigins` addresses the actual JSON columns and list elements. Scalar
 payloads, followed Reference slots and selected instances identify their original decoded DCB
 positions. The total retains the WHERE inputs actually read, including short-circuit evaluation.

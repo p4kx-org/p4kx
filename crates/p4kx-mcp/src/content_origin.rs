@@ -94,7 +94,7 @@ impl EntryPageSources {
         Self::observe_into(archive, entry, SourceUses::with_compact_use_refs())
     }
 
-    fn observe_into(
+    pub(crate) fn observe_into(
         archive: &Archive,
         entry: &Entry,
         uses: SourceUses,
@@ -146,6 +146,22 @@ impl EntryPageSources {
 
     pub(crate) const fn complete(&self) -> bool {
         self.complete
+    }
+
+    pub(crate) fn directory_subresource(
+        &self,
+        location: SourceLocation,
+        role: SourceUseRole,
+    ) -> Result<SourceUse, SourceEvidenceError> {
+        self.directory.at(location, role)
+    }
+
+    pub(crate) fn directory_fact(
+        &self,
+        field: &str,
+        role: SourceUseRole,
+    ) -> Result<SourceUse, SourceEvidenceError> {
+        self.directory.at(metadata(field), role)
     }
 
     pub(crate) fn leaf_path(&self) -> Result<SourceUse, SourceEvidenceError> {

@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::DecimalU64;
 use serde::Deserialize;
 
-use crate::MediaError;
 use crate::origin_fact_read::{Declaration, Fact};
 use crate::origin_source_shape::{
     CoordinateIndices, CoordinateText, DecimalCoordinate, EntryIndex, ProofDetails, RecordFormat,
     RecordRange,
 };
+use crate::{MediaError, origin_decimal};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -34,6 +35,7 @@ pub(crate) enum SourceKind {
     ArchiveEntry,
     ArchiveEntryProof,
     ArchiveFile,
+    ArchiveDirectory,
     File,
     Unknown,
 }
@@ -46,6 +48,7 @@ pub(crate) struct SourceRow {
     pub(crate) stored_encryption: Encryption,
     pub(crate) kind: SourceKind,
     pub(crate) entry_index: Option<EntryIndex>,
+    pub(crate) admitted_entry_count: Option<DirectoryOrdinal>,
     pub(crate) details: Option<ProofDetails>,
     pub(crate) record_format: Option<RecordFormat>,
     pub(crate) record_range: Option<RecordRange>,
@@ -71,6 +74,7 @@ impl SourceRow {
                 self.entry_index == Some(EntryIndex::Decimal) && self.details.is_some()
             }
             SourceKind::ArchiveFile => self.byte_length.is_some(),
+            SourceKind::ArchiveDirectory => self.admitted_entry_count.is_some(),
             SourceKind::File => self.name.is_some() && self.byte_length.is_some(),
             SourceKind::Unknown => true,
         };
@@ -129,15 +133,38 @@ pub(crate) struct Location {
     field: Option<CoordinateText>,
     language: Option<CoordinateText>,
     record_index: Option<u32>,
+    start_entry_index: Option<DirectoryOrdinal>,
+    end_entry_index: Option<DirectoryOrdinal>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(transparent)]
+pub(crate) struct DirectoryOrdinal(
+    #[serde(deserialize_with = "origin_decimal::deserialize")] DecimalU64,
+);
+
+impl DirectoryOrdinal {
+    pub(crate) const fn is_start(self) -> bool {
+        self.0.get() == 0
+    }
 }
 
 impl Location {
+    pub(crate) fn directory_paths(&self) -> Option<[DirectoryOrdinal; 2]> {
+        if self.kind == LocationKind::ArchiveDirectoryPaths {
+            Some([self.start_entry_index?, self.end_entry_index?])
+        } else {
+            None
+        }
+    }
+
     pub(crate) fn require_shape(&self) -> Result<(), MediaError> {
         let valid = match self.kind {
             LocationKind::Opaque => self.reason.is_some(),
             LocationKind::Metadata => self.field.is_some(),
             LocationKind::DataForge => self.record_index.is_some() && self.field.is_some(),
             LocationKind::LocalizationLookup => self.language.is_some() && self.selector.is_some(),
+            LocationKind::ArchiveDirectoryPaths => self.directory_paths().is_some(),
             LocationKind::Subresource => {
                 self.namespace.is_some() && self.indices.is_some() && self.field.is_some()
             }
@@ -157,6 +184,7 @@ pub(crate) enum LocationKind {
     DataForge,
     LocalizationLookup,
     Subresource,
+    ArchiveDirectoryPaths,
     Metadata,
 }
 

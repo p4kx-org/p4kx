@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::entry_search_origins::SearchOrigins;
 use p4kx_channels::Channel;
 use p4kx_extraction::{ArchiveLayoutInfo, Build, Entry, EntryMetadataInfo};
 use schemars::JsonSchema;
@@ -179,6 +180,8 @@ pub(crate) enum FolderItem {
 /// The Entries a Filter matched.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct SearchResult {
+    #[serde(flatten)]
+    pub(crate) origins: SearchOrigins,
     /// The path of the Archive.
     pub(crate) archive: String,
     /// The Filter.

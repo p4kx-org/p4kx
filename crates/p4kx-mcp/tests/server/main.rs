@@ -41,6 +41,7 @@ mod entity_loadout;
 mod entity_loadout_notes;
 mod entity_loadout_pick;
 mod entries;
+mod entry_search_origins;
 mod exact_audio_assertions;
 mod exact_audio_fixture;
 mod exact_audio_paging;

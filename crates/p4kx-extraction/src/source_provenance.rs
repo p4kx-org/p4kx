@@ -33,9 +33,9 @@ pub use crate::source_details::{SourceCoordinateOmission, SourceDetails};
 pub use crate::source_encryption_evidence::SourceDeclarationEvidence;
 pub use crate::source_evidence_error::SourceEvidenceError;
 pub use crate::source_inventory::{
-    ArchiveEntryProof, ArchiveEntrySource, ArchiveFileSource, FileSource, PhysicalSource,
-    PhysicalSourceKind, PhysicalSourceRef, SourceDeclarationKind, SourceEncryptionDeclaration,
-    SourceEncryptionState, SourceInventory, SourceRecordFormat,
+    ArchiveDirectorySource, ArchiveEntryProof, ArchiveEntrySource, ArchiveFileSource, FileSource,
+    PhysicalSource, PhysicalSourceKind, PhysicalSourceRef, SourceDeclarationKind,
+    SourceEncryptionDeclaration, SourceEncryptionState, SourceInventory, SourceRecordFormat,
 };
 pub use crate::source_scope::{SourceInput, SourceScope};
 pub use crate::source_use::{

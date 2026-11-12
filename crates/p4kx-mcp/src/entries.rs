@@ -5,6 +5,7 @@ use p4kx_channels::PublicPatches;
 use p4kx_extraction::{Archive, ArchiveLayoutInfo, Filter};
 
 use crate::container::Place;
+use crate::entry_search_origins::SearchOrigins;
 use crate::error::ToolError;
 use crate::page::Page;
 use crate::shapes::{
@@ -63,22 +64,33 @@ pub(crate) fn search(
     let archive = place.archive();
     let filter = Filter::parse(filter)?;
     let mut total = 0;
-    let mut entries = Vec::with_capacity(page.limit());
+    let mut selected = Vec::with_capacity(page.limit());
     for entry in archive.entries() {
         if filter.matches(entry.path()) {
             if page.contains(total) {
-                entries.push(EntryShape::at(entry, place.shown(entry.path())));
+                selected.push(entry);
             }
             total += 1;
         }
     }
+    let next_cursor = page.next_cursor(total)?;
+    let entries: Vec<_> = selected
+        .iter()
+        .map(|entry| EntryShape::at(entry, place.shown(entry.path())))
+        .collect();
+    let rows = selected
+        .into_iter()
+        .zip(&entries)
+        .map(|(entry, shape)| (entry, &shape.metadata));
+    let origins = SearchOrigins::capture(archive, rows, next_cursor.is_some())?;
     Ok(SearchResult {
+        origins,
         archive: archive.path().display().to_string(),
         container: place.chain().map(str::to_owned),
         filter: filter.as_str().to_owned(),
         total,
         entries,
-        next_cursor: page.next_cursor(total)?,
+        next_cursor,
     })
 }
 

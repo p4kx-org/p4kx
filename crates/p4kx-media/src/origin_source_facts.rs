@@ -7,7 +7,7 @@ use p4kx_extraction::{
 
 use crate::MediaError;
 use crate::origin_fact_read::{Declaration, Fact};
-use crate::origin_inventory_wire::{Encryption, Scope, SourceKind, SourceRow};
+use crate::origin_inventory_wire::{DirectoryOrdinal, Encryption, Scope, SourceKind, SourceRow};
 use crate::origin_read_policy::{InventoryBudget, OriginReadPolicy};
 use crate::origin_source_shape::RecordFormat;
 
@@ -16,6 +16,7 @@ pub(crate) struct SourceFacts {
     pub(crate) ancestors: Vec<String>,
     pub(crate) stored_encryption: Encryption,
     pub(crate) kind: SourceKind,
+    pub(crate) admitted_entry_count: Option<DirectoryOrdinal>,
 }
 
 impl SourceFacts {
@@ -28,6 +29,10 @@ impl SourceFacts {
     ) -> bool {
         let expected = match (self.kind, scope) {
             (SourceKind::File | SourceKind::ArchiveFile, _) => Encryption::Unknown,
+            (SourceKind::ArchiveDirectory, Scope::ArchiveDirectoryMetadata) => {
+                Encryption::Unencrypted
+            }
+            (SourceKind::ArchiveDirectory, _) => return false,
             (SourceKind::Unknown, Scope::ArchiveDirectoryMetadata | Scope::FileMetadata)
                 if matches!(ancestors, Encryption::Unencrypted) =>
             {
@@ -66,6 +71,7 @@ impl SourceFacts {
                 ancestors: source.ancestors,
                 stored_encryption: source.stored_encryption,
                 kind: source.kind,
+                admitted_entry_count: source.admitted_entry_count,
             },
         ))
     }

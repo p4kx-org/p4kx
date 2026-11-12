@@ -180,7 +180,8 @@ fn the_page_size_is_capped_at_one_thousand() -> TestResult {
 fn search_follows_the_filter_rules() -> TestResult {
     let install = Install::standard()?;
     let mut server = install.serve(&["--archive", "LIVE"])?;
-    let glob = server.ok("search_entries", &json!({ "filter": r"data\libs\*.XML" }))?;
+    let glob =
+        search_payload(server.ok("search_entries", &json!({ "filter": r"data\libs\*.XML" }))?)?;
     assert_eq!(
         glob,
         json!({
@@ -216,7 +217,7 @@ fn search_follows_the_filter_rules() -> TestResult {
     );
     let glob_whole = server.ok("search_entries", &json!({ "filter": "*.xm?" }))?;
     assert_eq!(glob_whole["total"], 2, "? matches one character");
-    let nothing = server.ok("search_entries", &json!({ "filter": "nothing" }))?;
+    let nothing = search_payload(server.ok("search_entries", &json!({ "filter": "nothing" }))?)?;
     assert_eq!(
         nothing,
         json!({
@@ -228,6 +229,17 @@ fn search_follows_the_filter_rules() -> TestResult {
         "no match is no error"
     );
     Ok(())
+}
+
+fn search_payload(mut reply: Value) -> TestResult<Value> {
+    let object = reply.as_object_mut().ok_or("structured search result")?;
+    for name in ["fieldOrigins", "provenance"] {
+        assert!(
+            object.remove(name).is_some_and(|value| value.is_object()),
+            "{name}"
+        );
+    }
+    Ok(reply)
 }
 
 #[test]

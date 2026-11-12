@@ -112,6 +112,13 @@ pub enum SourceLocation {
         /// The source use holding the actual lookup key.
         selector: SourceUseRef,
     },
+    /// Half-open admitted Entry positions in a parsed root Archive directory.
+    ArchiveDirectoryPaths {
+        /// First admitted Entry path position.
+        start_entry_index: DecimalU64,
+        /// Position after the last consulted Entry path.
+        end_entry_index: DecimalU64,
+    },
     /// One exact logical field inside an already observed structured source subresource.
     Subresource {
         /// Format-owned namespace for the original source object.
@@ -142,6 +149,10 @@ impl SourceLocation {
                 let code = language.code();
                 format!("q{}:{code}{}:{}", code.len(), selector.0.len(), selector.0)
             }
+            Self::ArchiveDirectoryPaths {
+                start_entry_index,
+                end_entry_index,
+            } => format!("a{}:{}", start_entry_index.get(), end_entry_index.get()),
             Self::Subresource {
                 namespace,
                 indices,

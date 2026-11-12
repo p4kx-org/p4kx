@@ -4,13 +4,16 @@
 use std::fmt;
 use std::sync::{Arc, Mutex};
 
+use p4kx_archive::Archive;
+
+use crate::DecimalU64;
 use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
 use crate::source_details::{SourceCoordinateOmission, SourceDetails};
 use crate::source_evidence_error::{self, SourceEvidenceError};
-use crate::source_inventory::SourceInventory;
+use crate::source_inventory::{SourceEncryptionState, SourceInventory};
 use crate::source_registry::SourceRegistry;
 use crate::source_scope::{SourceInput, SourceScope};
-use crate::source_use::{InputScope, SourceLocation, SourceUse};
+use crate::source_use::{InputScope, SourceLocation, SourceUse, SourceUseRole};
 use crate::source_value::{SourceValue, SourcedValue};
 
 /// Per-preparation physical source and use inventory shared by parallel field projections.
@@ -38,6 +41,33 @@ impl SourceUses {
         let identity = Arc::new(());
         let registry = Arc::new(Mutex::new(make(Arc::clone(&identity))));
         Self { registry, identity }
+    }
+
+    /// Retains a complete survey of the admitted paths in this root Archive directory.
+    /// Call after consulting every admitted path. A nested Archive returns no root survey.
+    ///
+    /// # Errors
+    /// Returns an error when a mutation interrupted the shared evidence registry.
+    pub fn observe_root_directory_paths(
+        &self,
+        archive: &Archive,
+    ) -> Result<Option<SourceUse>, SourceEvidenceError> {
+        let Some(count) = archive.root_directory_entry_count() else {
+            return Ok(None);
+        };
+        let end_entry_index = DecimalU64::new(count as u64);
+        let mut registry = source_evidence_error::lock(&self.registry)?;
+        let source = registry.root_directory(archive.input_origin(), end_entry_index);
+        Ok(Some(registry.register_use(
+            &source,
+            InputScope::ArchiveDirectoryMetadata,
+            SourceLocation::ArchiveDirectoryPaths {
+                start_entry_index: DecimalU64::new(0),
+                end_entry_index,
+            },
+            SourceUseRole::Selector,
+            SourceEncryptionState::Unencrypted,
+        )))
     }
 
     /// Retains the actual input once and returns a shared payload or metadata scope.

@@ -9,7 +9,7 @@ use p4kx_extraction::FieldOrigin;
 use crate::checkpoint::Checkpoint;
 use crate::origin_contract::OriginReceipts;
 use crate::origin_inventory_wire::{
-    Encryption, LocationKind, Role, Scope, SourceKind, SourceRow, UseRow,
+    DirectoryOrdinal, Encryption, LocationKind, Role, Scope, SourceKind, SourceRow, UseRow,
 };
 use crate::origin_line_reader::OriginLines;
 use crate::origin_read_policy::{InventoryBudget, OriginReadPolicy};
@@ -33,6 +33,7 @@ struct UseFacts {
 struct UseLocation {
     kind: LocationKind,
     selector: Option<String>,
+    directory_paths: Option<[DirectoryOrdinal; 2]>,
 }
 
 impl ReadInventory {
@@ -105,6 +106,7 @@ impl ReadInventory {
                 role: used.role,
                 location: UseLocation {
                     kind: used.location.kind,
+                    directory_paths: used.location.directory_paths(),
                     selector: used.location.selector,
                 },
                 effective_encryption: used.effective_encryption,
@@ -130,6 +132,9 @@ impl ReadInventory {
             if (matches!(source.kind, SourceKind::ArchiveFile | SourceKind::File)
                 && (!source.ancestors.is_empty()
                     || source.stored_encryption != Encryption::Unknown))
+                || (source.kind == SourceKind::ArchiveDirectory
+                    && (!source.ancestors.is_empty()
+                        || source.stored_encryption != Encryption::Unencrypted))
                 || (source.kind == SourceKind::Unknown
                     && source.stored_encryption != Encryption::Unknown)
             {
@@ -140,7 +145,10 @@ impl ReadInventory {
             let mut seen = BTreeSet::new();
             for ancestor in &source.ancestors {
                 if ancestor == reference
-                    || !self.sources.contains_key(ancestor)
+                    || self
+                        .sources
+                        .get(ancestor)
+                        .is_none_or(|source| source.kind == SourceKind::ArchiveDirectory)
                     || !seen.insert(ancestor)
                 {
                     return Err(invalid("invalid physical source ancestor closure"));
@@ -150,6 +158,22 @@ impl ReadInventory {
         Ok(())
     }
 
+    fn validate_directory_paths(used: &UseFacts, source: &SourceFacts) -> Result<(), MediaError> {
+        match (source.kind, used.location.directory_paths) {
+            (SourceKind::ArchiveDirectory, Some([start, end]))
+                if start.is_start()
+                    && source.admitted_entry_count == Some(end)
+                    && used.role == Role::Selector =>
+            {
+                Ok(())
+            }
+            (SourceKind::ArchiveDirectory, _) | (_, Some(_)) => Err(invalid(
+                "directory path survey contradicts its original owner",
+            )),
+            _ => Ok(()),
+        }
+    }
+
     fn validate_uses(&self, states: &BTreeMap<&str, Encryption>) -> Result<(), MediaError> {
         for used in self.uses.values() {
             let source = self
@@ -157,6 +181,7 @@ impl ReadInventory {
                 .get(&used.source)
                 .ok_or_else(|| invalid("source use refers to a missing physical source"))?;
             Self::validate_use_encryption(used, source, states)?;
+            Self::validate_directory_paths(used, source)?;
             if used.location.kind == LocationKind::LocalizationLookup {
                 let Some(selector) = &used.location.selector else {
                     return Err(invalid("localization use lacks its selector reference"));
@@ -280,3 +305,7 @@ fn require_reference(reference: &str) -> Result<(), MediaError> {
 fn invalid(message: &str) -> MediaError {
     MediaError::Destination(message.to_owned())
 }
+
+#[cfg(test)]
+#[path = "origin_directory_survey_tests.rs"]
+mod directory_survey_tests;

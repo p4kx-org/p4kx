@@ -179,6 +179,14 @@ pub struct ArchiveEntryProof {
     pub(crate) details: SourceDetails,
 }
 
+/// Admitted Entry positions from the original root Archive directory.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = projection_schema::require_properties)]
+pub struct ArchiveDirectorySource {
+    pub(crate) admitted_entry_count: DecimalU64,
+}
+
 /// Measured whole-Archive file facts independently of its stored Entry declarations.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -205,6 +213,8 @@ pub enum PhysicalSourceKind {
     ArchiveEntry(ArchiveEntrySource),
     /// Original Entry identity and encryption with explicitly limited stored details.
     ArchiveEntryProof(ArchiveEntryProof),
+    /// The original root Archive's parsed directory.
+    ArchiveDirectory(ArchiveDirectorySource),
     /// The completed whole-file read of an observed Archive input.
     ArchiveFile(ArchiveFileSource),
     /// One observed file input, without publication of its host path.
