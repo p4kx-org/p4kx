@@ -8,12 +8,14 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_facility::Facility;
 use super::catalog_fuel_configurations::{
     FuelConfigurationKind, FuelConfigurationRows, FuelConfigurationTables,
 };
 use super::catalog_item_alignment::{ItemAlignmentKind, ItemAlignmentRows, ItemAlignmentTables};
 use super::catalog_resource_component::{self, ResourceComponent};
 use super::catalog_resource_connection::{self, ConnectionKind, ResourceConnection};
+use super::catalog_seat;
 use super::catalog_vehicle_armor::{self, VehicleArmor};
 use super::item_alignment_options::AlignmentOptions;
 use super::item_component_owner::ComponentOwner;
@@ -35,6 +37,7 @@ pub(crate) struct EntityConfigurationRows<'source> {
     pub(crate) alignment: ItemAlignmentRows<'source>,
     pub(crate) topology: ResourceTopologyDeclarations<'source>,
     fuel: FuelConfigurationRows<'source>,
+    facilities: Vec<Facility<'source>>,
     resources: Vec<ResourceComponent<'source>>,
     connections: Vec<ResourceConnection<'source>>,
     vehicle_armor: Vec<VehicleArmor<'source>>,
@@ -46,10 +49,48 @@ impl<'source> EntityConfigurationRows<'source> {
         &self.resources
     }
 
+    fn push_configuration(
+        &mut self,
+        configuration: ConfigurationKind,
+        owner: ComponentOwner,
+        source: Observed<'_, '_, '_, 'source>,
+        options: &AlignmentOptions<'_>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<(), CatalogError> {
+        match configuration {
+            ConfigurationKind::Alignment(alignment) => {
+                if matches!(alignment, ItemAlignmentKind::Port)
+                    && let Some(links) = ResourceNetworkLinks::read(owner.clone(), source, notes)?
+                {
+                    self.topology.links.push(links);
+                }
+                self.alignment
+                    .push(alignment, owner, source, options, notes)?;
+            }
+            ConfigurationKind::RoomAssociations => self
+                .topology
+                .rooms
+                .push(RoomAssociations::read(owner, source, notes)?),
+            ConfigurationKind::Fuel(fuel) => self.fuel.push(fuel, owner, source, notes)?,
+            ConfigurationKind::Resource => self
+                .resources
+                .push(ResourceComponent::read(owner, source, notes)?),
+            ConfigurationKind::Connection(kind) => self
+                .connections
+                .push(ResourceConnection::read(kind, owner, source, notes)?),
+            ConfigurationKind::Seat => self.facilities.push(Facility::seat(owner, source, notes)?),
+            ConfigurationKind::VehicleArmor => self
+                .vehicle_armor
+                .push(VehicleArmor::read(owner, source, notes)?),
+        }
+        Ok(())
+    }
+
     pub(crate) fn extend(&mut self, other: Self) {
         self.alignment.extend(other.alignment);
         self.topology.extend(other.topology);
         self.fuel.extend(other.fuel);
+        self.facilities.extend(other.facilities);
         self.resources.extend(other.resources);
         self.connections.extend(other.connections);
         self.vehicle_armor.extend(other.vehicle_armor);
@@ -60,12 +101,14 @@ impl<'source> EntityConfigurationRows<'source> {
         mut self,
         forge: &DataForge<'_>,
     ) -> EntityConfigurationTables<'source> {
+        self.facilities.sort_by_key(|row| row.owner().key());
         self.resources.sort_by_key(|row| row.owner().key());
         self.connections.sort_by_key(|row| row.owner().key());
         self.vehicle_armor.sort_by_key(|row| row.owner().key());
         EntityConfigurationTables {
             alignment: self.alignment.into_tables(forge),
             fuel: self.fuel.into_tables(forge),
+            facilities: CatalogTable::new(forge, &[catalog_seat::COMPONENT], self.facilities),
             resource_components: CatalogTable::new(
                 forge,
                 &[catalog_resource_component::COMPONENT],
@@ -93,17 +136,20 @@ pub(crate) struct EntityConfigurationTables<'source> {
     alignment: ItemAlignmentTables<'source>,
     #[serde(flatten)]
     fuel: FuelConfigurationTables<'source>,
+    facilities: CatalogTable<Facility<'source>>,
     resource_components: CatalogTable<ResourceComponent<'source>>,
     resource_connections: CatalogTable<ResourceConnection<'source>>,
     vehicle_armor: CatalogTable<VehicleArmor<'source>>,
 }
 
+#[derive(Clone, Copy)]
 enum ConfigurationKind {
     Alignment(ItemAlignmentKind),
     Fuel(FuelConfigurationKind),
     Resource,
     Connection(ConnectionKind),
     RoomAssociations,
+    Seat,
     VehicleArmor,
 }
 
@@ -111,6 +157,7 @@ impl ConfigurationKind {
     fn of(value: &StructValue<'_>, input: &OriginalCatalogInput<'_, '_>) -> Option<Self> {
         match value.type_name() {
             catalog_resource_component::COMPONENT => return Some(Self::Resource),
+            catalog_seat::COMPONENT => return Some(Self::Seat),
             catalog_vehicle_armor::COMPONENT => return Some(Self::VehicleArmor),
             _ => {}
         }
@@ -161,32 +208,7 @@ pub(crate) fn read<'source>(
         let component = originals.fact(component)?;
         let owner = ComponentOwner::read(tree, &context, &originals, component)?;
         let source = Observed::new(&originals, input, component, &capture, &numbers);
-        match configuration {
-            ConfigurationKind::Alignment(alignment) => {
-                if matches!(alignment, ItemAlignmentKind::Port)
-                    && let Some(links) =
-                        ResourceNetworkLinks::read(owner.clone(), source, &mut notes)?
-                {
-                    rows.topology.links.push(links);
-                }
-                rows.alignment
-                    .push(alignment, owner, source, options, &mut notes)?;
-            }
-            ConfigurationKind::RoomAssociations => rows
-                .topology
-                .rooms
-                .push(RoomAssociations::read(owner, source, &mut notes)?),
-            ConfigurationKind::Fuel(fuel) => rows.fuel.push(fuel, owner, source, &mut notes)?,
-            ConfigurationKind::Resource => rows
-                .resources
-                .push(ResourceComponent::read(owner, source, &mut notes)?),
-            ConfigurationKind::Connection(kind) => rows
-                .connections
-                .push(ResourceConnection::read(kind, owner, source, &mut notes)?),
-            ConfigurationKind::VehicleArmor => rows
-                .vehicle_armor
-                .push(VehicleArmor::read(owner, source, &mut notes)?),
-        }
+        rows.push_configuration(configuration, owner, source, options, &mut notes)?;
     }
     rows.numbers = numbers.into_inner();
     Ok((rows, notes))

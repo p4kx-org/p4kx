@@ -10,7 +10,7 @@ use p4kx_extraction::{
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
-use crate::real_archive_item_components::{self as components, require_state};
+use crate::real_archive_item_components::{self as components, owned, require_state, single};
 use crate::real_archive_item_durability as proof;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -187,38 +187,4 @@ fn compare_curve(source: &StructValue<'_>, row: &Value) -> TestResult {
         }
     }
     Ok(())
-}
-
-fn owned(
-    source: &StructValue<'_>,
-    row: &Value,
-    field: &str,
-    compare: impl FnOnce(&StructValue<'_>, &Value) -> TestResult,
-) -> TestResult {
-    let cell = components::cell(row, field)?;
-    match source.field(field) {
-        None => require_state(cell, "absent"),
-        Some(Original::Null) => require_state(cell, "null"),
-        Some(Original::Struct(original)) => {
-            let value = cell.get("value").ok_or("original owned armour value")?;
-            if proof::text(value, "/sourceType/value")? != original.type_name() {
-                return Err("original owned armour type differs".into());
-            }
-            compare(original, value)
-        }
-        _ => Err("unreadable original armour structure".into()),
-    }
-}
-
-fn single(source: &StructValue<'_>, field: &str, cell: &Value) -> TestResult {
-    match source.field(field) {
-        None => require_state(cell, "absent"),
-        Some(Original::Single(expected)) => {
-            if proof::text(cell, "/value/rawBits")? != format!("{:08x}", expected.to_bits()) {
-                return Err(format!("original armour Single {field} differs").into());
-            }
-            require_state(cell, "present")
-        }
-        _ => Err("unreadable original armour Single".into()),
-    }
 }

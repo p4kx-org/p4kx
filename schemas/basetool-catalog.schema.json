@@ -3795,6 +3795,9 @@
         "explosives": {
           "$ref": "#/$defs/CatalogTableOfExplosive"
         },
+        "facilities": {
+          "$ref": "#/$defs/CatalogTableOfFacility"
+        },
         "fuelIntakes": {
           "$ref": "#/$defs/CatalogTableOfFuelIntake"
         },
@@ -3864,6 +3867,7 @@
         "distortion",
         "durability",
         "explosives",
+        "facilities",
         "fuelIntakes",
         "fuelTanks",
         "hackingChips",
@@ -4542,6 +4546,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/Explosive"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfFacility": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/Facility"
           },
           "type": "array"
         }
@@ -10315,6 +10338,45 @@
         "targetRecordIndex",
         "targetRecordPath",
         "targetType"
+      ],
+      "type": "object"
+    },
+    "Facility": {
+      "description": "The configuration of one original facility component.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/Seat",
+          "properties": {
+            "kind": {
+              "const": "seat",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -26245,6 +26307,160 @@
       ],
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
+    },
+    "Seat": {
+      "description": "The stored seat controls, ranges and attachment declarations.",
+      "properties": {
+        "actorAttachment": {
+          "$ref": "#/$defs/SourcedValueOfSeatActorAttachment"
+        },
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "availableOperatorModes": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "controlTemplate": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "ejection": {
+          "$ref": "#/$defs/SourcedValueOfSeatEjection"
+        },
+        "maxPitch": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxYaw": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minPitch": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minYaw": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "seatType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "setYawPitchLimits": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "transitionTemplate": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "actorAttachment",
+        "additionalFields",
+        "availableOperatorModes",
+        "controlTemplate",
+        "ejection",
+        "maxPitch",
+        "maxYaw",
+        "minPitch",
+        "minYaw",
+        "seatType",
+        "setYawPitchLimits",
+        "transitionTemplate"
+      ],
+      "type": "object"
+    },
+    "SeatActorAttachment": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "boneName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "stance": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "type": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "boneName",
+        "sourceType",
+        "stance",
+        "type"
+      ],
+      "type": "object"
+    },
+    "SeatEjection": {
+      "description": "The original ejection motion parameters, interaction and offset.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "ejectionInteraction": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "ejectionLoopTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxAngularAcceleration": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxAngularVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxLinearAcceleration": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxLinearVelocity": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "offsetAngles": {
+          "$ref": "#/$defs/SourcedValueOfSeatEjectionAngles"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "ejectionInteraction",
+        "ejectionLoopTime",
+        "maxAngularAcceleration",
+        "maxAngularVelocity",
+        "maxLinearAcceleration",
+        "maxLinearVelocity",
+        "offsetAngles",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "SeatEjectionAngles": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "x": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "y": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "z": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "sourceType",
+        "x",
+        "y",
+        "z"
+      ],
+      "type": "object"
     },
     "SecondaryMagazine": {
       "description": "One original secondary Class element, including its unevaluated condition.",
@@ -64558,6 +64774,396 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ScopeStandingMap"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSeatActorAttachment": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SeatActorAttachment"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSeatEjection": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SeatEjection"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSeatEjectionAngles": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SeatEjectionAngles"
               }
             }
           }

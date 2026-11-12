@@ -103,3 +103,37 @@ pub(super) fn cell<'row>(row: &'row Value, name: &str) -> TestResult<&'row Value
     row.get(name)
         .ok_or_else(|| "expected the authored field carrier".into())
 }
+
+pub(super) fn owned(
+    source: &StructValue<'_>,
+    row: &Value,
+    field: &str,
+    compare: impl FnOnce(&StructValue<'_>, &Value) -> TestResult,
+) -> TestResult {
+    let cell = cell(row, field)?;
+    match source.field(field) {
+        None => require_state(cell, "absent"),
+        Some(Original::Null) => require_state(cell, "null"),
+        Some(Original::Struct(original)) => {
+            let value = cell.get("value").ok_or("original owned source value")?;
+            if proof::text(value, "/sourceType/value")? != original.type_name() {
+                return Err("original owned source type differs".into());
+            }
+            compare(original, value)
+        }
+        _ => Err("unreadable original owned structure".into()),
+    }
+}
+
+pub(super) fn single(source: &StructValue<'_>, field: &str, cell: &Value) -> TestResult {
+    match source.field(field) {
+        None => require_state(cell, "absent"),
+        Some(Original::Single(expected)) => {
+            if proof::text(cell, "/value/rawBits")? != format!("{:08x}", expected.to_bits()) {
+                return Err(format!("original Single {field} differs").into());
+            }
+            require_state(cell, "present")
+        }
+        _ => Err("unreadable original Single".into()),
+    }
+}

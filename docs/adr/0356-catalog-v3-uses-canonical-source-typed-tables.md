@@ -179,3 +179,10 @@ uses in their immediate source cell. Physical pointer matches retain their
 own selected candidate evidence.
 [Declared resource-network topology](../catalog-resource-topology.md) defines
 the placement and resolution states.
+## Ship facility configurations
+
+A facility definition is identified by the original Entity Record index and
+`Components` slot. The `configurations.facilities` `seat` kind carries the original
+`SCItemSeatParams` member data and its owned ejection and actor-attachment
+definitions. Placement consumers can use the physical component key with
+their contextual placement identity. See [ship facility configurations](../catalog-ship-facilities.md).

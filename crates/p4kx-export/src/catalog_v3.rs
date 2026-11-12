@@ -80,6 +80,8 @@ pub(crate) mod catalog_declarations;
 pub(crate) mod catalog_entity_configurations;
 #[path = "catalog_explosives.rs"]
 pub(crate) mod catalog_explosives;
+#[path = "catalog_facility.rs"]
+mod catalog_facility;
 #[path = "catalog_fuel.rs"]
 mod catalog_fuel;
 #[path = "catalog_fuel_configurations.rs"]
@@ -122,6 +124,10 @@ mod catalog_resource_power_ranges;
 mod catalog_resource_signature;
 #[path = "catalog_resource_state.rs"]
 mod catalog_resource_state;
+#[path = "catalog_seat.rs"]
+mod catalog_seat;
+#[path = "catalog_seat_ejection.rs"]
+mod catalog_seat_ejection;
 #[path = "catalog_shield_generator.rs"]
 pub(crate) mod catalog_shield_generator;
 #[path = "catalog_unit_source.rs"]

@@ -184,6 +184,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "fuelTanks": absent_table(),
             "fuelIntakes": absent_table(),
             "resourceContainers": absent_table(),
+            "facilities": absent_table(),
             "resourceComponents": absent_table(),
             "resourceConnections": absent_table(),
             "resourceNetworkParameters": absent_table(),
