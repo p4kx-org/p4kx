@@ -1971,6 +1971,14 @@ screen by type, `rendered` says whether `ui render --screen` draws the type. `mo
 `moviePath` of UI owner components. A canvas that cannot be read keeps its row with the GUID as
 `canvas`, size 0 and no assets. The exit code is 0.
 
+`fieldOrigins` and `provenance` describe the original DataForge declarations used by this listing.
+The receipt distinguishes a screen reference, its admitted canvas path, each read dimension, the
+authored field behind a deduplicated asset path, and every widget counted in an element group.
+Widget addresses record the physical canvas Record, the original `scene` or `library` field, its
+stored array position and, for an asset, the value's preorder position within the widget. The
+listed texture, SVG, movie and localization paths come from authored DataForge fields. Origins with
+unproved loadout port segments or nested canvas selection routes report an incomplete source set.
+
 ## `p4kx ui render <archive> --screen <canvas> --out <file.png> [--svg] [--size <W>x<H>|<W>] [--background …] [--brand <code>] [--var <name>=<value>]… [--lang <language>] --json`
 
 Renders a `BuildingBlocks` canvas, by record path or GUID, instead of a movie; an ENTRY excludes

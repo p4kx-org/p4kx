@@ -77,6 +77,8 @@ mod picture;
 mod reader;
 mod report;
 mod rest;
+mod screen_asset_inputs;
+mod screen_listing_inputs;
 mod screens;
 mod statics;
 mod still;
@@ -108,6 +110,10 @@ pub use images::{ImageSources, LoadTexture, LoadVector};
 pub use inspect::ElementCount;
 pub use limits::Limits;
 pub use report::{Report, Unsupported, VariableInForce};
+pub use screen_asset_inputs::{ScreenAssetInputs, WidgetAssetInput, WidgetInput, WidgetSection};
+pub use screen_listing_inputs::{
+    CanvasInput, EntityScreenInputs, MovieInput, ObservedEntityScreens, ScreenInput, ValueInput,
+};
 pub use screens::{EntityScreens, MovieUse, Screen};
 pub use still::{ObservedStill, Still, StillFormat, StillRequest};
 pub use still_inputs::{StillInputs, StillTextInput};

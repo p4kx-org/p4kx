@@ -29,6 +29,11 @@ const STYLES: &str = "libs/foundry/records/ui/buildingblocks/styles";
 const DEFAULT_STYLE: &str = "libs/foundry/records/ui/buildingblocks/styles/default";
 const MAX_CANVAS_SIDE: f32 = 16_384.0;
 
+pub(crate) struct BrandSelection {
+    pub(crate) code: String,
+    pub(crate) record_index: u32,
+}
+
 /// A screen composed into a scene, with what the composition left out.
 #[derive(Debug)]
 pub struct Composed {
@@ -321,8 +326,18 @@ impl<'a, 'f> ScreenComposer<'a, 'f> {
     /// `AEGS_Avenger_Titan`, when the Archive has a HUD style for it.
     #[must_use]
     pub fn brand_of(&self, class_name: &str) -> Option<String> {
+        self.brand_selection(class_name)
+            .map(|selection| selection.code)
+    }
+
+    pub(crate) fn brand_selection(&self, class_name: &str) -> Option<BrandSelection> {
         let code = class_name.split('_').next()?.to_ascii_lowercase();
-        self.style_ref(&brand_style_path(&code)).map(|_| code)
+        let path = brand_style_path(&code);
+        let record = self.store.forge().records_at_path(&path).next()?;
+        Some(BrandSelection {
+            code,
+            record_index: record.index(),
+        })
     }
 
     fn style_ref(&self, path: &str) -> Option<StyleRef> {

@@ -9,6 +9,7 @@ use serde::Serialize;
 use crate::assets::{AssetSet, ScreenAssets};
 use crate::canvas::CanvasStore;
 use crate::elements::is_rendered;
+use crate::screen_asset_inputs::{ScreenAssetInputs, WidgetInput};
 use crate::style::{CanvasStyles, StyleCache};
 
 /// How many widgets of one element type a screen holds and whether P4KX draws them.
@@ -22,12 +23,19 @@ pub struct ElementCount {
     pub rendered: bool,
 }
 
+struct Kind {
+    count: usize,
+    rendered: bool,
+    widgets: Vec<WidgetInput>,
+}
+
 pub(crate) fn inspect(
     store: &mut CanvasStore<'_, '_>,
     root: Guid,
+    mut inputs: Option<&mut ScreenAssetInputs>,
 ) -> (ScreenAssets, Vec<ElementCount>) {
     let mut assets = AssetSet::default();
-    let mut kinds: BTreeMap<String, (usize, bool)> = BTreeMap::new();
+    let mut kinds: BTreeMap<String, Kind> = BTreeMap::new();
     let mut seen = HashSet::new();
     let mut cache = StyleCache::new();
     let mut queue = vec![root];
@@ -38,17 +46,22 @@ pub(crate) fn inspect(
         let Some(canvas) = store.get(guid) else {
             continue;
         };
-        assets.add_canvas(&canvas.record_path);
+        assets.add_canvas(&canvas.record_path, canvas.record_index);
         for widget in &canvas.widgets {
-            assets.add(&widget.assets);
+            assets.add(&widget.assets, widget.input);
             let name = widget
                 .type_name
                 .strip_prefix("BuildingBlocks_")
                 .unwrap_or(&widget.type_name);
-            kinds
-                .entry(name.to_owned())
-                .or_insert_with(|| (0, is_rendered(&widget.type_name)))
-                .0 += 1;
+            let kind = kinds.entry(name.to_owned()).or_insert_with(|| Kind {
+                count: 0,
+                rendered: is_rendered(&widget.type_name),
+                widgets: Vec::new(),
+            });
+            kind.count += 1;
+            if inputs.is_some() {
+                kind.widgets.push(widget.input);
+            }
             queue.extend(widget.canvas);
         }
         queue.extend(CanvasStyles::swapped_canvases(
@@ -59,13 +72,18 @@ pub(crate) fn inspect(
     }
     let elements = kinds
         .into_iter()
-        .map(|(element, (count, rendered))| ElementCount {
-            element,
-            count,
-            rendered,
+        .map(|(element, kind)| {
+            if let Some(inputs) = inputs.as_deref_mut() {
+                inputs.elements.push(kind.widgets);
+            }
+            ElementCount {
+                element,
+                count: kind.count,
+                rendered: kind.rendered,
+            }
         })
         .collect();
-    (assets.finish(), elements)
+    (assets.finish(inputs), elements)
 }
 
 #[cfg(test)]
@@ -114,7 +132,7 @@ mod tests {
             .build();
         let forge = DataForge::open(&bytes).expect("database");
         let root = find_canvas(&forge, &guid_text(OUTER)).expect("canvas");
-        let (assets, _) = inspect(&mut CanvasStore::new(&forge), root);
+        let (assets, _) = inspect(&mut CanvasStore::new(&forge), root, None);
         assert_eq!(assets.canvases.len(), 2, "{:?}", assets.canvases);
         assert_eq!(assets.textures, ["UI/Test/swapped.dds"]);
     }
@@ -145,7 +163,7 @@ mod tests {
         let bytes = source.build();
         let forge = DataForge::open(&bytes)?;
         let root = find_canvas(&forge, &guid_text(OUTER))?;
-        let (assets, kinds) = inspect(&mut CanvasStore::new(&forge), root);
+        let (assets, kinds) = inspect(&mut CanvasStore::new(&forge), root, None);
         assert_eq!(assets.canvases.len(), COUNT);
         assert_eq!(assets.textures, ["UI/Test/final.dds"]);
         assert!(
