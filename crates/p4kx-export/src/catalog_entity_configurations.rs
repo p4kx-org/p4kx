@@ -12,6 +12,7 @@ use super::catalog_facility::Facility;
 use super::catalog_fuel_configurations::{
     FuelConfigurationKind, FuelConfigurationRows, FuelConfigurationTables,
 };
+use super::catalog_interactions::{self, InteractionConfiguration, InteractionKind};
 use super::catalog_item_alignment::{ItemAlignmentKind, ItemAlignmentRows, ItemAlignmentTables};
 use super::catalog_resource_component::{self, ResourceComponent};
 use super::catalog_resource_connection::{self, ConnectionKind, ResourceConnection};
@@ -28,6 +29,7 @@ use super::{inventory_owner_bounds, inventory_owner_storage};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
+use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
 use crate::record_observation::RecordObservation;
@@ -41,6 +43,7 @@ pub(crate) struct EntityConfigurationRows<'source> {
     pub(crate) topology: ResourceTopologyDeclarations<'source>,
     fuel: FuelConfigurationRows<'source>,
     inventory: InventoryEntityRows<'source>,
+    interactions: Vec<InteractionConfiguration<'source>>,
     facilities: Vec<Facility<'source>>,
     resources: Vec<ResourceComponent<'source>>,
     connections: Vec<ResourceConnection<'source>>,
@@ -59,6 +62,7 @@ impl<'source> EntityConfigurationRows<'source> {
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,
         options: &AlignmentOptions<'_>,
+        projection: &CatalogProjection<'_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<(), CatalogError> {
         match configuration {
@@ -87,6 +91,9 @@ impl<'source> EntityConfigurationRows<'source> {
             ConfigurationKind::ObjectMetadataBounds => {
                 self.inventory.metadata(owner, source, notes)?;
             }
+            ConfigurationKind::Interaction(kind) => self.interactions.push(
+                InteractionConfiguration::read(kind, owner, source, projection, notes)?,
+            ),
             ConfigurationKind::Fuel(fuel) => self.fuel.push(fuel, owner, source, notes)?,
             ConfigurationKind::Resource => self
                 .resources
@@ -107,6 +114,7 @@ impl<'source> EntityConfigurationRows<'source> {
         self.topology.extend(other.topology);
         self.fuel.extend(other.fuel);
         self.inventory.extend(other.inventory);
+        self.interactions.extend(other.interactions);
         self.facilities.extend(other.facilities);
         self.resources.extend(other.resources);
         self.connections.extend(other.connections);
@@ -126,6 +134,7 @@ impl<'source> EntityConfigurationRows<'source> {
             alignment: self.alignment.into_tables(forge),
             fuel: self.fuel.into_tables(forge),
             inventory: self.inventory.into_tables(forge),
+            interactions: catalog_interactions::table(forge, self.interactions),
             facilities: CatalogTable::new(forge, &[catalog_seat::COMPONENT], self.facilities),
             resource_components: CatalogTable::new(
                 forge,
@@ -156,6 +165,7 @@ pub(crate) struct EntityConfigurationTables<'source> {
     fuel: FuelConfigurationTables<'source>,
     #[serde(flatten)]
     inventory: InventoryEntityTables<'source>,
+    interactions: CatalogTable<InteractionConfiguration<'source>>,
     facilities: CatalogTable<Facility<'source>>,
     resource_components: CatalogTable<ResourceComponent<'source>>,
     resource_connections: CatalogTable<ResourceConnection<'source>>,
@@ -170,6 +180,7 @@ enum ConfigurationKind {
     },
     InventoryStorage,
     ObjectMetadataBounds,
+    Interaction(InteractionKind),
     Fuel(FuelConfigurationKind),
     Resource,
     Connection(ConnectionKind),
@@ -191,6 +202,9 @@ impl ConfigurationKind {
         if value.type_name() == room_associations::VEHICLE {
             return Some(Self::RoomAssociations);
         }
+        if let Some(kind) = InteractionKind::of(value.type_name()) {
+            return Some(Self::Interaction(kind));
+        }
         ItemAlignmentKind::of(value, input)
             .map(|alignment| Self::Alignment {
                 alignment,
@@ -204,11 +218,12 @@ impl ConfigurationKind {
 
 pub(crate) fn read<'source>(
     tree: &RecordTree<'source>,
-    input: &OriginalCatalogInput<'_, 'source>,
+    projection: &CatalogProjection<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     options: &AlignmentOptions<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<(EntityConfigurationRows<'source>, Vec<FieldError>), CatalogError> {
+    let input = projection.original();
     let mut rows = EntityConfigurationRows::default();
     let mut notes = Vec::new();
     let Some(Value::Array(components)) = tree.field("Components") else {
@@ -239,7 +254,14 @@ pub(crate) fn read<'source>(
         let component = originals.fact(component)?;
         let owner = ComponentOwner::read(tree, &context, &originals, component)?;
         let source = Observed::new(&originals, input, component, &capture, &numbers);
-        rows.push_configuration(configuration, owner, source, options, &mut notes)?;
+        rows.push_configuration(
+            configuration,
+            owner,
+            source,
+            options,
+            projection,
+            &mut notes,
+        )?;
     }
     rows.numbers = numbers.into_inner();
     Ok((rows, notes))

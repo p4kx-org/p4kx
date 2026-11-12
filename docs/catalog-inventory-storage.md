@@ -16,7 +16,8 @@ identified build, join a present storage reference's `targetRecordIndex.value` t
 the requested catalog filter. The cell retains the authored GUID and distinguishes a dangling
 or unexpected target type from a null or absent Reference. Configuration row identity includes
 `ownerRecordIndex` and the original `componentOrdinal`. Repeated components retain separate
-positions. Assembly placements are a separate relation.
+positions. Assembly placements are a separate relation. [Interaction declarations](catalog-inventory-interactions.md)
+retain the physical targets of the storage component's interaction links.
 
 Open storage retains the authored grid cell unit and amount, minimum and maximum item vectors,
 external flag, grid offset, destruction parameters and ordered item-type filters. The subtype

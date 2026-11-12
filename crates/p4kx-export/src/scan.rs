@@ -344,7 +344,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
                 crate::catalog_v3::tag_catalog::entity(&tree, input, &admission, cancel)?;
             let (configurations, configuration_notes) = catalog_entity_configurations::read(
                 &tree,
-                input,
+                self.projection,
                 &admission,
                 &self.alignment_options,
                 cancel,

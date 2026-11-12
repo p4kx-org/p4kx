@@ -16,6 +16,9 @@ use crate::source_value_catalog::{
 };
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "authored_field_link_arrays.rs"]
+mod arrays;
+
 pub(in crate::catalog_v3) type ReferenceCell<'source> =
     SourcedValue<Box<SourceRecordReference<'source>>>;
 
@@ -112,14 +115,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
             "a nullable WeakPointer",
             Some((DataType::WeakPointer, target_type)),
             notes,
-            |fact, sources, _| {
-                Ok(
-                    link::read(fact, sources)?.and_then(|(part, link)| match link {
-                        HealthLink::WeakReference { value } => Some((part, value)),
-                        HealthLink::RecordReference { .. } => None,
-                    }),
-                )
-            },
+            |fact, sources, _| decode_weak_link(fact, sources),
         )
     }
 
@@ -149,54 +145,6 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
                 Ok(Some((part, Box::new(record))))
             },
         )
-    }
-
-    pub(in crate::catalog_v3) fn record_link_array_to(
-        &self,
-        name: &str,
-        target_type: &str,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<SourcedValue<Vec<ReferenceCell<'source>>>, CatalogError> {
-        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
-            return self.absent();
-        };
-        let mut selectors = Vec::new();
-        if let Some(rejected) = self.reject_link_declaration(
-            fact,
-            (DataType::Reference, target_type),
-            ReferenceCardinality::Array,
-            notes,
-            &mut selectors,
-        )? {
-            return Ok(rejected);
-        }
-        let state = self.array_elements(
-            fact,
-            name,
-            "a nullable Reference array",
-            notes,
-            |index, element, notes| self.record_link_element(name, index, element, notes),
-        )?;
-        self.bind_link(fact, OriginalValuePart::Value, state, selectors)
-    }
-
-    fn record_link_element(
-        &self,
-        name: &str,
-        index: usize,
-        fact: &Fact<'scope, 'read, 'source>,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<ReferenceCell<'source>, CatalogError> {
-        let mut selectors = Vec::new();
-        let decoded = self.decode_record_link(fact, self.originals.sources(), &mut selectors)?;
-        let (part, state) = self.link_state(
-            &format!("{name}[{index}]"),
-            fact,
-            decoded,
-            "a nullable Reference",
-            notes,
-        )?;
-        self.bind_link(fact, part, state, selectors)
     }
 
     fn reject_link_declaration<T>(
@@ -356,4 +304,14 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         }
         Ok(cell.into_cell(self.originals.sources()))
     }
+}
+
+fn decode_weak_link<'source>(
+    fact: &Fact<'_, '_, 'source>,
+    sources: &SourceUses,
+) -> Result<Option<(OriginalValuePart, Box<SourceWeakReference<'source>>)>, CatalogError> {
+    Ok(match link::read(fact, sources)? {
+        Some((part, HealthLink::WeakReference { value })) => Some((part, value)),
+        Some((_, HealthLink::RecordReference { .. })) | None => None,
+    })
 }

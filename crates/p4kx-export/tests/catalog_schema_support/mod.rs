@@ -216,6 +216,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "facilities": absent_table(),
             "inventoryConfigurations": absent_table(),
             "itemBounds": absent_table(),
+            "interactions": absent_table(),
             "resourceComponents": absent_table(),
             "resourceConnections": absent_table(),
             "resourceNetworkParameters": absent_table(),

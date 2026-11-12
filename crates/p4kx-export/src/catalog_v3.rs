@@ -134,6 +134,8 @@ mod catalog_fuel_configurations;
 pub(crate) mod catalog_global_configurations;
 #[path = "catalog_hacking_chips.rs"]
 pub(crate) mod catalog_hacking_chips;
+#[path = "catalog_interactions.rs"]
+mod catalog_interactions;
 #[path = "catalog_item_alignment.rs"]
 pub(crate) mod catalog_item_alignment;
 #[path = "catalog_item_components.rs"]
@@ -180,6 +182,22 @@ mod catalog_unit_source;
 pub(crate) mod catalog_weapon_actions;
 #[path = "catalog_weapon_magazine_slots.rs"]
 mod catalog_weapon_magazine_slots;
+#[path = "interactable_configuration.rs"]
+mod interactable_configuration;
+#[path = "interaction_conditions.rs"]
+mod interaction_conditions;
+#[path = "interaction_point.rs"]
+mod interaction_point;
+#[path = "interaction_source.rs"]
+mod interaction_source;
+#[path = "interaction_state.rs"]
+mod interaction_state;
+#[path = "interaction_state_edges.rs"]
+mod interaction_state_edges;
+#[path = "interaction_state_type.rs"]
+mod interaction_state_type;
+#[path = "interaction_task.rs"]
+mod interaction_task;
 #[path = "inventory_container_definition.rs"]
 pub(crate) mod inventory_container_definition;
 #[path = "inventory_container_type.rs"]
@@ -234,6 +252,8 @@ pub(crate) mod resource_topology_projection;
 mod room_associations;
 #[path = "sensor_mine.rs"]
 mod sensor_mine;
+#[path = "shared_interaction.rs"]
+mod shared_interaction;
 
 #[path = "catalog_durability.rs"]
 pub(crate) mod catalog_durability;
