@@ -37,6 +37,7 @@ mod real_archive_crafting;
 mod real_archive_crafting_catalog;
 mod real_archive_crafting_details;
 mod real_archive_explosive_components;
+mod real_archive_factions;
 mod real_archive_flow_action_wrappers;
 mod real_archive_gear_stats;
 mod real_archive_gear_trace;

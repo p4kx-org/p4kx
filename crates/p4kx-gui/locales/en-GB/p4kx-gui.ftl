@@ -511,6 +511,7 @@ catalog-summary-kind = { $kind ->
     [missionPropertySets] Mission property sets
     [blueprintCategories] Blueprint categories
     [blueprintCategoryLists] Blueprint category lists
+    [factions] Factions
     [paints] Paints
     [loadouts] Loadouts
    *[other] { $kind }

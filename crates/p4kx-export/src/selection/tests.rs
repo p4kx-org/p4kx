@@ -62,7 +62,8 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 Kind::ResourceTypes => assert_eq!(by_path, Some(Kind::ResourceGroups)),
                 Kind::BlueprintCategoryLists
                 | Kind::ExplosionDefinitions
-                | Kind::AmmoDefinitions => {
+                | Kind::AmmoDefinitions
+                | Kind::Factions => {
                     assert_eq!(
                         by_path,
                         Some(Kind::Tags),

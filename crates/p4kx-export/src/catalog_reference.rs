@@ -91,6 +91,7 @@ pub(crate) fn actual_kind(type_name: &str) -> Option<Kind> {
     match type_name {
         "Tag" => Some(Kind::Tags),
         "SCItemManufacturer" => Some(Kind::Manufacturers),
+        crate::catalog_v3::faction_definition::SOURCE_TYPE => Some(Kind::Factions),
         "ResourceType" => Some(Kind::ResourceTypes),
         "ResourceTypeGroup" => Some(Kind::ResourceGroups),
         "CraftingQualityDistributionRecord" | "CraftingQualityLocationOverrideRecord" => {

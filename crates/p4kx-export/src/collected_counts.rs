@@ -10,6 +10,7 @@ impl Collected<'_> {
         match kind {
             Kind::Tags => self.tags.count(),
             Kind::Manufacturers => self.manufacturers.len(),
+            Kind::Factions => self.factions.len(),
             Kind::Items => self.items.len(),
             Kind::Ships => self.ships.len(),
             Kind::Commodities => self.commodities.len(),

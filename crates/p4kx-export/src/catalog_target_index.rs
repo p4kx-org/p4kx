@@ -134,6 +134,7 @@ fn origins<'source>(
         if !matches!(
             kind,
             Kind::Manufacturers
+                | Kind::Factions
                 | Kind::ContractTemplates
                 | Kind::MissionBrokerEntries
                 | Kind::GameplayProperties

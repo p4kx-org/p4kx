@@ -26,6 +26,9 @@ mod authored_link;
 #[path = "authored_nodes.rs"]
 mod authored_nodes;
 
+#[path = "faction_definition.rs"]
+pub(crate) mod faction_definition;
+
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;
 

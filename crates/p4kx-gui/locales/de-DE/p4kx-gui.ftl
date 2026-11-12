@@ -511,6 +511,7 @@ catalog-summary-kind = { $kind ->
     [missionPropertySets] Eigenschaftssätze für Missionen
     [blueprintCategories] Blaupausenkategorien
     [blueprintCategoryLists] Blaupausenkategorielisten
+    [factions] Fraktionen
     [paints] Lackierungen
     [loadouts] Loadouts
    *[other] { $kind }

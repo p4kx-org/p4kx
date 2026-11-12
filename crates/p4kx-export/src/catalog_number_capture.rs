@@ -39,6 +39,7 @@ pub(crate) enum NumberOccurrence {
     ConfigurationValue { ordinal: u64 },
     ConfigurationRawValue { ordinal: u64 },
     AuthoredDefinitionValue { ordinal: u64 },
+    AuthoredDefinitionRawValue { ordinal: u64 },
 }
 
 /// The emitted owner of an exact source scalar.
@@ -102,8 +103,11 @@ impl CapturedNumber {
             AuthoredNumberOwner::Configuration => {
                 NumberOccurrence::ConfigurationRawValue { ordinal }
             }
-            AuthoredNumberOwner::ItemComponent | AuthoredNumberOwner::Definition => {
+            AuthoredNumberOwner::ItemComponent => {
                 NumberOccurrence::ItemComponentRawValue { ordinal }
+            }
+            AuthoredNumberOwner::Definition => {
+                NumberOccurrence::AuthoredDefinitionRawValue { ordinal }
             }
         };
         Self::authored(

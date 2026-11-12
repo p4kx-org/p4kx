@@ -17,6 +17,7 @@ use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::catalog_v3::catalog_entity_configurations::EntityConfigurationRows;
 use crate::catalog_v3::catalog_item_components::ItemComponentRows;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
+use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::contract::{
     BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
@@ -64,6 +65,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) ledger: ExportLedger,
     pub(crate) tags: crate::catalog_v3::tag_catalog::TagRows<'f>,
     pub(crate) manufacturers: Vec<Manufacturer<'f>>,
+    pub(crate) factions: Vec<PreparedFaction<'f>>,
     pub(crate) items: Vec<Item<'f>>,
     pub(crate) item_components: ItemComponentRows<'f>,
     pub(crate) entity_configurations: EntityConfigurationRows<'f>,
@@ -162,6 +164,7 @@ impl<'f> Collected<'f> {
             ledger: crafting.ledger,
             tags: crate::catalog_v3::tag_catalog::TagRows::default(),
             manufacturers: Vec::new(),
+            factions: Vec::new(),
             items: Vec::new(),
             item_components: ItemComponentRows::default(),
             entity_configurations: EntityConfigurationRows::default(),
@@ -222,9 +225,14 @@ impl<'f> Collected<'f> {
     }
 
     /// Collects a selected Record or records its skipped category GUID.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one exhaustive dispatch arm per selected row"
+    )]
     fn take(&mut self, pick: Picked<'f>, missing_categories: &mut HashSet<Guid>) {
         match pick {
             Picked::Manufacturer(entity) => self.manufacturers.push(*entity),
+            Picked::Faction(entity) => self.factions.push(*entity),
             Picked::Item {
                 entity,
                 line,

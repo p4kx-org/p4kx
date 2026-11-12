@@ -4,6 +4,9 @@
 //! Factions, reputation scopes, standings and contexts, mission types and localities and contract
 //! scenarios in the Basetool catalog.
 
+#[path = "catalog_faction.rs"]
+mod catalog_faction;
+
 use crate::reputation_fixture::{
     CONTEXT, FACTION, FACTION_BARE, LEGACY_FACTION, LOCALITY, MISSION_TYPE, PLAIN_A, PLAIN_B,
     SCENARIO, SCOPE, STANDING_HIGH, STANDING_LOW, write_archive,

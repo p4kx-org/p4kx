@@ -29,6 +29,32 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         self.locale(name, notes, |fact| projection.protected_locale_fact(fact))
     }
 
+    /// Reads a localized or directly stored authored text in its caller's domain.
+    pub(in crate::catalog_v3) fn locale_or_string<T>(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+        localize: impl FnOnce(&Fact<'scope, 'read, 'source>) -> Result<T, CatalogError>,
+        literal: impl FnOnce(&'source str) -> T,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
+            return self.absent();
+        };
+        let (state, role) = match fact.value() {
+            Value::Locale(_) => (
+                SourceValue::Present(localize(fact)?),
+                SourceUseRole::Conversion,
+            ),
+            Value::String(text) => (SourceValue::Present(literal(text)), SourceUseRole::Payload),
+            Value::Null => (SourceValue::Null, SourceUseRole::Selector),
+            value => (
+                self.failure(name, value, "a nullable Locale or String", notes)?,
+                SourceUseRole::Selector,
+            ),
+        };
+        self.bind_field(fact, OriginalValuePart::Value, state, role)
+    }
+
     fn locale<T>(
         &self,
         name: &str,

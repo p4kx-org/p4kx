@@ -61,6 +61,7 @@ impl Kind {
             Self::ShopInventories => 51,
             Self::ExplosionDefinitions => 52,
             Self::AmmoDefinitions => 53,
+            Self::Factions => 54,
         }
     }
 }

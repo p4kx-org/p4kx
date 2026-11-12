@@ -1438,7 +1438,7 @@ leadership, focus) are not exported.
 On LIVE 4.10 (2026-10-28) the kinds hold 39 factions, 46 scopes, 380 standings, 27 contexts, 42
 mission types, 20 localities and 2 scenarios, none skipped.
 
-**Factions (`factionReputations`).** `displayName` is a game text (37 of 39 have an English text).
+**Faction reputation (`factionReputations`).** `displayName` is a game text (37 of 39 have an English text).
 `isNpc` is the Record's flag (false for all 39). `lawful` is the value of the boolean property
 `entityLawful` among the `propertiesBB` of the Record, `null` for a faction without it
 (`FactionReputation_IASI`): 29 are lawful, 9 not. It is a field and not the class name, so
@@ -1447,6 +1447,25 @@ so. `contextGuid` is the `reputationContextPropertiesUI`; `allyGuids` and `enemy
 References as stored (two factions have enemies on LIVE, none has allies); `hostility` and
 `allied` hold the `scopeGuid` and `standingGuid` of the `hostilityParams` and `alliedParams`, `null`
 when both are absent.
+
+#### Faction definitions
+
+`definitions.factions` holds physical `Faction` Records keyed by GUID, in GUID and physical
+Record order. Its selection uses the exact owning type and the normal Record path Filter. The
+table's `availability` and `completeness.factions` describe source declaration and Filter
+coverage independently.
+
+Every row holds `defaultReaction`, `factionType`, the stored `alliedFactions` and
+`enemyFactions` Reference lists and `friendlyFireBehaviorOverrides` in source order. Each
+override gives its original reaction label and `shouldAllowFriendlyFire`. The source flags
+`ableToArrest`, `policesLawfulTrespass`, `policesCriminality` and `noLegalRights` keep
+false distinct from an absent declaration. `factionReputationRef` links the original independent
+reputation GUID and keeps unresolved identities. These are static Record facts.
+
+The sourced `name` and `description` hold a `localized` canonical text Reference or a
+`literal` authored String. The name uses the public short-name domain and the description uses
+the protected `x-gameText` domain. `authoredFields` holds remaining field occurrences with
+their source declarations and values. The same rules apply to each owned override body.
 
 **Scopes, standings and contexts.** A scope (`reputationScopes`) has `scopeName`, `displayName` (a
 game text), `reputationCeiling`, `initialReputation` and `standingGuids`, its standings in stored
@@ -1464,8 +1483,10 @@ stored order (218 on LIVE, all in `starmapObjects`). The game does not localise 
 locality; the `className` (`Pyro`) is the only name.
 
 **Contract scenarios (`contractScenarios`).** A `ScenarioProgress` Record. `factionRewardTiers`
-hold, per `Faction` Record (`factionGuid`, `factionName` the last part of its record path),
-`factionReputationGuid` (the `factionReputationRef` of that `Faction` Record, an entry of `factionReputations`; no kind lists the `Faction` Records themselves), `pointsAsPercent` and the `progressions` (`minMultiplierThreshold`, `completionType` the name of
+hold the authored `factionGuid`, which joins to `definitions.factions` when the row is present.
+`factionName` is the last part of the source Record path when resolved. `factionReputationGuid`
+is the independent link to `factionReputations` from that Record's `factionReputationRef`.
+The tiers also hold `pointsAsPercent` and the `progressions` (`minMultiplierThreshold`, `completionType` the name of
 the struct, `periodScenarioGuid`), each with `tiers`: `minPoints`, `badgeToAward` (an identifier;
 `null` for a tier without a badge, which the game stores as the text `None`), `globalPointsMultiplier` and
 `blueprintPoolGuids`, entries of `blueprintPools`. The progression texts and the multiplier rewards

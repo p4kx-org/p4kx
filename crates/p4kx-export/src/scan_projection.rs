@@ -164,6 +164,7 @@ impl<'f> Scan<'_, '_, 'f> {
                 (Picked::Loot(LootPick::Filter(Box::new(value))), Vec::new())
             }
             Kind::ExplosionDefinitions => self.explosion_definition(admission, tree)?,
+            Kind::Factions => self.faction_definition(admission, tree)?,
             Kind::BlueprintCategoryLists => {
                 let read = crate::catalog_v3::blueprint_category_list_read::read(
                     tree,
@@ -222,6 +223,20 @@ impl<'f> Scan<'_, '_, 'f> {
             Picked::ExplosionDefinition(Box::new(read.value)),
             read.notes,
         ))
+    }
+
+    fn faction_definition(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let read = crate::catalog_v3::faction_definition::read(
+            tree,
+            self.projection,
+            admission,
+            self.options.cancel,
+        )?;
+        Ok((Picked::Faction(Box::new(read.value)), read.notes))
     }
 
     fn resource_group(

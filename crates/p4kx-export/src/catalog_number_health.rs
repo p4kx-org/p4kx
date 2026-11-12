@@ -121,7 +121,8 @@ fn emitted_record_numbers<'source>(
                 | NumberOccurrence::BlueprintValue { ordinal }
                 | NumberOccurrence::ItemComponentValue { ordinal }
                 | NumberOccurrence::ItemComponentRawValue { ordinal }
-                | NumberOccurrence::AuthoredDefinitionValue { ordinal } => {
+                | NumberOccurrence::AuthoredDefinitionValue { ordinal }
+                | NumberOccurrence::AuthoredDefinitionRawValue { ordinal } => {
                     if matches!(actual.occurrence, NumberOccurrence::BlueprintValue { .. })
                         && number.kind != Kind::Blueprints
                     {
@@ -298,6 +299,7 @@ impl Coverage<'_, '_> {
                     | Kind::Items
                     | Kind::ExplosionDefinitions
                     | Kind::AmmoDefinitions
+                    | Kind::Factions
             )
         ) {
             return self.owned(required);
@@ -366,6 +368,10 @@ impl Coverage<'_, '_> {
             Some(Kind::Items) => (
                 NumberOccurrence::ItemComponentValue { ordinal },
                 ResourceNumberContract::Single,
+            ),
+            Some(Kind::Factions) => (
+                NumberOccurrence::AuthoredDefinitionRawValue { ordinal },
+                ResourceNumberContract::Number,
             ),
             Some(Kind::ExplosionDefinitions | Kind::AmmoDefinitions) => (
                 NumberOccurrence::AuthoredDefinitionValue { ordinal },

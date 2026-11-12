@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, RecordTree, StructValue, TreeBuilder, Value};
+use p4kx_extraction::{DataForge, RecordTree, StructValue, TreeBuilder, Value, ValueError};
 
 use crate::contract_mission_data::{
     ContractScenario, MissionLocality, MissionType, ScenarioFactionTiers, ScenarioProgression,
@@ -56,7 +56,10 @@ fn faction_tiers<'f>(tiers: &StructValue<'f>) -> ScenarioFactionTiers<'f> {
         _ => None,
     });
     ScenarioFactionTiers {
-        faction_guid: faction.map(|target| CatalogGuid(target.guid())),
+        faction_guid: match tiers.field("faction") {
+            Some(Value::Error(ValueError::DanglingReference { guid })) => Some(CatalogGuid(*guid)),
+            _ => faction.map(|target| CatalogGuid(target.guid())),
+        },
         faction_reputation_guid: None,
         faction_name: faction.and_then(|target| target.record_path().rsplit('/').next()),
         points_as_percent: boolean(Some(tiers), "convertTiersPointsToPercent"),

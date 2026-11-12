@@ -156,9 +156,6 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         &self,
         projected: impl IntoIterator<Item = (&'static str, SourceValueState)>,
     ) -> Result<SourceArenaOutput<'source>, CatalogError> {
-        let owner = self
-            .owner
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         let projected = projected.into_iter();
         let mut consumed = Vec::with_capacity(projected.size_hint().0);
         for (name, state) in projected {
@@ -168,7 +165,7 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
                 consumed.push(member.ordinal());
             }
         }
-        source_value_catalog::read_members(self.originals, owner, &consumed, |original| {
+        source_value_catalog::read_members(self.originals, self.owner, &consumed, |original| {
             self.retain_raw_number(original)
         })
     }

@@ -9,6 +9,7 @@ use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
+use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::contract::{
     Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
     MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup, ResourceType, Ship,
@@ -56,6 +57,7 @@ pub(crate) enum Picked<'f> {
     /// One original explosion definition.
     ExplosionDefinition(Box<PreparedExplosionDefinition<'f>>),
     AmmoDefinition(Box<PreparedAmmoDefinition<'f>>),
+    Faction(Box<PreparedFaction<'f>>),
     /// A starmap object.
     Starmap(StarmapObject<'f>),
     /// A mineable element.
@@ -93,6 +95,10 @@ pub(crate) enum Picked<'f> {
 impl<'f> Picked<'f> {
     /// Returns the entity of `kind` the Record tree `tree` describes, its texts resolved by
     /// `texts`. `None` for a kind whose dedicated reader supplies its rows.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one exhaustive dispatch for the catalog kinds"
+    )]
     pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>, texts: &Texts<'f>) -> Option<Self> {
         Some(match kind {
             Kind::Items => Self::item_entity(tree, texts),
@@ -129,6 +135,7 @@ impl<'f> Picked<'f> {
             | Kind::BlueprintCategoryLists
             | Kind::ExplosionDefinitions
             | Kind::AmmoDefinitions
+            | Kind::Factions
             | Kind::GameplayProperties
             | Kind::QualityDistributions
             | Kind::QualityQuantizations

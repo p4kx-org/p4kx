@@ -97,18 +97,24 @@ pub(crate) fn read_subtree<'scope, 'read, 'source>(
 /// Retains the original Struct fields outside the consumed original occurrences.
 pub(crate) fn read_members<'scope, 'read, 'source>(
     fields: &OriginalFlowFields<'scope, 'read, 'source>,
-    owner: &OriginalValueFact<'scope, 'read, 'source>,
+    owner: Option<&OriginalValueFact<'scope, 'read, 'source>>,
     consumed: &[u64],
     mut retain: impl FnMut(&OriginalValueFact<'scope, 'read, 'source>) -> Result<(), CatalogError>,
 ) -> Result<SourceArenaOutput<'source>, CatalogError> {
-    let span = fields.span(owner)?;
-    if !matches!(owner.value(), Value::Struct(_)) {
-        return Err(ExportAccountingError::ConflictingSourceDatum.into());
-    }
-    let mut next = span
-        .start
-        .checked_add(1)
-        .ok_or(ExportAccountingError::CounterOverflow)?;
+    let span = match owner {
+        Some(owner) if matches!(owner.value(), Value::Struct(_)) => {
+            let mut span = fields.span(owner)?;
+            span.start = span
+                .start
+                .checked_add(1)
+                .ok_or(ExportAccountingError::CounterOverflow)?;
+            span
+        }
+        Some(_) => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+        None => 0..fields.facts().len(),
+    };
+    let owner_ordinal = owner.map(OriginalValueFact::ordinal);
+    let mut next = span.start;
     let mut arena = SourceArena::default();
     while next < span.end {
         fields.check_cancel()?;
@@ -117,7 +123,7 @@ pub(crate) fn read_members<'scope, 'read, 'source>(
             .get(next)
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         let member_span = fields.span(member)?;
-        if member.parent_ordinal() != Some(owner.ordinal())
+        if member.parent_ordinal() != owner_ordinal
             || !matches!(member.edge(), OriginalValueEdge::Field { .. })
             || member_span.start != next
             || member_span.end > span.end

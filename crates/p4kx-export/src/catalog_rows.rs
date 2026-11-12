@@ -30,6 +30,14 @@ pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -
             .iter()
             .map(|row| (row.source.physical.guid, row.source.physical.record_path)),
     );
+    append(
+        &mut emitted,
+        Kind::Factions,
+        collected
+            .factions
+            .iter()
+            .map(|row| (row.physical_guid, row.physical_path)),
+    );
     append_resources(&mut emitted, collected);
     append_explosions_and_ammo(&mut emitted, collected);
     append(
@@ -220,6 +228,12 @@ fn definition_number_groups<'rows>(
         .resource_types
         .iter()
         .map(|row| (Kind::ResourceTypes, row.numbers.as_slice()))
+        .chain(
+            collected
+                .factions
+                .iter()
+                .map(|row| (Kind::Factions, row.numbers.as_slice())),
+        )
         .chain(
             collected
                 .explosion_definitions

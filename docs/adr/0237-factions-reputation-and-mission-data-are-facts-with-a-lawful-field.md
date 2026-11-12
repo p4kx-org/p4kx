@@ -25,6 +25,25 @@ Decided for issue #319. Evidence: LIVE 4.10, ScDataDumper and NovaSCDataExtracto
   `MissionLocationTemplate` are not exported: the Basetool has no use for them yet and they are
   large, free-form structures. They can follow as further kinds.
 
+## Faction definitions in schema v3
+
+The catalog exports each Record whose owning type is `Faction` in
+`definitions.factions.rows`, independent of its path spelling or development-like name. The
+unfiltered family keeps every physical owner. The shared Filter selects rows by Record path, and
+availability reports the source declaration independently of that selection.
+
+A row carries its original Record identity, name and description, reaction and faction labels,
+allied and enemy References in source order, the ordered friendly-fire overrides, and the
+arrest, trespass, criminality and legal-rights flags. Each sourced value distinguishes a missing
+field, explicit null, readable false and unreadable or invalid storage. A remaining owned member
+occurs once in the row's source arena with its original declaration and value. Unknown Enum
+labels remain authored strings. These fields describe static configuration.
+
+Locale fields refer to canonical public names or protected game texts. Legacy String fields retain
+their literal text in the same domains. A `FactionReputation` GUID and an incoming `Faction` GUID
+are independent links. A stored GUID survives a dangling or filtered target. The reputation
+dataset retains its own identity and standing semantics.
+
 ## Consequences
 
 - A consumer joins `contracts[].factionReputation`, `reputationGains[].scopeGuid`,

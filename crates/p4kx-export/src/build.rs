@@ -202,14 +202,11 @@ fn assemble<R>(
     let components = collected.item_components.into_tables(&forge);
     let topology =
         std::mem::take(&mut collected.entity_configurations.topology).into_tables(&forge);
+    let patches = options.public_patches;
+    let source = source(archive, options.exported_at, patches, key_use);
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
-        source: source(
-            archive,
-            options.exported_at,
-            options.public_patches,
-            key_use,
-        ),
+        source,
         completeness: Completeness::of_every_kind(KindCompleteness::for_filter(options.filter)),
         export_health: health.clone(),
         items: collected.items,
@@ -285,6 +282,7 @@ fn assemble<R>(
             resource_types: CatalogTable::new(&forge, &["ResourceType"], collected.resource_types),
             commodities,
             manufacturers: crate::manufacturer::table(&forge, collected.manufacturers),
+            factions: crate::catalog_v3::faction_definition::table(&forge, collected.factions),
         },
         projections: CatalogProjections {
             contracts: CatalogTable::new(&forge, &["ContractGenerator"], collected.contracts),
