@@ -26,3 +26,12 @@ representing selection as playback.
 The v154 layout and signed weights are established by the version branches in
 [wwiser's Random/Sequence reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L1501)
 and [StarBreaker's container reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/containers.rs#L33).
+
+
+The CLI and MCP ObjectView stream the same checked original Random/Sequence
+declaration. The object-local source inventory resolves each per-value use to
+its original bank span. The source view keeps raw mode and flag words, finite
+transition values with original bits, and authored playlist order with signed
+weights and their original words. Incomplete or unavailable declarations
+retain their checked prefixes. MCP applies its existing whole-object transport
+budget.

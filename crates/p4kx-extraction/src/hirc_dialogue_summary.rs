@@ -11,11 +11,11 @@ use crate::source_evidence_error::SourceEvidenceError;
 use super::dto::{
     DialoguePropertyExtent, DialogueSummary, DialogueTreeStatus, DialogueTreeSummary,
 };
-use super::origins::DialogueOrigins;
+use super::origins::ObjectOrigins;
 
 pub(super) fn collect<R>(
     dialogue: &BankHircDialogueEvent<'_, R>,
-    origins: &DialogueOrigins,
+    origins: &ObjectOrigins,
 ) -> Result<DialogueSummary, SourceEvidenceError> {
     let fields = dialogue.fields();
     let checked_arguments = if let (Some(count), Some(range)) =
@@ -62,7 +62,7 @@ pub(super) fn collect<R>(
 fn tree_summary(
     tree: &BankDialogueTree,
     size_start: u64,
-    origins: &DialogueOrigins,
+    origins: &ObjectOrigins,
 ) -> Result<DialogueTreeSummary, SourceEvidenceError> {
     let extent = size_start..tree.range.end;
     let coverage = match tree.coverage {
@@ -84,7 +84,7 @@ fn tree_summary(
 }
 
 fn property_extent(
-    origins: &DialogueOrigins,
+    origins: &ObjectOrigins,
     extent: Option<&BankNodePropertyExtent>,
 ) -> Result<Option<DialoguePropertyExtent>, SourceEvidenceError> {
     let Some(extent) = extent else {

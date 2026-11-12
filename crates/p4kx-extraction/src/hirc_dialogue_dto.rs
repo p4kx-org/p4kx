@@ -8,7 +8,7 @@ use crate::hirc_view::StateRange;
 use crate::source_inventory::SourceInventory;
 use crate::source_value::SourcedValue;
 
-pub(crate) type ObjectSourceSchema =
+pub(super) type DialogueSourceSchema =
     DialogueSourceDocument<Vec<DialogueSourceRow>, SourceInventory>;
 
 #[derive(Serialize, JsonSchema)]

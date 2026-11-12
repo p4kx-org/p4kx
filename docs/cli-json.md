@@ -1704,6 +1704,15 @@ bank-relative byte span. A standalone file has unknown original Archive encrypti
 The same object shape is returned by MCP `list_soundbank_objects` within its existing whole-object
 response budget. The CLI writes the complete checked rows for each selected object.
 
+Version-154 Random/Sequence objects include `source_fields` with original loop counts and
+modifiers, transition words, avoid-repeat count, mode codes, flags, child count and checked
+playlist extent. Finite transition values use milliseconds. The raw binary32 words also
+preserve nonfinite values. The playlist retains every readable original play ID and weight
+word in authored order. Its signed `weight` and unsigned `weight_bits` share the same original
+span. A short final weight keeps its play ID and checked row range. Source coverage distinguishes
+a complete declaration, a malformed prefix, an unreachable continuation and an unsupported
+version.
+
 Other object details:
 
 - `state`: standalone State versions 128 through 145 expose `property_count`, `count_range`,

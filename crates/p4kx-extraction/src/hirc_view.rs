@@ -260,14 +260,11 @@ pub struct ItemView {
 
 impl<'a> ObjectView<'a> {
     pub(crate) fn attach_source_fields(&mut self, bank: &'a Bank) {
-        if bank
+        self.source_fields = bank
             .soundbank()
             .objects()
             .get(self.index)
-            .is_some_and(|object| object.kind == HircKind::DialogueEvent)
-        {
-            self.source_fields = Some(ObjectSourceFields::new(bank, self.index));
-        }
+            .and_then(|object| ObjectSourceFields::new(bank, self.index, object.kind));
     }
 
     /// Describes the object at `index` in bank order.

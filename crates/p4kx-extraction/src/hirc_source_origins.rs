@@ -15,16 +15,17 @@ use crate::source_use::{InputScope, SourceLocation, SourceUse, SourceUseRole};
 use crate::source_uses::SourceUses;
 use crate::source_value::{SourceValue, SourcedValue};
 
-const DIALOGUE: &str = "bnkDialogueEvent";
+use super::SourceFamily;
 
-pub(super) struct DialogueOrigins {
+pub(super) struct ObjectOrigins {
     uses: SourceUses,
     scope: SourceScope,
     complete: bool,
+    family: SourceFamily,
 }
 
-impl DialogueOrigins {
-    pub(super) fn new(bank: &Bank) -> Result<Self, SourceEvidenceError> {
+impl ObjectOrigins {
+    pub(super) fn new(bank: &Bank, family: SourceFamily) -> Result<Self, SourceEvidenceError> {
         let uses = SourceUses::new();
         let input = bank.observed_input();
         let complete = !matches!(input, SourceInput::Unknown);
@@ -33,6 +34,7 @@ impl DialogueOrigins {
             uses,
             scope,
             complete,
+            family,
         })
     }
 
@@ -41,7 +43,12 @@ impl DialogueOrigins {
         field: &BankHircField<T>,
         label: &'static str,
     ) -> Result<SourcedValue<T>, SourceEvidenceError> {
-        let used = self.site(DIALOGUE, label, &field.range, SourceUseRole::Payload)?;
+        let used = self.site(
+            self.family.namespace(),
+            label,
+            &field.range,
+            SourceUseRole::Payload,
+        )?;
         Ok(self.value(field.value, &[used]))
     }
 
@@ -59,7 +66,12 @@ impl DialogueOrigins {
         extent: &Range<u64>,
         label: &'static str,
     ) -> Result<SourcedValue<T>, SourceEvidenceError> {
-        let used = self.site(DIALOGUE, label, extent, SourceUseRole::Conversion)?;
+        let used = self.site(
+            self.family.namespace(),
+            label,
+            extent,
+            SourceUseRole::Conversion,
+        )?;
         Ok(self.value(value, &[used]))
     }
 
@@ -68,7 +80,12 @@ impl DialogueOrigins {
         extent: &Range<u64>,
         label: &'static str,
     ) -> Result<SourcedValue<StateRange>, SourceEvidenceError> {
-        let used = self.site(DIALOGUE, label, extent, SourceUseRole::Selector)?;
+        let used = self.site(
+            self.family.namespace(),
+            label,
+            extent,
+            SourceUseRole::Selector,
+        )?;
         Ok(self.value(StateRange::new(extent), &[used]))
     }
 
@@ -96,8 +113,8 @@ impl DialogueOrigins {
             SourceUseRole::Selector,
         )?;
         let body = self.site(
-            DIALOGUE,
-            "dialogueExtent",
+            self.family.namespace(),
+            self.family.extent_label(),
             &(object.header_offset()..object.body_end_exclusive()),
             SourceUseRole::Conversion,
         )?;
@@ -127,7 +144,7 @@ impl DialogueOrigins {
     }
 }
 
-impl Serialize for DialogueOrigins {
+impl Serialize for ObjectOrigins {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         self.uses
             .freeze()

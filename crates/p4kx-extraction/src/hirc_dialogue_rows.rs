@@ -15,17 +15,17 @@ use serde::{Serialize, Serializer};
 use crate::source_evidence_error::SourceEvidenceError;
 
 use super::dto::{DialogueLinkInterpretation, DialoguePropertyKind, DialogueSourceRow};
-use super::origins::DialogueOrigins;
+use super::origins::ObjectOrigins;
 
 pub(super) struct DialogueRows<'view, 'input, R> {
     dialogue: RefCell<BankHircDialogueEvent<'input, R>>,
-    origins: &'view DialogueOrigins,
+    origins: &'view ObjectOrigins,
 }
 
 impl<'view, 'input, R> DialogueRows<'view, 'input, R> {
     pub(super) const fn new(
         dialogue: BankHircDialogueEvent<'input, R>,
-        origins: &'view DialogueOrigins,
+        origins: &'view ObjectOrigins,
     ) -> Self {
         Self {
             dialogue: RefCell::new(dialogue),
@@ -89,7 +89,7 @@ impl<R: Read + Seek> DialogueRows<'_, '_, R> {
 }
 
 fn argument(
-    origins: &DialogueOrigins,
+    origins: &ObjectOrigins,
     ordinal: u32,
     id: &BankHircField<u32>,
     kind: Option<&BankHircField<u8>>,
@@ -102,7 +102,7 @@ fn argument(
 }
 
 fn node(
-    origins: &DialogueOrigins,
+    origins: &ObjectOrigins,
     ordinal: u32,
     node: &BankDialogueNode,
 ) -> Result<DialogueSourceRow, SourceEvidenceError> {
@@ -129,7 +129,7 @@ fn node(
 }
 
 fn property<E: serde::ser::Error>(
-    origins: &DialogueOrigins,
+    origins: &ObjectOrigins,
     count: &Range<u64>,
     kind: DialoguePropertyKind,
     row: &BankNodePropertyRow,

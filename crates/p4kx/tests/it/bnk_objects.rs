@@ -14,6 +14,8 @@ use serde_json::Value;
 
 #[path = "bnk_dialogue_source_fields.rs"]
 mod dialogue_source_fields;
+#[path = "bnk_random_sequence_source_fields.rs"]
+mod random_sequence_source_fields;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
