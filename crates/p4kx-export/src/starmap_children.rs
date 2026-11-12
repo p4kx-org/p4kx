@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_extraction::Guid;
 
 use super::{Bounds, CHILD, CHILDREN, Child, Level, Pose};
 use crate::CatalogError;
-use crate::catalog_read::original::{AuthoredEntryPath, EntryXml};
+use crate::catalog_read::original::{AuthoredEntryPath, EntryXml, XmlNodeSource};
+use crate::starmap_containers::proof::ChildOrigins;
 use crate::starmap_report::clip;
 use crate::starmap_xml::{Node, Root, attribute, first_below, pose};
 
@@ -33,6 +36,7 @@ pub(super) fn level(
             ..Level::default()
         });
     }
+    let list_source = xml.node_source(list)?;
     let mut children = Vec::new();
     let mut truncated = false;
     for child in list.children() {
@@ -44,7 +48,7 @@ pub(super) fn level(
             truncated = true;
             break;
         }
-        children.push(read_child(child, &name, depth, bounds, xml)?);
+        children.push(read_child(child, &name, &list_source, depth, bounds, xml)?);
     }
     Ok(Level {
         children,
@@ -57,6 +61,7 @@ pub(super) fn level(
 fn read_child(
     child: Root<'_>,
     name: &AuthoredEntryPath,
+    list: &XmlNodeSource,
     depth: usize,
     bounds: &Bounds,
     xml: &EntryXml<'_, '_, '_>,
@@ -64,18 +69,18 @@ fn read_child(
     let record = attribute(child, "starMapRecord")
         .and_then(|text| text.trim().parse::<Guid>().ok())
         .filter(|guid| guid.stored() != [0; 16]);
-    let external_recipe = external(child, name, xml)?;
-    let external = external_recipe
-        .as_ref()
-        .map(|path| path.as_str().to_owned());
+    let external = external(child, name, xml)?;
     let pose = child_pose(child);
     let below = level(child, depth + 1, bounds, xml)?;
     let named = record.is_some() || external.is_some() || !below.children.is_empty();
+    let origins = named
+        .then(|| ChildOrigins::capture(xml, list, child).map(Arc::new))
+        .transpose()?;
     Ok(Child {
         pose,
         record,
         external,
-        external_recipe,
+        origins,
         below,
         entity_name: if named {
             attribute(child, "entityName")

@@ -67,5 +67,11 @@ audio play and stop trigger classes retain their original `GlobalResourceAudio` 
 
 `placements.starmapPlacements` joins these definitions by `objectGuid.value` and
 `objectRecordIndex.value`. The existing traversal supplies its world position and hierarchy
-values separately. Until the full XML chain is captured, those computed cells mark the
-source set incomplete and the encryption origin unknown.
+values separately. Each selected placement cell carries the original root directory and
+XML route. Position also uses the local position and the position and rotation of each
+ancestor. Entity name uses the leaf attribute, and the nearest parent GUID uses the
+original ancestor selector. The markers include encryption of the containing Archive
+Entries. A missing encryption declaration can leave the marker unknown even with a
+complete contributor set. When two positions establish ambiguity, the absent placement
+cells cite their actual comparison inputs. An absence without a selected placement or
+an established source survey has incomplete origin and unknown encryption.

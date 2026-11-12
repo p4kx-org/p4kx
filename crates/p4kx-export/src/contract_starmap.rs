@@ -3,6 +3,7 @@
 
 use crate::contract::LocalisedText;
 use crate::guid_text::CatalogGuid;
+use crate::starmap_containers::proof::PlacementEvidence;
 
 /// Starmap object data used for placement and catalog relationship projections.
 #[derive(Debug)]
@@ -16,5 +17,6 @@ pub(crate) struct StarmapObject<'source> {
     pub(crate) entity_name: Option<String>,
     pub(crate) placed_under_guid: Option<CatalogGuid>,
     pub(crate) position: Option<[f64; 3]>,
+    pub(crate) placement_proof: Option<PlacementEvidence>,
     pub(crate) mining_claim: bool,
 }

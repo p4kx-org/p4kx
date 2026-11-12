@@ -4,10 +4,11 @@
 use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry};
 
-use crate::catalog_read::original::{AuthoredEntryPath, with_entry_capture};
+use crate::catalog_read::original::{AuthoredEntryPath, EntryXml, with_entry_capture};
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::SourceDisposition;
 use crate::starmap_index::Index;
+use crate::starmap_xml::Document;
 use crate::{CatalogError, ExportAccountingError, Kind};
 
 use super::Body;
@@ -277,17 +278,9 @@ fn a_missing_external_uses_the_actual_case_insensitive_first_attribute() -> Test
         .first()
         .ok_or("actual selected case-insensitive Child")?;
     assert_eq!(
-        child.external.as_deref(),
+        child.external.as_ref().map(AuthoredEntryPath::as_str),
         Some(NEXT),
-        "original first attribute wins"
-    );
-    assert_eq!(
-        child
-            .external_recipe
-            .as_ref()
-            .map(AuthoredEntryPath::as_str),
-        Some(NEXT),
-        "the same actual getter produced the retained original recipe"
+        "the first original attribute supplies the resolved path and retained receipt"
     );
     let missing = source
         .ledger
@@ -304,63 +297,39 @@ fn a_missing_external_uses_the_actual_case_insensitive_first_attribute() -> Test
 }
 
 #[test]
-fn a_changed_external_description_cannot_rebind_a_genuine_path_recipe() -> TestResult {
-    let xml = format!(
-        r#"<ObjectContainer><ChildObjectContainers><Child pos="0,0,0" external="1" name="{NEXT}"/></ChildObjectContainers></ObjectContainer>"#
-    );
-    let (_folder, archive) = opened(vec![container(ROOT, &xml)])?;
+fn an_xml_node_from_another_parse_cannot_supply_a_placement_receipt() -> TestResult {
+    let xml = r#"<ObjectContainer pos="1,2,3"/>"#;
+    let (_folder, archive) = opened(vec![container(ROOT, xml)])?;
     with_entry_capture(&archive, |capture| {
-        let index = Index::new(&archive);
-        let bounds = super::Bounds {
-            depth: 64,
-            children: std::sync::atomic::AtomicUsize::new(10),
-        };
-        let (mut body, mut ledger) = super::parse(&archive, &index, 0, &bounds, capture)?;
-        let Body::Parsed { root, .. } = &mut body else {
-            return Err(ExportAccountingError::ConflictingSourceDatum.into());
-        };
-        let child = root
-            .children
-            .first_mut()
+        let entry = archive
+            .entries()
+            .first()
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        assert_eq!(
-            child.external.as_deref(),
-            Some(NEXT),
-            "real original external path"
-        );
-        assert_eq!(
-            child
-                .external_recipe
-                .as_ref()
-                .map(AuthoredEntryPath::as_str),
-            Some(NEXT),
-            "real same-getter original receipt before mutation"
-        );
+        let mut ledger = super::ExportLedger::default();
+        let original = super::main_xml(&archive, entry, capture, &mut ledger)?
+            .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;
+        let original = EntryXml::parse(&original.bytes, capture)?
+            .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;
+        let other = Document::parse(xml.as_bytes())
+            .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;
         assert!(
-            index.find(NEXT).is_none(),
-            "genuine original target is absent"
+            original.attribute_source(original.root(), "pos").is_ok(),
+            "the exact node from the admitted read supplies a receipt"
         );
-        assert_eq!(
-            ledger.entries.len(),
-            2,
-            "directory and XML succeed before missing selection"
-        );
-        child.external = Some("changed.socpak".to_owned());
-        let result = super::next_sources(std::iter::once(&body), &index, &mut ledger);
-        assert!(
-            matches!(
-                result,
-                Err(CatalogError::Accounting(
-                    ExportAccountingError::ConflictingSourceDatum
-                ))
-            ),
-            "a descriptive path cannot replace the actual selected source value"
-        );
-        assert_eq!(
-            ledger.entries.len(),
-            2,
-            "mismatch creates no fabricated missing operation"
-        );
+        for error in [
+            original.node_source(other.root()).err(),
+            original.attribute_source(other.root(), "pos").err(),
+        ] {
+            assert!(
+                matches!(
+                    error,
+                    Some(CatalogError::Accounting(
+                        ExportAccountingError::ConflictingSourceDatum
+                    ))
+                ),
+                "an equal-looking node from another parse has no original coordinates"
+            );
+        }
         Ok(())
     })?;
     Ok(())

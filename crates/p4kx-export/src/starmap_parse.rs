@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use p4kx_extraction::{Archive, CancelToken, Guid};
@@ -11,11 +12,12 @@ use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, 
 use crate::entry_source::EntrySource;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::starmap_containers::proof::ChildOrigins;
 use crate::starmap_index::Index;
 use crate::starmap_read::main_xml;
 use crate::starmap_transform::Rotation;
 use crate::starmap_xml::XmlError;
-use crate::{CatalogError, ExportAccountingError, Kind};
+use crate::{CatalogError, Kind};
 #[path = "starmap_children.rs"]
 mod children;
 
@@ -43,8 +45,8 @@ pub(crate) struct Child {
     /// Children of its own.
     pub(crate) entity_name: String,
     /// The path of the external container the Child names.
-    pub(crate) external: Option<String>,
-    external_recipe: Option<AuthoredEntryPath>,
+    pub(crate) external: Option<AuthoredEntryPath>,
+    pub(crate) origins: Option<Arc<ChildOrigins>>,
     pub(crate) below: Level,
 }
 
@@ -173,19 +175,11 @@ fn source_loss(level: &Level) -> SourceLoss {
     loss
 }
 
-fn externals<'level>(
-    level: &'level Level,
-    out: &mut Vec<(&'level str, &'level AuthoredEntryPath)>,
-) -> Result<(), CatalogError> {
+fn externals<'level>(level: &'level Level, out: &mut Vec<&'level AuthoredEntryPath>) {
     for child in &level.children {
-        match (&child.external, &child.external_recipe) {
-            (Some(path), Some(recipe)) if path == recipe.as_str() => out.push((path, recipe)),
-            (None, None) => {}
-            _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
-        }
-        externals(&child.below, out)?;
+        out.extend(child.external.as_ref());
+        externals(&child.below, out);
     }
-    Ok(())
 }
 /// The containers read, and how many parses that took.
 pub(crate) struct Read {
@@ -233,7 +227,7 @@ pub(crate) fn read_all(
             .map(|&entry| parse(archive, index, entry, &bounds, capture).map(|read| (entry, read)))
             .collect::<Result<_, _>>()?;
         parsed += read.len();
-        let next = next_sources(read.iter().map(|(_, (body, _))| body), index, &mut ledger)?;
+        let next = next_sources(read.iter().map(|(_, (body, _))| body), index, &mut ledger);
         for (entry, (body, observed)) in read {
             bodies.insert(entry, body);
             ledger.merge(observed);
@@ -257,25 +251,25 @@ fn next_sources<'a>(
     bodies: impl Iterator<Item = &'a Body>,
     index: &Index<'_>,
     ledger: &mut ExportLedger,
-) -> Result<HashSet<usize>, CatalogError> {
+) -> HashSet<usize> {
     let mut next = HashSet::new();
     let mut paths = Vec::new();
     for body in bodies {
         if let Body::Parsed { root, .. } = body {
             paths.clear();
-            externals(root, &mut paths)?;
-            for (path, recipe) in paths.iter().copied() {
-                if let Some(entry) = index.find(path) {
+            externals(root, &mut paths);
+            for path in &paths {
+                if let Some(entry) = index.find(path.as_str()) {
                     next.insert(entry);
                 } else {
-                    EntrySource::authored_missing(recipe.clone())
+                    EntrySource::authored_missing(AuthoredEntryPath::clone(path))
                         .dependency()
                         .record(ledger, Kind::StarmapObjects, SourceDisposition::ReadFailed);
                 }
             }
         }
     }
-    Ok(next)
+    next
 }
 
 fn record_unread(

@@ -8,6 +8,7 @@ use crate::guid_text::CatalogGuid;
 use crate::memo::Memo;
 use crate::record_fields::{class_name, locale_key, reference, text};
 use crate::starmap_containers::Placements;
+use crate::starmap_containers::proof::PlacementEvidence;
 use crate::texts::Texts;
 
 /// The `description` key all mining claim markers share and no other starmap object has (188 of
@@ -67,6 +68,9 @@ pub(crate) fn starmap_object<'f>(
             .and_then(|placement| placement.placed_under)
             .map(CatalogGuid),
         position: placement.map(|placement| placement.position.map(millimetres)),
+        placement_proof: placement
+            .map(|placement| PlacementEvidence::Selected(placement.proof.clone()))
+            .or_else(|| placements.ambiguity_proof(tree.guid())),
         mining_claim: locale_key(root, "description").or_else(|| text(root, "description"))
             == Some(MINING_CLAIM_DESCRIPTION),
     }

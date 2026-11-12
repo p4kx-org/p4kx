@@ -41,3 +41,16 @@ container on the chain (up to 128 MiB each) was held at once. Only the systems r
 - The catalog JSON and its schema do not change.
 - An out-of-range position is reported with the composed number and the entity name of a placed
   Child, no longer with the raw attribute text, which is not kept.
+
+## Catalog placement evidence
+
+The same walk retains the selected root directory and the parsed XML node and attribute
+coordinates used by each placement. A reused container shares its parsed source sites.
+Each placement retains its own ancestor route so the same Child can supply different
+world positions in different instances.
+
+The route selects the occurrence for all placement fields. Position uses the leaf
+translation and ancestor translations and rotations. Entity name and parent GUID
+retain their respective original attribute uses. The two positions that establish an
+ambiguous placement supply the absence evidence. Referenced or attempted targets
+stay in the operation ledger unless their contents contribute to a placement.

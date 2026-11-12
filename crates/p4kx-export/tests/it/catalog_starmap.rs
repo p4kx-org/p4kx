@@ -11,6 +11,8 @@ use crate::starmap_fixture;
 mod definitions;
 #[path = "starmap_objects_contract.rs"]
 mod objects;
+#[path = "starmap_placement_origins.rs"]
+mod placement_origins;
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
@@ -210,12 +212,12 @@ fn verify_placement_evidence(catalog: &Value, placed: &Value) -> TestResult {
     assert_eq!(
         at(placed, "/position/containsEncryptedSource")?,
         &Value::Null,
-        "derived placement contribution receipts are unestablished"
+        "the inner ZIP has no supported encryption declaration"
     );
     assert_eq!(
         at(placed, "/position/sourceSetComplete")?,
-        false,
-        "placement evidence remains incomplete"
+        true,
+        "the selected XML position retains every actual contributor"
     );
     Ok(())
 }

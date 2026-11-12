@@ -182,7 +182,7 @@ pub(crate) use health_entry_json::{EntryJson, JsonEvent};
 pub(crate) use health_entry_observation::FailedEntryObservation;
 pub(crate) use health_entry_read::{EntryRead, EntryReadError};
 pub(crate) use health_entry_receipt::{EntryReceipt, PhysicalEntryIdentity, PhysicalEntryRef};
-pub(crate) use health_entry_xml::EntryXml;
+pub(crate) use health_entry_xml::{EntryXml, XmlAttributeSource, XmlNodeSource};
 pub use health_failed_entry::FailedExportEntry;
 
 #[path = "health_example_description.rs"]

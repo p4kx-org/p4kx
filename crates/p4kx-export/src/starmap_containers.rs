@@ -3,6 +3,7 @@
 
 use std::collections::hash_map::Entry as MapEntry;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::time::Instant;
 
 use p4kx_extraction::{Archive, CancelToken, Guid};
@@ -15,6 +16,11 @@ use crate::starmap_index::{Index, unreferenced};
 use crate::starmap_parse::{Read, read_all};
 use crate::starmap_report::{ContainerCounts, Placement, StarmapReport, apart, clip};
 use crate::starmap_walk::{Opened, System, SystemRead};
+
+use self::proof::{PlacementEvidence, PlacementProof};
+
+#[path = "starmap_placement_proof.rs"]
+pub(crate) mod proof;
 
 /// What bounds the walk through a star system.
 #[derive(Debug, Clone, Copy)]
@@ -42,6 +48,7 @@ impl Default for Limits {
 pub(crate) struct Placements {
     pub(crate) ledger: ExportLedger,
     by_record: HashMap<Guid, Placement>,
+    ambiguous: HashMap<Guid, Arc<[PlacementProof; 2]>>,
     pub(crate) counts: ContainerCounts,
     pub(crate) report: StarmapReport,
     /// Every container below the system folder: those the walk opened, each with the record it
@@ -52,6 +59,12 @@ pub(crate) struct Placements {
 impl Placements {
     pub(crate) fn get(&self, record: Guid) -> Option<&Placement> {
         self.by_record.get(&record)
+    }
+
+    pub(crate) fn ambiguity_proof(&self, record: Guid) -> Option<PlacementEvidence> {
+        self.ambiguous
+            .get(&record)
+            .map(|proof| PlacementEvidence::Ambiguous(Arc::clone(proof)))
     }
 
     /// Reads the container of every star system of `archive` and the external containers it
@@ -90,10 +103,20 @@ impl Placements {
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        let read: Vec<SystemRead> = systems
+        let read = systems
             .par_iter()
-            .map(|(name, entry)| System::run(&index, &bodies, name, *entry, cancel, limits))
-            .collect();
+            .map(|(name, entry)| {
+                System::run(
+                    &index,
+                    &bodies,
+                    name,
+                    *entry,
+                    cancel,
+                    limits,
+                    (archive, capture),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
@@ -102,15 +125,14 @@ impl Placements {
             ..Self::default()
         };
         placements.counts.systems = systems.len();
-        let mut repeated: HashSet<Guid> = HashSet::new();
         let mut opened: HashSet<usize> = HashSet::new();
-        let named = placements.merge_systems(read, &mut opened, &mut repeated);
-        placements.counts.ambiguous = repeated.len();
+        let named = placements.merge_systems(read, &mut opened);
+        placements.counts.ambiguous = placements.ambiguous.len();
         placements
             .report
             .containers
             .push(format!("{named} containers name starmap records"));
-        for record in &repeated {
+        for record in placements.ambiguous.keys() {
             placements.by_record.remove(record);
         }
         placements.report.unreferenced = unreferenced(&index, &opened);
@@ -119,12 +141,7 @@ impl Placements {
         Ok(placements)
     }
 
-    fn merge_systems(
-        &mut self,
-        systems: Vec<SystemRead>,
-        opened: &mut HashSet<usize>,
-        repeated: &mut HashSet<Guid>,
-    ) -> usize {
+    fn merge_systems(&mut self, systems: Vec<SystemRead>, opened: &mut HashSet<usize>) -> usize {
         let mut named = 0;
         for system in systems {
             opened.extend(system.opened.iter().copied());
@@ -137,7 +154,7 @@ impl Placements {
             self.report.issues.extend(system.report.issues);
             self.opened.extend(system.containers);
             for (record, placement) in system.placed {
-                self.add(record, placement, repeated);
+                self.add(record, placement);
             }
         }
         named
@@ -159,16 +176,17 @@ impl Placements {
         );
     }
 
-    /// Keeps the first placement of `record`; a later one more than `SAME_PLACE` metres from it
-    /// puts the record into `repeated`, to be left unplaced.
-    fn add(&mut self, record: Guid, placement: Placement, repeated: &mut HashSet<Guid>) {
+    /// Retains the first placement and the first pair establishing an ambiguous position.
+    fn add(&mut self, record: Guid, placement: Placement) {
         let MapEntry::Occupied(held) = self.by_record.entry(record) else {
             self.by_record.insert(record, placement);
             return;
         };
         let moved = apart(held.get().position, placement.position);
         if moved {
-            repeated.insert(record);
+            self.ambiguous
+                .entry(record)
+                .or_insert_with(|| Arc::new([held.get().proof.clone(), placement.proof.clone()]));
         }
         if self.report.repeated.len() < 100 {
             self.report.repeated.push(format!(
