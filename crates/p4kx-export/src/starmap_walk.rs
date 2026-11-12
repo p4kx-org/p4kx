@@ -310,7 +310,7 @@ impl<'a> System<'a> {
                     "{label}: out of range: pos {:?} places {:?} of {}",
                     local.position,
                     world.position,
-                    clip(&child.entity_name)
+                    clip(child.entity_name())
                 ));
                 continue;
             }
@@ -375,7 +375,7 @@ impl<'a> System<'a> {
             Placement {
                 system: Arc::clone(&self.name),
                 position: path.transform.position,
-                entity_name: child.entity_name.clone(),
+                entity_name: child.entity_name().to_owned(),
                 placed_under: under,
                 proof: PlacementProof {
                     root: Arc::clone(&self.root),

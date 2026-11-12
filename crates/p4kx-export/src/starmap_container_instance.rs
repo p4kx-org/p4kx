@@ -5,7 +5,7 @@ use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::proof::PlacementStep;
+use super::proof::{ChildNames, PlacementStep};
 use crate::CatalogError;
 use crate::catalog_read::original::{
     AuthoredEntryPath, EntryCapture, EntryXml, PhysicalEntryRef, XmlNodeSource,
@@ -87,6 +87,9 @@ pub(crate) struct ContainerInstance {
     system: SourcedValue<String>,
     source_path: SourcedValue<String>,
     declared_path: SourcedValue<String>,
+    #[schemars(extend("x-gameText" = true))]
+    declared_label: SourcedValue<String>,
+    declared_entity_name: SourcedValue<String>,
     local_position: SourcedValue<[f64; 3]>,
     local_rotation: SourcedValue<[f64; 4]>,
     world_position: SourcedValue<[f64; 3]>,
@@ -116,6 +119,7 @@ impl ContainerOccurrence<'_> {
             .map(|_| ContainerInstanceKey::from_route(self.root_entry, self.parent_route));
         let xml_root = file.root.selected()?;
         let transform = self.transform_inputs(&xml_root)?;
+        let names = ChildNames::from_route(self.route, &xml_root, sources)?;
         Ok(ContainerInstance {
             instance_id: sources.value_with_shared_origin(
                 SourceValue::Present(ContainerInstanceKey::from_route(
@@ -140,6 +144,8 @@ impl ContainerOccurrence<'_> {
             ),
             source_path: file.path.clone(),
             declared_path,
+            declared_label: names.label,
+            declared_entity_name: names.entity_name,
             local_position: sources.value(state(local_pos), &[transform.local_position], true),
             local_rotation: sources.value(state(local_rot), &[transform.local_rotation], true),
             world_position: sources.value_with_shared_origin(

@@ -81,13 +81,6 @@ fn read_child(
         external,
         origins,
         below,
-        entity_name: if named {
-            attribute(child, "entityName")
-                .unwrap_or_default()
-                .to_owned()
-        } else {
-            String::new()
-        },
     })
 }
 

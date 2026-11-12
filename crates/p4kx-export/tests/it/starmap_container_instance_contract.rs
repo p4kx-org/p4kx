@@ -16,11 +16,12 @@ use crate::health_origin_entry_source as entries;
 const ROOT: &str = "Data/ObjectContainers/PU/system/canary/canarysystem.socpak";
 const TILE: &str = "Data/ObjectContainers/PU/Starchitect/Tile/instance.socpak";
 const RECORD: u128 = 0x844_0101;
+const LABEL_KEY: &str = "@sample_label";
 const MISSING: &str = "Data/ObjectContainers/PU/Starchitect/Tile/missing.socpak";
 
 #[test]
 fn one_tile_file_keeps_two_physical_instances_and_their_own_transforms() -> TestResult {
-    let catalog = catalog(None, true)?;
+    let catalog = catalog(None, true, LABEL_KEY)?;
     let rows = proof::rows(&catalog, "/placements/containerInstances/rows")?;
     let root = by_path(rows, ROOT)
         .next()
@@ -145,9 +146,80 @@ fn original_node(used: &Value) -> Result<u64, Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn reused_instances_keep_their_own_authored_child_labels() -> TestResult {
+    for label in [LABEL_KEY, "Synthetic display label"] {
+        assert_instance_labels(&catalog(None, true, label)?, label)?;
+    }
+    Ok(())
+}
+
+fn assert_instance_labels(catalog: &Value, first_label: &str) -> TestResult {
+    let rows = proof::rows(catalog, "/placements/containerInstances/rows")?;
+    let root = by_path(rows, ROOT).next().ok_or("root occurrence")?;
+    proof::cell(root, "declaredLabel", "absent")?;
+    proof::cell(root, "declaredEntityName", "absent")?;
+
+    let mut instances = by_path(rows, TILE);
+    let first = instances.next().ok_or("first tile occurrence")?;
+    let second = instances.next().ok_or("second tile occurrence")?;
+    let label = proof::present(first, "declaredLabel", &json!(first_label), Some(true))?;
+    let entity = proof::present(
+        first,
+        "declaredEntityName",
+        &json!("SampleEntity"),
+        Some(true),
+    )?;
+    assert_child_attribute_source(catalog, first, label, "@label")?;
+    assert_child_attribute_source(catalog, first, entity, "@entityName")?;
+
+    let empty = proof::present(second, "declaredLabel", &json!(""), Some(true))?;
+    let missing = proof::cell(second, "declaredEntityName", "absent")?;
+    assert_eq!(
+        proof::at(missing, "/containsEncryptedSource")?,
+        true,
+        "the missing attribute is observed in the encrypted Child XML"
+    );
+    assert_eq!(
+        proof::at(missing, "/sourceSetComplete")?,
+        true,
+        "the complete original attribute slot was inspected"
+    );
+    assert_child_attribute_source(catalog, second, empty, "@label")?;
+    assert_child_attribute_source(catalog, second, missing, "$absent:@entityName")?;
+    proof::closure(catalog)
+}
+
+fn assert_child_attribute_source(
+    catalog: &Value,
+    instance: &Value,
+    field: &Value,
+    attribute: &str,
+) -> TestResult {
+    let leaf = proof::rows(instance, "/instanceId/value/childNodeIndices")?
+        .last()
+        .and_then(Value::as_u64)
+        .ok_or("the declaring Child node ordinal")?;
+    let uses = proof::uses(catalog, field)?;
+    let [source] = uses.as_slice() else {
+        return Err("a direct authored attribute needs its one exact source use".into());
+    };
+    assert_eq!(
+        proof::at(source, "/location/field")?,
+        attribute,
+        "the source is the exact declared or observed-absent Child attribute"
+    );
+    assert_eq!(
+        original_node(source)?,
+        leaf,
+        "the label is sourced from this occurrence's terminal Child"
+    );
+    Ok(())
+}
+
+#[test]
 fn unrelated_record_filter_leaves_physical_container_inventory_unavailable() -> TestResult {
     let filter = Filter::new("*/unrelated/*");
-    let catalog = catalog(Some(&filter), true)?;
+    let catalog = catalog(Some(&filter), true, LABEL_KEY)?;
     assert_eq!(
         proof::at(&catalog, "/placements/containerInstances/availability")?,
         "unavailable"
@@ -170,7 +242,7 @@ fn by_path<'catalog>(
 
 #[test]
 fn an_unfiltered_catalog_discovers_file_instances_without_matching_records() -> TestResult {
-    let catalog = catalog(None, false)?;
+    let catalog = catalog(None, false, LABEL_KEY)?;
     assert_eq!(
         proof::rows(&catalog, "/definitions/starmapObjects/rows")?,
         &[] as &[Value],
@@ -199,6 +271,7 @@ fn an_unfiltered_catalog_discovers_file_instances_without_matching_records() -> 
 fn catalog(
     filter: Option<&Filter>,
     with_starmap_record: bool,
+    first_label: &str,
 ) -> Result<Value, Box<dyn std::error::Error>> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("Data.p4k");
@@ -206,11 +279,11 @@ fn catalog(
         r#"<ObjectContainer version="14">
           <ChildObjectContainers>
             <Child pos="10,0,0" rot="0.7071067811865475,0,0,0.7071067811865475">
-              <ChildObjectContainers><Child external="1" name="{TILE}" pos="2,0,0" rot="2,0,0,0"/></ChildObjectContainers>
+              <ChildObjectContainers><Child external="1" name="{TILE}" pos="2,0,0" rot="2,0,0,0" label="{first_label}" entityName="SampleEntity"/></ChildObjectContainers>
             </Child>
           </ChildObjectContainers>
           <ChildObjectContainers>
-            <Child external="1" name="{TILE}" pos="100,0,0"/>
+            <Child external="1" name="{TILE}" pos="100,0,0" label=""/>
             <Child external="1" name="{MISSING}"/>
           </ChildObjectContainers>
         </ObjectContainer>"#,

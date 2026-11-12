@@ -38,13 +38,19 @@ pub(crate) enum Pose {
 pub(crate) struct Child {
     pub(crate) pose: Pose,
     pub(crate) record: Option<Guid>,
-    /// The `entityName`, kept for a Child that names a record or an external container or has
-    /// Children of its own.
-    pub(crate) entity_name: String,
     /// The path of the external container the Child names.
     pub(crate) external: Option<AuthoredEntryPath>,
     pub(crate) origins: Option<Arc<ChildOrigins>>,
     pub(crate) below: Level,
+}
+
+impl Child {
+    pub(crate) fn entity_name(&self) -> &str {
+        self.origins
+            .as_deref()
+            .and_then(ChildOrigins::entity_name)
+            .unwrap_or_default()
+    }
 }
 
 /// The Children of one element.

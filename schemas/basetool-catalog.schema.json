@@ -7619,6 +7619,13 @@
         "container": {
           "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"
         },
+        "declaredEntityName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "declaredLabel": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
         "declaredPath": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
@@ -7649,6 +7656,8 @@
       },
       "required": [
         "container",
+        "declaredEntityName",
+        "declaredLabel",
         "declaredPath",
         "instanceId",
         "localPosition",

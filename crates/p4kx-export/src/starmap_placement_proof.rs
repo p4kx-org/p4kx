@@ -4,13 +4,15 @@
 use std::iter;
 use std::sync::Arc;
 
-use p4kx_extraction::{SharedFieldOrigin, SourceUse, SourceUseRole, SourceUses};
+use p4kx_extraction::{
+    SharedFieldOrigin, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
+};
 
 use crate::CatalogError;
 use crate::catalog_read::original::{
     AuthoredEntryPath, EntryXml, XmlAttributeSource, XmlNodeSource,
 };
-use crate::starmap_xml::Root;
+use crate::starmap_xml::{Root, attribute};
 
 #[derive(Debug)]
 pub(crate) struct ChildOrigins {
@@ -19,7 +21,8 @@ pub(crate) struct ChildOrigins {
     position: XmlAttributeSource,
     rotation: XmlAttributeSource,
     record: XmlAttributeSource,
-    entity: XmlAttributeSource,
+    entity: ChildText,
+    label: ChildText,
 }
 
 impl ChildOrigins {
@@ -34,7 +37,66 @@ impl ChildOrigins {
             position: xml.attribute_source(child, "pos")?,
             rotation: xml.attribute_source(child, "rot")?,
             record: xml.attribute_source(child, "starMapRecord")?,
-            entity: xml.attribute_source(child, "entityName")?,
+            entity: ChildText::read(xml, child, "entityName")?,
+            label: ChildText::read(xml, child, "label")?,
+        })
+    }
+
+    pub(crate) fn entity_name(&self) -> Option<&str> {
+        self.entity.value.as_deref()
+    }
+}
+
+#[derive(Debug)]
+struct ChildText {
+    value: Option<String>,
+    source: XmlAttributeSource,
+}
+
+impl ChildText {
+    fn read(
+        xml: &EntryXml<'_, '_, '_>,
+        child: Root<'_>,
+        field: &'static str,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self {
+            value: attribute(child, field).map(str::to_owned),
+            source: xml.attribute_source(child, field)?,
+        })
+    }
+
+    fn project(&self, sources: &SourceUses) -> Result<SourcedValue<String>, CatalogError> {
+        let value = self
+            .value
+            .clone()
+            .map_or(SourceValue::Absent, SourceValue::Present);
+        let source = self.source.observe(SourceUseRole::Payload)?;
+        Ok(sources.value(value, &[source], true))
+    }
+}
+
+/// The authored names of the Child that declares an external occurrence.
+pub(crate) struct ChildNames {
+    pub(crate) label: SourcedValue<String>,
+    pub(crate) entity_name: SourcedValue<String>,
+}
+
+impl ChildNames {
+    pub(crate) fn from_route(
+        route: Option<&PlacementStep>,
+        root: &SourceUse,
+        sources: &SourceUses,
+    ) -> Result<Self, CatalogError> {
+        let Some(step) = route else {
+            let absent = sources.value(SourceValue::Absent, std::slice::from_ref(root), true);
+            return Ok(Self {
+                label: absent.clone(),
+                entity_name: absent,
+            });
+        };
+        Ok(Self {
+            label: step.child.label.project(sources)?,
+            entity_name: step.child.entity.project(sources)?,
         })
     }
 }
@@ -146,7 +208,11 @@ impl PlacementProof {
         match field {
             PlacementField::System => Ok(Vec::new()),
             PlacementField::Entity => Ok(vec![
-                self.last.child.entity.observe(SourceUseRole::Payload)?,
+                self.last
+                    .child
+                    .entity
+                    .source
+                    .observe(SourceUseRole::Payload)?,
             ]),
             PlacementField::Parent => self.parent_uses(),
             PlacementField::Position => self.position_uses(),

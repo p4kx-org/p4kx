@@ -77,3 +77,8 @@ precision. World rotations use the composed unit quaternions in w, x, y, z order
 The root frame is the identity. Unread, malformed and unreachable placements
 remain visible through the traversal diagnostics. Table availability describes
 the discovered source family independently of traversal completeness.
+
+Each external occurrence preserves the declaring Child's `label` and `entityName`
+as `declaredLabel` and `declaredEntityName`. Empty attributes remain present.
+The label retains its literal text or localization key and carries `x-gameText`.
+Each name cites its own original attribute or the observed absence at that Child.
