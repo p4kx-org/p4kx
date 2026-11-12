@@ -86,7 +86,7 @@ pub(crate) fn export_raw_bank(
     export_observed(source, encrypted, false, inspect)
 }
 
-fn export_observed(
+pub(crate) fn export_observed(
     source: &[u8],
     encrypted: bool,
     diagnostic: bool,

@@ -38,6 +38,12 @@ pub use p4kx_audio::{
     BankBlendLayers, BankBlendPoint, BankBlendPointRows,
 };
 pub use p4kx_audio::{
+    BankDialogueEventFields, BankDialogueEventRow, BankDialogueEventRows, BankDialogueNode,
+    BankDialogueTree, BankDialogueTreeCoverage, BankHircDialogueEvent, BankHircMusicSwitch,
+    BankMusicSwitchBranch, BankMusicSwitchFields, BankMusicSwitchGroup, BankMusicSwitchNode,
+    BankMusicSwitchRead, BankMusicSwitchRow, BankMusicSwitchRows, BankMusicSwitchTarget,
+};
+pub use p4kx_audio::{
     BankGraphPoint, BankGraphPointRows, BankMusicTrackAutomation, BankMusicTrackAutomationRows,
     BankMusicTrackFadeFields, BankMusicTrackTransitionFields, BankTrackAutomationExtent,
     BankTrackAutomationFields, BankTrackAutomationPoints,
@@ -46,11 +52,6 @@ pub use p4kx_audio::{
     BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistItem,
     BankMusicPlaylistRead, BankMusicPlaylistRow, BankMusicPlaylistRows, BankMusicTransitionFields,
     MusicPlayMode,
-};
-pub use p4kx_audio::{
-    BankHircMusicSwitch, BankMusicSwitchBranch, BankMusicSwitchFields, BankMusicSwitchGroup,
-    BankMusicSwitchNode, BankMusicSwitchRead, BankMusicSwitchRow, BankMusicSwitchRows,
-    BankMusicSwitchTarget,
 };
 pub use p4kx_audio::{
     BankHircRtpc, BankRtpcCurve, BankRtpcExtent, BankRtpcPoint, BankRtpcRead, BankRtpcRow,

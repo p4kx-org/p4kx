@@ -5540,6 +5540,329 @@
       "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|1844674407370955[0-0][0-9]{3}|18446744073709551[0-5][0-9]{2}|184467440737095516[0-0][0-9]{1}|1844674407370955161[0-4][0-9]{0}|18446744073709551615)$",
       "type": "string"
     },
+    "DialogueArgumentRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "group_id": {
+          "$ref": "#/$defs/BankField_uint32"
+        },
+        "group_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DialogueGroupType"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "group_type_code": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "group_id"
+      ],
+      "type": "object"
+    },
+    "DialogueDecisionMode": {
+      "enum": [
+        "best-match",
+        "weighted",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "DialogueEventObservations": {
+      "additionalProperties": false,
+      "properties": {
+        "argument_count": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "checked_argument_types": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "checked_arguments": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "complete_nodes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "mode": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DialogueDecisionMode"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mode_code": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "partial_node_bytes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "partial_node_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "probability": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "properties": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodePropertyListRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ranged_modifiers": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/NodePropertyListRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tree_coverage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DialogueTreeCoverage"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tree_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "tree_size": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "DialogueEventPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/NodeDeclaration_DialogueEventObservations"
+            },
+            "record_type": {
+              "const": "bank-dialogue-event",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/DialogueArgumentRecord"
+            },
+            "record_type": {
+              "const": "bank-dialogue-argument",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/DialogueNodeRecord"
+            },
+            "record_type": {
+              "const": "bank-dialogue-node",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "DialogueEventPayload"
+    },
+    "DialogueGroupType": {
+      "enum": [
+        "switch",
+        "state",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "DialogueLinkInterpretation": {
+      "enum": [
+        "undetermined"
+      ],
+      "type": "string"
+    },
+    "DialogueNodeLayout": {
+      "enum": [
+        "decoded",
+        "malformed"
+      ],
+      "type": "string"
+    },
+    "DialogueNodeRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "$ref": "#/$defs/BankField_uint32"
+        },
+        "layout": {
+          "$ref": "#/$defs/DialogueNodeLayout"
+        },
+        "link_interpretation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DialogueLinkInterpretation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "link_word": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "probability": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint16"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "weight": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint16"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "layout",
+        "range",
+        "key"
+      ],
+      "type": "object"
+    },
+    "DialogueTreeCoverage": {
+      "enum": [
+        "complete",
+        "truncated",
+        "misaligned"
+      ],
+      "type": "string"
+    },
     "Digest": {
       "description": "An explicitly scoped integrity value.",
       "properties": {
@@ -9570,6 +9893,113 @@
             },
             "observed": {
               "$ref": "#/$defs/BlendObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "absent",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "NodeDeclaration_DialogueEventObservations": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/DialogueEventObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/DialogueEventObservations"
             },
             "version": {
               "format": "uint32",
@@ -21333,6 +21763,336 @@
               },
               "status": {
                 "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-dialogue-event"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/DialogueEventPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-dialogue-event"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-dialogue-argument"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/DialogueEventPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-dialogue-argument"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-dialogue-node"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/DialogueEventPayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-dialogue-node"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
               }
             }
           }

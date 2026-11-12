@@ -31,6 +31,7 @@ pub(crate) enum NodeKind {
     BlendContainer,
     MusicTrackControls,
     MusicTransitionRules,
+    DialogueEvent,
 }
 
 impl NodeKind {
@@ -50,6 +51,7 @@ impl NodeKind {
             Self::BlendContainer => "bnkHircBlendContainer",
             Self::MusicTrackControls => "bnkMusicTrackControls",
             Self::MusicTransitionRules => "bnkMusicTransitionRules",
+            Self::DialogueEvent => "bnkDialogueEvent",
         }
     }
 
@@ -69,6 +71,7 @@ impl NodeKind {
             Self::BlendContainer => "blendContainerPosition",
             Self::MusicTrackControls => "musicTrackAutomationPosition",
             Self::MusicTransitionRules => "musicTransitionRulePosition",
+            Self::DialogueEvent => "dialogueRowPosition",
         }
     }
 
@@ -88,6 +91,7 @@ impl NodeKind {
             Self::BlendContainer => "blendContainerExtent",
             Self::MusicTrackControls => "musicTrackControlsExtent",
             Self::MusicTransitionRules => "musicTransitionRulesExtent",
+            Self::DialogueEvent => "dialogueExtent",
         }
     }
 }

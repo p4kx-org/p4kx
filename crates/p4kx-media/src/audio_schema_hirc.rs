@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use serde_json::Value;
+
+use crate::audio_bank_dialogue_payload::{ARGUMENT, DialogueEventPayload, NODE, SUMMARY};
 use crate::audio_bank_hirc_action;
 use crate::audio_bank_hirc_action::reference as action_target;
 use crate::audio_bank_hirc_container;
@@ -9,7 +12,19 @@ use crate::audio_bank_hirc_sound::loose as sound_loose;
 use crate::audio_bank_sound_reference;
 use crate::audio_schema_status::StatusRule;
 
+use crate::{MediaError, schema_merge};
+
 use super::{ACTION_PAYLOAD, Binding, CONTAINER_PAYLOAD, SOUND_PAYLOAD};
+
+const DIALOGUE_PAYLOAD: &str = "DialogueEventPayload";
+
+pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
+    schema_merge::insert_payload(
+        base,
+        DIALOGUE_PAYLOAD,
+        schema_merge::serialized_payload::<DialogueEventPayload<'static>>(),
+    )
+}
 
 const ACTION: Binding = Binding::exact(
     ACTION_PAYLOAD,
@@ -35,7 +50,8 @@ const ACTION_TARGET_CANDIDATE: Binding = Binding::exact(
     StatusRule::Complete,
 );
 
-pub(super) const fn bindings() -> [Binding; 10] {
+pub(super) const fn bindings() -> [Binding; 13] {
+    let [event, argument, node] = dialogue_bindings();
     [
         ACTION,
         ACTION_TARGET_RESOLUTION,
@@ -88,6 +104,35 @@ pub(super) const fn bindings() -> [Binding; 10] {
             "bank-hirc-container-child",
             3,
             StatusRule::Complete,
+        ),
+        event,
+        argument,
+        node,
+    ]
+}
+
+const fn dialogue_bindings() -> [Binding; 3] {
+    [
+        Binding::exact(
+            DIALOGUE_PAYLOAD,
+            SUMMARY,
+            "bank-dialogue-event",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            DIALOGUE_PAYLOAD,
+            ARGUMENT,
+            "bank-dialogue-argument",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            DIALOGUE_PAYLOAD,
+            NODE,
+            "bank-dialogue-node",
+            3,
+            StatusRule::MalformedLayout,
         ),
     ]
 }

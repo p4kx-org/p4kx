@@ -18,6 +18,7 @@ use crate::{BankError, BankHircObject, BankReadError, HircKind};
 #[path = "bank_source_music_switch_rows.rs"]
 mod rows;
 
+pub(crate) use self::rows::read_group;
 pub use self::rows::{BankMusicSwitchRow, BankMusicSwitchRows};
 
 /// A physical music switch and its checked original fields and rows.

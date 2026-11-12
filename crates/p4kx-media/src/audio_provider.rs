@@ -171,7 +171,14 @@ fn bank_node_field_groups() -> [FieldGroup; 2] {
     ]
 }
 
-fn bank_field_groups() -> [FieldGroup; 14] {
+fn dialogue_event_fields() -> FieldGroup {
+    FieldGroup::new(
+        "bank-dialogue-event-fields",
+        "Original version-154 DialogueEvent argument, tree and property fields, with checked physical node prefixes and exact source ranges.",
+    )
+}
+
+fn bank_field_groups() -> [FieldGroup; 15] {
     [
         FieldGroup::new(
             "bank-directory",
@@ -201,6 +208,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
             "bank-music-playlist-fields",
             "Original MusicPlaylist node, children, stinger schedules, transition rules with ordered source and destination IDs, and ordered item fields.",
         ),
+        dialogue_event_fields(),
         FieldGroup::new(
             "bank-music-segment-fields",
             "Original MusicSegment node, meter, tracks, stingers and their scheduling words, and marker values with exact source ranges.",

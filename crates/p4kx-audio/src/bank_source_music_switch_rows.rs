@@ -8,7 +8,7 @@ use crate::bank_music_transition_rows::BankMusicTransitionRows;
 use crate::bank_object_fields::{BankHircField, ObjectFields, SeekObjectFields};
 use crate::hirc_music_node::{self, BankMusicStinger, MusicList, STINGER_LEN};
 use crate::hirc_music_switch::{
-    self, BankMusicSwitchGroup, BankMusicSwitchNode, DecisionTree, NODE_LEN,
+    self, BankMusicSwitchGroup, BankMusicSwitchNode, DecisionTree, NODE_LEN, SwitchGroups,
 };
 use crate::hirc_music_switch_traversal::{BankMusicSwitchBranch, BankMusicSwitchTarget, Traversal};
 use crate::hirc_music_transition::BankMusicTransitionFields;
@@ -161,7 +161,7 @@ impl<R: Read + Seek> BankMusicSwitchRows<'_, R> {
             },
             Kind::Groups => BankMusicSwitchRow::Group {
                 ordinal,
-                value: self.group(ordinal)?,
+                value: read_group(self.input, &self.lists.groups, ordinal)?,
             },
             Kind::Nodes => BankMusicSwitchRow::Node {
                 ordinal,
@@ -172,17 +172,6 @@ impl<R: Read + Seek> BankMusicSwitchRows<'_, R> {
                 value: self.target()?,
             },
         })
-    }
-
-    fn group(&mut self, ordinal: u32) -> Result<BankMusicSwitchGroup, BankReadError> {
-        let groups = &self.lists.groups;
-        let id = list_reader(self.input, groups.ids, ordinal, ID_LEN).read_u32()?;
-        let type_code = if ordinal < groups.types.count {
-            Some(list_reader(self.input, groups.types, ordinal, size_of::<u8>()).read_u8()?)
-        } else {
-            None
-        };
-        Ok(BankMusicSwitchGroup { id, type_code })
     }
 
     fn target(&mut self) -> Result<BankMusicSwitchTarget, BankReadError> {
@@ -222,6 +211,20 @@ impl<R: Read + Seek> Iterator for BankMusicSwitchRows<'_, R> {
         }
         None
     }
+}
+
+pub(crate) fn read_group<R: Read + Seek>(
+    input: &mut SeekSource<R>,
+    groups: &SwitchGroups,
+    ordinal: u32,
+) -> Result<BankMusicSwitchGroup, BankReadError> {
+    let id = list_reader(input, groups.ids, ordinal, ID_LEN).read_u32()?;
+    let type_code = if ordinal < groups.types.count {
+        Some(list_reader(input, groups.types, ordinal, size_of::<u8>()).read_u8()?)
+    } else {
+        None
+    };
+    Ok(BankMusicSwitchGroup { id, type_code })
 }
 
 fn list_reader<R>(

@@ -25,6 +25,7 @@ mod bank_rtpc_rows;
 mod bank_source;
 mod bank_source_actor_mixer;
 mod bank_source_container;
+mod bank_source_dialogue_event;
 mod bank_source_didx;
 mod bank_source_event;
 mod bank_source_hirc;
@@ -45,6 +46,7 @@ mod hirc_action;
 mod hirc_actor_mixer;
 mod hirc_blend_container;
 mod hirc_container;
+mod hirc_dialogue_event;
 mod hirc_event;
 mod hirc_layout;
 mod hirc_music;
@@ -131,6 +133,9 @@ pub use bank_source_container::{
     BankContainerChild, BankContainerChildren, BankContainerRead, BankHircContainer,
     BankHircContainerNode,
 };
+pub use bank_source_dialogue_event::{
+    BankDialogueEventRow, BankDialogueEventRows, BankDialogueNode, BankHircDialogueEvent,
+};
 pub use bank_source_didx::{BankDidx, BankDidxEntry, BankMediaInfo};
 pub use bank_source_event::{BankEvent, BankEventAction, BankEventRead, BankHircEvent};
 pub use bank_source_hirc::BankHircSoundNode;
@@ -169,6 +174,9 @@ pub use hirc_blend_container::{
     BankBlendAssociationFields, BankBlendContainerFields, BankBlendExtent, BankBlendLayerFields,
 };
 pub use hirc_container::BankContainerFields;
+pub use hirc_dialogue_event::{
+    BankDialogueEventFields, BankDialogueTree, BankDialogueTreeCoverage,
+};
 pub use hirc_event::BankEventCountEncoding;
 pub use hirc_layout::HircLayout;
 pub use hirc_music::{

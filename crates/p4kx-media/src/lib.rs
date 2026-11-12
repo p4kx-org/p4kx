@@ -33,6 +33,8 @@ mod audio_bank_blend_origins;
 mod audio_bank_blend_payload;
 mod audio_bank_blend_points;
 mod audio_bank_container_node;
+mod audio_bank_dialogue_event;
+mod audio_bank_dialogue_payload;
 mod audio_bank_didx_index;
 mod audio_bank_failure;
 mod audio_bank_hirc;

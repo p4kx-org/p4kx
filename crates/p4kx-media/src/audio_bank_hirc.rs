@@ -13,6 +13,7 @@ use p4kx_extraction::bank::{
 
 use crate::audio_bank_actor_mixer;
 use crate::audio_bank_container_node;
+use crate::audio_bank_dialogue_event;
 use crate::audio_bank_failure::BankPhase;
 use crate::audio_bank_inventory::{BankInventory, VersionSite};
 use crate::audio_bank_music_track_controls;
@@ -36,6 +37,8 @@ use crate::{
 
 pub(crate) const HIRC_NAMESPACE: &str = "audio-bank-hirc";
 pub(crate) const OBJECT_NAMESPACE: &str = "audio-bank-object";
+
+const VERSION_REQUIRED: &str = "HIRC semantics have no observed bank version";
 
 pub(crate) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,
@@ -117,6 +120,9 @@ fn emit_semantic<R: Read + Seek>(
         (BankHircSemantic::ContainerWithNode(container), Some(version)) => {
             audio_bank_hirc_container::project(projection, version, *container, writer)
         }
+        (BankHircSemantic::DialogueEvent(dialogue), Some(version)) => {
+            audio_bank_dialogue_event::project(projection, version, *dialogue, writer)
+        }
         (BankHircSemantic::MusicPlaylist(playlist), Some(version)) => {
             audio_bank_music_playlist::project(projection, version, *playlist, writer)
         }
@@ -145,9 +151,7 @@ fn emit_semantic<R: Read + Seek>(
         (BankHircSemantic::State(state), Some(version)) => {
             audio_bank_state::project(projection.input, version, state, writer)
         }
-        _ => Err(MediaError::Contract(
-            "HIRC semantics have no observed bank version".into(),
-        )),
+        _ => Err(MediaError::Contract(VERSION_REQUIRED.into())),
     }
 }
 
@@ -169,6 +173,9 @@ fn emit_raw(
         | HircKind::SwitchContainer
         | HircKind::LayerContainer => {
             audio_bank_container_node::unsupported(projection, version, original, writer)
+        }
+        HircKind::DialogueEvent => {
+            audio_bank_dialogue_event::unsupported(projection, version, original, writer)
         }
         HircKind::MusicTrack => {
             audio_bank_music_track_controls::unsupported(projection, version, original, writer)

@@ -193,6 +193,7 @@ fn insert_audio_payloads(base: &mut Value) -> Result<(), MediaError> {
 }
 
 fn insert_hirc_field_payloads(base: &mut Value) -> Result<(), MediaError> {
+    hirc::insert_payload(base)?;
     music::insert_payload(base)?;
     state::insert_payload(base)?;
     rtpc::insert_payload(base)?;

@@ -105,6 +105,9 @@ and fallback selection.
 | `audio-bank-music-switch-group` | `bank-music-switch-group` | HIRC section and switch and group ordinals |
 | `audio-bank-music-switch-node` | `bank-music-switch-node` | HIRC section and switch and physical node ordinals |
 | `audio-bank-music-switch-target` | `bank-music-switch-target` | HIRC section and switch and traversal target ordinals |
+| `audio-bank-dialogue-event` | `bank-dialogue-event` | HIRC section and DialogueEvent object ordinals |
+| `audio-bank-dialogue-argument` | `bank-dialogue-argument` | HIRC section, DialogueEvent object and original argument ordinals |
+| `audio-bank-dialogue-node` | `bank-dialogue-node` | HIRC section, DialogueEvent object and physical node ordinals |
 | `audio-bank-hirc` | `bank-hirc` | HIRC section ordinal |
 | `audio-bank-stid` | `bank-stid` | STID section ordinal |
 | `audio-bank-name` | `bank-name` | STID section and name ordinals |
@@ -423,6 +426,24 @@ nonzero-target traversal in order, with physical node indices, levels and ancest
 Repeated visits to a physical node remain separate. A malformed path retains its preceding
 checked targets and available physical nodes. The original tree extent refers to the retained
 bank and can be shorter than its declared size for a truncated tree.
+
+Version-154 DialogueEvent summaries retain the original probability, argument
+count, tree length, decision mode byte and checked tree extent. Argument rows
+preserve the original planar ID and type tables in order. Recognized mode and
+group values carry a conversion receipt for their original byte. An unknown
+code stays visible alongside its raw value.
+
+Physical node rows preserve each readable key, raw link word, weight and
+probability in file order. A complete key identifies a truncated final node,
+and the summary also locates any unreadable final word bytes. A readable link
+has `link_interpretation: undetermined`. The raw word can encode a target ID
+or a child index/count pair. The export preserves repeated words and all
+physical nodes. The generic HIRC node property rows preserve scalar values and
+ranged modifier bounds as original words. The DialogueEvent summary reports
+the independent property list coverage. A misaligned tree with a readable
+declared boundary can still locate the following property lists. Other
+bank versions report unsupported DialogueEvent coverage and retain the raw
+object envelope.
 
 STID header rows retain the authored string type and name count. Each name row carries its
 original ID and byte count, exact header and name ranges, original bytes and UTF-8 result.
