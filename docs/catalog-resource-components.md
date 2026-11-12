@@ -9,10 +9,17 @@ components. Ship loadout ports expose their selected physical target index.
 The row contains the authored network, relay, room and wireless flags,
 `defaultPriority`, `repairRestoreRatio`, and the self-repair parameters
 `maxRepairCount`, `timeToRepair` and `healthRatio`. The named control blocks
-`filterParams`, `controlParameters`, `controlBlocks`, `functionalityModifiers`
-and `powerPlantOverride` retain their ordered original field/value arenas.
-These retain, among other data, the relay's declared allowed-resources bits,
-control conditions and outputs, and the power override's additive modifier.
+`filterParams`, `controlBlocks`, `functionalityModifiers` and
+`powerPlantOverride` retain their ordered original field/value arenas.
+These retain the relay's declared allowed-resources bits, control conditions
+and outputs, and the power override's additive modifier.
+
+The ordered `controlParameters` cells distinguish the original network
+parameter and external-port classes. An external-port cell keeps its
+`parameter`, `name` and `portName` as authored. The port name is scoped to
+that declaration. Its actual installation, if known, is described by the
+corresponding loadout placement. New admitted parameter subtypes keep their
+actual type, array slot and original member arena.
 
 ## States and deltas
 
@@ -47,6 +54,31 @@ the actual stored width. Unknown unit types retain all original members in
 their arena. Every sourced field, slot and raw arena member keeps its direct
 encryption origin and source references. Singles retain their IEEE bits,
 including signed zero and nonfinite values.
+
+## Power and heat connections
+
+`configurations.resourceConnections` contains one row for each selected
+`EntityComponentPowerConnection` or `EntityComponentHeatConnection`. Join
+by `ownerRecordIndex` and use `componentOrdinal` to distinguish repeated
+physical components. The row's `kind` selects `power` or `heat`.
+Both forms preserve the source names and keep unprojected fields in the
+original member arena.
+
+| Form | Original fields |
+|---|---|
+| Power supply | `PowerBase`, `PowerDraw`, `TimeToReachDrawRequest`, `SafeguardPriority`, `DisplayedInPoweredItemList`, `IsThrottleable` |
+| Power performance | `IsOverclockable`, `OverclockThresholdMin`, `OverclockThresholdMax`, `OverpowerPerformance`, `OverclockPerformance` |
+| Power signatures and warnings | `PowerToEM`, `DecayRateOfEM`, `WarningDelayTime`, `WarningDisplayTime` |
+| Power misfire blocks | `MisfireItemTypeLocID`, `MisfireGenerationParams`, `MisfireEvents` |
+| Heat transfer | `ThermalEnergyBase`, `ThermalEnergyDraw`, `ThermalConductivity`, `SpecificHeatCapacity`, `Mass`, `SurfaceArea` |
+| Heat performance | `TemperatureToIR`, `StartIRTemperature`, `OverpowerHeat`, `OverclockThresholdMinHeat`, `OverclockThresholdMaxHeat` |
+| Heat operating bounds | `StartCoolingTemperature`, `MaxCoolingRate`, `MaxTemperature`, `OverheatTemperature`, `RecoveryTemperature`, `MinTemperature`, `MisfireMinTemperature`, `MisfireMaxTemperature` |
+
+The three power misfire blocks retain their exact original Locale key or
+owned value arena. The Locale key uses the protected game-text domain.
+Power and heat rows supply independent component parameters. External
+resource parameter ports use their authored declarations, and ship-level
+topology uses the original hardpoint declarations.
 
 ## Previous convenience values
 

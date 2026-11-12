@@ -13,6 +13,7 @@ use super::catalog_fuel_configurations::{
 };
 use super::catalog_item_alignment::{ItemAlignmentKind, ItemAlignmentRows, ItemAlignmentTables};
 use super::catalog_resource_component::{self, ResourceComponent};
+use super::catalog_resource_connection::{self, ConnectionKind, ResourceConnection};
 use super::item_alignment_options::AlignmentOptions;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
@@ -30,6 +31,7 @@ pub(crate) struct EntityConfigurationRows<'source> {
     pub(crate) alignment: ItemAlignmentRows<'source>,
     fuel: FuelConfigurationRows<'source>,
     resources: Vec<ResourceComponent<'source>>,
+    connections: Vec<ResourceConnection<'source>>,
     pub(crate) numbers: Vec<CapturedNumber>,
 }
 
@@ -38,6 +40,7 @@ impl<'source> EntityConfigurationRows<'source> {
         self.alignment.extend(other.alignment);
         self.fuel.extend(other.fuel);
         self.resources.extend(other.resources);
+        self.connections.extend(other.connections);
         self.numbers.extend(other.numbers);
     }
 
@@ -46,6 +49,7 @@ impl<'source> EntityConfigurationRows<'source> {
         forge: &DataForge<'_>,
     ) -> EntityConfigurationTables<'source> {
         self.resources.sort_by_key(|row| row.owner().key());
+        self.connections.sort_by_key(|row| row.owner().key());
         EntityConfigurationTables {
             alignment: self.alignment.into_tables(forge),
             fuel: self.fuel.into_tables(forge),
@@ -53,6 +57,11 @@ impl<'source> EntityConfigurationRows<'source> {
                 forge,
                 &[catalog_resource_component::COMPONENT],
                 self.resources,
+            ),
+            resource_connections: CatalogTable::new(
+                forge,
+                catalog_resource_connection::SOURCE_TYPES,
+                self.connections,
             ),
         }
     }
@@ -67,12 +76,14 @@ pub(crate) struct EntityConfigurationTables<'source> {
     #[serde(flatten)]
     fuel: FuelConfigurationTables<'source>,
     resource_components: CatalogTable<ResourceComponent<'source>>,
+    resource_connections: CatalogTable<ResourceConnection<'source>>,
 }
 
 enum ConfigurationKind {
     Alignment(ItemAlignmentKind),
     Fuel(FuelConfigurationKind),
     Resource,
+    Connection(ConnectionKind),
 }
 
 impl ConfigurationKind {
@@ -83,6 +94,7 @@ impl ConfigurationKind {
         ItemAlignmentKind::of(value, input)
             .map(Self::Alignment)
             .or_else(|| FuelConfigurationKind::of(value.type_name()).map(Self::Fuel))
+            .or_else(|| ConnectionKind::of(value.type_name()).map(Self::Connection))
     }
 }
 
@@ -132,6 +144,9 @@ pub(crate) fn read<'source>(
             ConfigurationKind::Resource => rows
                 .resources
                 .push(ResourceComponent::read(owner, source, &mut notes)?),
+            ConfigurationKind::Connection(kind) => rows
+                .connections
+                .push(ResourceConnection::read(kind, owner, source, &mut notes)?),
         }
     }
     rows.numbers = numbers.into_inner();

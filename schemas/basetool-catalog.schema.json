@@ -3550,6 +3550,9 @@
         "resourceComponents": {
           "$ref": "#/$defs/CatalogTableOfResourceComponent"
         },
+        "resourceConnections": {
+          "$ref": "#/$defs/CatalogTableOfResourceConnection"
+        },
         "resourceContainers": {
           "$ref": "#/$defs/CatalogTableOfResourceContainer"
         },
@@ -3581,6 +3584,7 @@
         "missionProperties",
         "quantumDrives",
         "resourceComponents",
+        "resourceConnections",
         "resourceContainers",
         "shieldGenerators",
         "weaponActions"
@@ -4543,6 +4547,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ResourceComponent"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfResourceConnection": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ResourceConnection"
           },
           "type": "array"
         }
@@ -21855,7 +21878,7 @@
           "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
         },
         "controlParameters": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceControlParameter"
         },
         "defaultPriority": {
           "$ref": "#/$defs/SourcedValueOfint32"
@@ -21942,6 +21965,58 @@
       ],
       "type": "object"
     },
+    "ResourceConnection": {
+      "description": "An original power or heat connection with its physical component owner.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ResourcePowerConnection",
+          "properties": {
+            "kind": {
+              "const": "power",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ResourceHeatConnection",
+          "properties": {
+            "kind": {
+              "const": "heat",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "ResourceContainer": {
       "description": "Authored contents and policy of a physical `ResourceContainer` component.",
       "properties": {
@@ -22013,6 +22088,100 @@
         "sourceType"
       ],
       "type": "object"
+    },
+    "ResourceControlParameter": {
+      "description": "An authored resource control parameter and its optional external port declaration.",
+      "oneOf": [
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "networkParameter",
+              "type": "string"
+            },
+            "parameter": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "sourcePosition": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourcePosition",
+            "sourceType",
+            "parameter"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "externalPort",
+              "type": "string"
+            },
+            "name": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "parameter": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "portName": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "sourcePosition": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourcePosition",
+            "sourceType",
+            "parameter",
+            "name",
+            "portName"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "unknownParameter",
+              "type": "string"
+            },
+            "sourcePosition": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourcePosition",
+            "sourceType"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
     },
     "ResourceCraftingData": {
       "description": "Independently authored quality configuration sources.",
@@ -22717,6 +22886,94 @@
       ],
       "type": "object"
     },
+    "ResourceHeatConnection": {
+      "description": "Authored thermal connection parameters of an original component.",
+      "properties": {
+        "Mass": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "MaxCoolingRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "MaxTemperature": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "MinTemperature": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "MisfireMaxTemperature": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "MisfireMinTemperature": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "OverclockThresholdMaxHeat": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "OverclockThresholdMinHeat": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "OverheatTemperature": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "OverpowerHeat": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "RecoveryTemperature": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "SpecificHeatCapacity": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "StartCoolingTemperature": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "StartIRTemperature": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "SurfaceArea": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "TemperatureToIR": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "ThermalConductivity": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "ThermalEnergyBase": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "ThermalEnergyDraw": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        }
+      },
+      "required": [
+        "Mass",
+        "MaxCoolingRate",
+        "MaxTemperature",
+        "MinTemperature",
+        "MisfireMaxTemperature",
+        "MisfireMinTemperature",
+        "OverclockThresholdMaxHeat",
+        "OverclockThresholdMinHeat",
+        "OverheatTemperature",
+        "OverpowerHeat",
+        "RecoveryTemperature",
+        "SpecificHeatCapacity",
+        "StartCoolingTemperature",
+        "StartIRTemperature",
+        "SurfaceArea",
+        "TemperatureToIR",
+        "ThermalConductivity",
+        "ThermalEnergyBase",
+        "ThermalEnergyDraw",
+        "additionalFields"
+      ],
+      "type": "object"
+    },
     "ResourceInt64": {
       "description": "Canonical signed 64-bit decimal text.",
       "maxLength": 20,
@@ -22914,6 +23171,90 @@
           "type": "object"
         }
       ]
+    },
+    "ResourcePowerConnection": {
+      "description": "Authored electrical connection parameters of an original component.",
+      "properties": {
+        "DecayRateOfEM": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "DisplayedInPoweredItemList": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "IsOverclockable": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "IsThrottleable": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "MisfireEvents": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "MisfireGenerationParams": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "MisfireItemTypeLocID": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "OverclockPerformance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "OverclockThresholdMax": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "OverclockThresholdMin": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "OverpowerPerformance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "PowerBase": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "PowerDraw": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "PowerToEM": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "SafeguardPriority": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "TimeToReachDrawRequest": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "WarningDelayTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "WarningDisplayTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        }
+      },
+      "required": [
+        "DecayRateOfEM",
+        "DisplayedInPoweredItemList",
+        "IsOverclockable",
+        "IsThrottleable",
+        "MisfireEvents",
+        "MisfireGenerationParams",
+        "MisfireItemTypeLocID",
+        "OverclockPerformance",
+        "OverclockThresholdMax",
+        "OverclockThresholdMin",
+        "OverpowerPerformance",
+        "PowerBase",
+        "PowerDraw",
+        "PowerToEM",
+        "SafeguardPriority",
+        "TimeToReachDrawRequest",
+        "WarningDelayTime",
+        "WarningDisplayTime",
+        "additionalFields"
+      ],
+      "type": "object"
     },
     "ResourcePowerRanges": {
       "description": "The three original power-range slots of a resource state.",
@@ -32637,6 +32978,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfResourceCargoSlot"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfResourceControlParameter": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfResourceControlParameter"
                 },
                 "type": "array"
               }
@@ -54343,6 +54817,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ResourceComposition"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfResourceControlParameter": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ResourceControlParameter"
               }
             }
           }

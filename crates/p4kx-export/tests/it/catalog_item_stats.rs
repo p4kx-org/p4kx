@@ -32,6 +32,8 @@ mod fuel_capacity;
 mod quantum;
 #[path = "catalog_resource_components.rs"]
 mod resource_components;
+#[path = "catalog_resource_connections.rs"]
+mod resource_connections;
 #[path = "catalog_shield.rs"]
 mod shield;
 

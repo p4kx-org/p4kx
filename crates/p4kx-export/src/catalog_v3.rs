@@ -67,14 +67,22 @@ pub(crate) mod catalog_item_components;
 pub(crate) mod catalog_quantum_drive;
 #[path = "catalog_resource_component.rs"]
 mod catalog_resource_component;
+#[path = "catalog_resource_connection.rs"]
+mod catalog_resource_connection;
 #[path = "catalog_resource_container.rs"]
 mod catalog_resource_container;
+#[path = "catalog_resource_control_parameter.rs"]
+mod catalog_resource_control_parameter;
 #[path = "catalog_resource_delta.rs"]
 mod catalog_resource_delta;
 #[path = "catalog_resource_delta_amount.rs"]
 mod catalog_resource_delta_amount;
 #[path = "catalog_resource_flow_unit.rs"]
 mod catalog_resource_flow_unit;
+#[path = "catalog_resource_heat_connection.rs"]
+mod catalog_resource_heat_connection;
+#[path = "catalog_resource_power_connection.rs"]
+mod catalog_resource_power_connection;
 #[path = "catalog_resource_power_ranges.rs"]
 mod catalog_resource_power_ranges;
 #[path = "catalog_resource_signature.rs"]

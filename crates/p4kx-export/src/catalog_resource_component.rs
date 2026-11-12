@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_resource_control_parameter::{self, ResourceControlParameter};
 use super::catalog_resource_state::ResourceState;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
@@ -94,7 +95,7 @@ impl<'source> ResourceComponent<'source> {
 #[schemars(transform = every_field_required)]
 struct ResourceControls<'source> {
     filter_params: AuthoredBlock<'source>,
-    control_parameters: AuthoredBlock<'source>,
+    control_parameters: SourcedValue<Vec<SourcedValue<ResourceControlParameter<'source>>>>,
     control_blocks: AuthoredBlock<'source>,
     functionality_modifiers: AuthoredBlock<'source>,
     power_plant_override: AuthoredBlock<'source>,
@@ -107,7 +108,12 @@ impl<'source> ResourceControls<'source> {
     ) -> Result<Self, CatalogError> {
         Ok(Self {
             filter_params: source.authored_member("filterParams", notes)?,
-            control_parameters: source.authored_member("controlParameters", notes)?,
+            control_parameters: source.strong_pointer_family_array_to(
+                "controlParameters",
+                catalog_resource_control_parameter::BASE,
+                notes,
+                ResourceControlParameter::read,
+            )?,
             control_blocks: source.authored_member("controlBlocks", notes)?,
             functionality_modifiers: source.authored_member("functionalityModifiers", notes)?,
             power_plant_override: source.authored_member("powerPlantOverride", notes)?,
