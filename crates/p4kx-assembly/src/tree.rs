@@ -205,8 +205,17 @@ impl EntityNode {
     #[must_use]
     pub fn walk(&self) -> Vec<(String, &PortNode)> {
         let mut ports = Vec::new();
-        walk(self, "", &mut ports);
+        self.visit_ports(|path, route| {
+            if let Some(&port) = route.last() {
+                ports.push((path.to_owned(), port));
+            }
+        });
         ports
+    }
+
+    /// Visits ports in depth-first order with their exact path and containing ports.
+    pub fn visit_ports<'node>(&'node self, visit: impl FnMut(&str, &[&'node PortNode])) {
+        crate::tree_walk::visit(&self.ports, visit);
     }
 
     /// Returns the default Loadout as one entry per port holding something, an Entity or an
@@ -230,25 +239,6 @@ impl EntityNode {
                 Attachment::Unresolved(unresolved) => Some((path, unresolved)),
                 _ => None,
             })
-    }
-}
-
-fn walk<'n>(node: &'n EntityNode, prefix: &str, ports: &mut Vec<(String, &'n PortNode)>) {
-    walk_ports(&node.ports, prefix, ports);
-}
-
-fn walk_ports<'n>(list: &'n [PortNode], prefix: &str, ports: &mut Vec<(String, &'n PortNode)>) {
-    for port in list {
-        let path = if prefix.is_empty() {
-            port.name.clone()
-        } else {
-            format!("{prefix}/{}", port.name)
-        };
-        ports.push((path.clone(), port));
-        walk_ports(&port.nested, &path, ports);
-        if let Attachment::Entity(child) = &port.attachment {
-            walk(child, &path, ports);
-        }
     }
 }
 

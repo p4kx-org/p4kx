@@ -112,7 +112,8 @@ pub use limits::Limits;
 pub use report::{Report, Unsupported, VariableInForce};
 pub use screen_asset_inputs::{ScreenAssetInputs, WidgetAssetInput, WidgetInput, WidgetSection};
 pub use screen_listing_inputs::{
-    CanvasInput, EntityScreenInputs, MovieInput, ObservedEntityScreens, ScreenInput, ValueInput,
+    AttachmentInput, CanvasInput, EntityScreenInputs, MovieInput, ObservedEntityScreens,
+    ScreenInput, ValueInput,
 };
 pub use screens::{EntityScreens, MovieUse, Screen};
 pub use still::{ObservedStill, Still, StillFormat, StillRequest};

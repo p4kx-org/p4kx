@@ -1987,6 +1987,9 @@ Widget addresses record the physical canvas Record, the original `scene` or `lib
 stored array position and, for an asset, the value's preorder position within the widget. The
 listed texture, SVG, movie and localization paths come from authored DataForge fields. Origins with
 unproved loadout port segments or nested canvas selection routes report an incomplete source set.
+Default port segments retain the original port `Name` and `defaultItem.entityClass` from the
+physical parent Entity Record. An explicit loadout name retains the evidence of other proven
+segments of its path.
 
 ## `p4kx ui render <archive> --screen <canvas> --out <file.png> [--svg] [--size <W>x<H>|<W>] [--background …] [--brand <code>] [--var <name>=<value>]… [--lang <language>] --json`
 

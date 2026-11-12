@@ -15,9 +15,13 @@ use serde::Serialize;
 
 use SourceUseRole::{Conversion, Payload, Selector};
 
+#[path = "ui_screens_attachment_origins.rs"]
+mod attachments;
+
 #[path = "ui_screens_widget_origins.rs"]
 mod widgets;
 
+use self::attachments::AttachmentEvidence;
 use self::widgets::Route;
 
 #[derive(Serialize)]
@@ -46,6 +50,11 @@ impl Evidence {
                 && observed.listing().movies.len() == inputs.movies().len(),
             "screen listing origin row counts",
         );
+        let attachments = inputs
+            .attachment_routes()
+            .iter()
+            .map(|route| projection.attachment(route))
+            .collect::<Result<Vec<_>>>()?;
         projection.base(inputs.entity_record(), inputs.brand_style_record())?;
         for (index, (row, input)) in observed
             .listing()
@@ -54,10 +63,12 @@ impl Evidence {
             .zip(inputs.screens())
             .enumerate()
         {
-            projection.screen(index, row, input)?;
+            let attachment = AttachmentEvidence::at(&attachments, input.attachment_route)?;
+            projection.screen(index, row, input, attachment)?;
         }
         for (index, input) in inputs.movies().iter().enumerate() {
-            projection.movie(index, input)?;
+            let attachment = AttachmentEvidence::at(&attachments, input.attachment_route)?;
+            projection.movie(index, input, attachment)?;
         }
         Ok(Self {
             field_origins: projection.fields,
@@ -70,6 +81,12 @@ struct Projection {
     scope: SourceScope,
     uses: SourceUses,
     fields: FieldOrigins,
+}
+
+struct ScreenContext<'source> {
+    selector: &'source SourceUse,
+    known_owner: bool,
+    attachment: &'source AttachmentEvidence,
 }
 
 impl Projection {
@@ -85,7 +102,7 @@ impl Projection {
                 Payload,
             )?;
         self.put("/entry", &[path], true)?;
-        self.entity("/entity", record, true)?;
+        self.entity("/entity", record, AttachmentEvidence::root())?;
         if let Some(style) = brand_style {
             let choice = self.header(style, "fileName", Selector)?;
             let mut inputs = vec![choice];
@@ -99,36 +116,44 @@ impl Projection {
         Ok(())
     }
 
-    fn entity(&mut self, path: &str, record: Option<u32>, complete: bool) -> Result<()> {
+    fn entity(
+        &mut self,
+        path: &str,
+        record: Option<u32>,
+        attachment: &AttachmentEvidence,
+    ) -> Result<()> {
         if let Some(index) = record {
             let name = self.header(index, "recordName", Conversion)?;
-            self.put(path, &[name], complete)
+            self.put_attached(path, &[name], true, attachment)
         } else {
-            self.put(path, &[], false)
+            self.put_attached(path, &[], false, attachment)
         }
     }
 
-    fn screen(&mut self, index: usize, row: &Screen, input: &ScreenInput) -> Result<()> {
+    fn screen(
+        &mut self,
+        index: usize,
+        row: &Screen,
+        input: &ScreenInput,
+        attachment: &AttachmentEvidence,
+    ) -> Result<()> {
         let path = format!("/screens/{index}");
-        let complete = input.is_root && input.entity_record == Some(input.reference.record_index);
-        self.put(&path, &[], false)?;
-        self.put(&format!("{path}/port"), &[], input.is_root)?;
-        self.entity(
-            &format!("{path}/entity"),
-            input.entity_record,
-            input.is_root,
-        )?;
+        let known_owner = input.entity_record == Some(input.reference.record_index);
+        self.put_attached(&path, &[], false, attachment)?;
+        self.put_attached(&format!("{path}/port"), &[], true, attachment)?;
+        self.entity(&format!("{path}/entity"), input.entity_record, attachment)?;
         let file = input
             .entity_record
             .map(|index| self.header(index, "fileName", Conversion))
             .transpose()?;
-        self.put(
+        self.put_attached(
             &format!("{path}/entity_record_path"),
             file.as_slice(),
-            input.is_root && file.is_some(),
+            file.is_some(),
+            attachment,
         )?;
 
-        let route = ["fieldDeclarations", "arrayPositions"].map(|field| {
+        let [declarations, positions] = ["fieldDeclarations", "arrayPositions"].map(|field| {
             self.value(
                 input.reference,
                 "dataforgeReferenceRoute",
@@ -136,13 +161,18 @@ impl Projection {
                 Conversion,
             )
         });
-        let [declarations, positions] = route;
-        self.put(
+        self.put_attached(
             &format!("{path}/field"),
             &[declarations?, positions?],
-            complete,
+            known_owner,
+            attachment,
         )?;
         let selector = self.value(input.reference, "dataforgeValue", "$value", Selector)?;
+        let context = ScreenContext {
+            selector: &selector,
+            known_owner,
+            attachment,
+        };
         let guid = if input.stored_guid {
             vec![self.value(input.reference, "dataforgeValue", "$value", Payload)?]
         } else {
@@ -151,9 +181,14 @@ impl Projection {
                 self.header(input.target_record, "guid", Conversion)?,
             ]
         };
-        self.put(&format!("{path}/canvas_guid"), &guid, complete)?;
-        self.canvas(&path, input.canvas, &selector, &guid, complete)?;
-        let route = Route::new(&selector, input.canvas, complete);
+        self.put_attached(
+            &format!("{path}/canvas_guid"),
+            &guid,
+            known_owner,
+            attachment,
+        )?;
+        self.canvas(&path, input.canvas, &guid, &context)?;
+        let route = Route::new(&context, input.canvas);
         self.nested(&path, row, &input.assets, &route)
     }
 
@@ -161,10 +196,11 @@ impl Projection {
         &mut self,
         path: &str,
         input: CanvasInput,
-        selector: &SourceUse,
         guid: &[SourceUse],
-        complete: bool,
+        context: &ScreenContext<'_>,
     ) -> Result<()> {
+        let selector = context.selector;
+        let attachment = context.attachment;
         if let CanvasInput::Read {
             record_index,
             width_read,
@@ -173,26 +209,19 @@ impl Projection {
         } = input
         {
             let file = self.header(record_index, "fileName", Conversion)?;
-            self.put(
+            self.put_attached(
                 &format!("{path}/canvas"),
                 &[selector.clone(), file],
-                complete,
+                context.known_owner,
+                attachment,
             )?;
-            self.dimension(
-                path,
-                "width",
-                "size.x",
-                (record_index, width_read),
-                selector,
-                complete,
-            )?;
+            self.dimension(path, "width", "size.x", (record_index, width_read), context)?;
             self.dimension(
                 path,
                 "height",
                 "size.y",
                 (record_index, height_read),
-                selector,
-                complete,
+                context,
             )?;
         } else {
             let fallback = if matches!(input, CanvasInput::Unreadable) {
@@ -200,9 +229,14 @@ impl Projection {
             } else {
                 slice::from_ref(selector)
             };
-            self.put(&format!("{path}/canvas"), fallback, false)?;
+            self.put_attached(&format!("{path}/canvas"), fallback, false, attachment)?;
             for axis in ["width", "height"] {
-                self.put(&format!("{path}/{axis}"), slice::from_ref(selector), false)?;
+                self.put_attached(
+                    &format!("{path}/{axis}"),
+                    slice::from_ref(selector),
+                    false,
+                    attachment,
+                )?;
             }
         }
         Ok(())
@@ -214,10 +248,9 @@ impl Projection {
         axis: &str,
         field: &str,
         (record_index, read): (u32, bool),
-        selector: &SourceUse,
-        complete: bool,
+        context: &ScreenContext<'_>,
     ) -> Result<()> {
-        let mut inputs = vec![selector.clone()];
+        let mut inputs = vec![context.selector.clone()];
         if read {
             inputs.push(self.scope.at(
                 SourceLocation::DataForge {
@@ -227,21 +260,27 @@ impl Projection {
                 Conversion,
             )?);
         }
-        self.put(&format!("{path}/{axis}"), &inputs, complete && read)
+        self.put_attached(
+            &format!("{path}/{axis}"),
+            &inputs,
+            context.known_owner && read,
+            context.attachment,
+        )
     }
 
-    fn movie(&mut self, index: usize, input: &MovieInput) -> Result<()> {
+    fn movie(
+        &mut self,
+        index: usize,
+        input: &MovieInput,
+        attachment: &AttachmentEvidence,
+    ) -> Result<()> {
         let path = format!("/movies/{index}");
-        self.put(&path, &[], false)?;
-        self.put(&format!("{path}/port"), &[], input.is_root)?;
-        self.entity(
-            &format!("{path}/entity"),
-            input.entity_record,
-            input.is_root,
-        )?;
+        self.put_attached(&path, &[], false, attachment)?;
+        self.put_attached(&format!("{path}/port"), &[], true, attachment)?;
+        self.entity(&format!("{path}/entity"), input.entity_record, attachment)?;
         let movie = self.value(input.movie_path, "dataforgeValue", "$value", Payload)?;
-        let complete = input.is_root && input.entity_record == Some(input.movie_path.record_index);
-        self.put(&format!("{path}/movie"), &[movie], complete)
+        let complete = input.entity_record == Some(input.movie_path.record_index);
+        self.put_attached(&format!("{path}/movie"), &[movie], complete, attachment)
     }
 
     fn header(&self, record: u32, field: &str, role: SourceUseRole) -> Result<SourceUse> {

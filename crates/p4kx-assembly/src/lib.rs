@@ -158,6 +158,7 @@ mod skeleton;
 mod spec;
 mod spec_loadout;
 mod tree;
+mod tree_walk;
 mod vehicle;
 mod walk;
 mod xml;

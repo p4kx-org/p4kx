@@ -5,33 +5,27 @@ use anyhow::{Result, ensure};
 use p4kx_extraction::{SourceUse, SourceUseRole};
 use p4kx_screens::{CanvasInput, Screen, ScreenAssetInputs, WidgetAssetInput, WidgetInput};
 
-use super::Projection;
+use super::{Projection, ScreenContext};
 
 pub(super) struct Route<'source> {
-    root_selector: &'source SourceUse,
+    screen: &'source ScreenContext<'source>,
     root_record: Option<u32>,
-    complete: bool,
 }
 
 impl<'source> Route<'source> {
-    pub(super) const fn new(
-        root_selector: &'source SourceUse,
-        canvas: CanvasInput,
-        complete: bool,
-    ) -> Self {
+    pub(super) const fn new(screen: &'source ScreenContext<'source>, canvas: CanvasInput) -> Self {
         let root_record = match canvas {
             CanvasInput::Read { record_index, .. } => Some(record_index),
             _ => None,
         };
         Self {
-            root_selector,
+            screen,
             root_record,
-            complete,
         }
     }
 
     fn proves(&self, record: u32) -> bool {
-        self.complete && self.root_record == Some(record)
+        self.screen.known_owner && self.root_record == Some(record)
     }
 }
 
@@ -52,10 +46,11 @@ impl Projection {
         );
         for (index, &record) in source.canvases.iter().enumerate() {
             let header = self.header(record, "fileName", SourceUseRole::Conversion)?;
-            self.put(
+            self.put_attached(
                 &format!("{canvases}/{index}"),
-                &[route.root_selector.clone(), header],
+                &[route.screen.selector.clone(), header],
                 route.proves(record),
+                route.screen.attachment,
             )?;
         }
         for (name, count, inputs) in [
@@ -103,10 +98,11 @@ impl Projection {
                 widget.section.field_name(),
                 SourceUseRole::Conversion,
             )?;
-            self.put(
+            self.put_attached(
                 &format!("{path}/{index}"),
-                &[route.root_selector.clone(), value],
+                &[route.screen.selector.clone(), value],
                 route.proves(widget.record_index),
+                route.screen.attachment,
             )?;
         }
         Ok(())
@@ -121,10 +117,15 @@ impl Projection {
         let Some((first, rest)) = inputs.split_first() else {
             anyhow::bail!("widget count has no source declarations");
         };
-        let mut sources = vec![route.root_selector.clone(), self.widget_type(*first)?];
+        let mut sources = vec![route.screen.selector.clone(), self.widget_type(*first)?];
         let first_complete = route.proves(first.record_index);
         for name in ["element", "rendered"] {
-            self.put(&format!("{path}/{name}"), &sources, first_complete)?;
+            self.put_attached(
+                &format!("{path}/{name}"),
+                &sources,
+                first_complete,
+                route.screen.attachment,
+            )?;
         }
         for &widget in rest {
             sources.push(self.widget_type(widget)?);
@@ -132,8 +133,13 @@ impl Projection {
         let complete = inputs
             .iter()
             .all(|widget| route.proves(widget.record_index));
-        self.put(&format!("{path}/count"), &sources, complete)?;
-        self.put(path, &sources, complete)
+        self.put_attached(
+            &format!("{path}/count"),
+            &sources,
+            complete,
+            route.screen.attachment,
+        )?;
+        self.put_attached(path, &sources, complete, route.screen.attachment)
     }
 
     fn widget_type(&self, widget: WidgetInput) -> Result<SourceUse> {

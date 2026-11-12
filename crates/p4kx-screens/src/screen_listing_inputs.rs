@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_assembly::{Attachment, PortDefinitionPosition, PortNode, PortSource};
+
 use crate::screen_asset_inputs::ScreenAssetInputs;
 use crate::screens::EntityScreens;
 
@@ -49,8 +51,8 @@ pub struct ScreenInput {
     pub canvas: CanvasInput,
     /// The observed inputs of each canvas, asset and widget group listed below this screen.
     pub assets: ScreenAssetInputs,
-    /// Whether the row belongs to the root Entity.
-    pub is_root: bool,
+    /// The original attachment route, absent for the root Entity.
+    pub attachment_route: Option<usize>,
 }
 
 /// Original inputs of one movie listing row.
@@ -61,8 +63,8 @@ pub struct MovieInput {
     pub entity_record: Option<u32>,
     /// The original owned moviePath in the scanned Entity Record.
     pub movie_path: ValueInput,
-    /// Whether the row belongs to the root Entity.
-    pub is_root: bool,
+    /// The original attachment route, absent for the root Entity.
+    pub attachment_route: Option<usize>,
 }
 
 /// Logical DataForge inputs selected by the listing in output order.
@@ -72,6 +74,47 @@ pub struct EntityScreenInputs {
     pub(crate) brand_style_record: Option<u32>,
     pub(crate) screens: Vec<ScreenInput>,
     pub(crate) movies: Vec<MovieInput>,
+    pub(crate) attachment_routes: Vec<AttachmentInput>,
+}
+
+/// The original proven port definitions used by one attachment path.
+#[derive(Debug)]
+pub struct AttachmentInput {
+    ports: Vec<PortDefinitionPosition>,
+    complete: bool,
+}
+
+impl AttachmentInput {
+    pub(crate) fn read(route: &[&PortNode]) -> Self {
+        let ports: Vec<_> = route.iter().filter_map(|port| default_port(port)).collect();
+        Self {
+            complete: route.len() == ports.len(),
+            ports,
+        }
+    }
+
+    /// Returns the known original port definitions in path order.
+    #[must_use]
+    pub fn ports(&self) -> &[PortDefinitionPosition] {
+        &self.ports
+    }
+
+    /// Returns whether every segment retained its name and target source.
+    #[must_use]
+    pub const fn is_complete(&self) -> bool {
+        self.complete
+    }
+}
+
+fn default_port(port: &PortNode) -> Option<PortDefinitionPosition> {
+    let Attachment::Entity(child) = port.attachment() else {
+        return None;
+    };
+    if port.source() != PortSource::PortDefault || child.attachment_target()?.guid() != child.guid()
+    {
+        return None;
+    }
+    Some(port.definition()?.position())
 }
 
 impl EntityScreenInputs {
@@ -91,6 +134,12 @@ impl EntityScreenInputs {
     #[must_use]
     pub fn screens(&self) -> &[ScreenInput] {
         &self.screens
+    }
+
+    /// Returns the actual attachment routes used by emitted rows.
+    #[must_use]
+    pub fn attachment_routes(&self) -> &[AttachmentInput] {
+        &self.attachment_routes
     }
 
     /// Returns the original inputs in emitted movie row order.

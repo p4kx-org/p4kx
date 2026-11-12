@@ -4,7 +4,10 @@
 use std::path::Path;
 
 use p4kx_extraction::DataForge;
-use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
+use p4kx_testkit::{
+    ArchiveBuilder, SCREEN_MFD, TestEntity, TestEntry, TestLoadout, TestLoadoutEntry, TestPort,
+    movie_component, screen_component, test_key,
+};
 use serde_json::Value;
 
 use super::{TestResult, p4kx, screens_sample};
@@ -173,5 +176,100 @@ fn direct_widget_assets_and_counts_keep_their_original_scene_sites() -> TestResu
         listing["fieldOrigins"][path]["containsEncryptedSource"],
         false
     );
+    Ok(())
+}
+
+fn default_route_forge(explicit: bool) -> Vec<u8> {
+    const ROOT: u128 = 0x48ab_2b09_582c_4289_94f8_949a_37d6_bc89;
+    const HOLDER: u128 = 0x60b4_fae5_31d5_4c3d_9fda_35eb_18f1_3199;
+    const SCREEN: u128 = 0xb120_5643_ed6b_45be_8c69_bc2e_9830_e7ab;
+    let mut root = TestEntity::new(ROOT, "TEST_DefaultRoute", "synthetic/route-root.xml")
+        .port(TestPort::new("Outer").default_item(HOLDER));
+    if explicit {
+        root = root.loadout(TestLoadout::Manual(vec![TestLoadoutEntry::class(
+            "oUTER",
+            "TEST_RouteHolder",
+        )]));
+    }
+    let holder = TestEntity::new(HOLDER, "TEST_RouteHolder", "synthetic/route-holder.xml")
+        .port(TestPort::new("Inner").default_item(SCREEN));
+    let screen = TestEntity::new(SCREEN, "TEST_RouteScreen", "synthetic/route-screen.xml")
+        .component(screen_component(SCREEN_MFD))
+        .component(movie_component(MOVIE));
+    screens_sample()
+        .record(root.record())
+        .record(holder.record())
+        .record(screen.record())
+        .build()
+}
+
+#[test]
+fn every_default_port_segment_contributes_its_own_name_and_target() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let bytes = default_route_forge(false);
+    let forge = DataForge::open(&bytes)?;
+    let records: Vec<_> = ["synthetic/route-root", "synthetic/route-holder"]
+        .into_iter()
+        .map(|path| {
+            forge
+                .records_at_path(path)
+                .next()
+                .map(|record| record.index())
+        })
+        .collect::<Option<_>>()
+        .ok_or("source Records")?;
+    let listing = report(
+        &dir.path().join("Data.p4k"),
+        TestEntry::zstd(DCB, bytes),
+        "TEST_DefaultRoute",
+    )?;
+    assert_eq!(listing["screens"][0]["port"], "Outer/Inner");
+    let fields = &listing["fieldOrigins"];
+    for path in ["/screens/0/port", "/screens/0/width", "/movies/0/movie"] {
+        assert_eq!(fields[path]["containsEncryptedSource"], false);
+        assert_eq!(fields[path]["sourceSetComplete"], true);
+    }
+    let selected = fields["/screens/0/port"]["sourceUsesRefs"]
+        .as_array()
+        .ok_or("port refs")?;
+    let uses = listing["provenance"]["uses"]
+        .as_array()
+        .ok_or("source uses")?;
+    assert_eq!(selected.len(), 4);
+    for record in records {
+        for (suffix, role) in [
+            (".Name", "conversion"),
+            (".defaultItem.entityClass", "selector"),
+        ] {
+            assert!(
+                uses.iter().any(|usage| {
+                    usage.get("id").is_some_and(|id| selected.contains(id))
+                        && usage["location"]["recordIndex"] == record
+                        && usage["role"] == role
+                        && usage
+                            .pointer("/location/field")
+                            .and_then(Value::as_str)
+                            .is_some_and(|field| field.ends_with(suffix))
+                }),
+                "record {record}, {suffix}"
+            );
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn a_matching_port_definition_does_not_prove_an_explicit_name() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let listing = report(
+        &dir.path().join("Data.p4k"),
+        TestEntry::zstd(DCB, default_route_forge(true)),
+        "TEST_DefaultRoute",
+    )?;
+    assert_eq!(listing["screens"][0]["port"], "oUTER/Inner");
+    let field = &listing["fieldOrigins"]["/screens/0/port"];
+    assert_eq!(field["containsEncryptedSource"], Value::Null);
+    assert_eq!(field["sourceSetComplete"], false);
+    assert_eq!(field["sourceUsesRefs"].as_array().map(Vec::len), Some(2));
     Ok(())
 }

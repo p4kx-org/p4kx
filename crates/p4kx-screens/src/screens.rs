@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::EntityNode;
+use p4kx_assembly::{Attachment, EntityNode, PortNode};
 use p4kx_dataforge::{Guid, Location, StructValue, Value};
 use serde::Serialize;
 
@@ -11,7 +11,8 @@ use crate::compose::ScreenComposer;
 use crate::inspect::{ElementCount, inspect};
 use crate::screen_asset_inputs::ScreenAssetInputs;
 use crate::screen_listing_inputs::{
-    CanvasInput, EntityScreenInputs, MovieInput, ObservedEntityScreens, ScreenInput, ValueInput,
+    AttachmentInput, CanvasInput, EntityScreenInputs, MovieInput, ObservedEntityScreens,
+    ScreenInput, ValueInput,
 };
 
 /// One `BuildingBlocks` screen an Entity of a Loadout shows.
@@ -117,15 +118,14 @@ impl ScreenComposer<'_, '_> {
             brand: brand.map(|brand| brand.code),
             ..EntityScreens::default()
         };
-        let mut nodes: Vec<(String, &EntityNode)> = vec![(String::new(), root)];
-        for entry in root.loadout() {
-            if let Some(node) = entry.entity() {
-                nodes.push((entry.path().to_owned(), node));
+        self.list_entity("", root, None, &mut listed, inputs.as_deref_mut());
+        root.visit_ports(|path, route| {
+            if let Some(port) = route.last()
+                && let Attachment::Entity(child) = port.attachment()
+            {
+                self.list_entity(path, child, Some(route), &mut listed, inputs.as_deref_mut());
             }
-        }
-        for (index, (port, node)) in nodes.into_iter().enumerate() {
-            self.list_entity(&port, node, index == 0, &mut listed, inputs.as_deref_mut());
-        }
+        });
         listed
     }
 
@@ -133,7 +133,7 @@ impl ScreenComposer<'_, '_> {
         &mut self,
         port: &str,
         node: &EntityNode,
-        is_root: bool,
+        route: Option<&[&PortNode]>,
         listed: &mut EntityScreens,
         mut inputs: Option<&mut EntityScreenInputs>,
     ) {
@@ -146,6 +146,14 @@ impl ScreenComposer<'_, '_> {
             return;
         };
         let found = find(tree.root());
+        if found.canvases.is_empty() && found.movies.is_empty() {
+            return;
+        }
+        let attachment_route = inputs.as_deref_mut().zip(route).map(|(inputs, route)| {
+            let index = inputs.attachment_routes.len();
+            inputs.attachment_routes.push(AttachmentInput::read(route));
+            index
+        });
         let source = |ordinal| ValueInput {
             record_index: tree.record_index(),
             ordinal,
@@ -155,7 +163,7 @@ impl ScreenComposer<'_, '_> {
                 inputs.movies.push(MovieInput {
                     entity_record: node.record_index(),
                     movie_path: source(movie.ordinal),
-                    is_root,
+                    attachment_route,
                 });
             }
             listed.movies.push(MovieUse {
@@ -179,7 +187,7 @@ impl ScreenComposer<'_, '_> {
                     stored_guid,
                     canvas,
                     assets,
-                    is_root,
+                    attachment_route,
                 });
             }
             listed.screens.push(screen);
