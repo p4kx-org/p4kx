@@ -3,6 +3,7 @@
 
 use std::io::{Read, Seek};
 
+use crate::bank_music_transition_rows::BankMusicTransitionRows;
 use crate::bank_object_fields::{ObjectFields, SeekObjectFields};
 use crate::bank_structure::OBJECT_ID_LEN;
 use crate::hirc::CONTAINER_VERSION;
@@ -30,6 +31,13 @@ pub struct BankHircMusicSwitch<'input, R> {
     pub fields: BankMusicSwitchFields,
     /// Bounded replay of original lists and admitted targets.
     pub rows: BankMusicSwitchRows<'input, R>,
+}
+
+impl<R> BankHircMusicSwitch<'_, R> {
+    /// Borrows the original transition rule count and checked rule prefix.
+    pub fn transition_rules(&mut self) -> Option<BankMusicTransitionRows<'_, R>> {
+        self.rows.transition_rules(&self.fields.transitions)
+    }
 }
 
 /// Interpretation status of a physical music switch.

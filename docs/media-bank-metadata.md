@@ -96,6 +96,9 @@ and fallback selection.
 | `audio-bank-music-playlist-child` | `bank-music-playlist-child` | HIRC section and playlist and child ordinals |
 | `audio-bank-music-playlist-stinger` | `bank-music-playlist-stinger` | HIRC section and playlist and stinger ordinals |
 | `audio-bank-music-playlist-item` | `bank-music-playlist-item` | HIRC section and playlist and item ordinals |
+| `audio-bank-music-transition-rules` | `bank-music-transition-rules` | HIRC section and owning MusicSwitch or MusicPlaylist object ordinals |
+| `audio-bank-music-transition-rule` | `bank-music-transition-rule` | HIRC section, owning music object and rule ordinals |
+| `audio-bank-music-transition-id` | `bank-music-transition-id` | HIRC section, owning music object, rule, ID list and ID ordinals |
 | `audio-bank-music-switch` | `bank-music-switch` | HIRC section and switch object ordinals |
 | `audio-bank-music-switch-child` | `bank-music-switch-child` | HIRC section and switch and child ordinals |
 | `audio-bank-music-switch-stinger` | `bank-music-switch-stinger` | HIRC section and switch and stinger ordinals |
@@ -402,6 +405,15 @@ words, byte stride, and byte width, in that order.
 The transition rule count and checked complete-rule prefix locate the original
 scheduling bytes in the retained bank. A truncated item leaves earlier complete rows
 available and reports the malformed layout.
+
+Version-154 MusicPlaylist and MusicSwitch transition summaries report the
+original rule count, complete rule count and checked table range. Rule rows
+retain the original source and destination controls and allocated transition
+object fields. Signed times and offsets retain their original bits. ID rows
+preserve all complete words in each authored list, including repeats and
+sentinels. List index 0 selects source IDs and index 1 selects destination
+IDs. A malformed table keeps the readable prefixes of its rule and ID lists.
+Each row carries exact field origins in its owning bank.
 
 Version 154 MusicSwitch rows retain the music node, ordered children and stingers, raw
 continue-playback and decision mode bytes, argument group IDs and type codes, and the checked

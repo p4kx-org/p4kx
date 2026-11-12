@@ -37,6 +37,8 @@ mod hirc;
 mod music;
 #[path = "audio_schema_music_track_controls.rs"]
 mod music_track_controls;
+#[path = "audio_schema_music_transition_rules.rs"]
+mod music_transition_rules;
 #[path = "audio_schema_node_declarations.rs"]
 mod node_declarations;
 #[path = "audio_schema_node_playback.rs"]
@@ -202,7 +204,8 @@ fn insert_hirc_field_payloads(base: &mut Value) -> Result<(), MediaError> {
     random_sequence::insert_payload(base)?;
     switch_container::insert_payload(base)?;
     blend::insert_payload(base)?;
-    music_track_controls::insert_payload(base)
+    music_track_controls::insert_payload(base)?;
+    music_transition_rules::insert_payload(base)
 }
 
 pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
@@ -234,6 +237,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             .chain(switch_container::bindings().iter())
             .chain(blend::bindings().iter())
             .chain(music_track_controls::bindings().iter())
+            .chain(music_transition_rules::bindings().iter())
             .chain(foreign::bindings().iter())
             .chain(std::iter::once(&BANK_FAILURE_BINDING))
             .chain(stid_bindings().iter())

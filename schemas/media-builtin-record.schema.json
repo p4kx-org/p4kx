@@ -9034,6 +9034,62 @@
       ],
       "title": "MusicTrackPayload"
     },
+    "MusicTransitionRulePayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/NodeDeclaration_TransitionRuleSummary"
+            },
+            "record_type": {
+              "const": "bank-music-transition-rules",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TransitionRuleRecord"
+            },
+            "record_type": {
+              "const": "bank-music-transition-rule",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TransitionIdRecord"
+            },
+            "record_type": {
+              "const": "bank-music-transition-id",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "MusicTransitionRulePayload"
+    },
     "NamedKind": {
       "enum": [
         "preload-request",
@@ -10049,6 +10105,113 @@
             },
             "observed": {
               "$ref": "#/$defs/TrackControlObservations"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "absent",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unavailable",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "unsupported",
+              "type": "string"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "NodeDeclaration_TransitionRuleSummary": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "decoded",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/TransitionRuleSummary"
+            },
+            "version": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "layout",
+            "version",
+            "observed"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "layout": {
+              "const": "malformed",
+              "type": "string"
+            },
+            "observed": {
+              "$ref": "#/$defs/TransitionRuleSummary"
             },
             "version": {
               "format": "uint32",
@@ -15581,6 +15744,378 @@
           ]
         }
       },
+      "type": "object"
+    },
+    "TransitionDestination": {
+      "additionalProperties": false,
+      "properties": {
+        "cue_filter_hash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "entry_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint16"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fade": {
+          "$ref": "#/$defs/TransitionFade"
+        },
+        "jump_to_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "jump_to_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint16"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "match_source_cue_name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "play_pre_entry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "fade"
+      ],
+      "type": "object"
+    },
+    "TransitionFade": {
+      "additionalProperties": false,
+      "properties": {
+        "curve": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "offset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransitionSignedWord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "time": {
+          "$ref": "#/$defs/TransitionSignedWord"
+        }
+      },
+      "required": [
+        "time"
+      ],
+      "type": "object"
+    },
+    "TransitionIdCoverage": {
+      "enum": [
+        "complete",
+        "truncated"
+      ],
+      "type": "string"
+    },
+    "TransitionIdRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/BankField_uint32"
+        },
+        "list": {
+          "$ref": "#/$defs/TransitionIdSide"
+        }
+      },
+      "required": [
+        "list",
+        "id"
+      ],
+      "type": "object"
+    },
+    "TransitionIdSide": {
+      "enum": [
+        "source",
+        "destination"
+      ],
+      "type": "string"
+    },
+    "TransitionIdTable": {
+      "additionalProperties": false,
+      "properties": {
+        "checked_range": {
+          "$ref": "#/$defs/BankEntryRange"
+        },
+        "coverage": {
+          "$ref": "#/$defs/TransitionIdCoverage"
+        },
+        "declared_count": {
+          "$ref": "#/$defs/BankField_uint32"
+        }
+      },
+      "required": [
+        "declared_count",
+        "checked_range",
+        "coverage"
+      ],
+      "type": "object"
+    },
+    "TransitionObject": {
+      "additionalProperties": false,
+      "properties": {
+        "fade_in": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransitionFade"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fade_out": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransitionFade"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "play_post_exit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "play_pre_entry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "segment_id": {
+          "$ref": "#/$defs/BankField_uint32"
+        }
+      },
+      "required": [
+        "segment_id"
+      ],
+      "type": "object"
+    },
+    "TransitionRuleLayout": {
+      "enum": [
+        "decoded",
+        "malformed"
+      ],
+      "type": "string"
+    },
+    "TransitionRuleRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "allocation_flag": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "destination": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransitionDestination"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "destination_ids": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransitionIdTable"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "layout": {
+          "$ref": "#/$defs/TransitionRuleLayout"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransitionSource"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_ids": {
+          "$ref": "#/$defs/TransitionIdTable"
+        },
+        "transition_object": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TransitionObject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "layout",
+        "source_ids"
+      ],
+      "type": "object"
+    },
+    "TransitionRuleSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "checked_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankEntryRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "complete_rules": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "declared_count": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "TransitionSignedWord": {
+      "additionalProperties": false,
+      "properties": {
+        "bits": {
+          "$ref": "#/$defs/BankField_uint32"
+        },
+        "signed_value": {
+          "format": "int32",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bits",
+        "signed_value"
+      ],
+      "type": "object"
+    },
+    "TransitionSource": {
+      "additionalProperties": false,
+      "properties": {
+        "cue_filter_hash": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fade": {
+          "$ref": "#/$defs/TransitionFade"
+        },
+        "play_post_exit": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sync_type": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "fade"
+      ],
       "type": "object"
     },
     "TransitionWord": {
@@ -27356,6 +27891,336 @@
                 "status": {
                   "const": "partial"
                 }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-transition-rules"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicTransitionRulePayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-transition-rules"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 2,
+                    "minItems": 2
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-transition-rule"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicTransitionRulePayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-transition-rule"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 3,
+                    "minItems": 3
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "else": {
+              "properties": {
+                "issues": {
+                  "items": {
+                    "properties": {
+                      "severity": {
+                        "const": "info"
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "complete"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "layout": {
+                          "const": "malformed"
+                        }
+                      },
+                      "required": [
+                        "layout"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "payload"
+                  ]
+                }
+              },
+              "required": [
+                "data"
+              ]
+            },
+            "then": {
+              "properties": {
+                "issues": {
+                  "contains": {
+                    "properties": {
+                      "severity": {
+                        "enum": [
+                          "warning",
+                          "error"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "severity"
+                    ]
+                  }
+                },
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "audio"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "audio-bank-music-transition-id"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "data": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/MusicTransitionRulePayload"
+                  },
+                  {
+                    "properties": {
+                      "record_type": {
+                        "const": "bank-music-transition-id"
+                      }
+                    },
+                    "required": [
+                      "record_type"
+                    ]
+                  }
+                ]
+              },
+              "subresource": {
+                "properties": {
+                  "indices": {
+                    "maxItems": 5,
+                    "minItems": 5
+                  }
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
+          },
+          {
+            "properties": {
+              "issues": {
+                "items": {
+                  "properties": {
+                    "severity": {
+                      "const": "info"
+                    }
+                  },
+                  "required": [
+                    "severity"
+                  ]
+                }
+              },
+              "status": {
+                "const": "complete"
               }
             }
           }

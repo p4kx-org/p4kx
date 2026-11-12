@@ -13,6 +13,7 @@ mod bank_error;
 mod bank_graph_point_rows;
 mod bank_inline_state_rows;
 mod bank_music_track_automation_rows;
+mod bank_music_transition_rows;
 mod bank_node_fx_slots;
 mod bank_node_property_rows;
 mod bank_object_fields;
@@ -47,6 +48,7 @@ mod hirc_container;
 mod hirc_event;
 mod hirc_layout;
 mod hirc_music;
+mod hirc_music_fade;
 mod hirc_music_node;
 mod hirc_music_parse;
 mod hirc_music_playlist;
@@ -59,6 +61,7 @@ mod hirc_music_track;
 mod hirc_music_track_automation;
 mod hirc_music_track_transition;
 mod hirc_music_transition;
+mod hirc_music_transition_rule;
 mod hirc_node;
 mod hirc_node_aux;
 mod hirc_node_fx;
@@ -105,6 +108,10 @@ pub use bank_graph_point_rows::{
 pub use bank_inline_state_rows::{BankInlineStateRow, BankInlineStateRows};
 pub use bank_music_track_automation_rows::{
     BankMusicTrackAutomation, BankMusicTrackAutomationRows,
+};
+pub use bank_music_transition_rows::{
+    BankMusicTransitionId, BankMusicTransitionIdRows, BankMusicTransitionRows,
+    BankMusicTransitionRule, BankMusicTransitionSide,
 };
 pub use bank_node_fx_slots::{BankNodeFxSlot, BankNodeFxSlots};
 pub use bank_node_property_rows::{
@@ -169,6 +176,7 @@ pub use hirc_music::{
     MusicPlaylistItem, MusicSegment, MusicStinger, MusicSwitch, MusicTrack, MusicTrackKind,
     MusicTrackSwitch,
 };
+pub use hirc_music_fade::{BankMusicFadeFields, BankMusicFadeFields as BankMusicTrackFadeFields};
 pub use hirc_music_node::BankMusicNodeFields;
 pub use hirc_music_playlist::BankMusicPlaylistItem;
 pub use hirc_music_segment::BankMusicSegmentFields;
@@ -182,8 +190,12 @@ pub use hirc_music_track::{
 pub use hirc_music_track_automation::{
     BankTrackAutomationExtent, BankTrackAutomationFields, BankTrackAutomationPoints,
 };
-pub use hirc_music_track_transition::{BankMusicTrackFadeFields, BankMusicTrackTransitionFields};
+pub use hirc_music_track_transition::BankMusicTrackTransitionFields;
 pub use hirc_music_transition::BankMusicTransitionFields;
+pub use hirc_music_transition_rule::{
+    BankMusicTransitionDestinationFields, BankMusicTransitionIds, BankMusicTransitionObjectFields,
+    BankMusicTransitionRuleFields, BankMusicTransitionSourceFields,
+};
 pub use hirc_node::{BankNodeParentFields, Container, ContainerKind};
 pub use hirc_node_aux::{BankNodeAuxFields, BankNodeUserAuxBuses};
 pub use hirc_node_fx::{BankNodeFxFields, BankNodeFxKind, BankNodeFxList};

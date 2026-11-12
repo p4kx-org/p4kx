@@ -4,12 +4,14 @@
 use std::io::{Read, Seek};
 
 use crate::BankReadError;
+use crate::bank_music_transition_rows::BankMusicTransitionRows;
 use crate::bank_object_fields::{BankHircField, ObjectFields, SeekObjectFields};
 use crate::hirc_music_node::{self, BankMusicStinger, MusicList, STINGER_LEN};
 use crate::hirc_music_switch::{
     self, BankMusicSwitchGroup, BankMusicSwitchNode, DecisionTree, NODE_LEN,
 };
 use crate::hirc_music_switch_traversal::{BankMusicSwitchBranch, BankMusicSwitchTarget, Traversal};
+use crate::hirc_music_transition::BankMusicTransitionFields;
 use crate::hirc_node::ID_LEN;
 use crate::read_at::SeekSource;
 
@@ -106,6 +108,13 @@ pub struct BankMusicSwitchRows<'input, R> {
 }
 
 impl<'input, R> BankMusicSwitchRows<'input, R> {
+    pub(super) fn transition_rules(
+        &mut self,
+        fields: &BankMusicTransitionFields,
+    ) -> Option<BankMusicTransitionRows<'_, R>> {
+        BankMusicTransitionRows::new(self.input, self.stopped, fields)
+    }
+
     pub(super) const fn new(
         input: &'input mut SeekSource<R>,
         stopped: &'input mut bool,

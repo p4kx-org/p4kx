@@ -74,13 +74,6 @@ pub(crate) trait ObjectFields {
     }
 }
 
-pub(crate) fn item_bytes(count: u32, len: usize) -> Result<usize, BankError> {
-    usize::try_from(count)
-        .ok()
-        .and_then(|count| count.checked_mul(len))
-        .ok_or_else(|| BankError::invalid(SectionId::HIRC, "a list is longer than its body"))
-}
-
 pub(crate) struct SeekObjectFields<'input, R> {
     input: &'input mut SeekSource<R>,
     body_offset: u64,

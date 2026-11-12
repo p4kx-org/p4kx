@@ -61,6 +61,12 @@ pub use p4kx_audio::{
     BankStateBinding, BankStateGroup,
 };
 pub use p4kx_audio::{
+    BankMusicFadeFields, BankMusicTransitionDestinationFields, BankMusicTransitionId,
+    BankMusicTransitionIdRows, BankMusicTransitionIds, BankMusicTransitionObjectFields,
+    BankMusicTransitionRows, BankMusicTransitionRule, BankMusicTransitionRuleFields,
+    BankMusicTransitionSide, BankMusicTransitionSourceFields,
+};
+pub use p4kx_audio::{
     BankNodeAdvancedFields, BankNodeParameters, BankNodePlaybackFields, BankNodePositioningFields,
     BankPositioningModes, BankPositioningRow, BankPositioningRowFields, BankPositioningRows,
     BankPositioningTableKind, BankPositioningVector,

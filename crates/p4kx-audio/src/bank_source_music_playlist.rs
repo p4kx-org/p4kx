@@ -3,6 +3,7 @@
 
 use std::io::{Read, Seek};
 
+use crate::bank_music_transition_rows::BankMusicTransitionRows;
 use crate::bank_object_fields::{BankHircField, ObjectFields, SeekObjectFields};
 use crate::bank_structure::OBJECT_ID_LEN;
 use crate::hirc::CONTAINER_VERSION;
@@ -26,6 +27,13 @@ pub struct BankHircMusicPlaylist<'input, R> {
     pub fields: BankMusicPlaylistFields,
     /// Bounded cursor over complete original rows.
     pub rows: BankMusicPlaylistRows<'input, R>,
+}
+
+impl<R> BankHircMusicPlaylist<'_, R> {
+    /// Borrows the original transition rule count and checked rule prefix.
+    pub fn transition_rules(&mut self) -> Option<BankMusicTransitionRows<'_, R>> {
+        BankMusicTransitionRows::new(self.rows.input, self.rows.stopped, &self.fields.transitions)
+    }
 }
 
 /// Interpretation status of a physical music playlist.

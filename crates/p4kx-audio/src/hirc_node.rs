@@ -3,7 +3,7 @@
 
 use std::ops::Range;
 
-use crate::bank_object_fields::{self, BankHircField, ObjectFields};
+use crate::bank_object_fields::{BankHircField, ObjectFields};
 use crate::bank_reader::SectionReader;
 use crate::hirc_node_aux::{self, BankNodeAuxFields};
 use crate::hirc_node_fx::{self, BankNodeFxFields, BankNodeFxKind, BankNodeFxList};
@@ -184,12 +184,4 @@ const fn child_count_error() -> BankError {
         SectionId::HIRC,
         "a container lists more children than its body holds",
     )
-}
-
-pub(crate) fn skip_items<F: ObjectFields>(
-    fields: &mut F,
-    count: u32,
-    len: usize,
-) -> Result<(), F::Error> {
-    fields.skip_bytes(bank_object_fields::item_bytes(count, len)? as u64)
 }

@@ -10,6 +10,7 @@ use p4kx_extraction::bank::{
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_music_segment::MusicChildField;
 use crate::audio_bank_music_stinger_schedule;
+use crate::audio_bank_music_transition_rules::{self, Owner as TransitionOwner};
 use crate::audio_bank_music_value::{MusicNodeChildRecord, MusicStingerRecord};
 use crate::audio_bank_projection::BankProjection;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
@@ -31,7 +32,7 @@ pub(crate) const ITEM: &str = "audio-bank-music-playlist-item";
 pub(crate) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,
     version: VersionSite,
-    playlist: BankHircMusicPlaylist<'_, R>,
+    mut playlist: BankHircMusicPlaylist<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let sites = PlaylistSites::new(&playlist.object, version, &playlist.fields);
@@ -46,7 +47,7 @@ pub(crate) fn project<R: Read + Seek>(
             &payload,
             issue.as_slice(),
         )?;
-    let mut rows = playlist.rows;
+    let rows = &mut playlist.rows;
     while let Some(row) = rows.next() {
         let row = row.map_err(|cause| projection.replay_failure(cause))?;
         emit(projection, &sites, row, rows.current_item_depth(), writer)?;
@@ -55,6 +56,12 @@ pub(crate) fn project<R: Read + Seek>(
         projection.input,
         sites.node(),
         playlist.fields.node.stinger_tail.as_ref(),
+        writer,
+    )?;
+    audio_bank_music_transition_rules::project(
+        projection,
+        version,
+        TransitionOwner::Playlist(&mut playlist),
         writer,
     )
 }

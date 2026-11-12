@@ -11,6 +11,7 @@ use p4kx_extraction::bank::{
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_music_segment::MusicChildField;
 use crate::audio_bank_music_stinger_schedule;
+use crate::audio_bank_music_transition_rules::{self, Owner as TransitionOwner};
 use crate::audio_bank_music_value::{MusicNodeChildRecord, MusicStingerRecord};
 use crate::audio_bank_projection::BankProjection;
 use crate::origin_prepared::PreparedRecordOrigins;
@@ -37,7 +38,7 @@ pub(crate) const TARGET: &str = "audio-bank-music-switch-target";
 pub(crate) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,
     version: VersionSite,
-    switch: BankHircMusicSwitch<'_, R>,
+    mut switch: BankHircMusicSwitch<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let sites = SwitchSites::new(&switch.object, version, &switch.fields);
@@ -52,15 +53,21 @@ pub(crate) fn project<R: Read + Seek>(
             &payload,
             issue.as_slice(),
         )?;
-    let mut rows = switch.rows;
+    let rows = &mut switch.rows;
     while let Some(row) = rows.next() {
         let row = row.map_err(|cause| projection.replay_failure(cause))?;
-        emit(projection, &sites, row, &rows, writer)?;
+        emit(projection, &sites, row, rows, writer)?;
     }
     audio_bank_music_stinger_schedule::tail(
         projection.input,
         sites.node(),
         switch.fields.node.stinger_tail.as_ref(),
+        writer,
+    )?;
+    audio_bank_music_transition_rules::project(
+        projection,
+        version,
+        TransitionOwner::Switch(&mut switch),
         writer,
     )
 }

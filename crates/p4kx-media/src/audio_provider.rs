@@ -199,7 +199,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-music-playlist-fields",
-            "Original MusicPlaylist node, children, stingers and their scheduling words, transition extent and ordered item fields.",
+            "Original MusicPlaylist node, children, stinger schedules, transition rules with ordered source and destination IDs, and ordered item fields.",
         ),
         FieldGroup::new(
             "bank-music-segment-fields",
@@ -207,7 +207,7 @@ fn bank_field_groups() -> [FieldGroup; 14] {
         ),
         FieldGroup::new(
             "bank-music-switch-fields",
-            "Original MusicSwitch group and physical decision-node words, stinger scheduling words, checked target paths and transition extents.",
+            "Original MusicSwitch group and physical decision-node words, stinger schedules, checked target paths and transition rules with ordered source and destination IDs.",
         ),
         FieldGroup::new(
             "bank-music-track-fields",
