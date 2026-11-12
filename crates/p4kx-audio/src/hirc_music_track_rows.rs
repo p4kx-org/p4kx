@@ -28,6 +28,8 @@ pub struct BankMusicTrackSource {
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct BankMusicTrackClip {
+    /// Original track ID within the authored clip.
+    pub track_id: BankHircField<u32>,
     /// Original media source ID.
     pub source_id: BankHircField<u32>,
     /// Original cache ID when present.
@@ -85,7 +87,7 @@ pub(crate) fn clip<F: ObjectFields>(
     input: &mut F,
 ) -> Result<BankMusicTrackClip, F::Error> {
     let start = input.offset();
-    input.read_u32()?;
+    let track_id = input.read_u32()?;
     let source_id = input.read_u32()?;
     let cache_id = if hirc::has_cache_id(version) {
         Some(input.read_u32()?)
@@ -93,6 +95,7 @@ pub(crate) fn clip<F: ObjectFields>(
         None
     };
     Ok(BankMusicTrackClip {
+        track_id,
         source_id,
         cache_id,
         event_id: input.read_u32()?,

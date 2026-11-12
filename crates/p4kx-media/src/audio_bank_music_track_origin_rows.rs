@@ -162,6 +162,11 @@ impl TrackSites<'_> {
         let row = self.row(&mut prepared, List::Clip, ordinal)?;
         for (path, name, bytes) in [
             (
+                "/data/payload/track_id",
+                "musicTrackClipTrackId",
+                Some(span(&clip.track_id.range)),
+            ),
+            (
                 "/data/payload/source_id",
                 "musicTrackClipSourceId",
                 Some(span(&clip.source_id.range)),

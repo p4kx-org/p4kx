@@ -171,6 +171,7 @@ impl TrackSourceRecord {
 #[serde(deny_unknown_fields)]
 pub(crate) struct TrackClipRecord {
     ordinal: DecimalU64,
+    track_id: u32,
     source_id: u32,
     cache_id: Option<u32>,
     event_id: u32,
@@ -185,6 +186,7 @@ impl TrackClipRecord {
     pub(super) fn new(ordinal: u64, clip: &BankMusicTrackClip) -> Self {
         Self {
             ordinal: DecimalU64::new(ordinal),
+            track_id: clip.track_id.value,
             source_id: clip.source_id.value,
             cache_id: word(clip.cache_id.as_ref()),
             event_id: clip.event_id.value,

@@ -16064,10 +16064,16 @@
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
+        },
+        "track_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
         }
       },
       "required": [
         "ordinal",
+        "track_id",
         "source_id",
         "cache_id",
         "event_id",

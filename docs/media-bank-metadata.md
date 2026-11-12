@@ -386,7 +386,8 @@ Version 154 MusicTrack rows carry the authored parent, list counts, raw track ki
 interpreted kind, and switch or state group when present. Separate rows preserve ordered
 source occurrences, clips and switch members, including repeated IDs. Source rows retain
 the original plug-in ID, storage code, cache ID, in-memory size and flags. Checked plug-in
-parameter, automation and switch transition ranges refer to the retained bank. Clip times
+parameter, automation and switch transition ranges refer to the retained bank. Clip rows
+retain the authored track ID independently from the physical clip position and media source ID. Clip times
 carry their original IEEE-754 words and a finite JSON value when available. A malformed tail
 keeps the preceding complete rows. Other layouts retain the physical HIRC object.
 

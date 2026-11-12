@@ -119,6 +119,45 @@ fn check_source_and_clip(
         origins::has_exact(&uses, "musicTrackSourceId", "payload", &(start..start + 4)),
         "the source receipt selects the original ID bytes"
     );
+    check_clip_track_ids(rows, evidence, bytes, owner)
+}
+
+fn check_clip_track_ids(
+    rows: &[MediaRecord],
+    evidence: &Origins,
+    bytes: &[u8],
+    owner: usize,
+) -> TestResult {
+    for index in 0..=owner {
+        let id = u32::try_from(index + 1)?;
+        let (ordinal, clip) = row(rows, owner, CLIP, &[1, 0, u64::try_from(index)?])?;
+        assert_eq!(
+            clip.data.pointer("/payload/track_id"),
+            Some(&json!(id)),
+            "the clip retains its original track ID separately from the repeated media ID",
+        );
+        let authored = [
+            id.to_le_bytes(),
+            SOURCE_ID.to_le_bytes(),
+            (SOURCE_ID ^ 0x5A5A_5A5A).to_le_bytes(),
+            0_u32.to_le_bytes(),
+        ];
+        let authored = authored.as_flattened();
+        let start = bytes
+            .windows(authored.len())
+            .position(|words| words == authored)
+            .ok_or("original clip header")?;
+        let uses = evidence.uses(ordinal, owner, "/data/payload/track_id")?;
+        assert!(
+            origins::has_exact(
+                &uses,
+                "musicTrackClipTrackId",
+                "payload",
+                &(start..start + size_of::<u32>())
+            ),
+            "the clip receipt selects its first original word",
+        );
+    }
     Ok(())
 }
 

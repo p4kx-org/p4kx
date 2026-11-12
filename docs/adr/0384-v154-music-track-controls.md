@@ -17,6 +17,8 @@ unknown codes, original numeric bits and available numeric interpretations
 in their original units. Checked ranges and independent table coverage
 preserve readable prefixes. Existing source, clip and switch member rows
 retain their prior meaning. A clip index remains an authored declaration.
+The first word in each clip is the authored track ID. Its receipt identifies the
+original four bytes separately from the clip's physical position and media ID.
 
 The MusicTrack and Switch transition layouts follow [wwiser's MusicTrack reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L2225),
 [wwiser's transition reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L2183)
