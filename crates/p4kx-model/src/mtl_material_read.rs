@@ -2,10 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::mtl_direct_read::{DirectRead, Identity, Lighting};
-use crate::mtl_material_inputs::{self, MaterialSites};
+use crate::mtl_material_inputs;
 use crate::mtl_palette_read;
 use crate::mtl_raw::{self, Attributes, Budget};
-use crate::mtl_read_site::ReadSite;
+use crate::mtl_read_site::{FieldToken, ReadSite};
 use crate::mtl_source_error::MaterialReadError;
 use crate::mtl_xml::XmlElement;
 use crate::{
@@ -34,6 +34,7 @@ struct Inputs {
     palette: Option<PaletteSlot>,
     textures: Vec<TextureSlot>,
     layers: Vec<MaterialLayer>,
+    public_params: Attributes,
     elements: Vec<RawElement>,
 }
 
@@ -43,20 +44,22 @@ pub(crate) fn material<'source, Interrupted>(
     site: ReadSite,
     observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
 ) -> Result<Material, MaterialReadError<Interrupted>> {
-    let (textures, mut sites) = mtl_material_inputs::textures(element, budget)?;
-    let layers = mtl_raw::layers(element);
+    let (textures, mut sites) = mtl_material_inputs::textures(element, budget, site, observer)?;
+    let layers = mtl_material_inputs::layers(element, site, observer)?;
     let elements = mtl_raw::other_elements(element, budget)?;
     let mut read = DirectRead {
         element,
         site,
         observer,
-        shader_use: MaterialReadUse::Selected,
-        mask_use: MaterialReadUse::Selected,
+        shader: FieldToken::attribute("Shader", None, MaterialReadUse::Selected),
+        mask: FieldToken::attribute("StringGenMask", None, MaterialReadUse::Selected),
     };
     let identity = read.identity().map_err(MaterialReadError::Interrupted)?;
     let lighting = read.lighting().map_err(MaterialReadError::Interrupted)?;
     let palette = mtl_palette_read::slot(element, site, read.observer)
         .map_err(MaterialReadError::Interrupted)?;
+    let public_params =
+        mtl_material_inputs::public_params(element, &mut sites, site, read.observer)?;
     let mut built = build(
         element,
         Inputs {
@@ -65,30 +68,19 @@ pub(crate) fn material<'source, Interrupted>(
             palette,
             textures,
             layers,
+            public_params,
             elements,
         },
         budget,
-        &mut sites,
     );
     if built.palette.is_none() {
-        built.palette = mtl_palette_read::stencil(
-            &built,
-            &sites,
-            site,
-            read.shader_use,
-            read.mask_use,
-            read.observer,
-        )?;
+        built.palette =
+            mtl_palette_read::stencil(&built, &sites, site, read.shader, read.mask, read.observer)?;
     }
     Ok(built)
 }
 
-fn build<'source>(
-    element: impl XmlElement<'source>,
-    inputs: Inputs,
-    budget: &Budget,
-    sites: &mut MaterialSites<'source>,
-) -> Material {
+fn build<'source>(element: impl XmlElement<'source>, inputs: Inputs, budget: &Budget) -> Material {
     Material {
         name: inputs.identity.name,
         flags: inputs.identity.flags,
@@ -107,7 +99,7 @@ fn build<'source>(
         tinted: false,
         decal_colours: None,
         other_attributes: other_attributes(element),
-        public_params: mtl_material_inputs::public_params(element, sites),
+        public_params: inputs.public_params,
         layers: inputs.layers,
         elements: inputs.elements,
         truncated: budget.cut(),

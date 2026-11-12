@@ -49,6 +49,7 @@ mod loadout_shapes;
 mod loadout_tools;
 mod locate;
 mod material;
+mod material_origin;
 mod material_shape;
 mod material_shapes;
 mod material_tools;

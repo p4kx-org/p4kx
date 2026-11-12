@@ -6,11 +6,14 @@ use std::sync::Arc;
 use crate::mtl::MAX_SUB_MATERIALS;
 use crate::mtl_material_read;
 use crate::mtl_raw::Budget;
-use crate::mtl_read_site::{MaterialElement, ReadSite};
+use crate::mtl_read_site::{FieldElement, FieldToken, MaterialElement, ReadSite};
 use crate::mtl_source::{MaterialEntryDisposition, MaterialSource, MaterialSourceEntry};
 use crate::mtl_source_error::MaterialReadError;
 use crate::mtl_xml::XmlElement;
-use crate::{Material, MaterialError, MaterialLibrary, MaterialReadObservation};
+use crate::{
+    Material, MaterialError, MaterialLibrary, MaterialReadField, MaterialReadObservation,
+    MaterialReadUse,
+};
 
 pub(crate) fn library<'a, Interrupted>(
     path: &str,
@@ -25,14 +28,14 @@ pub(crate) fn library<'a, Interrupted>(
         }
         .into());
     }
-    let default_palette = root
-        .attribute("DefaultPalette")
-        .filter(|palette| !palette.is_empty())
-        .map(str::to_owned);
+    let default_palette =
+        default_palette(root, observer).map_err(MaterialReadError::Interrupted)?;
     let sub_materials = root
         .children()
         .enumerate()
         .find(|(_, child)| child.name().eq_ignore_ascii_case("SubMaterials"));
+    observe_selection(sub_materials.map(|(ordinal, _)| ordinal), observer)
+        .map_err(MaterialReadError::Interrupted)?;
     let Some(sub_materials) = sub_materials else {
         return single(path, root, authored, default_palette, checkpoint, observer);
     };
@@ -55,6 +58,45 @@ pub(crate) fn library<'a, Interrupted>(
     })
 }
 
+fn default_palette<'source, Interrupted>(
+    root: impl XmlElement<'source>,
+    observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
+) -> Result<Option<String>, Interrupted> {
+    let palette = root.positioned_attribute("DefaultPalette");
+    if let Some(palette) = palette.filter(|palette| !palette.value.is_empty()) {
+        ReadSite::ROOT.token(
+            FieldElement::Material,
+            MaterialReadField::LibraryDefaultPalette,
+            FieldToken {
+                name: palette.name,
+                ordinal: Some(palette.ordinal),
+                use_kind: MaterialReadUse::Authored,
+            },
+            observer,
+        )?;
+        Ok(Some(palette.value.to_owned()))
+    } else {
+        Ok(None)
+    }
+}
+
+fn observe_selection<Interrupted>(
+    list: Option<usize>,
+    observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
+) -> Result<(), Interrupted> {
+    let selection = list.map_or(FieldElement::Material, |ordinal| FieldElement::Child {
+        ordinal,
+    });
+    for (field, label) in [
+        (MaterialReadField::LibrarySingle, "SubMaterials"),
+        (MaterialReadField::LibraryTotal, "materialSlots"),
+        (MaterialReadField::LibraryUnknownCount, "materialSlotKinds"),
+    ] {
+        ReadSite::ROOT.at(selection, field, label, MaterialReadUse::Selected, observer)?;
+    }
+    Ok(())
+}
+
 fn single<'source, Interrupted>(
     path: &str,
     root: impl XmlElement<'source>,
@@ -64,10 +106,7 @@ fn single<'source, Interrupted>(
     observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
 ) -> Result<MaterialLibrary, MaterialReadError<Interrupted>> {
     checkpoint().map_err(MaterialReadError::Interrupted)?;
-    let site = ReadSite {
-        material: 0,
-        element: MaterialElement::Root,
-    };
+    let site = ReadSite::ROOT;
     site.disposition(root.name(), observer)
         .map_err(MaterialReadError::Interrupted)?;
     Ok(MaterialLibrary {
@@ -129,6 +168,20 @@ fn submaterials<'a, Interrupted>(
             )?);
         } else {
             unknown_entries += 1;
+            for field in [
+                MaterialReadField::Textures,
+                MaterialReadField::PublicParams,
+                MaterialReadField::Layers,
+            ] {
+                site.at(
+                    FieldElement::Material,
+                    field,
+                    "engineDefaultSlot",
+                    MaterialReadUse::Selected,
+                    observer,
+                )
+                .map_err(MaterialReadError::Interrupted)?;
+            }
             materials.push(Material::engine_default());
         }
     }

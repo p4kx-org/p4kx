@@ -49,10 +49,15 @@ impl MaterialLayer {
     /// Returns the value of the attribute `name`, ignoring case.
     #[must_use]
     pub fn attribute(&self, name: &str) -> Option<&str> {
+        self.positioned_attribute(name).map(|(_, _, value)| value)
+    }
+
+    pub(crate) fn positioned_attribute(&self, name: &str) -> Option<(usize, &str, &str)> {
         self.attributes
             .iter()
-            .find(|(known, _)| known.eq_ignore_ascii_case(name))
-            .map(|(_, value)| value.as_str())
+            .enumerate()
+            .find(|(_, (known, _))| known.eq_ignore_ascii_case(name))
+            .map(|(index, (name, value))| (index, name.as_str(), value.as_str()))
     }
 
     /// Returns the palette entry the layer takes: that of its `PaletteTint` from 1 to 3.
@@ -135,24 +140,6 @@ pub(crate) fn raw<'a>(
         authored: element.syntax()?.into_owned(ordinal),
     }))
 }
-pub(crate) fn layers<'source>(element: impl XmlElement<'source>) -> Vec<MaterialLayer> {
-    let mut layers = Vec::new();
-    let lists = element
-        .children()
-        .filter(|child| child.name().eq_ignore_ascii_case("MatLayers"));
-    for layer in lists
-        .flat_map(XmlElement::children)
-        .filter(|child| child.name().eq_ignore_ascii_case("Layer"))
-    {
-        layers.push(MaterialLayer {
-            attributes: attributes(layer),
-            surface: None,
-            palette_entry: None,
-        });
-    }
-    layers
-}
-
 pub(crate) fn other_elements<'a>(
     element: impl XmlElement<'a>,
     budget: &mut Budget,

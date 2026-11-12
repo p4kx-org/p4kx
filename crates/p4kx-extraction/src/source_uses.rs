@@ -24,11 +24,20 @@ impl SourceUses {
     /// Starts an empty inventory; inputs are observed in a deterministic preparation order.
     #[must_use]
     pub fn new() -> Self {
+        Self::with_registry(SourceRegistry::new)
+    }
+
+    /// Starts an inventory with short, document-local source-use references.
+    /// Register uses in deterministic order for repeatable serialized references.
+    #[must_use]
+    pub fn with_compact_use_refs() -> Self {
+        Self::with_registry(SourceRegistry::with_compact_use_refs)
+    }
+
+    fn with_registry(make: impl FnOnce(Arc<()>) -> SourceRegistry) -> Self {
         let identity = Arc::new(());
-        Self {
-            registry: Arc::new(Mutex::new(SourceRegistry::new(Arc::clone(&identity)))),
-            identity,
-        }
+        let registry = Arc::new(Mutex::new(make(Arc::clone(&identity))));
+        Self { registry, identity }
     }
 
     /// Retains the actual input once and returns a shared payload or metadata scope.
@@ -209,6 +218,43 @@ impl fmt::Debug for SourceUses {
 mod tests {
     use super::SourceUses;
     use crate::{InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceUseRole};
+
+    #[test]
+    fn compact_use_refs_reuse_only_the_same_original_use() -> Result<(), SourceEvidenceError> {
+        let sources = SourceUses::with_compact_use_refs();
+        let scope = sources.observe(SourceInput::Unknown, InputScope::Payload)?;
+        let at = |index| {
+            scope.at(
+                SourceLocation::Subresource {
+                    namespace: "synthetic".into(),
+                    indices: vec![index],
+                    field: "same".into(),
+                },
+                SourceUseRole::Payload,
+            )
+        };
+        let first = at(0)?;
+        let repeated = at(0)?;
+        let second = at(1)?;
+        assert_eq!(
+            first.reference().as_str(),
+            "u0",
+            "short document-local reference"
+        );
+        assert_eq!(first.reference(), repeated.reference(), "same original use");
+        assert_eq!(
+            second.reference().as_str(),
+            "u1",
+            "a different original ordinal"
+        );
+        let inventory = sources.freeze()?;
+        assert_eq!(
+            inventory.uses().len(),
+            2,
+            "the two references resolve uniquely"
+        );
+        Ok(())
+    }
 
     #[test]
     fn interrupted_evidence_rejects_observation_registration_and_freeze() {

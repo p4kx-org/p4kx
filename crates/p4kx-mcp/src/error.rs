@@ -96,6 +96,16 @@ pub(crate) enum ToolError {
     /// The Entry read's original input evidence could not be retained.
     #[error("cannot retain the Entry read source evidence")]
     EntryEvidence(#[source] SourceEvidenceError),
+    /// The emitted material field could not be linked to its original input.
+    #[error("cannot retain the material source evidence")]
+    MaterialEvidence(#[from] crate::material_origin::EvidenceError),
+    /// The original material input failed before a field could be projected.
+    #[error("cannot read the material library at `{path}`")]
+    MaterialRead {
+        path: String,
+        #[source]
+        source: Box<crate::material_origin::MaterialObservationFailure>,
+    },
     /// The chunk table's original input or field addresses could not be retained.
     #[error("cannot retain the chunk table source evidence")]
     ChunkEvidence(#[from] ChunkEvidenceError),

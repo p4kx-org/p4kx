@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{FieldOrigins, SourceInventory};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -22,7 +23,7 @@ pub(crate) struct MaterialParams {
 
 /// The sub-materials of one `.mtl` file.
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct MaterialsResult {
+pub(crate) struct MaterialHeader {
     /// The path of the Archive.
     pub(crate) archive: String,
     /// The Entry path of the `.mtl` file.
@@ -38,11 +39,22 @@ pub(crate) struct MaterialsResult {
     pub(crate) unknown_entries: usize,
     /// The number of sub-materials.
     pub(crate) total: usize,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub(crate) struct MaterialsResult<Materials = Vec<MaterialShape>, Header = MaterialHeader> {
+    #[serde(flatten)]
+    pub(crate) header: Header,
     /// The sub-materials on this page, in material ID order.
-    pub(crate) materials: Vec<MaterialShape>,
+    pub(crate) materials: Materials,
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    /// The actual physical contributions of the structured output fields.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    /// The inputs and observations referenced by the fields.
+    pub(crate) provenance: SourceInventory,
 }
 
 /// One sub-material.

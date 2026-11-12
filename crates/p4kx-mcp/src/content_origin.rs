@@ -83,7 +83,21 @@ pub(crate) struct EntryPageSources {
 
 impl EntryPageSources {
     pub(crate) fn observe(archive: &Archive, entry: &Entry) -> Result<Self, SourceEvidenceError> {
-        let uses = SourceUses::new();
+        Self::observe_into(archive, entry, SourceUses::new())
+    }
+
+    pub(crate) fn observe_with_compact_use_refs(
+        archive: &Archive,
+        entry: &Entry,
+    ) -> Result<Self, SourceEvidenceError> {
+        Self::observe_into(archive, entry, SourceUses::with_compact_use_refs())
+    }
+
+    fn observe_into(
+        archive: &Archive,
+        entry: &Entry,
+        uses: SourceUses,
+    ) -> Result<Self, SourceEvidenceError> {
         let observed = archive.observed_entry(entry);
         let input = observed.map_or(SourceInput::Unknown, SourceInput::ArchiveView);
         let payload = uses.observe(input, InputScope::Payload)?;
@@ -123,6 +137,14 @@ impl EntryPageSources {
                 role,
             )
             .map(Some)
+    }
+
+    pub(crate) fn subresource(
+        &self,
+        location: SourceLocation,
+        role: SourceUseRole,
+    ) -> Result<SourceUse, SourceEvidenceError> {
+        self.payload.at(location, role)
     }
 
     pub(crate) fn cryxml_field(

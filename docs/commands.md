@@ -855,6 +855,14 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | `mtl_summary` | A `.mtl` Entry (`path`), paged by sub-material: name, shader, surface type, flags, colours, opacity, glow, complete admitted texture-slot, shader-parameter and layer lists; retained strings are complete, paging observes the 256 KiB response budget, and an item that cannot fit alone is explicitly refused |
 | `entity_loadout` | The default Loadout of an Entity (`entity`: class name, record path or GUID) as a list of ports, parents first: path, depth, source, what the port takes, the Entity attached and for each unresolved port the reason; each Entity states its `issues` and, only when it has any, its `notes` (all admitted undecidable spawn requirements, such as an `assortment_requirement`, as in the CLI JSON); `max_depth` (16 by default, at most 32) and a cursor bound it; retained identities, paths, values and reasons are complete within the 256 KiB response budget, with explicit refusal for an item that cannot fit first |
 
+For `mtl_summary`, `fieldOrigins` addresses the fields of the returned page, including each
+admitted texture, parameter and layer. `materialXmlElement` locations are zero-based element
+child ordinals from the original XML root. `materialXmlAttribute` appends the original attribute
+ordinal. The selected Entry supplies the material values and authored references. Its directory
+path uses the names in its actual containing Archive chain. Source-use IDs resolve within that
+response's `provenance` inventory. Provenance is part of the 256 KiB response budget, and the
+cursor resumes after the last returned material.
+
 For `list_chunks`, `fieldOrigins` uses JSON Pointers such as
 `/structuredContent/chunks/0/offset` into the current response. Its `provenance` records the
 original table ordinal and the half-open byte range in the decoded Entry. Filtered totals and

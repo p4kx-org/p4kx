@@ -8,7 +8,7 @@ use p4kx_extraction::{
 };
 
 use crate::archives::Opened;
-use crate::budget::{self, MAX_RESPONSE_LEN};
+use crate::budget;
 use crate::error::ToolError;
 use crate::model_shapes::{ChunkShape, ChunksResult};
 use crate::models::converted;
@@ -62,33 +62,17 @@ struct Listing<'a> {
 
 impl Listing<'_> {
     fn fit(&self, candidates: &[ChunkRow<'_>]) -> Result<ChunksResult, ToolError> {
-        let full = self.response(candidates)?;
-        if budget::json_len(&full) <= MAX_RESPONSE_LEN {
-            return Ok(full);
-        }
-        drop(full);
-        let mut fitting = 0;
-        let mut oversized = candidates.len();
-        let mut best = None;
-        while oversized.saturating_sub(fitting) > 1 {
-            let size = fitting + (oversized - fitting) / 2;
-            let (prefix, _) = candidates.split_at(size);
-            let response = self.response(prefix)?;
-            if budget::json_len(&response) <= MAX_RESPONSE_LEN {
-                fitting = size;
-                best = Some(response);
-            } else {
-                oversized = size;
-            }
-        }
-        best.ok_or_else(|| ToolError::TooLargeItem {
-            what: candidates.first().map_or_else(
-                || "result without its list".to_owned(),
-                |(index, _)| format!("chunk {index}"),
-            ),
-            limit: MAX_RESPONSE_LEN,
-            hint: "ask for it by a narrower filter",
-        })
+        let (_, result) = budget::fit_prefix(
+            candidates.len(),
+            |size| self.response(candidates.split_at(size).0),
+            || {
+                candidates.first().map_or_else(
+                    || "result without its list".to_owned(),
+                    |(index, _)| format!("chunk {index}"),
+                )
+            },
+        )?;
+        Ok(result)
     }
 
     fn response(&self, selected: &[ChunkRow<'_>]) -> Result<ChunksResult, ToolError> {

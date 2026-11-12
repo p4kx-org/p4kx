@@ -62,6 +62,7 @@ mod legal_notice;
 mod model_animations;
 mod models;
 mod mtl_summary;
+mod mtl_summary_origins;
 mod query;
 mod query_selection;
 mod read;

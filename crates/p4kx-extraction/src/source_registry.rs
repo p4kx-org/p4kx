@@ -40,6 +40,7 @@ pub(crate) struct SourceRegistry {
     pub(crate) inputs: Vec<InputIdentity>,
     pub(crate) sources: BTreeMap<PhysicalSourceRef, PhysicalSource>,
     pub(crate) uses: BTreeMap<SourceUseRef, Arc<SourceUseDescription>>,
+    compact_use_refs: Option<HashMap<SourceUseRef, SourceUseRef>>,
 }
 
 impl SourceRegistry {
@@ -49,6 +50,14 @@ impl SourceRegistry {
             inputs: Vec::new(),
             sources: BTreeMap::new(),
             uses: BTreeMap::new(),
+            compact_use_refs: None,
+        }
+    }
+
+    pub(crate) fn with_compact_use_refs(identity: Arc<()>) -> Self {
+        Self {
+            compact_use_refs: Some(HashMap::new()),
+            ..Self::new(identity)
         }
     }
 
@@ -153,6 +162,15 @@ impl SourceRegistry {
             role.key(),
             location.key()
         ));
+        let id = if let Some(aliases) = &mut self.compact_use_refs {
+            let ordinal = aliases.len();
+            aliases
+                .entry(id)
+                .or_insert_with(|| SourceUseRef(format!("u{ordinal}")))
+                .clone()
+        } else {
+            id
+        };
         let description = self.uses.entry(id.clone()).or_insert_with(|| {
             Arc::new(SourceUseDescription {
                 id: id.clone(),

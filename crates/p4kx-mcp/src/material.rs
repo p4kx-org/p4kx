@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::model::MaterialLibrary;
-use p4kx_extraction::{Archive, find_entry, read_bytes};
+use p4kx_extraction::model::{MaterialLibrary, MaterialReadError, MaterialSourceLimits};
+use p4kx_extraction::{Archive, Entry, find_entry, read_bytes};
 
-use crate::budget::{Budget, fill_within, json_len};
+use crate::budget::{self, Budget};
 use crate::container::Place;
 use crate::error::ToolError;
+use crate::material_origin::Observations;
 use crate::material_shape;
-use crate::material_shapes;
+use crate::material_shapes::{MaterialHeader, MaterialShape};
 pub(crate) use crate::material_shapes::{MaterialParams, MaterialsResult};
 use crate::page::Page;
 
@@ -22,15 +23,74 @@ pub(crate) fn summary(
     page: Page,
 ) -> Result<MaterialsResult, ToolError> {
     let archive = place.archive();
-    let (name, library) = read(archive, path)?;
+    let entry =
+        find_entry(archive, path).ok_or_else(|| ToolError::UnknownEntry(path.to_owned()))?;
+    let mut observations = Observations::default();
+    let library = read(archive, entry, page, &mut observations)?;
+    let header = header(place, entry, &library)?;
+    let shapes = page
+        .slice(&library.materials)
+        .iter()
+        .enumerate()
+        .map(|(position, material)| material_shape::shape(page.offset() + position, material));
+    let (mut shapes, _) = budget::fill_within(
+        page,
+        header.total,
+        budget::json_len(&header),
+        shapes,
+        |shape: &MaterialShape| format!("material {}", shape.id),
+    )?;
+    let (keep, result) = budget::fit_prefix(
+        shapes.len(),
+        |length| {
+            let materials = shapes.split_at(length).0;
+            let next_cursor = page.next_cursor_after(length, header.total)?;
+            let (field_origins, provenance) =
+                observations.project(archive, entry, materials, &header, next_cursor.as_deref())?;
+            Ok(MaterialsResult {
+                header: &header,
+                materials,
+                next_cursor,
+                field_origins,
+                provenance,
+            })
+        },
+        || {
+            shapes.first().map_or_else(
+                || "result without its list".to_owned(),
+                |shape| format!("material {}", shape.id),
+            )
+        },
+    )?;
+    let MaterialsResult {
+        next_cursor,
+        field_origins,
+        provenance,
+        ..
+    } = result;
+    shapes.truncate(keep);
+    Ok(MaterialsResult {
+        header,
+        materials: shapes,
+        next_cursor,
+        field_origins,
+        provenance,
+    })
+}
+
+fn header(
+    place: &Place<'_>,
+    entry: &Entry,
+    library: &MaterialLibrary,
+) -> Result<MaterialHeader, ToolError> {
     let mut text = Budget::new();
-    let archive_path = archive.path().display().to_string();
-    text.admit_text(archive_path.len())?;
-    let shown_path = place.shown(&name);
-    text.admit_text(shown_path.len())?;
-    let mut result = MaterialsResult {
-        archive: archive_path,
-        path: shown_path,
+    let archive = place.archive().path().display().to_string();
+    text.admit_text(archive.len())?;
+    let path = place.shown(entry.path());
+    text.admit_text(path.len())?;
+    Ok(MaterialHeader {
+        archive,
+        path,
         single: library.single,
         default_palette: library
             .default_palette
@@ -39,29 +99,15 @@ pub(crate) fn summary(
             .transpose()?,
         unknown_entries: library.unknown_entries,
         total: library.materials.len(),
-        materials: Vec::new(),
-        next_cursor: None,
-    };
-    let items = page
-        .slice(&library.materials)
-        .iter()
-        .enumerate()
-        .map(|(position, material)| material_shape::shape(page.offset() + position, material));
-    let (materials, next_cursor) = fill_within(
-        page,
-        library.materials.len(),
-        json_len(&result),
-        items,
-        |shape: &material_shapes::MaterialShape| format!("material {}", shape.id),
-    )?;
-    result.materials = materials;
-    result.next_cursor = next_cursor;
-    Ok(result)
+    })
 }
 
-fn read(archive: &Archive, path: &str) -> Result<(String, MaterialLibrary), ToolError> {
-    let entry =
-        find_entry(archive, path).ok_or_else(|| ToolError::UnknownEntry(path.to_owned()))?;
+fn read(
+    archive: &Archive,
+    entry: &Entry,
+    page: Page,
+    observations: &mut Observations,
+) -> Result<MaterialLibrary, ToolError> {
     if entry.uncompressed_size() > MAX_MTL_LEN {
         return Err(ToolError::Refused(format!(
             "the Entry {} holds {} bytes, more than the {MAX_MTL_LEN} a material library may",
@@ -74,11 +120,24 @@ fn read(archive: &Archive, path: &str) -> Result<(String, MaterialLibrary), Tool
         path: entry.path().to_owned(),
         source,
     })?;
-    let library = MaterialLibrary::parse(entry.path(), &data.bytes).map_err(|source| {
-        ToolError::Material {
+    let mut limits = MaterialSourceLimits::default();
+    limits.source_bytes = data.bytes.len().max(1);
+    MaterialLibrary::parse_with_observer(
+        entry.path(),
+        &data.bytes,
+        limits,
+        || Ok(()),
+        |site| observations.retain(page, site),
+    )
+    .map_err(|error| match error {
+        MaterialReadError::Material(source) => ToolError::Material {
             path: entry.path().to_owned(),
             source,
-        }
-    })?;
-    Ok((entry.path().to_owned(), library))
+        },
+        MaterialReadError::Interrupted(source) => ToolError::MaterialEvidence(source),
+        other => ToolError::MaterialRead {
+            path: entry.path().to_owned(),
+            source: Box::new(other),
+        },
+    })
 }

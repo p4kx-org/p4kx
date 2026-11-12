@@ -114,6 +114,42 @@ pub(crate) fn fill_within<T: Serialize>(
     Ok((taken, next))
 }
 
+/// Fits a structured prefix whose rows and evidence grow together.
+pub(crate) fn fit_prefix<T: Serialize>(
+    count: usize,
+    response: impl Fn(usize) -> Result<T, ToolError>,
+    describe: impl FnOnce() -> String,
+) -> Result<(usize, T), ToolError> {
+    let full = response(count)?;
+    if structured_len(&full) <= MAX_RESPONSE_LEN {
+        return Ok((count, full));
+    }
+    drop(full);
+    let mut fitting = 0;
+    let mut oversized = count;
+    let mut best = None;
+    while oversized.saturating_sub(fitting) > 1 {
+        let size = fitting + (oversized - fitting) / 2;
+        let candidate = response(size)?;
+        if structured_len(&candidate) <= MAX_RESPONSE_LEN {
+            fitting = size;
+            best = Some((size, candidate));
+        } else {
+            oversized = size;
+        }
+    }
+    best.ok_or_else(|| ToolError::TooLargeItem {
+        what: describe(),
+        limit: MAX_RESPONSE_LEN,
+        hint: "ask for it by a narrower filter",
+    })
+}
+
+// MCP serializes a JSON Value, which preserves f32 fields as f64 numbers.
+fn structured_len(item: &impl Serialize) -> usize {
+    serde_json::to_value(item).map_or(usize::MAX, |value| json_len(&value))
+}
+
 /// Returns the length of `item` as JSON, without writing it anywhere.
 pub(crate) fn json_len(item: &impl Serialize) -> usize {
     let mut counter = Counter::default();

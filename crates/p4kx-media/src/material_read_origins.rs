@@ -34,8 +34,15 @@ pub(crate) struct MaterialReadOrigins {
 
 impl MaterialReadOrigins {
     pub(crate) fn observe(&mut self, observation: MaterialReadObservation<'_>, limit: u64) {
-        let (Some(field), Some(role)) = (field_name(observation.field), role(observation.use_kind))
-        else {
+        let field = match surface_field(observation.field) {
+            SurfaceField::Reported(name) => name,
+            SurfaceField::Other => return,
+            SurfaceField::Unknown => {
+                self.unknown = true;
+                return;
+            }
+        };
+        let Some(role) = role(observation.use_kind) else {
             self.unknown = true;
             return;
         };
@@ -137,22 +144,48 @@ fn field_path(material: usize, field: &str) -> Result<FieldPath, MediaError> {
     Ok(path)
 }
 
-const fn field_name(field: MaterialReadField) -> Option<&'static str> {
+enum SurfaceField {
+    Reported(&'static str),
+    Other,
+    Unknown,
+}
+
+const fn surface_field(field: MaterialReadField) -> SurfaceField {
     match field {
-        MaterialReadField::Name => Some("name"),
-        MaterialReadField::Flags => Some("interpreted_surface/flags"),
-        MaterialReadField::Shader => Some("interpreted_surface/shader"),
-        MaterialReadField::SurfaceType => Some("interpreted_surface/surface_type"),
-        MaterialReadField::StringGenMask => Some("interpreted_surface/string_gen_mask"),
-        MaterialReadField::Diffuse => Some("interpreted_surface/diffuse"),
-        MaterialReadField::Specular => Some("interpreted_surface/specular"),
-        MaterialReadField::Emissive => Some("interpreted_surface/emissive"),
-        MaterialReadField::Shininess => Some("interpreted_surface/shininess"),
-        MaterialReadField::Opacity => Some("interpreted_surface/opacity"),
-        MaterialReadField::AlphaTest => Some("interpreted_surface/alpha_test"),
-        MaterialReadField::Glow => Some("interpreted_surface/glow"),
-        MaterialReadField::Palette => Some("interpreted_surface/palette"),
-        _ => None,
+        MaterialReadField::Name => SurfaceField::Reported("name"),
+        MaterialReadField::Flags => SurfaceField::Reported("interpreted_surface/flags"),
+        MaterialReadField::Shader => SurfaceField::Reported("interpreted_surface/shader"),
+        MaterialReadField::SurfaceType => {
+            SurfaceField::Reported("interpreted_surface/surface_type")
+        }
+        MaterialReadField::StringGenMask => {
+            SurfaceField::Reported("interpreted_surface/string_gen_mask")
+        }
+        MaterialReadField::Diffuse => SurfaceField::Reported("interpreted_surface/diffuse"),
+        MaterialReadField::Specular => SurfaceField::Reported("interpreted_surface/specular"),
+        MaterialReadField::Emissive => SurfaceField::Reported("interpreted_surface/emissive"),
+        MaterialReadField::Shininess => SurfaceField::Reported("interpreted_surface/shininess"),
+        MaterialReadField::Opacity => SurfaceField::Reported("interpreted_surface/opacity"),
+        MaterialReadField::AlphaTest => SurfaceField::Reported("interpreted_surface/alpha_test"),
+        MaterialReadField::Glow => SurfaceField::Reported("interpreted_surface/glow"),
+        MaterialReadField::Palette => SurfaceField::Reported("interpreted_surface/palette"),
+        MaterialReadField::LibrarySingle
+        | MaterialReadField::LibraryDefaultPalette
+        | MaterialReadField::LibraryTotal
+        | MaterialReadField::LibraryUnknownCount
+        | MaterialReadField::Row
+        | MaterialReadField::Textures
+        | MaterialReadField::Texture { .. }
+        | MaterialReadField::TextureMap { .. }
+        | MaterialReadField::TextureFile { .. }
+        | MaterialReadField::PublicParams
+        | MaterialReadField::PublicParam { .. }
+        | MaterialReadField::Layers
+        | MaterialReadField::Layer { .. }
+        | MaterialReadField::LayerName { .. }
+        | MaterialReadField::LayerPath { .. }
+        | MaterialReadField::LayerPaletteTint { .. } => SurfaceField::Other,
+        _ => SurfaceField::Unknown,
     }
 }
 
