@@ -11,6 +11,7 @@ use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::law_kinds::LawPick;
+use crate::catalog_v3::location_vocabulary::LocationVocabularyPick;
 use crate::contract::{
     Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
     MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup, ResourceType, Ship,
@@ -60,6 +61,7 @@ pub(crate) enum Picked<'f> {
     AmmoDefinition(Box<PreparedAmmoDefinition<'f>>),
     Faction(Box<PreparedFaction<'f>>),
     Law(LawPick<'f>),
+    LocationVocabulary(LocationVocabularyPick<'f>),
     /// A starmap object.
     Starmap(StarmapObject<'f>),
     /// A mineable element.
@@ -144,6 +146,12 @@ impl<'f> Picked<'f> {
             | Kind::Infractions
             | Kind::InfractionSets
             | Kind::Jurisdictions
+            | Kind::LocationClasses
+            | Kind::LocationFunctions
+            | Kind::LocationSizes
+            | Kind::LocationClassRegistries
+            | Kind::LocationFunctionRegistries
+            | Kind::LocationSizeRegistries
             | Kind::GameplayProperties
             | Kind::QualityDistributions
             | Kind::QualityQuantizations

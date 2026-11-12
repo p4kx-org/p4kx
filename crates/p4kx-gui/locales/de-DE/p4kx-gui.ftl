@@ -518,6 +518,12 @@ catalog-summary-kind = { $kind ->
     [infractions] Verstöße
     [infractionSets] Verstoßsammlungen
     [jurisdictions] Rechtsgebiete
+    [locationClasses] Ortsklassen
+    [locationFunctions] Ortsfunktionen
+    [locationSizes] Ortsgrößen
+    [locationClassRegistries] Register der Ortsklassen
+    [locationFunctionRegistries] Register der Ortsfunktionen
+    [locationSizeRegistries] Register der Ortsgrößen
     [paints] Lackierungen
     [loadouts] Loadouts
    *[other] { $kind }

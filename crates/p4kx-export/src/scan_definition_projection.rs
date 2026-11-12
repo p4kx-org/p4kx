@@ -6,6 +6,7 @@ use p4kx_extraction::RecordTree;
 use super::Scan;
 use crate::Kind;
 use crate::catalog_v3::law_kinds::LawPick;
+use crate::catalog_v3::location_vocabulary::{self, LocationVocabularyPick};
 use crate::loot_kinds::LootPick;
 use crate::mission_kinds::MissionPick;
 use crate::picked::Picked;
@@ -75,12 +76,12 @@ impl<'f> Scan<'_, '_, 'f> {
                 (Picked::ResourceType(Box::new(read.value)), read.notes)
             }
             Kind::ResourceGroups => self.resource_group(admission, tree)?,
-            _ => return self.read_reputation_definition(kind, admission, tree),
+            _ => return self.read_mission_definition(kind, admission, tree),
         };
         Ok(Some(projection))
     }
 
-    fn read_reputation_definition(
+    fn read_mission_definition(
         &self,
         kind: Kind,
         admission: &RecordObservation<'_, 'f>,
@@ -111,6 +112,16 @@ impl<'f> Scan<'_, '_, 'f> {
                 )?;
                 let picked = MissionPick::RewardAmount(Box::new(read.value));
                 (Picked::Mission(picked), read.notes)
+            }
+            _ if location_vocabulary::source_type(kind).is_some() => {
+                let (value, notes) = LocationVocabularyPick::read(
+                    kind,
+                    tree,
+                    self.projection,
+                    admission,
+                    self.options.cancel,
+                )?;
+                (Picked::LocationVocabulary(value), notes)
             }
             _ => return Ok(None),
         };

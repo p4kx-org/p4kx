@@ -244,6 +244,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.infractions` | Physical infraction definitions with ordered source triggers and authored defaults. [Law definitions](catalog-law.md) |
 | `definitions.infractionSets` | Physical reusable sets of ordered infraction links and overrides. [Law definitions](catalog-law.md) |
 | `definitions.jurisdictions` | Physical jurisdictions with authored parent links, fines, limits, prison and penalty configuration. [Law definitions](catalog-law.md) |
+| `definitions.locationClasses`, `definitions.locationFunctions`, `definitions.locationSizes` and `definitions.locationRegistries` | Physical definitions and ordered registry members for mission location classification. [Location vocabulary](catalog-location-vocabulary.md) |
 | `definitions.reputationContexts` | Physical reputation contexts with authored scope order, original references and display properties |
 | `missionTypes` | The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID |
 | `missionLocalities` | The mission localities, named sets of starmap objects, ordered by GUID |
@@ -2746,6 +2747,12 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `contractScenarios` | `libs/foundry/records/contracts/contractscenarios/` | `ScenarioProgress` |
 | `cargoManifests` | `libs/foundry/records/cargomanifest/` | `CargoManifest` |
 | `missionLocationTemplates` | `libs/foundry/records/missiondata/pu_locations/` | `MissionLocationTemplate` |
+| `locationClasses` | Any Record path | `MissionLocationClass` |
+| `locationFunctions` | Any Record path | `MissionLocationFunction` |
+| `locationSizes` | Any Record path | `MissionLocationSize` |
+| `locationClassRegistries` | Any Record path | `MissionLocationClasses` |
+| `locationFunctionRegistries` | Any Record path | `MissionLocationFunctions` |
+| `locationSizeRegistries` | Any Record path | `MissionLocationSizes` |
 | `contractShipSpawns` | None: derived from the properties of the contracts and their templates, no Records | |
 | `contractLocationQueries` | None: derived from the properties of the contracts and their templates, no Records | |
 | `contractNpcSpawns` | None: derived from the properties of the contracts, templates and broker entries, no Records | |

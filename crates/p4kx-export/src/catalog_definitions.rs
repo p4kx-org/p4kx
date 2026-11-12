@@ -13,6 +13,7 @@ use crate::catalog_v3::faction_definition::FactionDefinition;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::infraction_definition::{InfractionDefinition, InfractionSetDefinition};
 use crate::catalog_v3::jurisdiction_definition::JurisdictionDefinition;
+use crate::catalog_v3::location_vocabulary::LocationVocabularyTables;
 use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
 use crate::catalog_v3::reputation_context_definition::ContextDefinition;
 use crate::catalog_v3::reputation_faction_definition::FactionReputationDefinition;
@@ -66,4 +67,6 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) infractions: CatalogTable<InfractionDefinition<'source>>,
     pub(crate) infraction_sets: CatalogTable<InfractionSetDefinition<'source>>,
     pub(crate) jurisdictions: CatalogTable<JurisdictionDefinition<'source>>,
+    #[serde(flatten)]
+    pub(crate) location_vocabulary: LocationVocabularyTables<'source>,
 }

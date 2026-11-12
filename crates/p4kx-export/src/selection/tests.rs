@@ -69,7 +69,13 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::ReputationRewardAmounts
                 | Kind::Infractions
                 | Kind::InfractionSets
-                | Kind::Jurisdictions => {
+                | Kind::Jurisdictions
+                | Kind::LocationClasses
+                | Kind::LocationFunctions
+                | Kind::LocationSizes
+                | Kind::LocationClassRegistries
+                | Kind::LocationFunctionRegistries
+                | Kind::LocationSizeRegistries => {
                     assert_eq!(
                         by_path,
                         Some(Kind::Tags),

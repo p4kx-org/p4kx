@@ -124,6 +124,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | crafters | D.crafters | station limits/modifiers/queues, identity |
 | cargoManifests | D.cargoManifests | stored cargo fill/spawn configuration, not runtime cargo |
 | missionLocationTemplates | D.missionLocationTemplates; C.locationData | completed #816 remains; actual configuration distinct from placed location |
+| locationClasses, locationFunctions, locationSizes, location registries | D.locationClasses/functions/sizes; D.locationRegistries | physical definitions and registries, including zero-field identities and ordered scope and Reference arrays ([contract](catalog-location-vocabulary.md)) |
 | contractShipSpawns | V.shipSpawnPools; A.spawnOccurrences | existing content identity/projection and authored occurrences separated |
 | contractLocationQueries | V.locationQueries; A.locationQueryOccurrences | strict typed source condition tree (completed #1011), content identity, no query execution |
 | contractTemplates | D.contractTemplates; C.contractTemplates/missionProperties/missionFlows | one physical owner source arena, original cut-root parent/field positions, typed links and meanings; permanent contextual outputs without duplicate raw values |

@@ -21,6 +21,30 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::jurisdiction_definition::SOURCE_TYPE,
             },
+            Self::LocationClasses => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::CLASS,
+            },
+            Self::LocationFunctions => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::FUNCTION,
+            },
+            Self::LocationSizes => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::SIZE,
+            },
+            Self::LocationClassRegistries => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::CLASS_REGISTRY,
+            },
+            Self::LocationFunctionRegistries => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::FUNCTION_REGISTRY,
+            },
+            Self::LocationSizeRegistries => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::SIZE_REGISTRY,
+            },
             Self::ReputationPerks => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::reputation_perk_list::SOURCE_TYPE,

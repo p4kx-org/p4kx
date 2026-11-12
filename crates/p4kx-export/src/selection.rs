@@ -6,24 +6,10 @@ use p4kx_extraction::{DataForgeError, Filter, Record};
 pub use crate::selection_rules::KindRule;
 pub(crate) use crate::selection_rules::starts_with_folder;
 
-/// The tokens that mark a development leftover: a Record whose record path or name holds one of
-/// them as a whole word, ignoring ASCII case, is left out and counted as skipped.
-///
-/// Words are the runs of ASCII letters and digits, so `paint_test_01` holds `test` while
-/// `contestant` does not.
-pub const EXCLUDED_TOKENS: [&str; 6] = ["test", "template", "dummy", "debug", "deprecated", "dev"];
+mod record_leftovers;
 
-/// The leftover tokens of a contract template: [`EXCLUDED_TOKENS`] without `template`, which
-/// live templates such as `handyman_template` carry.
-const CONTRACT_TEMPLATE_EXCLUDED_TOKENS: [&str; 5] =
-    ["test", "dummy", "debug", "deprecated", "dev"];
-
-/// The extra tokens of a leftover ship.
-///
-/// A Record of the ships kind whose record path or name holds one of them as a whole word, ignoring
-/// ASCII case, is left out and counted as skipped, as for [`EXCLUDED_TOKENS`]. The other kinds keep
-/// their `display` and `temp` Records.
-pub const SHIP_EXCLUDED_TOKENS: [&str; 3] = ["temp", "display", "hijacked"];
+pub(crate) use record_leftovers::is_leftover;
+pub use record_leftovers::{EXCLUDED_TOKENS, SHIP_EXCLUDED_TOKENS, is_kind_leftover};
 
 /// A kind of entity in the Basetool catalog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, schemars::JsonSchema)]
@@ -182,11 +168,23 @@ pub enum Kind {
     InfractionSets,
     /// Physical jurisdiction definitions.
     Jurisdictions,
+    /// Physical mission location class definitions.
+    LocationClasses,
+    /// Physical mission location function definitions.
+    LocationFunctions,
+    /// Physical mission location size definitions.
+    LocationSizes,
+    /// Physical mission location class registries.
+    LocationClassRegistries,
+    /// Physical mission location function registries.
+    LocationFunctionRegistries,
+    /// Physical mission location size registries.
+    LocationSizeRegistries,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 61] = [
+    pub const ALL: [Self; 67] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -248,6 +246,12 @@ impl Kind {
         Self::Infractions,
         Self::InfractionSets,
         Self::Jurisdictions,
+        Self::LocationClasses,
+        Self::LocationFunctions,
+        Self::LocationSizes,
+        Self::LocationClassRegistries,
+        Self::LocationFunctionRegistries,
+        Self::LocationSizeRegistries,
     ];
 
     /// Returns the stable kind identifier, independently of its canonical dataset path.
@@ -319,6 +323,12 @@ impl Kind {
             Self::Infractions => "infractions",
             Self::InfractionSets => "infractionSets",
             Self::Jurisdictions => "jurisdictions",
+            Self::LocationClasses => "locationClasses",
+            Self::LocationFunctions => "locationFunctions",
+            Self::LocationSizes => "locationSizes",
+            Self::LocationClassRegistries => "locationClassRegistries",
+            Self::LocationFunctionRegistries => "locationFunctionRegistries",
+            Self::LocationSizeRegistries => "locationSizeRegistries",
         }
     }
 }
@@ -357,41 +367,6 @@ pub(crate) fn selects_blueprint(
     } else {
         BlueprintSelection::Kept
     })
-}
-
-fn has_word(record_path: &str, name: &str, tokens: &[&str]) -> bool {
-    [record_path, name].into_iter().any(|text| {
-        text.split(|c: char| !c.is_ascii_alphanumeric())
-            .any(|word| tokens.iter().any(|token| word.eq_ignore_ascii_case(token)))
-    })
-}
-
-/// Returns whether a Record with `record_path` and `name` is a development leftover.
-pub(crate) fn is_leftover(record_path: &str, name: &str) -> bool {
-    has_word(record_path, name, &EXCLUDED_TOKENS)
-}
-
-/// Returns whether a source Record is excluded by the kind's development-leftover policy.
-///
-/// Contract templates permit `template`; ships also exclude [`SHIP_EXCLUDED_TOKENS`].
-/// Type-only kinds retain every source Record of their exact type.
-#[must_use]
-pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
-    match kind {
-        Kind::Tags
-        | Kind::Factions
-        | Kind::ReputationPerks
-        | Kind::ReputationTriggerRecords
-        | Kind::ReputationRewardAmounts
-        | Kind::Infractions
-        | Kind::InfractionSets
-        | Kind::Jurisdictions => false,
-        Kind::ContractTemplates => has_word(record_path, name, &CONTRACT_TEMPLATE_EXCLUDED_TOKENS),
-        Kind::Ships => {
-            is_leftover(record_path, name) || has_word(record_path, name, &SHIP_EXCLUDED_TOKENS)
-        }
-        _ => is_leftover(record_path, name),
-    }
 }
 
 #[cfg(test)]

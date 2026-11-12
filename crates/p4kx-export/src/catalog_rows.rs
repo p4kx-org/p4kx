@@ -92,6 +92,7 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
         collected
             .law
             .sources()
+            .chain(collected.location_vocabulary.sources())
             .map(|(kind, guid, path, _)| CatalogRow {
                 kind,
                 guid,
@@ -311,6 +312,7 @@ fn definition_number_groups<'rows>(
         )
         .chain(collected.mission_kinds.reputation_number_groups())
         .chain(collected.law.number_groups())
+        .chain(collected.location_vocabulary.number_groups())
         .chain(
             collected
                 .explosion_definitions

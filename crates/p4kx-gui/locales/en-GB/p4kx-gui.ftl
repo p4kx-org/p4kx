@@ -518,6 +518,12 @@ catalog-summary-kind = { $kind ->
     [infractions] Infractions
     [infractionSets] Infraction sets
     [jurisdictions] Jurisdictions
+    [locationClasses] Location classes
+    [locationFunctions] Location functions
+    [locationSizes] Location sizes
+    [locationClassRegistries] Location class registries
+    [locationFunctionRegistries] Location function registries
+    [locationSizeRegistries] Location size registries
     [paints] Paints
     [loadouts] Loadouts
    *[other] { $kind }

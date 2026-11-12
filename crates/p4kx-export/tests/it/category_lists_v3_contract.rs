@@ -215,7 +215,7 @@ fn assert_header(catalog: &Value) -> TestResult {
     Ok(())
 }
 
-const EXPECTED_KINDS: [&str; 61] = [
+const EXPECTED_KINDS: [&str; 67] = [
     "manufacturers",
     "items",
     "ships",
@@ -277,6 +277,12 @@ const EXPECTED_KINDS: [&str; 61] = [
     "infractions",
     "infractionSets",
     "jurisdictions",
+    "locationClasses",
+    "locationFunctions",
+    "locationSizes",
+    "locationClassRegistries",
+    "locationFunctionRegistries",
+    "locationSizeRegistries",
 ];
 
 fn assert_kind_order() {

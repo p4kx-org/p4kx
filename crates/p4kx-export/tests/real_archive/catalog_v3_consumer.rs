@@ -30,62 +30,53 @@ pub(crate) fn named_rows<'catalog>(
         .into_iter()
         .find(|kind| kind.name() == name)
         .ok_or("unknown catalog Kind")?;
-    match kind {
-        Kind::GameplayProperties => checked_table(catalog, kind, "/definitions/gameplayProperties"),
-        Kind::LootPoolFilters => checked_table(catalog, kind, "/definitions/lootPoolFilters"),
-        Kind::BlueprintCategoryLists => {
-            checked_table(catalog, kind, "/declarations/blueprintCategoryLists")
-        }
-        Kind::Blueprints => checked_table(catalog, kind, "/definitions/blueprints"),
-        Kind::ShopInventories => checked_table(catalog, kind, "/definitions/shopInventories"),
-        Kind::ExplosionDefinitions => {
-            checked_table(catalog, kind, "/definitions/explosionDefinitions")
-        }
-        Kind::AmmoDefinitions => checked_table(catalog, kind, "/definitions/ammoDefinitions"),
-        Kind::ReputationContexts => checked_table(catalog, kind, "/definitions/reputationContexts"),
-        Kind::ReputationScopes => checked_table(catalog, kind, "/definitions/reputationScopes"),
-        Kind::ReputationStandings => {
-            checked_table(catalog, kind, "/definitions/reputationStandings")
-        }
-        Kind::Contracts => checked_table(catalog, kind, "/projections/contracts"),
-        Kind::ContractTemplates => checked_table(catalog, kind, "/definitions/contractTemplates"),
-        Kind::MissionBrokerEntries => {
-            checked_table(catalog, kind, "/definitions/missionBrokerEntries")
-        }
-        Kind::BlueprintCategories => {
-            checked_table(catalog, kind, "/definitions/blueprintCategories")
-        }
-        Kind::Manufacturers => checked_table(catalog, kind, "/definitions/manufacturers"),
-        Kind::Factions => checked_table(catalog, kind, "/definitions/factions"),
-        Kind::FactionReputations => checked_table(catalog, kind, "/definitions/factionReputations"),
-        Kind::ReputationPerks => checked_table(catalog, kind, "/definitions/reputationPerks"),
-        Kind::ReputationTriggerRecords => {
-            checked_table(catalog, kind, "/definitions/reputationTriggerRecords")
-        }
-        Kind::ReputationRewardAmounts => {
-            checked_table(catalog, kind, "/definitions/reputationRewardAmounts")
-        }
-        Kind::Infractions => checked_table(catalog, kind, "/definitions/infractions"),
-        Kind::InfractionSets => checked_table(catalog, kind, "/definitions/infractionSets"),
-        Kind::Jurisdictions => checked_table(catalog, kind, "/definitions/jurisdictions"),
-        Kind::QualityDistributions => {
-            checked_table(catalog, kind, "/definitions/qualityDistributions")
-        }
-        Kind::QualityQuantizations => {
-            checked_table(catalog, kind, "/definitions/qualityQuantizations")
-        }
-        Kind::Tags => checked_table(catalog, kind, "/definitions/tags"),
-        Kind::ResourceTypes => checked_table(catalog, kind, "/definitions/resourceTypes"),
-        Kind::ResourceGroups => checked_table(catalog, kind, "/definitions/resourceGroups"),
+    let path = match kind {
+        Kind::GameplayProperties => "/definitions/gameplayProperties",
+        Kind::LootPoolFilters => "/definitions/lootPoolFilters",
+        Kind::BlueprintCategoryLists => "/declarations/blueprintCategoryLists",
+        Kind::Blueprints => "/definitions/blueprints",
+        Kind::ShopInventories => "/definitions/shopInventories",
+        Kind::ExplosionDefinitions => "/definitions/explosionDefinitions",
+        Kind::AmmoDefinitions => "/definitions/ammoDefinitions",
+        Kind::ReputationContexts => "/definitions/reputationContexts",
+        Kind::ReputationScopes => "/definitions/reputationScopes",
+        Kind::ReputationStandings => "/definitions/reputationStandings",
+        Kind::Contracts => "/projections/contracts",
+        Kind::ContractTemplates => "/definitions/contractTemplates",
+        Kind::MissionBrokerEntries => "/definitions/missionBrokerEntries",
+        Kind::BlueprintCategories => "/definitions/blueprintCategories",
+        Kind::Manufacturers => "/definitions/manufacturers",
+        Kind::Factions => "/definitions/factions",
+        Kind::FactionReputations => "/definitions/factionReputations",
+        Kind::ReputationPerks => "/definitions/reputationPerks",
+        Kind::ReputationTriggerRecords => "/definitions/reputationTriggerRecords",
+        Kind::ReputationRewardAmounts => "/definitions/reputationRewardAmounts",
+        Kind::Infractions => "/definitions/infractions",
+        Kind::InfractionSets => "/definitions/infractionSets",
+        Kind::Jurisdictions => "/definitions/jurisdictions",
+        Kind::LocationClasses => "/definitions/locationClasses",
+        Kind::LocationFunctions => "/definitions/locationFunctions",
+        Kind::LocationSizes => "/definitions/locationSizes",
+        Kind::LocationClassRegistries => "/definitions/locationRegistries/classes",
+        Kind::LocationFunctionRegistries => "/definitions/locationRegistries/functions",
+        Kind::LocationSizeRegistries => "/definitions/locationRegistries/sizes",
+        Kind::QualityDistributions => "/definitions/qualityDistributions",
+        Kind::QualityQuantizations => "/definitions/qualityQuantizations",
+        Kind::Tags => "/definitions/tags",
+        Kind::ResourceTypes => "/definitions/resourceTypes",
+        Kind::ResourceGroups => "/definitions/resourceGroups",
         Kind::Commodities => {
             presentations(catalog)?;
-            table(catalog, "/definitions/commodities")
+            return table(catalog, "/definitions/commodities");
         }
-        _ => catalog
-            .get(kind.name())
-            .and_then(Value::as_array)
-            .ok_or_else(|| format!("required {} rows are missing", kind.name()).into()),
-    }
+        _ => {
+            return catalog
+                .get(kind.name())
+                .and_then(Value::as_array)
+                .ok_or_else(|| format!("required {} rows are missing", kind.name()).into());
+        }
+    };
+    checked_table(catalog, kind, path)
 }
 
 fn checked_table<'catalog>(
@@ -118,6 +109,12 @@ fn checked_table<'catalog>(
                 | Kind::Infractions
                 | Kind::InfractionSets
                 | Kind::Jurisdictions
+                | Kind::LocationClasses
+                | Kind::LocationFunctions
+                | Kind::LocationSizes
+                | Kind::LocationClassRegistries
+                | Kind::LocationFunctionRegistries
+                | Kind::LocationSizeRegistries
         ) {
             record_header(row)?;
         }
@@ -230,6 +227,12 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::Infractions
             | Kind::InfractionSets
             | Kind::Jurisdictions
+            | Kind::LocationClasses
+            | Kind::LocationFunctions
+            | Kind::LocationSizes
+            | Kind::LocationClassRegistries
+            | Kind::LocationFunctionRegistries
+            | Kind::LocationSizeRegistries
             | Kind::Commodities
             | Kind::ResourceTypes
             | Kind::ResourceGroups

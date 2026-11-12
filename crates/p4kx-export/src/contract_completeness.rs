@@ -88,6 +88,12 @@ pub(crate) struct Completeness<'a> {
     pub(crate) infraction_sets: KindCompleteness<'a>,
     /// The physical jurisdiction selection.
     pub(crate) jurisdictions: KindCompleteness<'a>,
+    pub(crate) location_classes: KindCompleteness<'a>,
+    pub(crate) location_functions: KindCompleteness<'a>,
+    pub(crate) location_sizes: KindCompleteness<'a>,
+    pub(crate) location_class_registries: KindCompleteness<'a>,
+    pub(crate) location_function_registries: KindCompleteness<'a>,
+    pub(crate) location_size_registries: KindCompleteness<'a>,
     /// The completeness of `factionReputations`.
     pub(crate) faction_reputations: KindCompleteness<'a>,
     /// The completeness of `reputationScopes`.
@@ -181,6 +187,12 @@ impl<'a> Completeness<'a> {
             infractions: completeness,
             infraction_sets: completeness,
             jurisdictions: completeness,
+            location_classes: completeness,
+            location_functions: completeness,
+            location_sizes: completeness,
+            location_class_registries: completeness,
+            location_function_registries: completeness,
+            location_size_registries: completeness,
             faction_reputations: completeness,
             reputation_scopes: completeness,
             reputation_standings: completeness,

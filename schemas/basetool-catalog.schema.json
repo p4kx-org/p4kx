@@ -3973,6 +3973,18 @@
         "jurisdictions": {
           "$ref": "#/$defs/CatalogTableOfJurisdictionDefinition"
         },
+        "locationClasses": {
+          "$ref": "#/$defs/CatalogTableOfLocationClassDefinition"
+        },
+        "locationFunctions": {
+          "$ref": "#/$defs/CatalogTableOfLocationDictionaryEntry"
+        },
+        "locationRegistries": {
+          "$ref": "#/$defs/LocationRegistries"
+        },
+        "locationSizes": {
+          "$ref": "#/$defs/CatalogTableOfLocationDictionaryEntry"
+        },
         "lootPoolFilters": {
           "$ref": "#/$defs/CatalogTableOfLootFilterDefinition"
         },
@@ -4033,6 +4045,10 @@
         "infractionSets",
         "infractions",
         "jurisdictions",
+        "locationClasses",
+        "locationFunctions",
+        "locationRegistries",
+        "locationSizes",
         "lootPoolFilters",
         "manufacturers",
         "missionBrokerEntries",
@@ -4862,6 +4878,63 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/JurisdictionDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfLocationClassDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/LocationClassDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfLocationDictionaryEntry": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/LocationDictionaryEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfLocationRegistry": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/LocationRegistry"
           },
           "type": "array"
         }
@@ -6361,6 +6434,24 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `loadouts`."
         },
+        "locationClassRegistries": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
+        "locationClasses": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
+        "locationFunctionRegistries": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
+        "locationFunctions": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
+        "locationSizeRegistries": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
+        "locationSizes": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
         "lootArchetypes": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `lootArchetypes`."
@@ -6524,6 +6615,12 @@
         "legacyLootArchetypes",
         "legacyLootTables",
         "loadouts",
+        "locationClassRegistries",
+        "locationClasses",
+        "locationFunctionRegistries",
+        "locationFunctions",
+        "locationSizeRegistries",
+        "locationSizes",
         "lootArchetypes",
         "lootContainers",
         "lootPoolFilters",
@@ -15264,6 +15361,30 @@
         {
           "description": "Physical jurisdiction definitions.",
           "value": "jurisdictions"
+        },
+        {
+          "description": "Physical mission location class definitions.",
+          "value": "locationClasses"
+        },
+        {
+          "description": "Physical mission location function definitions.",
+          "value": "locationFunctions"
+        },
+        {
+          "description": "Physical mission location size definitions.",
+          "value": "locationSizes"
+        },
+        {
+          "description": "Physical mission location class registries.",
+          "value": "locationClassRegistries"
+        },
+        {
+          "description": "Physical mission location function registries.",
+          "value": "locationFunctionRegistries"
+        },
+        {
+          "description": "Physical mission location size registries.",
+          "value": "locationSizeRegistries"
         }
       ]
     },
@@ -16070,6 +16191,54 @@
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
+    "LocationClassDefinition": {
+      "description": "An authored mission location class and the ordered scopes it exposes.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "scopesVisibleTo": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "scopesVisibleTo",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "LocationCondition": {
       "description": "One match condition of a location query (`DataSetMatchCondition_*`), as stored.",
       "oneOf": [
@@ -16354,6 +16523,50 @@
         }
       ]
     },
+    "LocationDictionaryEntry": {
+      "description": "An authored mission location dictionary entry identified by its physical Record.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "LocationName": {
       "description": "A string variant of a location template.",
       "properties": {
@@ -16506,6 +16719,73 @@
         "queryGuid",
         "token",
         "variable"
+      ],
+      "type": "object"
+    },
+    "LocationRegistries": {
+      "properties": {
+        "classes": {
+          "$ref": "#/$defs/CatalogTableOfLocationRegistry"
+        },
+        "functions": {
+          "$ref": "#/$defs/CatalogTableOfLocationRegistry"
+        },
+        "sizes": {
+          "$ref": "#/$defs/CatalogTableOfLocationRegistry"
+        }
+      },
+      "required": [
+        "classes",
+        "functions",
+        "sizes"
+      ],
+      "type": "object"
+    },
+    "LocationRegistry": {
+      "description": "A physical mission location register with its original member occurrences.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "members": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "fileName",
+        "guid",
+        "members",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
       ],
       "type": "object"
     },

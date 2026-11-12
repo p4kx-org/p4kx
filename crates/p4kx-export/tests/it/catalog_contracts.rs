@@ -5,6 +5,9 @@
 
 use crate::contracts_fixture;
 
+#[path = "catalog_location_vocabulary.rs"]
+mod location_vocabulary;
+
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 

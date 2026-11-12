@@ -20,6 +20,7 @@ use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::law_kinds::LawKinds;
+use crate::catalog_v3::location_vocabulary::LocationVocabulary;
 use crate::contract::{
     BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
     HarvestableLocation, HarvestableProviderPreset, Item, Loadout, LootContainer,
@@ -68,6 +69,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) manufacturers: Vec<Manufacturer<'f>>,
     pub(crate) factions: Vec<PreparedFaction<'f>>,
     pub(crate) law: LawKinds<'f>,
+    pub(crate) location_vocabulary: LocationVocabulary<'f>,
     pub(crate) items: Vec<Item<'f>>,
     pub(crate) item_components: ItemComponentRows<'f>,
     pub(crate) entity_configurations: EntityConfigurationRows<'f>,
@@ -218,6 +220,7 @@ impl<'f> Collected<'f> {
             crafters: Vec::new(),
             mission_kinds: MissionKinds::default(),
             law: LawKinds::default(),
+            location_vocabulary: LocationVocabulary::default(),
             loot_kinds: LootKinds::default(),
             vehicles: Vec::new(),
             item_classes: ItemClassSummary::default(),
@@ -276,6 +279,7 @@ impl<'f> Collected<'f> {
             Picked::MultiConfig(entity) => self.sub_harvestable_multi_configs.push(entity),
             Picked::Mission(entity) => self.mission_kinds.push(entity),
             Picked::Law(entity) => self.law.push(entity),
+            Picked::LocationVocabulary(entity) => self.location_vocabulary.push(entity),
             Picked::Loot(entity) => self.loot_kinds.push(entity),
             Picked::Crafter(entity) => self.crafters.push(entity),
             Picked::Crafted(pick, entity) => {

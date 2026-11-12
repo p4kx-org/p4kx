@@ -16,6 +16,12 @@ impl Collected<'_> {
             Kind::Manufacturers => self.manufacturers.len(),
             Kind::Factions => self.factions.len(),
             Kind::Infractions | Kind::InfractionSets | Kind::Jurisdictions => self.law.count(kind),
+            Kind::LocationClasses
+            | Kind::LocationFunctions
+            | Kind::LocationSizes
+            | Kind::LocationClassRegistries
+            | Kind::LocationFunctionRegistries
+            | Kind::LocationSizeRegistries => self.location_vocabulary.count(kind),
             Kind::Items => self.items.len(),
             Kind::Ships => self.ships.len(),
             Kind::Commodities => self.commodities.len(),

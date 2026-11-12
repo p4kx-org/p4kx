@@ -23,6 +23,12 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
             | Kind::Infractions
             | Kind::InfractionSets
             | Kind::Jurisdictions
+            | Kind::LocationClasses
+            | Kind::LocationFunctions
+            | Kind::LocationSizes
+            | Kind::LocationClassRegistries
+            | Kind::LocationFunctionRegistries
+            | Kind::LocationSizeRegistries
     )
 }
 
@@ -52,7 +58,13 @@ pub(super) const fn expected_owned_number(
             | Kind::ReputationPerks
             | Kind::Infractions
             | Kind::InfractionSets
-            | Kind::Jurisdictions,
+            | Kind::Jurisdictions
+            | Kind::LocationClasses
+            | Kind::LocationFunctions
+            | Kind::LocationSizes
+            | Kind::LocationClassRegistries
+            | Kind::LocationFunctionRegistries
+            | Kind::LocationSizeRegistries,
             AuthoredDefinitionRawValue { .. },
         ) => (AuthoredDefinitionRawValue { ordinal }, Number),
         (
