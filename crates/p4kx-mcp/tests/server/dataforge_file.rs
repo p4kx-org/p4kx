@@ -40,16 +40,16 @@ fn every_dataforge_tool_reads_a_file_like_the_archive() -> TestResult {
         read["archive"] = json!("");
         expected["archive"] = json!("");
 
-        if tool == "search_records" {
-            take_search_origin(&mut read, "file", &Value::Null)?;
-            take_search_origin(&mut expected, "archiveEntry", &json!(false))?;
+        if matches!(tool, "search_records" | "list_structs" | "list_enums") {
+            take_forge_origin(&mut read, "file", &Value::Null)?;
+            take_forge_origin(&mut expected, "archiveEntry", &json!(false))?;
         }
         assert_eq!(read, expected, "{tool}");
     }
     Ok(())
 }
 
-fn take_search_origin(result: &mut Value, kind: &str, encryption: &Value) -> TestResult {
+fn take_forge_origin(result: &mut Value, kind: &str, encryption: &Value) -> TestResult {
     let result = result.as_object_mut().ok_or("search result object")?;
     let fields = result
         .remove("fieldOrigins")

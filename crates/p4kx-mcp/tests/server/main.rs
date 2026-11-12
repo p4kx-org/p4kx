@@ -35,6 +35,7 @@ mod complete_material_raw_budget;
 mod containers;
 mod dataforge_cache;
 mod dataforge_file;
+mod definition_origins;
 mod definitions;
 mod entity_loadout;
 mod entity_loadout_notes;

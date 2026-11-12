@@ -4,25 +4,11 @@
 use std::borrow::Cow;
 use std::collections::BTreeSet;
 
-use p4kx_extraction::{
-    DataForgeOrigin, FieldOrigin, FieldOrigins, FieldOriginsError, FieldPath, FieldPathError,
-    InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceScope, SourceUse,
-    SourceUseRole, SourceUses,
-};
-use thiserror::Error;
+use p4kx_extraction::{DataForgeOrigin, SourceLocation, SourceUse, SourceUseRole};
 
-use crate::forge_shapes::RecordSearchOrigins;
+use crate::forge_origins::{EvidenceError, ForgeOrigins, site};
+use crate::forge_shapes::ForgeFieldOrigins;
 use crate::record_search::Row;
-
-#[derive(Debug, Error)]
-pub(crate) enum EvidenceError {
-    #[error(transparent)]
-    Source(#[from] SourceEvidenceError),
-    #[error(transparent)]
-    Path(#[from] FieldPathError),
-    #[error(transparent)]
-    Duplicate(#[from] FieldOriginsError),
-}
 
 #[derive(Clone, Copy)]
 pub(crate) enum Navigation {
@@ -57,7 +43,7 @@ impl Survey {
 
     fn write(
         &self,
-        origins: &mut Origins,
+        origins: &mut ForgeOrigins,
         cursor: bool,
         navigation: Navigation,
     ) -> Result<(), EvidenceError> {
@@ -119,23 +105,8 @@ pub(crate) fn project(
     rows: &[Row],
     cursor: bool,
     navigation: Navigation,
-) -> Result<RecordSearchOrigins, EvidenceError> {
-    let (source, complete) = match origin {
-        DataForgeOrigin::Archive(entry) => (
-            SourceInput::Archive(entry),
-            entry.ancestors().all(|step| step.is_some()),
-        ),
-        DataForgeOrigin::File(file) => (SourceInput::File(file), true),
-        _ => (SourceInput::Unknown, false),
-    };
-    let uses = SourceUses::with_compact_use_refs();
-    let scope = uses.observe(source, InputScope::Payload)?;
-    let mut origins = Origins {
-        uses,
-        scope,
-        fields: FieldOrigins::new(),
-        complete,
-    };
+) -> Result<ForgeFieldOrigins, EvidenceError> {
+    let mut origins = ForgeOrigins::new(origin)?;
     origins.put("archive", origins.uses.origin(&[], true))?;
     survey.write(&mut origins, cursor, navigation)?;
     let mut contributors = Vec::new();
@@ -146,22 +117,12 @@ pub(crate) fn project(
         "records",
         origins
             .uses
-            .origin(&contributors, rows.is_empty() || complete),
+            .origin(&contributors, rows.is_empty() || origins.complete),
     )?;
-    Ok(RecordSearchOrigins {
-        fields: origins.fields,
-        provenance: origins.uses.freeze()?,
-    })
+    origins.finish()
 }
 
-struct Origins {
-    uses: SourceUses,
-    scope: SourceScope,
-    fields: FieldOrigins,
-    complete: bool,
-}
-
-impl Origins {
+impl ForgeOrigins {
     fn row(
         &mut self,
         row: &Row,
@@ -204,31 +165,6 @@ impl Origins {
         }
         Ok(())
     }
-
-    fn put(&mut self, pointer: &str, origin: FieldOrigin) -> Result<(), EvidenceError> {
-        self.fields.insert(
-            FieldPath::parse(&format!("/structuredContent/{pointer}"))?,
-            origin,
-        )?;
-        Ok(())
-    }
-}
-
-fn site(
-    scope: &SourceScope,
-    namespace: &str,
-    field: &str,
-    indices: Vec<u64>,
-    role: SourceUseRole,
-) -> Result<SourceUse, SourceEvidenceError> {
-    scope.at(
-        SourceLocation::Subresource {
-            namespace: namespace.into(),
-            indices,
-            field: field.into(),
-        },
-        role,
-    )
 }
 
 fn record_ranges(positions: Cow<'_, [u32]>, record_count: usize) -> Vec<u64> {

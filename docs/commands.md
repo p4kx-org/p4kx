@@ -864,6 +864,12 @@ budget. When the complete survey cannot fit, the original Record count retains i
 proof and the navigation contributor set is marked incomplete. A standalone DCB supplies its
 own physical evidence and has unknown P4K encryption.
 
+For `list_structs` and `list_enums`, the same field-origin carrier identifies the original
+definition, property and option table positions. Parent, Struct target and Enum target
+names retain both the selecting declaration and the selected name. Definition totals and
+cursors use the original table count and the names consulted by filtering or sorting.
+The page budget includes provenance and a declaration that cannot fit is explicitly refused.
+
 For `list_model_items` with `section: "bones"`, `fieldOrigins` addresses the returned bone fields,
 including each rotation and translation component. `cryEngineSkeleton` coordinates on a bone
 field are `[chunkOrdinal, boneOrdinal, start, endExclusive]` in the original decoded model Entry.

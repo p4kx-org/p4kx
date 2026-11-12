@@ -51,11 +51,11 @@ pub(crate) struct RecordSearchResult<Records = Vec<RecordShape>> {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
     #[serde(flatten)]
-    pub(crate) origins: RecordSearchOrigins,
+    pub(crate) origins: ForgeFieldOrigins,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct RecordSearchOrigins {
+pub(crate) struct ForgeFieldOrigins {
     #[serde(rename = "fieldOrigins")]
     pub(crate) fields: FieldOrigins,
     pub(crate) provenance: SourceInventory,
@@ -103,6 +103,8 @@ pub(crate) struct StructsResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: ForgeFieldOrigins,
 }
 
 /// One enum definition.
@@ -126,6 +128,8 @@ pub(crate) struct EnumsResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: ForgeFieldOrigins,
 }
 
 /// One column of a Query result after the record path.

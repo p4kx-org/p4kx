@@ -69,7 +69,10 @@ fn structs_page_by_name_ignoring_case() -> TestResult {
 fn enums_list_their_values_in_order() -> TestResult {
     let install = install(dataforge(0, 0))?;
     let mut server = install.serve(&["--archive", "LIVE"])?;
-    let result = server.ok("list_enums", &json!({}))?;
+    let mut result = server.ok("list_enums", &json!({}))?;
+    let object = result.as_object_mut().ok_or("enum result object")?;
+    object.remove("fieldOrigins").ok_or("enum field origins")?;
+    object.remove("provenance").ok_or("enum provenance")?;
     assert_eq!(
         result,
         json!({

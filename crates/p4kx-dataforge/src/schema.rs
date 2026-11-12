@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use crate::dataforge::out_of_range;
 use crate::rows::{EnumDef, NO_PARENT, PropertyDef, StructDef};
 use crate::{DataForge, DataForgeError, DataType};
@@ -58,10 +60,17 @@ impl<'f> Struct<'f> {
     /// Returns the properties the struct declares itself, without the inherited ones, in order.
     pub fn properties(&self) -> impl Iterator<Item = Property<'f>> + use<'f> {
         let forge = self.forge;
+        self.property_range().filter_map(move |index| {
+            let def = forge.properties.get(index)?;
+            Some(Property { forge, index, def })
+        })
+    }
+
+    /// Returns the declared original range in the property table.
+    #[must_use]
+    pub fn property_range(&self) -> Range<usize> {
         let first = usize::from(self.def.first_property);
-        (first..first + usize::from(self.def.property_count))
-            .filter_map(move |index| forge.properties.get(index))
-            .map(move |def| Property { forge, def })
+        first..first + usize::from(self.def.property_count)
     }
 }
 
@@ -69,10 +78,17 @@ impl<'f> Struct<'f> {
 #[derive(Debug, Clone, Copy)]
 pub struct Property<'f> {
     forge: &'f DataForge<'f>,
+    index: usize,
     def: PropertyDef,
 }
 
 impl<'f> Property<'f> {
+    /// Returns the physical position of this property definition.
+    #[must_use]
+    pub const fn index(&self) -> usize {
+        self.index
+    }
+
     /// Returns the field name.
     ///
     /// # Errors
@@ -130,7 +146,11 @@ impl<'f> Property<'f> {
         matches!(self.data_type(), Ok(DataType::Enum))
             .then(|| forge.enums.get(usize::from(self.def.target)))
             .flatten()
-            .map(|def| Enum { forge, def })
+            .map(|def| Enum {
+                forge,
+                index: u32::from(self.def.target),
+                def,
+            })
     }
 }
 
@@ -138,10 +158,17 @@ impl<'f> Property<'f> {
 #[derive(Debug, Clone, Copy)]
 pub struct Enum<'f> {
     forge: &'f DataForge<'f>,
+    index: u32,
     def: EnumDef,
 }
 
 impl<'f> Enum<'f> {
+    /// Returns the physical position of this enum definition.
+    #[must_use]
+    pub const fn index(&self) -> u32 {
+        self.index
+    }
+
     /// Returns the name.
     ///
     /// # Errors
@@ -156,14 +183,20 @@ impl<'f> Enum<'f> {
         &self,
     ) -> impl ExactSizeIterator<Item = Result<&'f str, DataForgeError>> + use<'f> {
         let forge = self.forge;
-        let first = usize::from(self.def.first_option);
-        (first..first + usize::from(self.def.option_count)).map(move |index| {
+        self.option_range().map(move |index| {
             let option = forge
                 .options
                 .get(index)
                 .ok_or_else(|| out_of_range("enum option", index, "enum option", index as u64))?;
             forge.blob.get(option.0)
         })
+    }
+
+    /// Returns the declared original range in the option table.
+    #[must_use]
+    pub fn option_range(&self) -> Range<usize> {
+        let first = usize::from(self.def.first_option);
+        first..first + usize::from(self.def.option_count)
     }
 }
 
@@ -179,7 +212,11 @@ impl DataForge<'_> {
 
     /// Returns every enum definition in order.
     pub fn enums(&self) -> impl ExactSizeIterator<Item = Enum<'_>> {
-        self.enums.iter().map(|def| Enum { forge: self, def })
+        self.enums.iter_indexed().map(|(index, def)| Enum {
+            forge: self,
+            index,
+            def,
+        })
     }
 
     /// Returns the definition at the given physical struct index, when present.

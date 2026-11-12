@@ -62,6 +62,7 @@ impl Budget {
 /// Fills one page from `items`, the items of a listing of `total` from the page's offset on:
 /// at most the page size, and no more than fit [`MAX_RESPONSE_LEN`] as JSON together. Returns
 /// them with the cursor of the next page; `describe` names an item that does not fit alone.
+#[cfg(test)]
 pub(crate) fn fill<T: Serialize>(
     page: Page,
     total: usize,

@@ -102,7 +102,7 @@ impl Server {
     #[tool(
         description = "List the struct definitions of the Archive's DataForge, the types of Records and nested values, \
         with their parent and the fields each declares (name, data type, array, target struct or enum). \
-        name is a Filter over the struct name. Paged with a cursor; use it to write correct Queries. The content may be forwarded by the client to \
+        name is a Filter over the struct name. Paged with a cursor; use it to write correct Queries. Field origins identify the declarations actually used. The content may be forwarded by the client to \
         third parties; game texts and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<StructsResult>(),
         annotations(
@@ -125,8 +125,8 @@ impl Server {
             let opened = state.forge(params.archive.as_deref())?;
             let listing = ("list_structs", opened.version(), &params.name);
             let page = Page::new(&listing, params.cursor.as_deref(), params.limit)?;
-            opened.with_dataforge(move |forge, archive| {
-                definitions::structs(forge, archive, params.name.as_deref(), page)
+            opened.with_dataforge_origin(move |forge, archive, origin| {
+                definitions::structs(forge, archive, origin, params.name.as_deref(), page)
             })
         })
         .await
@@ -134,7 +134,7 @@ impl Server {
 
     #[tool(
         description = "List the enum definitions of the Archive's DataForge with their values in order. \
-        name is a Filter over the enum name. Paged with a cursor. The content may be forwarded by the \
+        name is a Filter over the enum name. Paged with a cursor; field origins identify the original option positions. The content may be forwarded by the \
         client to third parties; game texts and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<EnumsResult>(),
         annotations(
@@ -157,8 +157,8 @@ impl Server {
             let opened = state.forge(params.archive.as_deref())?;
             let listing = ("list_enums", opened.version(), &params.name);
             let page = Page::new(&listing, params.cursor.as_deref(), params.limit)?;
-            opened.with_dataforge(move |forge, archive| {
-                definitions::enums(forge, archive, params.name.as_deref(), page)
+            opened.with_dataforge_origin(move |forge, archive, origin| {
+                definitions::enums(forge, archive, origin, params.name.as_deref(), page)
             })
         })
         .await
