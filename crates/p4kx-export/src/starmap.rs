@@ -6,7 +6,7 @@ use p4kx_extraction::{DataForge, RecordTree, TreeBuilder};
 use crate::contract::StarmapObject;
 use crate::guid_text::CatalogGuid;
 use crate::memo::Memo;
-use crate::record_fields::{boolean, class_name, locale_key, reference, text};
+use crate::record_fields::{class_name, locale_key, reference, text};
 use crate::starmap_containers::Placements;
 use crate::texts::Texts;
 
@@ -54,13 +54,10 @@ pub(crate) fn starmap_object<'f>(
     let placement = placements.get(tree.guid());
     StarmapObject {
         guid: CatalogGuid(tree.guid()),
+        record_index: tree.record_index(),
         class_name: class_name(tree),
-        record_path: tree.record_path(),
         name: texts.localised(key),
         r#type: type_guid.and_then(|guid| types.get(trees, forge, guid)),
-        type_guid,
-        parent_guid: reference(root, "parent"),
-        hide_in_starmap: boolean(root, "hideInStarmap"),
         system: placement.map(|placement| placement.system.to_string()),
         entity_name: placement
             .map(|placement| placement.entity_name.as_str())

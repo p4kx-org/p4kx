@@ -50,14 +50,6 @@ pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -
     );
     append_missions(&mut emitted, collected);
     append_gameplay_definitions(&mut emitted, collected);
-    append(
-        &mut emitted,
-        Kind::StarmapObjects,
-        collected
-            .starmap_objects
-            .iter()
-            .map(|row| (row.guid.0, row.record_path)),
-    );
     CatalogRows {
         emitted,
         filter: filter.cloned(),

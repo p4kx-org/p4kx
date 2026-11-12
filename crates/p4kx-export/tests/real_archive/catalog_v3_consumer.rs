@@ -69,6 +69,7 @@ pub(crate) fn named_rows<'catalog>(
         Kind::StarmapTypes => "/definitions/starmapTypes",
         Kind::StarmapPresets => "/definitions/starmapPresets",
         Kind::StarmapAmenities => "/definitions/starmapAmenities",
+        Kind::StarmapObjects => "/definitions/starmapObjects",
         Kind::Commodities => {
             presentations(catalog)?;
             return table(catalog, "/definitions/commodities");
@@ -120,6 +121,7 @@ fn checked_table<'catalog>(
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries
+                | Kind::StarmapObjects
                 | Kind::StarmapTypes
                 | Kind::StarmapPresets
                 | Kind::StarmapAmenities
@@ -241,6 +243,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::StarmapObjects
             | Kind::StarmapTypes
             | Kind::StarmapPresets
             | Kind::StarmapAmenities

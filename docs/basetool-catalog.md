@@ -225,7 +225,8 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `dismantleProcesses` | The dismantle processes, ordered by GUID |
 | `paints` | The paints, each the `itemGuid` of an entry of `items` with the ships it fits, ordered by `itemGuid` |
 | `loadouts` | The ports of every ship and of every item that has ports, with the Entity the Default Loadout attaches to each, ordered by `entityGuid` |
-| `starmapObjects` | The starmap objects (star systems, planets, moons, stations, jump points) with type, parent, name and world position, ordered by GUID |
+| `definitions.starmapObjects` | Authored starmap objects with original links, presentation and navigation settings, ordered by GUID and physical Record index |
+| `placements.starmapPlacements` | The selected world placement of each physical starmap object |
 | `definitions.contractGenerators`, `projections.contracts`, `projections.missionTitles` | Physical Generator definitions, logical contract and sub-contract rows, and their sourced titles and descriptions ([contract](catalog-contract-generators.md)) |
 | `mineableElements` | The mineable elements with their instability and other plain numbers, each linked to a `ResourceType`, ordered by GUID |
 | `refiningProcesses` | The refining processes (speed and quality pairs of a refinery), ordered by GUID |
@@ -1879,22 +1880,26 @@ Records) have no commodity in the catalog, and 2 spawn rules, both of one manife
 
 ### Starmap objects
 
-A starmap object (`starmapObjects`) is a `StarMapObject` Record under `starmap/pu` in Catalog
-schema 3 (ADR-0054). The kind is facts only: no description, no lore, no media.
-The `name` is a game text, the localisation key with its English and German text, and carries
-`"x-gameText": true` like a description; the Basetool keeps it from third parties.
+`definitions.starmapObjects` owns the authored `StarMapObject` Record. The original type,
+parent, jurisdiction, affiliation, location hierarchy tag and ordered amenity links carry exact
+GUIDs and source states. Original flags, overrides, text and owned settings use independent
+source cells. The [starmap field map](catalog-starmap-definitions.md) lists the original fields.
 
-| Field | Source |
-|-------|--------|
-| `guid`, `className`, `recordPath` | The Record, as for every entity |
-| `name` | `name`, a localisation key |
-| `type`, `typeGuid` | The `StarMapObjectType` Record the Reference `type` links to: `type` is its `name` when that is a plain string, else its Record name without the type, and `typeGuid` its GUID; `null` for a null or dangling Reference. The schema keeps `type` a string, so a new type is additive |
-| `parentGuid` | The Reference `parent`, the `guid` of another entry unless that Record is missing or left out; `null` for none |
-| `hideInStarmap` | `hideInStarmap`; `null` when the Record states none |
-| `system` | The folder of the star system below `Data/ObjectContainers/PU/system` that places the object, e.g. `stanton`; `null` when no container places it |
-| `entityName` | The `entityName` of the Child element that places the object, e.g. `jumppoint_stanton_pyro`; `null` when it is not placed or the Child names none |
-| `placedUnderGuid` | The `guid` of the nearest object above this one in the container hierarchy; `null` when it is not placed or hangs directly below the system. It is a fact of the containers; `parentGuid` is the Record's own and the two need not agree |
-| `position` | `[x, y, z]` in metres in the frame of the system container, rounded to a millimetre; `null` when no container places the object |
+`placements.starmapPlacements` contains one row per selected object. `objectGuid.value` and
+`objectRecordIndex.value` identify the physical definition. The original definition's `parent`
+and the derived placement's `placedUnderGuid` can differ.
+
+| Placement field | Source |
+| --- | --- |
+| `system` | The star system folder under `Data/ObjectContainers/PU/system`. |
+| `entityName` | The name of the Child element that places the object. |
+| `placedUnderGuid` | The nearest starmap Record above the placement in the container hierarchy. |
+| `position` | `[x, y, z]` in metres in the frame of the system container, rounded to a millimetre. |
+
+The current placement traversal supplies these derived values without a complete per-field
+XML contribution chain. Their cells report an incomplete source set and unknown encryption
+origin. The physical owner identity has independent DataForge evidence.
+
 
 **Where a position comes from.** The main container of a star system is
 `Data/ObjectContainers/PU/system/<folder>/<folder>system.socpak` (else the first `*system.socpak`
@@ -1955,12 +1960,10 @@ position and 854 have none. Searching all 9,668 object containers of the Archive
   `Stanton4_L1_02`). Their own position in the star system is unknown, because no `external`
   Child of a system container names them, so the position of what they place cannot be composed.
 
-These objects keep `position` `null`; the catalog never guesses a place from the parent.
-The kind is selected by the prefix `libs/foundry/records/starmap/pu/` and the type `StarMapObject`
-like the others, with the development leftovers left out. The positions do not depend on the
-Filter: the containers are read whole. `typeGuid` identifies an authored type in
-`definitions.starmapTypes`. Its stored settings and the separate presets and amenities have
-[canonical definition tables](catalog-starmap-definitions.md).
+These objects have an absent `position` cell. The existing container traversal reads a complete
+system scope for its position projection, independently of the object Filter. Selection uses
+`libs/foundry/records/starmap/pu/` and the exact `StarMapObject` type with the usual development
+leftover policy. The original `type` Reference targets a [canonical type](catalog-starmap-definitions.md).
 
 Size, measured on LIVE (2026-10-22): the 2,093 objects are about 1.2 MB of JSON (570 bytes each), 4.5 % of the 26.5 MB of the
 catalog, and a smaller share compressed.

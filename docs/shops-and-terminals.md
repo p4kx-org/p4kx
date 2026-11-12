@@ -60,8 +60,8 @@ item list.
 ## Where a shop is
 
 The `SuperName` path is the location. For the 77 distinct location containers that stand in the
-third place of the paths, 63 equal the `entityName` or `className` of a `starmapObjects` entry of
-the catalog (case-insensitively), e.g. `Area18_City_objectContainer`, `Drlct_Stmnt_005_Windmill_RastarLE`,
+third place of the paths, 63 equal the `entityName` of a starmap placement or the `className`
+of its authored definition (case-insensitively), e.g. `Area18_City_objectContainer`, `Drlct_Stmnt_005_Windmill_RastarLE`,
 `LOC_RR_S1_L1` (the Lagrange-point stations). The path also names the body: `OOC_Stanton_1_Hurston`
 (180 entries), `..._4_Microtech` (165), `..._2_Crusader` (98), `..._3_ArcCorp` (89), the jump-point
 stations and the Lagrange points. Rest stops and cities enter as containers whose inner name has
@@ -71,7 +71,7 @@ Pyro: the same file holds a second platform, `pyrosystem` with 371 shops (#462),
 has 813 Stanton and 371 Pyro entries. The catalog measured it on all 1,184 shops (#462): 184 have
 a location container without a starmap match and need a manual mapping.
 
-The catalog `starmapObjects` carry world positions for 1,239 of 2,093 objects. A shop inherits the
+The catalog's starmap placements carry world positions for 1,239 of 2,093 objects in this Build. A shop inherits the
 position of its location object; a position inside the interior needs the `.soc` of the container
 and is out of scope here.
 

@@ -57,7 +57,7 @@ impl Family {
             Self::Commodities => "/definitions/commodities/rows",
             Self::CommodityPresentation => "/projections/commodityPresentation/rows",
             Self::MineableElements => "/mineableElements",
-            Self::Placements => "/starmapObjects",
+            Self::Placements => "/placements/starmapPlacements/rows",
         }
     }
 
@@ -65,6 +65,7 @@ impl Family {
         match self {
             Self::Commodities => &["guid", "value"],
             Self::CommodityPresentation => &["commodityGuid", "value"],
+            Self::Placements => &["objectGuid", "value"],
             _ => &["guid"],
         }
     }

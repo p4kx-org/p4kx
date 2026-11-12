@@ -3,10 +3,14 @@
 
 //! Starmap objects and their world positions in the Basetool catalog, through the public API.
 
+use crate::commodity_v3_fixture::{at, guid, text_row};
+use crate::health_origin_assertions as proof;
 use crate::starmap_fixture;
 
 #[path = "starmap_definitions_contract.rs"]
 mod definitions;
+#[path = "starmap_objects_contract.rs"]
+mod objects;
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
@@ -38,30 +42,39 @@ fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error
     Ok((built, json))
 }
 
-fn guid(value: u128) -> String {
-    let text = format!("{value:032x}");
-    format!(
-        "{}-{}-{}-{}-{}",
-        &text[0..8],
-        &text[8..12],
-        &text[12..16],
-        &text[16..20],
-        &text[20..32]
+fn object(catalog: &Value, record: u128) -> Result<&Value, Box<dyn Error>> {
+    row(
+        catalog,
+        "/definitions/starmapObjects/rows",
+        "/guid/value",
+        record,
     )
 }
 
-fn object(catalog: &Value, record: u128) -> Result<&Value, Box<dyn Error>> {
-    let wanted = guid(record);
-    catalog["starmapObjects"]
-        .as_array()
-        .ok_or("starmapObjects")?
+fn placement(catalog: &Value, record: u128) -> Result<&Value, Box<dyn Error>> {
+    row(
+        catalog,
+        "/placements/starmapPlacements/rows",
+        "/objectGuid/value",
+        record,
+    )
+}
+
+fn row<'catalog>(
+    catalog: &'catalog Value,
+    rows: &str,
+    guid_path: &str,
+    record: u128,
+) -> Result<&'catalog Value, Box<dyn Error>> {
+    let wanted = serde_json::json!(guid(record));
+    proof::rows(catalog, rows)?
         .iter()
-        .find(|entry| entry["guid"] == wanted.as_str())
-        .ok_or_else(|| format!("the object {wanted}").into())
+        .find(|entry| entry.pointer(guid_path) == Some(&wanted))
+        .ok_or_else(|| format!("missing {record:x} at {rows}").into())
 }
 
 fn position(catalog: &Value, record: u128) -> Result<Option<[f64; 3]>, Box<dyn Error>> {
-    let value = &object(catalog, record)?["position"];
+    let value = at(placement(catalog, record)?, "/position/value")?;
     if value.is_null() {
         return Ok(None);
     }
@@ -109,18 +122,18 @@ fn the_hierarchy_names_the_nearest_record_above() -> TestResult {
     let (_, catalog) = build(None)?;
     for (record, under) in [(MOON, Some(PLANET)), (STATION, Some(PLANET)), (BELT, None)] {
         assert_eq!(
-            object(&catalog, record)?["placedUnderGuid"],
+            *at(placement(&catalog, record)?, "/placedUnderGuid/value")?,
             under.map_or(Value::Null, |parent| Value::String(guid(parent))),
             "placedUnderGuid of {record:x}"
         );
     }
     assert_eq!(
-        object(&catalog, PLANET)?["parentGuid"],
+        at(object(&catalog, PLANET)?, "/parent/value/guid/value")?,
         guid(STAR).as_str(),
         "the Reference parent of the Record"
     );
     assert_eq!(
-        object(&catalog, BELT)?["parentGuid"],
+        at(object(&catalog, BELT)?, "/parent/value/guid/value")?,
         guid(STAR).as_str(),
         "parentGuid is the Record's, whatever the containers say"
     );
@@ -131,21 +144,79 @@ fn the_hierarchy_names_the_nearest_record_above() -> TestResult {
 fn an_object_states_its_system_entity_name_type_and_name() -> TestResult {
     let (_, catalog) = build(None)?;
     let planet = object(&catalog, PLANET)?;
-    assert_eq!(planet["system"], "stanton", "the folder of the system");
-    assert_eq!(planet["entityName"], "planet_hurston", "the Child's entity");
-    assert_eq!(planet["type"], "Planet", "the type Record without its type");
-    assert_eq!(planet["typeGuid"], guid(PLANET_TYPE).as_str(), "type guid");
+    let placed = placement(&catalog, PLANET)?;
     assert_eq!(
-        planet["name"],
-        serde_json::json!({"key": "@starmap_Hurston", "en": "Hurston", "de": null}),
-        "the localised name"
+        at(placed, "/system/value")?,
+        "stanton",
+        "the folder of the system"
     );
     assert_eq!(
-        planet["className"], "Hurston",
+        at(placed, "/entityName/value")?,
+        "planet_hurston",
+        "the Child's entity"
+    );
+    for definition in [planet, object(&catalog, MOON)?] {
+        assert_eq!(
+            at(definition, "/type/value/guid/value")?,
+            guid(PLANET_TYPE).as_str(),
+            "both objects link the same physical type"
+        );
+    }
+    let kind = row(
+        &catalog,
+        "/definitions/starmapTypes/rows",
+        "/guid/value",
+        PLANET_TYPE,
+    )?;
+    assert_eq!(
+        at(kind, "/name/value")?,
+        "Planet",
+        "the authored name of the type Record"
+    );
+    let name = text_row(&catalog, "gameTexts", at(planet, "/name/value")?)?;
+    assert_eq!(
+        at(name, "/key/value")?,
+        "@starmap_Hurston",
+        "original Locale key"
+    );
+    assert_eq!(
+        at(name, "/translations/value/en/displayText/value")?,
+        "Hurston",
+        "the resolved display name"
+    );
+    assert_eq!(
+        at(planet, "/className/value")?,
+        "Hurston",
         "the Record name without its type"
     );
-    assert_eq!(planet["hideInStarmap"], false, "the flag of the Record");
-    assert_eq!(object(&catalog, BELT)?["hideInStarmap"], true, "hidden");
+    assert_eq!(
+        at(planet, "/hideInStarmap/value")?,
+        false,
+        "the flag of the Record"
+    );
+    verify_placement_evidence(&catalog, placed)
+}
+
+fn verify_placement_evidence(catalog: &Value, placed: &Value) -> TestResult {
+    assert_eq!(
+        at(object(catalog, BELT)?, "/hideInStarmap/value")?,
+        true,
+        "hidden"
+    );
+    assert!(
+        position(catalog, BELT)?.is_some(),
+        "hidden object still has placement"
+    );
+    assert_eq!(
+        at(placed, "/position/containsEncryptedSource")?,
+        &Value::Null,
+        "derived placement contribution receipts are unestablished"
+    );
+    assert_eq!(
+        at(placed, "/position/sourceSetComplete")?,
+        false,
+        "placement evidence remains incomplete"
+    );
     Ok(())
 }
 
@@ -153,9 +224,9 @@ fn an_object_states_its_system_entity_name_type_and_name() -> TestResult {
 fn an_object_no_container_places_has_no_position_and_a_malformed_child_places_none() -> TestResult {
     let (_, catalog) = build(None)?;
     for record in [ORPHAN, BAD] {
-        let entry = object(&catalog, record)?;
+        let entry = placement(&catalog, record)?;
         for field in ["position", "system", "entityName", "placedUnderGuid"] {
-            assert!(entry[field].is_null(), "{field} of {record:x}");
+            proof::cell(entry, field, "absent")?;
         }
     }
     Ok(())
@@ -169,7 +240,11 @@ fn a_record_placed_twice_keeps_one_place_but_none_when_the_places_are_apart() ->
         Some([0.0, 0.0, 50.0]),
         "terra places it half a metre away: one place, the first is kept"
     );
-    assert_eq!(object(&catalog, JUMP)?["system"], "stanton", "system");
+    assert_eq!(
+        at(placement(&catalog, JUMP)?, "/system/value")?,
+        "stanton",
+        "system"
+    );
     assert_eq!(
         position(&catalog, DOUBLE)?,
         None,
@@ -238,11 +313,9 @@ fn a_development_leftover_is_skipped_and_the_kind_is_counted() -> TestResult {
 #[test]
 fn the_objects_are_ordered_by_guid_and_a_filter_makes_the_kind_partial() -> TestResult {
     let (_, catalog) = build(None)?;
-    let guids: Vec<&str> = catalog["starmapObjects"]
-        .as_array()
-        .ok_or("starmapObjects")?
+    let guids: Vec<&str> = proof::rows(&catalog, "/definitions/starmapObjects/rows")?
         .iter()
-        .filter_map(|entry| entry["guid"].as_str())
+        .filter_map(|entry| entry.pointer("/guid/value").and_then(Value::as_str))
         .collect();
     let mut sorted = guids.clone();
     sorted.sort_unstable();
@@ -251,8 +324,8 @@ fn the_objects_are_ordered_by_guid_and_a_filter_makes_the_kind_partial() -> Test
     let filter = Filter::new("*/hurston*");
     let (built, filtered) = build(Some(&filter))?;
     assert_eq!(
-        filtered["starmapObjects"].as_array().map(Vec::len),
-        Some(1),
+        proof::rows(&filtered, "/definitions/starmapObjects/rows")?.len(),
+        1,
         "only Hurston"
     );
     assert_eq!(
@@ -270,13 +343,22 @@ fn the_objects_are_ordered_by_guid_and_a_filter_makes_the_kind_partial() -> Test
 
 #[test]
 fn a_position_never_prints_a_negative_zero_and_two_builds_are_identical() -> TestResult {
-    let (first, first_json) = build(None)?;
-    let (_, second_json) = build(None)?;
-    assert_eq!(
-        first_json["starmapObjects"], second_json["starmapObjects"],
-        "deterministic"
+    let (_, first) = build(None)?;
+    let (_, second) = build(None)?;
+    for path in [
+        "/definitions/starmapObjects",
+        "/placements/starmapPlacements",
+    ] {
+        assert_eq!(
+            at(&first, path)?,
+            at(&second, path)?,
+            "deterministic {path}"
+        );
+    }
+    let text = serde_json::to_string(at(&first, "/placements/starmapPlacements")?)?;
+    assert!(
+        !text.contains("-0.0"),
+        "no negative zero in computed coordinates"
     );
-    let text = std::str::from_utf8(first.json())?;
-    assert!(!text.contains("-0.0"), "no negative zero");
     Ok(())
 }

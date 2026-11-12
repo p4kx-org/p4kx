@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use super::prepared_definition::PreparedDefinition;
 use super::starmap_amenity_definition::{self, StarmapAmenityDefinition};
+use super::starmap_object_definition::{self, StarmapObjectDefinition};
 use super::starmap_preset_definition::{self, StarmapPresetDefinition};
 use super::starmap_type_definition::{self, StarmapTypeDefinition};
 use crate::catalog_number_capture::CapturedNumber;
@@ -76,6 +77,7 @@ impl<'source> StarmapDefinitionPick<'source> {
 
 #[derive(Default)]
 pub(crate) struct StarmapDefinitions<'source> {
+    objects: Vec<PreparedDefinition<'source, StarmapObjectDefinition<'source>>>,
     types: Vec<PreparedDefinition<'source, StarmapTypeDefinition<'source>>>,
     presets: Vec<PreparedDefinition<'source, StarmapPresetDefinition<'source>>>,
     amenities: Vec<PreparedDefinition<'source, StarmapAmenityDefinition<'source>>>,
@@ -86,6 +88,8 @@ pub(crate) struct StarmapDefinitions<'source> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct StarmapDefinitionTables<'source> {
+    #[serde(rename = "starmapObjects")]
+    objects: CatalogTable<StarmapObjectDefinition<'source>>,
     #[serde(rename = "starmapTypes")]
     types: CatalogTable<StarmapTypeDefinition<'source>>,
     #[serde(rename = "starmapPresets")]
@@ -95,6 +99,13 @@ pub(crate) struct StarmapDefinitionTables<'source> {
 }
 
 impl<'source> StarmapDefinitions<'source> {
+    pub(crate) fn push_object(
+        &mut self,
+        row: PreparedDefinition<'source, StarmapObjectDefinition<'source>>,
+    ) {
+        self.objects.push(row);
+    }
+
     pub(crate) fn push(&mut self, pick: StarmapDefinitionPick<'source>) {
         match pick {
             StarmapDefinitionPick::Type(row) => self.types.push(*row),
@@ -104,6 +115,7 @@ impl<'source> StarmapDefinitions<'source> {
     }
 
     pub(crate) fn order(&mut self) {
+        PreparedDefinition::order(&mut self.objects);
         PreparedDefinition::order(&mut self.types);
         PreparedDefinition::order(&mut self.presets);
         PreparedDefinition::order(&mut self.amenities);
@@ -121,7 +133,8 @@ impl<'source> StarmapDefinitions<'source> {
     pub(crate) fn sources(
         &self,
     ) -> impl Iterator<Item = (Kind, Guid, &'source str, &[CapturedNumber])> {
-        PreparedDefinition::sources(Kind::StarmapTypes, &self.types)
+        PreparedDefinition::sources(Kind::StarmapObjects, &self.objects)
+            .chain(PreparedDefinition::sources(Kind::StarmapTypes, &self.types))
             .chain(PreparedDefinition::sources(
                 Kind::StarmapPresets,
                 &self.presets,
@@ -138,6 +151,11 @@ impl<'source> StarmapDefinitions<'source> {
 
     pub(crate) fn into_tables(self, forge: &DataForge<'_>) -> StarmapDefinitionTables<'source> {
         StarmapDefinitionTables {
+            objects: PreparedDefinition::table(
+                forge,
+                starmap_object_definition::SOURCE_TYPE,
+                self.objects,
+            ),
             types: PreparedDefinition::table(
                 forge,
                 starmap_type_definition::SOURCE_TYPE,

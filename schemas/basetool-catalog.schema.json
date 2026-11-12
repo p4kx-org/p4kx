@@ -4041,6 +4041,9 @@
         "starmapAmenities": {
           "$ref": "#/$defs/CatalogTableOfStarmapAmenityDefinition"
         },
+        "starmapObjects": {
+          "$ref": "#/$defs/CatalogTableOfStarmapObjectDefinition"
+        },
         "starmapPresets": {
           "$ref": "#/$defs/CatalogTableOfStarmapPresetDefinition"
         },
@@ -4085,6 +4088,7 @@
         "resourceTypes",
         "shopInventories",
         "starmapAmenities",
+        "starmapObjects",
         "starmapPresets",
         "starmapTypes",
         "tags"
@@ -4125,7 +4129,7 @@
       "type": "object"
     },
     "CatalogPlacements": {
-      "description": "Contextual placements referring to authored definitions and declarations.",
+      "description": "Contextual placements and relationships keyed by their physical definitions.",
       "properties": {
         "resourceNetworkLinkBindings": {
           "$ref": "#/$defs/CatalogTableOfResourceNetworkLinkBinding"
@@ -4135,12 +4139,16 @@
         },
         "roomAssociationBindings": {
           "$ref": "#/$defs/CatalogTableOfRoomAssociationBinding"
+        },
+        "starmapPlacements": {
+          "$ref": "#/$defs/CatalogTableOfStarmapPlacement"
         }
       },
       "required": [
         "resourceNetworkLinkBindings",
         "resourceNetworkNodes",
-        "roomAssociationBindings"
+        "roomAssociationBindings",
+        "starmapPlacements"
       ],
       "type": "object"
     },
@@ -5605,6 +5613,44 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/StarmapAmenityDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfStarmapObjectDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/StarmapObjectDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfStarmapPlacement": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/StarmapPlacement"
           },
           "type": "array"
         }
@@ -41299,6 +41345,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfStarmapAsteroidRing": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfStarmapAsteroidRing"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfTagValue": {
       "allOf": [
         {
@@ -41930,6 +42109,142 @@
                   "minimum": 0,
                   "type": "integer"
                 },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_size_3_of_double": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "maxItems": 3,
+                "minItems": 3,
                 "type": "array"
               }
             }
@@ -72457,6 +72772,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfStarmapAsteroidRing": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/StarmapAsteroidRing"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfStarmapLocation": {
       "allOf": [
         {
@@ -75496,6 +75941,41 @@
       ],
       "type": "object"
     },
+    "StarmapAsteroidRing": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "densityScale": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "depth": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "innerRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat64"
+        },
+        "outerRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat64"
+        },
+        "sizeScale": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "densityScale",
+        "depth",
+        "innerRadius",
+        "outerRadius",
+        "sizeScale",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "StarmapLocation": {
       "properties": {
         "authoredFields": {
@@ -75523,114 +76003,256 @@
       ],
       "type": "object"
     },
-    "StarmapObject": {
-      "description": "A starmap object: a `StarMapObject` Record under `starmap/pu`, a star system, planet, moon,\nstation, jump point or other place, with its world position when a system container places it.",
+    "StarmapObjectDefinition": {
+      "description": "One physical starmap object with its authored settings and relationships.",
       "properties": {
-        "className": {
-          "description": "The Record name without its type, e.g. `Stanton1_Hurston`.",
-          "type": "string"
+        "affiliation": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
         },
-        "entityName": {
-          "description": "The `entityName` of the Child element that places the object, e.g. `jumppoint_stanton_pyro`;\n`null` when it is not placed or the Child names none.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "amenities": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
         },
-        "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+        "assetManagerLocationParams": {
+          "$ref": "#/$defs/SourcedValueOfStarmapAssetManager"
         },
-        "hideInStarmap": {
-          "description": "Whether the starmap hides the object, from `hideInStarmap`; `null` when the Record states\nnone.",
-          "type": [
-            "boolean",
-            "null"
-          ]
+        "asteroidRings": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfStarmapAsteroidRing"
         },
-        "name": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The name of the place, from `name` of the Record. The localisation key and the texts are\ngame texts.",
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "blockTravel": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "callout1": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "x-gameText": true
         },
-        "parentGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the object the Reference `parent` links to, `null` for a null Reference. Each\nis the `guid` of an entry of `starmapObjects` unless its Record is missing or left out."
+        "callout2": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
         },
-        "placedUnderGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the nearest object above this one in the container hierarchy, `null` when it\nis not placed or hangs directly below the system. Each is a `guid` of `starmapObjects`\nunless its Record is missing or left out."
+        "callout3": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
         },
-        "position": {
-          "description": "The position `[x, y, z]` in metres in the frame of the system container, the position of\neach Child composed with the positions and the full rotations of the Children above it;\n`null` when no system container places the object.",
-          "items": {
-            "format": "double",
-            "type": "number"
-          },
-          "maxItems": 3,
-          "minItems": 3,
-          "type": [
-            "array",
-            "null"
-          ]
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "description": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "hideInStarmap": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "hideInWorld": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "hideWhenInAdoptionRadius": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "isScannable": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "jurisdiction": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "locationAudioPlayTrigger": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "locationAudioStopTrigger": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "locationHierarchyTag": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "locationImagePath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "locationMedicalImagePath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "locationParams": {
+          "$ref": "#/$defs/SourcedValueOfStarmapLocation"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "minimumDisplaySize": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "navIcon": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "noAutoBodyRecovery": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "onlyShowWhenParentSelected": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "overridePermanent": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "overrideRotationSpeed": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "overrideRotationSpeedValue": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "overrideShowInAllZones": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "overrideShowInRouteOnly": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "overrideSpawnNavPoints": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "parent": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "quantumTravelData": {
+          "$ref": "#/$defs/SourcedValueOfStarmapQuantumTravel"
+        },
+        "radarProperties": {
+          "$ref": "#/$defs/SourcedValueOfRadarProperties"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "system": {
-          "description": "The star system that places the object: the folder below `ObjectContainers/PU/system`,\ne.g. `stanton`; `null` when no system container places it.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "respawnLocationType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "showOrbitLine": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "size": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat64"
+        },
+        "skipCollisionCheckIfInArrivalRadius": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "starMapGeomPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "starMapMaterialPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "starMapShapePath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "type": {
-          "description": "The type of the object: the `name` of the `StarMapObjectType` Record the Reference `type`\nlinks to when that is a plain string, else the Record name without its type; `null` for a\nnull or dangling Reference. The schema keeps a string, as a new type is additive.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
         },
-        "typeGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID the Reference `type` links to, `null` for a null Reference."
+        "useHoloMaterial": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
         }
       },
       "required": [
+        "affiliation",
+        "amenities",
+        "assetManagerLocationParams",
+        "asteroidRings",
+        "authoredFields",
+        "blockTravel",
+        "callout1",
+        "callout2",
+        "callout3",
         "className",
-        "entityName",
+        "description",
+        "fileName",
         "guid",
         "hideInStarmap",
+        "hideInWorld",
+        "hideWhenInAdoptionRadius",
+        "isScannable",
+        "jurisdiction",
+        "locationAudioPlayTrigger",
+        "locationAudioStopTrigger",
+        "locationHierarchyTag",
+        "locationImagePath",
+        "locationMedicalImagePath",
+        "locationParams",
+        "metadataTag",
+        "minimumDisplaySize",
         "name",
-        "parentGuid",
+        "navIcon",
+        "noAutoBodyRecovery",
+        "onlyShowWhenParentSelected",
+        "overridePermanent",
+        "overrideRotationSpeed",
+        "overrideRotationSpeedValue",
+        "overrideShowInAllZones",
+        "overrideShowInRouteOnly",
+        "overrideSpawnNavPoints",
+        "parent",
+        "quantumTravelData",
+        "radarProperties",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "respawnLocationType",
+        "showOrbitLine",
+        "size",
+        "skipCollisionCheckIfInArrivalRadius",
+        "sourceType",
+        "starMapGeomPath",
+        "starMapMaterialPath",
+        "starMapShapePath",
+        "type",
+        "useHoloMaterial"
+      ],
+      "type": "object"
+    },
+    "StarmapPlacement": {
+      "description": "The selected world-position projection of one physical starmap Record.",
+      "properties": {
+        "entityName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "objectGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "objectRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "placedUnderGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+        },
+        "system": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "entityName",
+        "objectGuid",
+        "objectRecordIndex",
         "placedUnderGuid",
         "position",
-        "recordPath",
-        "system",
-        "type",
-        "typeGuid"
+        "system"
       ],
       "type": "object"
     },
@@ -79032,7 +79654,7 @@
     },
     "placements": {
       "$ref": "#/$defs/CatalogPlacements",
-      "description": "Physical loadout placements and their contextual bindings."
+      "description": "Physical and derived placements linked to canonical definitions."
     },
     "projections": {
       "$ref": "#/$defs/CatalogProjections",
@@ -79080,13 +79702,6 @@
     "source": {
       "$ref": "#/$defs/Source",
       "description": "The Archive and Build the catalog was made from."
-    },
-    "starmapObjects": {
-      "description": "The starmap objects with their world positions, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/StarmapObject"
-      },
-      "type": "array"
     },
     "subHarvestableMultiConfigs": {
       "description": "The sub harvestable multi configs, what the slots of an object can hold, ordered by GUID.",
@@ -79143,7 +79758,6 @@
     "ships",
     "shops",
     "source",
-    "starmapObjects",
     "subHarvestableMultiConfigs",
     "texts"
   ],

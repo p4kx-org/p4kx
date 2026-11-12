@@ -185,6 +185,7 @@ pub(crate) fn minimal_catalog() -> Value {
                 "functions": absent_table(),
                 "sizes": absent_table(),
             },
+            "starmapObjects": absent_table(),
             "starmapTypes": absent_table(),
             "starmapPresets": absent_table(),
             "starmapAmenities": absent_table(),
@@ -238,7 +239,8 @@ pub(crate) fn minimal_catalog() -> Value {
         "placements": {
             "resourceNetworkNodes": absent_table(),
             "resourceNetworkLinkBindings": absent_table(),
-            "roomAssociationBindings": absent_table()
+            "roomAssociationBindings": absent_table(),
+            "starmapPlacements": absent_table()
         },
         "texts": {"publicNames": public_names(), "gameTexts": []},
         "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table()},
@@ -261,20 +263,6 @@ pub(crate) fn minimal_catalog() -> Value {
             "shipGuids": ["90000000-0000-4000-8000-000000000001"]
         }],
         "loadouts": loadouts::loadouts(),
-        "starmapObjects": [{
-            "guid": "a2000000-0000-4000-8000-000000000001",
-            "className": "Stanton1_Hurston",
-            "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton1_hurston",
-            "name": {"key": "@Stanton1_Name", "en": "Hurston", "de": null},
-            "type": "Planet",
-            "typeGuid": "a2000000-0000-4000-8000-000000000002",
-            "parentGuid": "a2000000-0000-4000-8000-000000000003",
-            "hideInStarmap": false,
-            "system": "stanton",
-            "entityName": "planet_hurston",
-            "placedUnderGuid": "a2000000-0000-4000-8000-000000000003",
-            "position": [12_850_000_000.0, 1250.5, -3.0]
-        }],
         "mineableElements": [{
             "guid": "a3000000-0000-4000-8000-000000000001",
             "className": "agricium_ore",

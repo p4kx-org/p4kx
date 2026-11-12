@@ -175,7 +175,8 @@ fn assemble<R>(
             CatalogProvenance::new(origins.uses.freeze()?),
         )));
     }
-    let topology = collected.resource_topology(&forge, &origins.uses, options.cancel)?;
+    let (catalog_placements, resource_declarations) =
+        collected.catalog_placements(&forge, &origins, options.cancel)?;
     let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
     let resolved = store_slugs.resolve(
@@ -209,8 +210,8 @@ fn assemble<R>(
             ),
             resource_group_members: group_tables.members,
             ammo_bindings: components.ammo_bindings,
-            resource_network_links: topology.declarations.resource_network_links,
-            room_associations: topology.declarations.room_associations,
+            resource_network_links: resource_declarations.resource_network_links,
+            room_associations: resource_declarations.room_associations,
             shop_inventory_resolution: collected.shop_inventory_resolution,
             tag_roots: CatalogTable::new(&forge, &["TagDatabase"], collected.tags.roots),
             entity_tags: CatalogTable::new(
@@ -219,7 +220,7 @@ fn assemble<R>(
                 collected.tags.entity_tags,
             ),
         },
-        placements: topology.placements,
+        placements: catalog_placements,
         definitions: CatalogDefinitions {
             blueprints: blueprints.definitions,
             shop_inventories: collected.shop_inventories,
@@ -349,7 +350,6 @@ fn assemble<R>(
         crafting_global: collected.crafting_global,
         paints: collected.paints,
         loadouts: collected.loadouts,
-        starmap_objects: collected.starmap_objects,
         mineable_elements: collected.mineable_elements,
         refining_processes: collected.refining_processes,
         mineable_compositions: collected.mineable_compositions,

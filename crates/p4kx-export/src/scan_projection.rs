@@ -5,6 +5,7 @@ use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
 use super::Scan;
 use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
+use crate::catalog_v3::starmap_object_definition;
 use crate::commodity_resource::{self, CommodityResource};
 use crate::contract_stats::ItemStats;
 use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
@@ -43,15 +44,7 @@ impl<'f> Scan<'_, '_, 'f> {
             return Ok(Some(entity.crafted(tree)));
         }
         if kind == Kind::StarmapObjects {
-            let object = starmap_object(
-                trees,
-                tree,
-                self.texts,
-                self.forge,
-                &self.types,
-                self.placements,
-            );
-            return Ok(Some(Picked::Starmap(object)));
+            return Ok(Some(self.starmap(trees, admission, tree, ledger)?));
         }
         if kind == Kind::Ships {
             return Ok(Some(self.ship(admission, tree, ledger)?.crafted(tree)));
@@ -73,6 +66,39 @@ impl<'f> Scan<'_, '_, 'f> {
             entity.stats = stats.and_then(ItemStats::into_published).map(Box::new);
         }
         Ok(picked.map(|picked| picked.crafted(tree)))
+    }
+
+    fn starmap(
+        &self,
+        trees: &mut TreeBuilder<'f>,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+        ledger: &mut ExportLedger,
+    ) -> Result<Picked<'f>, ScanError> {
+        let object = starmap_object(
+            trees,
+            tree,
+            self.texts,
+            self.forge,
+            &self.types,
+            self.placements,
+        );
+        let (read, notes) = starmap_object_definition::read(
+            tree,
+            self.projection,
+            admission,
+            self.options.cancel,
+            object,
+        )?;
+        crate::source_projection_notes::record(
+            Kind::StarmapObjects,
+            ExportSourceRole::Selected,
+            admission,
+            tree,
+            notes,
+            ledger,
+        )?;
+        Ok(Picked::Starmap(Box::new(read)))
     }
 
     fn item_components(

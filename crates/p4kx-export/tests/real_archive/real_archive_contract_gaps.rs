@@ -40,7 +40,7 @@ fn guids<'a>(value: &'a Value, field: &str) -> HashSet<&'a str> {
 fn every_contract_links_its_places_and_reports_pickup_list_lengths() -> TestResult {
     let catalog = catalog()?;
     let localities = guids(&catalog, "missionLocalities");
-    let objects = guids(&catalog, "starmapObjects");
+    let objects = crate::real_archive_verification::guids(&catalog, "starmapObjects")?;
     let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let (mut with_places, mut max_pickup, mut unlinked) = (0_usize, 0_usize, 0_usize);
     for entry in contracts {

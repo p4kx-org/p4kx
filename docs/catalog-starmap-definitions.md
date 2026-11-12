@@ -1,4 +1,4 @@
-# Authored starmap types, presets and amenities
+# Authored starmap definitions
 
 The catalog retains each physical `StarMapObjectType`, `StarMapPreset` and
 `StarMapAmenityTypeEntry` in `definitions.starmapTypes`, `definitions.starmapPresets` and
@@ -40,3 +40,32 @@ reference `texts.publicNames`.
 
 A preset is a reusable authored configuration. The export preserves links as stored.
 Placement, travel policy and release status are separate concepts.
+
+
+## Starmap objects
+
+`definitions.starmapObjects` contains selected physical `StarMapObject` Records with the
+canonical Record header. The original `type`, `parent`, `jurisdiction` and
+`locationHierarchyTag` are References to `StarMapObjectType`, `StarMapObject`,
+`Jurisdiction` and `Tag`, respectively. `affiliation` declares `Faction_LEGACY` and retains
+that original Record identity. `amenities` is the ordered Reference array to
+`StarMapAmenityTypeEntry`. Repeated and dangling slots retain their original positions.
+
+Object flags retain the same five visibility fields as a preset and the original
+`isScannable`, `skipCollisionCheckIfInArrivalRadius`, `overrideRotationSpeed`,
+`showOrbitLine` and `noAutoBodyRecovery`. `overrideSpawnNavPoints`,
+`overrideShowInAllZones`, `overrideShowInRouteOnly` and `overridePermanent` are
+`StarmapBoolOverride` option labels. `respawnLocationType` retains the
+`ERespawnLocationType` label, and the rotation speed value is an independent Single.
+
+The object carries the same original display fields as a preset and adds
+`locationImagePath`. `name`, `description` and `callout1` through `callout3` use the
+protected game-text domain. The object stores `locationParams`, `quantumTravelData` and
+`radarProperties` as StrongPointers. `asteroidRings` retains ordered `StarMapAsteroidRing`
+classes with the original Single scales and depth and Double inner and outer radii. The
+audio play and stop trigger classes retain their original `GlobalResourceAudio` bodies.
+
+`placements.starmapPlacements` joins these definitions by `objectGuid.value` and
+`objectRecordIndex.value`. The existing traversal supplies its world position and hierarchy
+values separately. Until the full XML chain is captured, those computed cells mark the
+source set incomplete and the encryption origin unknown.

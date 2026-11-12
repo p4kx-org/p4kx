@@ -30,6 +30,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::StarmapObjects
             | Kind::StarmapTypes
             | Kind::StarmapPresets
             | Kind::StarmapAmenities
@@ -71,12 +72,13 @@ pub(super) const fn expected_owned_number(
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::StarmapObjects
             | Kind::StarmapTypes
             | Kind::StarmapPresets
             | Kind::StarmapAmenities,
             AuthoredDefinitionRawValue { .. },
         ) => (AuthoredDefinitionRawValue { ordinal }, Number),
-        (Kind::StarmapPresets, AuthoredDefinitionValue { .. })
+        (Kind::StarmapObjects | Kind::StarmapPresets, AuthoredDefinitionValue { .. })
             if matches!(token, FloatToken::Double(_)) =>
         {
             (AuthoredDefinitionValue { ordinal }, Double)
@@ -92,6 +94,7 @@ pub(super) const fn expected_owned_number(
             | Kind::Infractions
             | Kind::InfractionSets
             | Kind::Jurisdictions
+            | Kind::StarmapObjects
             | Kind::StarmapTypes
             | Kind::StarmapPresets,
             _,

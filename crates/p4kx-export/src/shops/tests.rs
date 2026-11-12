@@ -18,13 +18,10 @@ const BODY: &str = "4ce1f681-b479-5269-0536-3d7f02fdccaf";
 fn object(id: u8, class_name: &'static str, entity_name: Option<&str>) -> StarmapObject<'static> {
     StarmapObject {
         guid: CatalogGuid(Guid::from_stored([id; 16])),
+        record_index: u32::from(id),
         class_name,
-        record_path: "",
         name: crate::contract::LocalisedText::default(),
         r#type: None,
-        type_guid: None,
-        parent_guid: None,
-        hide_in_starmap: None,
         system: None,
         entity_name: entity_name.map(str::to_owned),
         placed_under_guid: None,

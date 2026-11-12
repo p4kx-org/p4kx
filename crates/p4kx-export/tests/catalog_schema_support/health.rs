@@ -95,6 +95,7 @@ fn row_count(kind: Kind, catalog: &Value) -> usize {
         Kind::LocationSizeRegistries => {
             catalog.pointer("/definitions/locationRegistries/sizes/rows")
         }
+        Kind::StarmapObjects => catalog.pointer("/definitions/starmapObjects/rows"),
         Kind::StarmapTypes => catalog.pointer("/definitions/starmapTypes/rows"),
         Kind::StarmapPresets => catalog.pointer("/definitions/starmapPresets/rows"),
         Kind::StarmapAmenities => catalog.pointer("/definitions/starmapAmenities/rows"),

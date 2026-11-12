@@ -83,15 +83,12 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         .get("$defs")
         .and_then(Value::as_object)
         .expect("catalog definitions");
-    let starmap = definitions
-        .get("StarmapObject")
-        .expect("the starmap object definition");
     let mut properties = Vec::new();
     collect_properties(&schema, "Catalog", &mut properties);
     for (owner, definition) in definitions {
         if !matches!(
             owner.as_str(),
-            "StarmapObject" | "SourceText" | "JsonString" | "InventoryCandidate"
+            "SourceText" | "JsonString" | "InventoryCandidate"
         ) {
             collect_properties(definition, owner, &mut properties);
         }
@@ -110,11 +107,9 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 66,
+        marked, 71,
         "every protected field in the canonical schema is accounted for"
     );
-
-    assert_starmap_annotations(starmap);
 }
 
 fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -> bool {
@@ -136,6 +131,10 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
         | ("StandingDefinition", "perkDescription")
         | ("FactionReputationDefinition", "background")
         | ("InfractionParameters", "graceWarnings")
+        | (
+            "StarmapObjectDefinition",
+            "name" | "description" | "callout1" | "callout2" | "callout3",
+        )
         | ("TemplateLocalization", "text")
         | ("ProjectedMissionText", "key" | "translations") => true,
         ("BlackboardPropertyBody", "value") => {
@@ -154,20 +153,6 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
             false
         }
         _ => GAME_TEXT.contains(&name) && !is_only_public_name(schema, field),
-    }
-}
-
-fn assert_starmap_annotations(starmap: &Value) {
-    let mut starmap_properties = Vec::new();
-    collect_properties(starmap, "StarmapObject", &mut starmap_properties);
-    for property in starmap_properties {
-        let carries = property.schema.get("x-gameText") == Some(&Value::Bool(true));
-        assert_eq!(
-            carries,
-            property.name == "name",
-            "x-gameText on the starmap {}",
-            property.name
-        );
     }
 }
 

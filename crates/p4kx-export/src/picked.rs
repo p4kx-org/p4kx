@@ -14,10 +14,11 @@ use crate::catalog_v3::inventory_container_definition::PreparedInventoryContaine
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyPick;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
+use crate::catalog_v3::starmap_object_definition::StarmapObjectRead;
 use crate::contract::{
     Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
     MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup, ResourceType, Ship,
-    StarmapObject, SubHarvestableMultiConfig,
+    SubHarvestableMultiConfig,
 };
 use crate::crafter::crafter;
 use crate::crafting_warning::CraftingWarning;
@@ -66,7 +67,7 @@ pub(crate) enum Picked<'f> {
     Law(LawPick<'f>),
     LocationVocabulary(LocationVocabularyPick<'f>),
     /// A starmap object.
-    Starmap(StarmapObject<'f>),
+    Starmap(Box<StarmapObjectRead<'f>>),
     StarmapDefinition(StarmapDefinitionPick<'f>),
     /// A mineable element.
     Mineable(MineableElement<'f>),

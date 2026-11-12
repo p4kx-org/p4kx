@@ -45,6 +45,8 @@ mod sandbox_trigger;
 #[path = "sandbox_trigger_record_definition.rs"]
 pub(crate) mod sandbox_trigger_record_definition;
 
+#[path = "catalog_placements.rs"]
+pub(crate) mod catalog_placements;
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;
 #[path = "infraction_definition.rs"]
@@ -79,6 +81,14 @@ pub(crate) mod starmap_definition_kinds;
 mod starmap_display;
 #[path = "starmap_navigation.rs"]
 mod starmap_navigation;
+#[path = "starmap_object_definition.rs"]
+pub(crate) mod starmap_object_definition;
+#[path = "starmap_object_links.rs"]
+mod starmap_object_links;
+#[path = "starmap_object_owned.rs"]
+mod starmap_object_owned;
+#[path = "starmap_placement.rs"]
+mod starmap_placement;
 #[path = "starmap_preset_definition.rs"]
 pub(crate) mod starmap_preset_definition;
 #[path = "starmap_radar.rs"]

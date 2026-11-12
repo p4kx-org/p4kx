@@ -77,9 +77,12 @@ fn repeated_placements_preserve_every_occurrence_and_each_changed_raw_value() ->
         .ok_or("field mapping absent")?
         .family = Family::Placements;
     fixture.save()?;
-    let catalog = json!({ "starmapObjects": [
-        fixtures::item(GUID, json!(1)), fixtures::item(GUID, json!(3))
-    ] });
+    let catalog = json!({
+        "placements": {"starmapPlacements": {"rows": [
+            {"objectGuid": {"value": GUID}, "stats": {"probe": {"value": 1}}},
+            {"objectGuid": {"value": GUID}, "stats": {"probe": {"value": 3}}}
+        ]}}
+    });
     let report = super::published::verify(
         &fixture.load()?,
         &catalog,

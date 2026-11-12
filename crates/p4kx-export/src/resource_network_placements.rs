@@ -20,8 +20,8 @@ pub(crate) struct ResourceNetworkPlacements {
 }
 
 impl ResourceNetworkPlacements {
-    pub(crate) fn into_tables(self, forge: &DataForge<'_>) -> CatalogPlacements {
-        CatalogPlacements {
+    pub(crate) fn into_tables(self, forge: &DataForge<'_>) -> ResourceNetworkPlacementTables {
+        ResourceNetworkPlacementTables {
             resource_network_nodes: CatalogTable::new(
                 forge,
                 &[
@@ -49,7 +49,7 @@ impl ResourceNetworkPlacements {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct CatalogPlacements {
+pub(crate) struct ResourceNetworkPlacementTables {
     resource_network_nodes: CatalogTable<ResourceNetworkNode>,
     resource_network_link_bindings: CatalogTable<ResourceNetworkLinkBinding>,
     room_association_bindings: CatalogTable<RoomAssociationBinding>,

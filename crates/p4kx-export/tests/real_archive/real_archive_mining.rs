@@ -313,7 +313,8 @@ fn an_asteroid_composition_and_a_location_of_a_real_archive_are_linked() -> Test
     let catalog: Value = serde_json::from_slice(built.json())?;
     let elements = guids(&catalog, "mineableElements")?;
     let compositions = guids(&catalog, "mineableCompositions")?;
-    let objects = guids(&catalog, "starmapObjects")?;
+    let objects = crate::real_archive_verification::guids(&catalog, "starmapObjects")?;
+    let object_rows = catalog_v3_consumer::named_rows(&catalog, "starmapObjects")?;
 
     let iron = named(&catalog, "mineableCompositions", "Asteroid_CType_Iron")?;
     let parts = iron["parts"].as_array().ok_or("the parts")?;
@@ -340,10 +341,10 @@ fn an_asteroid_composition_and_a_location_of_a_real_archive_are_linked() -> Test
         .find(|location| {
             location["presetGuid"] == preset_guid
                 && location["starmapObjectGuid"].as_str().is_some_and(|guid| {
-                    list(&catalog, "starmapObjects").is_ok_and(|all| {
-                        all.iter().any(|object| {
-                            object["guid"] == guid && object["className"] == "Stanton1_L1_01"
-                        })
+                    object_rows.iter().any(|object| {
+                        object.pointer("/guid/value").and_then(Value::as_str) == Some(guid)
+                            && object.pointer("/className/value").and_then(Value::as_str)
+                                == Some("Stanton1_L1_01")
                     })
                 })
         })

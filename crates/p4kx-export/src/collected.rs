@@ -276,7 +276,10 @@ impl<'f> Collected<'f> {
             Picked::ExplosionDefinition(entity) => self.explosion_definitions.push(*entity),
             Picked::AmmoDefinition(entity) => self.ammo_definitions.push(*entity),
             Picked::InventoryContainer(entity) => self.inventory_containers.push(*entity),
-            Picked::Starmap(entity) => self.starmap_objects.push(entity),
+            Picked::Starmap(read) => {
+                self.starmap_definitions.push_object(read.definition);
+                self.starmap_objects.push(read.object);
+            }
             Picked::StarmapDefinition(entity) => self.starmap_definitions.push(entity),
             Picked::Mineable(entity) => self.mineable_elements.push(entity),
             Picked::Refining(entity) => self.refining_processes.push(entity),

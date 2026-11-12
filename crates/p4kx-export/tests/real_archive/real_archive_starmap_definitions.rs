@@ -5,7 +5,9 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, Kind, build_catalog_from};
+use p4kx_export::{
+    CatalogOptions, CatalogPublicationMode, Kind, build_catalog_from, is_kind_leftover,
+};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, RecordTree, TreeBuilder, Value as Original,
     ValueError,
@@ -18,7 +20,8 @@ use crate::real_archive_verification::print_line;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-const FAMILIES: [(Kind, &str); 3] = [
+const FAMILIES: [(Kind, &str); 4] = [
+    (Kind::StarmapObjects, "StarMapObject"),
     (Kind::StarmapTypes, "StarMapObjectType"),
     (Kind::StarmapPresets, "StarMapPreset"),
     (Kind::StarmapAmenities, "StarMapAmenityTypeEntry"),
@@ -60,6 +63,17 @@ fn verify_family(
     let expected: BTreeSet<_> = forge
         .records()
         .filter(|record| record.type_name().is_ok_and(|name| name == source_type))
+        .filter(|record| {
+            kind != Kind::StarmapObjects
+                || record
+                    .record_path()
+                    .ok()
+                    .zip(record.name().ok())
+                    .is_some_and(|(path, name)| {
+                        kind.rule().is_some_and(|rule| rule.matches_path(path))
+                            && !is_kind_leftover(kind, path, name)
+                    })
+        })
         .map(|record| record.index())
         .collect();
     let rows = consumer::rows(catalog, kind)?;
@@ -90,6 +104,7 @@ fn verify_family(
 
 fn verify_body(kind: Kind, tree: &RecordTree<'_>, row: &Value) -> TestResult {
     match kind {
+        Kind::StarmapObjects => verify_object(tree, row),
         Kind::StarmapTypes => {
             for name in [
                 "name",
@@ -137,6 +152,39 @@ fn verify_body(kind: Kind, tree: &RecordTree<'_>, row: &Value) -> TestResult {
         }
         _ => Err("unhandled starmap definition family".into()),
     }
+}
+
+fn verify_object(tree: &RecordTree<'_>, row: &Value) -> TestResult {
+    for name in [
+        "hideInStarmap",
+        "hideInWorld",
+        "blockTravel",
+        "isScannable",
+        "noAutoBodyRecovery",
+    ] {
+        verify_scalar(tree.field(name), field(row, name)?)?;
+    }
+    for name in [
+        "type",
+        "parent",
+        "jurisdiction",
+        "affiliation",
+        "locationHierarchyTag",
+    ] {
+        verify_reference(tree.field(name), field(row, name)?)?;
+    }
+    let amenities = field(row, "amenities")?;
+    let Some(Original::Array(original)) = tree.field("amenities") else {
+        return verify_state(tree.field("amenities"), amenities);
+    };
+    let rows = consumer::source_value(amenities)?
+        .and_then(Value::as_array)
+        .ok_or("ordered original amenity links")?;
+    assert_eq!(rows.len(), original.len(), "every original amenity slot");
+    for (row, slot) in rows.iter().zip(original.iter()) {
+        verify_reference(Some(slot), row)?;
+    }
+    Ok(())
 }
 
 fn verify_scalar(source: Option<&Original<'_>>, row: &Value) -> TestResult {

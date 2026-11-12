@@ -347,7 +347,7 @@ fn mission_types_localities_and_scenarios_of_a_real_archive_are_linked() -> Test
     let types = list(&catalog, "missionTypes")?;
     let localities = list(&catalog, "missionLocalities")?;
     let scenarios = list(&catalog, "contractScenarios")?;
-    let objects = guids(&catalog, "starmapObjects")?;
+    let objects = canonical_guids(&catalog, "starmapObjects")?;
     let pools = guids(&catalog, "blueprintPools")?;
     let factions = canonical_guids(&catalog, "factionReputations")?;
     print_line(&format!(

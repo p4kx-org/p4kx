@@ -38,7 +38,7 @@ impl<'source> DisplayFields<'source> {
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
-            description: fields.protected_locale("description", projection, notes)?,
+            description: fields.protected_locale_or_legacy_key("description", projection, notes)?,
             nav_icon: fields.borrowed_enum_to("navIcon", "NavPointIconEnum", notes)?,
             size: fields.double("size", notes)?,
             minimum_display_size: fields.single("minimumDisplaySize", notes)?,

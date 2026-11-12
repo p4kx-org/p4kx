@@ -8,9 +8,9 @@ use p4kx_extraction::{CancelToken, DataForge, SourceUses, SourceValue, SourcedVa
 use super::catalog_entity_configurations::EntityConfigurationRows;
 use super::network_endpoint::{LocalPorts, NetworkEndpoint};
 use super::resource_network_placements::{
-    CatalogPlacements, FuseEvidence, InstalledResourceComponent, LinkFamily, LoadoutPosition,
-    ResourceNetworkLinkBinding, ResourceNetworkNode, ResourceNetworkPlacements,
-    RoomAssociationBinding,
+    FuseEvidence, InstalledResourceComponent, LinkFamily, LoadoutPosition,
+    ResourceNetworkLinkBinding, ResourceNetworkNode, ResourceNetworkPlacementTables,
+    ResourceNetworkPlacements, RoomAssociationBinding,
 };
 use super::resource_topology_index::{TopologyIndex, TopologySource};
 use crate::collected::Collected;
@@ -35,7 +35,7 @@ impl Context<'_> {
 
 pub(crate) struct CatalogResourceTopology<'source> {
     pub(crate) declarations: super::resource_topology_declarations::ResourceTopologyTables<'source>,
-    pub(crate) placements: CatalogPlacements,
+    pub(crate) placements: ResourceNetworkPlacementTables,
 }
 
 impl<'source> Collected<'source> {

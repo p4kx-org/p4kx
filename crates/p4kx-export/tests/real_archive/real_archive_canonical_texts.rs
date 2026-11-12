@@ -34,6 +34,7 @@ const FIELDS: [(&str, TextDomain); 2] = [
 ];
 
 const REPUTATION_DISPLAY_FIELDS: [(&str, TextDomain); 1] = [("displayName", TextDomain::GameText)];
+const STARMAP_NAME: [(&str, TextDomain); 1] = [("name", TextDomain::GameText)];
 
 const PRESENTATION_FIELDS: [(&str, TextDomain); 3] = [
     ("name", TextDomain::PublicName),
@@ -272,6 +273,7 @@ pub(crate) fn kind_coverage(
             | Kind::Blueprints
             | Kind::ReputationScopes
             | Kind::ReputationStandings
+            | Kind::StarmapObjects
     ) {
         return canonical_coverage(catalog, kind, english_oracle, german_oracle);
     }
@@ -367,16 +369,14 @@ fn canonical_coverage(
             }
             continue;
         }
-        let (fields, shape) = if matches!(kind, Kind::ReputationScopes | Kind::ReputationStandings)
-        {
-            (
+        let (fields, shape) = match kind {
+            Kind::ReputationScopes | Kind::ReputationStandings => (
                 REPUTATION_DISPLAY_FIELDS.as_slice(),
                 TextReferenceShape::Required,
-            )
-        } else if kind == Kind::Commodities {
-            (PRESENTATION_FIELDS.as_slice(), TextReferenceShape::Nullable)
-        } else {
-            (FIELDS.as_slice(), TextReferenceShape::Required)
+            ),
+            Kind::Commodities => (PRESENTATION_FIELDS.as_slice(), TextReferenceShape::Nullable),
+            Kind::StarmapObjects => (STARMAP_NAME.as_slice(), TextReferenceShape::Required),
+            _ => (FIELDS.as_slice(), TextReferenceShape::Required),
         };
         for &(field, domain) in fields {
             counters.count(index.reference(

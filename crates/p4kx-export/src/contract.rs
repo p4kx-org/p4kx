@@ -70,8 +70,8 @@ pub(crate) struct Catalog<'a> {
     pub(crate) configurations: crate::catalog_configurations::CatalogConfigurations<'a>,
     /// Ordered authored declarations from selected physical Records.
     pub(crate) declarations: crate::catalog_v3::catalog_declarations::CatalogDeclarations<'a>,
-    /// Physical loadout placements and their contextual bindings.
-    pub(crate) placements: crate::catalog_v3::resource_network_placements::CatalogPlacements,
+    /// Physical and derived placements linked to canonical definitions.
+    pub(crate) placements: crate::catalog_v3::catalog_placements::CatalogPlacements,
     /// Explicit derived choices using the canonical definitions' source facts.
     pub(crate) projections: CatalogProjections<'a>,
     /// Physical source observations and actual contribution uses.
@@ -89,8 +89,6 @@ pub(crate) struct Catalog<'a> {
     /// The ports of every ship and of every item that has ports, with what the Default Loadout
     /// attaches to each, ordered by the GUID of the entity.
     pub(crate) loadouts: Vec<Loadout>,
-    /// The starmap objects with their world positions, ordered by GUID.
-    pub(crate) starmap_objects: Vec<StarmapObject<'a>>,
 
     /// The mineable elements, ordered by GUID. Several may link to one `ResourceType`.
     pub(crate) mineable_elements: Vec<MineableElement<'a>>,
