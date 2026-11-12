@@ -27,6 +27,9 @@ use crate::{exit, json};
 #[path = "ui_hologram_bone_origins.rs"]
 mod bone_origins;
 
+#[path = "ui_hologram_cdf_origins.rs"]
+mod cdf_origins;
+
 #[path = "ui_hologram_node_origins.rs"]
 mod node_origins;
 

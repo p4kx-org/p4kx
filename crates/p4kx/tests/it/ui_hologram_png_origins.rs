@@ -222,3 +222,6 @@ mod bone_placement;
 
 #[path = "ui_hologram_root_rig.rs"]
 mod root_rig;
+
+#[path = "ui_hologram_cdf_attachments.rs"]
+mod cdf_attachments;

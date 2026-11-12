@@ -6,6 +6,7 @@ use std::slice;
 
 use crate::document::{Document, Node};
 use crate::strings::Span;
+use crate::{SourceAttribute, SourceElement};
 
 /// One attribute of an element.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -91,6 +92,11 @@ impl<'d> Element<'d> {
             text: &self.document.text,
             spans: spans.iter(),
         }
+    }
+
+    /// Returns each attribute with its original node and attribute table coordinates.
+    pub fn source_attributes(self) -> impl Iterator<Item = SourceAttribute<'d>> {
+        SourceElement::cryxml(self).attributes()
     }
 
     /// Returns the value of the first attribute named `name`.

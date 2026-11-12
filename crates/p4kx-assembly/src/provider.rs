@@ -18,9 +18,9 @@ use thiserror::Error;
 #[path = "provider_file.rs"]
 mod file;
 
-use crate::MAX_ASSEMBLY_VERTICES;
 use crate::path_match::starts_with_path;
 use crate::skeleton::SkeletonProblem;
+use crate::{CdfAttachmentSite, MAX_ASSEMBLY_VERTICES};
 
 mod character;
 #[path = "provider_dispatch.rs"]
@@ -65,6 +65,7 @@ pub struct ProvidedAttachment {
     /// The model, read without its material library.
     pub model: Arc<Model>,
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) cdf_sources: Option<Arc<[CdfAttachmentSite]>>,
 }
 
 /// Why a [`ModelProvider`] cannot supply a model.

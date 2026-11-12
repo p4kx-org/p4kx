@@ -1,7 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
+use crate::CdfAttachmentSite;
+use crate::cdf_attachment_source;
 use crate::cdf_bone::BoneAttachment;
+use crate::loadout_xml::Node;
 use crate::markup::{self, Budget, Element};
 
 /// The most bytes of a character definition that are read.
@@ -35,6 +40,35 @@ pub(crate) fn is_character_definition(path: &str) -> bool {
 pub(crate) fn read(bytes: &[u8]) -> Result<Character, String> {
     let mut budget = Budget::new(bytes.len());
     let root = markup::parse(bytes, &mut budget)?;
+    project(&root, |_| None)
+}
+
+pub(crate) fn read_observing_attachments(bytes: &[u8]) -> Result<Character, String> {
+    let mut budget = Budget::new(bytes.len());
+    markup::parse_with_source(bytes, &mut budget, |root, original, scope| {
+        let original = original
+            .children()
+            .into_iter()
+            .find(|child| child.name().eq_ignore_ascii_case("AttachmentList"))
+            .map(Node::children);
+        project(&root, |ordinal| {
+            let node = original.as_ref()?.get(ordinal).copied()?;
+            Some(cdf_attachment_source::capture(node, scope))
+        })
+    })
+}
+
+struct Candidate<'a> {
+    ordinal: usize,
+    binding: &'a str,
+    skin: bool,
+    element: &'a Element,
+}
+
+fn project(
+    root: &Element,
+    capture: impl FnMut(usize) -> Option<Arc<[CdfAttachmentSite]>>,
+) -> Result<Character, String> {
     if !root.name.eq_ignore_ascii_case("CharacterDefinition") {
         return Err(format!(
             "the root element is {}, not CharacterDefinition",
@@ -44,26 +78,34 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Character, String> {
     let attachments: Vec<_> = root
         .child("AttachmentList")
         .into_iter()
-        .flat_map(|list| list.children_named("Attachment"))
-        .filter_map(|attachment| {
+        .flat_map(|list| list.children.iter().enumerate())
+        .filter_map(|(ordinal, attachment)| {
+            if !attachment.name.eq_ignore_ascii_case("Attachment") {
+                return None;
+            }
             let binding = attachment.attribute("Binding").filter(|b| !b.is_empty())?;
             let skin = attachment
                 .attribute("Type")
                 .is_some_and(|kind| kind.eq_ignore_ascii_case("CA_SKIN"));
-            Some((binding, skin, attachment))
+            Some(Candidate {
+                ordinal,
+                binding,
+                skin,
+                element: attachment,
+            })
         })
         .collect();
     let chosen = attachments
         .iter()
-        .position(|(_, skin, _)| *skin)
+        .position(|candidate| candidate.skin)
         .or_else(|| (!attachments.is_empty()).then_some(0));
     let (model, material) = match chosen.and_then(|at| attachments.get(at)) {
-        Some((binding, _, attachment)) => (
-            slashes(binding),
-            attachment.attribute("Material").map(slashes),
+        Some(candidate) => (
+            slashes(candidate.binding),
+            candidate.element.attribute("Material").map(slashes),
         ),
         None => (
-            slashes(skeleton_file(&root).ok_or("it names no model and no attachment")?),
+            slashes(skeleton_file(root).ok_or("it names no model and no attachment")?),
             None,
         ),
     };
@@ -75,9 +117,10 @@ pub(crate) fn read(bytes: &[u8]) -> Result<Character, String> {
             .iter()
             .enumerate()
             .filter(|(at, _)| Some(*at) != chosen)
-            .map(|(_, (binding, _, attachment))| (*binding, *attachment)),
+            .map(|(_, candidate)| candidate),
+        capture,
     );
-    let skeleton = skeleton_file(&root).map(slashes);
+    let skeleton = skeleton_file(root).map(slashes);
     Ok(Character {
         model,
         material,
@@ -97,16 +140,20 @@ fn skeleton_file(root: &Element) -> Option<&str> {
 /// Splits the attachments that are not the drawn model into the bone attachments that are drawn
 /// and the files of those that are not.
 fn sort_rest<'a>(
-    rest: impl Iterator<Item = (&'a str, &'a Element)>,
+    rest: impl Iterator<Item = &'a Candidate<'a>>,
+    mut capture: impl FnMut(usize) -> Option<Arc<[CdfAttachmentSite]>>,
 ) -> (Vec<BoneAttachment>, Vec<String>) {
     let mut bones = Vec::new();
     let mut left_out = Vec::new();
-    for (binding, attachment) in rest {
-        let bone = BoneAttachment::read(attachment, binding)
+    for candidate in rest {
+        let bone = BoneAttachment::read(candidate.element, candidate.binding)
             .filter(|bone| !is_character_definition(&bone.binding));
         match bone {
-            Some(bone) => bones.push(bone),
-            None => left_out.push(slashes(binding)),
+            Some(mut bone) => {
+                bone.sources = capture(candidate.ordinal);
+                bones.push(bone);
+            }
+            None => left_out.push(slashes(candidate.binding)),
         }
     }
     (bones, left_out)

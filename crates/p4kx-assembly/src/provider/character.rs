@@ -29,7 +29,12 @@ impl ArchiveModels<'_> {
         let unreadable = |reason: String| ModelFailure::Unreadable {
             reason: format!("{entry}: {reason}"),
         };
-        let mut character = cdf::read(&bytes).map_err(unreadable)?;
+        let read = if self.observe_nodes && definition_origin.is_some() {
+            cdf::read_observing_attachments
+        } else {
+            cdf::read
+        };
+        let mut character = read(&bytes).map_err(unreadable)?;
         let model_entry = self
             .entry_of(&character.model)
             .ok_or_else(|| unreadable(format!("{} does not exist", character.model)))?;
@@ -85,6 +90,7 @@ impl ArchiveModels<'_> {
             entry,
             model: read.model,
             archive_sources: read.sources,
+            cdf_sources: bone.sources.clone(),
         })
     }
 

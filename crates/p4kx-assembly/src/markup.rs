@@ -260,6 +260,20 @@ pub(crate) fn parse(bytes: &[u8], budget: &mut Budget) -> Result<Element, String
     crate::loadout_xml::parse_unbound(bytes, |root, _| from_node(root, 0, budget))
 }
 
+pub(crate) fn parse_with_source<T>(
+    bytes: &[u8],
+    budget: &mut Budget,
+    project: impl FnOnce(
+        Element,
+        crate::loadout_xml::Node<'_, '_>,
+        &crate::loadout_xml::Scope<'_, '_>,
+    ) -> Result<T, String>,
+) -> Result<T, String> {
+    crate::loadout_xml::parse_unbound(bytes, |root, scope| {
+        project(from_node(root, 0, budget)?, root, scope)
+    })
+}
+
 pub(crate) fn parse_observed<T>(
     document: &crate::loadout_file_events::Document,
     budget: &mut Budget,

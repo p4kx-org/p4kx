@@ -1,8 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_foundation::read_text_number;
 
+use crate::CdfAttachmentSite;
 use crate::cdf::slashes;
 use crate::markup::Element;
 use crate::read::narrow;
@@ -23,6 +26,7 @@ pub(crate) struct BoneAttachment {
     pub(crate) position: [f32; 3],
     /// The rotation from the bone as a quaternion `[w, x, y, z]` (`RelRotation`).
     pub(crate) rotation: [f32; 4],
+    pub(crate) sources: Option<Arc<[CdfAttachmentSite]>>,
 }
 
 impl BoneAttachment {
@@ -58,6 +62,7 @@ impl BoneAttachment {
             binding,
             position,
             rotation,
+            sources: None,
         })
     }
 }

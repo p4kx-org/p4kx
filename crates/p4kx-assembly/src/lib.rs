@@ -85,6 +85,7 @@ mod build_place;
 mod build_zones;
 mod catalogue;
 mod cdf;
+mod cdf_attachment_source;
 mod cdf_bone;
 mod changes;
 mod character_path;
@@ -183,6 +184,7 @@ pub use assembly::{
 pub use attached::AttachedModel;
 pub use bone_placement_source::BonePlacementSource;
 pub use catalogue::{EntityCatalogue, EntityKind, EntitySummary};
+pub use cdf_attachment_source::{CdfAttachmentField, CdfAttachmentSite};
 pub use changes::{ChangeError, ChangedLoadout, LoadoutChanges, PortChange, ReplacementMismatch};
 pub use chf_name_sources::{ChfNameContributions, ObservedChfNames};
 pub use chf_names::{archive_names, archive_names_observed};

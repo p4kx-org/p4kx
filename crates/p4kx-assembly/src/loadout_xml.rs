@@ -5,6 +5,9 @@ use std::ptr;
 
 use p4kx_cryxml::{ByteOrder, Document as CryDocument, Element, Signature, Xml};
 
+#[path = "loadout_xml_source_positions.rs"]
+mod source_positions;
+
 use crate::loadout_file_events::Document;
 use crate::loadout_xml_attribute::XmlLoadoutAttributeSite;
 use crate::resolver_observation::Observation;
@@ -172,6 +175,7 @@ pub(crate) struct Scope<'scope, 'input> {
     source: Option<&'scope LoadoutFileObservation>,
     observation: Option<&'scope Observation<'scope>>,
     decoding: LoadoutXmlDecoding,
+    text_prefix: usize,
 }
 
 #[derive(Clone, Copy)]
@@ -332,6 +336,7 @@ fn parse_bytes<T>(
         Xml::CryXml(document) => {
             let scope = Scope {
                 owner: Owner::Cry(&document),
+                text_prefix: 0,
                 source,
                 observation,
                 decoding: LoadoutXmlDecoding::CryXml {
@@ -343,15 +348,17 @@ fn parse_bytes<T>(
             read(Node::Cry(document.root()), &scope)
         }
         Xml::Text(text) => {
-            let text = std::str::from_utf8(text).map_err(|error| error.to_string())?;
+            let original = std::str::from_utf8(text).map_err(|error| error.to_string())?;
+            let text = original.trim_start_matches('\u{feff}');
+            let text_prefix = original.len() - text.len();
             let decoding = LoadoutXmlDecoding::Text {
-                utf8_bom: text.starts_with('\u{feff}'),
+                utf8_bom: text_prefix != 0,
             };
-            let text = text.trim_start_matches('\u{feff}');
             p4kx_cryxml::check_text_depth(text).map_err(|error| error.to_string())?;
             let document = roxmltree::Document::parse(text).map_err(|error| error.to_string())?;
             let scope = Scope {
                 owner: Owner::Text(&document),
+                text_prefix,
                 source,
                 observation,
                 decoding,

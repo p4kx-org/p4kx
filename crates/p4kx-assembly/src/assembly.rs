@@ -297,16 +297,6 @@ impl Assembly {
         self.lod
     }
 
-    /// Returns the bone attachments of all parts, each with the index of its part, in the order
-    /// of the parts.
-    pub fn attached_models(&self) -> impl Iterator<Item = (usize, &AttachedModel)> {
-        self.parts.iter().enumerate().flat_map(|(index, part)| {
-            part.attachments
-                .iter()
-                .map(move |attached| (index, attached))
-        })
-    }
-
     /// Returns the number of parts that have a model.
     #[must_use]
     pub fn modelled_parts(&self) -> usize {

@@ -89,3 +89,14 @@ impl Assembly {
         BonePlacementSource::new(owner, selection)
     }
 }
+
+impl Part {
+    /// Returns the original skeleton used by this part's own CDF bone attachment.
+    #[must_use]
+    pub fn attachment_bone_placement_source(
+        &self,
+        ordinal: usize,
+    ) -> Option<BonePlacementSource<'_>> {
+        BonePlacementSource::new(self, self.attachments.get(ordinal)?.bone_selection?)
+    }
+}

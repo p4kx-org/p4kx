@@ -21,7 +21,7 @@ use p4kx_render::{
 
 use super::origins::CameraInput;
 use super::{HologramInputs, Projection};
-use super::{bone_origins, node_origins};
+use super::{bone_origins, cdf_origins, node_origins};
 use crate::json;
 
 pub(super) struct Published {
@@ -110,6 +110,42 @@ struct PieceInputs<'a> {
 }
 
 impl PieceInputs<'_> {
+    fn project(
+        &self,
+        projection: &Projection,
+        assembly: &Assembly,
+        piece: &PlacedPieceInput<'_>,
+        drawn: bool,
+        sources: &mut SceneInputs,
+    ) -> Result<()> {
+        let role = if drawn {
+            SourceUseRole::Payload
+        } else {
+            SourceUseRole::Conversion
+        };
+        projection.authored_selector(
+            self.material.owner.and_then(Part::geometry_selector),
+            &mut sources.placed,
+        )?;
+        model_inputs(
+            projection,
+            self.models,
+            self.definition,
+            role,
+            &mut sources.placed,
+        )?;
+        self.material
+            .selected(projection, piece.material_slots(), &mut sources.placed)?;
+        self.mesh_nodes(projection, piece, drawn, sources)?;
+        if let (Some(owner), Some((ordinal, _))) = (
+            assembly.parts().get(self.ancestry),
+            self.material.attachment,
+        ) {
+            cdf_origins::attachment(projection, owner, ordinal, &mut sources.placed)?;
+        }
+        Ok(())
+    }
+
     fn mesh_nodes(
         &self,
         projection: &Projection,
@@ -139,7 +175,7 @@ impl PieceInputs<'_> {
 
 fn piece_inputs<'a>(
     assembly: &'a Assembly,
-    attachments: &[(usize, &'a AttachedModel)],
+    attachments: &[(usize, usize, &'a AttachedModel)],
     piece: AssemblyPieceSource,
 ) -> Option<PieceInputs<'a>> {
     match piece {
@@ -152,12 +188,13 @@ fn piece_inputs<'a>(
                 material: MaterialInputs {
                     archive: part.material_archive_origins(),
                     owner: Some(part),
+                    attachment: None,
                 },
                 ancestry: index,
             })
         }
         AssemblyPieceSource::BoneAttachment(index) => {
-            let &(parent, attachment) = attachments.get(index)?;
+            let &(parent, ordinal, attachment) = attachments.get(index)?;
             Some(PieceInputs {
                 model: Some(attachment.model()),
                 models: attachment.model_archive_sources(),
@@ -165,6 +202,7 @@ fn piece_inputs<'a>(
                 material: MaterialInputs {
                     archive: attachment.material_archive_origins(),
                     owner: None,
+                    attachment: Some((ordinal, attachment)),
                 },
                 ancestry: parent,
             })
@@ -184,33 +222,14 @@ fn scene_inputs(
         suppressed_ranges: Vec::new(),
         drawn_nodes: Vec::new(),
     };
-    let attachments: Vec<_> = assembly.attached_models().collect();
+    let attachments: Vec<_> = assembly.indexed_attachments().collect();
     let mut placed_ancestry = HashSet::new();
     for piece in scene.placed_inputs() {
         let drawn = visible.binary_search(&piece.ordinal()).is_ok();
-        let role = if drawn {
-            SourceUseRole::Payload
-        } else {
-            SourceUseRole::Conversion
-        };
         let Some(input) = piece_inputs(assembly, &attachments, piece.source()) else {
             continue;
         };
-        projection.authored_selector(
-            input.material.owner.and_then(Part::geometry_selector),
-            &mut sources.placed,
-        )?;
-        model_inputs(
-            projection,
-            input.models,
-            input.definition,
-            role,
-            &mut sources.placed,
-        )?;
-        input
-            .material
-            .selected(projection, piece.material_slots(), &mut sources.placed)?;
-        input.mesh_nodes(projection, &piece, drawn, &mut sources)?;
+        input.project(projection, assembly, &piece, drawn, &mut sources)?;
         let mut at = Some(input.ancestry);
         while let Some(index) = at.filter(|index| placed_ancestry.insert(*index)) {
             let Some(part) = assembly.parts().get(index) else {
@@ -236,7 +255,7 @@ fn scene_inputs(
 fn suppressed_materials(
     projection: &Projection,
     assembly: &Assembly,
-    attachments: &[(usize, &AttachedModel)],
+    attachments: &[(usize, usize, &AttachedModel)],
     scene: &AssemblyScene,
     visible: &[usize],
     sources: &mut SceneInputs,
@@ -260,6 +279,11 @@ fn suppressed_materials(
             continue;
         };
         if let Some(scope) = input.material.scope(projection, uses)? {
+            if let (MaterialSuppressionEffect::WholePiece, Some((_, attachment))) =
+                (suppression.effect(), input.material.attachment)
+            {
+                cdf_origins::whole_piece_selection(projection, attachment, uses)?;
+            }
             uses.push(material_slot(&scope, suppression.slot(), field)?);
         }
     }
@@ -287,6 +311,7 @@ fn model_inputs(
 struct MaterialInputs<'a> {
     archive: &'a MaterialArchiveOrigins,
     owner: Option<&'a Part>,
+    attachment: Option<(usize, &'a AttachedModel)>,
 }
 
 impl MaterialInputs<'_> {
@@ -299,6 +324,9 @@ impl MaterialInputs<'_> {
             return Ok(None);
         };
         projection.authored_selector(self.owner.and_then(Part::material_selector), sources)?;
+        if let Some((_, attachment)) = self.attachment {
+            cdf_origins::material(projection, attachment, sources)?;
+        }
         Ok(Some(projection.uses().observe(
             SourceInput::Archive(origin),
             InputScope::Payload,

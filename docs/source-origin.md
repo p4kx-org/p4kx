@@ -166,8 +166,17 @@ Its indices identify the physical skeleton chunk, bone ordinal and byte
 range in the selected Entry. The selected name and the parent and
 relative-pose fields belong to the effective main or LOD skeleton.
 Equipment anchored through a parent skin uses the original character-root
-rig when that rig supplied its placement. CDF attachments have their own
-bind-pose route.
+rig when that rig supplied its placement.
+
+CDF bone attachments retain the type and binding that selected the
+model. A placed attachment retains its bone name and the authored
+relative transform it used. Text attributes use the half-open original
+byte range in `cdfAttachmentTextBytes`. CryXml attributes use the original
+node ordinal and global attribute table ordinal in
+`cdfAttachmentCryXmlAttribute`. A material attribute contributes when
+its selected library supplies a used surface or suppression. A placed
+attachment with a resolved bone also contributes the original skeleton
+pose fields.
 
 Direct mesh conversion uses `modelMeshNodeBytes` for the node matrices,
 parent links and CrCh parent IDs that supply the bounds of an admitted

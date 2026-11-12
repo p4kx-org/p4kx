@@ -4,7 +4,7 @@
 use std::ops::Range;
 
 use anyhow::Result;
-use p4kx_assembly::Assembly;
+use p4kx_assembly::{Assembly, BonePlacementSource};
 use p4kx_extraction::{
     InputScope, SourceInput, SourceLocation, SourceScope, SourceUse, SourceUseRole,
 };
@@ -20,6 +20,14 @@ pub(super) fn placement(
     let Some(source) = assembly.bone_placement_source(part) else {
         return Ok(());
     };
+    record(projection, &source, uses)
+}
+
+pub(super) fn record(
+    projection: &Projection,
+    source: &BonePlacementSource<'_>,
+    uses: &mut Vec<SourceUse>,
+) -> Result<()> {
     projection.authored_selector(source.geometry_selector(), uses)?;
     if let Some(definition) = source.definition_origin() {
         uses.push(projection.opaque_archive(definition, SourceUseRole::Selector)?);

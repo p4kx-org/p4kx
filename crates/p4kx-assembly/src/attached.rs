@@ -8,6 +8,9 @@ use p4kx_extraction::{
 };
 use p4kx_model::{MaterialStatus, Model, Transform};
 
+use crate::placement::BoneSelection;
+use crate::{Assembly, CdfAttachmentSite};
+
 /// A rigid model a part carries at a bone of its skeleton: a bone attachment of the character
 /// definition the part's geometry is, e.g. the housing of a thruster.
 #[derive(Debug, Clone)]
@@ -16,6 +19,9 @@ pub struct AttachedModel {
     pub(crate) bone: String,
     pub(crate) local: Transform,
     pub(crate) found: bool,
+    pub(crate) bone_selection: Option<BoneSelection>,
+    pub(crate) cdf_sources: Option<Arc<[CdfAttachmentSite]>>,
+    pub(crate) offset_used: bool,
     pub(crate) entry: String,
     pub(crate) model: Arc<Model>,
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
@@ -74,6 +80,18 @@ impl AttachedModel {
         self.definition_origin.as_ref()
     }
 
+    /// Returns original CDF attributes retained for this attachment.
+    #[must_use]
+    pub fn cdf_sources(&self) -> &[CdfAttachmentSite] {
+        self.cdf_sources.as_deref().unwrap_or_default()
+    }
+
+    /// Returns whether the authored relative transform contributed to placement.
+    #[must_use]
+    pub const fn offset_used(&self) -> bool {
+        self.offset_used
+    }
+
     /// Returns the original observations of the material library used by this attachment.
     #[must_use]
     pub fn material_archive_origins(&self) -> &MaterialArchiveOrigins {
@@ -84,5 +102,24 @@ impl AttachedModel {
     #[must_use]
     pub fn materials(&self) -> &MaterialStatus {
         &self.materials.status
+    }
+}
+
+impl Assembly {
+    /// Returns the bone attachments of all parts, each with the index of its part.
+    pub fn attached_models(&self) -> impl Iterator<Item = (usize, &AttachedModel)> {
+        self.indexed_attachments()
+            .map(|(part, _, attachment)| (part, attachment))
+    }
+
+    /// Returns each bone attachment with its owning part and local attachment ordinal.
+    pub fn indexed_attachments(&self) -> impl Iterator<Item = (usize, usize, &AttachedModel)> {
+        self.parts.iter().enumerate().flat_map(|(part, owner)| {
+            owner
+                .attachments()
+                .iter()
+                .enumerate()
+                .map(move |(ordinal, attachment)| (part, ordinal, attachment))
+        })
     }
 }
