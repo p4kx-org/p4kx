@@ -16,6 +16,9 @@ use predicates::prelude::predicate;
 #[path = "chunks_origin.rs"]
 mod origin;
 
+#[path = "chunks_dump_origin.rs"]
+mod dump_origin;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const MODEL_ENTRY: &str = "Data\\Objects\\Test\\cube.cgf";

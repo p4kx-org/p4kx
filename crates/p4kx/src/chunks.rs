@@ -2,14 +2,16 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::{self, BufWriter, Write};
-use std::path::Path;
 
 use anyhow::Result;
-use p4kx_extraction::{ChunkJson, ChunkSource};
+use p4kx_extraction::{ChunkDumpMode, ChunkJson, ChunkSource};
 use serde::Serialize;
 
 use crate::cli_chunks::{ChunkFileSource, ChunksAction, ChunksArgs};
 use crate::json;
+
+#[path = "chunk_dump.rs"]
+mod dump;
 
 #[path = "chunk_list_origins.rs"]
 mod origin;
@@ -29,13 +31,6 @@ struct ListJson<'a> {
     origins: ChunkListOrigins,
 }
 
-#[derive(Serialize)]
-struct DumpJson<'a> {
-    file: &'a str,
-    chunk: ChunkJson,
-    out: String,
-}
-
 /// Runs `p4kx chunks list` or `p4kx chunks dump`.
 pub(crate) fn run(args: &ChunksArgs, as_json: bool) -> Result<()> {
     match &args.action {
@@ -45,7 +40,14 @@ pub(crate) fn run(args: &ChunksArgs, as_json: bool) -> Result<()> {
             chunk,
             out,
             text,
-        } => dump(&open(source, false)?, *chunk, out, *text, as_json),
+        } => {
+            let mode = if *text {
+                ChunkDumpMode::Text
+            } else {
+                ChunkDumpMode::Raw
+            };
+            dump::run(source, *chunk, out, mode, as_json)
+        }
     }
 }
 
@@ -112,30 +114,5 @@ fn list(source: &ChunkSource, as_json: bool) -> Result<()> {
         )?;
     }
     out.flush()?;
-    Ok(())
-}
-
-fn dump(source: &ChunkSource, index: usize, out: &Path, text: bool, as_json: bool) -> Result<()> {
-    let chunk = if text {
-        source.write_chunk_text_to_file(index, out)?
-    } else {
-        source.write_chunk_to_file(index, out)?
-    };
-    if as_json {
-        json::print(&DumpJson {
-            file: source.name(),
-            chunk: ChunkJson::of(index, &chunk),
-            out: json::path(out),
-        })?;
-    } else {
-        writeln!(
-            io::stdout().lock(),
-            "wrote chunk {index} ({}, {} bytes) of {} to {}",
-            chunk.chunk_type().name().unwrap_or(UNKNOWN),
-            chunk.size(),
-            source.name(),
-            out.display()
-        )?;
-    }
     Ok(())
 }

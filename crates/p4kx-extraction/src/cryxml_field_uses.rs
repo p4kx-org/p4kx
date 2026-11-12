@@ -27,6 +27,28 @@ impl SourceScope {
         &self,
         field: &XmlWriteField,
     ) -> Result<Option<CryXmlFieldUses>, SourceEvidenceError> {
+        self.cryxml_field_in(field, None)
+    }
+
+    /// Registers the actual contributors to a CryXml field in an embedded document.
+    ///
+    /// `decoded_offset` is the document start in the decoded physical file.
+    ///
+    /// # Errors
+    /// Returns an error if the original source registry cannot retain evidence.
+    pub fn cryxml_field_at(
+        &self,
+        field: &XmlWriteField,
+        decoded_offset: u64,
+    ) -> Result<Option<CryXmlFieldUses>, SourceEvidenceError> {
+        self.cryxml_field_in(field, Some(decoded_offset))
+    }
+
+    fn cryxml_field_in(
+        &self,
+        field: &XmlWriteField,
+        base: Option<u64>,
+    ) -> Result<Option<CryXmlFieldUses>, SourceEvidenceError> {
         let (output, member) = match field.kind() {
             XmlFieldKind::ElementName => (OriginXmlField::ElementName, "name"),
             XmlFieldKind::ClosingElementName => (OriginXmlField::ClosingElementName, "name"),
@@ -35,21 +57,35 @@ impl SourceScope {
             XmlFieldKind::Text => (OriginXmlField::Text, "text"),
             _ => return Ok(None),
         };
+        let (node_namespace, attribute_namespace, names_namespace) = if base.is_some() {
+            (
+                "embeddedCryXmlNode",
+                "embeddedCryXmlAttribute",
+                "embeddedCryXmlAttributeNames",
+            )
+        } else {
+            ("cryxmlNode", "cryxmlAttribute", "cryxmlAttributeNames")
+        };
         let node = u64::from(field.node_index());
-        let (namespace, indices) = field.attribute_index().map_or_else(
-            || ("cryxmlNode", vec![node]),
-            |attribute| ("cryxmlAttribute", vec![node, u64::from(attribute)]),
+        let primary = field.attribute_index().map_or_else(
+            || location(node_namespace, &[node], member, base),
+            |attribute| {
+                location(
+                    attribute_namespace,
+                    &[node, u64::from(attribute)],
+                    member,
+                    base,
+                )
+            },
         );
-        let mut uses = vec![self.at(
-            location(namespace, indices, member),
-            SourceUseRole::Conversion,
-        )?];
+        let mut uses = vec![self.at(primary, SourceUseRole::Conversion)?];
         if let Some(names) = field.preceding_names() {
             uses.push(self.at(
                 location(
-                    "cryxmlAttributeNames",
-                    vec![node, u64::from(names.start), u64::from(names.end)],
+                    names_namespace,
+                    &[node, u64::from(names.start), u64::from(names.end)],
                     "suffixSelection",
+                    base,
                 ),
                 SourceUseRole::Selector,
             )?);
@@ -61,10 +97,10 @@ impl SourceScope {
     }
 }
 
-fn location(namespace: &str, indices: Vec<u64>, field: &str) -> SourceLocation {
+fn location(namespace: &str, indices: &[u64], field: &str, base: Option<u64>) -> SourceLocation {
     SourceLocation::Subresource {
         namespace: namespace.into(),
-        indices,
+        indices: base.into_iter().chain(indices.iter().copied()).collect(),
         field: field.into(),
     }
 }

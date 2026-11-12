@@ -216,6 +216,27 @@ impl ChunkSource {
         Ok(found)
     }
 
+    /// Validates and selects the original bytes or decoded XML of one dump.
+    ///
+    /// # Errors
+    /// Returns an invalid chunk, output alias or text decoding error.
+    pub fn prepare_dump(
+        &self,
+        index: usize,
+        out: &Path,
+        mode: ChunkDumpMode,
+    ) -> Result<PreparedChunk<'_>, ConversionError> {
+        let (chunk, data) = self.chunk_and_data(index, out)?;
+        let payload = match mode {
+            ChunkDumpMode::Raw => ChunkDumpPayload::Bytes(data),
+            ChunkDumpMode::Text => self.text_payload(index, chunk, data)?,
+        };
+        Ok(PreparedChunk {
+            chunk: *chunk,
+            payload,
+        })
+    }
+
     /// Writes the data of the chunk at `index` in the table unchanged to `out`, replacing it, and
     /// returns the chunk; the file is written under a temporary name first.
     ///
@@ -225,14 +246,7 @@ impl ChunkSource {
     /// [`ConversionError::OutputIsInput`] when `out` is the chunk file itself, and
     /// [`ConversionError::Write`] when the file cannot be written.
     pub fn write_chunk_to_file(&self, index: usize, out: &Path) -> Result<Chunk, ConversionError> {
-        let (chunk, data) = self.chunk_and_data(index, out)?;
-        write_replacing_protected(out, self.protection.context()?, None, |writer| {
-            writer
-                .write_all(data)
-                .map_err(|source| write_error(out, source))?;
-            Ok(())
-        })?;
-        Ok(*chunk)
+        self.write_dump(index, out, ChunkDumpMode::Raw)
     }
 
     /// Writes the chunk at `index` as UTF-8 text to `out`, replacing it, and returns the chunk:
@@ -251,7 +265,32 @@ impl ChunkSource {
         index: usize,
         out: &Path,
     ) -> Result<Chunk, ConversionError> {
-        let (chunk, data) = self.chunk_and_data(index, out)?;
+        self.write_dump(index, out, ChunkDumpMode::Text)
+    }
+
+    fn write_dump(
+        &self,
+        index: usize,
+        out: &Path,
+        mode: ChunkDumpMode,
+    ) -> Result<Chunk, ConversionError> {
+        let dump = self.prepare_dump(index, out, mode)?;
+        write_replacing_protected(out, self.protection.context()?, None, |writer| {
+            let result = match &dump.payload {
+                ChunkDumpPayload::Bytes(bytes) => writer.write_all(bytes),
+                ChunkDumpPayload::CryXml(document) => document.write_xml(writer),
+            };
+            result.map_err(|source| write_error(out, source))
+        })?;
+        Ok(dump.chunk)
+    }
+
+    fn text_payload<'data>(
+        &self,
+        index: usize,
+        chunk: &Chunk,
+        data: &'data [u8],
+    ) -> Result<ChunkDumpPayload<'data>, ConversionError> {
         let kind = chunk.chunk_type();
         let text_error = |source| ConversionError::ChunkText {
             file: self.name.clone(),
@@ -261,34 +300,53 @@ impl ChunkSource {
         let utf8 = |bytes| {
             std::str::from_utf8(bytes).map_err(|error| text_error(ChunkTextError::Utf8(error)))
         };
-        let text = if kind == crch::CRY_XML_B || kind == crch::CRY_XML_B_2 {
-            match cryxml::read(data).map_err(|error| text_error(ChunkTextError::CryXml(error)))? {
-                cryxml::Xml::Text(bytes) => ChunkText::Utf8(utf8(bytes)?),
-                xml @ cryxml::Xml::CryXml(_) => ChunkText::Xml(xml),
-            }
-        } else if kind == crch::JSON || kind == crch::MODEL_PATHS {
-            ChunkText::Utf8(utf8(data)?)
-        } else {
-            return Err(ConversionError::ChunkNotText {
-                file: self.name.clone(),
-                index,
-                chunk_type: kind.to_string(),
-            });
-        };
-        write_replacing_protected(out, self.protection.context()?, None, |writer| {
-            match text {
-                ChunkText::Xml(xml) => xml.write_to(&mut *writer),
-                ChunkText::Utf8(text) => writer.write_all(text.as_bytes()),
-            }
-            .map_err(|source| write_error(out, source))
-        })?;
-        Ok(*chunk)
+        if kind == crch::CRY_XML_B || kind == crch::CRY_XML_B_2 {
+            return match cryxml::read(data)
+                .map_err(|error| text_error(ChunkTextError::CryXml(error)))?
+            {
+                cryxml::Xml::Text(bytes) => Ok(ChunkDumpPayload::Bytes(utf8(bytes)?.as_bytes())),
+                cryxml::Xml::CryXml(document) => Ok(ChunkDumpPayload::CryXml(document)),
+            };
+        }
+        if kind == crch::JSON || kind == crch::MODEL_PATHS {
+            return Ok(ChunkDumpPayload::Bytes(utf8(data)?.as_bytes()));
+        }
+        Err(ConversionError::ChunkNotText {
+            file: self.name.clone(),
+            index,
+            chunk_type: kind.to_string(),
+        })
     }
 }
 
-enum ChunkText<'a> {
-    Xml(cryxml::Xml<'a>),
-    Utf8(&'a str),
+/// The requested representation of a chunk dump.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum ChunkDumpMode {
+    /// Preserve the original chunk bytes.
+    Raw,
+    /// Write the supported text representation.
+    Text,
+}
+
+/// The selected original table row and validated dump payload.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct PreparedChunk<'a> {
+    /// The selected physical chunk table row.
+    pub chunk: Chunk,
+    /// The source bytes or the parsed binary XML document.
+    pub payload: ChunkDumpPayload<'a>,
+}
+
+/// The data to write for a prepared dump.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum ChunkDumpPayload<'a> {
+    /// Original bytes, including validated UTF-8 preserved as stored.
+    Bytes(&'a [u8]),
+    /// A binary XML document to write as UTF-8 XML.
+    CryXml(cryxml::Document<'a>),
 }
 
 /// Why the data of a chunk has no text form.

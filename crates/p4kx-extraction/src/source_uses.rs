@@ -141,14 +141,25 @@ impl SourceUses {
         uses: &[SourceUse],
         source_set_complete: bool,
     ) -> Result<SourcedValue<T>, SourceEvidenceError> {
+        let origin = self.origin_with_shared(shared, uses, source_set_complete)?;
+        Ok(SourcedValue::new(value, origin))
+    }
+
+    /// Binds an output address to its shared and field-specific contributors.
+    ///
+    /// # Errors
+    /// Returns an error when the shared origin belongs to another inventory.
+    pub fn origin_with_shared(
+        &self,
+        shared: &SharedFieldOrigin,
+        uses: &[SourceUse],
+        source_set_complete: bool,
+    ) -> Result<FieldOrigin, SourceEvidenceError> {
         if !shared.belongs_to(&self.identity) {
             return Err(SourceEvidenceError::ForeignEvidence);
         }
         let (own, complete) = self.owned_uses(uses, source_set_complete);
-        Ok(SourcedValue::new(
-            value,
-            FieldOrigin::with_shared(shared, own, complete),
-        ))
+        Ok(FieldOrigin::with_shared(shared, own, complete))
     }
 
     fn owned_uses<'a>(

@@ -4,17 +4,27 @@
 use std::io::{self, Write};
 
 use anyhow::Result;
-use p4kx_extraction::cryxml::{Xml, XmlWriteField};
+use p4kx_extraction::cryxml::{Document, Xml, XmlWriteField};
 use p4kx_extraction::{
     DecimalU64, FieldOrigin, FieldOrigins, FieldPath, InputScope, ObservedFileRead,
-    OriginArtifactBinding, OriginOutputAddress, SourceInput, SourceInventory, SourceLocation,
-    SourceScope, SourceUseRole, SourceUses, write_origin_companion,
+    OriginArtifactBinding, OriginOutputAddress, SharedFieldOrigin, SourceInput, SourceInventory,
+    SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses, write_origin_companion,
 };
 
 pub(crate) struct CryXmlOrigins {
     uses: SourceUses,
     payload: SourceScope,
     complete: bool,
+}
+
+pub(crate) struct EmbeddedXml<'source> {
+    pub(crate) base: u64,
+    pub(crate) selectors: &'source [SourceUse],
+}
+
+struct EmbeddedEvidence {
+    base: u64,
+    shared: SharedFieldOrigin,
 }
 
 pub(crate) struct XmlReceipt {
@@ -70,9 +80,8 @@ impl CryXmlOrigins {
     }
 
     pub(crate) fn render(&self, xml: &Xml<'_>, writer: &mut dyn Write) -> io::Result<XmlReceipt> {
-        let fields = match xml {
+        match xml {
             Xml::Text(bytes) => {
-                writer.write_all(bytes)?;
                 let datum = self
                     .payload
                     .at(
@@ -80,48 +89,67 @@ impl CryXmlOrigins {
                         SourceUseRole::Payload,
                     )
                     .map_err(io::Error::other)?;
-                vec![(
-                    OriginOutputAddress::OpaquePayload,
+                XmlReceipt::opaque(
+                    writer,
+                    bytes,
+                    &self.uses,
                     self.uses.origin(&[datum], self.complete),
-                )]
+                )
             }
-            Xml::CryXml(document) => {
-                let mut fields = Vec::new();
-                document.write_xml_observed(writer, |field| {
-                    fields.try_reserve(1).map_err(io::Error::other)?;
-                    fields.push(self.binary_field(&field)?);
-                    Ok(())
-                })?;
-                fields
-            }
-        };
-        Ok(XmlReceipt {
-            inventory: self.uses.freeze().map_err(io::Error::other)?,
-            fields,
-        })
-    }
-
-    fn binary_field(
-        &self,
-        field: &XmlWriteField,
-    ) -> io::Result<(OriginOutputAddress, FieldOrigin)> {
-        let captured = self
-            .payload
-            .cryxml_field(field)
-            .map_err(io::Error::other)?
-            .ok_or_else(|| io::Error::other("unknown XML writer field category"))?;
-        let origin = self.uses.origin(&captured.uses, self.complete);
-        let range = field.range();
-        let address = OriginOutputAddress::XmlBytes {
-            start: DecimalU64::new(range.start),
-            end_exclusive: DecimalU64::new(range.end),
-            field: captured.field,
-        };
-        Ok((address, origin))
+            Xml::CryXml(document) => XmlReceipt::document(
+                document,
+                writer,
+                (&self.uses, &self.payload),
+                self.complete,
+                None,
+            ),
+        }
     }
 }
 
 impl XmlReceipt {
+    pub(crate) fn opaque(
+        writer: &mut dyn Write,
+        bytes: &[u8],
+        uses: &SourceUses,
+        origin: FieldOrigin,
+    ) -> io::Result<Self> {
+        writer.write_all(bytes)?;
+        Ok(Self {
+            inventory: uses.freeze().map_err(io::Error::other)?,
+            fields: vec![(OriginOutputAddress::OpaquePayload, origin)],
+        })
+    }
+
+    pub(crate) fn document(
+        document: &Document<'_>,
+        writer: &mut dyn Write,
+        (uses, payload): (&SourceUses, &SourceScope),
+        complete: bool,
+        embedded: Option<&EmbeddedXml<'_>>,
+    ) -> io::Result<Self> {
+        let embedded = embedded.map(|origin| EmbeddedEvidence {
+            base: origin.base,
+            shared: uses.shared_origin(origin.selectors, complete),
+        });
+        let mut fields = Vec::new();
+        document.write_xml_observed(writer, |field| {
+            fields.try_reserve(1).map_err(io::Error::other)?;
+            fields.push(binary_field(
+                &field,
+                uses,
+                payload,
+                complete,
+                embedded.as_ref(),
+            )?);
+            Ok(())
+        })?;
+        Ok(Self {
+            inventory: uses.freeze().map_err(io::Error::other)?,
+            fields,
+        })
+    }
+
     pub(crate) fn write(
         &self,
         writer: &mut dyn Write,
@@ -136,6 +164,35 @@ impl XmlReceipt {
                 .map(|(address, origin)| (address, origin)),
         )
     }
+}
+
+fn binary_field(
+    field: &XmlWriteField,
+    uses: &SourceUses,
+    payload: &SourceScope,
+    complete: bool,
+    embedded: Option<&EmbeddedEvidence>,
+) -> io::Result<(OriginOutputAddress, FieldOrigin)> {
+    let captured = embedded
+        .map_or_else(
+            || payload.cryxml_field(field),
+            |embedded| payload.cryxml_field_at(field, embedded.base),
+        )
+        .map_err(io::Error::other)?
+        .ok_or_else(|| io::Error::other("unknown XML writer field category"))?;
+    let origin = match embedded {
+        Some(origin) => uses
+            .origin_with_shared(&origin.shared, &captured.uses, complete)
+            .map_err(io::Error::other)?,
+        None => uses.origin(&captured.uses, complete),
+    };
+    let range = field.range();
+    let address = OriginOutputAddress::XmlBytes {
+        start: DecimalU64::new(range.start),
+        end_exclusive: DecimalU64::new(range.end),
+        field: captured.field,
+    };
+    Ok((address, origin))
 }
 
 fn location(namespace: &str, indices: Vec<u64>, field: &str) -> SourceLocation {

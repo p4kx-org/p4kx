@@ -4,10 +4,10 @@
 use std::ops::Range;
 
 use anyhow::{Context, Result};
-use p4kx_extraction::chunks::{ChunkTableRow, Container};
+use p4kx_extraction::chunks::{ChunkFile, ChunkTableRow, Container};
 use p4kx_extraction::{
-    ChunkSource, FieldOrigin, FieldOrigins, FieldPath, InputScope, SourceInput, SourceInventory,
-    SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses,
+    ChunkDumpMode, ChunkSource, FieldOrigin, FieldOrigins, FieldPath, InputScope, SourceInput,
+    SourceInventory, SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses,
 };
 use serde::Serialize;
 
@@ -27,38 +27,26 @@ impl ChunkListOrigins {
     pub(super) fn capture(source: &ChunkSource) -> Result<Self> {
         let evidence = Evidence::new(source.original_input())?;
         let file = source.file();
-        let signature = evidence.header("signature", SIGNATURE)?;
-        let table_offset = evidence.header("tableOffset", TABLE_OFFSET)?;
-        let count = evidence.header("rowCount", COUNT)?;
-        let index = evidence.origin(&[table_offset.clone(), count]);
-        let size = if file.container() == Container::Ivo && !file.chunks().is_empty() {
-            Some(evidence.ivo_extent(&file.table_range(), table_offset)?)
-        } else {
-            None
-        };
+        let shared = evidence.row_selection(file)?;
         let mut fields = FieldOrigins::new();
         let root = FieldPath::root();
         add(&mut fields, &root, "file", evidence.path()?)?;
-        add(&mut fields, &root, "container", evidence.one(&signature))?;
+        add(&mut fields, &root, "container", shared.layout.clone())?;
         add(
             &mut fields,
             &root,
             "version",
             evidence.one(&evidence.header("version", VERSION)?),
         )?;
-        add(&mut fields, &root, "chunks", index.clone())?;
-        let layout = evidence.one(&signature);
-        let shared = RowSelection {
-            index: &index,
-            signature: &signature,
-            layout: &layout,
-            size: size.as_ref(),
-        };
+        add(&mut fields, &root, "chunks", shared.index.clone())?;
+        let mut path = FieldPath::parse("/chunks")?;
         for row in 0..file.chunks().len() {
             let columns = file
                 .table_row(row)
                 .context("parsed chunk has no table row")?;
-            evidence.row(&mut fields, row, columns, &shared)?;
+            path.push_index(row)?;
+            evidence.row(&mut fields, &path, row, columns, &shared)?;
+            path.pop();
         }
         Ok(Self {
             field_origins: fields,
@@ -67,22 +55,22 @@ impl ChunkListOrigins {
     }
 }
 
-struct RowSelection<'a> {
-    index: &'a FieldOrigin,
-    signature: &'a SourceUse,
-    layout: &'a FieldOrigin,
-    size: Option<&'a [SourceUse; 3]>,
+pub(super) struct RowSelection {
+    index: FieldOrigin,
+    signature: SourceUse,
+    layout: FieldOrigin,
+    size: Option<[SourceUse; 3]>,
 }
 
-struct Evidence {
-    sources: SourceUses,
-    scope: SourceScope,
+pub(super) struct Evidence {
+    pub(super) sources: SourceUses,
+    pub(super) scope: SourceScope,
     path_scope: InputScope,
-    complete: bool,
+    pub(super) complete: bool,
 }
 
 impl Evidence {
-    fn new(input: SourceInput<'_>) -> Result<Self> {
+    pub(super) fn new(input: SourceInput<'_>) -> Result<Self> {
         let sources = SourceUses::new();
         let scope = sources.observe(input, InputScope::Payload)?;
         let path_scope = if matches!(input, SourceInput::Archive(_)) {
@@ -98,7 +86,7 @@ impl Evidence {
         })
     }
 
-    fn path(&self) -> Result<FieldOrigin> {
+    pub(super) fn path(&self) -> Result<FieldOrigin> {
         let retained = self.scope.for_scope(self.path_scope).at(
             SourceLocation::Metadata {
                 field: "path".into(),
@@ -106,6 +94,67 @@ impl Evidence {
             SourceUseRole::Payload,
         )?;
         Ok(self.one(&retained))
+    }
+
+    pub(super) fn row_selection(&self, file: &ChunkFile<Vec<u8>>) -> Result<RowSelection> {
+        let signature = self.header("signature", SIGNATURE)?;
+        let table_offset = self.header("tableOffset", TABLE_OFFSET)?;
+        let count = self.header("rowCount", COUNT)?;
+        let index = self.origin(&[table_offset.clone(), count]);
+        let size = if file.container() == Container::Ivo && !file.chunks().is_empty() {
+            Some(self.ivo_extent(&file.table_range(), table_offset)?)
+        } else {
+            None
+        };
+        let layout = self.one(&signature);
+        Ok(RowSelection {
+            index,
+            signature,
+            layout,
+            size,
+        })
+    }
+
+    pub(super) fn selected_payload(
+        &self,
+        file: &ChunkFile<Vec<u8>>,
+        index: usize,
+        columns: ChunkTableRow,
+        mode: ChunkDumpMode,
+    ) -> Result<Vec<SourceUse>> {
+        let role = SourceUseRole::Selector;
+        let header = |name, range: Range<u64>| {
+            self.site(
+                "cryEngineChunkHeader",
+                name,
+                vec![range.start, range.end],
+                role,
+            )
+        };
+        let word = |name, range: Range<u64>| {
+            self.site(
+                "cryEngineChunkTable",
+                name,
+                vec![index as u64, range.start, range.end],
+                role,
+            )
+        };
+        let mut uses = vec![
+            header("signature", SIGNATURE)?,
+            header("rowCount", COUNT)?,
+            word("offset", columns.offset)?,
+        ];
+        let table = header("tableOffset", TABLE_OFFSET)?;
+        if let Some(range) = columns.size {
+            uses.push(table);
+            uses.push(word("size", range)?);
+        } else {
+            uses.extend(self.ivo_extent(&file.table_range(), table)?);
+        }
+        if matches!(mode, ChunkDumpMode::Text) {
+            uses.push(word("type", columns.kind)?);
+        }
+        Ok(uses)
     }
 
     fn header(&self, name: &str, range: Range<u64>) -> Result<SourceUse> {
@@ -142,7 +191,7 @@ impl Evidence {
         Ok([offsets, extent, table_offset])
     }
 
-    fn site(
+    pub(super) fn site(
         &self,
         namespace: &str,
         name: &str,
@@ -159,7 +208,7 @@ impl Evidence {
         )?)
     }
 
-    fn origin(&self, uses: &[SourceUse]) -> FieldOrigin {
+    pub(super) fn origin(&self, uses: &[SourceUse]) -> FieldOrigin {
         self.sources.origin(uses, self.complete)
     }
 
@@ -167,15 +216,14 @@ impl Evidence {
         self.origin(std::slice::from_ref(usage))
     }
 
-    fn row(
+    pub(super) fn row(
         &self,
         fields: &mut FieldOrigins,
+        path: &FieldPath,
         index: usize,
         columns: ChunkTableRow,
-        shared: &RowSelection<'_>,
+        shared: &RowSelection,
     ) -> Result<()> {
-        let mut path = FieldPath::parse("/chunks")?;
-        path.push_index(index)?;
         let kind_word = self.column(index, "type", columns.kind)?;
         let type_id = self.one(&kind_word);
         let kind = self.origin(&[kind_word, shared.signature.clone()]);
@@ -195,7 +243,7 @@ impl Evidence {
         let size = if let Some(range) = columns.size {
             self.one(&self.column(index, "size", range)?)
         } else {
-            let [offsets, extent, table] = shared.size.context("missing IVO extent")?;
+            let [offsets, extent, table] = shared.size.as_ref().context("missing IVO extent")?;
             self.origin(&[offsets.clone(), extent.clone(), table.clone(), offset_use])
         };
         for (name, origin) in [
@@ -209,7 +257,7 @@ impl Evidence {
             ("offset", offset),
             ("size", size),
         ] {
-            add(fields, &path, name, origin)?;
+            add(fields, path, name, origin)?;
         }
         Ok(())
     }

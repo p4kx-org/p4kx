@@ -2141,6 +2141,14 @@ chunk (`0x0004`, `0x0014`) as XML, a `Json` or `ModelPaths` chunk (`0x0011`, `0x
 file itself, or `--text` on a chunk of another type fails with exit code 2; `--text` on data that
 is no valid `CryXml` or UTF-8 text fails with exit code 3.
 
+The dump publishes a sibling `<output>.p4kx-origin.jsonl` bound to the written
+bytes. The JSON summary includes its basename in `originReceipt` and uses the
+same table-word origins as the listing at the `/chunk` paths in `fieldOrigins`.
+Unchanged bytes use one `opaquePayload` address. Converted CryXml uses
+`xmlBytes` addresses for the emitted fields. The embedded source coordinates
+start with the chunk's decoded byte offset, followed by the original CryXml
+ordinals. The dump file and its companion cannot alias the input.
+
 ## `p4kx model info <archive> <entry> [--anim-from <entry>]… --json`
 
 Also `p4kx model info <file> [--anim-from <file>]… --json` for a model file on disk with its geometry

@@ -7,6 +7,7 @@ mod model_archive_source;
 pub(crate) mod model_material_origins;
 
 pub use crate::animation_sources::ArchiveAnimationRead;
+pub use crate::chunk_source::{ChunkDumpMode, ChunkDumpPayload, PreparedChunk};
 pub use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
 pub use crate::field_origin_seed::FieldOriginSeed;
 pub use crate::field_origins::{FieldOrigins, FieldOriginsError};
