@@ -3,12 +3,10 @@
 
 use p4kx_extraction::{RecordTree, StructValue};
 
-use crate::contract_reputation::{
-    FactionReputation, RelationStanding, ReputationContext, ReputationScope,
-};
+use crate::contract_reputation::{FactionReputation, RelationStanding, ReputationContext};
 use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{key, one};
-use crate::record_fields::{boolean, class_name, integer, reference, references, structs, text};
+use crate::record_fields::{boolean, class_name, reference, references, structs, text};
 use crate::texts::Texts;
 
 /// The name of the `propertiesBB` entry of a faction that states whether it is lawful.
@@ -34,25 +32,6 @@ pub(crate) fn faction_reputation<'f>(
         enemy_guids: references(root, "enemies"),
         hostility: relation(root, "hostilityParams"),
         allied: relation(root, "alliedParams"),
-    }
-}
-
-/// Returns the reputation scope the Record tree `tree` describes.
-pub(crate) fn reputation_scope<'f>(
-    tree: &RecordTree<'f>,
-    texts: &Texts<'f>,
-) -> ReputationScope<'f> {
-    let root = Some(tree.root());
-    let map = one(root, "standingMap");
-    ReputationScope {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        scope_name: text(root, "scopeName"),
-        display_name: texts.localised(key(root, "displayName")),
-        reputation_ceiling: integer(map, "reputationCeiling"),
-        initial_reputation: integer(map, "initialReputation"),
-        standing_guids: references(map, "standings"),
     }
 }
 

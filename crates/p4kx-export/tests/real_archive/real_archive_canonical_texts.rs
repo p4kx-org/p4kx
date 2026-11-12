@@ -33,7 +33,7 @@ const FIELDS: [(&str, TextDomain); 2] = [
     ("description", TextDomain::GameText),
 ];
 
-const STANDING_DISPLAY_FIELDS: [(&str, TextDomain); 1] = [("displayName", TextDomain::GameText)];
+const REPUTATION_DISPLAY_FIELDS: [(&str, TextDomain); 1] = [("displayName", TextDomain::GameText)];
 
 const PRESENTATION_FIELDS: [(&str, TextDomain); 3] = [
     ("name", TextDomain::PublicName),
@@ -270,6 +270,7 @@ pub(crate) fn kind_coverage(
             | Kind::Commodities
             | Kind::ResourceTypes
             | Kind::Blueprints
+            | Kind::ReputationScopes
             | Kind::ReputationStandings
     ) {
         return canonical_coverage(catalog, kind, english_oracle, german_oracle);
@@ -366,9 +367,10 @@ fn canonical_coverage(
             }
             continue;
         }
-        let (fields, shape) = if kind == Kind::ReputationStandings {
+        let (fields, shape) = if matches!(kind, Kind::ReputationScopes | Kind::ReputationStandings)
+        {
             (
-                STANDING_DISPLAY_FIELDS.as_slice(),
+                REPUTATION_DISPLAY_FIELDS.as_slice(),
                 TextReferenceShape::Required,
             )
         } else if kind == Kind::Commodities {

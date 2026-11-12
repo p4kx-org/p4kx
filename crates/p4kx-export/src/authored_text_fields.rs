@@ -29,6 +29,21 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         self.locale(name, notes, |fact| projection.protected_locale_fact(fact))
     }
 
+    /// Reads an authored Locale or a legacy String localization key in the protected domain.
+    pub(in crate::catalog_v3) fn protected_locale_or_legacy_key(
+        &self,
+        name: &str,
+        projection: &CatalogProjection<'_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<GameTextRef>, CatalogError> {
+        if let Some((_, fact)) = self.originals.field(self.owner, name)?
+            && matches!(fact.value(), Value::String(_))
+        {
+            return projection.description_fact(fact);
+        }
+        self.protected_locale(name, projection, notes)
+    }
+
     /// Reads a localized or directly stored authored text in its caller's domain.
     pub(in crate::catalog_v3) fn locale_or_string<T>(
         &self,

@@ -137,12 +137,14 @@ fn scope() -> TestRecord {
     )
     .value("scopeName", TestValue::text("FactionReputation"))
     .value("displayName", TestValue::text("@scope_standing"))
+    .value("description", TestValue::text("@scope_fixture_description"))
+    .value("icon", TestValue::text("ui/fixture/reputation_scope.dds"))
     .value(
         "standingMap",
         TestValue::Struct(
             TestInstance::new("SReputationStandingMapParams")
-                .value("reputationCeiling", TestValue::Int32(95_250))
-                .value("initialReputation", TestValue::Int32(0))
+                .value("reputationCeiling", TestValue::Int64(9_007_199_254_740_993))
+                .value("initialReputation", TestValue::Int64(0))
                 .value(
                     "standings",
                     TestValue::Array(vec![
@@ -301,6 +303,7 @@ pub(super) fn write_archive_with_drift(
             GlobalIniBuilder::new()
                 .text("faction_acme", "Acme Emporium")
                 .text("scope_standing", "Standing")
+                .text("scope_fixture_description", "Synthetic scope description")
                 .text("type_job", "Job")
                 .text("fixture_standing_perk", "Synthetic perk")
                 .build(),

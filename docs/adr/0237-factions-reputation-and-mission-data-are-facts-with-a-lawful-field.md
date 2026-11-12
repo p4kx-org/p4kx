@@ -58,3 +58,11 @@ identity and field provenance follow ADR-0356 and ADR-0357. The authored descrip
 perk text and icon paths are part of the definition. Rank display names and perk
 descriptions use the protected text registry. Stored drift intervals retain their
 Single bits and original hours, including fractional intervals and signed zero.
+
+## Catalog v3 scope definitions
+
+`definitions.reputationScopes` holds one sourced row per physical scope Record. The
+owned standing map retains the authored numeric widths and each standing reference
+in stored order, including unresolved references. Scope labels and descriptions use
+the protected text registry. The icon remains a path, and the source arena retains
+additional declarations.

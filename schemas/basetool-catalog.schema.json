@@ -3796,6 +3796,9 @@
         "qualityQuantizations": {
           "$ref": "#/$defs/CatalogTableOfQualityQuantizationDefinition"
         },
+        "reputationScopes": {
+          "$ref": "#/$defs/CatalogTableOfScopeDefinition"
+        },
         "reputationStandings": {
           "$ref": "#/$defs/CatalogTableOfStandingDefinition"
         },
@@ -3827,6 +3830,7 @@
         "missionBrokerEntries",
         "qualityDistributions",
         "qualityQuantizations",
+        "reputationScopes",
         "reputationStandings",
         "resourceGroups",
         "resourceTypes",
@@ -4873,6 +4877,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/RoomAssociations"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfScopeDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ScopeDefinition"
           },
           "type": "array"
         }
@@ -21973,69 +21996,6 @@
       ],
       "type": "object"
     },
-    "ReputationScope": {
-      "description": "A reputation scope: an `SReputationScopeParams` Record under `reputation/scopes`, the ladder of\nstandings one kind of reputation climbs.",
-      "properties": {
-        "className": {
-          "description": "The Record name without its type, e.g. `ReputationScope_Affinity`.",
-          "type": "string"
-        },
-        "displayName": {
-          "$ref": "#/$defs/LocalisedText",
-          "description": "The `displayName`.",
-          "x-gameText": true
-        },
-        "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
-        },
-        "initialReputation": {
-          "description": "The reputation a player starts with (`initialReputation`).",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
-        },
-        "reputationCeiling": {
-          "description": "The highest reputation of the scope (`reputationCeiling`).",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "scopeName": {
-          "description": "The `scopeName`, e.g. `Affinity`.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "standingGuids": {
-          "description": "The standings of the scope, in the stored order.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "className",
-        "displayName",
-        "guid",
-        "initialReputation",
-        "recordPath",
-        "reputationCeiling",
-        "scopeName",
-        "standingGuids"
-      ],
-      "type": "object"
-    },
     "RequiredIntro": {
       "description": "A completion tag a contract requires and the intro contracts that grant it.",
       "properties": {
@@ -24585,6 +24545,99 @@
         "blueprintPoolGuids",
         "globalPointsMultiplier",
         "minPoints"
+      ],
+      "type": "object"
+    },
+    "ScopeDefinition": {
+      "description": "An authored reputation scope and its ordered standing map.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "description": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "displayName": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "icon": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "scopeName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "standingMap": {
+          "$ref": "#/$defs/SourcedValueOfScopeStandingMap"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "description",
+        "displayName",
+        "fileName",
+        "guid",
+        "icon",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "scopeName",
+        "sourceType",
+        "standingMap"
+      ],
+      "type": "object"
+    },
+    "ScopeStandingMap": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "initialReputation": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "reputationCeiling": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "standings": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "initialReputation",
+        "reputationCeiling",
+        "sourceType",
+        "standings"
       ],
       "type": "object"
     },
@@ -60294,6 +60347,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfScopeStandingMap": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ScopeStandingMap"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfSecondaryMagazine": {
       "allOf": [
         {
@@ -68719,13 +68902,6 @@
       },
       "type": "array"
     },
-    "reputationScopes": {
-      "description": "The reputation scopes with the standings of each, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/ReputationScope"
-      },
-      "type": "array"
-    },
     "schemaVersion": {
       "const": 3,
       "description": "The version of the catalog shape; an import rejects a version it does not know.",
@@ -68816,7 +68992,6 @@
     "provenance",
     "refiningProcesses",
     "reputationContexts",
-    "reputationScopes",
     "schemaVersion",
     "shipStoreSlugs",
     "ships",

@@ -18,7 +18,9 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_global_configurations::{self, GlobalConfigurations};
-use crate::catalog_v3::{ammo_definition, reputation_standing_definition};
+use crate::catalog_v3::{
+    ammo_definition, reputation_scope_definition, reputation_standing_definition,
+};
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
 use crate::mission_data::link_scenario_factions;
@@ -226,6 +228,10 @@ fn assemble<R>(
                 collected.explosion_definitions,
             ),
             ammo_definitions: ammo_definition::table(&forge, collected.ammo_definitions),
+            reputation_scopes: reputation_scope_definition::table(
+                &forge,
+                collected.mission_kinds.scopes,
+            ),
             reputation_standings: reputation_standing_definition::table(
                 &forge,
                 collected.mission_kinds.standings,
@@ -348,7 +354,6 @@ fn assemble<R>(
         loot_containers: collected.loot_containers,
         shops: collected.shops,
         faction_reputations: collected.mission_kinds.factions,
-        reputation_scopes: collected.mission_kinds.scopes,
         reputation_contexts: collected.mission_kinds.contexts,
         mission_types: collected.mission_kinds.types,
         mission_localities: collected.mission_kinds.localities,

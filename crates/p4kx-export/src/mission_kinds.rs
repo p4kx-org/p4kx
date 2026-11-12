@@ -5,14 +5,15 @@ use p4kx_extraction::RecordTree;
 
 use crate::Kind;
 use crate::cargo_manifest::cargo_manifest;
+use crate::catalog_v3::reputation_scope_definition::PreparedScope;
 use crate::catalog_v3::reputation_standing_definition::PreparedStanding;
 use crate::contract::{
     CargoManifest, ContractScenario, FactionReputation, MissionLocality, MissionType,
-    ReputationContext, ReputationScope,
+    ReputationContext,
 };
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::mission_data::{contract_scenario, mission_locality, mission_type};
-use crate::reputation::{faction_reputation, reputation_context, reputation_scope};
+use crate::reputation::{faction_reputation, reputation_context};
 use crate::texts::Texts;
 
 /// An entity of one of the mission and reputation kinds.
@@ -20,7 +21,7 @@ pub(crate) enum MissionPick<'f> {
     /// A faction.
     Faction(FactionReputation<'f>),
     /// A reputation scope.
-    Scope(ReputationScope<'f>),
+    Scope(Box<PreparedScope<'f>>),
     /// A reputation standing.
     Standing(Box<PreparedStanding<'f>>),
     /// A reputation context.
@@ -41,7 +42,6 @@ impl<'f> MissionPick<'f> {
     pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>, texts: &Texts<'f>) -> Option<Self> {
         Some(match kind {
             Kind::FactionReputations => Self::Faction(faction_reputation(tree, texts)),
-            Kind::ReputationScopes => Self::Scope(reputation_scope(tree, texts)),
             Kind::ReputationContexts => Self::Context(reputation_context(tree)),
             Kind::MissionTypes => Self::Type(mission_type(tree, texts)),
             Kind::MissionLocalities => Self::Locality(mission_locality(tree)),
@@ -56,7 +56,7 @@ impl<'f> MissionPick<'f> {
 #[derive(Default)]
 pub(crate) struct MissionKinds<'f> {
     pub(crate) factions: Vec<FactionReputation<'f>>,
-    pub(crate) scopes: Vec<ReputationScope<'f>>,
+    pub(crate) scopes: Vec<PreparedScope<'f>>,
     pub(crate) standings: Vec<PreparedStanding<'f>>,
     pub(crate) contexts: Vec<ReputationContext<'f>>,
     pub(crate) types: Vec<MissionType<'f>>,
@@ -70,7 +70,7 @@ impl<'f> MissionKinds<'f> {
     pub(crate) fn push(&mut self, pick: MissionPick<'f>) {
         match pick {
             MissionPick::Faction(entity) => self.factions.push(entity),
-            MissionPick::Scope(entity) => self.scopes.push(entity),
+            MissionPick::Scope(entity) => self.scopes.push(*entity),
             MissionPick::Standing(entity) => self.standings.push(*entity),
             MissionPick::Context(entity) => self.contexts.push(entity),
             MissionPick::Type(entity) => self.types.push(entity),
@@ -83,7 +83,8 @@ impl<'f> MissionKinds<'f> {
     /// Orders every kind by the text of the GUID.
     pub(crate) fn order(&mut self) {
         sort_by_guid(&mut self.factions, |entity| entity.guid);
-        sort_by_guid(&mut self.scopes, |entity| entity.guid);
+        self.scopes
+            .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         self.standings
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         sort_by_guid(&mut self.contexts, |entity| entity.guid);

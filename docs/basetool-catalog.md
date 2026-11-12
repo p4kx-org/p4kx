@@ -236,7 +236,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `harvestableLocations` | The containers whose `.soc` names a provider preset, with the starmap object each hangs below, ordered by preset, container, system and object |
 | `shops` | The shops of the shop registry with kind, brand, location and the link to a starmap object, ordered by `key` |
 | `factionReputations` | The factions of the reputation system with their allies, enemies and relation standings, ordered by GUID |
-| `reputationScopes` | The reputation scopes, each the ladder of standings one kind of reputation climbs, ordered by GUID |
+| `definitions.reputationScopes` | Physical reputation scope definitions with authored presentation and ordered standing maps |
 | `definitions.reputationStandings` | The physical reputation standings with authored presentation and progression fields, ordered by GUID and original Record index |
 | `reputationContexts` | The reputation contexts, the scopes a faction is shown with, ordered by GUID |
 | `missionTypes` | The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID |
@@ -1467,9 +1467,12 @@ The sourced `name` and `description` hold a `localized` canonical text Reference
 the protected `x-gameText` domain. `authoredFields` holds remaining field occurrences with
 their source declarations and values. The same rules apply to each owned override body.
 
-**Scopes, standings and contexts.** A scope (`reputationScopes`) has `scopeName`, `displayName` (a
-game text), `reputationCeiling`, `initialReputation` and `standingGuids`, its standings in stored
-order. The standing definitions under `definitions.reputationStandings.rows` retain physical
+**Scopes, standings and contexts.** A scope in `definitions.reputationScopes.rows` retains its
+physical Record identity, `scopeName`, protected `displayName` and `description` references, and
+`icon` path. The owned `standingMap` preserves the original `reputationCeiling` and
+`initialReputation` in their authored numeric widths and each `standings` reference in stored
+order. Filtered and dangling targets retain their original GUIDs. Source fields and links carry
+individual provenance. The standing definitions under `definitions.reputationStandings.rows` retain physical
 Record identity and join to stored standing GUIDs from scopes, scenarios and contracts.
 Each definition includes the original `name`, `description`, `displayName`, `perkDescription`,
 `icon` and `missionBoardIcon` fields. The rank name and perk text use the protected
@@ -1480,7 +1483,7 @@ Single in hours with exact IEEE bits and a nullable finite projection. Each sour
 has its original contributors. Additional fields remain in the shared source arena.
 A context (`reputationContexts`) has `primaryScopeGuid` and `scopeGuids`
 (the `scopeContextList`). The scope of a gain in `reputationGains` is an entry of
-`reputationScopes` (10 of the 46 are used by a contract).
+`definitions.reputationScopes`.
 
 **Mission types (`missionTypes`).** `typeName` is the `LocalisedTypeName`, a game text (41 of 42
 have an English one). Every `missionTypeGuid` of `contracts` (26 types on LIVE) is an entry.
@@ -1622,7 +1625,7 @@ additive rule of ADR-0054 is not touched.
 | `shipSpawns`, `npcSpawns`, `entitySpawns`, `locationQueries` | The links of ADR-0266 and ADR-0324, one per variable the template states, with `level` always `template`, into `contractShipSpawns`, `contractNpcSpawns`, `contractEntitySpawns` and `contractLocationQueries` |
 | `haulingOrders` | The hauling orders of the template as in "Hauling orders": the properties (`source` `template`) and the orders of its hauling objectives (`templateObjective`) |
 | `objectives` | The objective tokens depth first, each phase after its parent (see "Objectives") |
-| `partialPayout` | The `PartialContractRewards`: `thresholds`, each `minPercentage`, `maxPercentage`, `currencyRewardMultiplier` and `reputationMultipliers` (`scopeGuid`, an entry of `reputationScopes`, and `reputationRewardMultiplier`); `null` without one |
+| `partialPayout` | The `PartialContractRewards`: `thresholds`, each `minPercentage`, `maxPercentage`, `currencyRewardMultiplier` and `reputationMultipliers` (`scopeGuid`, a row of `definitions.reputationScopes`, and `reputationRewardMultiplier`); `null` without one |
 | `modifiers` | The modifiers in stored order, tagged by `modifier`: `securityClearance` (`clearanceTokenGuid`), `requestRentShip` (`itemGuid`, `durationSeconds`, `clearRentalOnFail`), `shipKioskFilter` (`terms`, each `positiveTags` and `negativeTags`), `factionHostility` (`factionGuid`, a `Faction` Record no kind lists, `myReaction` and `theirReaction` as `friendly`, `neutral` or `hostile`, `ignoreCriminalHostility`), `hostileMission` and `ignoreMissionPlayerCriminality` (`brokerEntryGuid`, an entry of `missionBrokerEntries`; `legalToAttack` for the first) and `lawLicense` (`licenseType`: `illegalGoodsLicenseClassA`, `B` or `C`); each with the shared `modifierName`, `enabled` and `locationProperty`, the variable of the property the weak pointer names |
 | `owner` | The `DevOwner` Record: `guid` and `className` (e.g. `MDT`); `null` without one |
 | `missionFlow` | The triggers in stored order (see "Mission flow") |

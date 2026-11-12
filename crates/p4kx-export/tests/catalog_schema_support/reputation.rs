@@ -28,16 +28,28 @@ pub(super) fn factions() -> serde_json::Value {
 }
 
 pub(super) fn scopes() -> serde_json::Value {
-    json!([{
-        "guid": SCOPE,
-        "className": "FactionReputationScope",
-        "recordPath": "libs/foundry/records/reputation/scopes/factionreputationscope",
-        "scopeName": "FactionReputation",
-        "displayName": {"key": "@scope_standing", "en": "Standing", "de": null},
-        "reputationCeiling": 95250,
-        "initialReputation": 0,
-        "standingGuids": [STANDING]
-    }])
+    json!({"availability":"available","rows":[{
+        "guid":values::present(json!(SCOPE)),
+        "recordName":values::present(json!("FactionReputationScope")),
+        "className":values::present(json!("FactionReputationScope")),
+        "recordPath":values::present(json!("libs/foundry/records/reputation/scopes/factionreputationscope")),
+        "recordIndex":values::present(json!(1)),
+        "sourceType":values::present(json!("SReputationScopeParams")),
+        "fileName":values::present(json!("libs/foundry/records/reputation/scopes/factionreputationscope.xml")),
+        "metadataTag":values::source(SourceValue::Absent),
+        "scopeName":values::present(json!("FactionReputation")),
+        "displayName":values::source(SourceValue::Absent),
+        "description":values::source(SourceValue::Absent),
+        "icon":values::present(json!("ui/fixture/reputation_scope.dds")),
+        "standingMap":values::present(json!({
+            "sourceType":values::present(json!("SReputationStandingMapParams")),
+            "reputationCeiling":values::present(json!({"type":"int64","value":"9007199254740993"})),
+            "initialReputation":values::present(json!({"type":"int64","value":"0"})),
+            "standings":values::present(json!([])),
+            "authoredFields":{"roots":[],"values":[]}
+        })),
+        "authoredFields":{"roots":[],"values":[]}
+    }]})
 }
 
 pub(super) fn standings() -> serde_json::Value {

@@ -321,6 +321,7 @@ fn check_coverage(
                     | Kind::Commodities
                     | Kind::ContractTemplates
                     | Kind::MissionBrokerEntries
+                    | Kind::ReputationScopes
                     | Kind::ReputationStandings
             )
             && row_count > 0

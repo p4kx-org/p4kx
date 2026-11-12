@@ -300,6 +300,7 @@ impl Coverage<'_, '_> {
                     | Kind::ExplosionDefinitions
                     | Kind::AmmoDefinitions
                     | Kind::Factions
+                    | Kind::ReputationScopes
                     | Kind::ReputationStandings
             )
         ) {
@@ -368,7 +369,7 @@ impl Coverage<'_, '_> {
                 NumberOccurrence::ItemComponentValue { ordinal },
                 ResourceNumberContract::Single,
             ),
-            Some(Kind::Factions | Kind::ReputationStandings)
+            Some(Kind::Factions | Kind::ReputationScopes | Kind::ReputationStandings)
                 if matches!(
                     captured,
                     NumberOccurrence::AuthoredDefinitionRawValue { .. }

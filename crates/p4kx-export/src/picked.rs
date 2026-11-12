@@ -108,7 +108,6 @@ impl<'f> Picked<'f> {
             Kind::MineableCompositions => Self::Composition(mineable_composition(tree, texts)),
             Kind::MiningGlobalParams => Self::MiningParams(mining_global_params(tree)),
             Kind::FactionReputations
-            | Kind::ReputationScopes
             | Kind::ReputationContexts
             | Kind::MissionTypes
             | Kind::MissionLocalities
@@ -132,6 +131,7 @@ impl<'f> Picked<'f> {
             | Kind::Blueprints
             | Kind::BlueprintCategories
             | Kind::BlueprintCategoryLists
+            | Kind::ReputationScopes
             | Kind::ReputationStandings
             | Kind::ExplosionDefinitions
             | Kind::AmmoDefinitions

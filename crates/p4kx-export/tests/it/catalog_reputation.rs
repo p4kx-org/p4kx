@@ -10,6 +10,8 @@ mod catalog_faction;
 mod faction_modifier;
 #[path = "catalog_scenario_faction_scope.rs"]
 mod faction_scope;
+#[path = "catalog_reputation_scope.rs"]
+mod reputation_scope;
 
 use crate::reputation_fixture::{
     CONTEXT, FACTION, FACTION_BARE, LEGACY_FACTION, LOCALITY, MISSION_TYPE, PLAIN_A, PLAIN_B,
@@ -116,18 +118,16 @@ fn a_faction_without_the_fields_has_null_and_empty_values() -> TestResult {
 #[test]
 fn a_scope_lists_its_standings_in_stored_order() -> TestResult {
     let (_, catalog) = build(None)?;
+    let scope = proof::at(&catalog, "/definitions/reputationScopes/rows/0")?;
+    proof::present(scope, "scopeName", &json!("FactionReputation"), Some(true))?;
+    let rows = proof::rows(scope, "/standingMap/value/standings/value")?;
+    let guids = rows
+        .iter()
+        .map(|row| proof::at(row, "/value/guid/value"))
+        .collect::<Result<Vec<_>, _>>()?;
     assert_eq!(
-        *entry(&catalog, "reputationScopes", SCOPE)?,
-        json!({
-            "guid": guid(SCOPE),
-            "className": "FactionReputationScope",
-            "recordPath": "libs/foundry/records/reputation/scopes/factionreputationscope",
-            "scopeName": "FactionReputation",
-            "displayName": {"key": "@scope_standing", "en": "Standing", "de": null},
-            "reputationCeiling": 95_250,
-            "initialReputation": 0,
-            "standingGuids": [guid(STANDING_LOW), guid(STANDING_HIGH)]
-        })
+        guids,
+        vec![&json!(guid(STANDING_LOW)), &json!(guid(STANDING_HIGH))]
     );
     Ok(())
 }

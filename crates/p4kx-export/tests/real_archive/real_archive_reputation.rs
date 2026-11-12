@@ -8,10 +8,13 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
+
+use crate::catalog_v3_consumer;
+use crate::real_archive_verification::guids as canonical_guids;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -40,13 +43,6 @@ fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, Box<dyn
         .iter()
         .filter_map(|entry| entry["guid"].as_str())
         .collect())
-}
-
-fn standing_guids(catalog: &Value) -> Result<HashSet<&str>, Box<dyn Error>> {
-    crate::catalog_v3_consumer::rows(catalog, p4kx_export::Kind::ReputationStandings)?
-        .iter()
-        .map(|row| text(row, "/guid/value").ok_or_else(|| "a sourced standing GUID".into()))
-        .collect()
 }
 
 fn named<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, Box<dyn Error>> {
@@ -87,10 +83,15 @@ fn assert_resolve<'c>(
 
 /// Asserts that the standings of every scope and the scopes of every context are kept Records.
 fn check_ladders(catalog: &Value, scopes: &HashSet<&str>, standings: &HashSet<&str>) -> TestResult {
-    for scope in list(catalog, "reputationScopes")? {
+    for scope in catalog_v3_consumer::rows(catalog, Kind::ReputationScopes)? {
         assert_resolve(
             "the standings of a scope",
-            strings(scope, "standingGuids"),
+            scope
+                .pointer("/standingMap/value/standings/value")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|link| text(link, "/value/guid/value")),
             standings,
         );
     }
@@ -114,8 +115,8 @@ fn check_ladders(catalog: &Value, scopes: &HashSet<&str>, standings: &HashSet<&s
 fn the_factions_and_their_reputation_ladders_of_a_real_archive_are_linked() -> TestResult {
     let catalog = catalog()?;
     let factions = list(&catalog, "factionReputations")?;
-    let scopes = guids(&catalog, "reputationScopes")?;
-    let standings = standing_guids(&catalog)?;
+    let scopes = canonical_guids(&catalog, "reputationScopes")?;
+    let standings = canonical_guids(&catalog, "reputationStandings")?;
     let contexts = guids(&catalog, "reputationContexts")?;
     let faction_guids = guids(&catalog, "factionReputations")?;
     print_line(&format!(
@@ -163,11 +164,10 @@ fn the_factions_and_their_reputation_ladders_of_a_real_archive_are_linked() -> T
         }
     }
     check_ladders(&catalog, &scopes, &standings)?;
-    let ranked =
-        crate::catalog_v3_consumer::rows(&catalog, p4kx_export::Kind::ReputationStandings)?
-            .iter()
-            .filter(|standing| standing["minReputation"]["state"] == "present")
-            .count();
+    let ranked = catalog_v3_consumer::rows(&catalog, Kind::ReputationStandings)?
+        .iter()
+        .filter(|standing| standing["minReputation"]["state"] == "present")
+        .count();
     assert_eq!(ranked, standings.len(), "every standing has a minimum");
     Ok(())
 }
@@ -201,8 +201,8 @@ fn a_contract_of_a_real_archive_names_its_type_and_standing_range() -> TestResul
     let catalog = catalog()?;
     let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let types = guids(&catalog, "missionTypes")?;
-    let standings = standing_guids(&catalog)?;
-    let scopes = guids(&catalog, "reputationScopes")?;
+    let standings = canonical_guids(&catalog, "reputationStandings")?;
+    let scopes = canonical_guids(&catalog, "reputationScopes")?;
     let factions = guids(&catalog, "factionReputations")?;
     let ranged: Vec<&Value> = contracts
         .iter()

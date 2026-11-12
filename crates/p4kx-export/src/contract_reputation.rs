@@ -52,31 +52,6 @@ pub(crate) struct RelationStanding {
     pub(crate) standing_guid: Option<CatalogGuid>,
 }
 
-/// A reputation scope: an `SReputationScopeParams` Record under `reputation/scopes`, the ladder of
-/// standings one kind of reputation climbs.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct ReputationScope<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `ReputationScope_Affinity`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The `scopeName`, e.g. `Affinity`.
-    pub(crate) scope_name: Option<&'a str>,
-    /// The `displayName`.
-    #[schemars(extend("x-gameText" = true))]
-    pub(crate) display_name: LocalisedText<'a>,
-    /// The highest reputation of the scope (`reputationCeiling`).
-    pub(crate) reputation_ceiling: Option<i64>,
-    /// The reputation a player starts with (`initialReputation`).
-    pub(crate) initial_reputation: Option<i64>,
-    /// The standings of the scope, in the stored order.
-    pub(crate) standing_guids: Vec<CatalogGuid>,
-}
-
 /// A reputation context: an `SReputationContextUI` Record under `reputation/contexts`, the scopes a
 /// faction is shown with.
 #[derive(Debug, Serialize, JsonSchema)]

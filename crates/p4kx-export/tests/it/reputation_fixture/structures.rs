@@ -43,11 +43,16 @@ fn reputation_structs() -> Vec<TestStruct> {
         TestStruct::new("SReputationScopeParams")
             .field("scopeName", TestType::String)
             .field("displayName", TestType::Locale)
+            .field("description", TestType::Locale)
+            .field("icon", TestType::String)
             .field("standingMap", class("SReputationStandingMapParams")),
         TestStruct::new("SReputationStandingMapParams")
-            .field("reputationCeiling", TestType::Int32)
-            .field("initialReputation", TestType::Int32)
-            .array("standings", TestType::Reference),
+            .field("reputationCeiling", TestType::Int64)
+            .field("initialReputation", TestType::Int64)
+            .array(
+                "standings",
+                TestType::ReferenceTo("SReputationStandingParams".to_owned()),
+            ),
         TestStruct::new("SReputationStandingParams")
             .field("name", TestType::String)
             .field("description", TestType::String)
