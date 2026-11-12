@@ -154,8 +154,7 @@ impl ViewTexture {
     pub(crate) fn take_pixels(&self) -> (Vec<u8>, Vec<Level>) {
         self.pixels
             .lock()
-            .map(|mut pixels| std::mem::take(&mut *pixels))
-            .unwrap_or_default()
+            .map_or_default(|mut pixels| std::mem::take(&mut *pixels))
     }
 }
 

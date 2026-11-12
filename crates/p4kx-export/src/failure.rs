@@ -25,7 +25,7 @@ impl CatalogFailure {
         let reason = crate::failure_text::render(error);
         Self {
             guid: record.guid(),
-            record_path: record.record_path().map(str::to_owned).unwrap_or_default(),
+            record_path: record.record_path().map_or_default(str::to_owned),
             reason,
         }
     }

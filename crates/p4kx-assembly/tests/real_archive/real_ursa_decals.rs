@@ -67,7 +67,7 @@ fn every_palette_with_decal_colours_paints_the_decals_of_the_ursa_medivac() -> T
         checked += 1;
         let bits = decal.map(|colour| colour.map(f32::to_bits));
         if example.is_none() && bits[0] != bits[1] && bits[1] != bits[2] && bits[0] != bits[2] {
-            example = Some((palette.name.clone(), decal));
+            example = Some((palette.name, decal));
         }
     }
 

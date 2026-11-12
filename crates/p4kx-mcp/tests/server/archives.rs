@@ -65,8 +65,7 @@ fn list_channels_includes_manual_archives_from_the_settings() -> TestResult {
     let channels = server.ok("list_channels", &json!({}))?;
     let names: Vec<&str> = channels["channels"]
         .as_array()
-        .map(|list| list.iter().filter_map(|c| c["name"].as_str()).collect())
-        .unwrap_or_default();
+        .map_or_default(|list| list.iter().filter_map(|c| c["name"].as_str()).collect());
     assert_eq!(names, ["LIVE", "PTU"], "default first, then manual");
     assert_eq!(channels["channels"][1]["source"], "manual", "PTU is manual");
     let first = server.ok("list_channels", &json!({ "limit": 1 }))?;

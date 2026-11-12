@@ -109,14 +109,11 @@ fn check_binds(
 
 fn check_node(glb: &CheckedGlb, node: &Node<'_>, parents: &[Option<usize>]) -> Result<(), String> {
     let name = format!("node {}", node.index());
-    let skinned_primitives = node
-        .mesh()
-        .map(|mesh| {
-            mesh.primitives()
-                .filter(|primitive| primitive.get(&Semantic::Joints(0)).is_some())
-                .count()
-        })
-        .unwrap_or_default();
+    let skinned_primitives = node.mesh().map_or_default(|mesh| {
+        mesh.primitives()
+            .filter(|primitive| primitive.get(&Semantic::Joints(0)).is_some())
+            .count()
+    });
     match (node.skin(), node.mesh()) {
         (Some(_), None) => return Err(format!("{name} has a skin but no mesh")),
         (None, Some(_)) if skinned_primitives > 0 => {

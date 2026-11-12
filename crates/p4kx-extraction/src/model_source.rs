@@ -273,8 +273,7 @@ impl ModelSource {
         let source = ChunkSource::from_file(path)?;
         let file_name = path
             .file_name()
-            .map(|name| name.to_string_lossy().into_owned())
-            .unwrap_or_default();
+            .map_or_default(|name| name.to_string_lossy().into_owned());
         let folder = path.parent().unwrap_or_else(|| Path::new(""));
         let mut companions = DiskCompanions {
             folder,

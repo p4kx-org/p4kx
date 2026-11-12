@@ -27,8 +27,7 @@ pub(crate) fn search(server: &mut Server) -> TestResult<Value> {
 pub(crate) fn texts(result: &Value) -> Vec<&str> {
     result["content"]
         .as_array()
-        .map(|blocks| blocks.iter().filter_map(|b| b["text"].as_str()).collect())
-        .unwrap_or_default()
+        .map_or_default(|blocks| blocks.iter().filter_map(|b| b["text"].as_str()).collect())
 }
 
 pub(crate) fn hint_of<'a>(result: &'a Value, needle: &str) -> Option<&'a str> {

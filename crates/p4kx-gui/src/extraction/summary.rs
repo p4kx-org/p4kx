@@ -102,14 +102,12 @@ impl ExtractionSummary {
             cancelled: report.cancelled().to_vec(),
             archive_changed: report.archive_changed(),
             records: report.records().map(RecordCounts::new),
-            record_failures: report
-                .records()
-                .map(|records| records.failures().iter().map(FailedRecord::of).collect())
-                .unwrap_or_default(),
-            records_renamed: report
-                .records()
-                .map(|records| records.renamed().iter().map(RenamedRecord::of).collect())
-                .unwrap_or_default(),
+            record_failures: report.records().map_or_default(|records| {
+                records.failures().iter().map(FailedRecord::of).collect()
+            }),
+            records_renamed: report.records().map_or_default(|records| {
+                records.renamed().iter().map(RenamedRecord::of).collect()
+            }),
             excluded_parts: 0,
             not_converted: report.not_converted(),
         }

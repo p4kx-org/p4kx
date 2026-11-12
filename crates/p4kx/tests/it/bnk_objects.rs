@@ -113,8 +113,7 @@ fn json(args: &[&str], file: &Path) -> Result<Value, Box<dyn Error>> {
 fn ids(report: &Value) -> Vec<u64> {
     report["objects"]
         .as_array()
-        .map(|objects| objects.iter().filter_map(|o| o["id"].as_u64()).collect())
-        .unwrap_or_default()
+        .map_or_default(|objects| objects.iter().filter_map(|o| o["id"].as_u64()).collect())
 }
 
 #[test]

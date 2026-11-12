@@ -235,7 +235,7 @@ fn summarise(records: &[Record<'_>], outcomes: Vec<(usize, RecordOutcome)>) -> R
             RecordOutcome::Failed(error) => {
                 let record = records.get(index);
                 report.failures.push(RecordFailure {
-                    guid: record.map(Record::guid).unwrap_or_default(),
+                    guid: record.map_or_default(Record::guid),
                     record_path: record
                         .and_then(|record| record.record_path().ok())
                         .unwrap_or_default()

@@ -136,8 +136,7 @@ impl Canvas {
             brands: brand_styles(root),
             shared: shared_styles(root),
             defaults: child(root, "defaultStyles")
-                .map(|defaults| parse_entries(items(defaults, "entries")).into())
-                .unwrap_or_default(),
+                .map_or_default(|defaults| parse_entries(items(defaults, "entries")).into()),
             embedded: parse_entries(items(root, "embeddedStyles")).into(),
         }
     }

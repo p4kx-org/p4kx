@@ -46,8 +46,7 @@ pub(crate) fn info(archive: &Archive, patches: &PublicPatches) -> ArchiveInfo {
                 path: archive
                     .entries()
                     .get(*index)
-                    .map(|entry| entry.path().to_owned())
-                    .unwrap_or_default(),
+                    .map_or_default(|entry| entry.path().to_owned()),
                 issue: issue.to_string(),
             })
             .collect(),
@@ -103,8 +102,7 @@ pub(crate) fn list(place: &Place<'_>, folder: &str, page: Page) -> Result<Folder
     let lookup = FolderLookup::run(tree, folder);
     let (folders, files) = lookup
         .selected
-        .map(|id| (tree.folder(id).children(), tree.files(id)))
-        .unwrap_or_default();
+        .map_or_default(|id| (tree.folder(id).children(), tree.files(id)));
     let total = folders.len() + files.len();
     let folder_page = page.slice(folders);
     let file_offset = page.offset().saturating_sub(folders.len()).min(files.len());

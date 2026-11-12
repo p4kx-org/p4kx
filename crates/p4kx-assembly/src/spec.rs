@@ -163,9 +163,9 @@ impl EntitySpec {
         };
         let geometry = geometry_component
             .and_then(|(ordinal, component)| Geometry::read(component, position(ordinal)));
-        let variants = geometry_component
-            .map(|(ordinal, component)| Geometry::read_variants(component, position(ordinal)))
-            .unwrap_or_default();
+        let variants = geometry_component.map_or_default(|(ordinal, component)| {
+            Geometry::read_variants(component, position(ordinal))
+        });
         let vehicle = component_slots(tree)
             .find(|(_, component)| component.type_name() == VEHICLE_PARAMS)
             .map(|(ordinal, component)| read_vehicle(component, ordinal, tree, paths));
@@ -177,11 +177,9 @@ impl EntitySpec {
                 .map_or("", |definition| text(definition, "SubType"))
                 .to_owned(),
             attach_tags: definition
-                .map(|definition| tag_words(text(definition, "Tags")))
-                .unwrap_or_default(),
+                .map_or_default(|definition| tag_words(text(definition, "Tags"))),
             material_variants: geometry_component
-                .map(|(_, component)| MaterialVariant::read(component))
-                .unwrap_or_default(),
+                .map_or_default(|(_, component)| MaterialVariant::read(component)),
             size: definition.and_then(|definition| unsigned(definition, "Size")),
             docked_vehicle: is_docked_vehicle_type(attach_type),
             attach_type: attach_type.to_owned(),

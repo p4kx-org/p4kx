@@ -39,10 +39,7 @@ pub(crate) fn xma() -> Vec<u8> {
 }
 
 pub(crate) fn prefetch() -> Vec<u8> {
-    pcm()
-        .get(..PREFETCH_LEN)
-        .map(<[u8]>::to_vec)
-        .unwrap_or_default()
+    pcm().get(..PREFETCH_LEN).map_or_default(<[u8]>::to_vec)
 }
 
 /// A soundbank embedding a Wwise Vorbis, a PCM and an XMA2 WEM and a prefetched start.

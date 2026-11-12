@@ -366,8 +366,7 @@ impl VehicleImplementation {
     pub fn port_visibility(&self, name: &str) -> PortVisibility {
         self.port_part(name)
             .and_then(|part| part.item_port.as_ref())
-            .map(VehicleItemPort::visibility)
-            .unwrap_or_default()
+            .map_or_default(VehicleItemPort::visibility)
     }
 
     /// Returns the first part named `name` that holds an item port, ignoring ASCII case.

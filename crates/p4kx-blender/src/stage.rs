@@ -55,7 +55,7 @@ pub(crate) struct Staging<'a> {
 impl<'a> Staging<'a> {
     pub(crate) fn create(out: &Path, context: PackageWriteContext<'a>) -> PackageResult<Self> {
         check_output_with_context(out, &context)?;
-        let name = out.file_name().map(OsStr::to_os_string).unwrap_or_default();
+        let name = out.file_name().map_or_default(OsStr::to_os_string);
         let folder = parent_of(out).join(sibling_name(&name, "part"));
         let mut staging = Self {
             folder,

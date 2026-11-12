@@ -108,15 +108,12 @@ fn fixture(text: &str) -> Value {
 }
 
 fn tokens_of<'a>(json: &'a Value, group: &str) -> Vec<(&'a str, &'a str)> {
-    json[group]["tokens"]
-        .as_array()
-        .map(|tokens| {
-            tokens
-                .iter()
-                .filter_map(|token| Some((token["name"].as_str()?, token["value"].as_str()?)))
-                .collect()
-        })
-        .unwrap_or_default()
+    json[group]["tokens"].as_array().map_or_default(|tokens| {
+        tokens
+            .iter()
+            .filter_map(|token| Some((token["name"].as_str()?, token["value"].as_str()?)))
+            .collect()
+    })
 }
 
 fn resolve<'a>(values: &BTreeMap<&str, &'a str>, value: &'a str) -> &'a str {

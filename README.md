@@ -203,8 +203,8 @@ P4KX only reads the game folders and refuses to write into a Star Citizen instal
 
 ## Build
 
-The repository selects an exact stable compiler in [rust-toolchain.toml](rust-toolchain.toml);
-rustup uses it automatically. The workspace minimum remains Rust 1.99.
+The repository pins Rust 1.100.0 in [rust-toolchain.toml](rust-toolchain.toml).
+Rustup selects it automatically. The minimum supported Rust version is also 1.100.0.
 The native v0.5.0 target and verification contract covers Windows and Linux on AMD64 and ARM64,
 and macOS 26 or later on Apple Silicon. See [native platforms and release verification](docs/supported-platforms.md).
 

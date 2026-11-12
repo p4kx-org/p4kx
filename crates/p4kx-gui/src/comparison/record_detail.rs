@@ -155,8 +155,7 @@ impl RecordWorker {
 fn fields(lookup: &RecordLookup<'_>, key: RecordKey) -> RecordFields {
     lookup
         .change(key)
-        .map(|change| RecordFields::of(&change))
-        .unwrap_or_default()
+        .map_or_default(|change| RecordFields::of(&change))
 }
 
 fn serve(

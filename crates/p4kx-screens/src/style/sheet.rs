@@ -127,8 +127,7 @@ fn style_entries(forge: &DataForge<'_>, cache: &mut StyleCache, style: Guid) -> 
     let entries: Rc<[Entry]> = forge
         .record_by_guid(style)
         .and_then(|record| record.tree().ok())
-        .map(|tree| parse_entries(items(tree.root(), "entries")))
-        .unwrap_or_default()
+        .map_or_default(|tree| parse_entries(items(tree.root(), "entries")))
         .into();
     cache.insert(style, Rc::clone(&entries));
     entries

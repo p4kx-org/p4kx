@@ -127,8 +127,7 @@ impl DemandScope {
                 .scopes
                 .iter()
                 .find(|(id, _)| *id == self.id)
-                .map(|(_, counts)| read(counts))
-                .unwrap_or_default()
+                .map_or_default(|(_, counts)| read(counts))
         })
     }
 }

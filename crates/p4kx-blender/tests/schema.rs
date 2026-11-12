@@ -54,8 +54,7 @@ fn the_schema_requires_the_fields_a_reader_depends_on() {
     let required: Vec<&str> = schema
         .get("required")
         .and_then(serde_json::Value::as_array)
-        .map(|names| names.iter().filter_map(serde_json::Value::as_str).collect())
-        .unwrap_or_default();
+        .map_or_default(|names| names.iter().filter_map(serde_json::Value::as_str).collect());
     for name in [
         "format",
         "version",

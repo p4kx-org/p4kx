@@ -64,7 +64,7 @@ impl OwnedTextSet {
     /// held it, also when it is empty.
     #[must_use]
     pub fn text(&self, key: &str, language: Language) -> Option<&str> {
-        let key = key.strip_prefix('@').unwrap_or(key);
+        let key = key.trim_prefix('@');
         let rows = self.rows(language)?;
         let at = rows
             .binary_search_by(|(known, _)| fold_cmp(known, key))

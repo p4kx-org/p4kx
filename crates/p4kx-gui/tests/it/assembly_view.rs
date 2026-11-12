@@ -42,14 +42,13 @@ pub(crate) fn built(harness: &mut Harness<'_, Model>, before: Option<u64>) -> Te
 fn paths(model: &Model) -> Vec<String> {
     view(model)
         .and_then(AssemblyView::scene)
-        .map(|scene| {
+        .map_or_default(|scene| {
             scene
                 .parts()
                 .iter()
                 .map(|part| part.path().to_owned())
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 pub(crate) fn draw(

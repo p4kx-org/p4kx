@@ -35,15 +35,12 @@ fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
 }
 
 fn shops_of<'a>(catalog: &'a Value, entity: &str) -> Vec<&'a Value> {
-    catalog["shops"]
-        .as_array()
-        .map(|shops| {
-            shops
-                .iter()
-                .filter(|shop| shop["entityGuid"] == entity)
-                .collect()
-        })
-        .unwrap_or_default()
+    catalog["shops"].as_array().map_or_default(|shops| {
+        shops
+            .iter()
+            .filter(|shop| shop["entityGuid"] == entity)
+            .collect()
+    })
 }
 
 #[test]

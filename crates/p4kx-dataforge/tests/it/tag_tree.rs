@@ -361,5 +361,5 @@ fn json_annotates_tag_references_only() -> TestResult {
 }
 
 fn guid_text(value: u128) -> String {
-    guid(value).map(|guid| guid.to_string()).unwrap_or_default()
+    guid(value).map_or_default(|guid| guid.to_string())
 }

@@ -68,8 +68,7 @@ pub(crate) fn resolve_on_disk(
     let folder = std::path::absolute(movie)
         .map_err(|source| read_error(movie, source))?
         .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_default();
+        .map_or_default(Path::to_path_buf);
     let root = image_root(&folder);
     if relative.contains(':') || relative.starts_with(['/', '\\']) {
         return Err(DiskPathError::Outside { root });

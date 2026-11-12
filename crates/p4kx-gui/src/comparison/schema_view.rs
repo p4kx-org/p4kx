@@ -154,22 +154,12 @@ fn struct_rows(change: &StructChange, rows: &mut Vec<SchemaRow>) {
             records: None,
         });
     }
-    rows.extend(change.properties.iter().map(|property| {
-        SchemaRow {
-            kind: SchemaRowKind::Property,
-            change: property.change,
-            name: property.name.clone(),
-            old: property
-                .old
-                .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_default(),
-            new: property
-                .new
-                .as_ref()
-                .map(ToString::to_string)
-                .unwrap_or_default(),
-            records: None,
-        }
+    rows.extend(change.properties.iter().map(|property| SchemaRow {
+        kind: SchemaRowKind::Property,
+        change: property.change,
+        name: property.name.clone(),
+        old: property.old.as_ref().map_or_default(ToString::to_string),
+        new: property.new.as_ref().map_or_default(ToString::to_string),
+        records: None,
     }));
 }

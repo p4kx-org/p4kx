@@ -136,7 +136,7 @@ fn meshes(inputs: &Inputs<'_>) -> Vec<Mesh> {
                     .collected
                     .materials
                     .get(index)
-                    .map(|drawn| {
+                    .map_or_default(|drawn| {
                         drawn
                             .iter()
                             .enumerate()
@@ -144,8 +144,7 @@ fn meshes(inputs: &Inputs<'_>) -> Vec<Mesh> {
                                 mesh_material(inputs, mesh, position, material)
                             })
                             .collect()
-                    })
-                    .unwrap_or_default(),
+                    }),
                 rig: None,
             }
         })

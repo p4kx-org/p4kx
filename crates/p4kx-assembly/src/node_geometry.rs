@@ -100,12 +100,11 @@ pub(crate) fn flag_words<'a>(
     name: &str,
     shared: &'a [String],
 ) -> Vec<&'a str> {
-    let defined = definition.map(PortDefinition::flags).unwrap_or_default();
+    let defined = definition.map_or_default(PortDefinition::flags);
     let flags = if defined.trim().is_empty() {
         vehicle
             .and_then(|vehicle| vehicle.item_port(name))
-            .map(crate::VehicleItemPort::flags)
-            .unwrap_or_default()
+            .map_or_default(crate::VehicleItemPort::flags)
     } else {
         defined
     };

@@ -6,7 +6,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 pub(crate) fn parent_of(out: &Path) -> PathBuf {
-    out.parent().map(Path::to_path_buf).unwrap_or_default()
+    out.parent().map_or_default(Path::to_path_buf)
 }
 
 pub(crate) fn sibling_name(name: &OsString, kind: &str) -> OsString {

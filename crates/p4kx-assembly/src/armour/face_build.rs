@@ -92,8 +92,7 @@ pub(super) fn extend_with_faces(skeleton: &mut Model, parts: &mut [ArmourPart], 
             .face
             .facial
             .as_ref()
-            .map(|facial| facial.offsets.as_slice())
-            .unwrap_or_default();
+            .map_or_default(|facial| facial.offsets.as_slice());
         skeleton.bones = extend_skeleton(&skeleton.bones, &bones, moves);
         let (Some(facial), Some(source)) = (head.face.facial, head.source) else {
             continue;

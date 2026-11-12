@@ -227,10 +227,7 @@ fn an_unknown_layout_version_is_reported_by_its_number() -> TestResult {
         ),
         "layout version 3 is not supported: {result:?}"
     );
-    let message = result
-        .err()
-        .map(|error| error.to_string())
-        .unwrap_or_default();
+    let message = result.err().map_or_default(|error| error.to_string());
     assert!(
         message.contains("layout v3"),
         "the message names the layout: {message}"

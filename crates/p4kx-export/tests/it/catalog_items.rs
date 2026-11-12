@@ -47,15 +47,12 @@ fn catalog_of(maker: Maker) -> Result<Value, Box<dyn Error>> {
 }
 
 fn manufacturer_guids<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c Value> {
-    catalog[kind]
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .filter(|entry| entry["className"] != "Counter_Shop")
-                .map(|entry| &entry["manufacturerGuid"])
-                .collect()
-        })
-        .unwrap_or_default()
+    catalog[kind].as_array().map_or_default(|list| {
+        list.iter()
+            .filter(|entry| entry["className"] != "Counter_Shop")
+            .map(|entry| &entry["manufacturerGuid"])
+            .collect()
+    })
 }
 
 #[test]
@@ -86,14 +83,11 @@ fn a_manufacturer_given_by_a_strong_or_weak_pointer_is_null() -> TestResult {
 }
 
 fn class_names<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c str> {
-    catalog[kind]
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .filter_map(|entry| entry["className"].as_str())
-                .collect()
-        })
-        .unwrap_or_default()
+    catalog[kind].as_array().map_or_default(|list| {
+        list.iter()
+            .filter_map(|entry| entry["className"].as_str())
+            .collect()
+    })
 }
 
 fn entity<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, String> {

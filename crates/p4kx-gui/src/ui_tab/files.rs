@@ -34,8 +34,7 @@ pub(super) fn start(
         }
         let mut paths: Vec<String> = index
             .archive()
-            .map(p4kx_extraction::Archive::entries)
-            .unwrap_or_default()
+            .map_or_default(p4kx_extraction::Archive::entries)
             .iter()
             .map(p4kx_extraction::Entry::path)
             .filter(|path| is_movie_path(path))

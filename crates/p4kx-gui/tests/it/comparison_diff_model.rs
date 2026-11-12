@@ -79,8 +79,7 @@ fn document(tab: &ComparisonTab) -> Result<&DiffDocument, Box<dyn Error>> {
 }
 
 fn text(document: &DiffDocument, side: ComparisonSide, cell: Option<DiffCell>) -> String {
-    cell.map(|cell| String::from_utf8_lossy(document.line(side, cell.line)).into_owned())
-        .unwrap_or_default()
+    cell.map_or_default(|cell| String::from_utf8_lossy(document.line(side, cell.line)).into_owned())
 }
 
 /// Returns each row as the old and the new line with its kind, or the hunk number.

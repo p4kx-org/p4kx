@@ -35,7 +35,7 @@ impl<'a> Replacement<'a> {
             context.cancel_flag(),
             |root| check_shape(root).map_err(io::Error::other),
         )?;
-        let name = out.file_name().map(OsStr::to_os_string).unwrap_or_default();
+        let name = out.file_name().map_or_default(OsStr::to_os_string);
         let old = parent_of(out).join(sibling_name(&name, "old"));
         context.writable(&old)?;
         permit.ensure_namespace_writable(out, context.cancel_flag())?;

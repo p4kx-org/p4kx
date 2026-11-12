@@ -92,15 +92,12 @@ pub(crate) fn serve(install: &Install) -> TestResult<Server> {
 }
 
 fn names(value: &Value, key: &str) -> Vec<String> {
-    value
-        .as_array()
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item[key].as_str().map(str::to_owned))
-                .collect()
-        })
-        .unwrap_or_default()
+    value.as_array().map_or_default(|items| {
+        items
+            .iter()
+            .filter_map(|item| item[key].as_str().map(str::to_owned))
+            .collect()
+    })
 }
 
 #[test]

@@ -186,11 +186,7 @@ impl EntryWriter<'_> {
 /// Returns the name of an image next to the header: its name with `extension` for `.dds`, and
 /// `suffix` before it for one of several images.
 fn image_name(header: &Destination, suffix: &str, extension: &str) -> OsString {
-    let mut name = header
-        .file
-        .file_stem()
-        .map(OsString::from)
-        .unwrap_or_default();
+    let mut name = header.file.file_stem().map_or_default(OsString::from);
     name.push(suffix);
     name.push(".");
     name.push(extension);

@@ -160,18 +160,16 @@ fn row(
     tags: Option<&Tags>,
 ) -> LootContainer {
     let counts = tags.and_then(|read| read.as_ref().ok());
-    let mut tag_counts: Vec<TagCount> = counts
-        .map(|counts| {
-            counts
-                .by_tag
-                .iter()
-                .map(|(&tag, &entities)| TagCount {
-                    tag_guid: CatalogGuid(tag),
-                    entities,
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    let mut tag_counts: Vec<TagCount> = counts.map_or_default(|counts| {
+        counts
+            .by_tag
+            .iter()
+            .map(|(&tag, &entities)| TagCount {
+                tag_guid: CatalogGuid(tag),
+                entities,
+            })
+            .collect()
+    });
     tag_counts.sort_by_cached_key(|count| count.tag_guid.text());
     LootContainer {
         multi_config_guid: CatalogGuid(placed.config),

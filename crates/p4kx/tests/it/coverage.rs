@@ -99,11 +99,7 @@ fn json_lists_every_type_component_and_folder_with_counts() -> TestResult {
     assert_eq!(weapon["entities"], 1);
     assert_eq!(weapon["instances"], 1);
     assert_eq!(weapon["reachable"], true);
-    let [folder] = document["entries"]
-        .as_array()
-        .map(Vec::as_slice)
-        .unwrap_or_default()
-    else {
+    let [folder] = document["entries"].as_array().map_or_default(Vec::as_slice) else {
         return Err("one folder".into());
     };
     assert_eq!(folder["entries"], 1);

@@ -155,8 +155,7 @@ impl<'i> Walk<'_, 'i> {
     fn transition_features(&self) -> MusicTransitionFeatures {
         self.path
             .last()
-            .map(|step| step.transition_features)
-            .unwrap_or_default()
+            .map_or_default(|step| step.transition_features)
     }
 
     fn leave(&mut self, previous: Option<Loaded<'i>>) {

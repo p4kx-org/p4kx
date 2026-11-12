@@ -72,7 +72,5 @@ pub(crate) fn item<'f>(tree: &RecordTree<'f>, texts: &Texts<'f>) -> (Item<'f>, C
 }
 
 fn words(value: Option<&str>) -> Vec<&str> {
-    value
-        .map(|tags| tags.split_whitespace().collect())
-        .unwrap_or_default()
+    value.map_or_default(|tags| tags.split_whitespace().collect())
 }

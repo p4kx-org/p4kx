@@ -18,7 +18,7 @@ pub const PLACEHOLDER_KEYS: [&str; 4] = [
 /// Returns whether `key` is one of the [`PLACEHOLDER_KEYS`].
 #[must_use]
 pub fn is_placeholder_key(key: &str) -> bool {
-    let key = key.strip_prefix('@').unwrap_or(key);
+    let key = key.trim_prefix('@');
     PLACEHOLDER_KEYS.iter().any(|placeholder| {
         placeholder
             .strip_prefix('@')

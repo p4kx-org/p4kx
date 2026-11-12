@@ -150,7 +150,7 @@ fn the_wav_carries_the_loop_as_a_smpl_chunk_before_the_samples() -> TestResult {
     let chunks = wav_chunks(&wav);
     let ids: Vec<[u8; 4]> = chunks.iter().map(|(id, _)| *id).collect();
     assert_eq!(ids, [*b"fmt ", *b"smpl", *b"data"], "chunk order");
-    let smpl = chunks.get(1).map(|(_, body)| *body).unwrap_or_default();
+    let smpl = chunks.get(1).map_or_default(|(_, body)| *body);
     let fields: Vec<u32> = (0..15)
         .filter_map(|index| u32_at(smpl, index * 4))
         .collect();
@@ -159,7 +159,7 @@ fn the_wav_carries_the_loop_as_a_smpl_chunk_before_the_samples() -> TestResult {
         [0, 0, 20_833, 60, 0, 0, 0, 1, 0, 0, 0, 1_000, 3_999, 0, 0],
         "sample period in ns, unity note, one infinite forward loop with an inclusive end"
     );
-    let data = chunks.get(2).map(|(_, body)| *body).unwrap_or_default();
+    let data = chunks.get(2).map_or_default(|(_, body)| *body);
     let samples: Vec<i16> = data
         .as_chunks::<2>()
         .0

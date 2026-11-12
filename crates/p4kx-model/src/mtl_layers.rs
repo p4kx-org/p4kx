@@ -77,7 +77,7 @@ pub(crate) fn resolve(
                 continue;
             };
             let path = path.to_owned();
-            let submaterial = layer.attribute("Submtl").map(str::trim).unwrap_or_default();
+            let submaterial = layer.attribute("Submtl").map_or_default(str::trim);
             let (source, origin) = cache.surface(&path, submaterial, companions, &mut budget);
             let (surface, source_material) = source.unzip();
             companions.observe_material(

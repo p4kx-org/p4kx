@@ -8,6 +8,9 @@ New-Item -ItemType Directory -Path $Directory -Force | Out-Null
 $contract = Get-P4kxPlatformContract
 $revision = 'a' * 40
 . (Join-Path $PSScriptRoot 'macho-test-image.ps1')
+$pins = & (Join-Path $PSScriptRoot 'check-build-tools.ps1')
+$compiler = ($pins | Where-Object { $_.StartsWith('rust-version=') }).Substring('rust-version='.Length)
+$nextest = ($pins | Where-Object { $_.StartsWith('nextest-version=') }).Substring('nextest-version='.Length)
 
 foreach ($row in $contract.targets) {
     $bytes = [byte[]]::new(256)
@@ -35,8 +38,8 @@ foreach ($row in $contract.targets) {
     try { Get-ImageMachine -Path $path -Os $row.os | Out-Null } catch { $rejected = $true }
     if (-not $rejected) { throw 'Malformed binary was accepted.' }
 
-    $baseline = New-P4kxTestEvidence -Platform $row -Version '0.5.0' -Revision $revision -Compiler '1.99.1' -Nextest '0.9.151'
-    Assert-P4kxArchiveEvidence -Metadata $baseline -Platform $row -Revision $revision -Compiler '1.99.1' -Nextest '0.9.151' -ArchiveHash ('b' * 64)
+    $baseline = New-P4kxTestEvidence -Platform $row -Version '0.5.0' -Revision $revision -Compiler $compiler -Nextest $nextest
+    Assert-P4kxArchiveEvidence -Metadata $baseline -Platform $row -Revision $revision -Compiler $compiler -Nextest $nextest -ArchiveHash ('b' * 64)
     Assert-P4kxRuntimeEvidence -Metadata $baseline -Platform $row -Version '0.5.0' -Revision $revision
     foreach ($mutation in @(
         { param($m) $m.target = 'wrong-architecture' },
@@ -53,7 +56,7 @@ foreach ($row in $contract.targets) {
         $changed = $baseline | ConvertTo-Json -Depth 8 | ConvertFrom-Json
         & $mutation $changed
         $rejected = $false
-        try { Assert-P4kxArchiveEvidence -Metadata $changed -Platform $row -Revision $revision -Compiler '1.99.1' -Nextest '0.9.151' -ArchiveHash ('b' * 64) } catch { $rejected = $true }
+        try { Assert-P4kxArchiveEvidence -Metadata $changed -Platform $row -Revision $revision -Compiler $compiler -Nextest $nextest -ArchiveHash ('b' * 64) } catch { $rejected = $true }
         if (-not $rejected) { throw 'Mismatched native archive evidence was accepted.' }
     }
     if ($row.os -ceq 'macos') {
@@ -67,7 +70,7 @@ foreach ($row in $contract.targets) {
             $changed = $baseline | ConvertTo-Json -Depth 8 | ConvertFrom-Json
             & $mutation $changed
             $rejected = $false
-            try { Assert-P4kxArchiveEvidence -Metadata $changed -Platform $row -Revision $revision -Compiler '1.99.1' -Nextest '0.9.151' -ArchiveHash ('b' * 64) } catch { $rejected = $true }
+            try { Assert-P4kxArchiveEvidence -Metadata $changed -Platform $row -Revision $revision -Compiler $compiler -Nextest $nextest -ArchiveHash ('b' * 64) } catch { $rejected = $true }
             if (-not $rejected) { throw 'Mismatched macOS host or Mach-O archive evidence was accepted.' }
         }
         foreach ($mutation in @(

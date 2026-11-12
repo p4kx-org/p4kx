@@ -23,14 +23,13 @@ fn schema() -> Result<QuerySchema, Box<dyn Error>> {
 fn names(schema: &QuerySchema, text: &str) -> Vec<String> {
     schema
         .complete(text, text.len())
-        .map(|completion| {
+        .map_or_default(|completion| {
             completion
                 .candidates()
                 .iter()
                 .map(|candidate| candidate.name().to_owned())
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 #[test]

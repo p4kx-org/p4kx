@@ -182,17 +182,15 @@ fn the_normal_maps_of_the_engine_have_green_pointing_down_the_image() -> TestRes
             if let Ok(mut reader) = archive.open_entry(entry) {
                 let _ignored = reader.read_to_end(&mut bytes);
             }
-            MaterialLibrary::parse(entry.path(), &bytes)
-                .map(|library| {
-                    library
-                        .materials
-                        .into_iter()
-                        .flat_map(|material| material.textures)
-                        .map(|texture| texture.file)
-                        .filter(|file| file.to_ascii_lowercase().ends_with("_ddna.tif"))
-                        .collect::<Vec<_>>()
-                })
-                .unwrap_or_default()
+            MaterialLibrary::parse(entry.path(), &bytes).map_or_default(|library| {
+                library
+                    .materials
+                    .into_iter()
+                    .flat_map(|material| material.textures)
+                    .map(|texture| texture.file)
+                    .filter(|file| file.to_ascii_lowercase().ends_with("_ddna.tif"))
+                    .collect::<Vec<_>>()
+            })
         })
         .collect();
 

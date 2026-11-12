@@ -74,8 +74,7 @@ impl Collected {
             let item = plan.first(index).and_then(|position| items.get(position));
             let drawn = item
                 .and_then(|item| item.drawn)
-                .map(|drawn| drawn_materials(drawn.model, drawn.materials, level))
-                .unwrap_or_default();
+                .map_or_default(|drawn| drawn_materials(drawn.model, drawn.materials, level));
             let palette = item
                 .and_then(|item| item.drawn?.palette)
                 .map(|palette| collected.palette_index(palette));
@@ -249,7 +248,7 @@ impl Collected {
         models: &dyn ModelProvider,
         depth: usize,
     ) -> Option<usize> {
-        let path = layer.attribute("Path").map(str::trim).unwrap_or_default();
+        let path = layer.attribute("Path").map_or_default(str::trim);
         if path.is_empty() {
             return None;
         }

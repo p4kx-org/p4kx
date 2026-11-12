@@ -289,7 +289,7 @@ impl<'t> Tag<'t> {
     /// Returns the GUID of the Tag Record, which fields refer to.
     #[must_use]
     pub fn guid(&self) -> Guid {
-        self.node().map(|node| node.guid).unwrap_or_default()
+        self.node().map_or_default(|node| node.guid)
     }
 
     /// Returns the name of the tag alone, e.g. `Gun`.

@@ -101,7 +101,7 @@ fn unsafe_sites(root: &Path) -> Result<Vec<String>> {
     file_size::collect_rust_files(&root.join("crates"), &mut files)?;
     let mut violations = Vec::new();
     for file in files {
-        let shown = file.strip_prefix(root).unwrap_or(&file).to_path_buf();
+        let shown = file.trim_prefix(root).to_path_buf();
         let text =
             fs::read_to_string(&file).with_context(|| format!("cannot read {}", file.display()))?;
         if names_unsafe_code(&shown, &text) {

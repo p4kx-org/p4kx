@@ -209,14 +209,11 @@ fn a_temp_or_display_ship_is_left_out_everywhere_and_an_item_keeps_its_display_w
     let groups = read_variant_groups(&archive, &forge, &|| false).ok_or("stopped")?;
 
     let classes = |kind: &str| -> Vec<String> {
-        catalog[kind]
-            .as_array()
-            .map(|list| {
-                list.iter()
-                    .filter_map(|entity| entity["className"].as_str().map(str::to_owned))
-                    .collect()
-            })
-            .unwrap_or_default()
+        catalog[kind].as_array().map_or_default(|list| {
+            list.iter()
+                .filter_map(|entity| entity["className"].as_str().map(str::to_owned))
+                .collect()
+        })
     };
     let ships = classes("ships");
     for class in ["ACME_Alpha_Temp", "ACME_Beta_Display"] {

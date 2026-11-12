@@ -146,15 +146,15 @@ mod tests {
         ] {
             assert_eq!(exact_version(value), None, "{value}");
         }
-        assert_eq!(exact_version("1.99.1"), Some([1, 99, 1]));
+        assert_eq!(exact_version("1.100.0"), Some([1, 100, 0]));
         assert_eq!(exact_version("0.9.151"), Some([0, 9, 151]));
     }
 
     #[test]
     fn compiler_pin_must_satisfy_workspace_minimum() {
-        let workspace = "[workspace.package]\nrust-version = \"1.99\"";
-        let older = "[toolchain]\nchannel = \"1.98.1\"";
-        let current = "[toolchain]\nchannel = \"1.99.1\"";
+        let workspace = "[workspace.package]\nrust-version = \"1.100.0\"";
+        let older = "[toolchain]\nchannel = \"1.99.1\"";
+        let current = "[toolchain]\nchannel = \"1.100.0\"";
         assert!(validate_pins(older, "0.9.151", workspace).is_err());
         assert!(validate_pins(current, "0.9.151", workspace).is_ok());
         assert!(validate_pins(current, "latest", workspace).is_err());

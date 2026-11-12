@@ -67,8 +67,7 @@ fn objects_of_a_newer_bank_version_are_listed_as_unsupported() -> TestResult {
 fn ids(result: &Value) -> Vec<u64> {
     result["objects"]
         .as_array()
-        .map(|objects| objects.iter().filter_map(|o| o["id"].as_u64()).collect())
-        .unwrap_or_default()
+        .map_or_default(|objects| objects.iter().filter_map(|o| o["id"].as_u64()).collect())
 }
 
 #[test]

@@ -19,15 +19,12 @@ fn metadata(owner: usize, method: u16) -> Value {
 }
 
 fn paths(items: &Value) -> Vec<String> {
-    items
-        .as_array()
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item["path"].as_str().map(str::to_owned))
-                .collect()
-        })
-        .unwrap_or_default()
+    items.as_array().map_or_default(|items| {
+        items
+            .iter()
+            .filter_map(|item| item["path"].as_str().map(str::to_owned))
+            .collect()
+    })
 }
 
 fn collect_pages(
