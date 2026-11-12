@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, StructValue, Value};
+use p4kx_extraction::{CancelToken, RecordTree, StructValue, Value};
 
 use crate::CatalogError;
 use crate::blueprint;
@@ -20,6 +20,7 @@ pub(crate) struct InterpretedTier<'read, 'source> {
 /// Reads every semantic tier and cost in original order.
 pub(crate) fn tiers<'read, 'source>(
     blueprint: Option<&'read StructValue<'source>>,
+    tree: &RecordTree<'source>,
     unknown: &mut Vec<&'source str>,
     cancel: Option<&CancelToken>,
 ) -> Result<Vec<InterpretedTier<'read, 'source>>, CatalogError> {
@@ -29,7 +30,7 @@ pub(crate) fn tiers<'read, 'source>(
             return Err(CatalogError::Cancelled);
         }
         if let Value::Struct(source) = original {
-            tiers.push(tier(source, original, unknown, cancel)?);
+            tiers.push(tier(source, original, tree, unknown, cancel)?);
         }
     }
     Ok(tiers)
@@ -38,6 +39,7 @@ pub(crate) fn tiers<'read, 'source>(
 fn tier<'read, 'source>(
     source: &'read StructValue<'source>,
     original: &'read Value<'source>,
+    tree: &RecordTree<'source>,
     unknown: &mut Vec<&'source str>,
     cancel: Option<&CancelToken>,
 ) -> Result<InterpretedTier<'read, 'source>, CatalogError> {
@@ -62,7 +64,7 @@ fn tier<'read, 'source>(
             mandatory,
             optional,
             arena.values,
-            crafting_research::read(source),
+            crafting_research::read(source, tree),
         ),
         original,
         costs: arena.originals,

@@ -74,11 +74,11 @@ fn pointer<'source>(
     let original = BlueprintField::read(fields, source, name)?;
     let (declared_base, state) = if let Some(fact) = original.fact() {
         let base = declared_base(input, fields, fact)?;
-        let supported = base.value().is_some_and(|actual| actual == expected);
-        let state = match crafting_research::member_value(fact.value(), expected) {
+        let declared = base.value().map(String::as_str);
+        let state = match crafting_research::member_value(fact.value(), expected, declared) {
             ResearchValue::Unreadable(_) => SourceValue::Unreadable,
-            ResearchValue::Null if supported => SourceValue::Null,
-            ResearchValue::Present if supported => SourceValue::Present(value_ref(fact)),
+            ResearchValue::Null => SourceValue::Null,
+            ResearchValue::Present => SourceValue::Present(value_ref(fact)),
             _ => {
                 unsupported(fields, capture, source, &original, notes)?;
                 SourceValue::Unsupported

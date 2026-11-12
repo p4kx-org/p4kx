@@ -43,7 +43,7 @@ pub(crate) fn blueprint<'source>(
 ) -> Result<BlueprintTiers<'source>, CatalogError> {
     let source = blueprint_source(tree);
     let mut unknown = Vec::new();
-    let tiers = crafting_tier::tiers(source, &mut unknown, cancel)?
+    let tiers = crafting_tier::tiers(source, tree, &mut unknown, cancel)?
         .into_iter()
         .map(|tier| tier.tier)
         .collect();

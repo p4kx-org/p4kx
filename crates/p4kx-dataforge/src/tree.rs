@@ -3,7 +3,9 @@
 
 use crate::tree_cursor::Cursor;
 use crate::tree_owner::TreeOwner;
-use crate::{Field, Guid, Location, Record, RecordMetadata, StructValue, Value, ValueError};
+use crate::{
+    Field, Guid, Location, Record, RecordMetadata, Struct, StructValue, Value, ValueError,
+};
 
 /// The canonical tree of one Record: its GUID, record path, name and root struct with the fields.
 ///
@@ -70,6 +72,12 @@ impl<'f> RecordTree<'f> {
     #[must_use]
     pub const fn tag(&self) -> Option<&'f str> {
         self.tag
+    }
+
+    /// Returns a struct definition by its index in the original DataForge.
+    #[must_use]
+    pub fn struct_at(&self, index: u32) -> Option<Struct<'f>> {
+        self.owner.struct_at(index)
     }
 
     /// Returns the Record's own struct, to walk it like any nested struct.

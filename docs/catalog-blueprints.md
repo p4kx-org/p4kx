@@ -54,7 +54,8 @@ the same ResourceType.
 for a readable `CraftingResearch`. Each member carries its original occurrence, actual declared
 base and independent value state. The recognized strong-pointer bases are
 `CraftingRecipeCosts_Base` and `CraftingResearchUnlock_Base`. A present envelope with both
-pointers null records the present-empty case. The exact fieldless declared bases can also be
+pointers null and both expected declarations records the present-empty case. A pointer
+with another declared base retains its raw state and is interpreted as unsupported. The exact fieldless declared bases can also be
 present. Unsupported populated shapes and unreadable members remain in the original arena.
 The health report carries the actual field diagnosis. Normal publication requires complete
 health, while diagnostic publication retains the raw owner and the diagnosis.
@@ -68,4 +69,5 @@ acceptance remains a separate check for concrete production payloads.
 `read_crafting` shares Blueprint selection and typed cost interpretation. `Tier::costs()`
 returns the flat cost sequence. Resolve the tier's `mandatory`, `optional` and each
 `Selection.options` value through `Tier::cost`. `Tier::mandatory_cost` reads the mandatory
-cost directly. `Tier::research` preserves the original envelope and member state.
+cost directly. `Tier::research` uses the same declared-base and payload interpretation
+as the catalog and preserves the original envelope and member state.

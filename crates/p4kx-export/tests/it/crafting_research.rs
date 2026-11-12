@@ -270,3 +270,54 @@ fn assert_present_research(
     }
     Ok(())
 }
+
+#[test]
+fn a_null_research_pointer_to_another_declared_family_is_unsupported() -> TestResult {
+    let database = fixture::database(Case::WrongDeclaration);
+    let (_directory, archive) = common::open(&database, DcbOrigin::Encrypted)?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let forge = entry.open()?;
+    let data = p4kx_export::read_crafting(&forge, None, None)?;
+    let [blueprint] = data.blueprints.as_slice() else {
+        return Err("one original Blueprint".into());
+    };
+    let [tier] = blueprint.tiers.as_slice() else {
+        return Err("one original tier".into());
+    };
+    let Research::Present(block) = &tier.research else {
+        return Err("original research envelope".into());
+    };
+    assert_eq!(
+        block.research_costs.value,
+        ResearchValue::Unsupported(None),
+        "a null payload cannot establish the expected declared base"
+    );
+
+    let mut options = common::options();
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
+    let built = p4kx_export::build_catalog_from(&archive, &entry, &options)?;
+    assert!(
+        !built.summary().is_complete(),
+        "the wrong declaration has an explicit coverage failure"
+    );
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    let recipe = blueprint::by_guid(&catalog, fixture::OWNER)?;
+    let tiers = recipe.tiers()?;
+    let tier = tiers.first().ok_or("original research tier")?;
+    let costs = &tier["research"]["envelope"]["value"]["researchCosts"];
+    assert_eq!(
+        costs["declaredBase"]["value"],
+        fixture::UNLOCK,
+        "the catalog retains the actual declaration"
+    );
+    assert_eq!(
+        costs["value"]["state"], "unsupported",
+        "the catalog and standalone reader classify the same declaration"
+    );
+    assert_eq!(
+        recipe.node(&costs["source"])?["value"]["state"],
+        "null",
+        "the raw original pointer still records the null payload"
+    );
+    Ok(())
+}

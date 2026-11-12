@@ -56,7 +56,7 @@ pub(crate) fn read<'source>(
     let capture = TemplateFieldCapture::new(fields, input, admission)?;
     let source = crafting_records::blueprint_source(tree);
     let mut unknown = Vec::new();
-    let interpreted = crate::crafting_tier::tiers(source, &mut unknown, cancel)?;
+    let interpreted = crate::crafting_tier::tiers(source, tree, &mut unknown, cancel)?;
     let owner = PhysicalBlueprintRef {
         input_ref: fields.input_ref().clone(),
         record_index: tree.record_index(),

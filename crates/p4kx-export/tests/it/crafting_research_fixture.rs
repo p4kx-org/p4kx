@@ -18,6 +18,7 @@ pub(super) enum Case {
     Known,
     Unsupported,
     Unreadable,
+    WrongDeclaration,
 }
 
 pub(super) fn database(case: Case) -> DataForgeBuilder {
@@ -25,6 +26,11 @@ pub(super) fn database(case: Case) -> DataForgeBuilder {
     if !matches!(case, Case::Absent) {
         tier = tier.field("research", pointer(RESEARCH));
     }
+    let costs_base = if matches!(case, Case::WrongDeclaration) {
+        UNLOCK
+    } else {
+        COSTS
+    };
     DataForgeBuilder::new()
         .version(8)
         .structure(
@@ -35,7 +41,7 @@ pub(super) fn database(case: Case) -> DataForgeBuilder {
         .structure(tier)
         .structure(
             TestStruct::new(RESEARCH)
-                .field("researchCosts", pointer(COSTS))
+                .field("researchCosts", pointer(costs_base))
                 .field("unlockRequirements", pointer(UNLOCK)),
         )
         .structure(TestStruct::new(COSTS))
@@ -71,7 +77,7 @@ fn record(case: Case) -> TestRecord {
 fn research(case: Case) -> TestValue {
     let costs = match case {
         Case::Absent | Case::Null => return TestValue::Null,
-        Case::Empty => TestValue::Null,
+        Case::Empty | Case::WrongDeclaration => TestValue::Null,
         Case::Known => TestValue::Struct(TestInstance::new(COSTS)),
         Case::Unsupported => TestValue::Struct(
             TestInstance::new(UNKNOWN).value("opaqueToken", TestValue::UInt64(u64::MAX)),

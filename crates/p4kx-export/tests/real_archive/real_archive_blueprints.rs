@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "real_archive_blueprint_research.rs"]
+mod research;
+
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 

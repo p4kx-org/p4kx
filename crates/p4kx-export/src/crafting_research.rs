@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataType, FieldStorage, StructValue, Value, ValueError};
+use p4kx_extraction::{DataType, FieldStorage, RecordTree, StructValue, Value, ValueError};
 
 pub(crate) const RESEARCH_TYPE: &str = "CraftingResearch";
 pub(crate) const COSTS_BASE: &str = "CraftingRecipeCosts_Base";
@@ -59,15 +59,18 @@ pub enum ResearchValue<'source> {
     Unreadable(ValueError),
 }
 
-pub(crate) fn read<'source>(tier: &StructValue<'source>) -> Research<'source> {
+pub(crate) fn read<'source>(
+    tier: &StructValue<'source>,
+    tree: &RecordTree<'source>,
+) -> Research<'source> {
     match tier.field("research") {
         None => Research::Absent,
         Some(Value::Null) => Research::Null,
         Some(Value::Error(error)) => Research::Unreadable(*error),
         Some(Value::Struct(source)) if source.type_name() == RESEARCH_TYPE => {
             Research::Present(ResearchBlock {
-                research_costs: member(source, "researchCosts", COSTS_BASE),
-                unlock_requirements: member(source, "unlockRequirements", UNLOCK_BASE),
+                research_costs: member(source, tree, "researchCosts", COSTS_BASE),
+                unlock_requirements: member(source, tree, "unlockRequirements", UNLOCK_BASE),
             })
         }
         Some(value) => Research::Unsupported(source_type(value)),
@@ -76,6 +79,7 @@ pub(crate) fn read<'source>(tier: &StructValue<'source>) -> Research<'source> {
 
 fn member<'source>(
     source: &StructValue<'source>,
+    tree: &RecordTree<'source>,
     name: &str,
     expected: &str,
 ) -> ResearchMember<'source> {
@@ -86,28 +90,27 @@ fn member<'source>(
         };
     };
     let storage = field.storage();
-    let supported = storage.data_type() == DataType::StrongPointer && !storage.is_array();
-    let value = if supported {
-        member_value(field.value(), expected)
+    let declared_base = if storage.data_type() == DataType::StrongPointer && !storage.is_array() {
+        tree.struct_at(u32::from(storage.target()))
+            .and_then(|definition| definition.name().ok())
     } else {
-        match field.value() {
-            Value::Error(error) => ResearchValue::Unreadable(*error),
-            value => ResearchValue::Unsupported(source_type(value)),
-        }
+        None
     };
     ResearchMember {
         declaration: Some(storage),
-        value,
+        value: member_value(field.value(), expected, declared_base),
     }
 }
 
 pub(crate) fn member_value<'source>(
     value: &Value<'source>,
     expected: &str,
+    declared_base: Option<&str>,
 ) -> ResearchValue<'source> {
     match value {
-        Value::Null => ResearchValue::Null,
         Value::Error(error) => ResearchValue::Unreadable(*error),
+        value if declared_base != Some(expected) => ResearchValue::Unsupported(source_type(value)),
+        Value::Null => ResearchValue::Null,
         Value::Struct(source) if source.type_name() == expected && source.fields().is_empty() => {
             ResearchValue::Present
         }
