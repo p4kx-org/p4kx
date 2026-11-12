@@ -64,6 +64,7 @@ mod real_archive_loot;
 mod real_archive_mining;
 mod real_archive_mining_stats;
 mod real_archive_mission_boards;
+mod real_archive_mission_scenarios;
 mod real_archive_npc_spawns;
 mod real_archive_paints;
 mod real_archive_playability;

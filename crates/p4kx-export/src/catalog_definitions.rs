@@ -43,6 +43,8 @@ use crate::template_definition::TemplateDefinition;
 pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) blueprints: CatalogTable<crate::blueprint_definition::BlueprintDefinition<'source>>,
     pub(crate) contract_generators: CatalogTable<GeneratorDefinition<'source>>,
+    pub(crate) mission_scenarios:
+        CatalogTable<super::mission_scenario_definition::MissionScenarioDefinition<'source>>,
     pub(crate) contract_templates: CatalogTable<TemplateDefinition<'source>>,
     pub(crate) mission_broker_entries: CatalogTable<BrokerDefinition<'source>>,
     pub(crate) loot_pool_filters: CatalogTable<LootFilterDefinition<'source>>,

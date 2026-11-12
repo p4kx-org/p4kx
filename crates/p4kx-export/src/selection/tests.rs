@@ -58,7 +58,9 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
             match kind {
                 Kind::LegacyLootTables => assert_eq!(by_path, Some(Kind::LootTables)),
                 Kind::LegacyLootArchetypes => assert_eq!(by_path, Some(Kind::LootArchetypes)),
-                Kind::MissionBrokerEntries => assert_eq!(by_path, Some(Kind::ContractTemplates)),
+                Kind::MissionBrokerEntries | Kind::MissionScenarios => {
+                    assert_eq!(by_path, Some(Kind::ContractTemplates));
+                }
                 Kind::ResourceTypes => assert_eq!(by_path, Some(Kind::ResourceGroups)),
                 Kind::BlueprintCategoryLists
                 | Kind::ExplosionDefinitions

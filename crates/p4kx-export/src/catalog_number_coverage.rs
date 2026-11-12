@@ -25,6 +25,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
             | Kind::Infractions
             | Kind::InfractionSets
             | Kind::Jurisdictions
+            | Kind::MissionScenarios
             | Kind::LocationClasses
             | Kind::LocationFunctions
             | Kind::LocationSizes
@@ -68,6 +69,7 @@ pub(super) const fn expected_owned_number(
             | Kind::Infractions
             | Kind::InfractionSets
             | Kind::Jurisdictions
+            | Kind::MissionScenarios
             | Kind::LocationClasses
             | Kind::LocationFunctions
             | Kind::LocationSizes

@@ -7,6 +7,8 @@ use crate::contracts_fixture;
 
 #[path = "catalog_location_vocabulary.rs"]
 mod location_vocabulary;
+#[path = "catalog_mission_scenario_definitions.rs"]
+mod mission_scenario_definitions;
 
 #[path = "catalog_mission_boards.rs"]
 mod mission_boards;

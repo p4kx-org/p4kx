@@ -118,6 +118,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) mission_localities: KindCompleteness<'a>,
     /// The completeness of `contractScenarios`.
     pub(crate) contract_scenarios: KindCompleteness<'a>,
+    /// The filtered physical mission scenario selection.
+    pub(crate) mission_scenarios: KindCompleteness<'a>,
     /// The completeness of `lootTables`.
     pub(crate) loot_tables: KindCompleteness<'a>,
     /// The completeness of `lootArchetypes`.
@@ -215,6 +217,7 @@ impl<'a> Completeness<'a> {
             mission_types: completeness,
             mission_localities: completeness,
             contract_scenarios: completeness,
+            mission_scenarios: completeness,
             loot_tables: completeness,
             loot_archetypes: completeness,
             loot_pool_filters: completeness,

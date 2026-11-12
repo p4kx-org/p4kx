@@ -40,6 +40,7 @@ pub(crate) fn named_rows<'catalog>(
         Kind::AmmoDefinitions => "/definitions/ammoDefinitions",
         Kind::InventoryContainers => "/definitions/inventoryContainers",
         Kind::MedicalItemTierConfigs => "/definitions/medicalItemTierConfigs",
+        Kind::MissionScenarios => "/definitions/missionScenarios",
         Kind::ReputationContexts => "/definitions/reputationContexts",
         Kind::ReputationScopes => "/definitions/reputationScopes",
         Kind::ReputationStandings => "/definitions/reputationStandings",

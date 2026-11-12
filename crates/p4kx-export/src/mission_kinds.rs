@@ -7,6 +7,9 @@ use crate::Kind;
 use crate::cargo_manifest::cargo_manifest;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::mission_scenario_definition::{
+    self, MissionScenarioDefinition, PreparedMissionScenario,
+};
 use crate::catalog_v3::reputation_context_definition::{self, ContextDefinition, PreparedContext};
 use crate::catalog_v3::reputation_faction_definition::{
     self, FactionReputationTables, PreparedFactionReputation,
@@ -49,6 +52,8 @@ pub(crate) enum MissionPick<'f> {
     Locality(MissionLocality<'f>),
     /// A contract scenario.
     Scenario(ContractScenario<'f>),
+    /// An authored scenario definition.
+    ScenarioDefinition(Box<PreparedMissionScenario<'f>>),
     /// A cargo manifest.
     Manifest(CargoManifest<'f>),
 }
@@ -80,6 +85,7 @@ pub(crate) struct MissionKinds<'f> {
     pub(crate) types: Vec<MissionType<'f>>,
     pub(crate) localities: Vec<MissionLocality<'f>>,
     pub(crate) scenarios: Vec<ContractScenario<'f>>,
+    pub(crate) scenario_definitions: Vec<PreparedMissionScenario<'f>>,
     pub(crate) manifests: Vec<CargoManifest<'f>>,
 }
 
@@ -107,6 +113,7 @@ impl<'f> MissionKinds<'f> {
             MissionPick::Type(entity) => self.types.push(entity),
             MissionPick::Locality(entity) => self.localities.push(entity),
             MissionPick::Scenario(entity) => self.scenarios.push(entity),
+            MissionPick::ScenarioDefinition(entity) => self.scenario_definitions.push(*entity),
             MissionPick::Manifest(entity) => self.manifests.push(entity),
         }
     }
@@ -131,6 +138,14 @@ impl<'f> MissionKinds<'f> {
         sort_by_guid(&mut self.localities, |entity| entity.guid);
         sort_by_guid(&mut self.scenarios, |entity| entity.guid);
         sort_by_guid(&mut self.manifests, |entity| entity.guid);
+    }
+
+    /// Takes the physical mission scenario definitions into their catalog table.
+    pub(crate) fn take_scenario_definitions(
+        &mut self,
+        forge: &DataForge<'_>,
+    ) -> CatalogTable<MissionScenarioDefinition<'f>> {
+        mission_scenario_definition::table(forge, std::mem::take(&mut self.scenario_definitions))
     }
 
     /// Takes the physical reputation definitions into their canonical catalog tables.
@@ -213,6 +228,7 @@ impl<'f> MissionKinds<'f> {
             Kind::MissionTypes => self.types.len(),
             Kind::MissionLocalities => self.localities.len(),
             Kind::ContractScenarios => self.scenarios.len(),
+            Kind::MissionScenarios => self.scenario_definitions.len(),
             Kind::CargoManifests => self.manifests.len(),
             _ => 0,
         }

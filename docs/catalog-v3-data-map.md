@@ -66,7 +66,7 @@ dataforgeRecordHeader; genuine body paths, identity, selection and counts retain
 | #1083 | D.geologySets, D.geologyTextureSets, D.soils, D.soilTextureSets, D.shadingClasses, D.ecosystems | all listed layer/scalar/texture/audio blocks and declared graph, Entry identity/path; empty RTPC/switch arrays only establish presence/count, populated unknown diagnosed |
 | #1084 | D.autoSpawns, D.autoSpawnSets, D.encounterIndices, D.npcArchetypes, D.npcClassPools | direct/archetype/pool classes, manual/reference sets, ordered identity branches/weights/delays/assignments/inventory/tags, all declared targets; no chosen NPC |
 | #1085 | D.factionIdentities | name/description/factionTag/Faction/security links, ordered encounter weights and theme tags, multiple identities per Faction; separate identity namespace |
-| #1086 | D.contractScopes, D.locationClasses/functions/sizes, D.locationRegistries; C.missionBoards, C.localContractGenerators; A.contractScenarioRequirements | all seven scope members/text/icon, zero-field dictionaries, registry order, source scope/positive-negative DNF/identity list; board variants, inherited required scenarios |
+| #1086 | D.contractScopes, D.missionScenarios, D.locationClasses/functions/sizes, D.locationRegistries; C.missionBoards, C.localContractGenerators; A.contractScenarioRequirements | all seven scope members/text/icon, zero-field dictionaries, registry order, source scope/positive-negative DNF/identity list; board variants, inherited required scenarios |
 | #1087 | C.itemPorts, C.itemAttachmentConstraints; loadout source constraints | Physical port and item alignment declarations, original enum labels and option status, stored center-of-mass check and exact owner links. [Contract](catalog-item-port-alignment.md) |
 
 D.weaponConfigurations above is the reusable referenced recoil/aim/reload definition family; C.weaponConfigurations is the owned weapon component/action tree. They are distinct source owners despite related names and should get clearer concrete Rust names (WeaponConfigDefinition vs WeaponComponentConfiguration). The final field survey decides exact concrete structs, not this naming coincidence.
@@ -115,6 +115,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | reputationContexts | D.reputationContexts | physical contexts, authored sort order, ordered scope occurrences, protected and original dynamic display properties |
 | missionTypes | D.missionTypes | mission-type definitions and source text |
 | missionLocalities | D.missionLocalities | stored starmap-object membership |
+| missionScenarios | D.missionScenarios | physical MissionScenario identity, authored variables, cycles, schedule and flags |
 | contractScenarios | D.contractScenarios | faction reward tiers/progression, source flags, no active state |
 | lootTables | D.lootTables | weighted archetype links/order |
 | lootArchetypes | D.lootArchetypes | weighted typed selectors/constraints/order |

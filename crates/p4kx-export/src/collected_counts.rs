@@ -75,6 +75,7 @@ impl Collected<'_> {
             | Kind::ReputationContexts
             | Kind::MissionTypes
             | Kind::MissionLocalities
+            | Kind::MissionScenarios
             | Kind::ContractScenarios
             | Kind::CargoManifests => self.mission_kinds.count(kind),
             Kind::LootTables

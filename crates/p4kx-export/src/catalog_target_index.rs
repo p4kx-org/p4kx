@@ -179,6 +179,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
             | Kind::Infractions
             | Kind::InfractionSets
             | Kind::Jurisdictions
+            | Kind::MissionScenarios
             | Kind::LocationClasses
             | Kind::LocationFunctions
             | Kind::LocationSizes

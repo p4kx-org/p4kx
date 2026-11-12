@@ -88,7 +88,7 @@ fn database() -> DataForgeBuilder {
             SCENARIO_GUID,
             SCENARIO,
             "MissionScenario.Fixture",
-            "libs/foundry/records/contracts/missionscenarios/fixture.xml",
+            "libs/foundry/records/missionscenarios/fixture_requirement_target.xml",
         ))
 }
 
@@ -124,6 +124,17 @@ fn authored_scenario_requirements_preserve_each_physical_owner_and_inherited_slo
         at(owned, "/0/value/guid/value")?
     );
     check_physical_occurrences(&catalog, rows)?;
+    let scenario = at(&catalog, "/definitions/missionScenarios/rows/0")?;
+    assert_eq!(
+        at(scenario, "/recordIndex/value")?,
+        at(root, "/0/value/targetRecordIndex/value")?,
+        "the authored requirement joins the physical scenario definition"
+    );
+    assert_eq!(
+        at(scenario, "/guid/value")?,
+        at(root, "/0/value/guid/value")?,
+        "the shared physical index retains the source scenario GUID"
+    );
     crate::commodity_v3_source_inventory::reference_closure(&catalog)
 }
 

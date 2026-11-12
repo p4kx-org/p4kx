@@ -237,6 +237,7 @@ fn assemble<R>(
                 &["ContractGenerator"],
                 collected.contract_generators,
             ),
+            mission_scenarios: collected.mission_kinds.take_scenario_definitions(&forge),
             contract_templates: CatalogTable::new(
                 &forge,
                 &["ContractTemplate"],

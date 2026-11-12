@@ -134,6 +134,18 @@ impl<'f> Scan<'_, '_, 'f> {
                 let picked = MissionPick::RewardAmount(Box::new(read.value));
                 (Picked::Mission(picked), read.notes)
             }
+            Kind::MissionScenarios => {
+                let (definition, notes) = crate::catalog_v3::mission_scenario_definition::read(
+                    tree,
+                    self.projection,
+                    admission,
+                    self.options.cancel,
+                )?;
+                (
+                    Picked::Mission(MissionPick::ScenarioDefinition(Box::new(definition))),
+                    notes,
+                )
+            }
             _ if location_vocabulary::source_type(kind).is_some() => {
                 let (value, notes) = LocationVocabularyPick::read(
                     kind,

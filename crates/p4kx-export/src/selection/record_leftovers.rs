@@ -37,7 +37,7 @@ pub(crate) fn is_leftover(record_path: &str, name: &str) -> bool {
 /// Returns whether a source Record is excluded by the kind's development-leftover policy.
 ///
 /// Contract templates permit `template`; ships also exclude [`SHIP_EXCLUDED_TOKENS`].
-/// Type-only kinds retain every source Record of their exact type.
+/// Authored definition kinds retain every matching physical Record.
 #[must_use]
 pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
     match kind {
@@ -55,6 +55,7 @@ pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
         | Kind::LocationClassRegistries
         | Kind::LocationFunctionRegistries
         | Kind::LocationSizeRegistries
+        | Kind::MissionScenarios
         | Kind::InventoryContainers
         | Kind::MedicalItemTierConfigs
         | Kind::StarmapTypes

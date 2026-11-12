@@ -9,6 +9,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::mission_scenario_definition;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueEdge, OriginalValueFact};
 use crate::catalog_record_reference::CatalogRecordReference;
@@ -19,7 +20,6 @@ use crate::source_value_catalog::{SourceRecordReference, SourceValueRef};
 use crate::{CatalogError, ExportAccountingError};
 
 const FIELD: &str = "required_active_scenarios";
-const TARGET: &str = "MissionScenario";
 const OWNERS: [&str; 3] = [
     "ContractGenerator",
     "ContractGeneratorHandlerBase",
@@ -89,7 +89,11 @@ pub(crate) fn read<'source>(
                 owner: owner.map(value_ref),
                 scenarios_value: value_ref(declaration),
             },
-            scenarios: observed.record_link_array_to(FIELD, TARGET, notes)?,
+            scenarios: observed.record_link_array_to(
+                FIELD,
+                mission_scenario_definition::SOURCE_TYPE,
+                notes,
+            )?,
         });
     }
     Ok(rows)

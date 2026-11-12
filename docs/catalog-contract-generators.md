@@ -35,6 +35,17 @@ evidence. The declaration stays with its original owner when the logical contrac
 excludes or deduplicates a row. The table describes authored requirements independently of any runtime scenario
 availability.
 
+## Physical mission scenario definitions
+
+`definitions.missionScenarios` holds each selected `MissionScenario` Record with its original
+header and complete ordered `authoredFields` arena. The arena retains variables, cycles and their
+phases, the schedule and its constraints and recurrence, and the original flags. The string text
+domain is retained in each cell. Each source field carries its own origin.
+
+Join an authored requirement's target by its physical Record index and GUID. A target can exist in
+the input even when the Record Filter excludes its definition row. This table describes authored
+configuration. Scenario progress and faction reward tiers are available in `contractScenarios`.
+
 ## Run terms
 
 `timeToComplete` and `buyInAmount` are sourced values on `projections.contracts.rows`. Both

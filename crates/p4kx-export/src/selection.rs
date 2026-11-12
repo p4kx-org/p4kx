@@ -190,11 +190,13 @@ pub enum Kind {
     StarmapPresets,
     /// Physical starmap amenity definitions.
     StarmapAmenities,
+    /// Physical `MissionScenario` Records selected by their exact type.
+    MissionScenarios,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 72] = [
+    pub const ALL: [Self; 73] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -267,6 +269,7 @@ impl Kind {
         Self::StarmapTypes,
         Self::StarmapPresets,
         Self::StarmapAmenities,
+        Self::MissionScenarios,
     ];
 
     /// Returns the stable kind identifier, independently of its canonical dataset path.
@@ -308,6 +311,7 @@ impl Kind {
             Self::MissionTypes => "missionTypes",
             Self::MissionLocalities => "missionLocalities",
             Self::ContractScenarios => "contractScenarios",
+            Self::MissionScenarios => "missionScenarios",
             Self::LootTables => "lootTables",
             Self::LootArchetypes => "lootArchetypes",
             Self::LootPoolFilters => "lootPoolFilters",

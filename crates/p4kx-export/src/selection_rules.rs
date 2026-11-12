@@ -215,6 +215,10 @@ impl Kind {
                 prefixes: &["libs/foundry/records/contracts/contractscenarios/"],
                 type_name: "ScenarioProgress",
             },
+            Self::MissionScenarios => KindRule {
+                prefixes: &["libs/foundry/records/"],
+                type_name: crate::catalog_v3::mission_scenario_definition::SOURCE_TYPE,
+            },
             Self::MissionLocationTemplates => KindRule {
                 prefixes: &["libs/foundry/records/missiondata/pu_locations/"],
                 type_name: "MissionLocationTemplate",

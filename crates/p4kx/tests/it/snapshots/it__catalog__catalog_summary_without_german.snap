@@ -76,6 +76,7 @@ medicalItemTierConfigs: 0 written, 0 skipped, complete
 starmapTypes: 0 written, 0 skipped, complete
 starmapPresets: 0 written, 0 skipped, complete
 starmapAmenities: 0 written, 0 skipped, complete
+missionScenarios: 0 written, 0 skipped, complete
 item classes: 1 read, 0 other values, 0 without a Class: line or English description
 paint assignment: 0 of 0 paints fit a ship, 0 fit none, 0 ships have paints, 0 vehicle files unreadable
 loadouts: 1 ships and 0 items, 0 ports, 0 hold an Entity (0 docked vehicles), 0 unresolved, 0 Entities without an entry in items or ships, 1 loadouts with issues
@@ -89,4 +90,4 @@ ships variants: 0 in 0 groups
 quality quantizations: 0 used by no ResourceType, 0 links reach no quantization
 en: 16 texts resolved, 1 unresolved, 0 placeholders
 de: 0 texts resolved, 17 unresolved, 0 placeholders, the Archive holds no global.ini
-wrote [DIR]/english-only.json: 206267 bytes, 1 Records skipped, 0 failed
+wrote [DIR]/english-only.json: 207084 bytes, 1 Records skipped, 0 failed

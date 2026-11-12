@@ -4144,6 +4144,9 @@
         "missionBrokerEntries": {
           "$ref": "#/$defs/CatalogTableOfBrokerDefinition"
         },
+        "missionScenarios": {
+          "$ref": "#/$defs/CatalogTableOfMissionScenarioDefinition"
+        },
         "qualityDistributions": {
           "$ref": "#/$defs/CatalogTableOfQualityDistributionDefinition"
         },
@@ -4216,6 +4219,7 @@
         "manufacturers",
         "medicalItemTierConfigs",
         "missionBrokerEntries",
+        "missionScenarios",
         "qualityDistributions",
         "qualityQuantizations",
         "reputationContexts",
@@ -5362,6 +5366,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/MissionPropertyConfiguration"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfMissionScenarioDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/MissionScenarioDefinition"
           },
           "type": "array"
         }
@@ -6958,6 +6981,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `missionPropertySets`."
         },
+        "missionScenarios": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The filtered physical mission scenario selection."
+        },
         "missionTypes": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `missionTypes`."
@@ -7102,6 +7129,7 @@
         "missionLocalities",
         "missionLocationTemplates",
         "missionPropertySets",
+        "missionScenarios",
         "missionTypes",
         "paints",
         "qualityDistributions",
@@ -17158,6 +17186,10 @@
         {
           "description": "Physical starmap amenity definitions.",
           "value": "starmapAmenities"
+        },
+        {
+          "description": "Physical `MissionScenario` Records selected by their exact type.",
+          "value": "missionScenarios"
         }
       ]
     },
@@ -20897,6 +20929,50 @@
         "plusBonuses",
         "reputationBonusGuid",
         "reward"
+      ],
+      "type": "object"
+    },
+    "MissionScenarioDefinition": {
+      "description": "A physical mission scenario and its authored variables, cycles and schedule.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
       ],
       "type": "object"
     },

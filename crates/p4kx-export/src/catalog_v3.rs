@@ -69,6 +69,8 @@ pub(crate) mod location_classification;
 pub(crate) mod location_vocabulary;
 #[path = "location_vocabulary_definition.rs"]
 mod location_vocabulary_definition;
+#[path = "mission_scenario_definition.rs"]
+pub(crate) mod mission_scenario_definition;
 #[path = "prepared_definition.rs"]
 mod prepared_definition;
 #[path = "reputation_blackboard.rs"]
