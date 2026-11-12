@@ -103,8 +103,10 @@ mod error;
 mod files;
 mod flatten;
 mod gear_clip;
+mod gear_params;
 mod gear_placement_source;
 mod gear_pose;
+mod gear_pose_sources;
 mod geometry;
 mod geometry_choice;
 mod head_rig;
@@ -199,6 +201,9 @@ pub use entity_interior::{EntityContainer, EntityInterior, INTERIOR_NODE};
 pub use error::{AssemblyError, EntityLookupError, LoadoutError};
 pub use files::{ArchiveFiles, LoadoutFileError, LoadoutFiles, MAX_XML_LOADOUT_LEN};
 pub use gear_placement_source::GearPlacementSource;
+pub use gear_pose_sources::{
+    DeployedGear, GearAnimationKey, GearKeyChannel, GearPoseInput, GearPoseSources,
+};
 pub use geometry::{Geometry, GeometryVariant, PaletteRef};
 pub use hologram::{HologramCamera, HologramCameraField, ObservedHologramCamera};
 pub use interior::{

@@ -4,6 +4,8 @@
 use p4kx_cryxml::SourceAttributePosition;
 use p4kx_extraction::SourceLocation;
 
+use crate::loadout_xml::AttributeNamespaces;
+
 #[derive(Clone, Copy)]
 pub(crate) enum CdfCoordinateDomain {
     Attachment,
@@ -16,33 +18,16 @@ impl CdfCoordinateDomain {
         position: &SourceAttributePosition,
         field: &str,
     ) -> Option<SourceLocation> {
-        let (namespace, indices) = match position {
-            SourceAttributePosition::Text(range) => (
-                match self {
-                    Self::Attachment => "cdfAttachmentTextBytes",
-                    Self::Model => "cdfModelTextBytes",
-                },
-                vec![
-                    u64::try_from(range.start).ok()?,
-                    u64::try_from(range.end).ok()?,
-                ],
-            ),
-            SourceAttributePosition::CryXml {
-                node_index,
-                attribute_index,
-            } => (
-                match self {
-                    Self::Attachment => "cdfAttachmentCryXmlAttribute",
-                    Self::Model => "cdfModelCryXmlAttribute",
-                },
-                vec![u64::from(*node_index), u64::from(*attribute_index)],
-            ),
-            _ => return None,
+        let namespaces = match self {
+            Self::Attachment => AttributeNamespaces {
+                text_bytes: "cdfAttachmentTextBytes",
+                cryxml_attribute: "cdfAttachmentCryXmlAttribute",
+            },
+            Self::Model => AttributeNamespaces {
+                text_bytes: "cdfModelTextBytes",
+                cryxml_attribute: "cdfModelCryXmlAttribute",
+            },
         };
-        Some(SourceLocation::Subresource {
-            namespace: namespace.into(),
-            indices,
-            field: field.into(),
-        })
+        namespaces.location(position, field)
     }
 }

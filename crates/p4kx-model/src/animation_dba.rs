@@ -10,7 +10,10 @@ use crate::animation_read::{
     corrupt, declared_keys, decode_tracks, listed_tracks, read_block, read_record, stem,
 };
 use crate::reader::to_usize;
-use crate::{Animation, AnimationError, AnimationHeader, CorruptAnimation};
+use crate::{
+    Animation, AnimationError, AnimationHeader, CorruptAnimation, PositionedAnimation,
+    PositionedDba,
+};
 
 pub(crate) const DBA_DATA_VERSION: u32 = 0x900;
 pub(crate) const DBA_METADATA_VERSION: u32 = 0x902;
@@ -92,16 +95,50 @@ impl Dba {
         file_name: &str,
         file: &ChunkFile<B>,
     ) -> Result<Self, AnimationError> {
-        let metadata = chunk_bytes(
+        let decoded = read_projected(file_name, file, |animation, _, _| animation, Capture::Off)?;
+        Ok(Self {
+            animations: decoded.animations,
+            skipped: decoded.skipped,
+        })
+    }
+
+    /// Reads a DBA and retains the original position of each decoded clip and track.
+    ///
+    /// # Errors
+    /// As [`Self::read`].
+    pub fn read_with_positions<B: AsRef<[u8]>>(
+        file_name: &str,
+        file: &ChunkFile<B>,
+    ) -> Result<PositionedDba, AnimationError> {
+        let decoded = read_projected(
             file_name,
             file,
-            ivo::DBA_METADATA,
-            DBA_METADATA_VERSION,
-            "DbaMetadata",
+            PositionedAnimation::new,
+            Capture::Positions,
         )?;
-        let data = chunk_bytes(file_name, file, ivo::DBA_DATA, DBA_DATA_VERSION, "DbaData")?;
-        read_database(metadata, data).map_err(|(chunk, source)| corrupt(file_name, chunk, source))
+        Ok(PositionedDba {
+            animations: decoded.animations,
+            skipped: decoded.skipped,
+        })
     }
+}
+
+fn read_projected<B: AsRef<[u8]>, T>(
+    file_name: &str,
+    file: &ChunkFile<B>,
+    project: impl Fn(Animation, usize, Vec<usize>) -> T,
+    capture: Capture,
+) -> Result<DecodedDatabase<T>, AnimationError> {
+    let metadata = chunk_bytes(
+        file_name,
+        file,
+        ivo::DBA_METADATA,
+        DBA_METADATA_VERSION,
+        "DbaMetadata",
+    )?;
+    let data = chunk_bytes(file_name, file, ivo::DBA_DATA, DBA_DATA_VERSION, "DbaData")?;
+    read_database(metadata, data, project, capture)
+        .map_err(|(chunk, source)| corrupt(file_name, chunk, source))
 }
 
 type ChunkFailure = (&'static str, CorruptAnimation);
@@ -112,7 +149,23 @@ struct Layout<'a> {
     blocks: Vec<Block>,
 }
 
-fn read_database(metadata: &[u8], data: &[u8]) -> Result<Dba, ChunkFailure> {
+#[derive(Clone, Copy)]
+enum Capture {
+    Off,
+    Positions,
+}
+
+struct DecodedDatabase<T> {
+    animations: Vec<T>,
+    skipped: Vec<SkippedAnimation>,
+}
+
+fn read_database<T>(
+    metadata: &[u8],
+    data: &[u8],
+    project: impl Fn(Animation, usize, Vec<usize>) -> T,
+    capture: Capture,
+) -> Result<DecodedDatabase<T>, ChunkFailure> {
     let Layout {
         records,
         paths,
@@ -125,17 +178,27 @@ fn read_database(metadata: &[u8], data: &[u8]) -> Result<Dba, ChunkFailure> {
         .map(|(block, record)| {
             let record = read_record(record)?;
             check_budget(declared_keys(data, block)?, MAX_ANIMATION_KEYS)?;
-            Ok::<_, CorruptAnimation>((record, decode_tracks(data, block)?))
+            let mut controllers = Vec::new();
+            let tracks = decode_tracks(data, block, |ordinal| {
+                if matches!(capture, Capture::Positions) {
+                    controllers.push(ordinal);
+                }
+            })?;
+            Ok::<_, CorruptAnimation>((record, tracks, controllers))
         })
         .collect();
-    let mut dba = Dba {
+    let mut dba = DecodedDatabase {
         animations: Vec::with_capacity(count),
         skipped: Vec::new(),
     };
-    for (path, result) in paths.into_iter().zip(decoded) {
+    for (ordinal, (path, result)) in paths.into_iter().zip(decoded).enumerate() {
         let name = stem(&path).to_owned();
         match result {
-            Ok((record, tracks)) => dba.animations.push(build(name, path, record, tracks)),
+            Ok((record, tracks, controllers)) => {
+                let animation = build(name, path, record, tracks);
+                dba.animations
+                    .push(project(animation, ordinal, controllers));
+            }
             Err(reason) => dba.skipped.push(SkippedAnimation { name, path, reason }),
         }
     }

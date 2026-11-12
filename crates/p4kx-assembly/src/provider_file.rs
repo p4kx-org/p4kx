@@ -4,7 +4,8 @@
 use std::io::Read;
 
 use p4kx_extraction::{
-    AnimationChoice, AnimationSet, ArchiveAnimationRead, ConversionError, Entry, EntryOrigin,
+    AnimationChoice, AnimationSet, ArchiveAnimationRead, ArchivePositionedAnimation,
+    ConversionError, Entry, EntryOrigin, ObservedEntryBinding,
 };
 
 use super::{ArchiveModels, ModelFailure, read_failure};
@@ -28,6 +29,31 @@ impl ArchiveModels<'_> {
         AnimationSet::from_folders_with_archive_sources(&self.index, &folders, choice, extra)
     }
 
+    pub(crate) fn animations_of(
+        &self,
+        extra: &[String],
+        choice: &AnimationChoice,
+    ) -> Result<AnimationSet, ConversionError> {
+        AnimationSet::from_folders(&self.index, &[], choice, extra)
+    }
+
+    pub(crate) const fn observes_model_sources(&self) -> bool {
+        self.observe_nodes
+    }
+
+    pub(crate) fn positioned_deploy_clip(
+        &self,
+        clip: &str,
+        extra: &[String],
+    ) -> Result<Option<ArchivePositionedAnimation>, ConversionError> {
+        ArchivePositionedAnimation::read_first_non_additive(&self.index, clip, extra)
+    }
+
+    pub(crate) fn animation_entry_binding(&self, path: &str) -> Option<ObservedEntryBinding> {
+        let entry = self.index.find(path)?;
+        Some(self.archive.entry_origin(entry)?.binding())
+    }
+
     pub(crate) fn observed_file(
         &self,
         path: &str,
@@ -38,6 +64,17 @@ impl ArchiveModels<'_> {
         };
         let origin = self.archive.entry_origin(entry);
         (origin, self.read_file_entry(entry, limit))
+    }
+
+    pub(crate) fn entry_of(&self, path: &str) -> Option<String> {
+        let path = path.trim_start_matches(['/', '\\']);
+        [format!("Data\\{path}"), path.to_owned()]
+            .into_iter()
+            .find_map(|candidate| {
+                self.index
+                    .find(&candidate)
+                    .map(|entry| entry.path().to_owned())
+            })
     }
 
     pub(super) fn file_entry(&self, path: &str) -> Option<&Entry> {

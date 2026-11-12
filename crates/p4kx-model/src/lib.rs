@@ -103,6 +103,7 @@ mod mtl_xml_source;
 mod nmc;
 mod object_container;
 mod palette;
+mod positioned_animation;
 mod prefab;
 mod reader;
 mod rig_logic_bytes;
@@ -127,7 +128,8 @@ pub use animation_read::{MAX_ANIMATION_KEYS, MAX_DATABASE_KEYS};
 pub use animation_source::{AnimationMetadata, AnimationSource, AnimationTiming, DbaAnimationName};
 pub use bone::{Bone, BoneTransform};
 pub use bone_extend::{
-    chained_world_poses, extend_skeleton, extend_skeleton_placed, multiply as multiply_quaternions,
+    chained_world_poses, chained_world_poses_observing, extend_skeleton, extend_skeleton_placed,
+    multiply as multiply_quaternions,
 };
 pub use bone_map::{Influences, MAX_INFLUENCES};
 pub use bone_match::BoneMatch;
@@ -176,6 +178,7 @@ pub use object_container::{
     ObjectContainer, ObjectContainerError,
 };
 pub use palette::{PaletteSlot, TintEntry, TintPalette, srgb8_to_linear};
+pub use positioned_animation::{PositionedAnimation, PositionedDba};
 pub use prefab::{
     MAX_GROUP_DEPTH, MAX_LIBRARY_OBJECTS, MAX_LIBRARY_PREFABS, Prefab, PrefabError, PrefabLibrary,
     PrefabObject, PrefabRef,

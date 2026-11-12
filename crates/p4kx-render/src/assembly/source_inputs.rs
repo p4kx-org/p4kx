@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use p4kx_assembly::GearAnimationKey;
+
 use super::{AssemblyScene, Item, MeshNodeInput};
 
 /// The actual Assembly piece from which a renderer part was built.
@@ -28,6 +33,8 @@ pub struct PlacedPieceInput<'scene> {
     items: &'scene [Item],
     bound_nodes: &'scene [MeshNodeInput],
     group_nodes: &'scene [Option<MeshNodeInput>],
+    bound_gear_keys: &'scene [GearAnimationKey],
+    group_gear_keys: Option<&'scene HashMap<u32, Arc<[GearAnimationKey]>>>,
 }
 
 impl PlacedPieceInput<'_> {
@@ -55,6 +62,19 @@ impl PlacedPieceInput<'_> {
             .filter_map(|item| self.group_nodes.get(item.group as usize).copied().flatten())
     }
 
+    /// Returns the gear animation keys used by the vertices setting local bounds.
+    pub fn bound_gear_keys(&self) -> impl Iterator<Item = GearAnimationKey> + '_ {
+        self.bound_gear_keys.iter().copied()
+    }
+
+    /// Returns the gear animation keys used by the admitted triangle ranges.
+    pub fn drawn_gear_keys(&self) -> impl Iterator<Item = GearAnimationKey> + '_ {
+        self.items
+            .iter()
+            .filter_map(|item| self.group_gear_keys?.get(&item.group))
+            .flat_map(|keys| keys.iter().copied())
+    }
+
     /// Returns the actual library slots of the admitted draw ranges in order.
     pub fn material_slots(&self) -> impl Iterator<Item = usize> + '_ {
         self.items.iter().filter_map(|item| item.library_slot)
@@ -78,6 +98,10 @@ impl AssemblyScene {
                     .and_then(|inputs| inputs.bounds.get(draw.mesh))
                     .map_or(&[], Vec::as_slice),
                 group_nodes: observed.map_or(&[], |inputs| inputs.groups.as_slice()),
+                bound_gear_keys: observed
+                    .and_then(|inputs| inputs.gear_bounds.get(&draw.mesh))
+                    .map_or(&[], Vec::as_slice),
+                group_gear_keys: observed.map(|inputs| &inputs.gear_groups),
             })
         })
     }

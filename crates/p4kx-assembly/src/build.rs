@@ -121,7 +121,7 @@ impl Assembly {
                 geometry: draft.geometry_path().map(str::to_owned),
                 model: geometry.model,
                 model_archive_sources: geometry.sources,
-                model_definition: ModelDefinition::of(*model, library.from_model),
+                model_definition: geometry.definition.with_model_material(library.from_model),
                 geometry_selectors: geometry.selectors,
                 materials: library.materials,
                 palette,
@@ -145,6 +145,7 @@ impl Assembly {
 struct RenderedGeometry {
     model: Option<Arc<Model>>,
     sources: Arc<[ModelArchiveSource]>,
+    definition: ModelDefinition,
     selectors: GeometrySelectors,
 }
 
@@ -169,6 +170,7 @@ fn rendered_geometry(
             geometry.selectors(draft.library.is_none())
         });
     RenderedGeometry {
+        definition: ModelDefinition::of(loaded, &rendered),
         model: Some(rendered),
         sources,
         selectors,

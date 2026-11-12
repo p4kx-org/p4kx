@@ -6,6 +6,8 @@ use p4kx_cryxml::{ByteOrder, Document as CryDocument, Element, Signature, Xml};
 #[path = "loadout_xml_source_positions.rs"]
 mod source_positions;
 
+pub(crate) use self::source_positions::AttributeNamespaces;
+
 use crate::loadout_file_events::Document;
 use crate::loadout_xml_attribute::XmlLoadoutAttributeSite;
 use crate::resolver_observation::Observation;

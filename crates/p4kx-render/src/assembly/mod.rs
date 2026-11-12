@@ -10,6 +10,7 @@ mod build_place;
 mod draw;
 mod flatten;
 mod frustum;
+mod gear_key_trace;
 mod material_suppression;
 mod mesh_node_input;
 mod mips;

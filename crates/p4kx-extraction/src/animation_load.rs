@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_model::{Animation, AnimationError, AnimationHeader, Dba, DbaHeaders, SkippedAnimation};
+use p4kx_model::{
+    Animation, AnimationError, AnimationHeader, Dba, DbaHeaders, PositionedAnimation,
+    SkippedAnimation,
+};
 
 use crate::{ChunkSource, ConversionError, UnreadAnimation};
 
@@ -47,6 +50,20 @@ impl Described for Animation {
     }
     fn additive(&self) -> bool {
         self.additive
+    }
+}
+
+impl Described for PositionedAnimation {
+    fn name(&self) -> &str {
+        self.animation().name()
+    }
+
+    fn path(&self) -> &str {
+        self.animation().path()
+    }
+
+    fn additive(&self) -> bool {
+        self.animation().additive()
     }
 }
 
@@ -97,6 +114,29 @@ pub(crate) fn load(
         }),
         Kind::Dba => {
             let dba = Dba::read(name, source.file()).map_err(failed(label))?;
+            Ok(Loaded {
+                unread: skipped(label, dba.skipped),
+                animations: dba.animations,
+            })
+        }
+    }
+}
+
+pub(crate) fn load_with_positions(
+    source: &ChunkSource,
+    label: &str,
+    kind: Kind,
+) -> Result<Loaded<PositionedAnimation>, ConversionError> {
+    let name = file_name(label);
+    match kind {
+        Kind::Caf => Ok(Loaded {
+            animations: vec![
+                Animation::read_caf_with_positions(name, source.file()).map_err(failed(label))?,
+            ],
+            unread: Vec::new(),
+        }),
+        Kind::Dba => {
+            let dba = Dba::read_with_positions(name, source.file()).map_err(failed(label))?;
             Ok(Loaded {
                 unread: skipped(label, dba.skipped),
                 animations: dba.animations,

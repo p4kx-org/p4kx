@@ -3,7 +3,7 @@
 
 use std::borrow::Cow;
 
-use p4kx_assembly::{Assembly, EntityInterior, INTERIOR_NODE};
+use p4kx_assembly::{Assembly, EntityInterior, GearPoseInput, INTERIOR_NODE};
 use p4kx_extraction::model::{MaterialStatus, Model, TintPalette};
 
 use super::AssemblyPieceSource;
@@ -22,6 +22,7 @@ pub(super) struct Piece<'a> {
     pub(super) path: Cow<'a, str>,
     pub(super) parent: Option<usize>,
     pub(super) model: Option<&'a Model>,
+    pub(super) gear_pose: Option<GearPoseInput<'a>>,
     pub(super) world: Rows,
     pub(super) materials: &'a MaterialStatus,
     pub(super) palette: Option<&'a TintPalette>,
@@ -42,6 +43,7 @@ pub(super) fn pieces_of(assembly: &Assembly) -> Vec<Piece<'_>> {
             path: Cow::Borrowed(part.path()),
             parent: part.parent(),
             model: part.model(),
+            gear_pose: part.gear_pose_input(),
             world: part.world().rows,
             materials: part.materials(),
             palette: part.palette(),
@@ -62,6 +64,7 @@ pub(super) fn pieces_of(assembly: &Assembly) -> Vec<Piece<'_>> {
             path: Cow::Owned(path),
             parent: Some(index),
             model: Some(attached.model()),
+            gear_pose: None,
             world: part.world().then(attached.local()).rows,
             materials: attached.materials(),
             palette: part.palette(),
@@ -103,6 +106,7 @@ fn push_containers<'a>(
                     .parent()
                     .map_or(owner_index, |parent| Some(base + parent)),
                 model: part.model(),
+                gear_pose: None,
                 world: anchor.then(part.world()).rows,
                 materials: part.materials(),
                 palette: part.palette(),

@@ -8,7 +8,8 @@ use crate::animation_controller::{CHANNEL_LEN, CONTROLLER_LEN};
 use crate::animation_keys::bytes_at;
 use crate::reader::to_usize;
 use crate::{
-    Animation, AnimationController, AnimationError, AnimationTiming, CorruptAnimation, Track,
+    Animation, AnimationController, AnimationError, AnimationTiming, CorruptAnimation,
+    PositionedAnimation, Track,
 };
 
 /// The most keys one animation may declare.
@@ -99,10 +100,15 @@ pub(crate) fn listed_tracks(
     Ok((ids, keys))
 }
 
-pub(crate) fn decode_tracks(data: &[u8], block: &Block) -> Result<Vec<Track>, CorruptAnimation> {
+pub(crate) fn decode_tracks(
+    data: &[u8],
+    block: &Block,
+    mut observe: impl FnMut(usize),
+) -> Result<Vec<Track>, CorruptAnimation> {
     let mut tracks = Vec::with_capacity(block.count);
     for controller in controllers(data, block, 0)? {
         if let Some(track) = controller.decode()? {
+            observe(controller.ordinal());
             tracks.push(track);
         }
     }
@@ -236,6 +242,28 @@ impl Animation {
         file_name: &str,
         file: &ChunkFile<B>,
     ) -> Result<Self, AnimationError> {
+        Self::read_caf_observing(file_name, file, |_| {})
+    }
+
+    /// Reads a CAF and retains each successful track's original controller ordinal.
+    ///
+    /// # Errors
+    /// As [`Self::read_caf`].
+    pub fn read_caf_with_positions<B: AsRef<[u8]>>(
+        file_name: &str,
+        file: &ChunkFile<B>,
+    ) -> Result<PositionedAnimation, AnimationError> {
+        let mut controllers = Vec::new();
+        let animation =
+            Self::read_caf_observing(file_name, file, |ordinal| controllers.push(ordinal))?;
+        Ok(PositionedAnimation::new(animation, 0, controllers))
+    }
+
+    fn read_caf_observing<B: AsRef<[u8]>>(
+        file_name: &str,
+        file: &ChunkFile<B>,
+        observe: impl FnMut(usize),
+    ) -> Result<Self, AnimationError> {
         let info = chunk_bytes(
             file_name,
             file,
@@ -249,7 +277,7 @@ impl Animation {
         let tracks = read_block(data, 0, CAF_SIGNATURE)
             .and_then(|block| {
                 check_budget(declared_keys(data, &block)?, MAX_ANIMATION_KEYS)?;
-                decode_tracks(data, &block)
+                decode_tracks(data, &block, observe)
             })
             .map_err(|source| corrupt(file_name, "CafData", source))?;
         Ok(build(

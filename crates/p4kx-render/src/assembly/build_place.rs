@@ -161,13 +161,7 @@ impl AssemblyScene {
                 .or_insert(next);
             if group == next {
                 if let Some(inputs) = self.mesh_node_inputs.as_mut() {
-                    let node = mesh
-                        .mesh_node_trace
-                        .as_ref()
-                        .and_then(|trace| trace.ranges.get(position))
-                        .copied()
-                        .flatten();
-                    inputs.groups.push(node);
+                    inputs.record_group(mesh, position, group);
                 }
                 self.groups.push(Group {
                     first_index: range.first_index,

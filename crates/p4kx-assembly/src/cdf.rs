@@ -3,8 +3,11 @@
 
 use std::sync::Arc;
 
+use p4kx_extraction::SourceLocation;
+
 use crate::CdfAttachmentSite;
 use crate::cdf_attachment_source;
+use crate::cdf_attribute_position::CdfCoordinateDomain;
 use crate::cdf_bone::BoneAttachment;
 use crate::cdf_model_sources::CdfModelSources;
 use crate::loadout_xml::Node;
@@ -55,6 +58,10 @@ pub(crate) fn read_observing_sources(bytes: &[u8]) -> Result<Character, String> 
             .find(|child| child.name().eq_ignore_ascii_case("AttachmentList"))
             .map(Node::children);
         let attachment = |ordinal| attachments.as_ref()?.get(ordinal).copied();
+        let model = children
+            .iter()
+            .copied()
+            .find(|child| child.name().eq_ignore_ascii_case("Model"));
         project(
             &root,
             |ordinal| Some(cdf_attachment_source::capture(attachment(ordinal)?, scope)),
@@ -63,15 +70,27 @@ pub(crate) fn read_observing_sources(bytes: &[u8]) -> Result<Character, String> 
                     ordinal,
                     preferred_skin,
                 } => CdfModelSources::attachment(attachment(ordinal)?, scope, preferred_skin),
-                MainSelector::ModelFile => {
-                    let node = children
-                        .iter()
-                        .copied()
-                        .find(|child| child.name().eq_ignore_ascii_case("Model"))?;
-                    CdfModelSources::file(node, scope)
-                }
+                MainSelector::ModelFile => CdfModelSources::file(model?, scope),
             },
         )
+    })
+}
+
+pub(crate) fn read_skeleton_with_position(
+    bytes: &[u8],
+) -> Result<(Option<String>, Option<SourceLocation>), String> {
+    let mut budget = Budget::new(bytes.len());
+    markup::parse_with_source(bytes, &mut budget, |root, original, scope| {
+        let character = project(&root, |_| None, |_| None)?;
+        let position = character.skeleton.as_ref().and_then(|_| {
+            let node = original
+                .children()
+                .into_iter()
+                .find(|child| child.name().eq_ignore_ascii_case("Model"))?;
+            let position = scope.attribute_ascii_position(node, "File")?;
+            CdfCoordinateDomain::Model.location(&position, "File")
+        });
+        Ok((character.skeleton, position))
     })
 }
 

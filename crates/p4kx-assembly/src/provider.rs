@@ -21,7 +21,7 @@ mod file;
 use crate::cdf_model_sources::CdfModelSources;
 use crate::path_match::starts_with_path;
 use crate::skeleton::SkeletonProblem;
-use crate::{CdfAttachmentSite, MAX_ASSEMBLY_VERTICES};
+use crate::{CdfAttachmentSite, DeployedGear, MAX_ASSEMBLY_VERTICES};
 
 mod character;
 #[path = "provider_dispatch.rs"]
@@ -218,6 +218,19 @@ pub trait ModelProvider: Sync {
         let _ = (path, model);
         Ok(None)
     }
+
+    /// Poses a gear and retains original evidence when the provider can observe it.
+    ///
+    /// # Errors
+    /// As [`ModelProvider::deployed`].
+    fn deployed_observed(
+        &self,
+        path: &str,
+        model: &Model,
+    ) -> Result<Option<DeployedGear>, ModelFailure> {
+        self.deployed(path, model)
+            .map(|posed| posed.map(DeployedGear::from_model))
+    }
 }
 
 /// Reads models and material libraries from the Entries of an Archive below `Data`.
@@ -314,28 +327,9 @@ impl<'a> ArchiveModels<'a> {
         self.animations_with_archive_sources(folders, choice, extra)
             .map(p4kx_extraction::ArchiveAnimationRead::into_set)
     }
-
-    pub(crate) fn entry_of(&self, path: &str) -> Option<String> {
-        let path = path.trim_start_matches(['/', '\\']);
-        [format!("Data\\{path}"), path.to_owned()]
-            .into_iter()
-            .find_map(|candidate| {
-                self.index
-                    .find(&candidate)
-                    .map(|entry| entry.path().to_owned())
-            })
-    }
 }
 
 impl ArchiveModels<'_> {
-    pub(crate) fn animations_of(
-        &self,
-        extra: &[String],
-        choice: &AnimationChoice,
-    ) -> Result<AnimationSet, ConversionError> {
-        AnimationSet::from_folders(&self.index, &[], choice, extra)
-    }
-
     fn read_model(
         &self,
         entry: String,

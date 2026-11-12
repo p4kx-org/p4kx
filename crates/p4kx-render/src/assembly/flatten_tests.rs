@@ -21,9 +21,10 @@ fn the_effective_skin_excludes_node_matrices_from_observed_vertices_and_bounds()
         node.transform.rows[0][3] = 25.0;
     }
 
-    let observed = flatten(&model, 0, MeshNodeCapture::Enabled).ok_or("skinned flattening")?;
+    let observed =
+        flatten(&model, 0, MeshNodeCapture::Enabled, None).ok_or("skinned flattening")?;
     let unobserved =
-        flatten(&model, 0, MeshNodeCapture::Disabled).ok_or("unobserved flattening")?;
+        flatten(&model, 0, MeshNodeCapture::Disabled, None).ok_or("unobserved flattening")?;
     assert_eq!(observed.vertices, unobserved.vertices);
     assert_eq!(observed.indices, unobserved.indices);
     assert_eq!(observed.bounds, unobserved.bounds);
@@ -40,7 +41,8 @@ fn the_effective_skin_excludes_node_matrices_from_observed_vertices_and_bounds()
     );
 
     model.bones.clear();
-    let fallback = flatten(&model, 0, MeshNodeCapture::Enabled).ok_or("unbound flattening")?;
+    let fallback =
+        flatten(&model, 0, MeshNodeCapture::Enabled, None).ok_or("unbound flattening")?;
     assert_ne!(fallback.vertices, observed.vertices);
     assert_ne!(fallback.bounds, observed.bounds);
     let trace = fallback

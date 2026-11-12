@@ -6,7 +6,7 @@ mod model_archive_source;
 #[path = "model_material_origins.rs"]
 pub(crate) mod model_material_origins;
 
-pub use crate::animation_sources::ArchiveAnimationRead;
+pub use crate::animation_sources::{ArchiveAnimationRead, ArchivePositionedAnimation};
 pub use crate::chunk_source::{ChunkDumpMode, ChunkDumpPayload, PreparedChunk};
 pub use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
 pub use crate::field_origin_seed::FieldOriginSeed;

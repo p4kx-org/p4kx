@@ -4,10 +4,10 @@
 use std::path::{Path, PathBuf};
 
 use p4kx_archive::EntryOrigin;
-use p4kx_model::Animation;
+use p4kx_model::{Animation, PositionedAnimation};
 
-use crate::animation_load::kind;
-use crate::animation_select::Gathered;
+use crate::animation_load::{kind, load_with_positions};
+use crate::animation_select::{self, Gathered};
 use crate::animation_set::{MAX_ANIMATION_FILE_LEN, Source};
 use crate::{AnimationChoice, AnimationSet, CancelToken, ChunkSource, ConversionError, PathIndex};
 
@@ -35,6 +35,52 @@ impl ArchiveAnimationRead {
     #[must_use]
     pub fn into_set(self) -> AnimationSet {
         self.set
+    }
+}
+
+/// The selected decoded clip and the physical Archive Entry that supplied it.
+#[derive(Debug)]
+pub struct ArchivePositionedAnimation {
+    animation: PositionedAnimation,
+    origin: Option<EntryOrigin>,
+}
+
+impl ArchivePositionedAnimation {
+    /// Reads the first non-additive named clip from the explicit sources in normal selection order.
+    ///
+    /// # Errors
+    /// As [`AnimationSet::from_folders`] for explicit sources and a named selection.
+    pub fn read_first_non_additive(
+        index: &PathIndex<'_>,
+        name: &str,
+        extra: &[String],
+    ) -> Result<Option<Self>, ConversionError> {
+        let choice = AnimationChoice::Named(vec![name.to_owned()]);
+        let sources = with_extras(index, Vec::new(), &choice, extra)?;
+        let gathered = animation_select::read(
+            sources,
+            &choice,
+            |label| open_entry(index, label, None),
+            |source, label, kind, _| load_with_positions(source, label, kind),
+        )?;
+        Ok(gathered
+            .animations
+            .into_iter()
+            .zip(gathered.archive_sources)
+            .find(|(clip, _)| !clip.animation().additive)
+            .map(|(animation, origin)| Self { animation, origin }))
+    }
+
+    /// Returns the decoded clip and its original ordinal coordinates.
+    #[must_use]
+    pub const fn animation(&self) -> &PositionedAnimation {
+        &self.animation
+    }
+
+    /// Returns the physical Archive Entry admitted by the read.
+    #[must_use]
+    pub const fn origin(&self) -> Option<&EntryOrigin> {
+        self.origin.as_ref()
     }
 }
 

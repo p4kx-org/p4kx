@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use p4kx_assembly::Assembly;
+use p4kx_assembly::{Assembly, GearPoseInput};
 use p4kx_extraction::model::Material;
 use p4kx_extraction::model::Model;
 use p4kx_extraction::{LoadedTexture, TextureLoader, layered_base_textures};
@@ -12,6 +12,7 @@ use rayon::prelude::*;
 use thiserror::Error;
 
 use super::flatten::{self, Range};
+use super::gear_key_trace::GearKeyTrace;
 use super::mesh_node_input::{MeshNodeCapture, MeshNodeInputs, MeshNodeTrace};
 use super::pieces::pieces_of;
 use super::surface::{SceneSurfaces, surfaces_of};
@@ -78,10 +79,36 @@ pub(super) struct SharedMesh {
     pub(super) bounds: Bounds,
     pub(super) triangles: usize,
     pub(super) mesh_node_trace: Option<MeshNodeTrace>,
+    pub(super) gear_key_trace: Option<GearKeyTrace>,
+}
+
+struct DistinctModel<'a> {
+    model: &'a Model,
+    gear: Option<GearPoseInput<'a>>,
 }
 
 fn address<T>(value: &T) -> usize {
     std::ptr::from_ref(value) as usize
+}
+
+fn observed_bounds(inputs: &mut MeshNodeInputs, meshes: Vec<Option<SharedMesh>>) {
+    inputs.bounds.reserve(meshes.len());
+    for (ordinal, mesh) in meshes.into_iter().enumerate() {
+        let Some(mesh) = mesh else {
+            inputs.bounds.push(Vec::new());
+            continue;
+        };
+        inputs.bounds.push(
+            mesh.mesh_node_trace
+                .map_or_else(Vec::new, MeshNodeTrace::into_bound_inputs),
+        );
+        if let Some(trace) = mesh.gear_key_trace {
+            let keys = trace.bound_keys();
+            if !keys.is_empty() {
+                inputs.gear_bounds.insert(ordinal, keys);
+            }
+        }
+    }
 }
 
 impl AssemblyScene {
@@ -120,13 +147,16 @@ impl AssemblyScene {
     ) -> Result<Self, BuildError> {
         let pieces = pieces_of(assembly);
         let mut ids: HashMap<usize, usize> = HashMap::new();
-        let mut distinct: Vec<&Model> = Vec::new();
+        let mut distinct: Vec<DistinctModel> = Vec::new();
         let model_of: Vec<Option<usize>> = pieces
             .iter()
             .map(|piece| {
                 piece.model.map(|model| {
                     *ids.entry(address(model)).or_insert_with(|| {
-                        distinct.push(model);
+                        distinct.push(DistinctModel {
+                            model,
+                            gear: piece.gear_pose,
+                        });
                         distinct.len() - 1
                     })
                 })
@@ -155,13 +185,7 @@ impl AssemblyScene {
         let textures = scene.read_textures(&wanted, options, hooks)?;
         scene.place(&pieces, (&model_of, &meshes), (&wanted.surfaces, &textures));
         if let Some(inputs) = scene.mesh_node_inputs.as_mut() {
-            inputs.bounds = meshes
-                .into_iter()
-                .map(|mesh| {
-                    mesh.and_then(|mesh| mesh.mesh_node_trace)
-                        .map_or_else(Vec::new, MeshNodeTrace::into_bound_inputs)
-                })
-                .collect();
+            observed_bounds(inputs, meshes);
         }
         if scene.draws.is_empty() || !scene.bounds.is_valid() {
             return Err(BuildError::Empty);
@@ -171,7 +195,7 @@ impl AssemblyScene {
 
     fn merge_meshes(
         &mut self,
-        distinct: &[&Model],
+        distinct: &[DistinctModel<'_>],
         lod: u32,
         hooks: &Hooks<'_>,
     ) -> Result<Vec<Option<SharedMesh>>, BuildError> {
@@ -187,7 +211,13 @@ impl AssemblyScene {
             }
             let flats: Vec<_> = wave
                 .par_iter()
-                .map(|model| flatten::flatten(model, lod, capture))
+                .map(|input| {
+                    let gear = match capture {
+                        MeshNodeCapture::Enabled => input.gear,
+                        MeshNodeCapture::Disabled => None,
+                    };
+                    flatten::flatten(input.model, lod, capture, gear)
+                })
                 .collect();
             for flat in flats {
                 let mesh = flat.and_then(|flat| {
@@ -214,6 +244,7 @@ impl AssemblyScene {
                         bounds: flat.bounds,
                         triangles: count,
                         mesh_node_trace: flat.mesh_node_trace,
+                        gear_key_trace: flat.gear_key_trace,
                     })
                 });
                 meshes.push(mesh);

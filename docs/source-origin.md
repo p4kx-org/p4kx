@@ -174,6 +174,17 @@ For a landing gear used by the scene, the receipt records the Entity's
 evaluates it against the parent model, including when the name chooses
 the origin fallback.
 
+A deployed landing gear contributes animation origins only where its keys
+supply a used bounds vertex or an admitted visible triangle range. The
+receipt identifies the physical CAF or DBA Entry, original clip and
+controller ordinals, and last key ordinal in each used channel through
+`gearDeployClip`, `gearDeployController` and `gearDeployKey`. It includes
+the original CDF skeleton `File` and the effective `.chrparams` clip and
+winning folder or database selectors when used. Parameter locators use
+`gearParameterTextBytes` for half-open original text byte ranges and
+`gearParameterCryXmlAttribute` for the original node and global attribute
+ordinals.
+
 The actual CDF main model selection is recorded as the winning attachment
 `Binding` or fallback `Model.File`. A `CA_SKIN` preference also records the
 winning attachment's `Type`. A CDF `Material` attribute contributes when

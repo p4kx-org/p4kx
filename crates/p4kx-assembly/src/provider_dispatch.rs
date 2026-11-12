@@ -7,6 +7,7 @@ use p4kx_extraction::model::{LayerBudget, MaterialStatus, Model};
 use p4kx_extraction::{ArchiveMaterialRead, EntryOrigin, ModelSource};
 
 use super::{ArchiveModels, ModelFailure, ModelProvider, ProvidedModel};
+use crate::DeployedGear;
 use crate::cdf::is_character_definition;
 
 impl ModelProvider for ArchiveModels<'_> {
@@ -62,6 +63,15 @@ impl ModelProvider for ArchiveModels<'_> {
     }
 
     fn deployed(&self, path: &str, model: &Model) -> Result<Option<Model>, ModelFailure> {
+        self.pose_gear(path, model)
+            .map(|posed| posed.map(DeployedGear::into_model))
+    }
+
+    fn deployed_observed(
+        &self,
+        path: &str,
+        model: &Model,
+    ) -> Result<Option<DeployedGear>, ModelFailure> {
         self.pose_gear(path, model)
     }
 }

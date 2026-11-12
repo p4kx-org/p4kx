@@ -228,3 +228,6 @@ mod cdf_attachments;
 
 #[path = "ui_hologram_gear_selectors.rs"]
 mod gear_selectors;
+
+#[path = "ui_hologram_gear_deploy.rs"]
+mod gear_deploy;

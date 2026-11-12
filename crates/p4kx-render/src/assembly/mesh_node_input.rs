@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashMap;
+use std::sync::Arc;
+
+use p4kx_assembly::GearAnimationKey;
+
+use super::build::SharedMesh;
 use crate::Bounds;
 
 /// A mesh whose vertices used a model node transform.
@@ -74,4 +80,26 @@ impl MeshNodeTrace {
 pub(super) struct MeshNodeInputs {
     pub(super) bounds: Vec<Vec<MeshNodeInput>>,
     pub(super) groups: Vec<Option<MeshNodeInput>>,
+    pub(super) gear_bounds: HashMap<usize, Vec<GearAnimationKey>>,
+    pub(super) gear_groups: HashMap<u32, Arc<[GearAnimationKey]>>,
+}
+
+impl MeshNodeInputs {
+    pub(super) fn record_group(&mut self, mesh: &SharedMesh, range: usize, group: u32) {
+        let node = mesh
+            .mesh_node_trace
+            .as_ref()
+            .and_then(|trace| trace.ranges.get(range))
+            .copied()
+            .flatten();
+        self.groups.push(node);
+        if let Some(keys) = mesh
+            .gear_key_trace
+            .as_ref()
+            .and_then(|trace| trace.ranges.get(range))
+            .and_then(Option::as_ref)
+        {
+            self.gear_groups.insert(group, Arc::clone(keys));
+        }
+    }
 }

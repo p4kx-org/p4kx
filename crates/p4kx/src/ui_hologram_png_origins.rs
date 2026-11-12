@@ -43,11 +43,11 @@ pub(super) fn publish(
     let SceneInputs {
         placed: mut sources,
         suppressed_ranges,
-        drawn_nodes,
+        drawn_geometry,
     } = scene_inputs(original.projection, assembly, scene, visible)?;
     let scene = uses.origin(&sources, false);
     sources.extend(suppressed_ranges);
-    sources.extend(drawn_nodes);
+    sources.extend(drawn_geometry);
     sources.extend(
         original
             .settings
@@ -99,7 +99,7 @@ fn write_error(output: &Path, source: io::Error) -> ConversionError {
 struct SceneInputs {
     placed: Vec<SourceUse>,
     suppressed_ranges: Vec<SourceUse>,
-    drawn_nodes: Vec<SourceUse>,
+    drawn_geometry: Vec<SourceUse>,
 }
 
 struct PieceInputs<'a> {
@@ -141,11 +141,39 @@ impl PieceInputs<'_> {
         self.material
             .selected(projection, piece.material_slots(), &mut sources.placed)?;
         self.mesh_nodes(projection, piece, drawn, sources)?;
+        self.gear_pose(projection, piece, drawn, sources)?;
         if let (Some(owner), Some((ordinal, _))) = (
             assembly.parts().get(self.ancestry),
             self.material.attachment,
         ) {
             cdf_origins::attachment(projection, owner, ordinal, &mut sources.placed)?;
+        }
+        Ok(())
+    }
+
+    fn gear_pose(
+        &self,
+        projection: &Projection,
+        piece: &PlacedPieceInput<'_>,
+        drawn: bool,
+        sources: &mut SceneInputs,
+    ) -> Result<()> {
+        let Some(part) = self.material.owner else {
+            return Ok(());
+        };
+        gear_origins::pose(
+            projection,
+            part,
+            piece.bound_gear_keys(),
+            &mut sources.placed,
+        )?;
+        if drawn {
+            gear_origins::pose(
+                projection,
+                part,
+                piece.drawn_gear_keys(),
+                &mut sources.drawn_geometry,
+            )?;
         }
         Ok(())
     }
@@ -170,7 +198,7 @@ impl PieceInputs<'_> {
                 self.model,
                 self.models,
                 piece.drawn_mesh_nodes(),
-                &mut sources.drawn_nodes,
+                &mut sources.drawn_geometry,
             )?;
         }
         Ok(())
@@ -224,7 +252,7 @@ fn scene_inputs(
     let mut sources = SceneInputs {
         placed: Vec::new(),
         suppressed_ranges: Vec::new(),
-        drawn_nodes: Vec::new(),
+        drawn_geometry: Vec::new(),
     };
     let attachments: Vec<_> = assembly.indexed_attachments().collect();
     let mut placed_ancestry = HashSet::new();

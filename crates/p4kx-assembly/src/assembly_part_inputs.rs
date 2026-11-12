@@ -5,28 +5,38 @@ use std::sync::Arc;
 
 use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource, SourceLocation};
 
+use p4kx_model::Model;
+
 use super::Part;
 use crate::build_models::Loaded;
 use crate::cdf_model_sources::CdfModelSources;
-use crate::{GearPlacementSource, PortPlacementSource};
+use crate::{GearPlacementSource, GearPoseInput, GearPoseSources, PortPlacementSource};
 
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ModelDefinition {
     origin: Option<EntryOrigin>,
     cdf: Option<Arc<CdfModelSources>>,
+    gear_pose: Option<Arc<GearPoseSources>>,
     material_from_model: bool,
 }
 
 impl ModelDefinition {
-    pub(crate) fn of(loaded: Option<&Loaded>, material_from_model: bool) -> Self {
-        let Some(loaded) = loaded else {
-            return Self::default();
-        };
+    pub(crate) fn of(loaded: &Loaded, rendered: &Arc<Model>) -> Self {
         Self {
             origin: loaded.definition_origin.clone(),
             cdf: loaded.cdf_model_sources.clone(),
-            material_from_model,
+            gear_pose: loaded
+                .gear_pose
+                .as_ref()
+                .filter(|_| Arc::ptr_eq(&loaded.model, rendered))
+                .map(Arc::clone),
+            material_from_model: false,
         }
+    }
+
+    pub(crate) const fn with_model_material(mut self, from_model: bool) -> Self {
+        self.material_from_model = from_model;
+        self
     }
 }
 
@@ -41,6 +51,15 @@ impl Part {
     #[must_use]
     pub fn material_selector(&self) -> Option<SourceLocation> {
         self.geometry_selectors.material_field()
+    }
+
+    /// Returns the actual rendered model and its retained deploy-pose evidence.
+    #[must_use]
+    pub fn gear_pose_input(&self) -> Option<GearPoseInput<'_>> {
+        Some(GearPoseInput {
+            model: self.model()?,
+            source: self.model_definition.gear_pose.as_deref()?,
+        })
     }
 
     /// Returns the selectors of this part's original landing gear declaration.

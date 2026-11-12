@@ -118,7 +118,7 @@ impl Animation {
     /// it; when several bones share a controller ID, the first of them gets the track.
     #[must_use]
     pub fn bind(&self, bones: &[Bone]) -> BoundTracks<'_> {
-        let matches = bind_controllers(bones, self.tracks.iter().map(|track| track.controller_id));
+        let matches = self.track_binding_indices(bones);
         let mut bound = Vec::new();
         let mut unbound = Vec::new();
         for (track, bone) in self.tracks.iter().zip(matches) {
@@ -128,6 +128,12 @@ impl Animation {
             }
         }
         BoundTracks { bound, unbound }
+    }
+
+    /// Returns each decoded track's first matching bone index in track order.
+    #[must_use]
+    pub fn track_binding_indices(&self, bones: &[Bone]) -> Vec<Option<usize>> {
+        bind_controllers(bones, self.tracks.iter().map(|track| track.controller_id))
     }
 }
 
