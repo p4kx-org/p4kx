@@ -5,19 +5,23 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use p4kx_extraction::gfx::{Background, CanvasSize, Localise, RasterOptions, Skipped};
 use p4kx_extraction::{
-    Archive, ArchiveImages, DataForgeEntry, Language, ScreenTexts, decode_line_breaks,
-    write_replacing_protected,
+    Archive, ArchiveImages, CancelToken, DataForgeEntry, FileReceipt, Language,
+    OriginOutputAddress, ScreenTexts, decode_line_breaks, write_origin_companion,
 };
 use p4kx_screens::{
-    ImageSources, MAX_SVG_BYTES, Report, ScreenComposer, Still, StillFormat, StillRequest,
-    TextSources, Variable, check_variable_count,
+    ImageSources, Report, ScreenComposer, Still, StillFormat, StillRequest, TextSources, Variable,
+    check_variable_count,
 };
 use serde::Serialize;
 
 use crate::{exit, json};
+
+#[path = "ui_screen_render_origins.rs"]
+mod origins;
+use self::origins::{ImageReads, ScreenEvidence, ScreenSource};
 
 pub(crate) struct Options<'a> {
     pub(crate) screen: &'a str,
@@ -30,6 +34,25 @@ pub(crate) struct Options<'a> {
     pub(crate) svg: bool,
 }
 
+impl Options<'_> {
+    fn request(&self) -> StillRequest<'_> {
+        StillRequest {
+            screen: self.screen,
+            brand: self.brand,
+            variables: self.variables,
+            raster: RasterOptions {
+                size: self.size.unwrap_or(CanvasSize::Stage),
+                background: self.background,
+            },
+            format: if self.svg {
+                StillFormat::Svg
+            } else {
+                StillFormat::Png
+            },
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct RenderJson<'a> {
     screen: &'a str,
@@ -40,6 +63,10 @@ struct RenderJson<'a> {
     #[serde(flatten)]
     report: &'a Report,
     skipped: &'a [SkippedJson],
+    #[serde(flatten)]
+    evidence: &'a ScreenEvidence,
+    #[serde(rename = "originReceipt")]
+    origin_receipt: String,
 }
 
 #[derive(Serialize)]
@@ -58,12 +85,18 @@ fn skipped_json(skipped: &[Skipped]) -> Vec<SkippedJson> {
         .collect()
 }
 
-fn draw(archive: &Archive, options: &Options<'_>) -> Result<Still> {
-    let entry = DataForgeEntry::read(archive)?;
+fn draw(
+    archive: &Archive,
+    options: &Options<'_>,
+    cancel: &CancelToken,
+) -> Result<(Still, ScreenEvidence)> {
+    let stopped = || cancel.is_cancelled();
+    let entry = DataForgeEntry::read_until(archive, &stopped)?;
     let forge = entry.open()?;
-    let texts = ScreenTexts::load(
+    let font = ScreenComposer::new(&forge).font_file_source();
+    let texts = ScreenTexts::load_observed(
         archive,
-        &ScreenComposer::new(&forge).font_file(),
+        &font.path,
         Some(options.lang.unwrap_or(Language::English)),
     );
     let mut warnings = texts.warnings().to_vec();
@@ -77,30 +110,18 @@ fn draw(archive: &Archive, options: &Options<'_>) -> Result<Still> {
             .map(|text| decode_line_breaks(text).into_owned())
     };
     let images = ArchiveImages::new(archive);
+    let reads = ImageReads::default();
     let read_texture = |path: &str, side: u32, pixels: u64| {
-        images
-            .texture(path, side, pixels)
+        reads
+            .texture(&images, path, side, pixels)
             .map_err(|error| describe(&error))
     };
     let read_vector = |path: &str| {
-        images
-            .vector(path, MAX_SVG_BYTES as u64)
+        reads
+            .vector(&images, path)
             .map_err(|error| describe(&error))
     };
-    let request = StillRequest {
-        screen: options.screen,
-        brand: options.brand,
-        variables: options.variables,
-        raster: RasterOptions {
-            size: options.size.unwrap_or(CanvasSize::Stage),
-            background: options.background,
-        },
-        format: if options.svg {
-            StillFormat::Svg
-        } else {
-            StillFormat::Png
-        },
-    };
+    let request = options.request();
     let text_sources = texts.fonts().map(|fonts| TextSources {
         fonts,
         localise: ini.as_ref().map(|_| &lookup as Localise<'_>),
@@ -109,12 +130,25 @@ fn draw(archive: &Archive, options: &Options<'_>) -> Result<Still> {
         texture: &read_texture,
         vector: &read_vector,
     };
-    Ok(Still::render(
+    let drawn = Still::render_observed(
         &forge,
         text_sources,
         Some(image_sources),
         &request,
-    )?)
+        &stopped,
+    )?;
+    let evidence = ScreenEvidence::register(
+        &ScreenSource {
+            dataforge: &entry,
+            font: font.record_index,
+            texts: &texts,
+            ini: ini.as_ref(),
+        },
+        &drawn,
+        &reads,
+        request.raster.size,
+    )?;
+    Ok((drawn.still, evidence))
 }
 
 /// Runs `p4kx ui render --screen`.
@@ -123,18 +157,30 @@ pub(crate) fn run(archive: &Path, options: &Options<'_>, as_json: bool) -> Resul
     let archive = crate::key::open(archive)?;
     let cancel = crate::extract::cancel_on_interrupt()?;
     let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
-    let still = draw(&archive, options)?;
+    let (still, evidence) = draw(&archive, options, &cancel)?;
     let bytes = still.encode()?;
-    write_replacing_protected(options.out, Some(&protection), Some(&cancel), |writer| {
-        writer
-            .write_all(&bytes)
-            .map_err(|source| p4kx_extraction::ConversionError::Write {
-                path: options.out.to_path_buf(),
-                source,
-            })
-    })?;
+    let receipt =
+        FileReceipt::new_with_cancel(options.out, Some(&protection), Some(&protection), cancel)?;
+    receipt.publish(
+        |writer| writer.write_all(&bytes),
+        |writer, binding, ()| {
+            write_origin_companion(
+                writer,
+                binding,
+                &evidence.provenance,
+                [(
+                    &OriginOutputAddress::OpaquePayload,
+                    &evidence.artifact_origin,
+                )],
+            )
+        },
+    )?;
     let skipped = skipped_json(still.skipped());
     if as_json {
+        let name = receipt
+            .path()
+            .file_name()
+            .context("missing Screen receipt name")?;
         json::print(&RenderJson {
             screen: options.screen,
             target: json::path(options.out),
@@ -143,6 +189,8 @@ pub(crate) fn run(archive: &Path, options: &Options<'_>, as_json: bool) -> Resul
             height: still.height(),
             report: still.report(),
             skipped: &skipped,
+            evidence: &evidence,
+            origin_receipt: json::path(Path::new(name)),
         })?;
     } else {
         print_report(options, &still, &skipped)?;

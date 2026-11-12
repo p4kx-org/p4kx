@@ -130,6 +130,17 @@ set as incomplete.
 A diagnostic field whose contributing inputs cannot be established carries an
 unknown marker.
 
+## Screen rendering
+
+`p4kx ui render --screen` uses the same sibling companion for PNG and SVG.
+Its artifact use includes the measured DataForge payload and the texture
+mips, vector files, font definitions and winning language values used by
+composition and drawing. A PNG records sources used by actual paints.
+An SVG also records sources embedded in its document. Screen dimension
+values identify the exact canvas Record fields used to derive them.
+Explicit dimensions and command options have their own tool-authored origins.
+A report value whose contributors cannot be established has a null marker.
+
 ## CHF GLB
 
 `p4kx chf glb` writes a sibling `<output>.p4kx-origin.jsonl` companion. Its

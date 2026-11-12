@@ -389,7 +389,7 @@ pub use textures::{
 };
 use ui_service::{ui_jobs, ui_movie};
 
-pub use ui_images::{ArchiveImages, MAX_SCREEN_TEXTURE_PIXELS};
+pub use ui_images::{ArchiveImages, MAX_SCREEN_TEXTURE_PIXELS, ObservedScreenVector};
 pub use ui_imports::{
     ImportIssue, ImportReport, MAX_IMPORT_BYTES, MAX_IMPORT_DEPTH, MAX_IMPORTED_FONTS,
     MAX_IMPORTED_MOVIES, UnresolvedImport,

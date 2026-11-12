@@ -119,6 +119,12 @@ impl DataForgeEntry {
         &self.path
     }
 
+    /// Returns the measured number of original payload bytes supplied to DataForge.
+    #[must_use]
+    pub const fn byte_len(&self) -> u64 {
+        self.bytes.len() as u64
+    }
+
     pub(crate) fn set_origin(&mut self, origin: DataForgeOrigin) {
         self.origin = origin;
     }

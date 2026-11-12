@@ -1960,6 +1960,12 @@ Renders a `BuildingBlocks` canvas, by record path or GUID, instead of a movie; a
 English by default; when the font movie or the language cannot be read, a warning goes to stderr and
 the texts are left out.
 
+Screen PNG and SVG have a sibling `<file>.p4kx-origin.jsonl` companion.
+The JSON summary adds `originReceipt`, `artifactOrigin`, `fieldOrigins` and
+`provenance` as described in [Source origin](source-origin.md). An explicit
+width is an option. The derived height uses both original canvas size fields.
+An unknown diagnostic retains a null origin marker.
+
 `--var <name>=<value>` (repeatable, at most 64, only with `--screen`) sets a game variable before
 the bindings are evaluated (ADR-0259); every other variable stays at zero, the state at rest
 (ADR-0110). `p4kx ui render … --screen <MFD> --var powerstate=1` draws the MFD of a powered ship.

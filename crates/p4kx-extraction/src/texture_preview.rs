@@ -19,7 +19,25 @@ pub struct ObservedPreviewImage<'a> {
     pub(crate) inputs: PreviewInputs<'a, MipByteSpans>,
 }
 
-impl ObservedPreviewImage<'_> {
+/// The original inputs retained independently of a decoded texture image.
+#[derive(Debug)]
+pub struct ObservedMipInput<'a> {
+    level: u32,
+    inputs: PreviewInputs<'a, MipByteSpans>,
+}
+
+impl ObservedMipInput<'_> {
+    /// Registers the actual selected mip inputs in one evidence inventory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the evidence inventory was interrupted.
+    pub fn evidence(&self, uses: &SourceUses) -> Result<PreviewPngEvidence, SourceEvidenceError> {
+        self.inputs.register(uses, self.level)
+    }
+}
+
+impl<'a> ObservedPreviewImage<'a> {
     /// Returns the decoded image.
     #[must_use]
     pub const fn image(&self) -> &RgbaImage {
@@ -30,6 +48,18 @@ impl ObservedPreviewImage<'_> {
     #[must_use]
     pub fn into_image(self) -> RgbaImage {
         self.image
+    }
+
+    /// Takes the pixels and their independent observed source.
+    #[must_use]
+    pub fn into_parts(self) -> (RgbaImage, ObservedMipInput<'a>) {
+        (
+            self.image,
+            ObservedMipInput {
+                level: self.level,
+                inputs: self.inputs,
+            },
+        )
     }
 
     /// Registers the actual decoded inputs in one evidence inventory.
@@ -78,6 +108,18 @@ impl<'a> Texture<'a> {
         level: u32,
     ) -> Result<ObservedPreviewImage<'a>, ConversionError> {
         self.decode_preview_selected(level, None)
+    }
+
+    pub(crate) fn decode_mip_observed(
+        &self,
+        level: u32,
+    ) -> Result<ObservedPreviewImage<'a>, ConversionError> {
+        let (image, inputs) = self.decode_mip_with_inputs(level)?;
+        Ok(ObservedPreviewImage {
+            level,
+            image,
+            inputs,
+        })
     }
 
     /// Binds the header already read when opening this texture.

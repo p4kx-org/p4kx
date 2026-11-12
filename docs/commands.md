@@ -633,9 +633,11 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   GFx renderer: the layout of its widgets (sizes, margins, padding, flex containers, raw units)
   is computed from the Records and the boxes, circles and polygons are drawn in the colours of
   the style cascade (palette slots of the default and manufacturer style, style entries with type,
-  tag, parent and ancestor selectors at rest). Texts, textures, vector graphics, lists, clones and
-  every other widget type without a renderer are left out and listed, with the features the layout
-  approximates (exit code 1); no ActionScript is run. Every game variable is zero, so the MFD of a
+  tag, parent and ancestor selectors at rest). The renderer draws supported texts, textures and
+  vector graphics. The report lists skipped widgets and approximated layout (exit code 1).
+  PNG and SVG have a sibling `<file>.p4kx-origin.jsonl` companion. `--json` reports the
+  artifact origin and the independent origins of summary values. The renderer evaluates the
+  screen at rest with game variables at zero, so the MFD of a
   cold ship is off; `--var powerstate=1` sets one (repeatable), and the report lists the variables
   in force and those the screen does not read. `--var CANVAS::NAME=VALUE` limits a setting to the
   canvases of that Record name, which are not told apart when several share it; `a::b::c` is

@@ -33,6 +33,7 @@ pub(crate) struct BrandStyle {
 /// A canvas read from its Record: the widgets of its scene followed by those of its library.
 #[derive(Debug)]
 pub(crate) struct Canvas {
+    pub(crate) record_index: u32,
     pub(crate) guid: Guid,
     pub(crate) record_path: String,
     pub(crate) size: [f32; 2],
@@ -114,6 +115,7 @@ impl Canvas {
             arrays: static_arrays(root),
             world_root: raw.then(|| world_root(&widgets, &roots)).flatten(),
             guid,
+            record_index: tree.record_index(),
             record_path: tree.record_path().to_owned(),
             size,
             roots,

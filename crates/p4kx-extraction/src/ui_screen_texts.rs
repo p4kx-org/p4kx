@@ -3,13 +3,20 @@
 
 use p4kx_gfx::Font;
 
-use crate::{Archive, GlobalIni, Language, LocalizationEntry, UiMovie};
+use crate::{
+    Archive, GlobalIni, Language, LocalizationEntry, SourceEvidenceError, SourceUse, SourceUses,
+};
+
+#[path = "screen_text_evidence.rs"]
+mod evidence;
+
+use self::evidence::{ScreenFontMovie, localization};
 
 /// The fonts and the `global.ini` the texts of screens are drawn with, read from an Archive once
 /// and used for any number of drawings.
 #[derive(Debug)]
 pub struct ScreenTexts {
-    fonts: Option<Vec<Font>>,
+    fonts: Option<ScreenFontMovie>,
     entry: Option<LocalizationEntry>,
     warnings: Vec<String>,
 }
@@ -23,8 +30,23 @@ impl ScreenTexts {
     /// they are.
     #[must_use]
     pub fn load(archive: &Archive, font_file: &str, language: Option<Language>) -> Self {
+        Self::load_with(archive, font_file, language, false)
+    }
+
+    /// Loads the same fonts and translations while retaining their original inputs.
+    #[must_use]
+    pub fn load_observed(archive: &Archive, font_file: &str, language: Option<Language>) -> Self {
+        Self::load_with(archive, font_file, language, true)
+    }
+
+    fn load_with(
+        archive: &Archive,
+        font_file: &str,
+        language: Option<Language>,
+        observe: bool,
+    ) -> Self {
         let mut warnings = Vec::new();
-        let fonts = read_fonts(archive, font_file)
+        let fonts = ScreenFontMovie::read(archive, font_file, observe)
             .map_err(|error| warnings.push(error))
             .ok();
         let entry = language.and_then(|language| {
@@ -60,7 +82,7 @@ impl ScreenTexts {
     /// Returns the fonts, if they were read.
     #[must_use]
     pub fn fonts(&self) -> Option<&[Font]> {
-        self.fonts.as_deref()
+        self.fonts.as_ref().map(ScreenFontMovie::fonts)
     }
 
     /// Parses the texts of the language, if they were read; a parse error is pushed to
@@ -73,12 +95,37 @@ impl ScreenTexts {
                 .ok()
         })
     }
-}
 
-fn read_fonts(archive: &Archive, record_path: &str) -> Result<Vec<Font>, String> {
-    let under_data = format!("Data/{record_path}");
-    let movie = UiMovie::from_archive(archive, record_path)
-        .or_else(|_| UiMovie::from_archive(archive, &under_data))
-        .map_err(|error| format!("the font movie {record_path} of the screens: {error}"))?;
-    Ok(movie.movie().assets().fonts)
+    /// Adds the selected font definition and its actual name inputs.
+    ///
+    /// # Errors
+    ///
+    /// Returns evidence-registration errors. Returns `false` if original proof is incomplete.
+    pub fn append_font_uses(
+        &self,
+        font: usize,
+        registry: &SourceUses,
+        output: &mut Vec<SourceUse>,
+    ) -> Result<bool, SourceEvidenceError> {
+        self.fonts
+            .as_ref()
+            .map_or(Ok(false), |fonts| fonts.append_uses(font, registry, output))
+    }
+
+    /// Adds the actual original language Entry and winning value span for this lookup.
+    ///
+    /// # Errors
+    ///
+    /// Returns evidence-registration errors. Returns `false` if original proof is incomplete.
+    pub fn append_localization_uses(
+        &self,
+        ini: &GlobalIni<'_>,
+        key: &str,
+        registry: &SourceUses,
+        output: &mut Vec<SourceUse>,
+    ) -> Result<bool, SourceEvidenceError> {
+        self.entry.as_ref().map_or(Ok(false), |entry| {
+            localization(entry, ini, key, registry, output)
+        })
+    }
 }

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use super::{Fit, Prepared};
+use super::super::fit::Fit;
+use super::Prepared;
 use crate::paint::Area;
 use crate::text::{Horizontal, Vertical};
 
@@ -16,6 +17,7 @@ fn prepared(height_input: Option<f32>, fit: Option<Fit>) -> Prepared {
         wrap: false,
         height_input,
         fit,
+        input: None,
     }
 }
 

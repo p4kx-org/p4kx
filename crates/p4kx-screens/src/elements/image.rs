@@ -101,6 +101,12 @@ pub(super) fn draw(
     if colours.multiply[3] <= 0.0 {
         return;
     }
+    if let Some(inputs) = cx.inputs.as_mut() {
+        inputs
+            .textures
+            .entry(texture.id)
+            .or_insert_with(|| path.into_owned());
+    }
     cx.painter.bitmap(
         texture.id,
         (texture.width, texture.height),
