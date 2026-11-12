@@ -18,6 +18,7 @@ mod audio_wem_shapes;
 mod audio_window;
 mod budget;
 mod budget_text;
+mod chunk_pages;
 mod container;
 mod content;
 mod content_origin;

@@ -23,6 +23,7 @@ mod audio_random_sequence_source_fields;
 mod audio_switch_source_fields;
 mod audio_wem;
 mod channel_notice;
+mod chunk_origins;
 mod complete_audio_events;
 mod complete_loadout_notes;
 mod complete_loadout_notes_fixture;

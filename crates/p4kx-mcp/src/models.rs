@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::chunks::{Chunk, Container, KnownChunkType};
 use p4kx_extraction::model::{LodSelection, MaterialReading, PositionBox};
 use p4kx_extraction::{
-    AnimationChoice, AnimationInfo, AnimationSet, BoneInfo, ChunkInfo, ChunkJson, ChunkSource,
-    ConversionError, LibraryInfo, LodInfo, MaterialInfo, MeshInfo, ModelSource, NodeInfo,
-    TextureVerdicts, UnreadInfo,
+    AnimationChoice, AnimationInfo, AnimationSet, BoneInfo, ChunkInfo, ConversionError,
+    LibraryInfo, LodInfo, MaterialInfo, MeshInfo, ModelSource, NodeInfo, TextureVerdicts,
+    UnreadInfo,
 };
 use serde::Serialize;
 
@@ -14,81 +13,8 @@ use crate::archives::Opened;
 use crate::budget::{MAX_RESPONSE_LEN, fill_within, json_len};
 use crate::error::ToolError;
 use crate::model_params::Section;
-use crate::model_shapes::{
-    ChunkShape, ChunksResult, LodShape, ModelCounts, ModelItemsResult, ModelOverview,
-};
+use crate::model_shapes::{LodShape, ModelCounts, ModelItemsResult, ModelOverview};
 use crate::page::Page;
-
-/// Returns one page of the chunks of the chunk file Entry at `path`, those of the type `filter`
-/// names if it is given.
-pub(crate) fn chunks(
-    opened: &Opened,
-    path: &str,
-    filter: Option<&str>,
-    page: Page,
-) -> Result<ChunksResult, ToolError> {
-    let index = opened.index();
-    let source = ChunkSource::from_index(&index, path)
-        .map_err(|error| converted(path, "a chunk file", error))?;
-    let file = source.file();
-    let container = file.container();
-    let wanted = filter.map(|text| type_id(text, container)).transpose()?;
-    let listed: Vec<(usize, &Chunk)> = file
-        .chunks()
-        .iter()
-        .enumerate()
-        .filter(|(_, chunk)| wanted.is_none_or(|id| chunk.chunk_type().id() == id))
-        .collect();
-    let items = page
-        .slice(&listed)
-        .iter()
-        .map(|&(index, chunk)| Ok(chunk_shape(index, chunk)));
-    let mut result = ChunksResult {
-        archive: opened.archive().path().display().to_string(),
-        path: source.name().to_owned(),
-        container: container.name(),
-        container_version: container.version(),
-        chunk_count: file.chunks().len(),
-        unknown_count: file
-            .chunks()
-            .iter()
-            .filter(|chunk| !chunk.chunk_type().is_known())
-            .count(),
-        total: listed.len(),
-        chunks: Vec::new(),
-        next_cursor: None,
-    };
-    let (chunks, next_cursor) = fill_within(
-        page,
-        listed.len(),
-        json_len(&result),
-        items,
-        |shape: &ChunkShape| format!("chunk {}", shape.chunk.index),
-    )?;
-    result.chunks = chunks;
-    result.next_cursor = next_cursor;
-    Ok(result)
-}
-
-fn chunk_shape(index: usize, chunk: &Chunk) -> ChunkShape {
-    ChunkShape {
-        chunk: ChunkJson::of(index, chunk),
-        type_id_hex: chunk.chunk_type().hex_id(),
-    }
-}
-
-fn type_id(text: &str, container: Container) -> Result<u32, ToolError> {
-    let text = text.trim();
-    let bad = || ToolError::BadChunkType(text.to_owned());
-    if let Some(digits) = text.strip_prefix("0x").or_else(|| text.strip_prefix("0X")) {
-        return u32::from_str_radix(digits, 16).map_err(|_| bad());
-    }
-    KnownChunkType::table(container)
-        .iter()
-        .find(|known| known.name.eq_ignore_ascii_case(text))
-        .map(|known| known.id)
-        .ok_or_else(bad)
-}
 
 /// Returns the summary of the model Entry at `path`.
 pub(crate) fn overview(opened: &Opened, path: &str) -> Result<ModelOverview, ToolError> {
@@ -261,7 +187,7 @@ fn read(
     Ok((source, animations))
 }
 
-fn converted(path: &str, what: &'static str, error: ConversionError) -> ToolError {
+pub(crate) fn converted(path: &str, what: &'static str, error: ConversionError) -> ToolError {
     match error {
         ConversionError::UnknownEntry(unknown) => ToolError::UnknownEntry(
             unknown

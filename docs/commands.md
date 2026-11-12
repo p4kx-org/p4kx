@@ -855,6 +855,14 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | `mtl_summary` | A `.mtl` Entry (`path`), paged by sub-material: name, shader, surface type, flags, colours, opacity, glow, complete admitted texture-slot, shader-parameter and layer lists; retained strings are complete, paging observes the 256 KiB response budget, and an item that cannot fit alone is explicitly refused |
 | `entity_loadout` | The default Loadout of an Entity (`entity`: class name, record path or GUID) as a list of ports, parents first: path, depth, source, what the port takes, the Entity attached and for each unresolved port the reason; each Entity states its `issues` and, only when it has any, its `notes` (all admitted undecidable spawn requirements, such as an `assortment_requirement`, as in the CLI JSON); `max_depth` (16 by default, at most 32) and a cursor bound it; retained identities, paths, values and reasons are complete within the 256 KiB response budget, with explicit refusal for an item that cannot fit first |
 
+For `list_chunks`, `fieldOrigins` uses JSON Pointers such as
+`/structuredContent/chunks/0/offset` into the current response. Its `provenance` records the
+original table ordinal and the half-open byte range in the decoded Entry. Filtered totals and
+pagination use the type column with coordinates `[firstStart, firstEndExclusive, stride, count]`.
+The Entry name uses directory metadata, which has a
+separate encryption marker from the chunk table. Provenance counts toward the response budget.
+The cursor resumes after the last returned row.
+
 For `image_preview`, `fieldOrigins` uses JSON Pointers into the complete MCP tool result. For example,
 `/structuredContent/texture_width` addresses the decoded header width and `/content/1/data` addresses
 the unchanged PNG image block. Each origin gives the encryption marker, actual use references and

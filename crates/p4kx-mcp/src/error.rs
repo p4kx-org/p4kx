@@ -6,6 +6,7 @@ use std::fmt::Error as FormatError;
 use std::path::PathBuf;
 
 use p4kx_assembly::{ChangeError, EntityLookupError, LoadoutError};
+use p4kx_extraction::ChunkEvidenceError;
 use p4kx_extraction::model::MaterialError;
 use p4kx_extraction::query::SelectionError;
 use p4kx_extraction::{
@@ -95,6 +96,9 @@ pub(crate) enum ToolError {
     /// The Entry read's original input evidence could not be retained.
     #[error("cannot retain the Entry read source evidence")]
     EntryEvidence(#[source] SourceEvidenceError),
+    /// The chunk table's original input or field addresses could not be retained.
+    #[error("cannot retain the chunk table source evidence")]
+    ChunkEvidence(#[from] ChunkEvidenceError),
     /// A material library cannot be read.
     #[error("cannot read the material library {path}")]
     Material {

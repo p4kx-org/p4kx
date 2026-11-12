@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "chunk_table_evidence.rs"]
+mod chunk_table_evidence;
 #[path = "model_archive_source.rs"]
 mod model_archive_source;
 #[path = "model_material_origins.rs"]
@@ -38,6 +40,7 @@ pub use crate::source_use::{
 };
 pub use crate::source_uses::SourceUses;
 pub use crate::source_value::{SourceValue, SourceValueState, SourcedValue};
+pub use chunk_table_evidence::{ChunkEvidenceError, ChunkTableEvidence, ChunkTableRows};
 pub use model_archive_source::{ArchiveModelRead, ModelArchiveSource};
 pub use model_material_origins::{
     ArchiveMaterialRead, ArchiveMaterialReads, MaterialArchiveOrigins, MaterialLayerOrigin,

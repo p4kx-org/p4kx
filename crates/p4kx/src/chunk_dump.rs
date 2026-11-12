@@ -5,15 +5,13 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use p4kx_extraction::chunks::ChunkTableRow;
 use p4kx_extraction::{
-    ArchiveWriteProtection, CancelToken, ChunkDumpMode, ChunkDumpPayload, ChunkJson, ChunkSource,
-    ConversionError, FieldOrigins, FieldPath, PreparedChunk, SourceInventory, SourceUse,
-    SourceUseRole,
+    ArchiveWriteProtection, CancelToken, ChunkDumpMode, ChunkDumpPayload, ChunkJson,
+    ChunkTableEvidence, ConversionError, FieldOrigins, FieldPath, PreparedChunk, SourceInventory,
+    SourceUse, SourceUseRole,
 };
 use serde::Serialize;
 
-use super::origin::Evidence;
 use super::{UNKNOWN, open};
 use crate::cli_chunks::ChunkFileSource;
 use crate::cryxml_origins::{EmbeddedXml, XmlReceipt};
@@ -49,14 +47,10 @@ pub(super) fn run(
     };
     let receipt = FileReceipt::new_with_cancel(out, Some(&guard), Some(&guard), cancel)
         .map_err(write_error)?;
-    let columns = source
-        .file()
-        .table_row(index)
-        .context("parsed chunk has no table row")?;
-    let evidence = Evidence::new(source.original_input())?;
-    let selectors = evidence.selected_payload(source.file(), index, columns.clone(), mode)?;
+    let evidence = ChunkTableEvidence::new(&source)?;
+    let selectors = evidence.selected_payload(index, mode)?;
     let fields = as_json
-        .then(|| report_fields(&source, &evidence, index, columns))
+        .then(|| report_fields(&evidence, index))
         .transpose()?;
     receipt
         .publish(
@@ -75,7 +69,7 @@ pub(super) fn run(
             out: json::path(out),
             origin_receipt: json::path(Path::new(name)),
             field_origins,
-            provenance: evidence.sources.freeze()?,
+            provenance: evidence.uses().freeze()?,
         })?;
     } else {
         writeln!(
@@ -93,7 +87,7 @@ pub(super) fn run(
 fn render(
     dump: &PreparedChunk<'_>,
     writer: &mut dyn Write,
-    evidence: &Evidence,
+    evidence: &ChunkTableEvidence<'_>,
     index: usize,
     mut selectors: Vec<SourceUse>,
 ) -> io::Result<XmlReceipt> {
@@ -110,18 +104,13 @@ fn render(
                     )
                     .map_err(io::Error::other)?,
             );
-            XmlReceipt::opaque(
-                writer,
-                bytes,
-                &evidence.sources,
-                evidence.origin(&selectors),
-            )
+            XmlReceipt::opaque(writer, bytes, evidence.uses(), evidence.origin(&selectors))
         }
         ChunkDumpPayload::CryXml(document) => XmlReceipt::document(
             document,
             writer,
-            (&evidence.sources, &evidence.scope),
-            evidence.complete,
+            (evidence.uses(), evidence.scope()),
+            evidence.is_complete(),
             Some(&EmbeddedXml {
                 base,
                 selectors: &selectors,
@@ -131,26 +120,17 @@ fn render(
     }
 }
 
-fn report_fields(
-    source: &ChunkSource,
-    evidence: &Evidence,
-    index: usize,
-    columns: ChunkTableRow,
-) -> Result<FieldOrigins> {
+fn report_fields(evidence: &ChunkTableEvidence<'_>, index: usize) -> Result<FieldOrigins> {
     let mut fields = FieldOrigins::new();
     fields.insert(FieldPath::parse("/file")?, evidence.path()?)?;
     for pointer in ["/out", "/originReceipt"] {
         fields.insert(
             FieldPath::parse(pointer)?,
-            evidence.sources.origin(&[], true),
+            evidence.uses().origin(&[], true),
         )?;
     }
-    evidence.row(
-        &mut fields,
-        &FieldPath::parse("/chunk")?,
-        index,
-        columns,
-        &evidence.row_selection(source.file())?,
-    )?;
+    evidence
+        .rows()?
+        .write_row(&mut fields, &FieldPath::parse("/chunk")?, index)?;
     Ok(fields)
 }

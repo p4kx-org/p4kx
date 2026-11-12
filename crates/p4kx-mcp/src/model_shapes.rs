@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::ChunkJson;
+use p4kx_extraction::{ChunkJson, FieldOrigins, SourceInventory};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
@@ -28,6 +28,11 @@ pub(crate) struct ChunksResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    /// The original inputs of each structured output field.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    /// The physical sources and exact uses referenced by the fields.
+    pub(crate) provenance: SourceInventory,
 }
 
 /// One chunk of a chunk file.
