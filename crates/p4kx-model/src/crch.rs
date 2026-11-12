@@ -5,13 +5,14 @@ use p4kx_chunks::{ByteOrder, ChunkFile, ChunkType, crch};
 
 use crate::build::{root_node, usage};
 use crate::crch_mesh::{physics_slots, read_physics_mesh};
-use crate::crch_node::{CrchNode, read_nodes};
+use crate::crch_node::{self, CrchNode};
 use crate::error::failure;
 use crate::material::material_library;
 use crate::mtl_load::load;
 use crate::{
     CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection, LodSkeletonOrigin,
-    MaterialReading, Mesh, Model, ModelError, ModelFile, ModelIssue, UnsupportedLayout,
+    MaterialReading, Mesh, Model, ModelError, ModelFile, ModelIssue, ModelNodeSources,
+    UnsupportedLayout,
 };
 
 const MESH_VERSION: u32 = 0x801;
@@ -27,9 +28,10 @@ pub(crate) fn build<B: AsRef<[u8]>>(
     companions: &mut dyn CompanionResolver,
     selection: LodSelection,
     materials: MaterialReading,
+    node_sources: Option<&mut ModelNodeSources>,
 ) -> Result<Model, ModelError> {
     let mut read = Vec::new();
-    let crch_nodes = read_nodes(name, file, &mut read)?;
+    let crch_nodes = crch_node::read_nodes(name, file, &mut read, node_sources)?;
     let mut lods = Vec::new();
     let mut issues = Vec::new();
     if selection.wants(0) || selection.is_lenient() {

@@ -6,8 +6,7 @@ use std::sync::Arc;
 
 use p4kx_archive::Archive;
 use p4kx_model::{
-    LayerBudget, LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, ModelFile,
-    PositionBox,
+    LayerBudget, LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, PositionBox,
 };
 
 use crate::ConversionError;
@@ -22,6 +21,9 @@ use crate::source_provenance::{
     ModelArchiveSource,
 };
 use crate::texture_grey::TextureVerdicts;
+
+#[path = "model_source_archive.rs"]
+mod archive_read;
 
 /// A model read from a chunk file Entry of an Archive or from a file on disk, with the
 /// companions next to it.
@@ -87,58 +89,6 @@ impl ModelSource {
             MaterialReading::Drawn,
             &TextureVerdicts::new(),
         )
-    }
-
-    /// Reads the model like [`Self::from_index_with_box`], reading the material library the model
-    /// names as `reading` says, see [`Model::read_with_materials`]: [`MaterialReading::Skipped`]
-    /// for a caller that chooses and caches the libraries itself, see [`Self::material_library`],
-    /// [`MaterialReading::Plain`] for a listing such as `model info`. The colour verdicts of the
-    /// textures the library names come from `verdicts` and stay there.
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::from_index_with`].
-    pub fn from_index_reading(
-        index: &PathIndex<'_>,
-        path: &str,
-        lods: LodSelection,
-        position_box: PositionBox,
-        reading: MaterialReading,
-        verdicts: &TextureVerdicts,
-    ) -> Result<Self, ConversionError> {
-        let source = ChunkSource::from_index(index, path)?;
-        let name = source.name().to_owned();
-        let (folder, file_name) = split_entry_path(&name);
-        let mut archive_sources = vec![ModelArchiveSource::new(
-            ModelFile::Model,
-            source.archive_origin().cloned(),
-        )];
-        let mut companions = ArchiveCompanions {
-            index,
-            folder,
-            verdicts,
-            model_sources: Some(&mut archive_sources),
-            material_observation: None,
-        };
-        let read = Model::read_with_materials(
-            file_name,
-            source.file(),
-            &mut companions,
-            lods,
-            position_box,
-            reading,
-        );
-        let model = read.map_err(|source| ConversionError::Model {
-            file: name.clone(),
-            source,
-        })?;
-        Ok(Self {
-            protection: source.into_protection(),
-            name,
-            inputs: vec![index.archive().path().to_path_buf()],
-            model,
-            archive_sources,
-        })
     }
 
     /// Reads the material library `library` as a model Entry at `model_path` names it: a bare

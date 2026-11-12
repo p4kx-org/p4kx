@@ -32,6 +32,7 @@ mod material_observer_texture_sites;
 mod material_raw;
 mod materials;
 mod model_chunk_layout;
+mod model_node_sources;
 mod palettes;
 mod prefab;
 mod relief_decals;

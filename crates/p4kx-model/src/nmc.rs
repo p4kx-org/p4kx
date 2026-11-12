@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_foundation::ByteReader;
 
 use crate::hierarchy::find_cycle;
 use crate::reader::{ReadValues, to_usize};
-use crate::{CorruptChunk, Node, Transform};
+use crate::{CorruptChunk, ModelNodeSource, ModelNodeSources, Node, Transform};
 
 const NODE_LEN: usize = 208;
 const LOCAL_TRANSFORM_AT: usize = 80;
@@ -29,7 +31,10 @@ pub(crate) struct Nmc {
 ///
 /// A node's transform and scale that are zero on every axis (within [`EPSILON`]) are the
 /// identity and 1: records that store none.
-pub(crate) fn read_nodes(data: &[u8]) -> Result<Nmc, CorruptChunk> {
+pub(crate) fn read_nodes(
+    data: &[u8],
+    mut sources: Option<NodeMeshSources<'_>>,
+) -> Result<Nmc, CorruptChunk> {
     let mut reader = ByteReader::new(data);
     reader.read_u32()?;
     let count = to_usize(reader.read_u32()?);
@@ -40,6 +45,7 @@ pub(crate) fn read_nodes(data: &[u8]) -> Result<Nmc, CorruptChunk> {
     let properties_len = to_usize(reader.read_u32()?);
     reader.skip(4)?;
 
+    let records_at = reader.offset();
     let records = reader.read_bytes(count.saturating_mul(NODE_LEN))?;
     reader.skip(FOOTER_LEN)?;
     reader.skip(other_indices.saturating_mul(2))?;
@@ -50,6 +56,9 @@ pub(crate) fn read_nodes(data: &[u8]) -> Result<Nmc, CorruptChunk> {
         .iter()
         .map(|&pair| u16::from_le_bytes(pair))
         .collect();
+    if let Some(sources) = sources.as_mut() {
+        sources.start(records_at, reader.offset(), names_len);
+    }
     let names = reader.read_bytes(names_len)?;
     let mut names = names.split(|&byte| byte == 0);
     let properties = reader.read_bytes(properties_len.min(reader.remaining()))?;
@@ -58,10 +67,14 @@ pub(crate) fn read_nodes(data: &[u8]) -> Result<Nmc, CorruptChunk> {
     let mut nodes = Vec::with_capacity(count);
     for (index, record) in records.as_chunks::<NODE_LEN>().0.iter().enumerate() {
         let mut node = read_record(index, record, count)?;
-        node.name = names.next().map_or_else(String::new, |name| {
-            let line = name.split(|&byte| byte == b'\n').next().unwrap_or(name);
-            String::from_utf8_lossy(line).into_owned()
+        let name = names.next();
+        let line = name.and_then(|bytes| bytes.split(|&byte| byte == b'\n').next());
+        node.name = line.map_or_else(String::new, |bytes| {
+            String::from_utf8_lossy(bytes).into_owned()
         });
+        if let Some(sources) = sources.as_mut() {
+            sources.record(index, name.map(<[u8]>::len), line.map(<[u8]>::len));
+        }
         node.properties = properties
             .next()
             .map(|entry| {
@@ -132,4 +145,48 @@ fn property(line: &[u8]) -> Option<(String, String)> {
             String::from_utf8_lossy(value).into_owned(),
         )
     })
+}
+
+pub(crate) struct NodeMeshSources<'a> {
+    nodes: &'a mut ModelNodeSources,
+    chunk: usize,
+    base: u64,
+    records: u64,
+    names: Range<u64>,
+}
+
+impl<'a> NodeMeshSources<'a> {
+    pub(crate) const fn new(nodes: &'a mut ModelNodeSources, chunk: usize, base: u64) -> Self {
+        Self {
+            nodes,
+            chunk,
+            base,
+            records: 0,
+            names: 0..0,
+        }
+    }
+
+    const fn start(&mut self, records: u64, names: u64, names_len: usize) {
+        self.records = self.base + records;
+        self.names = self.base + names..self.base + names + names_len as u64;
+    }
+
+    fn record(&mut self, index: usize, name_len: Option<usize>, line_len: Option<usize>) {
+        let start = self.records + index as u64 * NODE_LEN as u64;
+        let name = line_len.and_then(|len| {
+            let end = self.names.start + len as u64;
+            let with_terminator = if end < self.names.end { end + 1 } else { end };
+            (with_terminator > self.names.start).then_some(self.names.start..with_terminator)
+        });
+        if let Some(len) = name_len {
+            self.names.start = (self.names.start + len as u64 + 1).min(self.names.end);
+        }
+        self.nodes.push(ModelNodeSource {
+            chunk: self.chunk,
+            name,
+            parent: start + PARENT_AT as u64..start + PARENT_AT as u64 + 2,
+            matrix: start + LOCAL_TRANSFORM_AT as u64..start + SCALE_AT as u64,
+            id: None,
+        });
+    }
 }

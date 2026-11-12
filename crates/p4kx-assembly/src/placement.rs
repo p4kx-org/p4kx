@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_model::{Bone, Model, Transform, chained_world_poses};
+use p4kx_model::{Bone, Model, Node, Transform, chained_world_poses};
 
 /// Returns the transform of a port's offset from its helper: the rotation `rotation` in degrees,
 /// about X first, then Y, then Z, and the translation `position` in metres.
@@ -40,20 +40,38 @@ const fn row([a, b, c]: [f64; 3], shift: f32) -> [f32; 4] {
 /// Returns the transform from the space of the node of `model` named `name`, ignoring ASCII
 /// case, to the model's space, or `None` when the model has no such node.
 pub(crate) fn node_transform(model: &Model, name: &str) -> Option<Transform> {
-    let mut at = model
+    node_placement(model, name).map(|placement| placement.transform)
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct NodePlacement {
+    pub(crate) transform: Transform,
+    pub(crate) node: usize,
+}
+
+pub(crate) fn node_placement(model: &Model, name: &str) -> Option<NodePlacement> {
+    let node = model
         .nodes
         .iter()
         .position(|node| node.name.eq_ignore_ascii_case(name))?;
     let mut transform = Transform::IDENTITY;
-    for _ in 0..=model.nodes.len() {
-        let node = model.nodes.get(at)?;
-        transform = node.transform.then(&transform);
-        match node.parent {
-            Some(parent) => at = parent,
-            None => return Some(transform),
+    for (_, ancestor) in node_ancestors(model, node) {
+        transform = ancestor.transform.then(&transform);
+        if ancestor.parent.is_none() {
+            return Some(NodePlacement { transform, node });
         }
     }
     None
+}
+
+pub(crate) fn node_ancestors(model: &Model, node: usize) -> impl Iterator<Item = (usize, &Node)> {
+    let mut at = Some(node);
+    (0..model.nodes.len()).map_while(move |_| {
+        let index = at?;
+        let node = model.nodes.get(index)?;
+        at = node.parent;
+        Some((index, node))
+    })
 }
 
 /// Returns whether the model has a level of detail near `level` and none of its meshes is skinned;

@@ -228,6 +228,7 @@ pub struct ArchiveModels<'a> {
     max_attachment_vertices: usize,
     layers: LayerCache,
     material_reads: ArchiveMaterialReads,
+    observe_nodes: bool,
     verdicts: TextureVerdicts,
 }
 
@@ -241,8 +242,16 @@ impl<'a> ArchiveModels<'a> {
             max_attachment_vertices: MAX_ASSEMBLY_VERTICES,
             layers: LayerCache::new(),
             material_reads: ArchiveMaterialReads::default(),
+            observe_nodes: false,
             verdicts: TextureVerdicts::new(),
         }
+    }
+
+    /// Retains original node coordinates with the primary Archive Entry of each read.
+    #[must_use]
+    pub const fn with_model_node_sources(mut self) -> Self {
+        self.observe_nodes = true;
+        self
     }
 
     /// Returns the provider with a limit of `max` vertices for the models of one character
@@ -330,8 +339,13 @@ impl ArchiveModels<'_> {
         lod: u32,
         left_out: Vec<String>,
     ) -> Result<ProvidedModel, ModelFailure> {
+        let read_model = if self.observe_nodes {
+            ModelSource::from_index_observing_nodes
+        } else {
+            ModelSource::from_index_reading
+        };
         let read = |selection| {
-            ModelSource::from_index_reading(
+            read_model(
                 &self.index,
                 &entry,
                 selection,

@@ -10,12 +10,18 @@ use crate::build::corrupt;
 use crate::error::failure;
 use crate::hierarchy::find_cycle;
 use crate::reader::ReadValues;
-use crate::{CorruptChunk, ModelError, ModelFile, Node, Transform, UnsupportedLayout};
+use crate::{
+    CorruptChunk, ModelError, ModelFile, ModelNodeSource, ModelNodeSources, Node, Transform,
+    UnsupportedLayout,
+};
 
 const NODE_VERSION: u32 = 0x824;
 const NAME_LEN: usize = 64;
 const NO_PARENT: u32 = u32::MAX;
 const UNUSED_WORDS: usize = 3 * 4;
+const PARENT_AT: u64 = NAME_LEN as u64 + 4;
+const MATRIX_AT: u64 = PARENT_AT + 4 + UNUSED_WORDS as u64;
+const MATRIX_LEN: u64 = 16 * 4;
 
 /// A `CrCh` node with the chunk ID its mesh or helper is referred to by.
 #[derive(Debug, Clone)]
@@ -37,6 +43,7 @@ pub(crate) fn read_nodes<B: AsRef<[u8]>>(
     file_name: &str,
     file: &ChunkFile<B>,
     read: &mut Vec<(ModelFile, usize)>,
+    mut sources: Option<&mut ModelNodeSources>,
 ) -> Result<Vec<CrchNode>, ModelError> {
     let mut raw = Vec::new();
     let mut by_id = HashMap::new();
@@ -51,7 +58,13 @@ pub(crate) fn read_nodes<B: AsRef<[u8]>>(
             ));
         }
         let chunk_id = chunk.id().unwrap_or_default();
-        let record = read_record(file.chunk_data(index).unwrap_or_default()).map_err(&fail)?;
+        let observe = |name_len: usize| {
+            if let Some(sources) = sources.as_mut() {
+                sources.push(node_source(file, index, chunk.offset(), name_len));
+            }
+        };
+        let record =
+            read_record(file.chunk_data(index).unwrap_or_default(), observe).map_err(&fail)?;
         if by_id.insert(chunk_id, raw.len()).is_some() {
             return Err(fail(CorruptChunk::RepeatedChunkId(chunk_id)));
         }
@@ -92,7 +105,23 @@ pub(crate) fn read_nodes<B: AsRef<[u8]>>(
         .collect())
 }
 
-fn read_record(data: &[u8]) -> Result<Raw, CorruptChunk> {
+fn node_source<B: AsRef<[u8]>>(
+    file: &ChunkFile<B>,
+    index: usize,
+    start: u64,
+    name_len: usize,
+) -> ModelNodeSource {
+    let name_extent = (name_len + 1).min(NAME_LEN);
+    ModelNodeSource {
+        chunk: index,
+        name: Some(start..start + name_extent as u64),
+        parent: start + PARENT_AT..start + PARENT_AT + 4,
+        matrix: start + MATRIX_AT..start + MATRIX_AT + MATRIX_LEN,
+        id: file.table_row(index).and_then(|row| row.id),
+    }
+}
+
+fn read_record(data: &[u8], observe: impl FnOnce(usize)) -> Result<Raw, CorruptChunk> {
     let mut reader = ByteReader::new(data);
     let name = reader.read_bytes(NAME_LEN)?;
     let name = name.split(|&byte| byte == 0).next().unwrap_or(name);
@@ -106,6 +135,7 @@ fn read_record(data: &[u8]) -> Result<Raw, CorruptChunk> {
     if matrix.iter().flatten().any(|value| !value.is_finite()) {
         return Err(CorruptChunk::NonFinite("node transform"));
     }
+    observe(name.len());
     Ok(Raw {
         object,
         parent,

@@ -9,13 +9,13 @@ use crate::material::material_library;
 use crate::mesh::split_by_node;
 use crate::model::MESH_TYPES;
 use crate::mtl_load::load;
-use crate::nmc::read_nodes;
+use crate::nmc::{self, NodeMeshSources};
 use crate::skeleton_source::SkeletonChunk;
 use crate::skin::read_skin;
 use crate::{
     Bone, ChunkUsage, CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection,
     LodSkeletonOrigin, MaterialReading, Mesh, Model, ModelChunk, ModelChunkLayout, ModelError,
-    ModelFile, ModelIssue, Node, PositionBox, RigLogicBytes, Transform,
+    ModelFile, ModelIssue, ModelNodeSources, Node, PositionBox, RigLogicBytes, Transform,
 };
 
 const MATERIAL_TYPES: [ChunkType; 2] = [ivo::MTL_NAME_320, ivo::MTL_NAME];
@@ -53,13 +53,16 @@ pub(crate) fn build<B: AsRef<[u8]>>(
     selection: LodSelection,
     materials: MaterialReading,
     position_box: PositionBox,
+    node_sources: Option<&mut ModelNodeSources>,
 ) -> Result<Model, ModelError> {
     let mut read = Vec::new();
     let nmc = match file.chunks_of(ivo::NODE_MESH_COMBO).next() {
-        Some((index, _)) => {
+        Some((index, chunk)) => {
             read.push((ModelFile::Model, index));
             let data = file.chunk_data(index).unwrap_or_default();
-            Some(read_nodes(data).map_err(corrupt(name, index, "NodeMeshCombo"))?)
+            let sources =
+                node_sources.map(|nodes| NodeMeshSources::new(nodes, index, chunk.offset()));
+            Some(nmc::read_nodes(data, sources).map_err(corrupt(name, index, "NodeMeshCombo"))?)
         }
         None => None,
     }

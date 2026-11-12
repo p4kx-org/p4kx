@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_chunks::{ChunkFile, ChunkType, Container, ivo};
+use p4kx_chunks::{ChunkFile, ChunkType, ivo};
 
-use crate::build::build;
-use crate::crch::build as build_crch;
+use crate::model_node_sources;
 use crate::{
     Bone, CompanionResolver, Influences, LodSkeletonOrigin, MaterialReading, MaterialStatus,
     ModelChunkLayout, ModelError, ModelIssue, PositionBox, RigLogicBytes, Transform,
@@ -346,10 +345,7 @@ impl Model {
         position_box: PositionBox,
         materials: MaterialReading,
     ) -> Result<Self, ModelError> {
-        match file.container() {
-            Container::Ivo => build(name, file, companions, lods, materials, position_box),
-            Container::CrCh => build_crch(name, file, companions, lods, materials),
-        }
+        model_node_sources::read(name, file, companions, lods, position_box, materials, None)
     }
 
     /// Returns the bones the meshes of `lod` are weighted to: those of the level's own file when

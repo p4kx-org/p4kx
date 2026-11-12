@@ -1,19 +1,36 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_archive::EntryOrigin;
-use p4kx_model::{ChunkUsage, Model, ModelFile, ModelIssue};
+use p4kx_model::{ChunkUsage, Model, ModelFile, ModelIssue, ModelNodeSources};
 
 /// One admitted model or companion Entry and its interpreted file role.
 #[derive(Debug, Clone)]
 pub struct ModelArchiveSource {
     file: ModelFile,
     origin: Option<EntryOrigin>,
+    nodes: Option<Arc<ModelNodeSources>>,
 }
 
 impl ModelArchiveSource {
     pub(crate) const fn new(file: ModelFile, origin: Option<EntryOrigin>) -> Self {
-        Self { file, origin }
+        Self {
+            file,
+            origin,
+            nodes: None,
+        }
+    }
+
+    pub(crate) fn set_node_sources(&mut self, nodes: ModelNodeSources) {
+        self.nodes = Some(Arc::new(nodes));
+    }
+
+    /// Returns the primary file's optional original node coordinates.
+    #[must_use]
+    pub fn node_sources(&self) -> Option<&ModelNodeSources> {
+        self.nodes.as_deref()
     }
 
     /// Returns the role for which the model decoder requested these bytes.

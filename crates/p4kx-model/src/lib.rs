@@ -62,6 +62,7 @@ mod material_request;
 mod mesh;
 mod model;
 mod model_chunk_layout;
+mod model_node_sources;
 mod model_options;
 mod mtl;
 mod mtl_direct_read;
@@ -146,6 +147,7 @@ pub use material_read_observation::{MaterialReadField, MaterialReadObservation, 
 pub use material_request::MaterialRequest;
 pub use model::{ChunkUsage, Lod, LodSelection, Mesh, Model, ModelChunk, ModelFile, Node, Submesh};
 pub use model_chunk_layout::ModelChunkLayout;
+pub use model_node_sources::{ModelNodeSource, ModelNodeSources};
 pub use model_options::{ModelIssue, PositionBox};
 pub use mtl::{
     MAX_SUB_MATERIALS, Material, MaterialFlags, MaterialLibrary, MaterialStatus, TextureSlot,

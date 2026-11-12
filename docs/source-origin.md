@@ -152,6 +152,15 @@ files without retained internal coordinates carry an explicit opaque use.
 The model and material selectors retain independent DataForge Record and
 array positions. A selected sub-geometry can inherit a material from its
 main geometry, and the two uses preserve their own original fields.
+When an admitted piece uses a model node for its placement, the original
+helper name, local matrices and parent links are bound to the actual
+primary model Entry. The `modelNodePlacementBytes` indices give the chunk
+ordinal, node ordinal and half-open range in the decoded Entry. They include
+CrCh parent target chunk IDs when the route uses them. The model selector
+also contributes when the helper's own mesh is absent from the scene.
+Successful child offset inversions also retain their node route. Bone and
+animation inputs outside these routes keep the artifact's contributor set
+incomplete.
 The receipt also records the original library slots that suppress a piece
 or a visible range. A whole-piece suppression affects the scene bounds and
 counts. Suppressing one range of a drawn piece affects the PNG.

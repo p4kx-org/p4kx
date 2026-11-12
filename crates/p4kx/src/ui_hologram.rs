@@ -24,6 +24,9 @@ use crate::entity_glb::GlbOutputIsArchive;
 use crate::entity_glb_json::IssueJson;
 use crate::{exit, json};
 
+#[path = "ui_hologram_node_origins.rs"]
+mod node_origins;
+
 #[path = "ui_hologram_origins.rs"]
 mod origins;
 
@@ -276,7 +279,7 @@ pub(crate) fn run(args: &HologramArgs, as_json: bool) -> Result<ExitCode> {
     let applied = resolver.resolve_changed(&record, &changes)?;
     crate::entity_ignored::warn(&applied)?;
     let tree = applied.node();
-    let models = ArchiveModels::new(&archive);
+    let models = ArchiveModels::new(&archive).with_model_node_sources();
     let options = AssemblyOptions::default().with_lod(args.lod);
     let palettes = ForgePalettes::new(&forge);
     let assembly = Assembly::build_with_palettes(tree, &models, &palettes, &options)?;

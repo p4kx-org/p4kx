@@ -4,9 +4,9 @@
 use anyhow::Result;
 use p4kx_assembly::{HologramCameraField, ObservedHologramCamera};
 use p4kx_extraction::{
-    DataForgeEntry, DataForgeOrigin, FieldOrigin, FieldOrigins, FieldPath, InputScope, SourceInput,
-    SourceInventory, SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses,
-    SourceValueState,
+    DataForgeEntry, DataForgeOrigin, EntryOrigin, FieldOrigin, FieldOrigins, FieldPath, InputScope,
+    SourceCoordinateOmission, SourceInput, SourceInventory, SourceLocation, SourceScope, SourceUse,
+    SourceUseRole, SourceUses, SourceValueState,
 };
 use serde::Serialize;
 
@@ -87,6 +87,28 @@ impl Projection {
 
     pub(super) const fn scope(&self) -> &SourceScope {
         &self.scope
+    }
+
+    pub(super) fn authored_selector(
+        &self,
+        selector: Option<SourceLocation>,
+        uses: &mut Vec<SourceUse>,
+    ) -> Result<()> {
+        if let Some(selector) = selector {
+            uses.push(self.scope.at(selector, SourceUseRole::Selector)?);
+        }
+        Ok(())
+    }
+
+    pub(super) fn opaque_archive(
+        &self,
+        origin: &EntryOrigin,
+        role: SourceUseRole,
+    ) -> Result<SourceUse> {
+        let scope = self
+            .uses
+            .observe(SourceInput::Archive(origin), InputScope::Payload)?;
+        Ok(scope.at_opaque(role, SourceCoordinateOmission::Unavailable)?)
     }
 
     fn summary(&mut self, entity: u32, summary: &Summary<'_>) -> Result<()> {

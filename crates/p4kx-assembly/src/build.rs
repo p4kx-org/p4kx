@@ -101,9 +101,8 @@ impl Assembly {
                 .then(|| creature_rig::anchor_bones_of(&parts, &issues, options.lod))
                 .flatten();
             let prop = is_prop(draft, *model, options.lod);
-            let (local, placement, placement_source) =
-                place(draft, &parts, *model, rig, prop, &mut issues);
-            let world = world_of(draft, &parts, &local);
+            let placement = place(draft, &parts, *model, rig, prop, &mut issues);
+            let world = world_of(draft, &parts, &placement.local);
             let geometry = rendered_geometry(cut.as_ref(), index, draft, *model, &mut issues);
             parts.push(Part {
                 name: draft.name.clone(),
@@ -112,10 +111,11 @@ impl Assembly {
                 class_name: draft.class_name().to_owned(),
                 landing_gear: draft.gear.is_some(),
                 parent: draft.parent,
-                local,
+                local: placement.local,
                 world,
-                placement,
-                placement_source,
+                placement: placement.kind,
+                placement_source: placement.port,
+                model_placement: placement.nodes,
                 geometry: draft.geometry_path().map(str::to_owned),
                 model: geometry.model,
                 model_archive_sources: geometry.sources,

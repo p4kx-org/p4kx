@@ -11,14 +11,15 @@ use p4kx_extraction::model::ModelFile;
 use p4kx_extraction::{
     ArchiveWriteProtection, CancelToken, ConversionError, EntryOrigin, FieldOrigin, FileReceipt,
     InputScope, MaterialArchiveOrigins, ModelArchiveSource, OriginArtifactBinding,
-    OriginOutputAddress, SourceCoordinateOmission, SourceInput, SourceLocation, SourceScope,
-    SourceUse, SourceUseRole, write_origin_companion,
+    OriginOutputAddress, SourceInput, SourceLocation, SourceScope, SourceUse, SourceUseRole,
+    write_origin_companion,
 };
 use p4kx_render::{
     AssemblyPieceSource, AssemblyScene, MaterialSuppressionEffect, MaterialSuppressionReason,
     Picture,
 };
 
+use super::node_origins;
 use super::origins::CameraInput;
 use super::{HologramInputs, Projection};
 use crate::json;
@@ -159,8 +160,7 @@ fn scene_inputs(
         let Some(input) = piece_inputs(assembly, &attachments, piece.source()) else {
             continue;
         };
-        authored_selector(
-            projection,
+        projection.authored_selector(
             input.material.owner.and_then(Part::geometry_selector),
             &mut sources.placed,
         )?;
@@ -180,6 +180,7 @@ fn scene_inputs(
                 break;
             };
             port_placement(projection, part, &mut sources.placed)?;
+            node_origins::placement(projection, assembly, index, &mut sources.placed)?;
             at = part.parent();
         }
     }
@@ -240,10 +241,7 @@ fn model_inputs(
         .filter_map(|source| Some((source.origin()?, role)))
         .chain(definition.map(|source| (source, SourceUseRole::Selector)))
     {
-        let scope = projection
-            .uses()
-            .observe(SourceInput::Archive(origin), InputScope::Payload)?;
-        sources.push(scope.at_opaque(role, SourceCoordinateOmission::Unavailable)?);
+        sources.push(projection.opaque_archive(origin, role)?);
     }
     Ok(())
 }
@@ -262,11 +260,7 @@ impl MaterialInputs<'_> {
         let Some(origin) = self.archive.library() else {
             return Ok(None);
         };
-        authored_selector(
-            projection,
-            self.owner.and_then(Part::material_selector),
-            sources,
-        )?;
+        projection.authored_selector(self.owner.and_then(Part::material_selector), sources)?;
         Ok(Some(projection.uses().observe(
             SourceInput::Archive(origin),
             InputScope::Payload,
@@ -301,17 +295,6 @@ fn material_slot(scope: &SourceScope, slot: usize, field: &str) -> Result<Source
         },
         SourceUseRole::Selector,
     )?)
-}
-
-fn authored_selector(
-    projection: &Projection,
-    selector: Option<SourceLocation>,
-    sources: &mut Vec<SourceUse>,
-) -> Result<()> {
-    if let Some(selector) = selector {
-        sources.push(projection.scope().at(selector, SourceUseRole::Selector)?);
-    }
-    Ok(())
 }
 
 fn port_placement(

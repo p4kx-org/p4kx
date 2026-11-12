@@ -210,3 +210,6 @@ fn selected_inputs(rows: &[Value], report: &Value) {
 
 #[path = "ui_hologram_material_suppression.rs"]
 mod suppression;
+
+#[path = "ui_hologram_model_nodes.rs"]
+mod model_nodes;
