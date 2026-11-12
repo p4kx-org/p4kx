@@ -13,6 +13,10 @@ on:
       - .github/scripts/test-msi-phase-journal-encoding.ps1
       - .github/scripts/msi-diagnostic-runner.ps1
 
+concurrency:
+  group: msi-feedback-fuse-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions: {}
 
 jobs:

@@ -75,6 +75,10 @@ package, and `Release::link()` returns the selected link or page. The GUI, CLI a
 
 ## Release preflight and evidence
 
+A new push to a pull request supersedes its earlier CI, release-validation, MSI probe and
+workflow-lint runs. Main-branch, merge-queue, manual and tag-triggered runs retain independent
+groups.
+
 Manual Release workflow runs can select `linux-only` or `windows-only` to validate both native
 CPUs and package formats for that OS without external scans or publication. The options are
 mutually exclusive. These scoped checks do not replace the final full release matrix from one
