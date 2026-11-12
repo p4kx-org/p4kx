@@ -96,6 +96,12 @@ pub(crate) struct Completeness<'a> {
     pub(crate) location_class_registries: KindCompleteness<'a>,
     pub(crate) location_function_registries: KindCompleteness<'a>,
     pub(crate) location_size_registries: KindCompleteness<'a>,
+    /// The physical `starmapTypes` selection.
+    pub(crate) starmap_types: KindCompleteness<'a>,
+    /// The physical `starmapPresets` selection.
+    pub(crate) starmap_presets: KindCompleteness<'a>,
+    /// The physical `starmapAmenities` selection.
+    pub(crate) starmap_amenities: KindCompleteness<'a>,
     /// The completeness of `factionReputations`.
     pub(crate) faction_reputations: KindCompleteness<'a>,
     /// The completeness of `reputationScopes`.
@@ -196,6 +202,9 @@ impl<'a> Completeness<'a> {
             location_class_registries: completeness,
             location_function_registries: completeness,
             location_size_registries: completeness,
+            starmap_types: completeness,
+            starmap_presets: completeness,
+            starmap_amenities: completeness,
             faction_reputations: completeness,
             reputation_scopes: completeness,
             reputation_standings: completeness,

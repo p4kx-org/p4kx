@@ -68,7 +68,27 @@ impl CapturedNumber {
         fact: &OriginalValueFact<'scope, 'read, 'source>,
         owner: AuthoredNumberOwner,
     ) -> Result<Option<Self>, CatalogError> {
-        let Some(token @ FloatToken::Single(_)) = FloatToken::read(fact.value()) else {
+        Self::authored_typed(originals, fact, owner, ResourceNumberContract::Single)
+    }
+
+    /// Retains the exact original Double emitted by a selected definition.
+    pub(crate) fn authored_double<'scope, 'read, 'source>(
+        originals: &OriginalFlowFields<'scope, 'read, 'source>,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+        owner: AuthoredNumberOwner,
+    ) -> Result<Option<Self>, CatalogError> {
+        Self::authored_typed(originals, fact, owner, ResourceNumberContract::Double)
+    }
+
+    fn authored_typed<'scope, 'read, 'source>(
+        originals: &OriginalFlowFields<'scope, 'read, 'source>,
+        fact: &OriginalValueFact<'scope, 'read, 'source>,
+        owner: AuthoredNumberOwner,
+        contract: ResourceNumberContract,
+    ) -> Result<Option<Self>, CatalogError> {
+        let Some(token) =
+            FloatToken::read(fact.value()).filter(|_| contract.captures(fact.value()))
+        else {
             return Ok(None);
         };
         let ordinal = fact.ordinal();
@@ -79,14 +99,7 @@ impl CapturedNumber {
                 NumberOccurrence::AuthoredDefinitionValue { ordinal }
             }
         };
-        Self::authored(
-            originals,
-            fact,
-            occurrence,
-            token,
-            ResourceNumberContract::Single,
-        )
-        .map(Some)
+        Self::authored(originals, fact, occurrence, token, contract).map(Some)
     }
 
     /// Retains an exact nonfinite scalar emitted inside an authored value subtree.

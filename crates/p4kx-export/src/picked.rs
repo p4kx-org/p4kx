@@ -13,6 +13,7 @@ use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyPick;
+use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
 use crate::contract::{
     Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
     MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup, ResourceType, Ship,
@@ -66,6 +67,7 @@ pub(crate) enum Picked<'f> {
     LocationVocabulary(LocationVocabularyPick<'f>),
     /// A starmap object.
     Starmap(StarmapObject<'f>),
+    StarmapDefinition(StarmapDefinitionPick<'f>),
     /// A mineable element.
     Mineable(MineableElement<'f>),
     /// A refining process.
@@ -155,6 +157,9 @@ impl<'f> Picked<'f> {
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::StarmapTypes
+            | Kind::StarmapPresets
+            | Kind::StarmapAmenities
             | Kind::GameplayProperties
             | Kind::QualityDistributions
             | Kind::QualityQuantizations

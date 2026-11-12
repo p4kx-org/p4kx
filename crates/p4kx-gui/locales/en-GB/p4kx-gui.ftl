@@ -525,6 +525,9 @@ catalog-summary-kind = { $kind ->
     [locationFunctionRegistries] Location function registries
     [locationSizeRegistries] Location size registries
     [inventoryContainers] Inventory containers
+    [starmapTypes] Starmap types
+    [starmapPresets] Starmap presets
+    [starmapAmenities] Starmap amenities
     [paints] Paints
     [loadouts] Loadouts
    *[other] { $kind }

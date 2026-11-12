@@ -339,10 +339,9 @@ impl Coverage<'_, '_> {
         };
         let ordinal = required.original_ordinal;
         let captured = actual.occurrence;
-        let Some((occurrence, contract)) = self
-            .kind
-            .and_then(|kind| coverage::expected_owned_number(kind, captured, ordinal))
-        else {
+        let Some((occurrence, contract)) = self.kind.and_then(|kind| {
+            coverage::expected_owned_number(kind, captured, ordinal, required.token)
+        }) else {
             return false;
         };
         captured == occurrence

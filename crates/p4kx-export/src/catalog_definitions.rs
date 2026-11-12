@@ -23,6 +23,7 @@ use crate::catalog_v3::reputation_reward_amount_definition::ReputationRewardAmou
 use crate::catalog_v3::reputation_scope_definition::ScopeDefinition;
 use crate::catalog_v3::reputation_standing_definition::StandingDefinition;
 use crate::catalog_v3::sandbox_trigger_record_definition::SandboxTriggerRecordDefinition;
+use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionTables;
 use crate::commodity_contract::CommodityDefinition;
 use crate::manufacturer::ManufacturerDefinition;
 use crate::mission_generator::GeneratorDefinition;
@@ -71,4 +72,6 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) jurisdictions: CatalogTable<JurisdictionDefinition<'source>>,
     #[serde(flatten)]
     pub(crate) location_vocabulary: LocationVocabularyTables<'source>,
+    #[serde(flatten)]
+    pub(crate) starmap: StarmapDefinitionTables<'source>,
 }

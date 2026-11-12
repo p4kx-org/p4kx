@@ -5,6 +5,9 @@
 
 use crate::starmap_fixture;
 
+#[path = "starmap_definitions_contract.rs"]
+mod definitions;
+
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 

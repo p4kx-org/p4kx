@@ -182,11 +182,17 @@ pub enum Kind {
     LocationSizeRegistries,
     /// All physical inventory storage Records.
     InventoryContainers,
+    /// Physical starmap object type definitions.
+    StarmapTypes,
+    /// Physical starmap preset definitions.
+    StarmapPresets,
+    /// Physical starmap amenity definitions.
+    StarmapAmenities,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 68] = [
+    pub const ALL: [Self; 71] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -255,6 +261,9 @@ impl Kind {
         Self::LocationFunctionRegistries,
         Self::LocationSizeRegistries,
         Self::InventoryContainers,
+        Self::StarmapTypes,
+        Self::StarmapPresets,
+        Self::StarmapAmenities,
     ];
 
     /// Returns the stable kind identifier, independently of its canonical dataset path.
@@ -333,6 +342,9 @@ impl Kind {
             Self::LocationFunctionRegistries => "locationFunctionRegistries",
             Self::LocationSizeRegistries => "locationSizeRegistries",
             Self::InventoryContainers => "inventoryContainers",
+            Self::StarmapTypes => "starmapTypes",
+            Self::StarmapPresets => "starmapPresets",
+            Self::StarmapAmenities => "starmapAmenities",
         }
     }
 }

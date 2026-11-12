@@ -525,6 +525,9 @@ catalog-summary-kind = { $kind ->
     [locationFunctionRegistries] Register der Ortsfunktionen
     [locationSizeRegistries] Register der Ortsgrößen
     [inventoryContainers] Inventarbehälter
+    [starmapTypes] Sternkartentypen
+    [starmapPresets] Sternkartenvorlagen
+    [starmapAmenities] Sternkarteneinrichtungen
     [paints] Lackierungen
     [loadouts] Loadouts
    *[other] { $kind }

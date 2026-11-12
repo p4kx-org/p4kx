@@ -41,6 +41,9 @@ impl Collected<'_> {
             Kind::Paints => self.paints.len(),
             Kind::Loadouts => self.loadouts.len(),
             Kind::StarmapObjects => self.starmap_objects.len(),
+            Kind::StarmapTypes | Kind::StarmapPresets | Kind::StarmapAmenities => {
+                self.starmap_definitions.count(kind)
+            }
             Kind::Contracts => self.contracts.len(),
             Kind::MissionLocationTemplates => self.mission_location_templates.len(),
             Kind::ContractShipSpawns => self.contract_ship_spawns.len(),

@@ -22,6 +22,7 @@ use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
 use crate::catalog_v3::law_kinds::LawKinds;
 use crate::catalog_v3::location_vocabulary::LocationVocabulary;
+use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitions;
 use crate::contract::{
     BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
     HarvestableLocation, HarvestableProviderPreset, Item, Loadout, LootContainer,
@@ -109,6 +110,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) mission_property_sets: Vec<MissionPropertySet<'f>>,
     pub(crate) port_items: Vec<crate::loadout::Wanted>,
     pub(crate) starmap_objects: Vec<StarmapObject<'f>>,
+    pub(crate) starmap_definitions: StarmapDefinitions<'f>,
     pub(crate) mineable_elements: Vec<MineableElement<'f>>,
     pub(crate) refining_processes: Vec<RefiningProcess<'f>>,
     pub(crate) mineable_compositions: Vec<MineableComposition<'f>>,
@@ -208,6 +210,7 @@ impl<'f> Collected<'f> {
             mission_property_sets: Vec::new(),
             port_items: Vec::new(),
             starmap_objects: Vec::new(),
+            starmap_definitions: StarmapDefinitions::default(),
             mineable_elements: Vec::new(),
             refining_processes: Vec::new(),
             mineable_compositions: Vec::new(),
@@ -274,6 +277,7 @@ impl<'f> Collected<'f> {
             Picked::AmmoDefinition(entity) => self.ammo_definitions.push(*entity),
             Picked::InventoryContainer(entity) => self.inventory_containers.push(*entity),
             Picked::Starmap(entity) => self.starmap_objects.push(entity),
+            Picked::StarmapDefinition(entity) => self.starmap_definitions.push(entity),
             Picked::Mineable(entity) => self.mineable_elements.push(entity),
             Picked::Refining(entity) => self.refining_processes.push(entity),
             Picked::Composition(entity) => self.mineable_compositions.push(entity),

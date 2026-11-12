@@ -22,6 +22,8 @@ use crate::{CatalogError, ExportAccountingError};
 mod alignment;
 #[path = "authored_array.rs"]
 mod array;
+#[path = "authored_float_fields.rs"]
+mod float_fields;
 #[path = "authored_field_links.rs"]
 mod links;
 #[path = "authored_owned_fields.rs"]
@@ -104,14 +106,6 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         }
     }
 
-    pub(super) fn single(
-        &self,
-        name: &str,
-        notes: &mut Vec<FieldError>,
-    ) -> Result<SourcedValue<ResourceFloat32>, CatalogError> {
-        self.single_observed(name, notes, |_| {})
-    }
-
     pub(super) fn authored_number(
         &self,
         name: &str,
@@ -137,34 +131,6 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
             value,
             legacy_value,
         })
-    }
-
-    fn single_observed(
-        &self,
-        name: &str,
-        notes: &mut Vec<FieldError>,
-        observed: impl FnOnce(&Value<'source>),
-    ) -> Result<SourcedValue<ResourceFloat32>, CatalogError> {
-        self.scalar(name, "a nullable Single", notes, |fact| {
-            let value = fact.value();
-            observed(value);
-            self.original_single(fact)
-        })
-    }
-
-    fn original_single(
-        &self,
-        fact: &Fact<'scope, 'read, 'source>,
-    ) -> Result<Option<ResourceFloat32>, CatalogError> {
-        let Value::Single(number) = fact.value() else {
-            return Ok(None);
-        };
-        if let Some(number) =
-            CapturedNumber::authored_single(self.originals, fact, self.number_owner)?
-        {
-            self.numbers.borrow_mut().push(number);
-        }
-        Ok(Some(ResourceFloat32::new(*number)))
     }
 
     pub(super) fn boolean(

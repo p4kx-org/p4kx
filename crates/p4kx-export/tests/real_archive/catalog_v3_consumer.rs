@@ -66,6 +66,9 @@ pub(crate) fn named_rows<'catalog>(
         Kind::Tags => "/definitions/tags",
         Kind::ResourceTypes => "/definitions/resourceTypes",
         Kind::ResourceGroups => "/definitions/resourceGroups",
+        Kind::StarmapTypes => "/definitions/starmapTypes",
+        Kind::StarmapPresets => "/definitions/starmapPresets",
+        Kind::StarmapAmenities => "/definitions/starmapAmenities",
         Kind::Commodities => {
             presentations(catalog)?;
             return table(catalog, "/definitions/commodities");
@@ -117,6 +120,9 @@ fn checked_table<'catalog>(
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries
+                | Kind::StarmapTypes
+                | Kind::StarmapPresets
+                | Kind::StarmapAmenities
         ) {
             record_header(row)?;
         }
@@ -235,6 +241,9 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::StarmapTypes
+            | Kind::StarmapPresets
+            | Kind::StarmapAmenities
             | Kind::Commodities
             | Kind::ResourceTypes
             | Kind::ResourceGroups

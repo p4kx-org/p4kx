@@ -93,6 +93,7 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
             .law
             .sources()
             .chain(collected.location_vocabulary.sources())
+            .chain(collected.starmap_definitions.sources())
             .map(|(kind, guid, path, _)| CatalogRow {
                 kind,
                 guid,
@@ -342,6 +343,7 @@ fn definition_number_groups<'rows>(
         .chain(collected.mission_kinds.reputation_number_groups())
         .chain(collected.law.number_groups())
         .chain(collected.location_vocabulary.number_groups())
+        .chain(collected.starmap_definitions.number_groups())
         .chain(physical_definition_number_groups(collected))
         .chain(
             collected

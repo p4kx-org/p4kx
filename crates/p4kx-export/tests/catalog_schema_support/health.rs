@@ -95,6 +95,9 @@ fn row_count(kind: Kind, catalog: &Value) -> usize {
         Kind::LocationSizeRegistries => {
             catalog.pointer("/definitions/locationRegistries/sizes/rows")
         }
+        Kind::StarmapTypes => catalog.pointer("/definitions/starmapTypes/rows"),
+        Kind::StarmapPresets => catalog.pointer("/definitions/starmapPresets/rows"),
+        Kind::StarmapAmenities => catalog.pointer("/definitions/starmapAmenities/rows"),
         Kind::ContractTemplates => catalog.pointer("/definitions/contractTemplates/rows"),
         Kind::MissionBrokerEntries => catalog.pointer("/definitions/missionBrokerEntries/rows"),
         Kind::BlueprintCategories => catalog.pointer("/definitions/blueprintCategories/rows"),

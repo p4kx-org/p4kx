@@ -26,6 +26,7 @@ impl Collected<'_> {
         sort_by_guid(&mut self.blueprint_categories, |entity| entity.guid);
         sort_by_guid(&mut self.blueprint_category_lists, |entity| entity.guid);
         sort_by_guid(&mut self.starmap_objects, |entity| entity.guid);
+        self.starmap_definitions.order();
         sort_by_guid(&mut self.mineable_elements, |entity| entity.guid);
         sort_by_guid(&mut self.refining_processes, |entity| entity.guid);
         sort_by_guid(&mut self.mineable_compositions, |entity| entity.guid);

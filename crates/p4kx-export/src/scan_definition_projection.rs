@@ -7,6 +7,7 @@ use super::Scan;
 use crate::Kind;
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::{self, LocationVocabularyPick};
+use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
 use crate::loot_kinds::LootPick;
 use crate::mission_kinds::MissionPick;
 use crate::picked::Picked;
@@ -34,10 +35,11 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::ExplosionDefinitions => self.explosion_definition(admission, tree)?,
             Kind::InventoryContainers => self.inventory_definition(admission, tree)?,
             Kind::Factions => self.faction_definition(admission, tree)?,
+            Kind::StarmapTypes | Kind::StarmapPresets | Kind::StarmapAmenities => {
+                self.starmap_definition(kind, admission, tree)?
+            }
             Kind::Infractions | Kind::InfractionSets | Kind::Jurisdictions => {
-                let (value, notes) =
-                    LawPick::read(kind, tree, self.projection, admission, self.options.cancel)?;
-                (Picked::Law(value), notes)
+                self.law_definition(kind, admission, tree)?
             }
             Kind::BlueprintCategoryLists => {
                 let read = crate::catalog_v3::blueprint_category_list_read::read(
@@ -127,6 +129,33 @@ impl<'f> Scan<'_, '_, 'f> {
             _ => return Ok(None),
         };
         Ok(Some(projection))
+    }
+
+    fn starmap_definition(
+        &self,
+        kind: Kind,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (value, notes) = StarmapDefinitionPick::read(
+            kind,
+            tree,
+            self.projection,
+            admission,
+            self.options.cancel,
+        )?;
+        Ok((Picked::StarmapDefinition(value), notes))
+    }
+
+    fn law_definition(
+        &self,
+        kind: Kind,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (value, notes) =
+            LawPick::read(kind, tree, self.projection, admission, self.options.cancel)?;
+        Ok((Picked::Law(value), notes))
     }
 
     fn explosion_definition(

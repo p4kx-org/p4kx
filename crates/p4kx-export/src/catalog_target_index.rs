@@ -200,6 +200,9 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
             | Kind::QualityDistributions
             | Kind::QualityQuantizations
             | Kind::StarmapObjects
+            | Kind::StarmapTypes
+            | Kind::StarmapPresets
+            | Kind::StarmapAmenities
             | Kind::ReputationContexts
             | Kind::ReputationScopes
             | Kind::ReputationStandings

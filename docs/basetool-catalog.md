@@ -1956,8 +1956,9 @@ position and 854 have none. Searching all 9,668 object containers of the Archive
 These objects keep `position` `null`; the catalog never guesses a place from the parent.
 The kind is selected by the prefix `libs/foundry/records/starmap/pu/` and the type `StarMapObject`
 like the others, with the development leftovers left out. The positions do not depend on the
-Filter: the containers are read whole. The `StarMapObjectType`, `Jurisdiction`, amenity and radar
-Records are not kinds; the type enters as `type` and `typeGuid`.
+Filter: the containers are read whole. `typeGuid` identifies an authored type in
+`definitions.starmapTypes`. Its stored settings and the separate presets and amenities have
+[canonical definition tables](catalog-starmap-definitions.md).
 
 Size, measured on LIVE (2026-10-22): the 2,093 objects are about 1.2 MB of JSON (570 bytes each), 4.5 % of the 26.5 MB of the
 catalog, and a smaller share compressed.
@@ -2741,6 +2742,9 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `infractions` | Any path | `InfractionDefinition` |
 | `infractionSets` | Any path | `InfractionSet` |
 | `jurisdictions` | Any path | `Jurisdiction` |
+| `starmapTypes` | Any path | `StarMapObjectType` |
+| `starmapPresets` | Any path | `StarMapPreset` |
+| `starmapAmenities` | Any path | `StarMapAmenityTypeEntry` |
 | `reputationContexts` | `libs/foundry/records/reputation/contexts/` | `SReputationContextUI` |
 | `missionTypes` | `libs/foundry/records/missiontype/` | `MissionType` |
 | `missionLocalities` | `libs/foundry/records/missiondata/pu_missionlocality/` | `MissionLocality` |

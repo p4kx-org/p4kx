@@ -193,7 +193,6 @@ fn assemble<R>(
     );
     let reputation_tables = collected.mission_kinds.take_reputation_tables(&forge);
     let law_tables = collected.law.into_tables(&forge);
-    let location_vocabulary = collected.location_vocabulary.into_tables(&forge);
     let components = collected.item_components.into_tables(&forge);
     let patches = options.public_patches;
     let catalog = Catalog {
@@ -287,7 +286,8 @@ fn assemble<R>(
             infractions: law_tables.infractions,
             infraction_sets: law_tables.infraction_sets,
             jurisdictions: law_tables.jurisdictions,
-            location_vocabulary,
+            location_vocabulary: collected.location_vocabulary.into_tables(&forge),
+            starmap: collected.starmap_definitions.into_tables(&forge),
         },
         projections: CatalogProjections {
             contracts: CatalogTable::new(&forge, &["ContractGenerator"], collected.contracts),

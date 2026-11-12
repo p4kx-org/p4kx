@@ -76,7 +76,10 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries
-                | Kind::InventoryContainers => {
+                | Kind::InventoryContainers
+                | Kind::StarmapTypes
+                | Kind::StarmapPresets
+                | Kind::StarmapAmenities => {
                     assert_eq!(
                         by_path,
                         Some(Kind::Tags),

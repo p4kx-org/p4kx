@@ -5,6 +5,7 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ResourceNumberContract {
     Single,
+    Double,
     Number,
     Int32,
 }
@@ -38,6 +39,7 @@ impl ResourceNumberContract {
 
         match self {
             Self::Single => matches!(value, Value::Single(_)),
+            Self::Double => matches!(value, Value::Double(_)),
             Self::Number | Self::Int32 => matches!(value, Value::Single(_) | Value::Double(_)),
         }
     }

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::Kind;
-use crate::catalog_number_capture::NumberOccurrence;
+use crate::catalog_number_capture::{FloatToken, NumberOccurrence};
 use crate::resource_raw_policy::ResourceNumberContract;
 
 /// Whether this kind covers original numeric data by owned occurrence.
@@ -30,6 +30,9 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::StarmapTypes
+            | Kind::StarmapPresets
+            | Kind::StarmapAmenities
     )
 }
 
@@ -38,12 +41,13 @@ pub(super) const fn expected_owned_number(
     kind: Kind,
     captured: NumberOccurrence,
     ordinal: u64,
+    token: FloatToken,
 ) -> Option<(NumberOccurrence, ResourceNumberContract)> {
     use NumberOccurrence::{
         AuthoredDefinitionRawValue, AuthoredDefinitionValue, BlueprintValue, ItemComponentRawValue,
         ItemComponentValue, LootValue,
     };
-    use ResourceNumberContract::{Number, Single};
+    use ResourceNumberContract::{Double, Number, Single};
 
     Some(match (kind, captured) {
         (Kind::LootPoolFilters, _) => (LootValue { ordinal }, Number),
@@ -66,9 +70,17 @@ pub(super) const fn expected_owned_number(
             | Kind::LocationSizes
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
-            | Kind::LocationSizeRegistries,
+            | Kind::LocationSizeRegistries
+            | Kind::StarmapTypes
+            | Kind::StarmapPresets
+            | Kind::StarmapAmenities,
             AuthoredDefinitionRawValue { .. },
         ) => (AuthoredDefinitionRawValue { ordinal }, Number),
+        (Kind::StarmapPresets, AuthoredDefinitionValue { .. })
+            if matches!(token, FloatToken::Double(_)) =>
+        {
+            (AuthoredDefinitionValue { ordinal }, Double)
+        }
         (
             Kind::ExplosionDefinitions
             | Kind::AmmoDefinitions
@@ -79,7 +91,9 @@ pub(super) const fn expected_owned_number(
             | Kind::ReputationPerks
             | Kind::Infractions
             | Kind::InfractionSets
-            | Kind::Jurisdictions,
+            | Kind::Jurisdictions
+            | Kind::StarmapTypes
+            | Kind::StarmapPresets,
             _,
         ) => (AuthoredDefinitionValue { ordinal }, Single),
         _ => return None,

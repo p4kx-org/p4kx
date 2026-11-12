@@ -69,6 +69,22 @@ pub(crate) mod reputation_context_definition;
 pub(crate) mod reputation_scope_definition;
 #[path = "reputation_standing_definition.rs"]
 pub(crate) mod reputation_standing_definition;
+#[path = "starmap_amenity_definition.rs"]
+pub(crate) mod starmap_amenity_definition;
+#[path = "starmap_definition_kinds.rs"]
+pub(crate) mod starmap_definition_kinds;
+#[path = "starmap_display.rs"]
+mod starmap_display;
+#[path = "starmap_navigation.rs"]
+mod starmap_navigation;
+#[path = "starmap_preset_definition.rs"]
+pub(crate) mod starmap_preset_definition;
+#[path = "starmap_radar.rs"]
+mod starmap_radar;
+#[path = "starmap_type_definition.rs"]
+pub(crate) mod starmap_type_definition;
+#[path = "starmap_visibility.rs"]
+mod starmap_visibility;
 
 #[path = "ammo_definition.rs"]
 pub(crate) mod ammo_definition;

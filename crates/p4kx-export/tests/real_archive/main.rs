@@ -83,6 +83,7 @@ mod real_archive_shop_items;
 mod real_archive_shops;
 mod real_archive_spawns;
 mod real_archive_starmap;
+mod real_archive_starmap_definitions;
 mod real_archive_store_slugs;
 mod real_archive_tags;
 mod real_archive_text_oracle;
