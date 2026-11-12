@@ -8,6 +8,8 @@ use crate::hirc_view::StateRange;
 use crate::source_inventory::SourceInventory;
 use crate::source_value::SourcedValue;
 
+use super::super::container_layout::ContainerSourceLayout;
+
 pub(in crate::hirc_view) type RandomSequenceSchema =
     RandomSequenceDocument<Vec<RandomSequenceRow>, SourceInventory>;
 
@@ -16,7 +18,7 @@ pub(in crate::hirc_view) type RandomSequenceSchema =
 #[schemars(rename = "RandomSequenceObjectSourceFields")]
 pub(in crate::hirc_view) struct RandomSequenceDocument<Rows, Inventory> {
     pub(super) kind: RandomSequenceSourceKind,
-    pub(super) layout: SourcedValue<RandomSequenceLayout>,
+    pub(super) layout: SourcedValue<ContainerSourceLayout>,
     pub(super) version: SourcedValue<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) error: Option<SourcedValue<String>>,
@@ -31,15 +33,6 @@ pub(in crate::hirc_view) struct RandomSequenceDocument<Rows, Inventory> {
 #[serde(rename_all = "kebab-case")]
 pub(super) enum RandomSequenceSourceKind {
     RandomSequenceContainer,
-}
-
-#[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "kebab-case")]
-pub(super) enum RandomSequenceLayout {
-    Decoded,
-    Malformed,
-    Unavailable,
-    Unsupported,
 }
 
 #[derive(Default, Serialize, JsonSchema)]

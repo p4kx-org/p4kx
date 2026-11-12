@@ -1,16 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::Soundbank;
-use p4kx_testkit::{TestBank, TestHircObject, TestNodeBase};
+use p4kx_testkit::{TestBank, TestHircObject};
 use serde_json::{Value, json};
 
-use super::{TestResult, json as list_json, write_bank};
+use super::{TestResult, json as list_json, plain_node_prefix, write_bank};
 
 const OBJECT_ID: u32 = 0xFA12_0500;
 const CHILD_A: u32 = 0xA122_0501;
 const CHILD_B: u32 = 0xB122_0502;
-const PLAIN_NODE_LENGTH: usize = 31;
 const PLAYLIST: [(u32, i32); 3] = [(CHILD_B, i32::MIN), (CHILD_A, -2), (CHILD_B, 0)];
 
 #[test]
@@ -147,21 +145,7 @@ fn bank(version: u32, body: Vec<u8>) -> TestBank {
 }
 
 fn original_header() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let original = TestBank::new(9)
-        .version(154)
-        .object(TestHircObject::actor_mixer(2, &[], TestNodeBase::Plain))
-        .bytes();
-    let original = Soundbank::parse(&original)?;
-    let node = original
-        .objects()
-        .first()
-        .ok_or("original synthetic shared node")?;
-    let start = size_of::<u32>();
-    let mut bytes = original
-        .object_body(node)
-        .get(start..start + PLAIN_NODE_LENGTH)
-        .ok_or("checked synthetic shared node prefix")?
-        .to_vec();
+    let mut bytes = plain_node_prefix()?;
     bytes.extend([0_u16, 3, u16::MAX].into_iter().flat_map(u16::to_le_bytes));
     bytes.extend(
         [0x7FC1_2345_u32, 2.5_f32.to_bits(), 0x7F80_0000]

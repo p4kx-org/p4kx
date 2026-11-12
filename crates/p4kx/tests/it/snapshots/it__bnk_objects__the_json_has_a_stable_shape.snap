@@ -251,6 +251,926 @@ expression: "serde_json::to_string_pretty(&report)?"
       "id": 14,
       "index": 6,
       "parent": 740367150,
+      "source_fields": {
+        "fields": {
+          "child_count": {
+            "containsEncryptedSource": null,
+            "sourceSetComplete": true,
+            "sourceUsesRefs": [
+              "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2080.2084.19:containerChildCount"
+            ],
+            "state": "present",
+            "value": 1
+          },
+          "child_range": {
+            "containsEncryptedSource": null,
+            "sourceSetComplete": true,
+            "sourceUsesRefs": [
+              "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2084.2088.23:containerChildrenExtent"
+            ],
+            "state": "present",
+            "value": {
+              "end_exclusive": "2088",
+              "start": "2084"
+            }
+          },
+          "configurations": {
+            "checked_range": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2108.2121.26:switchConfigurationsExtent"
+              ],
+              "state": "present",
+              "value": {
+                "end_exclusive": "2121",
+                "start": "2108"
+              }
+            },
+            "complete": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2104.2121.19:switchTableCoverage"
+              ],
+              "state": "present",
+              "value": true
+            },
+            "declared_count": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2104.2108.24:switchConfigurationCount"
+              ],
+              "state": "present",
+              "value": 1
+            }
+          },
+          "continuous_validation": {
+            "containsEncryptedSource": null,
+            "sourceSetComplete": true,
+            "sourceUsesRefs": [
+              "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2079.2080.26:switchContinuousValidation"
+            ],
+            "state": "present",
+            "value": 0
+          },
+          "default_value_id": {
+            "containsEncryptedSource": null,
+            "sourceSetComplete": true,
+            "sourceUsesRefs": [
+              "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2075.2079.20:switchDefaultValueId"
+            ],
+            "state": "present",
+            "value": 930712164
+          },
+          "group_id": {
+            "containsEncryptedSource": null,
+            "sourceSetComplete": true,
+            "sourceUsesRefs": [
+              "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2071.2075.13:switchGroupId"
+            ],
+            "state": "present",
+            "value": 2087089674
+          },
+          "group_kind": {
+            "containsEncryptedSource": null,
+            "sourceSetComplete": true,
+            "sourceUsesRefs": [
+              "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2070.2071.15:switchGroupType"
+            ],
+            "state": "present",
+            "value": "state"
+          },
+          "group_type": {
+            "containsEncryptedSource": null,
+            "sourceSetComplete": true,
+            "sourceUsesRefs": [
+              "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2070.2071.15:switchGroupType"
+            ],
+            "state": "present",
+            "value": 1
+          },
+          "groups": {
+            "checked_range": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2092.2104.28:switchMembershipGroupsExtent"
+              ],
+              "state": "present",
+              "value": {
+                "end_exclusive": "2104",
+                "start": "2092"
+              }
+            },
+            "complete": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2088.2104.19:switchTableCoverage"
+              ],
+              "state": "present",
+              "value": true
+            },
+            "declared_count": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2088.2092.26:switchMembershipGroupCount"
+              ],
+              "state": "present",
+              "value": 1
+            }
+          }
+        },
+        "kind": "switch-container",
+        "layout": {
+          "containsEncryptedSource": null,
+          "sourceSetComplete": true,
+          "sourceUsesRefs": [
+            "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2030.2121.21:switchContainerExtent",
+            "u2:f0:payload:selector:s7:bnkBkhd2:8.12.7:version"
+          ],
+          "state": "present",
+          "value": "decoded"
+        },
+        "rows": [
+          {
+            "complete": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2092.2104.29:switchMembershipGroupCoverage"
+              ],
+              "state": "present",
+              "value": true
+            },
+            "kind": "group",
+            "member_count": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2096.2100.21:switchMembershipCount"
+              ],
+              "state": "present",
+              "value": 1
+            },
+            "members_range": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2100.2104.29:switchMembershipMembersExtent"
+              ],
+              "state": "present",
+              "value": {
+                "end_exclusive": "2104",
+                "start": "2100"
+              }
+            },
+            "ordinal": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2092.2096.29:switchMembershipGroupPosition"
+              ],
+              "state": "present",
+              "value": 0
+            },
+            "range": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2092.2104.27:switchMembershipGroupExtent"
+              ],
+              "state": "present",
+              "value": {
+                "end_exclusive": "2104",
+                "start": "2092"
+              }
+            },
+            "value_id": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2092.2096.23:switchMembershipValueId"
+              ],
+              "state": "present",
+              "value": 20480
+            }
+          },
+          {
+            "child_id": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2100.2104.23:switchMembershipChildId"
+              ],
+              "state": "present",
+              "value": 15
+            },
+            "group_ordinal": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2092.2096.29:switchMembershipGroupPosition"
+              ],
+              "state": "present",
+              "value": 0
+            },
+            "kind": "member",
+            "ordinal": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2100.2104.24:switchMembershipPosition"
+              ],
+              "state": "present",
+              "value": 0
+            },
+            "reference_resolution": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2100.2104.23:switchMembershipChildId"
+              ],
+              "state": "present",
+              "value": "unchecked"
+            }
+          },
+          {
+            "child_id": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2108.2112.26:switchConfigurationChildId"
+              ],
+              "state": "present",
+              "value": 15
+            },
+            "fade_in": {
+              "bits": {
+                "containsEncryptedSource": null,
+                "sourceSetComplete": true,
+                "sourceUsesRefs": [
+                  "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2117.2121.16:switchFadeInBits"
+                ],
+                "state": "present",
+                "value": 0
+              },
+              "signed_value": {
+                "containsEncryptedSource": null,
+                "sourceSetComplete": true,
+                "sourceUsesRefs": [
+                  "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2117.2121.18:switchSignedFadeIn"
+                ],
+                "state": "present",
+                "value": 0
+              }
+            },
+            "fade_out": {
+              "bits": {
+                "containsEncryptedSource": null,
+                "sourceSetComplete": true,
+                "sourceUsesRefs": [
+                  "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2113.2117.17:switchFadeOutBits"
+                ],
+                "state": "present",
+                "value": 0
+              },
+              "signed_value": {
+                "containsEncryptedSource": null,
+                "sourceSetComplete": true,
+                "sourceUsesRefs": [
+                  "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2113.2117.19:switchSignedFadeOut"
+                ],
+                "state": "present",
+                "value": 0
+              }
+            },
+            "flags": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2112.2113.24:switchConfigurationFlags"
+              ],
+              "state": "present",
+              "value": 0
+            },
+            "kind": "configuration",
+            "ordinal": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2108.2112.27:switchConfigurationPosition"
+              ],
+              "state": "present",
+              "value": 0
+            },
+            "range": {
+              "containsEncryptedSource": null,
+              "sourceSetComplete": true,
+              "sourceUsesRefs": [
+                "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2108.2121.25:switchConfigurationExtent"
+              ],
+              "state": "present",
+              "value": {
+                "end_exclusive": "2121",
+                "start": "2108"
+              }
+            }
+          }
+        ],
+        "source_inventory": {
+          "sources": [
+            {
+              "ancestors": [],
+              "byteLength": {
+                "containsEncryptedSource": null,
+                "sourceSetComplete": true,
+                "sourceUsesRefs": [
+                  "u2:f0:fileMetadata:payload:m10:byteLength"
+                ],
+                "state": "present",
+                "value": "2222"
+              },
+              "id": "f0",
+              "kind": "file",
+              "name": {
+                "containsEncryptedSource": null,
+                "sourceSetComplete": true,
+                "sourceUsesRefs": [
+                  "u2:f0:fileMetadata:payload:m4:name"
+                ],
+                "state": "present",
+                "value": "SSAM_Music.bnk"
+              },
+              "storedEncryption": "unknown"
+            }
+          ],
+          "uses": [
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:fileMetadata:payload:m10:byteLength",
+              "location": {
+                "field": "byteLength",
+                "type": "metadata"
+              },
+              "role": "payload",
+              "scope": "fileMetadata",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:fileMetadata:payload:m4:name",
+              "location": {
+                "field": "name",
+                "type": "metadata"
+              },
+              "role": "payload",
+              "scope": "fileMetadata",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2030.2121.21:switchContainerExtent",
+              "location": {
+                "field": "switchContainerExtent",
+                "indices": [
+                  "2030",
+                  "2121"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "conversion",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2070.2071.15:switchGroupType",
+              "location": {
+                "field": "switchGroupType",
+                "indices": [
+                  "2070",
+                  "2071"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "conversion",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2088.2104.19:switchTableCoverage",
+              "location": {
+                "field": "switchTableCoverage",
+                "indices": [
+                  "2088",
+                  "2104"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "conversion",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2092.2096.29:switchMembershipGroupPosition",
+              "location": {
+                "field": "switchMembershipGroupPosition",
+                "indices": [
+                  "2092",
+                  "2096"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "conversion",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2092.2104.29:switchMembershipGroupCoverage",
+              "location": {
+                "field": "switchMembershipGroupCoverage",
+                "indices": [
+                  "2092",
+                  "2104"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "conversion",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2100.2104.23:switchMembershipChildId",
+              "location": {
+                "field": "switchMembershipChildId",
+                "indices": [
+                  "2100",
+                  "2104"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "conversion",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2100.2104.24:switchMembershipPosition",
+              "location": {
+                "field": "switchMembershipPosition",
+                "indices": [
+                  "2100",
+                  "2104"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "conversion",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2104.2121.19:switchTableCoverage",
+              "location": {
+                "field": "switchTableCoverage",
+                "indices": [
+                  "2104",
+                  "2121"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "conversion",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2108.2112.27:switchConfigurationPosition",
+              "location": {
+                "field": "switchConfigurationPosition",
+                "indices": [
+                  "2108",
+                  "2112"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "conversion",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2113.2117.19:switchSignedFadeOut",
+              "location": {
+                "field": "switchSignedFadeOut",
+                "indices": [
+                  "2113",
+                  "2117"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "conversion",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:conversion:s22:bnkHircSwitchContainer2:2117.2121.18:switchSignedFadeIn",
+              "location": {
+                "field": "switchSignedFadeIn",
+                "indices": [
+                  "2117",
+                  "2121"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "conversion",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2070.2071.15:switchGroupType",
+              "location": {
+                "field": "switchGroupType",
+                "indices": [
+                  "2070",
+                  "2071"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2071.2075.13:switchGroupId",
+              "location": {
+                "field": "switchGroupId",
+                "indices": [
+                  "2071",
+                  "2075"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2075.2079.20:switchDefaultValueId",
+              "location": {
+                "field": "switchDefaultValueId",
+                "indices": [
+                  "2075",
+                  "2079"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2079.2080.26:switchContinuousValidation",
+              "location": {
+                "field": "switchContinuousValidation",
+                "indices": [
+                  "2079",
+                  "2080"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2080.2084.19:containerChildCount",
+              "location": {
+                "field": "containerChildCount",
+                "indices": [
+                  "2080",
+                  "2084"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2088.2092.26:switchMembershipGroupCount",
+              "location": {
+                "field": "switchMembershipGroupCount",
+                "indices": [
+                  "2088",
+                  "2092"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2092.2096.23:switchMembershipValueId",
+              "location": {
+                "field": "switchMembershipValueId",
+                "indices": [
+                  "2092",
+                  "2096"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2096.2100.21:switchMembershipCount",
+              "location": {
+                "field": "switchMembershipCount",
+                "indices": [
+                  "2096",
+                  "2100"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2100.2104.23:switchMembershipChildId",
+              "location": {
+                "field": "switchMembershipChildId",
+                "indices": [
+                  "2100",
+                  "2104"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2104.2108.24:switchConfigurationCount",
+              "location": {
+                "field": "switchConfigurationCount",
+                "indices": [
+                  "2104",
+                  "2108"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2108.2112.26:switchConfigurationChildId",
+              "location": {
+                "field": "switchConfigurationChildId",
+                "indices": [
+                  "2108",
+                  "2112"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2112.2113.24:switchConfigurationFlags",
+              "location": {
+                "field": "switchConfigurationFlags",
+                "indices": [
+                  "2112",
+                  "2113"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2113.2117.17:switchFadeOutBits",
+              "location": {
+                "field": "switchFadeOutBits",
+                "indices": [
+                  "2113",
+                  "2117"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s22:bnkHircSwitchContainer2:2117.2121.16:switchFadeInBits",
+              "location": {
+                "field": "switchFadeInBits",
+                "indices": [
+                  "2117",
+                  "2121"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:payload:s7:bnkBkhd2:8.12.7:version",
+              "location": {
+                "field": "version",
+                "indices": [
+                  "8",
+                  "12"
+                ],
+                "namespace": "bnkBkhd",
+                "type": "subresource"
+              },
+              "role": "payload",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2084.2088.23:containerChildrenExtent",
+              "location": {
+                "field": "containerChildrenExtent",
+                "indices": [
+                  "2084",
+                  "2088"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "selector",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2092.2104.27:switchMembershipGroupExtent",
+              "location": {
+                "field": "switchMembershipGroupExtent",
+                "indices": [
+                  "2092",
+                  "2104"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "selector",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2092.2104.28:switchMembershipGroupsExtent",
+              "location": {
+                "field": "switchMembershipGroupsExtent",
+                "indices": [
+                  "2092",
+                  "2104"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "selector",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2100.2104.29:switchMembershipMembersExtent",
+              "location": {
+                "field": "switchMembershipMembersExtent",
+                "indices": [
+                  "2100",
+                  "2104"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "selector",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2108.2121.25:switchConfigurationExtent",
+              "location": {
+                "field": "switchConfigurationExtent",
+                "indices": [
+                  "2108",
+                  "2121"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "selector",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:selector:s22:bnkHircSwitchContainer2:2108.2121.26:switchConfigurationsExtent",
+              "location": {
+                "field": "switchConfigurationsExtent",
+                "indices": [
+                  "2108",
+                  "2121"
+                ],
+                "namespace": "bnkHircSwitchContainer",
+                "type": "subresource"
+              },
+              "role": "selector",
+              "scope": "payload",
+              "source": "f0"
+            },
+            {
+              "effectiveEncryption": "unknown",
+              "id": "u2:f0:payload:selector:s7:bnkBkhd2:8.12.7:version",
+              "location": {
+                "field": "version",
+                "indices": [
+                  "8",
+                  "12"
+                ],
+                "namespace": "bnkBkhd",
+                "type": "subresource"
+              },
+              "role": "selector",
+              "scope": "payload",
+              "source": "f0"
+            }
+          ]
+        },
+        "version": {
+          "containsEncryptedSource": null,
+          "sourceSetComplete": true,
+          "sourceUsesRefs": [
+            "u2:f0:payload:payload:s7:bnkBkhd2:8.12.7:version"
+          ],
+          "state": "present",
+          "value": 154
+        }
+      },
       "status": "decoded",
       "type": "switch-container"
     },

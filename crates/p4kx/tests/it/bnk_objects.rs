@@ -6,6 +6,8 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use p4kx_extraction::Soundbank;
+
 use p4kx_testkit::{
     ArchiveBuilder, TestBank, TestContainerKind, TestEntry, TestHircObject, TestNodeBase,
     TestPlaylistItem,
@@ -16,10 +18,31 @@ use serde_json::Value;
 mod dialogue_source_fields;
 #[path = "bnk_random_sequence_source_fields.rs"]
 mod random_sequence_source_fields;
+#[path = "bnk_switch_source_fields.rs"]
+mod switch_source_fields;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
 const BANK_ENTRY: &str = "Data\\Sounds\\wwise\\SSAM_Music.bnk";
+
+fn plain_node_prefix() -> Result<Vec<u8>, Box<dyn Error>> {
+    const PLAIN_NODE_LENGTH: usize = 31;
+    let original = TestBank::new(9)
+        .version(154)
+        .object(TestHircObject::actor_mixer(2, &[], TestNodeBase::Plain))
+        .bytes();
+    let original = Soundbank::parse(&original)?;
+    let node = original
+        .objects()
+        .first()
+        .ok_or("original synthetic shared node")?;
+    let start = size_of::<u32>();
+    let bytes = original
+        .object_body(node)
+        .get(start..start + PLAIN_NODE_LENGTH)
+        .ok_or("checked synthetic shared node prefix")?;
+    Ok(bytes.to_vec())
+}
 
 fn music_bank() -> TestBank {
     TestBank::new(0xD155_6D49)

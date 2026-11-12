@@ -6,12 +6,13 @@ use std::io::{Read, Seek};
 use p4kx_audio::{
     BankHircDialogueEvent, BankHircObject, BankHircSemantic, BankObservedHeader, HircKind,
 };
-use schemars::JsonSchema;
 use serde::ser::Error as _;
 use serde::{Serialize, Serializer};
 
 use crate::bank::Bank;
 
+#[path = "hirc_container_source_layout.rs"]
+mod container_layout;
 #[path = "hirc_dialogue_dto.rs"]
 mod dto;
 #[path = "hirc_source_origins.rs"]
@@ -20,32 +21,27 @@ mod origins;
 mod random_sequence;
 #[path = "hirc_dialogue_rows.rs"]
 mod rows;
+#[path = "hirc_source_schema.rs"]
+mod schema;
 #[path = "hirc_dialogue_summary.rs"]
 mod summary;
+#[path = "hirc_switch_source.rs"]
+mod switch;
 
-use self::dto::DialogueSourceSchema;
 use self::dto::{
     DialogueSourceDocument, DialogueSourceKind, DialogueSourceLayout, DialogueSourceRow,
     DialogueSummary,
 };
 use self::origins::ObjectOrigins;
-use self::random_sequence::RandomSequenceSchema;
 use self::rows::DialogueRows;
 
-pub(super) type ObjectSourceSchema = SourceWire<DialogueSourceSchema, RandomSequenceSchema>;
-
-#[derive(Serialize, JsonSchema)]
-#[serde(untagged)]
-#[schemars(rename = "HircObjectSourceFields")]
-pub(super) enum SourceWire<Dialogue, RandomSequence> {
-    Dialogue(Dialogue),
-    RandomSequence(RandomSequence),
-}
+pub(super) use self::schema::ObjectSourceSchema;
 
 #[derive(Debug, Clone, Copy)]
 enum SourceFamily {
     Dialogue,
     RandomSequence,
+    Switch,
 }
 
 impl SourceFamily {
@@ -53,6 +49,7 @@ impl SourceFamily {
         match self {
             Self::Dialogue => HircKind::DialogueEvent,
             Self::RandomSequence => HircKind::RandomSequenceContainer,
+            Self::Switch => HircKind::SwitchContainer,
         }
     }
 
@@ -60,6 +57,7 @@ impl SourceFamily {
         match self {
             Self::Dialogue => "bnkDialogueEvent",
             Self::RandomSequence => "bnkHircRandomSequence",
+            Self::Switch => "bnkHircSwitchContainer",
         }
     }
 
@@ -67,6 +65,7 @@ impl SourceFamily {
         match self {
             Self::Dialogue => "dialogueExtent",
             Self::RandomSequence => "randomSequenceExtent",
+            Self::Switch => "switchContainerExtent",
         }
     }
 }
@@ -84,6 +83,7 @@ impl<'bank> ObjectSourceFields<'bank> {
         let family = match kind {
             HircKind::DialogueEvent => SourceFamily::Dialogue,
             HircKind::RandomSequenceContainer => SourceFamily::RandomSequence,
+            HircKind::SwitchContainer => SourceFamily::Switch,
             _ => return None,
         };
         Some(Self {
@@ -121,6 +121,9 @@ fn project<R: Read + Seek, S: Serializer>(
         (BankHircSemantic::ContainerWithNode(container), SourceFamily::RandomSequence) => {
             random_sequence::serialize(serializer, origins, header, *container)
         }
+        (BankHircSemantic::ContainerWithNode(container), SourceFamily::Switch) => {
+            switch::serialize(serializer, origins, header, *container)
+        }
         (BankHircSemantic::Raw(object), family)
             if object.kind(header.header().version) == family.kind() =>
         {
@@ -131,6 +134,7 @@ fn project<R: Read + Seek, S: Serializer>(
                 SourceFamily::RandomSequence => {
                     random_sequence::unsupported(serializer, origins, header, &object)
                 }
+                SourceFamily::Switch => switch::unsupported(serializer, origins, header, &object),
             }
         }
         _ => Err(S::Error::custom(
@@ -160,7 +164,7 @@ fn serialize_dialogue<R: Read + Seek, S: Serializer>(
         .coverage(layout, header, original)
         .map_err(S::Error::custom)?;
     let fields = summary::collect(&dialogue, origins).map_err(S::Error::custom)?;
-    let document = DialogueSourceDocument {
+    DialogueSourceDocument {
         kind: DialogueSourceKind::DialogueEvent,
         layout,
         version: origins.version(header).map_err(S::Error::custom)?,
@@ -168,8 +172,8 @@ fn serialize_dialogue<R: Read + Seek, S: Serializer>(
         fields,
         rows: DialogueRows::new(dialogue, origins),
         source_inventory: origins,
-    };
-    SourceWire::<_, RandomSequenceSchema>::Dialogue(document).serialize(serializer)
+    }
+    .serialize(serializer)
 }
 
 fn serialize_unsupported<S: Serializer>(
@@ -178,7 +182,7 @@ fn serialize_unsupported<S: Serializer>(
     header: &BankObservedHeader,
     object: &BankHircObject,
 ) -> Result<S::Ok, S::Error> {
-    let document = DialogueSourceDocument {
+    DialogueSourceDocument {
         kind: DialogueSourceKind::DialogueEvent,
         layout: origins
             .coverage(DialogueSourceLayout::Unsupported, header, object)
@@ -188,6 +192,6 @@ fn serialize_unsupported<S: Serializer>(
         fields: DialogueSummary::default(),
         rows: [] as [DialogueSourceRow; 0],
         source_inventory: origins,
-    };
-    SourceWire::<_, RandomSequenceSchema>::Dialogue(document).serialize(serializer)
+    }
+    .serialize(serializer)
 }

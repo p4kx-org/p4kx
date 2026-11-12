@@ -5,8 +5,8 @@ use std::cell::RefCell;
 use std::io::{Read, Seek};
 
 use p4kx_audio::{
-    BankContainerRead, BankError, BankHircContainerNode, BankHircObject, BankObservedHeader,
-    BankRandomSequenceFields, BankRandomSequenceItem,
+    BankHircContainerNode, BankHircObject, BankObservedHeader, BankRandomSequenceFields,
+    BankRandomSequenceItem,
 };
 use serde::ser::{Error as _, SerializeSeq};
 use serde::{Serialize, Serializer};
@@ -18,14 +18,12 @@ mod dto;
 #[path = "hirc_random_sequence_fields.rs"]
 mod fields;
 
-use super::SourceWire;
-use super::dto::DialogueSourceSchema;
+use super::container_layout::{self, CheckedExtent, ContainerSourceLayout};
 use super::origins::ObjectOrigins;
 
 pub(super) use self::dto::RandomSequenceSchema;
 use self::dto::{
-    RandomSequenceDocument, RandomSequenceFields, RandomSequenceLayout, RandomSequenceRow,
-    RandomSequenceSourceKind,
+    RandomSequenceDocument, RandomSequenceFields, RandomSequenceRow, RandomSequenceSourceKind,
 };
 
 pub(super) fn serialize<R: Read + Seek, S: Serializer>(
@@ -34,9 +32,13 @@ pub(super) fn serialize<R: Read + Seek, S: Serializer>(
     header: &BankObservedHeader,
     container: BankHircContainerNode<'_, R>,
 ) -> Result<S::Ok, S::Error> {
-    let (layout, error) = coverage(&container);
+    let extent = CheckedExtent::observe(
+        container.fields().random_sequence.as_ref(),
+        BankRandomSequenceFields::complete_range,
+    );
+    let (layout, error) = container_layout::coverage(container.status(), extent);
     let original = container.object();
-    let document = RandomSequenceDocument {
+    RandomSequenceDocument {
         kind: RandomSequenceSourceKind::RandomSequenceContainer,
         layout: origins
             .coverage(layout, header, original)
@@ -52,8 +54,8 @@ pub(super) fn serialize<R: Read + Seek, S: Serializer>(
             origins,
         },
         source_inventory: origins,
-    };
-    SourceWire::<DialogueSourceSchema, _>::RandomSequence(document).serialize(serializer)
+    }
+    .serialize(serializer)
 }
 
 pub(super) fn unsupported<S: Serializer>(
@@ -62,38 +64,18 @@ pub(super) fn unsupported<S: Serializer>(
     header: &BankObservedHeader,
     original: &BankHircObject,
 ) -> Result<S::Ok, S::Error> {
-    let document = RandomSequenceDocument {
+    RandomSequenceDocument {
         kind: RandomSequenceSourceKind::RandomSequenceContainer,
         layout: origins
-            .coverage(RandomSequenceLayout::Unsupported, header, original)
+            .coverage(ContainerSourceLayout::Unsupported, header, original)
             .map_err(S::Error::custom)?,
         version: origins.version(header).map_err(S::Error::custom)?,
         error: None,
         fields: RandomSequenceFields::default(),
         rows: [] as [RandomSequenceRow; 0],
         source_inventory: origins,
-    };
-    SourceWire::<DialogueSourceSchema, _>::RandomSequence(document).serialize(serializer)
-}
-
-fn coverage<'view, R>(
-    container: &'view BankHircContainerNode<'_, R>,
-) -> (RandomSequenceLayout, Option<&'view BankError>) {
-    let original = container.fields().random_sequence.as_ref();
-    if original
-        .and_then(BankRandomSequenceFields::complete_range)
-        .is_some()
-    {
-        return (RandomSequenceLayout::Decoded, None);
     }
-    match container.status() {
-        BankContainerRead::Malformed(error) if original.is_some() => {
-            (RandomSequenceLayout::Malformed, Some(error))
-        }
-        BankContainerRead::Malformed(error) => (RandomSequenceLayout::Unavailable, Some(error)),
-        BankContainerRead::Unsupported(_) => (RandomSequenceLayout::Unsupported, None),
-        _ => (RandomSequenceLayout::Unavailable, None),
-    }
+    .serialize(serializer)
 }
 
 struct PlaylistRows<'view, 'input, R> {

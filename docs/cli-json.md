@@ -1713,6 +1713,13 @@ span. A short final weight keeps its play ID and checked row range. Source cover
 a complete declaration, a malformed prefix, an unreachable continuation and an unsupported
 version.
 
+Version-154 Switch objects include `source_fields` with original group and default values,
+continuous-validation byte, child extent, membership groups and child configurations.
+Group, member and configuration rows keep physical order and repeated IDs. Each fade
+retains its signed value and original 32-bit word. A readable member remains visible
+when the declared membership table is truncated. Known group codes identify Switch or
+State. Membership references carry unchecked resolution.
+
 Other object details:
 
 - `state`: standalone State versions 128 through 145 expose `property_count`, `count_range`,
