@@ -147,7 +147,7 @@ impl Walk<'_, '_, '_, '_> {
                     uses = uses.or(over.uses());
                     reachable.extend(over.canvases());
                 }
-                reachable.extend(widget.canvas);
+                reachable.extend(widget.canvas.guid());
                 reachable.extend(
                     widget
                         .inline

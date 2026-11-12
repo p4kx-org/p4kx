@@ -18,6 +18,9 @@ use SourceUseRole::{Conversion, Payload, Selector};
 #[path = "ui_screens_attachment_origins.rs"]
 mod attachments;
 
+#[path = "ui_screens_canvas_routes.rs"]
+mod canvas_routes;
+
 #[path = "ui_screens_widget_origins.rs"]
 mod widgets;
 
@@ -188,7 +191,8 @@ impl Projection {
             attachment,
         )?;
         self.canvas(&path, input.canvas, &guid, &context)?;
-        let route = Route::new(&context, input.canvas);
+        let canvases = self.canvas_routes(input.canvas, &input.assets.canvas_routes)?;
+        let route = Route::new(&context, &canvases);
         self.nested(&path, row, &input.assets, &route)
     }
 

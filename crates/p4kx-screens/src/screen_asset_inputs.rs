@@ -44,12 +44,24 @@ pub struct WidgetAssetInput {
     pub ordinal: usize,
 }
 
+/// The admitted canvas and the original direct widget Reference that selected it.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub struct CanvasRouteInput {
+    /// The physical admitted canvas Record position.
+    pub record_index: u32,
+    /// The selecting widget, when its original direct Reference was retained.
+    pub through_widget: Option<WidgetInput>,
+}
+
 /// Original inspected sources, aligned to the lists and widget groups in one screen row.
 #[derive(Debug, Default)]
 #[non_exhaustive]
 pub struct ScreenAssetInputs {
     /// Physical source Record of each listed canvas path.
     pub canvases: Vec<u32>,
+    /// Actual admitted canvas routes in traversal order.
+    pub canvas_routes: Vec<CanvasRouteInput>,
     /// Original field of each listed texture path.
     pub textures: Vec<WidgetAssetInput>,
     /// Original field of each listed vector path.

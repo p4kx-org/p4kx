@@ -273,3 +273,26 @@ fn a_matching_port_definition_does_not_prove_an_explicit_name() -> TestResult {
     assert_eq!(field["sourceUsesRefs"].as_array().map(Vec::len), Some(2));
     Ok(())
 }
+
+#[test]
+fn a_nested_asset_keeps_its_actual_direct_canvas_reference() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let listing = report(
+        &dir.path().join("Data.p4k"),
+        TestEntry::zstd(DCB, screens_sample().build()),
+        "TEST_Screen_MFD",
+    )?;
+    let path = "/screens/0/assets/vectors/0";
+    assert_eq!(
+        listing.pointer(path).and_then(Value::as_str),
+        Some("UI/Textures/Vector/Test/glyph.svg"),
+    );
+    let source = used(&listing, path, "scene[7].canvas")?;
+    assert_eq!(source["role"], "selector");
+    assert_eq!(
+        listing["fieldOrigins"][path]["containsEncryptedSource"],
+        false
+    );
+    assert_eq!(listing["fieldOrigins"][path]["sourceSetComplete"], true);
+    Ok(())
+}

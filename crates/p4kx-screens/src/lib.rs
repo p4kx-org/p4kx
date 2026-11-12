@@ -99,6 +99,7 @@ mod walk_rest;
 mod walk_style;
 mod walk_text;
 mod widget;
+mod widget_canvas_ref;
 
 pub use archive_screen::{ArchiveScreen, ArchiveScreenError, ArchiveScreenRender};
 pub use archive_screen_origin::ScreenRenderOrigin;
@@ -110,7 +111,9 @@ pub use images::{ImageSources, LoadTexture, LoadVector};
 pub use inspect::ElementCount;
 pub use limits::Limits;
 pub use report::{Report, Unsupported, VariableInForce};
-pub use screen_asset_inputs::{ScreenAssetInputs, WidgetAssetInput, WidgetInput, WidgetSection};
+pub use screen_asset_inputs::{
+    CanvasRouteInput, ScreenAssetInputs, WidgetAssetInput, WidgetInput, WidgetSection,
+};
 pub use screen_listing_inputs::{
     AttachmentInput, CanvasInput, EntityScreenInputs, MovieInput, ObservedEntityScreens,
     ScreenInput, ValueInput,

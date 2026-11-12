@@ -220,7 +220,7 @@ impl Walk<'_, '_, '_, '_> {
         style
             .canvas
             .or_else(|| self.rests.last().and_then(|state| state.canvas(index)))
-            .or(widget.canvas)
+            .or_else(|| widget.canvas.guid())
     }
 
     /// Returns the own alpha of widget `index`, in the same order of precedence.

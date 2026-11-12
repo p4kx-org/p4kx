@@ -15,6 +15,7 @@ use crate::rest::RestParams;
 use crate::screen_asset_inputs::WidgetInput;
 use crate::style::{Entry, Modifiers, inline_entries, modifiers};
 use crate::text::TextSpec;
+use crate::widget_canvas_ref::WidgetCanvasRef;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Parent {
@@ -84,8 +85,7 @@ pub(crate) struct Widget {
     pub(crate) shrink: f32,
     pub(crate) order: i32,
     pub(crate) layer: i32,
-    pub(crate) canvas: Option<Guid>,
-    pub(crate) canvas_dangling: bool,
+    pub(crate) canvas: WidgetCanvasRef,
     pub(crate) canvas_sizing: CanvasSizing,
     pub(crate) stylesheet: Option<Guid>,
     pub(crate) shape: ShapeStyle,
@@ -235,8 +235,7 @@ impl Widget {
                 .and_then(|common| int(common, "order"))
                 .unwrap_or(0),
             layer: int(structure, "layer").unwrap_or(0),
-            canvas: reference(structure, "canvas").map(Reference::guid),
-            canvas_dangling: matches!(structure.field("canvas"), Some(Value::Error(_))),
+            canvas: WidgetCanvasRef::read(structure),
             stylesheet: reference(structure, "stylesheetOverride").map(Reference::guid),
             canvas_sizing: if text(structure, "sizingMethod") == Some("Scale") {
                 CanvasSizing::Scale

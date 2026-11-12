@@ -1990,6 +1990,9 @@ unproved loadout port segments or nested canvas selection routes report an incom
 Default port segments retain the original port `Name` and `defaultItem.entityClass` from the
 physical parent Entity Record. An explicit loadout name retains the evidence of other proven
 segments of its path.
+Direct nested canvases retain the actual `scene` or `library` widget `canvas` Reference used to
+reach each read. A style or operation route whose selector is unobserved retains an incomplete
+source set for dependent values.
 
 ## `p4kx ui render <archive> --screen <canvas> --out <file.png> [--svg] [--size <W>x<H>|<W>] [--background …] [--brand <code>] [--var <name>=<value>]… [--lang <language>] --json`
 

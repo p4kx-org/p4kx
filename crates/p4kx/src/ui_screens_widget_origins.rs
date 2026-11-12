@@ -1,31 +1,30 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashSet;
+
 use anyhow::{Result, ensure};
 use p4kx_extraction::{SourceUse, SourceUseRole};
-use p4kx_screens::{CanvasInput, Screen, ScreenAssetInputs, WidgetAssetInput, WidgetInput};
+use p4kx_screens::{Screen, ScreenAssetInputs, WidgetAssetInput, WidgetInput};
 
+use super::canvas_routes::CanvasRoutes;
 use super::{Projection, ScreenContext};
 
 pub(super) struct Route<'source> {
     screen: &'source ScreenContext<'source>,
-    root_record: Option<u32>,
+    canvases: &'source CanvasRoutes,
 }
 
 impl<'source> Route<'source> {
-    pub(super) const fn new(screen: &'source ScreenContext<'source>, canvas: CanvasInput) -> Self {
-        let root_record = match canvas {
-            CanvasInput::Read { record_index, .. } => Some(record_index),
-            _ => None,
-        };
-        Self {
-            screen,
-            root_record,
-        }
+    pub(super) const fn new(
+        screen: &'source ScreenContext<'source>,
+        canvases: &'source CanvasRoutes,
+    ) -> Self {
+        Self { screen, canvases }
     }
 
-    fn proves(&self, record: u32) -> bool {
-        self.screen.known_owner && self.root_record == Some(record)
+    fn append(&self, record: u32, sources: &mut Vec<SourceUse>) -> bool {
+        self.canvases.append(record, sources) && self.screen.known_owner
     }
 }
 
@@ -46,10 +45,12 @@ impl Projection {
         );
         for (index, &record) in source.canvases.iter().enumerate() {
             let header = self.header(record, "fileName", SourceUseRole::Conversion)?;
+            let mut inputs = vec![route.screen.selector.clone(), header];
+            let complete = route.append(record, &mut inputs);
             self.put_attached(
                 &format!("{canvases}/{index}"),
-                &[route.screen.selector.clone(), header],
-                route.proves(record),
+                &inputs,
+                complete,
                 route.screen.attachment,
             )?;
         }
@@ -98,10 +99,12 @@ impl Projection {
                 widget.section.field_name(),
                 SourceUseRole::Conversion,
             )?;
+            let mut sources = vec![route.screen.selector.clone(), value];
+            let complete = route.append(widget.record_index, &mut sources);
             self.put_attached(
                 &format!("{path}/{index}"),
-                &[route.screen.selector.clone(), value],
-                route.proves(widget.record_index),
+                &sources,
+                complete,
                 route.screen.attachment,
             )?;
         }
@@ -118,21 +121,22 @@ impl Projection {
             anyhow::bail!("widget count has no source declarations");
         };
         let mut sources = vec![route.screen.selector.clone(), self.widget_type(*first)?];
-        let first_complete = route.proves(first.record_index);
+        let mut complete = route.append(first.record_index, &mut sources);
         for name in ["element", "rendered"] {
             self.put_attached(
                 &format!("{path}/{name}"),
                 &sources,
-                first_complete,
+                complete,
                 route.screen.attachment,
             )?;
         }
+        let mut seen = HashSet::from([first.record_index]);
         for &widget in rest {
             sources.push(self.widget_type(widget)?);
+            if seen.insert(widget.record_index) {
+                complete &= route.append(widget.record_index, &mut sources);
+            }
         }
-        let complete = inputs
-            .iter()
-            .all(|widget| route.proves(widget.record_index));
         self.put_attached(
             &format!("{path}/count"),
             &sources,
