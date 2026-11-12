@@ -152,6 +152,9 @@ files without retained internal coordinates carry an explicit opaque use.
 The model and material selectors retain independent DataForge Record and
 array positions. A selected sub-geometry can inherit a material from its
 main geometry, and the two uses preserve their own original fields.
+The receipt also records the original library slots that suppress a piece
+or a visible range. A whole-piece suppression affects the scene bounds and
+counts. Suppressing one range of a drawn piece affects the PNG.
 Unobserved inputs keep the contributor set incomplete. A known encrypted
 input still gives the artifact a positive marker.
 

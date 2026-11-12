@@ -6,15 +6,18 @@ use std::io;
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use p4kx_assembly::{Assembly, Part};
+use p4kx_assembly::{Assembly, AttachedModel, Part};
 use p4kx_extraction::model::ModelFile;
 use p4kx_extraction::{
     ArchiveWriteProtection, CancelToken, ConversionError, EntryOrigin, FieldOrigin, FileReceipt,
     InputScope, MaterialArchiveOrigins, ModelArchiveSource, OriginArtifactBinding,
-    OriginOutputAddress, SourceCoordinateOmission, SourceInput, SourceLocation, SourceUse,
-    SourceUseRole, write_origin_companion,
+    OriginOutputAddress, SourceCoordinateOmission, SourceInput, SourceLocation, SourceScope,
+    SourceUse, SourceUseRole, write_origin_companion,
 };
-use p4kx_render::{AssemblyPieceSource, AssemblyScene, Picture};
+use p4kx_render::{
+    AssemblyPieceSource, AssemblyScene, MaterialSuppressionEffect, MaterialSuppressionReason,
+    Picture,
+};
 
 use super::origins::CameraInput;
 use super::{HologramInputs, Projection};
@@ -35,8 +38,12 @@ pub(super) fn publish(
     (assembly, scene, visible): (&Assembly, &AssemblyScene, &[usize]),
 ) -> Result<Published> {
     let uses = original.projection.uses();
-    let mut sources = scene_inputs(original.projection, assembly, scene, visible)?;
+    let SceneInputs {
+        placed: mut sources,
+        suppressed_ranges,
+    } = scene_inputs(original.projection, assembly, scene, visible)?;
     let scene = uses.origin(&sources, false);
+    sources.extend(suppressed_ranges);
     sources.extend(
         original
             .settings
@@ -85,13 +92,62 @@ fn write_error(output: &Path, source: io::Error) -> ConversionError {
     }
 }
 
+struct SceneInputs {
+    placed: Vec<SourceUse>,
+    suppressed_ranges: Vec<SourceUse>,
+}
+
+struct PieceInputs<'a> {
+    models: &'a [ModelArchiveSource],
+    definition: Option<&'a EntryOrigin>,
+    material: MaterialInputs<'a>,
+    ancestry: usize,
+}
+
+fn piece_inputs<'a>(
+    assembly: &'a Assembly,
+    attachments: &[(usize, &'a AttachedModel)],
+    piece: AssemblyPieceSource,
+) -> Option<PieceInputs<'a>> {
+    match piece {
+        AssemblyPieceSource::Part(index) => {
+            let part = assembly.parts().get(index)?;
+            Some(PieceInputs {
+                models: part.model_archive_sources(),
+                definition: part.model_definition_origin(),
+                material: MaterialInputs {
+                    archive: part.material_archive_origins(),
+                    owner: Some(part),
+                },
+                ancestry: index,
+            })
+        }
+        AssemblyPieceSource::BoneAttachment(index) => {
+            let &(parent, attachment) = attachments.get(index)?;
+            Some(PieceInputs {
+                models: attachment.model_archive_sources(),
+                definition: attachment.model_definition_origin(),
+                material: MaterialInputs {
+                    archive: attachment.material_archive_origins(),
+                    owner: None,
+                },
+                ancestry: parent,
+            })
+        }
+        _ => None,
+    }
+}
+
 fn scene_inputs(
     projection: &Projection,
     assembly: &Assembly,
     scene: &AssemblyScene,
     visible: &[usize],
-) -> Result<Vec<SourceUse>> {
-    let mut sources = Vec::new();
+) -> Result<SceneInputs> {
+    let mut sources = SceneInputs {
+        placed: Vec::new(),
+        suppressed_ranges: Vec::new(),
+    };
     let attachments: Vec<_> = assembly.attached_models().collect();
     let mut placed_ancestry = HashSet::new();
     for piece in scene.placed_inputs() {
@@ -100,52 +156,75 @@ fn scene_inputs(
         } else {
             SourceUseRole::Conversion
         };
-        let (models, definition, materials, material_owner, index) = match piece.source() {
-            AssemblyPieceSource::Part(index) => {
-                let Some(part) = assembly.parts().get(index) else {
-                    continue;
-                };
-                authored_selector(projection, part.geometry_selector(), &mut sources)?;
-                (
-                    part.model_archive_sources(),
-                    part.model_definition_origin(),
-                    part.material_archive_origins(),
-                    Some(part),
-                    index,
-                )
-            }
-            AssemblyPieceSource::BoneAttachment(index) => {
-                let Some(&(parent, attachment)) = attachments.get(index) else {
-                    continue;
-                };
-                (
-                    attachment.model_archive_sources(),
-                    attachment.model_definition_origin(),
-                    attachment.material_archive_origins(),
-                    None,
-                    parent,
-                )
-            }
-            _ => continue,
+        let Some(input) = piece_inputs(assembly, &attachments, piece.source()) else {
+            continue;
         };
-        model_inputs(projection, models, definition, role, &mut sources)?;
-        selected_materials(
+        authored_selector(
             projection,
-            materials,
-            material_owner,
-            piece.material_slots(),
-            &mut sources,
+            input.material.owner.and_then(Part::geometry_selector),
+            &mut sources.placed,
         )?;
-        let mut at = Some(index);
+        model_inputs(
+            projection,
+            input.models,
+            input.definition,
+            role,
+            &mut sources.placed,
+        )?;
+        input
+            .material
+            .selected(projection, piece.material_slots(), &mut sources.placed)?;
+        let mut at = Some(input.ancestry);
         while let Some(index) = at.filter(|index| placed_ancestry.insert(*index)) {
             let Some(part) = assembly.parts().get(index) else {
                 break;
             };
-            port_placement(projection, part, &mut sources)?;
+            port_placement(projection, part, &mut sources.placed)?;
             at = part.parent();
         }
     }
+    suppressed_materials(
+        projection,
+        assembly,
+        &attachments,
+        scene,
+        visible,
+        &mut sources,
+    )?;
     Ok(sources)
+}
+
+fn suppressed_materials(
+    projection: &Projection,
+    assembly: &Assembly,
+    attachments: &[(usize, &AttachedModel)],
+    scene: &AssemblyScene,
+    visible: &[usize],
+    sources: &mut SceneInputs,
+) -> Result<()> {
+    for suppression in scene.material_suppressions() {
+        let uses = match suppression.effect() {
+            MaterialSuppressionEffect::WholePiece => &mut sources.placed,
+            MaterialSuppressionEffect::DrawRange
+                if visible.binary_search(&suppression.ordinal()).is_ok() =>
+            {
+                &mut sources.suppressed_ranges
+            }
+            _ => continue,
+        };
+        let field = match suppression.reason() {
+            MaterialSuppressionReason::Hidden => "hiddenMaterial",
+            MaterialSuppressionReason::Decal => "decalMaterial",
+            _ => continue,
+        };
+        let Some(input) = piece_inputs(assembly, attachments, suppression.source()) else {
+            continue;
+        };
+        if let Some(scope) = input.material.scope(projection, uses)? {
+            uses.push(material_slot(&scope, suppression.slot(), field)?);
+        }
+    }
+    Ok(())
 }
 
 fn model_inputs(
@@ -169,39 +248,59 @@ fn model_inputs(
     Ok(())
 }
 
-fn selected_materials(
-    projection: &Projection,
-    materials: &MaterialArchiveOrigins,
-    material_owner: Option<&Part>,
-    slots: impl Iterator<Item = usize>,
-    sources: &mut Vec<SourceUse>,
-) -> Result<()> {
-    let Some(origin) = materials.library() else {
-        return Ok(());
-    };
-    let mut slots = slots.peekable();
-    if slots.peek().is_none() {
-        return Ok(());
+struct MaterialInputs<'a> {
+    archive: &'a MaterialArchiveOrigins,
+    owner: Option<&'a Part>,
+}
+
+impl MaterialInputs<'_> {
+    fn scope(
+        &self,
+        projection: &Projection,
+        sources: &mut Vec<SourceUse>,
+    ) -> Result<Option<SourceScope>> {
+        let Some(origin) = self.archive.library() else {
+            return Ok(None);
+        };
+        authored_selector(
+            projection,
+            self.owner.and_then(Part::material_selector),
+            sources,
+        )?;
+        Ok(Some(projection.uses().observe(
+            SourceInput::Archive(origin),
+            InputScope::Payload,
+        )?))
     }
-    authored_selector(
-        projection,
-        material_owner.and_then(Part::material_selector),
-        sources,
-    )?;
-    let scope = projection
-        .uses()
-        .observe(SourceInput::Archive(origin), InputScope::Payload)?;
-    for slot in slots {
-        sources.push(scope.at(
-            SourceLocation::Subresource {
-                namespace: "materialLibrary".into(),
-                indices: vec![u64::try_from(slot)?],
-                field: "selectedMaterial".into(),
-            },
-            SourceUseRole::Selector,
-        )?);
+
+    fn selected(
+        &self,
+        projection: &Projection,
+        slots: impl Iterator<Item = usize>,
+        sources: &mut Vec<SourceUse>,
+    ) -> Result<()> {
+        let mut slots = slots.peekable();
+        if slots.peek().is_none() {
+            return Ok(());
+        }
+        if let Some(scope) = self.scope(projection, sources)? {
+            for slot in slots {
+                sources.push(material_slot(&scope, slot, "selectedMaterial")?);
+            }
+        }
+        Ok(())
     }
-    Ok(())
+}
+
+fn material_slot(scope: &SourceScope, slot: usize, field: &str) -> Result<SourceUse> {
+    Ok(scope.at(
+        SourceLocation::Subresource {
+            namespace: "materialLibrary".into(),
+            indices: vec![u64::try_from(slot)?],
+            field: field.into(),
+        },
+        SourceUseRole::Selector,
+    )?)
 }
 
 fn authored_selector(

@@ -12,13 +12,13 @@ use rayon::prelude::*;
 use thiserror::Error;
 
 use super::flatten::{Range, flatten};
-use super::pieces::{Piece, pieces_of};
-use super::surface::{SceneSurfaces, Surface, SurfaceKey, surface_key, surfaces_of};
+use super::pieces::pieces_of;
+use super::surface::{SceneSurfaces, surfaces_of};
 use super::{
-    AssemblyScene, Group, Item, Left, MAX_VIEW_ITEMS, MAX_VIEW_TEXTURE_BYTES, MAX_VIEW_TRIANGLES,
-    MAX_VIEW_VERTICES, PartDraw, PartInfo, VIEW_TEXTURE_MIP, ViewTexture, chain,
+    AssemblyScene, Left, MAX_VIEW_TEXTURE_BYTES, MAX_VIEW_TRIANGLES, MAX_VIEW_VERTICES,
+    MaterialSuppression, VIEW_TEXTURE_MIP, ViewTexture, chain,
 };
-use crate::scene::{Bounds, apply, next_serial};
+use crate::scene::{Bounds, next_serial};
 
 const WAVE: usize = 64;
 const TEXTURE_WAVE: usize = 16;
@@ -74,11 +74,9 @@ pub struct Hooks<'a> {
 
 pub(super) struct SharedMesh {
     pub(super) ranges: Vec<Range>,
-    bounds: Bounds,
-    triangles: usize,
+    pub(super) bounds: Bounds,
+    pub(super) triangles: usize,
 }
-
-type GroupKey = (usize, usize, Option<u32>, bool);
 
 fn address<T>(value: &T) -> usize {
     std::ptr::from_ref(value) as usize
@@ -96,6 +94,27 @@ impl AssemblyScene {
         assembly: &Assembly,
         options: &BuildOptions<'_>,
         hooks: &Hooks<'_>,
+    ) -> Result<Self, BuildError> {
+        Self::build_inner(assembly, options, hooks, None)
+    }
+
+    /// Builds the scene and retains actual selected material suppressions.
+    ///
+    /// # Errors
+    /// Returns a cancellation or empty-scene error.
+    pub fn build_observed(
+        assembly: &Assembly,
+        options: &BuildOptions<'_>,
+        hooks: &Hooks<'_>,
+    ) -> Result<Self, BuildError> {
+        Self::build_inner(assembly, options, hooks, Some(Vec::new()))
+    }
+
+    fn build_inner(
+        assembly: &Assembly,
+        options: &BuildOptions<'_>,
+        hooks: &Hooks<'_>,
+        material_suppressions: Option<Vec<MaterialSuppression>>,
     ) -> Result<Self, BuildError> {
         let pieces = pieces_of(assembly);
         let mut ids: HashMap<usize, usize> = HashMap::new();
@@ -118,6 +137,7 @@ impl AssemblyScene {
             items: Vec::new(),
             draws: Vec::new(),
             parts: Vec::new(),
+            material_suppressions,
             textures: Vec::new(),
             meshes: 0,
             bounds: Bounds::EMPTY,
@@ -237,125 +257,6 @@ impl AssemblyScene {
             });
         }
         Ok(kept)
-    }
-
-    fn place(
-        &mut self,
-        pieces: &[Piece<'_>],
-        (model_of, meshes): (&[Option<usize>], &[Option<SharedMesh>]),
-        (surfaces, textures): (&HashMap<SurfaceKey, Option<Surface>>, &HashMap<String, u32>),
-    ) {
-        let mut groups: HashMap<GroupKey, u32> = HashMap::new();
-        for (at, part) in pieces.iter().enumerate() {
-            let mesh = model_of
-                .get(at)
-                .copied()
-                .flatten()
-                .and_then(|id| meshes.get(id).map(|mesh| (id, mesh)))
-                .and_then(|(id, mesh)| mesh.as_ref().map(|mesh| (id, mesh)));
-            let mut info = PartInfo {
-                source: part.source,
-                name: part.name.clone(),
-                path: part.path.clone().into_owned(),
-                parent: part.parent,
-                triangles: 0,
-                interior: part.interior,
-            };
-            let Some((id, mesh)) = mesh else {
-                if part.model.is_some() {
-                    self.left.parts += 1;
-                }
-                self.parts.push(info);
-                continue;
-            };
-            let first = self.items.len();
-            let pending = self.items_of(part, (id, mesh), (surfaces, textures), &mut groups);
-            if pending.is_empty() {
-                self.parts.push(info);
-                continue;
-            }
-            if first + pending.len() > MAX_VIEW_ITEMS {
-                self.left.parts += 1;
-                self.parts.push(info);
-                continue;
-            }
-            let Some(placed) = self.include(&mesh.bounds, &part.world) else {
-                self.left.parts += 1;
-                self.parts.push(info);
-                continue;
-            };
-            info.triangles = mesh.triangles;
-            self.items.extend(pending);
-            self.draws.push(PartDraw {
-                part: at,
-                mesh: id,
-                world: part.world,
-                centre: placed.centre(),
-                radius: placed.radius(),
-                bounds: placed,
-                items: u32::try_from(first).unwrap_or(u32::MAX)
-                    ..u32::try_from(self.items.len()).unwrap_or(u32::MAX),
-            });
-            self.parts.push(info);
-        }
-    }
-
-    fn items_of(
-        &mut self,
-        part: &Piece<'_>,
-        (id, mesh): (usize, &SharedMesh),
-        (surfaces, textures): (&HashMap<SurfaceKey, Option<Surface>>, &HashMap<String, u32>),
-        groups: &mut HashMap<GroupKey, u32>,
-    ) -> Vec<Item> {
-        let mut pending = Vec::new();
-        for (position, range) in mesh.ranges.iter().enumerate() {
-            let key = surface_key(part, range.material);
-            let Some(surface) = surfaces.get(&key).and_then(Option::as_ref) else {
-                continue;
-            };
-            let texture = surface
-                .texture
-                .as_ref()
-                .and_then(|path| textures.get(path))
-                .copied();
-            let next = u32::try_from(self.groups.len()).unwrap_or(u32::MAX);
-            let group = *groups
-                .entry((id, position, texture, surface.translucent))
-                .or_insert(next);
-            if group == next {
-                self.groups.push(Group {
-                    first_index: range.first_index,
-                    index_count: range.index_count,
-                    texture,
-                    translucent: surface.translucent,
-                });
-            }
-            pending.push(Item {
-                library_slot: surface.library_slot,
-                group,
-                colour: surface.colour,
-            });
-        }
-        pending
-    }
-
-    fn include(&mut self, local: &Bounds, world: &[[f32; 4]; 3]) -> Option<Bounds> {
-        let mut placed = Bounds::EMPTY;
-        for corner in 0..8_usize {
-            let pick = |axis: usize| {
-                let side = if corner >> axis & 1 == 1 {
-                    &local.max
-                } else {
-                    &local.min
-                };
-                side.get(axis).copied().unwrap_or(0.0)
-            };
-            placed.include(apply(world, [pick(0), pick(1), pick(2)]));
-        }
-        placed.is_valid().then(|| {
-            self.bounds.union(&placed);
-            placed
-        })
     }
 }
 

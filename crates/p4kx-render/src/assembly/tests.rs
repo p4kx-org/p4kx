@@ -110,6 +110,7 @@ fn scene() -> AssemblyScene {
             info("a/b", Some(1)),
             info("c", Some(0)),
         ],
+        material_suppressions: None,
         textures: Vec::new(),
         meshes: 1,
         bounds: Bounds {

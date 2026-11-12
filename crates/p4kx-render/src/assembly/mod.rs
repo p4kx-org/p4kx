@@ -6,9 +6,11 @@
 //! frame draws.
 
 mod build;
+mod build_place;
 mod draw;
 mod flatten;
 mod frustum;
+mod material_suppression;
 mod mips;
 mod pieces;
 mod source_inputs;
@@ -25,6 +27,9 @@ use super::scene::{Bounds, Rows, Vertex};
 
 pub use build::{BuildError, BuildOptions, Hooks, Progress};
 pub use draw::{DrawList, GroupDraw, Instance, ObservedDrawList};
+pub use material_suppression::{
+    MaterialSuppression, MaterialSuppressionEffect, MaterialSuppressionReason,
+};
 pub(crate) use mips::{Level, chain, level_count};
 pub use source_inputs::{AssemblyPieceSource, PlacedPieceInput};
 pub use visibility::hidden_mask;
@@ -173,6 +178,7 @@ pub struct AssemblyScene {
     items: Vec<Item>,
     draws: Vec<PartDraw>,
     parts: Vec<PartInfo>,
+    material_suppressions: Option<Vec<MaterialSuppression>>,
     textures: Vec<ViewTexture>,
     meshes: usize,
     bounds: Bounds,

@@ -7,6 +7,7 @@ use p4kx_extraction::model::Material;
 use p4kx_extraction::{base_colour_factor, diffuse_texture_path, layered_base_key};
 use p4kx_settings::ModelMaterials;
 
+use super::MaterialSuppressionReason;
 use super::build::SharedMesh;
 use super::pieces::Piece;
 
@@ -30,6 +31,26 @@ pub(super) struct Surface {
     pub(super) layered: Option<Material>,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub(super) struct SuppressedSurface {
+    pub(super) slot: usize,
+    pub(super) reason: MaterialSuppressionReason,
+}
+
+pub(super) struct ResolvedSurface {
+    pub(super) surface: Option<Surface>,
+    pub(super) suppression: Option<SuppressedSurface>,
+}
+
+impl ResolvedSurface {
+    fn suppressed(slot: Option<usize>, reason: MaterialSuppressionReason) -> Self {
+        Self {
+            surface: None,
+            suppression: slot.map(|slot| SuppressedSurface { slot, reason }),
+        }
+    }
+}
+
 fn is_one_of(shader: &str, names: &[&str]) -> bool {
     names.iter().any(|name| shader.eq_ignore_ascii_case(name))
 }
@@ -42,24 +63,30 @@ pub(super) fn surface_key(part: &Piece<'_>, id: u16) -> SurfaceKey {
     (address(part.materials), part.palette.map_or(0, address), id)
 }
 
-/// Resolves the material `id` of `part` the way the GLB export picks it: the sub-material of
-/// its library, else the engine's default, with the part's tint palette applied. Returns `None`
-/// when nothing is drawn with it: a hidden material or a decal, whose shape only a texture gives.
-pub(super) fn resolve(part: &Piece<'_>, id: u16, mode: ModelMaterials) -> Option<Surface> {
+fn resolve(part: &Piece<'_>, id: u16, mode: ModelMaterials) -> ResolvedSurface {
     let fallback = Material::engine_default();
     let library = part.materials.library();
     let selected = library.and_then(|library| {
         let slot = if library.single { 0 } else { usize::from(id) };
         Some((slot, library.materials.get(slot)?))
     });
-    let found = selected.map_or(&fallback, |(_, material)| material);
-    if found.hidden() || is_one_of(&found.shader, &DECAL_SHADERS) {
-        return None;
+    let (slot, found) =
+        selected.map_or((None, &fallback), |(slot, material)| (Some(slot), material));
+    if found.hidden() {
+        return ResolvedSurface::suppressed(slot, MaterialSuppressionReason::Hidden);
+    }
+    if is_one_of(&found.shader, &DECAL_SHADERS) {
+        return ResolvedSurface::suppressed(slot, MaterialSuppressionReason::Decal);
     }
     let tinted = part.palette.and_then(|palette| palette.apply(found));
-    let mut surface = surface_of(tinted.as_ref().unwrap_or(found), mode)?;
-    surface.library_slot = selected.map(|(slot, _)| slot);
-    Some(surface)
+    let Some(mut surface) = surface_of(tinted.as_ref().unwrap_or(found), mode) else {
+        return ResolvedSurface::suppressed(slot, MaterialSuppressionReason::Decal);
+    };
+    surface.library_slot = slot;
+    ResolvedSurface {
+        surface: Some(surface),
+        suppression: None,
+    }
 }
 
 /// Returns how `material` is drawn: the base colour the GLB writer uses (the specular colour of a
@@ -98,7 +125,7 @@ pub(super) fn surface_of(material: &Material, mode: ModelMaterials) -> Option<Su
 /// The surfaces of the material ranges of a scene, the distinct texture keys they want in order,
 /// and the layered materials whose blended images some keys stand for.
 pub(super) struct SceneSurfaces {
-    pub(super) surfaces: HashMap<SurfaceKey, Option<Surface>>,
+    pub(super) surfaces: HashMap<SurfaceKey, ResolvedSurface>,
     pub(super) wanted: Vec<String>,
     pub(super) layered: HashMap<String, Material>,
 }
@@ -129,16 +156,17 @@ pub(super) fn surfaces_of(
             surfaces
                 .entry(surface_key(part, range.material))
                 .or_insert_with(|| {
-                    let surface = resolve(part, range.material, mode);
-                    if let Some(path) = surface.as_ref().and_then(|s| s.texture.as_ref())
+                    let resolved = resolve(part, range.material, mode);
+                    let surface = resolved.surface.as_ref();
+                    if let Some(path) = surface.and_then(|s| s.texture.as_ref())
                         && seen.insert(path.clone())
                     {
                         wanted.push(path.clone());
-                        if let Some(material) = surface.as_ref().and_then(|s| s.layered.as_ref()) {
+                        if let Some(material) = surface.and_then(|s| s.layered.as_ref()) {
                             layered.insert(path.clone(), material.clone());
                         }
                     }
-                    surface
+                    resolved
                 });
         }
     }

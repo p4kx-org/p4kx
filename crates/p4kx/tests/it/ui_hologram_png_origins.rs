@@ -207,3 +207,6 @@ fn selected_inputs(rows: &[Value], report: &Value) {
         "the placement retains its authored port rotation"
     );
 }
+
+#[path = "ui_hologram_material_suppression.rs"]
+mod suppression;

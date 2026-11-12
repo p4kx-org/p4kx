@@ -200,7 +200,7 @@ fn draw_picture(
     cancel: &CancelToken,
 ) -> Result<Outcome> {
     let camera = view_of(args, original.camera.camera());
-    let scene = AssemblyScene::build(
+    let scene = AssemblyScene::build_observed(
         assembly,
         &BuildOptions {
             materials: ModelMaterials::Colours,

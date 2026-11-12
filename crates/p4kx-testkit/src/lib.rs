@@ -152,7 +152,9 @@ pub use dna::{TestCell, TestControl, TestDeltaRecord, TestDna};
 pub use entity::TestEntity;
 pub use entity_armour::{armour_entries, armour_female_skeleton, armour_male_skeleton};
 pub use entity_armour_loadout::{ARMOUR_XML_LOADOUT, armour_xml_loadout};
-pub use entity_assembly::{ASSEMBLY_GUN_PAINT, assembly_entries, hologram_entries};
+pub use entity_assembly::{
+    ASSEMBLY_GUN_PAINT, assembly_entries, hologram_entries, hologram_suppression_entries,
+};
 pub use entity_assortment::{TestGroup, assortment_record, assortment_record_requiring};
 pub use entity_bone::{
     BONE_THRUSTER, bone_thruster_definition, bone_thruster_entries, bone_thruster_housing,
