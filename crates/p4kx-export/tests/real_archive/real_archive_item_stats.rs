@@ -14,15 +14,12 @@ use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-const BLOCKS: [(&str, &[&str]); 5] = [
+const BLOCKS: [(&str, &[&str]); 2] = [
     ("weapon", &["fireActions", "ammoCapacity", "ammo"]),
-    ("powerPlant", &["powerOutput", "unit"]),
-    ("cooler", &["coolingRate", "unit"]),
     (
         "missile",
         &["damage", "explosionMaxRadius", "lockTime", "linearSpeed"],
     ),
-    ("resourceStates", &[]),
 ];
 
 const MIN_SHARE: f64 = 0.8;
@@ -164,10 +161,18 @@ fn known_items_carry_their_known_values() -> TestResult {
     );
     let missile = stats_of(items, "MISL_S07_IR_TALN_Hellion")?;
     assert_eq!(missile["missile"]["trackingSignalType"], "Infrared");
-    let cooler = stats_of(items, "COOL_JUST_S02_Snowpack_SCItem")?;
-    assert_eq!(cooler["cooler"]["coolingRate"], 46.0);
-    let plant = stats_of(items, "POWR_JUST_S03_Durango_SCItem")?;
-    assert_eq!(plant["powerPlant"]["powerOutput"], 24.0);
+    let cooler = item_of(items, "COOL_JUST_S02_Snowpack_SCItem")?;
+    assert_eq!(
+        crate::real_archive_resource_components::known_generation_amount(
+            &catalog, cooler, "Coolant"
+        ),
+        Some(46.0)
+    );
+    let plant = item_of(items, "POWR_JUST_S03_Durango_SCItem")?;
+    assert_eq!(
+        crate::real_archive_resource_components::known_generation_amount(&catalog, plant, "Power"),
+        Some(24.0)
+    );
     let laser = stats_of(items, "VNCL_LaserCannon_S1")?;
     assert_eq!(laser["weapon"]["fireActions"][0]["fireRate"], 350.0);
     let item = item_of(items, "QDRV_WETK_S04_Idris_TEMP")?;

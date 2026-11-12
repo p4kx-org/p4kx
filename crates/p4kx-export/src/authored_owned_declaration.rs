@@ -183,6 +183,23 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         Ok(())
     }
 
+    /// Reads a declared Enum label or a directly stored String label.
+    pub(in crate::catalog_v3) fn borrowed_enum_or_string(
+        &self,
+        name: &str,
+        target: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<&'source str>, CatalogError> {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
+            return self.absent();
+        };
+        let storage = fact.field().storage();
+        if storage.data_type() == DataType::String && !storage.is_array() {
+            return self.borrowed_string(name, notes);
+        }
+        self.read_enum(name, target, fact, notes)
+    }
+
     /// Reads the stored label of a scalar Enum with the expected original declaration.
     pub(in crate::catalog_v3) fn borrowed_enum_to(
         &self,
@@ -193,6 +210,16 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         let Some((_, fact)) = self.originals.field(self.owner, name)? else {
             return self.absent();
         };
+        self.read_enum(name, target, fact, notes)
+    }
+
+    fn read_enum(
+        &self,
+        name: &str,
+        target: &str,
+        fact: &Fact<'scope, 'read, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<&'source str>, CatalogError> {
         let storage = fact.field().storage();
         if storage.data_type() != DataType::Enum || storage.is_array() {
             let state = self.failure(name, fact.value(), "a nullable scalar Enum", notes)?;

@@ -30,6 +30,8 @@ mod durability;
 mod fuel_capacity;
 #[path = "catalog_quantum.rs"]
 mod quantum;
+#[path = "catalog_resource_components.rs"]
+mod resource_components;
 #[path = "catalog_shield.rs"]
 mod shield;
 
@@ -277,35 +279,45 @@ fn quantum_drive(catalog: &Value, guid: u128) -> Result<&Value, Box<dyn Error>> 
 #[test]
 fn a_power_plant_and_a_cooler_carry_the_rate_of_their_own_resource() -> TestResult {
     let catalog = catalog()?;
-    let plant = item(&catalog, PLANT)?;
-    let cooler = item(&catalog, COOLER)?;
+    for (owner, resource, unit, field, amount) in [
+        (PLANT, "Power", "SPowerSegmentResourceUnit", "units", 12.0),
+        (
+            COOLER,
+            "Coolant",
+            "SStandardResourceUnit",
+            "standardResourceUnits",
+            40.0,
+        ),
+    ] {
+        let item = item(&catalog, owner)?;
+        assert!(
+            item["stats"].is_null(),
+            "only the canonical table publishes resource fields"
+        );
+        let row = resource_components::component(&catalog, owner)?;
+        let state = &row["states"]["value"][0]["value"];
+        let generated = &state["deltas"]["value"][0]["value"]["generation"]["value"];
+        let stored_unit = &generated["resourceAmountPerSecond"]["value"];
+        assert_eq!(generated["resource"]["value"], resource);
+        assert_eq!(stored_unit["sourceType"]["value"], unit);
+        assert_eq!(stored_unit[field]["value"]["finite"], amount);
+    }
+    let row = resource_components::component(&catalog, COOLER)?;
+    let state = &row["states"]["value"][0]["value"];
+    assert_eq!(state["name"]["value"], "Online");
     assert_eq!(
-        plant["stats"]["powerPlant"],
-        json!({"powerOutput": 12.0, "unit": "SPowerSegmentResourceUnit"})
+        state.pointer("/signatureParams/value/EMSignature/value/nominalSignature/value/finite"),
+        Some(&json!(500.0))
     );
-    assert!(plant["stats"]["cooler"].is_null());
     assert_eq!(
-        cooler["stats"]["cooler"],
-        json!({"coolingRate": 40.0, "unit": "SStandardResourceUnit"})
+        state.pointer("/signatureParams/value/IRSignature/value/nominalSignature/value/finite"),
+        Some(&json!(80.0))
     );
-    assert!(cooler["stats"]["powerPlant"].is_null());
+    let delta = &state["deltas"]["value"][0]["value"];
+    assert_eq!(delta["kind"], "conversion");
     assert_eq!(
-        cooler["stats"]["resourceStates"],
-        json!([{
-            "name": "Online",
-            "emSignature": {"nominal": 500.0, "decayRate": 0.15},
-            "irSignature": {"nominal": 80.0, "decayRate": 0.5},
-            "flows": [
-                {
-                    "kind": "ItemResourceDeltaConversion", "direction": "generation",
-                    "resource": "Coolant", "amount": 40.0, "unit": "SStandardResourceUnit"
-                },
-                {
-                    "kind": "ItemResourceDeltaConversion", "direction": "consumption",
-                    "resource": "Power", "amount": 2.0, "unit": "SPowerSegmentResourceUnit"
-                }
-            ]
-        }])
+        delta.pointer("/consumption/value/resourceAmountPerSecond/value/units/value/finite"),
+        Some(&json!(2.0))
     );
     Ok(())
 }

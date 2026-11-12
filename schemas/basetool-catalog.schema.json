@@ -3547,6 +3547,9 @@
         "quantumDrives": {
           "$ref": "#/$defs/CatalogTableOfQuantumDrive"
         },
+        "resourceComponents": {
+          "$ref": "#/$defs/CatalogTableOfResourceComponent"
+        },
         "resourceContainers": {
           "$ref": "#/$defs/CatalogTableOfResourceContainer"
         },
@@ -3577,6 +3580,7 @@
         "missionFlows",
         "missionProperties",
         "quantumDrives",
+        "resourceComponents",
         "resourceContainers",
         "shieldGenerators",
         "weaponActions"
@@ -4520,6 +4524,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/QuantumDrive"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfResourceComponent": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ResourceComponent"
           },
           "type": "array"
         }
@@ -5815,6 +5838,29 @@
       ],
       "type": "object"
     },
+    "CompositionValue": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "containerResource": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "ratio": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "containerResource",
+        "ratio",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "ConditionMeaning": {
       "description": "A condition interpretation using original fields and flat child references.",
       "oneOf": [
@@ -6532,31 +6578,6 @@
         "hasPersonalCooldown",
         "personalCooldownTime",
         "personalCooldownTimeVariation"
-      ],
-      "type": "object"
-    },
-    "CoolerStats": {
-      "description": "A cooler.",
-      "properties": {
-        "coolingRate": {
-          "description": "The `amount` of the first `generation` flow of `resourceStates` whose resource is\n`Coolant`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "unit": {
-          "description": "The `unit` of that flow.",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "coolingRate",
-        "unit"
       ],
       "type": "object"
     },
@@ -13035,7 +13056,7 @@
       "type": "object"
     },
     "ItemStats": {
-      "description": "Published item stat blocks, health and resource states.",
+      "description": "Published item stat blocks and health.",
       "properties": {
         "armor": {
           "anyOf": [
@@ -13058,17 +13079,6 @@
             }
           ],
           "description": "The worn properties block, from `SCItemClothingParams`."
-        },
-        "cooler": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/CoolerStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The cooler block, for an item of the type `Cooler`."
         },
         "health": {
           "description": "The hit points, from `SHealthComponentParams.Health`.",
@@ -13111,17 +13121,6 @@
           ],
           "description": "The missile block, from `SCItemMissileParams`."
         },
-        "powerPlant": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/PowerPlantStats"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The power plant block, for an item of the type `PowerPlant`."
-        },
         "radar": {
           "anyOf": [
             {
@@ -13132,13 +13131,6 @@
             }
           ],
           "description": "The radar block, from `SCItemRadarComponentParams`."
-        },
-        "resourceStates": {
-          "description": "The states of `ItemResourceComponentParams` in stored order: signatures and resource flows.",
-          "items": {
-            "$ref": "#/$defs/ResourceState"
-          },
-          "type": "array"
         },
         "tractorBeam": {
           "anyOf": [
@@ -13177,14 +13169,11 @@
       "required": [
         "armor",
         "clothing",
-        "cooler",
         "health",
         "miningLaser",
         "miningModifier",
         "missile",
-        "powerPlant",
         "radar",
-        "resourceStates",
         "tractorBeam",
         "weapon",
         "weaponModifier"
@@ -14089,6 +14078,29 @@
           "value": "illegalGoodsLicenseClassC"
         }
       ]
+    },
+    "LinkedInteraction": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "changeInteractionState": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "linkedInteractionState": {
+          "$ref": "#/$defs/SourcedValueOfHealthLink"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "changeInteractionState",
+        "linkedInteractionState",
+        "sourceType"
+      ],
+      "type": "object"
     },
     "Loadout": {
       "description": "The ports of a ship or of an item that has ports, and what the Default Loadout puts into them.",
@@ -18229,28 +18241,30 @@
       ],
       "type": "object"
     },
-    "PowerPlantStats": {
-      "description": "A power plant.",
+    "PowerRange": {
       "properties": {
-        "powerOutput": {
-          "description": "The `amount` of the first `generation` flow of `resourceStates` whose resource is `Power`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
-        "unit": {
-          "description": "The `unit` of that flow.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "modifier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "registerRange": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "start": {
+          "$ref": "#/$defs/SourcedValueOfint32"
         }
       },
       "required": [
-        "powerOutput",
-        "unit"
+        "additionalFields",
+        "modifier",
+        "registerRange",
+        "sourceType",
+        "start"
       ],
       "type": "object"
     },
@@ -21693,6 +21707,7 @@
       "description": "A capacity retains the concrete unit and its own stored numeric member.",
       "oneOf": [
         {
+          "description": "Concrete unit identity and the original members outside its typed amount.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -21713,6 +21728,7 @@
           "type": "object"
         },
         {
+          "description": "Concrete unit identity and the original members outside its typed amount.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -21737,6 +21753,7 @@
           "type": "object"
         },
         {
+          "description": "Concrete unit identity and the original members outside its typed amount.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -21761,6 +21778,7 @@
           "type": "object"
         },
         {
+          "description": "Concrete unit identity and the original members outside its typed amount.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -21785,6 +21803,7 @@
           "type": "object"
         },
         {
+          "description": "Concrete unit identity and the original members outside its typed amount.",
           "properties": {
             "additionalFields": {
               "$ref": "#/$defs/SourceArenaOutput"
@@ -21820,6 +21839,106 @@
       "required": [
         "entityClass",
         "slot"
+      ],
+      "type": "object"
+    },
+    "ResourceComponent": {
+      "description": "Resource-network parameters and ordered states of one physical component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "controlBlocks": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "controlParameters": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "defaultPriority": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "filterParams": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "functionalityModifiers": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "isConnectedToRoom": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "isRelay": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "isResourceNetworked": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "powerPlantOverride": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "repairRestoreRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "selfRepair": {
+          "$ref": "#/$defs/SourcedValueOfSelfRepair"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "states": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceState"
+        },
+        "wirelessConnection": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "componentOrdinal",
+        "controlBlocks",
+        "controlParameters",
+        "defaultPriority",
+        "filterParams",
+        "functionalityModifiers",
+        "isConnectedToRoom",
+        "isRelay",
+        "isResourceNetworked",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "powerPlantOverride",
+        "repairRestoreRatio",
+        "selfRepair",
+        "sourceType",
+        "states",
+        "wirelessConnection"
+      ],
+      "type": "object"
+    },
+    "ResourceComposition": {
+      "description": "Ordered authored resource ratios attached to a delta side.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "values": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCompositionValue"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "sourceType",
+        "values"
       ],
       "type": "object"
     },
@@ -21912,6 +22031,252 @@
         "qualityDistribution",
         "qualityLocationOverride",
         "qualityQuantization"
+      ],
+      "type": "object"
+    },
+    "ResourceDelta": {
+      "description": "A source delta with its original array slot and linked sides.",
+      "oneOf": [
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "consumption": {
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+            },
+            "consumptionComposition": {
+              "$ref": "#/$defs/SourcedValueOfResourceComposition"
+            },
+            "kind": {
+              "const": "consumption",
+              "type": "string"
+            },
+            "minimumConsumptionFraction": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "sourcePosition": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourcePosition",
+            "sourceType",
+            "consumption",
+            "consumptionComposition",
+            "minimumConsumptionFraction"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "composition": {
+              "$ref": "#/$defs/SourcedValueOfResourceComposition"
+            },
+            "generation": {
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+            },
+            "kind": {
+              "const": "generation",
+              "type": "string"
+            },
+            "noOverGeneration": {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            },
+            "sourcePosition": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourcePosition",
+            "sourceType",
+            "generation",
+            "composition",
+            "noOverGeneration"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "consumption": {
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+            },
+            "consumptionComposition": {
+              "$ref": "#/$defs/SourcedValueOfResourceComposition"
+            },
+            "generatedComposition": {
+              "$ref": "#/$defs/SourcedValueOfResourceComposition"
+            },
+            "generation": {
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+            },
+            "kind": {
+              "const": "conversion",
+              "type": "string"
+            },
+            "minimumConsumptionFraction": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "noOverGeneration": {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            },
+            "sourcePosition": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourcePosition",
+            "sourceType",
+            "consumption",
+            "consumptionComposition",
+            "minimumConsumptionFraction",
+            "generation",
+            "generatedComposition",
+            "noOverGeneration"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "consumption": {
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+            },
+            "consumptionComposition": {
+              "$ref": "#/$defs/SourcedValueOfResourceComposition"
+            },
+            "discharge": {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            },
+            "generation": {
+              "$ref": "#/$defs/SourcedValueOfResourceDeltaAmount"
+            },
+            "kind": {
+              "const": "storage",
+              "type": "string"
+            },
+            "sourcePosition": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourcePosition",
+            "sourceType",
+            "consumption",
+            "generation",
+            "consumptionComposition",
+            "discharge"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "binaryEvaluation": {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            },
+            "kind": {
+              "const": "networkReflection",
+              "type": "string"
+            },
+            "resource": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "sourcePosition": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourcePosition",
+            "sourceType",
+            "resource",
+            "binaryEvaluation"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "unknownDelta",
+              "type": "string"
+            },
+            "sourcePosition": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourcePosition",
+            "sourceType"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "ResourceDeltaAmount": {
+      "description": "One side of an original resource delta.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "resource": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "resourceAmountPerSecond": {
+          "$ref": "#/$defs/SourcedValueOfResourceFlowUnit"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "resource",
+        "resourceAmountPerSecond",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -22103,48 +22468,153 @@
       ],
       "type": "object"
     },
-    "ResourceFlow": {
-      "description": "One generation or consumption of a resource, per second, in the unit the Archive states.",
-      "properties": {
-        "amount": {
-          "description": "The first number of `resourceAmountPerSecond`, in the unit named by `unit`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+    "ResourceFlowUnit": {
+      "description": "The original unit of a resource amount per second.",
+      "oneOf": [
+        {
+          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "base",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType"
+          ],
+          "type": "object"
         },
-        "direction": {
-          "description": "`generation` or `consumption`: the field of the delta that holds the flow.",
-          "type": "string"
+        {
+          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "centiResourceUnits": {
+              "$ref": "#/$defs/SourcedValueOfResourceNumber"
+            },
+            "kind": {
+              "const": "centiResourceUnit",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType",
+            "centiResourceUnits"
+          ],
+          "type": "object"
         },
-        "kind": {
-          "description": "The struct of the delta, e.g. `ItemResourceDeltaGeneration`. A closed set the game may\nextend; the schema keeps a string.",
-          "type": "string"
+        {
+          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "microResourceUnit",
+              "type": "string"
+            },
+            "microResourceUnits": {
+              "$ref": "#/$defs/SourcedValueOfResourceNumber"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType",
+            "microResourceUnits"
+          ],
+          "type": "object"
         },
-        "resource": {
-          "description": "The `resource`, e.g. `Power`. A closed set the game may extend; the schema keeps a string.",
-          "type": [
-            "string",
-            "null"
-          ]
+        {
+          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "standardResourceUnit",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "standardResourceUnits": {
+              "$ref": "#/$defs/SourcedValueOfResourceNumber"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType",
+            "standardResourceUnits"
+          ],
+          "type": "object"
         },
-        "unit": {
-          "description": "The struct that holds the amount, e.g. `SPowerSegmentResourceUnit`; the units of two\nstructs differ and are not converted.",
-          "type": [
-            "string",
-            "null"
-          ]
+        {
+          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "powerSegmentResourceUnit",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "units": {
+              "$ref": "#/$defs/SourcedValueOfResourceNumber"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType",
+            "units"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Concrete unit identity and the original members outside its typed amount.",
+          "properties": {
+            "additionalFields": {
+              "$ref": "#/$defs/SourceArenaOutput"
+            },
+            "kind": {
+              "const": "unknownUnit",
+              "type": "string"
+            },
+            "sourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "additionalFields",
+            "sourceType"
+          ],
+          "type": "object"
         }
-      },
-      "required": [
-        "amount",
-        "direction",
-        "kind",
-        "resource",
-        "unit"
       ],
-      "type": "object"
+      "required": []
     },
     "ResourceGroupDefinition": {
       "description": "Direct scalar facts of one physical `ResourceTypeGroup` Record.",
@@ -22445,6 +22915,34 @@
         }
       ]
     },
+    "ResourcePowerRanges": {
+      "description": "The three original power-range slots of a resource state.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "high": {
+          "$ref": "#/$defs/SourcedValueOfPowerRange"
+        },
+        "low": {
+          "$ref": "#/$defs/SourcedValueOfPowerRange"
+        },
+        "medium": {
+          "$ref": "#/$defs/SourcedValueOfPowerRange"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "high",
+        "low",
+        "medium",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "ResourceProperty": {
       "description": "One authored resource property and its exact concrete source type.",
       "properties": {
@@ -22508,51 +23006,67 @@
         }
       ]
     },
-    "ResourceState": {
-      "description": "One state of the resource component: its signatures and the resources it generates and uses.",
+    "ResourceSignatureParams": {
+      "description": "The electromagnetic and infrared signature blocks of an original state.",
       "properties": {
-        "emSignature": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Signature"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`signatureParams.EMSignature`."
+        "EMSignature": {
+          "$ref": "#/$defs/SourcedValueOfSignatureEntry"
         },
-        "flows": {
-          "description": "The `generation` and `consumption` of the state's `deltas`, in stored order.",
-          "items": {
-            "$ref": "#/$defs/ResourceFlow"
-          },
-          "type": "array"
+        "IRSignature": {
+          "$ref": "#/$defs/SourcedValueOfSignatureEntry"
         },
-        "irSignature": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Signature"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "`signatureParams.IRSignature`."
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
-        "name": {
-          "description": "The `name` of the state, e.g. `Online`.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
-        "emSignature",
-        "flows",
-        "irSignature",
-        "name"
+        "EMSignature",
+        "IRSignature",
+        "additionalFields",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "ResourceState": {
+      "description": "The authored configuration and ordered deltas of one resource state.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "deltas": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfResourceDelta"
+        },
+        "linkedInteractionStates": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfLinkedInteraction"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "powerRanges": {
+          "$ref": "#/$defs/SourcedValueOfResourcePowerRanges"
+        },
+        "signatureParams": {
+          "$ref": "#/$defs/SourcedValueOfResourceSignatureParams"
+        },
+        "sourcePosition": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "deltas",
+        "linkedInteractionStates",
+        "name",
+        "powerRanges",
+        "signatureParams",
+        "sourcePosition",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -23233,6 +23747,33 @@
       "required": [
         "ammoContainerRecord",
         "condition"
+      ],
+      "type": "object"
+    },
+    "SelfRepair": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "healthRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxRepairCount": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "timeToRepair": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "healthRatio",
+        "maxRepairCount",
+        "sourceType",
+        "timeToRepair"
       ],
       "type": "object"
     },
@@ -24277,32 +24818,6 @@
       ],
       "type": "object"
     },
-    "Signature": {
-      "description": "A signature of a state.",
-      "properties": {
-        "decayRate": {
-          "description": "`decayRate`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "nominal": {
-          "description": "`nominalSignature`.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "decayRate",
-        "nominal"
-      ],
-      "type": "object"
-    },
     "SignatureCategory": {
       "description": "One original signature/category pair.",
       "properties": {
@@ -24332,6 +24847,33 @@
       },
       "required": [
         "deathEmissionModifierParams"
+      ],
+      "type": "object"
+    },
+    "SignatureEntry": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "decayRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "functionalityCurve": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "nominalSignature": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "decayRate",
+        "functionalityCurve",
+        "nominalSignature",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -28409,6 +28951,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfCompositionValue": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfCompositionValue"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfConditionalActionEntry": {
       "allOf": [
         {
@@ -29967,6 +30642,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfItemPort"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfLinkedInteraction": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfLinkedInteraction"
                 },
                 "type": "array"
               }
@@ -31867,6 +32675,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfResourceDelta": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfResourceDelta"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfResourceFloat32": {
       "allOf": [
         {
@@ -32095,6 +33036,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfResourceProperty"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfResourceState": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfResourceState"
                 },
                 "type": "array"
               }
@@ -36429,6 +37503,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/CompositionEntry"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCompositionValue": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CompositionValue"
               }
             }
           }
@@ -43745,6 +44949,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfLinkedInteraction": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/LinkedInteraction"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfMaelstromEvent": {
       "allOf": [
         {
@@ -46639,6 +47973,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/PhysicalEntryRef"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfPowerRange": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/PowerRange"
               }
             }
           }
@@ -52785,6 +54249,396 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfResourceComposition": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ResourceComposition"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfResourceDelta": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ResourceDelta"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfResourceDeltaAmount": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ResourceDeltaAmount"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfResourceDensityPayload": {
       "allOf": [
         {
@@ -53435,6 +55289,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfResourceFlowUnit": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ResourceFlowUnit"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfResourceInt64": {
       "allOf": [
         {
@@ -53695,6 +55679,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfResourcePowerRanges": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ResourcePowerRanges"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfResourceProperty": {
       "allOf": [
         {
@@ -53919,6 +56033,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ResourcePropertyPayload"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfResourceSignatureParams": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ResourceSignatureParams"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfResourceState": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ResourceState"
               }
             }
           }
@@ -54699,6 +57073,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/SecondaryMagazine"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSelfRepair": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SelfRepair"
               }
             }
           }
@@ -55869,6 +58373,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/SignatureDeath"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSignatureEntry": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SignatureEntry"
               }
             }
           }

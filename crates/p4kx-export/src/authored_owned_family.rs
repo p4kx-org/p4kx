@@ -32,7 +32,23 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         notes: &mut Vec<FieldError>,
         decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<T>, CatalogError> {
-        self.family_field(name, target, PointerShape::Scalar, notes, |fact, notes| {
+        self.family_field(
+            name,
+            Some(target),
+            PointerShape::Scalar,
+            notes,
+            |fact, notes| self.family_value(name, fact, notes, decode),
+        )
+    }
+
+    /// Reads a scalar pointer using its actual nominal declaration and concrete ancestry.
+    pub(in crate::catalog_v3) fn declared_pointer<T>(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+        decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        self.family_field(name, None, PointerShape::Scalar, notes, |fact, notes| {
             self.family_value(name, fact, notes, decode)
         })
     }
@@ -45,7 +61,22 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         notes: &mut Vec<FieldError>,
         decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
-        self.family_field(name, target, PointerShape::Array, notes, |fact, notes| {
+        self.family_field(
+            name,
+            Some(target),
+            PointerShape::Array,
+            notes,
+            |fact, notes| self.family_array(name, fact, notes, decode),
+        )
+    }
+
+    pub(in crate::catalog_v3) fn declared_family_array<T>(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+        decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
+        self.family_field(name, None, PointerShape::Array, notes, |fact, notes| {
             self.family_array(name, fact, notes, decode)
         })
     }
@@ -94,7 +125,7 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
     fn family_field<T>(
         &self,
         name: &str,
-        target: &str,
+        target: Option<&str>,
         shape: PointerShape,
         notes: &mut Vec<FieldError>,
         read: impl FnOnce(
@@ -113,7 +144,10 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
             return self.bind_storage(fact, state);
         }
         let declared = fact.observe_declared_target(self.input)?;
-        self.read_declared_value(fact, &[target], declared, notes, |notes| read(fact, notes))
+        let expected = target.or_else(|| declared.0.as_ref().ok().copied());
+        self.read_declared_value(fact, expected.as_slice(), declared, notes, |notes| {
+            read(fact, notes)
+        })
     }
 
     fn family_value<T>(

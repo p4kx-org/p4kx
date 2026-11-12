@@ -110,18 +110,20 @@ fn shield_variant_groups_use_original_stats_after_the_wire_field_is_removed() ->
         "a shield with different authored health stays separate"
     );
     let resource_item = item("shield_with_resources")?;
-    let stats = &resource_item["stats"];
     assert!(
-        stats.get("shield").is_none(),
-        "shield is removed from item stats"
+        resource_item["stats"].is_null(),
+        "the shield and resource component publish their own independent configuration rows"
     );
-    assert!(
-        stats["health"].is_null(),
-        "the shield has resource states without health"
-    );
+    let resource = catalog["configurations"]["resourceComponents"]["rows"]
+        .as_array()
+        .ok_or("canonical resource components")?
+        .iter()
+        .find(|row| row.pointer("/ownerGuid/value") == resource_item.get("guid"))
+        .ok_or("the shield's original resource component")?;
     assert_eq!(
-        stats["resourceStates"][0]["flows"][0]["amount"], 12.0,
-        "independent resource state is retained"
+        resource.pointer("/states/value/0/value/deltas/value/0/value/generation/value/resourceAmountPerSecond/value/units/value/finite"),
+        Some(&serde_json::json!(12.0)),
+        "the independent original resource amount is retained"
     );
 
     let entry = DataForgeEntry::read(&archive)?;

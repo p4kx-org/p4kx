@@ -6,7 +6,7 @@ use std::convert::Infallible;
 use p4kx_extraction::{DataForge, Record, RecordTree, TreeBuilder};
 
 use crate::catalog_v3::catalog_durability;
-use crate::contract_stats::{AmmoStats, ItemStats, ItemStatsFields};
+use crate::contract_stats::{AmmoStats, ItemStatBlocks, ItemStats, ItemStatsFields};
 use crate::record_fields::{component, structure, text};
 
 mod gear;
@@ -78,21 +78,23 @@ pub(crate) fn read_with_sources<'f, E>(
         fields: ItemStatsFields {
             power_plant,
             cooler,
-            missile,
-            armor,
-            clothing,
-            radar,
-            tractor_beam,
-            weapon_modifier,
-            mining_laser,
-            mining_modifier,
-            health: None,
+            blocks: ItemStatBlocks {
+                missile,
+                armor,
+                clothing,
+                radar,
+                tractor_beam,
+                weapon_modifier,
+                mining_laser,
+                mining_modifier,
+                health: None,
+            },
             resource_states,
         },
     };
     if !stats.has_specialist() {
         return Ok(None);
     }
-    stats.fields.health = health();
+    stats.fields.blocks.health = health();
     Ok(Some(stats))
 }

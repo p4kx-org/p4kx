@@ -52,11 +52,11 @@ const FIELDS: [(&str, &[&str]); 29] = [
     ("gpp_weapon_reloadspeed", &[]),
     (
         "gpp_itemresource_powergeneration",
-        &["powerPlant.powerOutput"],
+        &["resourceGeneration.Power"],
     ),
     (
         "gpp_itemresource_coolantgeneration",
-        &["cooler.coolingRate"],
+        &["resourceGeneration.Coolant"],
     ),
     ("gpp_shield_maxhealth", &["shield.maxHealth.value"]),
     (
@@ -134,6 +134,7 @@ fn source_blocks<'catalog>(
     let table = match block {
         "shield" => "/configurations/shieldGenerators/rows",
         "quantumDrive" => "/configurations/quantumDrives/rows",
+        "resourceGeneration" => "/configurations/resourceComponents/rows",
         _ => {
             return item["stats"]
                 .get(block)
@@ -154,6 +155,12 @@ fn source_blocks<'catalog>(
 
 fn item_reaches(catalog: &Value, item: &Value, path: &str) -> bool {
     let (block, fields) = path.split_once('.').unwrap_or((path, ""));
+    if block == "resourceGeneration" {
+        return crate::real_archive_resource_components::known_generation_amount(
+            catalog, item, fields,
+        )
+        .is_some();
+    }
     source_blocks(catalog, item, block)
         .into_iter()
         .any(|source| fields.is_empty() || reaches(source, fields))

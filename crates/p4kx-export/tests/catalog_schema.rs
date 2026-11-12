@@ -204,7 +204,6 @@ fn the_stat_blocks_accept_additions_and_new_closed_values_but_stay_required() ->
             "ammo": null,
             "extra": true
         },
-        "powerPlant": null, "cooler": null,
         "armor": null, "clothing": null, "radar": null, "tractorBeam": null,
         "weaponModifier": null, "miningLaser": null, "miningModifier": null,
         "missile": {
@@ -212,14 +211,7 @@ fn the_stat_blocks_accept_additions_and_new_closed_values_but_stay_required() ->
             "trackingSignalType": "NewSignal", "lockTime": null, "lockingAngle": null,
             "lockRangeMin": null, "lockRangeMax": null, "linearSpeed": null
         },
-        "health": 1.5, "extra": true,
-        "resourceStates": [{
-            "name": null, "emSignature": null, "irSignature": {"nominal": 1.0, "decayRate": null},
-            "flows": [{
-                "kind": "ItemResourceDeltaNew", "direction": "generation", "resource": "New",
-                "amount": 1.0, "unit": null
-            }]
-        }]
+        "health": 1.5, "extra": true
     });
     assert!(
         validator.is_valid(&stats),
@@ -227,7 +219,7 @@ fn the_stat_blocks_accept_additions_and_new_closed_values_but_stay_required() ->
     );
     let mut no_block = stats.clone();
     if let Some(block) = no_block["items"][0]["stats"].as_object_mut() {
-        block.remove("cooler");
+        block.remove("radar");
     }
     assert!(!validator.is_valid(&no_block), "every block is present");
     let mut no_action_field = stats.clone();

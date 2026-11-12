@@ -21,7 +21,7 @@ pub(crate) struct ItemStats<'a> {
     pub(crate) fields: ItemStatsFields<'a>,
 }
 
-/// Published item stat blocks, health and resource states.
+/// Published item stat blocks and health.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(rename = "ItemStats", transform = every_field_required)]
@@ -29,18 +29,25 @@ pub(crate) struct PublishedItemStats<'a> {
     /// The weapon block, from `SCItemWeaponComponentParams`.
     weapon: Option<WeaponStats<'a>>,
     #[serde(flatten)]
-    fields: ItemStatsFields<'a>,
+    fields: ItemStatBlocks<'a>,
 }
 
-/// Shared item stat fields in their serialization order after the device configurations.
+/// Remaining private variant identity fields in compact serialization order.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ItemStatsFields<'a> {
+    pub(crate) power_plant: Option<PowerPlantStats<'a>>,
+    pub(crate) cooler: Option<CoolerStats<'a>>,
+    #[serde(flatten)]
+    pub(crate) blocks: ItemStatBlocks<'a>,
+    pub(crate) resource_states: Vec<ResourceState<'a>>,
+}
+
+/// Shared specialist blocks in their public serialization order.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ItemStatsFields<'a> {
-    /// The power plant block, for an item of the type `PowerPlant`.
-    pub(crate) power_plant: Option<PowerPlantStats<'a>>,
-    /// The cooler block, for an item of the type `Cooler`.
-    pub(crate) cooler: Option<CoolerStats<'a>>,
+pub(crate) struct ItemStatBlocks<'a> {
     /// The missile block, from `SCItemMissileParams`.
     pub(crate) missile: Option<MissileStats<'a>>,
     /// The suit armour block, from `SCItemSuitArmorParams`.
@@ -62,8 +69,6 @@ pub(crate) struct ItemStatsFields<'a> {
     pub(crate) mining_modifier: Option<MiningModifierStats<'a>>,
     /// The hit points, from `SHealthComponentParams.Health`.
     pub(crate) health: Option<f32>,
-    /// The states of `ItemResourceComponentParams` in stored order: signatures and resource flows.
-    pub(crate) resource_states: Vec<ResourceState<'a>>,
 }
 
 impl<'a> ItemStats<'a> {
@@ -76,19 +81,21 @@ impl<'a> ItemStats<'a> {
 
     pub(crate) fn into_published(self) -> Option<PublishedItemStats<'a>> {
         let Self { weapon, fields, .. } = self;
-        (weapon.is_some()
-            || fields.has_specialist()
-            || fields.health.is_some()
-            || !fields.resource_states.is_empty())
-        .then_some(PublishedItemStats { weapon, fields })
+        let fields = fields.blocks;
+        (weapon.is_some() || fields.has_specialist() || fields.health.is_some())
+            .then_some(PublishedItemStats { weapon, fields })
     }
 }
 
 impl ItemStatsFields<'_> {
     const fn has_specialist(&self) -> bool {
-        self.power_plant.is_some()
-            || self.cooler.is_some()
-            || self.missile.is_some()
+        self.power_plant.is_some() || self.cooler.is_some() || self.blocks.has_specialist()
+    }
+}
+
+impl ItemStatBlocks<'_> {
+    const fn has_specialist(&self) -> bool {
+        self.missile.is_some()
             || self.armor.is_some()
             || self.clothing.is_some()
             || self.radar.is_some()

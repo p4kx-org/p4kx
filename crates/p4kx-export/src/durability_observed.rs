@@ -224,6 +224,13 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         )
     }
 
+    pub(super) fn array_ordinal(&self) -> Result<SourcedValue<u32>, CatalogError> {
+        let owner = self
+            .owner
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        super::item_component_owner::ComponentOwner::ordinal(self.originals, owner)
+    }
+
     pub(super) fn source_type_value(&self) -> Result<SourcedValue<&'source str>, CatalogError> {
         Ok(self.originals.sources().value(
             SourceValue::Present(self.source_type()?),

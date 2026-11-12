@@ -116,3 +116,14 @@ Commodity authoring links each original ResourceContainer slot to the canonical 
 first-entry presentation choice still reads the original authored order. Resolved loadouts
 join by the actual selected target Record index and keep one placement for each port.
 [Fuel and resource capacity](../catalog-fuel-capacity.md) specifies the field paths.
+
+## Catalog schema 3 resource components
+
+Under ADR-0356, one physical ItemResourceComponentParams occurrence owns
+its states, deltas and control settings. Resource-only items expose these
+facts independently of specialist statistics. The source delta supplies
+the pairing of input and output, original position and unit declarations.
+
+The compact power, coolant and flat state bytes remain private variant
+identity inputs. Consumer field mapping and the original ordering and
+numeric projection are documented in [Resource components](../catalog-resource-components.md).

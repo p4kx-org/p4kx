@@ -5,8 +5,8 @@ use serde_json::Value;
 
 use super::stats_digest;
 use crate::contract_stats::{
-    ItemStats, ItemStatsFields, PublishedItemStats, QuantumDriveStats, ResourceFlow, ResourceState,
-    ShieldStats, Signature, WeaponStats,
+    ItemStatBlocks, ItemStats, ItemStatsFields, PublishedItemStats, QuantumDriveStats,
+    ResourceFlow, ResourceState, ShieldStats, Signature, WeaponStats,
 };
 use crate::digest::Wide;
 
@@ -70,15 +70,17 @@ fn stats(
         fields: ItemStatsFields {
             power_plant: None,
             cooler: None,
-            missile: None,
-            armor: None,
-            clothing: None,
-            radar: None,
-            tractor_beam: None,
-            weapon_modifier: None,
-            mining_laser: None,
-            mining_modifier: None,
-            health: Some(450.0),
+            blocks: ItemStatBlocks {
+                missile: None,
+                armor: None,
+                clothing: None,
+                radar: None,
+                tractor_beam: None,
+                weapon_modifier: None,
+                mining_laser: None,
+                mining_modifier: None,
+                health: Some(450.0),
+            },
             resource_states: vec![ResourceState {
                 name: Some("Online"),
                 em_signature: Some(Signature {
@@ -134,7 +136,14 @@ fn published_stats_keep_fields_outside_device_configurations() -> TestResult {
     let published = stats(Some(shield()), Some(quantum()))
         .into_published()
         .ok_or("public stats still present")?;
-    let expected = format!("{WEAPON}{REMAINING}");
+    let expected = format!(
+        "{WEAPON}{}",
+        concat!(
+            r#","missile":null,"armor":null,"clothing":null,"radar":null,"#,
+            r#""tractorBeam":null,"weaponModifier":null,"miningLaser":null,"#,
+            r#""miningModifier":null,"health":450.0}"#,
+        )
+    );
     assert_eq!(
         serde_json::to_string(&published)?,
         expected,
