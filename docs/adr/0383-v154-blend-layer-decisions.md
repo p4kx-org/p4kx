@@ -23,3 +23,9 @@ child list and from any evaluated playback.
 The ordinary layout follows [wwiser's Layer reader](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L2020)
 and [StarBreaker's Blend reader](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/crates/starbreaker-wwise/src/hirc/containers.rs#L193).
 The raw marked custom bank versions fall outside the ordinary version gate. [wwiser custom version table](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wdefs.py).
+
+CLI and MCP ObjectView use the same checked cursors. Source fields include
+the original children, physical Layers and associations, complete initial
+RTPC curves and individually readable crossfade point words. Each value
+keeps its physical receipt. Association references carry unchecked
+resolution. MCP uses its existing whole-object response budget.

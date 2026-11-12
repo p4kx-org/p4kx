@@ -11,6 +11,8 @@ use serde::{Serialize, Serializer};
 
 use crate::bank::Bank;
 
+#[path = "hirc_blend_source.rs"]
+mod blend;
 #[path = "hirc_container_source_layout.rs"]
 mod container_layout;
 #[path = "hirc_dialogue_dto.rs"]
@@ -42,6 +44,7 @@ enum SourceFamily {
     Dialogue,
     RandomSequence,
     Switch,
+    Blend,
 }
 
 impl SourceFamily {
@@ -50,6 +53,7 @@ impl SourceFamily {
             Self::Dialogue => HircKind::DialogueEvent,
             Self::RandomSequence => HircKind::RandomSequenceContainer,
             Self::Switch => HircKind::SwitchContainer,
+            Self::Blend => HircKind::LayerContainer,
         }
     }
 
@@ -58,6 +62,7 @@ impl SourceFamily {
             Self::Dialogue => "bnkDialogueEvent",
             Self::RandomSequence => "bnkHircRandomSequence",
             Self::Switch => "bnkHircSwitchContainer",
+            Self::Blend => "bnkHircBlendContainer",
         }
     }
 
@@ -66,6 +71,7 @@ impl SourceFamily {
             Self::Dialogue => "dialogueExtent",
             Self::RandomSequence => "randomSequenceExtent",
             Self::Switch => "switchContainerExtent",
+            Self::Blend => "blendContainerExtent",
         }
     }
 }
@@ -84,6 +90,7 @@ impl<'bank> ObjectSourceFields<'bank> {
             HircKind::DialogueEvent => SourceFamily::Dialogue,
             HircKind::RandomSequenceContainer => SourceFamily::RandomSequence,
             HircKind::SwitchContainer => SourceFamily::Switch,
+            HircKind::LayerContainer => SourceFamily::Blend,
             _ => return None,
         };
         Some(Self {
@@ -124,6 +131,9 @@ fn project<R: Read + Seek, S: Serializer>(
         (BankHircSemantic::ContainerWithNode(container), SourceFamily::Switch) => {
             switch::serialize(serializer, origins, header, *container)
         }
+        (BankHircSemantic::ContainerWithNode(container), SourceFamily::Blend) => {
+            blend::serialize(serializer, origins, header, *container)
+        }
         (BankHircSemantic::Raw(object), family)
             if object.kind(header.header().version) == family.kind() =>
         {
@@ -135,6 +145,7 @@ fn project<R: Read + Seek, S: Serializer>(
                     random_sequence::unsupported(serializer, origins, header, &object)
                 }
                 SourceFamily::Switch => switch::unsupported(serializer, origins, header, &object),
+                SourceFamily::Blend => blend::unsupported(serializer, origins, header, &object),
             }
         }
         _ => Err(S::Error::custom(

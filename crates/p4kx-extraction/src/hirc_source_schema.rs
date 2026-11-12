@@ -5,6 +5,7 @@ use std::borrow::Cow;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 
+use super::blend::BlendSourceSchema;
 use super::dto::DialogueSourceSchema;
 use super::random_sequence::RandomSequenceSchema;
 use super::switch::SwitchSourceSchema;
@@ -21,6 +22,7 @@ impl JsonSchema for ObjectSourceSchema {
             generator.subschema_for::<DialogueSourceSchema>(),
             generator.subschema_for::<RandomSequenceSchema>(),
             generator.subschema_for::<SwitchSourceSchema>(),
+            generator.subschema_for::<BlendSourceSchema>(),
         ];
         schemars::json_schema!({ "anyOf": alternatives })
     }

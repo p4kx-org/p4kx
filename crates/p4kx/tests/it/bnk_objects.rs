@@ -14,6 +14,8 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+#[path = "bnk_blend_source_fields.rs"]
+mod blend_source_fields;
 #[path = "bnk_dialogue_source_fields.rs"]
 mod dialogue_source_fields;
 #[path = "bnk_random_sequence_source_fields.rs"]

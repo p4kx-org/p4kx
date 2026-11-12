@@ -1720,6 +1720,13 @@ retains its signed value and original 32-bit word. A readable member remains vis
 when the declared membership table is truncated. Known group codes identify Switch or
 State. Membership references carry unchecked resolution.
 
+Version-154 Blend objects include `source_fields` with original children, Layer and
+association counts, crossfade RTPC selectors and the continuous-validation byte.
+Rows carry physical Layer, curve, association and point positions. Initial RTPC data
+includes its checked complete curves. Crossfade points keep each readable binary32
+word and the original interpolation code. Association references carry unchecked
+resolution. Unknown and non-finite words remain available.
+
 Other object details:
 
 - `state`: standalone State versions 128 through 145 expose `property_count`, `count_range`,
