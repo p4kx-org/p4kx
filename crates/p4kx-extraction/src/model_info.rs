@@ -244,10 +244,17 @@ impl<'a> BoneInfo<'a> {
     /// Describes the bones of `model`.
     #[must_use]
     pub fn of_model(model: &'a Model) -> Vec<Self> {
-        model.bones.iter().enumerate().map(Self::of).collect()
+        model
+            .bones
+            .iter()
+            .enumerate()
+            .map(|(index, bone)| Self::of_bone(index, bone))
+            .collect()
     }
 
-    fn of((index, bone): (usize, &'a Bone)) -> Self {
+    /// Describes the selected original bone at its model ordinal.
+    #[must_use]
+    pub fn of_bone(index: usize, bone: &'a Bone) -> Self {
         Self {
             index,
             name: &bone.name,

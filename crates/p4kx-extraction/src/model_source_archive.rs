@@ -190,6 +190,9 @@ impl ModelSource {
         if !matches!(coordinates, Coordinates::Skip) {
             if let Some(primary) = archive_sources.first_mut() {
                 primary.set_node_sources(observed.nodes);
+                if let Some(selection) = observed.primary_skeleton {
+                    primary.set_primary_skeleton(selection);
+                }
             }
             for skeleton in observed.skeletons {
                 if let Some(source) = archive_sources

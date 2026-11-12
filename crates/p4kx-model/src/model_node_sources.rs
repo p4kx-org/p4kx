@@ -7,7 +7,7 @@ use p4kx_chunks::{ChunkFile, Container};
 
 use crate::{
     CompanionResolver, LodSelection, MaterialReading, Model, ModelBoneSources, ModelError, Node,
-    PositionBox,
+    PositionBox, PrimarySkeletonSelection,
 };
 use crate::{build, crch};
 
@@ -19,12 +19,15 @@ pub struct ModelReadSources {
     pub nodes: ModelNodeSources,
     /// Skeleton fields keyed by the file actually read.
     pub skeletons: Vec<ModelBoneSources>,
+    /// The survey of the primary file's skeleton selection.
+    pub primary_skeleton: Option<PrimarySkeletonSelection>,
 }
 
 #[derive(Default)]
 pub(crate) struct ReadCapture<'a> {
     pub(crate) nodes: Option<&'a mut ModelNodeSources>,
     pub(crate) skeletons: Option<&'a mut Vec<ModelBoneSources>>,
+    pub(crate) primary_skeleton: Option<&'a mut Option<PrimarySkeletonSelection>>,
 }
 
 /// Coordinates from the primary file of one successfully decoded model.
@@ -133,6 +136,7 @@ impl Model {
             ReadCapture {
                 nodes: Some(&mut captured),
                 skeletons: None,
+                primary_skeleton: None,
             },
         )?;
         *sources = captured;
@@ -164,6 +168,7 @@ impl Model {
             ReadCapture {
                 nodes: Some(&mut captured.nodes),
                 skeletons: Some(&mut captured.skeletons),
+                primary_skeleton: Some(&mut captured.primary_skeleton),
             },
         )?;
         *sources = captured;
@@ -190,6 +195,11 @@ pub(crate) fn read<B: AsRef<[u8]>>(
             position_box,
             sources,
         ),
-        Container::CrCh => crch::build(name, file, companions, lods, materials, sources.nodes),
+        Container::CrCh => {
+            if let Some(selection) = sources.primary_skeleton {
+                *selection = Some(PrimarySkeletonSelection::ContainerOnly);
+            }
+            crch::build(name, file, companions, lods, materials, sources.nodes)
+        }
     }
 }

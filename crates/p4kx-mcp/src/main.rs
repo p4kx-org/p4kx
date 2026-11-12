@@ -53,6 +53,7 @@ mod material_origin;
 mod material_shape;
 mod material_shapes;
 mod material_tools;
+mod model_bone_items;
 mod model_params;
 mod model_shapes;
 mod model_tools;

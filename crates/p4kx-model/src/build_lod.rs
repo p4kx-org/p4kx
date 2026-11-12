@@ -44,7 +44,8 @@ fn level_skeleton(
         });
     };
     let mut read = Vec::new();
-    let bones = skeleton_source::read_model_skeleton(&file_name, &file, which, &mut read, sources)?;
+    let bones =
+        skeleton_source::read_model_skeleton(&file_name, &file, which, &mut read, sources, None)?;
     chunks.extend(build::usage(&file, which, &read));
     let origin = if read.is_empty() {
         LodSkeletonOrigin::NoSkeleton

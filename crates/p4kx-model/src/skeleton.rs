@@ -26,16 +26,18 @@ pub(crate) fn read_bones(
     let record_start = reader.offset();
     let entries = reader.read_bytes(count.saturating_mul(ENTRY_LEN))?;
     let names_start = reader.offset();
-    let parent_start = record_start + PARENT_AT as u64;
+    let relative_start = record_start + PARENT_AT as u64 + size_of::<u32>() as u64;
     let capture = sources.map(|sources| NameCapture {
         sources,
         fields: BoneFields {
             names_start,
-            parent_start,
+            records_start: record_start,
+            record_stride: ENTRY_LEN,
             parent_width: size_of::<u32>() as u64,
-            parent_stride: ENTRY_LEN,
-            relative_start: parent_start + size_of::<u32>() as u64,
-            relative_stride: ENTRY_LEN,
+            node: false,
+            relative_start,
+            world_start: relative_start + POSE_LEN as u64,
+            pose_stride: ENTRY_LEN,
         },
     });
     let names = names(reader.read_bytes(reader.remaining())?, count, capture)?;
@@ -76,15 +78,18 @@ pub(crate) fn read_compact_bones(
     let records = reader.read_bytes(count.saturating_mul(COMPACT_RECORD_LEN))?;
     let names_start = reader.offset();
     let name_bytes = reader.read_bytes(names_len)?;
+    let relative_start = reader.offset();
     let capture = sources.map(|sources| NameCapture {
         sources,
         fields: BoneFields {
             names_start,
-            parent_start: record_start + PARENT_AT as u64,
+            records_start: record_start,
+            record_stride: COMPACT_RECORD_LEN,
             parent_width: size_of::<u16>() as u64,
-            parent_stride: COMPACT_RECORD_LEN,
-            relative_start: reader.offset(),
-            relative_stride: POSE_LEN,
+            node: true,
+            relative_start,
+            world_start: relative_start + count as u64 * POSE_LEN as u64,
+            pose_stride: POSE_LEN,
         },
     });
     let names = names(name_bytes, count, capture)?;
@@ -164,25 +169,33 @@ fn parent_index(parent: i32, bones: usize, bone: usize) -> Result<Option<usize>,
 
 struct BoneFields {
     names_start: u64,
-    parent_start: u64,
+    records_start: u64,
+    record_stride: usize,
     parent_width: u64,
-    parent_stride: usize,
+    node: bool,
     relative_start: u64,
-    relative_stride: usize,
+    world_start: u64,
+    pose_stride: usize,
 }
 
 impl BoneFields {
     fn observe(&mut self, sources: &mut ModelBoneSources, ordinal: usize, name_extent: usize) {
         let name_start = sources.start + self.names_start;
         self.names_start += name_extent as u64;
-        let parent_start =
-            sources.start + self.parent_start + (ordinal * self.parent_stride) as u64;
-        let pose_start =
-            sources.start + self.relative_start + (ordinal * self.relative_stride) as u64;
+        let record = sources.start + self.records_start + (ordinal * self.record_stride) as u64;
+        let parent = record + PARENT_AT as u64;
+        let node = record + NODE_AT as u64;
+        let pose = |start| {
+            let offset = sources.start + start + (ordinal * self.pose_stride) as u64;
+            offset..offset + POSE_LEN as u64
+        };
         sources.fields.push(ModelBoneSource {
             name: name_start..sources.start + self.names_start,
-            parent: parent_start..parent_start + self.parent_width,
-            relative: pose_start..pose_start + POSE_LEN as u64,
+            parent: parent..parent + self.parent_width,
+            controller: record..record + size_of::<u32>() as u64,
+            node: self.node.then_some(node..node + size_of::<u16>() as u64),
+            relative: pose(self.relative_start),
+            world: pose(self.world_start),
         });
     }
 }

@@ -105,7 +105,11 @@ pub(crate) struct LodShape {
 
 /// One page of a section of a model.
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct ModelItemsResult {
+#[schemars(extend("allOf" = [{
+    "if": { "properties": { "section": { "const": "bones" } }, "required": ["section"] },
+    "then": { "required": ["fieldOrigins", "provenance"] }
+}]))]
+pub(crate) struct ModelItemsResult<Items = Vec<Value>> {
     /// The path of the Archive.
     pub(crate) archive: String,
     /// The Entry path of the model.
@@ -117,8 +121,17 @@ pub(crate) struct ModelItemsResult {
     /// The items on this page, each as `p4kx model info --json` shows it in the section of the
     /// same name.
     #[schemars(with = "Vec<Value>")]
-    pub(crate) items: Vec<Value>,
+    pub(crate) items: Items,
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: Option<ModelItemOrigins>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub(crate) struct ModelItemOrigins {
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    pub(crate) provenance: SourceInventory,
 }

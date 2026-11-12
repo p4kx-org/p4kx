@@ -5,7 +5,7 @@ use std::ops::Range;
 
 use p4kx_extraction::cryxml::XmlWriteField;
 use p4kx_extraction::{
-    Archive, CryXmlFieldUses, Entry, EntryBytes, FieldOrigin, InputScope, ObservedEntry,
+    Archive, CryXmlFieldUses, Entry, EntryBytes, EntryOrigin, FieldOrigin, InputScope,
     SourceEvidenceError, SourceInput, SourceInventory, SourceLocation, SourceScope, SourceUse,
     SourceUseRole, SourceUses,
 };
@@ -100,10 +100,32 @@ impl EntryPageSources {
     ) -> Result<Self, SourceEvidenceError> {
         let observed = archive.observed_entry(entry);
         let input = observed.map_or(SourceInput::Unknown, SourceInput::ArchiveView);
-        let payload = uses.observe(input, InputScope::Payload)?;
+        let ancestors = observed.map_or(0, |entry| entry.ancestors().len());
         let complete = observed.is_some_and(|entry| entry.ancestors().all(|step| step.is_some()));
+        Self::bind(uses, input, ancestors, complete)
+    }
+
+    pub(crate) fn from_origin(origin: Option<&EntryOrigin>) -> Result<Self, SourceEvidenceError> {
+        let input = origin.map_or(SourceInput::Unknown, SourceInput::Archive);
+        let ancestors = origin.map_or(0, |entry| entry.ancestors().len());
+        let complete = origin.is_some_and(|entry| entry.ancestors().all(|step| step.is_some()));
+        Self::bind(
+            SourceUses::with_compact_use_refs(),
+            input,
+            ancestors,
+            complete,
+        )
+    }
+
+    fn bind(
+        uses: SourceUses,
+        input: SourceInput<'_>,
+        ancestors: usize,
+        complete: bool,
+    ) -> Result<Self, SourceEvidenceError> {
+        let payload = uses.observe(input, InputScope::Payload)?;
         let directory = payload.for_scope(InputScope::ArchiveDirectoryMetadata);
-        let path = path_origin(&uses, &directory, observed.as_ref(), complete)?;
+        let path = path_origin(&uses, &directory, ancestors, complete)?;
         Ok(Self {
             uses,
             path,
@@ -170,11 +192,11 @@ impl EntryPageSources {
 fn path_origin(
     uses: &SourceUses,
     directory: &SourceScope,
-    observed: Option<&ObservedEntry<'_>>,
+    ancestors: usize,
     mut complete: bool,
 ) -> Result<FieldOrigin, SourceEvidenceError> {
     let mut path = Vec::new();
-    for index in 0..observed.map_or(0, |entry| entry.ancestors().len()) {
+    for index in 0..ancestors {
         if let Some(ancestor) = directory.ancestor(index)? {
             path.push(ancestor.at(metadata("path"), SourceUseRole::Payload)?);
         } else {

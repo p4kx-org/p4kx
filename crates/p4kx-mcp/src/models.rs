@@ -3,22 +3,22 @@
 
 use p4kx_extraction::model::{LodSelection, MaterialReading, PositionBox};
 use p4kx_extraction::{
-    AnimationChoice, AnimationInfo, AnimationSet, BoneInfo, ChunkInfo, ConversionError,
-    LibraryInfo, LodInfo, MaterialInfo, MeshInfo, ModelSource, NodeInfo, TextureVerdicts,
-    UnreadInfo,
+    AnimationChoice, AnimationInfo, AnimationSet, ChunkInfo, ConversionError, LibraryInfo, LodInfo,
+    MaterialInfo, MeshInfo, ModelSource, NodeInfo, TextureVerdicts, UnreadInfo,
 };
 use serde::Serialize;
 
 use crate::archives::Opened;
 use crate::budget::{MAX_RESPONSE_LEN, fill_within, json_len};
 use crate::error::ToolError;
+use crate::model_bone_items;
 use crate::model_params::Section;
 use crate::model_shapes::{LodShape, ModelCounts, ModelItemsResult, ModelOverview};
 use crate::page::Page;
 
 /// Returns the summary of the model Entry at `path`.
 pub(crate) fn overview(opened: &Opened, path: &str) -> Result<ModelOverview, ToolError> {
-    let (source, animations) = read(opened, path, true)?;
+    let (source, animations) = read(opened, path, ModelRead::Overview)?;
     let model = source.model();
     let library = serde_json::to_value(LibraryInfo::of(model))?;
     let overview = ModelOverview {
@@ -70,7 +70,7 @@ pub(crate) fn items(
     section: Section,
     page: Page,
 ) -> Result<ModelItemsResult, ToolError> {
-    let (source, animations) = read(opened, path, section.needs_animations())?;
+    let (source, animations) = read(opened, path, ModelRead::Section(section))?;
     let model = source.model();
     let what = section.name();
     let reserved = envelope_len(opened, source.name(), what);
@@ -98,9 +98,7 @@ pub(crate) fn items(
                 .collect();
             paged(&meshes, page, what, reserved, |item| item)?
         }
-        Section::Bones => paged(&BoneInfo::of_model(model), page, what, reserved, |item| {
-            item
-        })?,
+        Section::Bones => return model_bone_items::list(opened, &source, page, reserved),
         Section::Animations => {
             let read: Vec<_> = animations
                 .animations
@@ -125,6 +123,7 @@ pub(crate) fn items(
         total,
         items,
         next_cursor,
+        origins: None,
     })
 }
 
@@ -163,13 +162,24 @@ fn paged<'a, T, U: Serialize>(
     Ok((items.len(), values, next))
 }
 
+#[derive(Clone, Copy)]
+enum ModelRead {
+    Overview,
+    Section(Section),
+}
+
 fn read(
     opened: &Opened,
     path: &str,
-    with_animations: bool,
+    request: ModelRead,
 ) -> Result<(ModelSource, AnimationSet), ToolError> {
     let index = opened.index();
-    let source = ModelSource::from_index_reading(
+    let load = if matches!(request, ModelRead::Section(Section::Bones)) {
+        ModelSource::from_index_observing_model_sources
+    } else {
+        ModelSource::from_index_reading
+    };
+    let source = load(
         &index,
         path,
         LodSelection::All,
@@ -178,6 +188,10 @@ fn read(
         &TextureVerdicts::new(),
     )
     .map_err(|error| converted(path, "a model", error))?;
+    let with_animations = match request {
+        ModelRead::Overview => true,
+        ModelRead::Section(section) => section.needs_animations(),
+    };
     let animations = if with_animations {
         AnimationSet::from_archive(&index, source.name(), &AnimationChoice::All, &[])
             .map_err(|error| converted(path, "a model with its animations", error))?

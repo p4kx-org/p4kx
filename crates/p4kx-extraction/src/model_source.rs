@@ -192,6 +192,12 @@ impl ModelSource {
         cache.library(path, &mut companions, budget)
     }
 
+    /// Returns the actual model and companion Entry observations.
+    #[must_use]
+    pub fn archive_sources(&self) -> &[ModelArchiveSource] {
+        &self.archive_sources
+    }
+
     /// Returns the model, giving up the source.
     #[must_use]
     pub fn into_model(self) -> Model {

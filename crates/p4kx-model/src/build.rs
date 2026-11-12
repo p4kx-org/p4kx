@@ -56,6 +56,7 @@ pub(crate) fn build<B: AsRef<[u8]>>(
         ModelFile::Model,
         &mut read,
         capture.skeletons.as_deref_mut(),
+        capture.primary_skeleton,
     )?;
     let rig = Rig {
         nodes: nodes.as_ref().map(Vec::len),

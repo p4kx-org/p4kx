@@ -10,7 +10,7 @@ use crate::controller_binding::{BoneControllers, ControllerBinder};
 use crate::skeleton::{
     COMPACT_HEADER_LEN, COMPACT_RECORD_LEN, ENTRY_LEN, read_bones, read_compact_bones,
 };
-use crate::{Bone, ModelBoneSources, ModelError, ModelFile};
+use crate::{Bone, ModelBoneSources, ModelError, ModelFile, PrimarySkeletonSelection};
 
 /// An admitted primary skeleton and its original controller table positions.
 #[derive(Debug)]
@@ -79,13 +79,23 @@ pub(crate) fn read_model_skeleton<B: AsRef<[u8]>>(
     which: ModelFile,
     read: &mut Vec<(ModelFile, usize)>,
     sources: Option<&mut Vec<ModelBoneSources>>,
+    primary_selection: Option<&mut Option<PrimarySkeletonSelection>>,
 ) -> Result<Vec<Bone>, ModelError> {
-    let Some(chunk) = SkeletonChunk::primary(file) else {
+    let selected = SkeletonChunk::primary(file);
+    if let Some(selection) = primary_selection {
+        let examined = match &selected {
+            Some(chunk) if matches!(chunk.layout, Layout::Compiled2) => chunk.index + 1,
+            _ => file.chunks().len(),
+        };
+        *selection = Some(PrimarySkeletonSelection::chunk_table(file, examined));
+    }
+    let Some(chunk) = selected else {
         return Ok(Vec::new());
     };
     read.push((which, chunk.index));
     if let Some(sources) = sources {
-        let mut skeleton = ModelBoneSources::new(which, chunk.index, chunk.start);
+        let mut skeleton =
+            ModelBoneSources::new(which, chunk.index, chunk.start, file.table_row(chunk.index));
         let bones = chunk.bones(name, Some(&mut skeleton))?;
         sources.push(skeleton);
         Ok(bones)

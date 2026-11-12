@@ -4,7 +4,10 @@
 use std::sync::Arc;
 
 use p4kx_archive::EntryOrigin;
-use p4kx_model::{ChunkUsage, Model, ModelBoneSources, ModelFile, ModelIssue, ModelNodeSources};
+use p4kx_model::{
+    ChunkUsage, Model, ModelBoneSources, ModelFile, ModelIssue, ModelNodeSources,
+    PrimarySkeletonSelection,
+};
 
 /// One admitted model or companion Entry and its interpreted file role.
 #[derive(Debug, Clone)]
@@ -13,6 +16,7 @@ pub struct ModelArchiveSource {
     origin: Option<EntryOrigin>,
     nodes: Option<Arc<ModelNodeSources>>,
     bones: Option<Arc<ModelBoneSources>>,
+    primary_skeleton: Option<PrimarySkeletonSelection>,
 }
 
 impl ModelArchiveSource {
@@ -22,6 +26,7 @@ impl ModelArchiveSource {
             origin,
             nodes: None,
             bones: None,
+            primary_skeleton: None,
         }
     }
 
@@ -31,6 +36,16 @@ impl ModelArchiveSource {
 
     pub(crate) fn set_bone_sources(&mut self, bones: ModelBoneSources) {
         self.bones = Some(Arc::new(bones));
+    }
+
+    pub(crate) const fn set_primary_skeleton(&mut self, selection: PrimarySkeletonSelection) {
+        self.primary_skeleton = Some(selection);
+    }
+
+    /// Returns the original primary skeleton survey when it was observed.
+    #[must_use]
+    pub const fn primary_skeleton(&self) -> Option<&PrimarySkeletonSelection> {
+        self.primary_skeleton.as_ref()
     }
 
     /// Returns this file's optional original skeleton coordinates.
