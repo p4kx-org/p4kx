@@ -13,50 +13,48 @@ use crate::starmap_containers::proof::ChildOrigins;
 use crate::starmap_report::clip;
 use crate::starmap_xml::{Node, Root, attribute, first_below, pose};
 
-/// Reads the existing first Child list with the actual parse receiving external-path selections.
+/// Reads direct Child lists in source order, with the legacy wrapped-list fallback.
 pub(super) fn level(
     node: Root<'_>,
     depth: usize,
     bounds: &Bounds,
     xml: &EntryXml<'_, '_, '_>,
 ) -> Result<Level, CatalogError> {
-    let Some(list) = first_below(node, CHILDREN) else {
-        return Ok(Level::default());
-    };
-    let extra_lists = node
+    let mut direct = node
         .children()
-        .filter(|sibling| sibling.name().eq_ignore_ascii_case(CHILDREN))
-        .nth(1)
-        .is_some();
+        .filter(|section| section.name().eq_ignore_ascii_case(CHILDREN))
+        .peekable();
+    let fallback = if direct.peek().is_none() {
+        first_below(node, CHILDREN)
+    } else {
+        None
+    };
+    let mut lists = direct.chain(fallback);
+    let mut level = Level::default();
     if depth >= bounds.depth {
-        return Ok(Level {
-            capped: list
-                .children()
-                .any(|child| child.name().eq_ignore_ascii_case(CHILD)),
-            extra_lists,
-            ..Level::default()
+        level.capped = lists.any(|list| {
+            list.children()
+                .any(|child| child.name().eq_ignore_ascii_case(CHILD))
         });
+        return Ok(level);
     }
-    let list_source = xml.node_source(list)?;
-    let mut children = Vec::new();
-    let mut truncated = false;
-    for child in list.children() {
-        let name = xml.name(child)?;
-        if !name.as_str().eq_ignore_ascii_case(CHILD) {
-            continue;
+    for list in lists {
+        let list_source = xml.node_source(list)?;
+        for child in list.children() {
+            let name = xml.name(child)?;
+            if !name.as_str().eq_ignore_ascii_case(CHILD) {
+                continue;
+            }
+            if !bounds.take() {
+                level.truncated = true;
+                return Ok(level);
+            }
+            level
+                .children
+                .push(read_child(child, &name, &list_source, depth, bounds, xml)?);
         }
-        if !bounds.take() {
-            truncated = true;
-            break;
-        }
-        children.push(read_child(child, &name, &list_source, depth, bounds, xml)?);
     }
-    Ok(Level {
-        children,
-        capped: false,
-        extra_lists,
-        truncated,
-    })
+    Ok(level)
 }
 
 fn read_child(

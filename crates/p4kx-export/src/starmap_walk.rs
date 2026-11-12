@@ -286,11 +286,6 @@ impl<'a> System<'a> {
             self.skipped(&format!("{label}: Children nested deeper than {limit}"));
             return Ok(());
         }
-        if level.extra_lists {
-            self.issue(&format!(
-                "{label}: more than one ChildObjectContainers, only the first is read"
-            ));
-        }
         for child in &level.children {
             if self.budget == 0 {
                 let limit = self.limits.children;

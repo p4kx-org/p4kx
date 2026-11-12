@@ -50,9 +50,8 @@ impl StarmapReport {
     }
 
     /// One line per container, placement or limit that left objects without a position, with
-    /// the reason, up to 300 per star system; also the containers read from a fallback XML and
-    /// the elements with a second child list. A missing or unreadable container is counted once
-    /// per Child that names it, not once per distinct container.
+    /// the reason, up to 300 per star system, and the containers read from a fallback XML.
+    /// A missing or unreadable container is counted once per Child that names it.
     #[must_use]
     pub fn issues(&self) -> &[String] {
         &self.issues

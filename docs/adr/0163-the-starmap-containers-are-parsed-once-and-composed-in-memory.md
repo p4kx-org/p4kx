@@ -30,8 +30,9 @@ container on the chain (up to 128 MiB each) was held at once. Only the systems r
   accepts `1` and `true`. Existing exact root Archive matches take priority. For
   other declarations the shared lookup tries the written path, optional `.socpak`
   extension, and root Archive prefixes used by interior assembly.
-- **A second `ChildObjectContainers` is reported.** Only the first list of an element is read;
-  when its direct siblings hold another one, an issue line says so. The positions are unchanged.
+- **Read every direct `ChildObjectContainers` list in document order.** Each `Child` keeps
+  its actual owning list. The legacy wrapped-list fallback applies when the element has
+  no direct list.
 - **Type names are read once.** `TypeNames` caches the name of each type Record by GUID for the
   parallel scan.
 - **`StarmapReport` stays public, read-only.** Its lines are diagnostics for the real-Archive

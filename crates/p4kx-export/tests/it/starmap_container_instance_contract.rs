@@ -208,6 +208,8 @@ fn catalog(
             <Child pos="10,0,0" rot="0.7071067811865475,0,0,0.7071067811865475">
               <ChildObjectContainers><Child external="1" name="{TILE}" pos="2,0,0" rot="2,0,0,0"/></ChildObjectContainers>
             </Child>
+          </ChildObjectContainers>
+          <ChildObjectContainers>
             <Child external="1" name="{TILE}" pos="100,0,0"/>
             <Child external="1" name="{MISSING}"/>
           </ChildObjectContainers>

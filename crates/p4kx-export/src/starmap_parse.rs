@@ -53,8 +53,6 @@ pub(crate) struct Level {
     pub(crate) children: Vec<Child>,
     /// The list lies beyond the depth limit and was not read.
     pub(crate) capped: bool,
-    /// The element holds more than one `ChildObjectContainers`; only the first was read.
-    pub(crate) extra_lists: bool,
     /// The list holds more Children than the budget of the parse allowed; the rest was not read.
     pub(crate) truncated: bool,
 }
@@ -167,7 +165,7 @@ struct SourceLoss {
 }
 
 fn source_loss(level: &Level) -> SourceLoss {
-    let inventory = level.capped || level.truncated || level.extra_lists;
+    let inventory = level.capped || level.truncated;
     let mut loss = SourceLoss {
         projection: inventory,
         inventory,

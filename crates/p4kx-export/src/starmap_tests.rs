@@ -320,22 +320,48 @@ fn a_container_without_the_main_xml_name_is_read_and_reported() {
 }
 
 #[test]
-fn a_second_child_list_is_reported() {
+fn all_direct_child_lists_are_read_in_document_order() {
     let dir = tempfile::tempdir().expect("a directory");
     let xml = TestElement::new("ObjectContainer")
         .child(TestElement::new("ChildObjectContainers").child(child("1,0,0", 1)))
-        .child(TestElement::new("ChildObjectContainers").child(child("2,0,0", 2)))
+        .child(
+            TestElement::new("ChildObjectContainers")
+                .child(child("1.001,0,0", 1))
+                .child(child("2,0,0", 2)),
+        )
+        .child(
+            TestElement::new("Wrapper")
+                .child(TestElement::new("ChildObjectContainers").child(child("3,0,0", 3))),
+        )
         .to_xml();
     let placements = read(dir.path(), system(&xml, &[]), Limits::default());
-    assert!(placed(&placements, 1).is_some(), "the first list is read");
-    assert_eq!(placed(&placements, 2), None, "the second is not");
-    assert!(
-        placements
-            .report
-            .issues
-            .iter()
-            .any(|line| line.contains("more than one ChildObjectContainers")),
-        "an issue line"
+    assert_eq!(
+        placed(&placements, 1),
+        Some([1.0, 0.0, 0.0]),
+        "the first direct list wins for an equivalent repeated position"
+    );
+    assert_eq!(
+        placed(&placements, 2),
+        Some([2.0, 0.0, 0.0]),
+        "the second direct list supplies its authored position"
+    );
+    assert_eq!(placed(&placements, 3), None, "direct list ownership wins");
+}
+
+#[test]
+fn a_legacy_wrapped_child_list_is_read_when_there_is_no_direct_list() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let xml = TestElement::new("ObjectContainer")
+        .child(
+            TestElement::new("Wrapper")
+                .child(TestElement::new("ChildObjectContainers").child(child("1,0,0", 1))),
+        )
+        .to_xml();
+    let placements = read(dir.path(), system(&xml, &[]), Limits::default());
+    assert_eq!(
+        placed(&placements, 1),
+        Some([1.0, 0.0, 0.0]),
+        "a wrapped list is the fallback when no direct list exists"
     );
 }
 
