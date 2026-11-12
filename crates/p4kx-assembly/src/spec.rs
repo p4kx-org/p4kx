@@ -8,6 +8,7 @@ use p4kx_dataforge::{Guid, RecordTree, StructValue};
 
 use crate::LoadoutXmlClassUse;
 use crate::armour::{ZoneList, read_zones};
+use crate::geometry::GeometryComponent;
 use crate::loadout_path::PathRead;
 use crate::loadout_reference::LoadoutReference;
 use crate::loadout_xml_use::XmlRoute;
@@ -125,7 +126,6 @@ pub(crate) struct EntitySpec {
     pub(crate) loadout: Option<LoadoutSpec>,
     pub(crate) outfit: Option<OutfitInfo>,
     pub(crate) geometry: Option<Geometry>,
-    pub(crate) geometry_component: Option<usize>,
     pub(crate) variants: Vec<GeometryVariant>,
     pub(crate) vehicle: Option<VehicleSpec>,
     pub(crate) docked_vehicle: bool,
@@ -154,9 +154,14 @@ impl EntitySpec {
         }
         let geometry_component =
             component_slots(tree).find(|(_, component)| component.type_name() == GEOMETRY_RESOURCE);
-        let geometry = geometry_component.and_then(|(_, component)| Geometry::read(component));
+        let position = |ordinal| GeometryComponent {
+            record: tree.record_index(),
+            ordinal,
+        };
+        let geometry = geometry_component
+            .and_then(|(ordinal, component)| Geometry::read(component, position(ordinal)));
         let variants = geometry_component
-            .map(|(_, component)| Geometry::read_variants(component))
+            .map(|(ordinal, component)| Geometry::read_variants(component, position(ordinal)))
             .unwrap_or_default();
         let vehicle = components
             .iter()
@@ -194,7 +199,6 @@ impl EntitySpec {
             loadout,
             outfit,
             geometry,
-            geometry_component: geometry_component.map(|(position, _)| position),
             variants,
             vehicle,
         }
@@ -301,10 +305,15 @@ fn components_of<'v, 'f>(tree: &'v RecordTree<'f>) -> Vec<&'v StructValue<'f>> {
 
 /// Reads the main geometry an Entity Record names, without its ports and Loadout.
 pub(crate) fn read_geometry(tree: &RecordTree<'_>) -> Option<Geometry> {
-    components_of(tree)
-        .into_iter()
-        .find(|component| component.type_name() == GEOMETRY_RESOURCE)
-        .and_then(|component| Geometry::read(component))
+    let (ordinal, component) =
+        component_slots(tree).find(|(_, component)| component.type_name() == GEOMETRY_RESOURCE)?;
+    Geometry::read(
+        component,
+        GeometryComponent {
+            record: tree.record_index(),
+            ordinal,
+        },
+    )
 }
 
 /// Reads what an Entity Record offers a port, with its class name taken from `name`.

@@ -8,7 +8,7 @@ use p4kx_extraction::SourceLocation;
 
 use super::hidden;
 use super::piece::{Mount, Note, Source};
-use super::wearable::{GeometryField, Unfit, Worn};
+use super::wearable::{Unfit, Worn};
 use super::{BodyVariant, Expressions, Look, PartOrigin, Piece, Wearable, ZoneChunk};
 use crate::bespoke::{Bespoke, exists, missing_library};
 use crate::{Issue, IssueKind, MaterialVariant, ModelProvider, PaletteRef};
@@ -209,16 +209,11 @@ fn select_wearable(
         let body = variant.code().to_owned();
         issues.push(piece_issue(piece, IssueKind::MainGeometryWorn { body }));
     }
-    let material = chosen_material(piece, wearable, variant, geometry.material());
-    let material_selector = if piece.variant_tags.is_empty() && material.is_some() {
-        wearable.geometry_field(worn, GeometryField::MaterialPath)
-    } else {
-        None
-    };
+    let (material, material_selector) = chosen_material(piece, wearable, variant, geometry);
     Some(Selected {
         path: geometry.path().to_owned(),
         material,
-        geometry_selector: wearable.geometry_field(worn, GeometryField::Path),
+        geometry_selector: geometry.model_field(),
         material_selector,
         palette: geometry.palette().cloned(),
     })
@@ -251,16 +246,19 @@ fn chosen_material(
     piece: &Piece,
     wearable: &Wearable,
     variant: BodyVariant,
-    geometry: Option<&str>,
-) -> Option<String> {
-    if piece.variant_tags.is_empty() {
-        return geometry.map(str::to_owned);
+    geometry: &crate::Geometry,
+) -> (Option<String>, Option<SourceLocation>) {
+    if !piece.variant_tags.is_empty() {
+        let mut tags = piece.variant_tags.clone();
+        tags.push(variant.tag().to_owned());
+        if let Some(path) = MaterialVariant::resolve(wearable.material_variants(), &tags) {
+            return (Some(path.to_owned()), None);
+        }
     }
-    let mut tags = piece.variant_tags.clone();
-    tags.push(variant.tag().to_owned());
-    MaterialVariant::resolve(wearable.material_variants(), &tags)
-        .or(geometry)
-        .map(str::to_owned)
+    (
+        geometry.material().map(str::to_owned),
+        geometry.material_field(),
+    )
 }
 
 /// Gives the body job, the first of `jobs`, the material library and the look of the

@@ -25,7 +25,7 @@ impl LoadoutResolver<'_> {
         };
         if let Some(main) = &child.geometry {
             if tagged.material.is_none() {
-                tagged.material.clone_from(&main.material);
+                tagged.inherit_material(main);
             }
             if tagged.palette.is_none() {
                 tagged.palette.clone_from(&main.palette);
@@ -133,13 +133,8 @@ mod tests {
 
     fn variant(tags: &str, path: &str) -> GeometryVariant {
         GeometryVariant {
-            source_slots: Vec::new(),
             tags: tags.split_whitespace().map(str::to_owned).collect(),
-            geometry: Geometry {
-                path: path.to_owned(),
-                material: None,
-                palette: None,
-            },
+            geometry: Geometry::fixture(path),
         }
     }
 

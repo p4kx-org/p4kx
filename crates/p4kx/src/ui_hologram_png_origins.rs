@@ -100,15 +100,17 @@ fn scene_inputs(
         } else {
             SourceUseRole::Conversion
         };
-        let (models, definition, materials, index) = match piece.source() {
+        let (models, definition, materials, material_owner, index) = match piece.source() {
             AssemblyPieceSource::Part(index) => {
                 let Some(part) = assembly.parts().get(index) else {
                     continue;
                 };
+                authored_selector(projection, part.geometry_selector(), &mut sources)?;
                 (
                     part.model_archive_sources(),
                     part.model_definition_origin(),
                     part.material_archive_origins(),
+                    Some(part),
                     index,
                 )
             }
@@ -120,13 +122,20 @@ fn scene_inputs(
                     attachment.model_archive_sources(),
                     attachment.model_definition_origin(),
                     attachment.material_archive_origins(),
+                    None,
                     parent,
                 )
             }
             _ => continue,
         };
         model_inputs(projection, models, definition, role, &mut sources)?;
-        selected_materials(projection, materials, piece.material_slots(), &mut sources)?;
+        selected_materials(
+            projection,
+            materials,
+            material_owner,
+            piece.material_slots(),
+            &mut sources,
+        )?;
         let mut at = Some(index);
         while let Some(index) = at.filter(|index| placed_ancestry.insert(*index)) {
             let Some(part) = assembly.parts().get(index) else {
@@ -163,6 +172,7 @@ fn model_inputs(
 fn selected_materials(
     projection: &Projection,
     materials: &MaterialArchiveOrigins,
+    material_owner: Option<&Part>,
     slots: impl Iterator<Item = usize>,
     sources: &mut Vec<SourceUse>,
 ) -> Result<()> {
@@ -173,6 +183,11 @@ fn selected_materials(
     if slots.peek().is_none() {
         return Ok(());
     }
+    authored_selector(
+        projection,
+        material_owner.and_then(Part::material_selector),
+        sources,
+    )?;
     let scope = projection
         .uses()
         .observe(SourceInput::Archive(origin), InputScope::Payload)?;
@@ -185,6 +200,17 @@ fn selected_materials(
             },
             SourceUseRole::Selector,
         )?);
+    }
+    Ok(())
+}
+
+fn authored_selector(
+    projection: &Projection,
+    selector: Option<SourceLocation>,
+    sources: &mut Vec<SourceUse>,
+) -> Result<()> {
+    if let Some(selector) = selector {
+        sources.push(projection.scope().at(selector, SourceUseRole::Selector)?);
     }
     Ok(())
 }

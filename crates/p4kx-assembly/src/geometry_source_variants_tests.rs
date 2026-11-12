@@ -4,9 +4,10 @@
 use std::error::Error;
 
 use p4kx_dataforge::{DataForge, StructValue, Value};
+use p4kx_extraction::SourceLocation;
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
-use super::Geometry;
+use super::{Geometry, GeometryComponent};
 use crate::read;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -32,8 +33,20 @@ fn complete(missing_geometry: Option<usize>) -> TestResult {
         0,
         "all original geometry slots are valid"
     );
-    original(tree.root(), missing_geometry)?;
-    let variants = Geometry::read_variants(tree.root());
+    let Some(Value::Array(components)) = tree.root().field("Components") else {
+        return Err("the original Components array".into());
+    };
+    let Some(Value::Struct(component)) = components.get(1) else {
+        return Err("the original geometry component".into());
+    };
+    original(component, missing_geometry)?;
+    let variants = Geometry::read_variants(
+        component,
+        GeometryComponent {
+            record: tree.record_index(),
+            ordinal: 1,
+        },
+    );
     let expected: Vec<_> = (1..=LEVELS)
         .flat_map(|level| ["a", "b"].map(move |branch| (branch, level)))
         .filter(|(branch, level)| *branch != "a" || Some(*level) != missing_geometry)
@@ -55,8 +68,68 @@ fn complete(missing_geometry: Option<usize>) -> TestResult {
             .chain(std::iter::repeat_n(0, level - 1))
             .collect();
         assert_eq!(
-            variant.source_slots, slots,
+            variant
+                .geometry()
+                .origins
+                .model
+                .as_ref()
+                .ok_or("model field position")?
+                .slots
+                .as_ref(),
+            slots,
             "the source path retains its original sparse ordinal"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn an_inherited_material_keeps_its_own_authored_geometry_position() -> TestResult {
+    let bytes = database(None);
+    let forge = DataForge::open(&bytes)?;
+    let record = forge.record(0).ok_or("geometry owner")?;
+    let tree = record.tree()?;
+    let Some(Value::Array(components)) = tree.root().field("Components") else {
+        return Err("the original Components array".into());
+    };
+    let Some(Value::Struct(component)) = components.get(1) else {
+        return Err("the original geometry component".into());
+    };
+    let owner = GeometryComponent {
+        record: tree.record_index(),
+        ordinal: 1,
+    };
+    let main = Geometry::read(component, owner).ok_or("main geometry")?;
+    let variants = Geometry::read_variants(component, owner);
+    let mut variant = variants.first().ok_or("first variant")?.geometry().clone();
+    assert_eq!(
+        variant.material_field(),
+        None,
+        "the variant authors no material"
+    );
+    variant.inherit_material(&main);
+    assert_eq!(
+        variant.material(),
+        Some("materials/main"),
+        "the main material is selected"
+    );
+    for (field, path) in [
+        (
+            variant.model_field(),
+            "Components[1].Geometry.SubGeometry[0].Geometry.Geometry.path",
+        ),
+        (
+            variant.material_field(),
+            "Components[1].Geometry.Geometry.Material.path",
+        ),
+    ] {
+        assert_eq!(
+            field,
+            Some(SourceLocation::DataForge {
+                record_index: tree.record_index(),
+                field: path.to_owned(),
+            }),
+            "independent source position for {path}"
         );
     }
     Ok(())
@@ -133,6 +206,10 @@ fn original_branch(mut node: &StructValue<'_>, branch: &str, missing: Option<usi
 fn database(missing_geometry: Option<usize>) -> Vec<u8> {
     DataForgeBuilder::new()
         .version(8)
+        .structure(TestStruct::new("GeometryOwner").array(
+            "Components",
+            TestType::StrongPointer("GeometrySource".to_owned()),
+        ))
         .structure(TestStruct::new("GeometrySource").field(
             "Geometry",
             TestType::StrongPointer("GeometryNode".to_owned()),
@@ -149,35 +226,56 @@ fn database(missing_geometry: Option<usize>) -> Vec<u8> {
                     TestType::StrongPointer("GeometryNode".to_owned()),
                 ),
         )
-        .structure(TestStruct::new("GeometryData").field(
-            "Geometry",
-            TestType::StrongPointer("GeometryFile".to_owned()),
-        ))
+        .structure(
+            TestStruct::new("GeometryData")
+                .field(
+                    "Geometry",
+                    TestType::StrongPointer("GeometryFile".to_owned()),
+                )
+                .field(
+                    "Material",
+                    TestType::StrongPointer("GeometryFile".to_owned()),
+                ),
+        )
         .structure(TestStruct::new("GeometryFile").field("path", TestType::String))
         .record(
             TestRecord::new(
                 0x7401,
-                "GeometrySource",
-                "GeometrySource.Owner",
+                "GeometryOwner",
+                "GeometryOwner.Owner",
                 "synthetic/geometry.xml",
             )
-            .value(
-                "Geometry",
-                TestValue::Struct(
-                    TestInstance::new("GeometryNode")
-                        .value("Tags", TestValue::text("root-is-not-inherited"))
-                        .value(
-                            "SubGeometry",
-                            TestValue::Array(vec![
-                                chain("a", missing_geometry),
-                                TestValue::Null,
-                                chain("b", None),
-                            ]),
-                        ),
-                ),
-            ),
+            .value("Components", components(missing_geometry)),
         )
         .build()
+}
+
+fn components(missing_geometry: Option<usize>) -> TestValue {
+    let geometry = TestInstance::new("GeometryNode")
+        .value("Tags", TestValue::text("root-is-not-inherited"))
+        .value("Geometry", main_geometry())
+        .value(
+            "SubGeometry",
+            TestValue::Array(vec![
+                chain("a", missing_geometry),
+                TestValue::Null,
+                chain("b", None),
+            ]),
+        );
+    let component =
+        TestInstance::new("GeometrySource").value("Geometry", TestValue::Struct(geometry));
+    TestValue::Array(vec![TestValue::Null, TestValue::Struct(component)])
+}
+
+fn main_geometry() -> TestValue {
+    let path = |value| {
+        TestValue::Struct(TestInstance::new("GeometryFile").value("path", TestValue::text(value)))
+    };
+    TestValue::Struct(
+        TestInstance::new("GeometryData")
+            .value("Geometry", path("models/main.cgf"))
+            .value("Material", path("materials/main")),
+    )
 }
 
 fn chain(branch: &str, missing_geometry: Option<usize>) -> TestValue {

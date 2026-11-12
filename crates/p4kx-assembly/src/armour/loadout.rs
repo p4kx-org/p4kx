@@ -158,7 +158,6 @@ impl<'f> LoadoutResolver<'f> {
             loadout: Some(loadout),
             outfit: None,
             geometry: None,
-            geometry_component: None,
             variants: Vec::new(),
             vehicle: None,
             docked_vehicle: false,

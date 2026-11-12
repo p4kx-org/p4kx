@@ -183,6 +183,19 @@ fn selected_inputs(rows: &[Value], report: &Value) {
         "the resolver bound the actual material slot"
     );
     let forge = source_uses(rows, report, "Game2.dcb");
+    for selector in [
+        ".Geometry.Geometry.Geometry.path",
+        ".Geometry.Geometry.Material.path",
+    ] {
+        assert!(
+            forge.iter().any(|row| row["role"] == "selector"
+                && row
+                    .pointer("/location/field")
+                    .and_then(Value::as_str)
+                    .is_some_and(|field| field.ends_with(selector))),
+            "the actual authored selector {selector}"
+        );
+    }
     assert!(
         forge.iter().any(|row| {
             row.pointer("/location/field")

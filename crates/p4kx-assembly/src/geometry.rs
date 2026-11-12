@@ -2,9 +2,15 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_dataforge::{Guid, StructValue, Value, ValueError};
+use p4kx_extraction::SourceLocation;
 
 use crate::character_path::is_rigged_path_outside_human_rigs;
 use crate::read::{indexed_struct_items, struct_field, text};
+
+#[path = "geometry_origins.rs"]
+mod origins;
+
+pub(crate) use self::origins::{GeometryComponent, GeometrySelectors};
 
 /// The tint palette an Entity's geometry names (`Palette.TintPaletteRef`): the `TintPaletteTree`
 /// Record and the child of its tree.
@@ -31,23 +37,47 @@ impl PaletteRef {
 
 /// The geometry an Entity Record names (`SGeometryResourceParams`): the model file, the material
 /// library that replaces the library the model names itself and the tint palette.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct Geometry {
     pub(crate) path: String,
     pub(crate) material: Option<String>,
     pub(crate) palette: Option<PaletteRef>,
+    origins: GeometrySelectors,
 }
+
+impl PartialEq for Geometry {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path && self.material == other.material && self.palette == other.palette
+    }
+}
+
+impl Eq for Geometry {}
 
 /// A geometry an Entity Record names for the tags of a sub-node (`SubGeometry`), e.g. `Male` or
 /// `Female` for the body a piece of armour is worn on.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct GeometryVariant {
     pub(crate) tags: Vec<String>,
     pub(crate) geometry: Geometry,
-    pub(crate) source_slots: Vec<usize>,
 }
 
+impl PartialEq for GeometryVariant {
+    fn eq(&self, other: &Self) -> bool {
+        self.tags == other.tags && self.geometry == other.geometry && self.slots() == other.slots()
+    }
+}
+
+impl Eq for GeometryVariant {}
+
 impl GeometryVariant {
+    fn slots(&self) -> &[usize] {
+        self.geometry
+            .origins
+            .model
+            .as_ref()
+            .map_or(&[], |source| source.slots.as_ref())
+    }
+
     /// Returns the tags of the sub-node, split at white space.
     #[must_use]
     pub fn tags(&self) -> &[String] {
@@ -96,15 +126,18 @@ impl Geometry {
     }
 
     /// Reads the main geometry of a `SGeometryResourceParams` component.
-    pub(crate) fn read(component: &StructValue<'_>) -> Option<Self> {
-        Self::of_node(struct_field(component, "Geometry")?)
+    pub(crate) fn read(component: &StructValue<'_>, owner: GeometryComponent) -> Option<Self> {
+        Self::of_node(struct_field(component, "Geometry")?, owner, &[])
     }
 
     /// Reads the geometry of the sub-nodes of the main node of a `SGeometryResourceParams`
     /// component that name a model, with their tags: the children of the main node first, then
     /// the sub-nodes nested in them, which carry the tags of the nodes they are nested in as well
     /// as their own.
-    pub(crate) fn read_variants(component: &StructValue<'_>) -> Vec<GeometryVariant> {
+    pub(crate) fn read_variants(
+        component: &StructValue<'_>,
+        owner: GeometryComponent,
+    ) -> Vec<GeometryVariant> {
         let Some(node) = struct_field(component, "Geometry") else {
             return Vec::new();
         };
@@ -117,11 +150,10 @@ impl Geometry {
                     let slots: Vec<_> = source.iter().copied().chain([slot]).collect();
                     let mut tags = inherited.clone();
                     tags.extend(text(sub, "Tags").split_whitespace().map(str::to_owned));
-                    if let Some(geometry) = Self::of_node(sub) {
+                    if let Some(geometry) = Self::of_node(sub, owner, &slots) {
                         variants.push(GeometryVariant {
                             tags: tags.clone(),
                             geometry,
-                            source_slots: slots.clone(),
                         });
                     }
                     next.push((sub, tags, slots));
@@ -132,7 +164,44 @@ impl Geometry {
         variants
     }
 
-    fn of_node(node: &StructValue<'_>) -> Option<Self> {
+    pub(crate) fn model_field(&self) -> Option<SourceLocation> {
+        self.origins.model_field()
+    }
+
+    pub(crate) fn material_field(&self) -> Option<SourceLocation> {
+        self.origins.material_field()
+    }
+
+    pub(crate) fn selectors(&self, material_from_geometry: bool) -> GeometrySelectors {
+        GeometrySelectors {
+            model: self.origins.model.clone(),
+            material: material_from_geometry
+                .then(|| self.origins.material.clone())
+                .flatten(),
+        }
+    }
+
+    pub(crate) fn inherit_material(&mut self, other: &Self) {
+        self.material.clone_from(&other.material);
+        self.origins.material.clone_from(&other.origins.material);
+    }
+
+    pub(crate) fn override_model(&mut self, path: String) {
+        self.path = path;
+        self.origins.model = None;
+    }
+
+    #[cfg(test)]
+    pub(crate) fn fixture(path: &str) -> Self {
+        Self {
+            path: path.to_owned(),
+            material: None,
+            palette: None,
+            origins: GeometrySelectors::default(),
+        }
+    }
+
+    fn of_node(node: &StructValue<'_>, owner: GeometryComponent, slots: &[usize]) -> Option<Self> {
         let data = struct_field(node, "Geometry")?;
         let path = struct_field(data, "Geometry").map(|resource| text(resource, "path"))?;
         if path.is_empty() {
@@ -145,6 +214,7 @@ impl Geometry {
             path: path.to_owned(),
             material: material.map(str::to_owned),
             palette: read_palette(data),
+            origins: GeometrySelectors::of(owner, slots, material.is_some()),
         })
     }
 }
@@ -167,19 +237,11 @@ mod tests {
     use super::Geometry;
     use crate::BodyVariant;
 
-    fn geometry(path: &str) -> Geometry {
-        Geometry {
-            path: path.to_owned(),
-            material: None,
-            palette: None,
-        }
-    }
-
     #[test]
     fn the_human_skeleton_and_skin_are_no_rigged_files_outside_the_human_rigs() {
         for body in BodyVariant::ALL {
-            assert!(!geometry(body.skeleton()).is_rigged_file_outside_human_rigs());
-            assert!(!geometry(body.skin()).is_rigged_file_outside_human_rigs());
+            assert!(!Geometry::fixture(body.skeleton()).is_rigged_file_outside_human_rigs());
+            assert!(!Geometry::fixture(body.skin()).is_rigged_file_outside_human_rigs());
         }
     }
 
@@ -191,7 +253,10 @@ mod tests {
             "/Objects/Characters/Vanduul/drone/body.skin",
             "Objects/Spaceships/Thrusters/nozzle.cdf",
         ] {
-            assert!(geometry(path).is_rigged_file_outside_human_rigs(), "{path}");
+            assert!(
+                Geometry::fixture(path).is_rigged_file_outside_human_rigs(),
+                "{path}"
+            );
         }
         for path in [
             "Data/Objects/Characters/Human/male_v7/export/bhm_skeleton_v7.chr",
@@ -201,7 +266,7 @@ mod tests {
             "Objects/Characters/Creatures/x/skin",
         ] {
             assert!(
-                !geometry(path).is_rigged_file_outside_human_rigs(),
+                !Geometry::fixture(path).is_rigged_file_outside_human_rigs(),
                 "{path}"
             );
         }

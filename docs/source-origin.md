@@ -149,6 +149,9 @@ The opaque payload row binds the committed filename, byte length and SHA-256.
 Its uses include the placed and drawn model reads, selected material slots,
 authored port placement and camera settings. Model and character-definition
 files without retained internal coordinates carry an explicit opaque use.
+The model and material selectors retain independent DataForge Record and
+array positions. A selected sub-geometry can inherit a material from its
+main geometry, and the two uses preserve their own original fields.
 Unobserved inputs keep the contributor set incomplete. A known encrypted
 input still gives the artifact a positive marker.
 

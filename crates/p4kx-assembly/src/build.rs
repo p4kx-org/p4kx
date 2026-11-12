@@ -17,6 +17,7 @@ use crate::build_place::{place, under_skin};
 use crate::build_zones::BodyCut;
 use crate::creature_rig;
 use crate::flatten::{Draft, flatten};
+use crate::geometry::GeometrySelectors;
 use crate::placement::{is_character_item, is_unskinned};
 use crate::{
     Assembly, AssemblyError, AssemblyOptions, EntityNode, Issue, IssueKind, ModelProvider,
@@ -119,6 +120,7 @@ impl Assembly {
                 model: geometry.model,
                 model_archive_sources: geometry.sources,
                 model_definition_origin: geometry.definition,
+                geometry_selectors: geometry.selectors,
                 materials,
                 palette,
                 attachments,
@@ -142,6 +144,7 @@ struct RenderedGeometry {
     model: Option<Arc<Model>>,
     sources: Arc<[ModelArchiveSource]>,
     definition: Option<EntryOrigin>,
+    selectors: GeometrySelectors,
 }
 
 fn rendered_geometry(
@@ -159,10 +162,16 @@ fn rendered_geometry(
         |cut| cut.model_of(index, draft, loaded, issues),
     );
     let sources = model_inputs(loaded, &rendered);
+    let selectors = draft
+        .geometry
+        .map_or_else(GeometrySelectors::default, |geometry| {
+            geometry.selectors(draft.library.is_none())
+        });
     RenderedGeometry {
         model: Some(rendered),
         sources,
         definition: loaded.definition_origin.clone(),
+        selectors,
     }
 }
 

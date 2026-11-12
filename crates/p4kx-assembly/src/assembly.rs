@@ -12,6 +12,7 @@ use p4kx_gltf::{
 };
 use p4kx_model::{MaterialStatus, Model, TintPalette, Transform, UnresolvedLayers};
 
+use crate::geometry::GeometrySelectors;
 use crate::{AttachedModel, Issue, PortPlacementSource, creature_rig};
 
 #[path = "assembly_part_inputs.rs"]
@@ -120,6 +121,7 @@ pub struct Part {
     pub(crate) model: Option<Arc<Model>>,
     pub(crate) model_archive_sources: Arc<[ModelArchiveSource]>,
     pub(crate) model_definition_origin: Option<EntryOrigin>,
+    pub(crate) geometry_selectors: GeometrySelectors,
     pub(crate) materials: Arc<ArchiveMaterialRead>,
     pub(crate) palette: Option<Arc<TintPalette>>,
     pub(crate) attachments: Vec<AttachedModel>,
