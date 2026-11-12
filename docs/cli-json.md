@@ -1947,6 +1947,12 @@ same and listed in `incompatible` (absent when empty), as for `entity loadout`; 
 works as there. A machine without
 a graphics adapter fails with `no graphics adapter` on stderr and exit code 1.
 
+`fieldOrigins` and `provenance` address the selected Entity and individual camera settings.
+Each setting uses the actual field of the selected `UIHoloVehicle_Config` Record or a command-line
+option. An explicit override is tool-authored even when its number equals the stored value.
+A readable Record with a missing setting retains the declaration survey that chose the fallback.
+Assembly counters and diagnostics whose source contributions are unproved retain unknown origins.
+
 ## `p4kx ui screens <archive> <entity> --json`
 
 The `BuildingBlocks` screens of an Entity and of everything attached in its resolved default

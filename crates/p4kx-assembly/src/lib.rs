@@ -189,7 +189,7 @@ pub use entity_interior::{EntityContainer, EntityInterior, INTERIOR_NODE};
 pub use error::{AssemblyError, EntityLookupError, LoadoutError};
 pub use files::{ArchiveFiles, LoadoutFileError, LoadoutFiles, MAX_XML_LOADOUT_LEN};
 pub use geometry::{Geometry, GeometryVariant, PaletteRef};
-pub use hologram::HologramCamera;
+pub use hologram::{HologramCamera, HologramCameraField, ObservedHologramCamera};
 pub use interior::{
     Interior, InteriorForge, InteriorOptions, InteriorPart, InteriorPartKind, InteriorProgress,
     InteriorWatch, MAX_INTERIOR_CONTAINERS, MAX_INTERIOR_DEPTH, MAX_INTERIOR_FILE_LEN,

@@ -28,6 +28,11 @@ use crate::entity_glb_json::IssueJson;
 use crate::query_table::one_line;
 use crate::{exit, json};
 
+#[path = "ui_hologram_origins.rs"]
+mod origins;
+
+use self::origins::Evidence;
+
 #[derive(Serialize)]
 struct CameraJson {
     source: &'static str,
@@ -68,6 +73,8 @@ struct HologramJson<'a> {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     incompatible: Vec<crate::entity_ignored::IncompatibleJson<'a>>,
     issues: Vec<IssueJson<'a>>,
+    #[serde(flatten)]
+    evidence: Evidence,
 }
 
 /// Returns the view of the camera the options and the Record ask for, and where it came from.
@@ -249,10 +256,11 @@ pub(crate) fn run(args: &HologramArgs, as_json: bool) -> Result<ExitCode> {
     let options = AssemblyOptions::default().with_lod(args.lod);
     let palettes = ForgePalettes::new(&forge);
     let assembly = Assembly::build_with_palettes(tree, &models, &palettes, &options)?;
+    let camera = HologramCamera::read_observed(&forge);
     let outcome = draw_picture(
         args,
         (&assembly, tree.class_name()),
-        HologramCamera::read(&forge),
+        camera.camera(),
         (started, started.elapsed()),
         &protection,
         &cancel,
@@ -270,7 +278,8 @@ pub(crate) fn run(args: &HologramArgs, as_json: bool) -> Result<ExitCode> {
         times: outcome.times,
     };
     if as_json {
-        json::print(&summary.json(&archive, tree.guid().to_string()))?;
+        let evidence = Evidence::of(&entry, record.index(), &camera, &summary)?;
+        json::print(&summary.json(&archive, tree.guid().to_string(), evidence))?;
         return Ok(ExitCode::from(exit::SUCCESS));
     }
     match summary.print() {
@@ -293,7 +302,12 @@ struct Summary<'a> {
 }
 
 impl<'a> Summary<'a> {
-    fn json(&'a self, archive: &p4kx_extraction::Archive, guid: String) -> HologramJson<'a> {
+    fn json(
+        &'a self,
+        archive: &p4kx_extraction::Archive,
+        guid: String,
+        evidence: Evidence,
+    ) -> HologramJson<'a> {
         let (view, source) = self.camera;
         HologramJson {
             archive: json::path(archive.path()),
@@ -320,6 +334,7 @@ impl<'a> Summary<'a> {
             ignored: self.applied.ignored(),
             incompatible: crate::entity_ignored::incompatible(self.applied),
             issues: self.assembly.issues().iter().map(IssueJson::from).collect(),
+            evidence,
         }
     }
 

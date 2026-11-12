@@ -6,7 +6,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use p4kx_testkit::{ArchiveBuilder, TestEntry, assembly_entries, hologram_entries};
+use p4kx_testkit::{ArchiveBuilder, TestEntry, assembly_entries, hologram_entries, test_key};
 use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -232,5 +232,66 @@ fn an_output_inside_a_star_citizen_installation_is_refused() -> TestResult {
         run.stderr
     );
     assert!(!out.exists(), "nothing is written into the installation");
+    Ok(())
+}
+
+#[test]
+fn an_equal_camera_option_retains_tool_origin_with_an_encrypted_config() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let entries = hologram_entries([14.0, 45.0, 2.5])
+        .into_iter()
+        .map(|entry| {
+            if entry.path() == "Data\\Game2.dcb" {
+                entry.encrypted()
+            } else {
+                entry
+            }
+        })
+        .collect();
+    let archive = write_archive(dir.path(), entries)?;
+    let out = dir.path().join("ship.png");
+    let key = test_key().to_hex();
+    let run = hologram(
+        &archive,
+        &out,
+        &["--size", "64", "--fov", "14", "--key", &key],
+        true,
+    )?;
+    if skip("an_equal_camera_option_retains_tool_origin", &run) {
+        return Ok(());
+    }
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let report: Value = serde_json::from_str(&run.stdout)?;
+    assert_eq!(report["camera"]["fov_degrees"], 14.0);
+    let fields = &report["fieldOrigins"];
+    for (path, expected) in [
+        ("/camera/fov_degrees", false),
+        ("/camera/elevation_degrees", false),
+        ("/camera/view_angle_degrees", true),
+        ("/camera/distance_scaler", true),
+        ("/entity", true),
+    ] {
+        let encrypted = fields
+            .get(path)
+            .and_then(|origin| origin.get("containsEncryptedSource"))
+            .and_then(Value::as_bool);
+        assert_eq!(encrypted, Some(expected), "{path}");
+    }
+    assert_eq!(
+        fields["/camera/fov_degrees"]["sourceUsesRefs"],
+        serde_json::json!([]),
+    );
+    let uses = report["provenance"]["uses"]
+        .as_array()
+        .ok_or("original uses")?;
+    assert!(
+        uses.iter()
+            .any(|usage| usage["location"]["field"] == "ownDefaultViewAngle")
+    );
+    assert!(
+        !uses
+            .iter()
+            .any(|usage| usage["location"]["field"] == "cameraFOV")
+    );
     Ok(())
 }

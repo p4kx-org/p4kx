@@ -106,7 +106,11 @@ fn unsigned_value(value: &Value<'_>) -> Option<u32> {
 
 /// Returns a numeric field as `f64`, or `None` when it holds none.
 pub(crate) fn float(structure: &StructValue<'_>, name: &str) -> Option<f64> {
-    match structure.field(name)? {
+    value_float(structure.field(name)?)
+}
+
+pub(crate) fn value_float(value: &Value<'_>) -> Option<f64> {
+    match value {
         Value::Single(value) => Some(f64::from(*value)),
         Value::Double(value) => Some(*value),
         _ => None,
