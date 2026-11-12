@@ -36,6 +36,8 @@ pub(crate) enum NumberOccurrence {
     TemplateValue { ordinal: u64 },
     ItemComponentValue { ordinal: u64 },
     ItemComponentRawValue { ordinal: u64 },
+    ConfigurationValue { ordinal: u64 },
+    ConfigurationRawValue { ordinal: u64 },
     AuthoredDefinitionValue { ordinal: u64 },
 }
 
@@ -43,6 +45,7 @@ pub(crate) enum NumberOccurrence {
 #[derive(Clone, Copy)]
 pub(crate) enum AuthoredNumberOwner {
     ItemComponent,
+    Configuration,
     Definition,
 }
 
@@ -70,6 +73,7 @@ impl CapturedNumber {
         let ordinal = fact.ordinal();
         let occurrence = match owner {
             AuthoredNumberOwner::ItemComponent => NumberOccurrence::ItemComponentValue { ordinal },
+            AuthoredNumberOwner::Configuration => NumberOccurrence::ConfigurationValue { ordinal },
             AuthoredNumberOwner::Definition => {
                 NumberOccurrence::AuthoredDefinitionValue { ordinal }
             }
@@ -84,20 +88,28 @@ impl CapturedNumber {
         .map(Some)
     }
 
-    /// Retains an exact nonfinite scalar emitted inside an original component value subtree.
-    pub(crate) fn item_component_raw<'scope, 'read, 'source>(
+    /// Retains an exact nonfinite scalar emitted inside an authored value subtree.
+    pub(crate) fn authored_raw<'scope, 'read, 'source>(
         originals: &OriginalFlowFields<'scope, 'read, 'source>,
         fact: &OriginalValueFact<'scope, 'read, 'source>,
+        owner: AuthoredNumberOwner,
     ) -> Result<Option<Self>, CatalogError> {
         let Some(token) = FloatToken::read(fact.value()) else {
             return Ok(None);
         };
+        let ordinal = fact.ordinal();
+        let occurrence = match owner {
+            AuthoredNumberOwner::Configuration => {
+                NumberOccurrence::ConfigurationRawValue { ordinal }
+            }
+            AuthoredNumberOwner::ItemComponent | AuthoredNumberOwner::Definition => {
+                NumberOccurrence::ItemComponentRawValue { ordinal }
+            }
+        };
         Self::authored(
             originals,
             fact,
-            NumberOccurrence::ItemComponentRawValue {
-                ordinal: fact.ordinal(),
-            },
+            occurrence,
             token,
             ResourceNumberContract::Number,
         )

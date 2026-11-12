@@ -9,12 +9,11 @@ use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_ammo_containers::AmmoContainer;
 use crate::catalog_v3::catalog_durability::{Degradation, Distortion, Durability};
 use crate::catalog_v3::catalog_explosives::Explosive;
+use crate::catalog_v3::catalog_global_configurations::GlobalConfigurationTables;
 use crate::catalog_v3::catalog_hacking_chips::HackingChip;
 use crate::catalog_v3::catalog_quantum_drive::QuantumDrive;
 use crate::catalog_v3::catalog_shield_generator::ShieldGenerator;
 use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
-use crate::contract_recovery::{ItemRecoveryEconomy, ItemRecoveryOverrides};
-use crate::recovery::ItemRecoveryPolicy;
 use crate::schema_fields::every_field_required;
 use crate::template_configuration::{MissionFlowConfiguration, MissionPropertyConfiguration};
 use crate::template_projection::TemplateProjection;
@@ -39,9 +38,8 @@ pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) entity_configurations:
         crate::catalog_v3::catalog_entity_configurations::EntityConfigurationTables<'source>,
     pub(crate) mission_broker_entries: CatalogTable<BrokerProjection<'source>>,
-    pub(crate) item_recovery_economy: CatalogTable<ItemRecoveryEconomy<'source>>,
-    pub(crate) item_recovery_overrides: CatalogTable<ItemRecoveryOverrides>,
-    pub(crate) item_recovery_policy: CatalogTable<ItemRecoveryPolicy<'source>>,
+    #[serde(flatten)]
+    pub(crate) globals: GlobalConfigurationTables<'source>,
     pub(crate) mission_flows: CatalogTable<MissionFlowConfiguration>,
     pub(crate) mission_properties: CatalogTable<MissionPropertyConfiguration>,
 }

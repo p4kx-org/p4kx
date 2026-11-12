@@ -127,3 +127,8 @@ the pairing of input and output, original position and unit declarations.
 The compact power, coolant and flat state bytes remain private variant
 identity inputs. Consumer field mapping and the original ordering and
 numeric projection are documented in [Resource components](../catalog-resource-components.md).
+
+Global resource rules have their own GameMode-owned rows. The original
+`params.resourceNetworkParams` declaration supplies the typed settings and
+their per-value origin. Component and placement rows continue to describe
+their own authored settings.

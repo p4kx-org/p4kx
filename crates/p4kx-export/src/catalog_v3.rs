@@ -57,6 +57,8 @@ pub(crate) mod catalog_explosives;
 mod catalog_fuel;
 #[path = "catalog_fuel_configurations.rs"]
 mod catalog_fuel_configurations;
+#[path = "catalog_global_configurations.rs"]
+pub(crate) mod catalog_global_configurations;
 #[path = "catalog_hacking_chips.rs"]
 pub(crate) mod catalog_hacking_chips;
 #[path = "catalog_item_alignment.rs"]
@@ -81,6 +83,10 @@ mod catalog_resource_delta_amount;
 mod catalog_resource_flow_unit;
 #[path = "catalog_resource_heat_connection.rs"]
 mod catalog_resource_heat_connection;
+#[path = "catalog_resource_network_configuration.rs"]
+pub(crate) mod catalog_resource_network_configuration;
+#[path = "catalog_resource_network_read.rs"]
+pub(crate) mod catalog_resource_network_read;
 #[path = "catalog_resource_power_connection.rs"]
 mod catalog_resource_power_connection;
 #[path = "catalog_resource_power_ranges.rs"]

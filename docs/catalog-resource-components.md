@@ -98,3 +98,26 @@ accepted stored integers representable by i64 and finite f32 results from
 stored Double values. Current typed cells preserve the original amount
 instead of narrowing it. Variant identity continues to use the exact
 private compact bytes.
+
+## Global resource-network rules
+
+`configurations.resourceNetworkParameters` owns a separate row for each
+selected physical `GameMode` Record. Its `source` header and `gameModeId`
+identify the original owner. The original StrongPointer `params` selects
+the concrete mode parameters. The nested Class `resourceNetworkParams`
+contains the authored `ResourceNetworkParams`. Modes with a null pointer
+or a concrete type without a rules declaration retain those source states.
+The regular catalog Record filter applies to the owning GameMode.
+
+| Scope | Original settings |
+|---|---|
+| Resource network and repairs | `enableItemResourceNetwork`, `enableSalvageItemRepair`, `doorsIgnoreRN` |
+| Misfire and armour flags | `enableMisfires`, `enableCriticalMisfires`, `enableExperimentalArmorPenetration` |
+| Destruction flags | `shipPassDestroyedPartDamageToComponent`, `shipPassDestroyedPartDamageToChild` |
+| Destruction Singles | `shipDestructionBufferMultiplier`, `shipDestructionHealthThreshold` |
+
+Each value keeps its original data and direct origin. Additional members
+of the rule Class retain their original storage and source coordinates.
+Health inspection covers the original rule subtree and the required
+selectors. Component and loadout rows retain their independent source
+scope.

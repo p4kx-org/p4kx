@@ -3556,6 +3556,9 @@
         "resourceContainers": {
           "$ref": "#/$defs/CatalogTableOfResourceContainer"
         },
+        "resourceNetworkParameters": {
+          "$ref": "#/$defs/CatalogTableOfResourceNetworkConfiguration"
+        },
         "shieldGenerators": {
           "$ref": "#/$defs/CatalogTableOfShieldGenerator"
         },
@@ -3586,6 +3589,7 @@
         "resourceComponents",
         "resourceConnections",
         "resourceContainers",
+        "resourceNetworkParameters",
         "shieldGenerators",
         "weaponActions"
       ],
@@ -4642,6 +4646,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ResourceGroupParent"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfResourceNetworkConfiguration": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ResourceNetworkConfiguration"
           },
           "type": "array"
         }
@@ -16810,6 +16833,21 @@
       ],
       "type": "object"
     },
+    "ModeParameters": {
+      "properties": {
+        "resourceNetworkParams": {
+          "$ref": "#/$defs/SourcedValueOfResourceNetworkParameters"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "resourceNetworkParams",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "Modifier": {
       "properties": {
         "name": {
@@ -22992,6 +23030,81 @@
       },
       "required": [
         "molarMass"
+      ],
+      "type": "object"
+    },
+    "ResourceNetworkConfiguration": {
+      "description": "Resource-network settings from a physically identified game-mode Record.",
+      "properties": {
+        "gameModeId": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "params": {
+          "$ref": "#/$defs/SourcedValueOfModeParameters"
+        },
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
+        }
+      },
+      "required": [
+        "gameModeId",
+        "params",
+        "source"
+      ],
+      "type": "object"
+    },
+    "ResourceNetworkParameters": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "doorsIgnoreRN": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enableCriticalMisfires": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enableExperimentalArmorPenetration": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enableItemResourceNetwork": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enableMisfires": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enableSalvageItemRepair": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "shipDestructionBufferMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "shipDestructionHealthThreshold": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "shipPassDestroyedPartDamageToChild": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "shipPassDestroyedPartDamageToComponent": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "doorsIgnoreRN",
+        "enableCriticalMisfires",
+        "enableExperimentalArmorPenetration",
+        "enableItemResourceNetwork",
+        "enableMisfires",
+        "enableSalvageItemRepair",
+        "shipDestructionBufferMultiplier",
+        "shipDestructionHealthThreshold",
+        "shipPassDestroyedPartDamageToChild",
+        "shipPassDestroyedPartDamageToComponent",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -46076,6 +46189,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfModeParameters": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ModeParameters"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfModifier": {
       "allOf": [
         {
@@ -56117,6 +56360,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ResourceInt64"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfResourceNetworkParameters": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ResourceNetworkParameters"
               }
             }
           }

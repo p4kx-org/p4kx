@@ -34,6 +34,8 @@ mod quantum;
 mod resource_components;
 #[path = "catalog_resource_connections.rs"]
 mod resource_connections;
+#[path = "catalog_resource_network.rs"]
+mod resource_network;
 #[path = "catalog_shield.rs"]
 mod shield;
 

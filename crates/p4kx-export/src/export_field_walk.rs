@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_extraction::{CancelToken, Guid, Record, RecordTree, Reference, Value};
 
 use crate::CatalogError;
@@ -47,6 +49,64 @@ pub(crate) fn inspect_observed<'source>(
     role: ExportSourceRole,
     cancel: Option<&CancelToken>,
 ) -> Result<ExportLedger, CatalogError> {
+    inspect_values(
+        input,
+        tree,
+        admission,
+        kind,
+        role,
+        cancel,
+        &FieldSelection::All,
+    )
+}
+
+/// Inspects the original value span used by one independent configuration.
+pub(crate) fn inspect_configuration<'source>(
+    input: &OriginalCatalogInput<'_, '_>,
+    tree: &RecordTree<'source>,
+    admission: &RecordObservation<'_, 'source>,
+    span: Option<Range<usize>>,
+    cancel: Option<&CancelToken>,
+) -> Result<ExportLedger, CatalogError> {
+    inspect_values(
+        Some(input),
+        tree,
+        admission,
+        None,
+        ExportSourceRole::Dependency,
+        cancel,
+        &FieldSelection::Subtree(span),
+    )
+}
+
+enum FieldSelection {
+    All,
+    Subtree(Option<Range<usize>>),
+}
+
+impl FieldSelection {
+    fn includes(&self, ordinal: u64) -> Result<bool, ExportAccountingError> {
+        match self {
+            Self::All => Ok(true),
+            Self::Subtree(None) => Ok(false),
+            Self::Subtree(Some(span)) => {
+                let index =
+                    usize::try_from(ordinal).map_err(|_| ExportAccountingError::CounterOverflow)?;
+                Ok(span.contains(&index))
+            }
+        }
+    }
+}
+
+fn inspect_values<'source>(
+    input: Option<&OriginalCatalogInput<'_, '_>>,
+    tree: &RecordTree<'source>,
+    admission: &RecordObservation<'_, 'source>,
+    kind: Option<Kind>,
+    role: ExportSourceRole,
+    cancel: Option<&CancelToken>,
+    selection: &FieldSelection,
+) -> Result<ExportLedger, CatalogError> {
     admission.check_tree(tree)?;
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
@@ -58,7 +118,7 @@ pub(crate) fn inspect_observed<'source>(
     if let Some(input) = input {
         let scope = input.record_scope(admission.record(), tree)?;
         let mut capture = ReferenceCapture::new(input, admission, &scope)?;
-        inspector.observed(&scope, &mut capture, cancel)?;
+        inspector.observed(&scope, &mut capture, cancel, selection)?;
     } else {
         inspector.accounting(tree, admission.record(), cancel)?;
     }
@@ -78,12 +138,20 @@ impl Inspector<'_, '_> {
         scope: &OriginalRecordScope<'_, '_>,
         capture: &mut ReferenceCapture<'_, '_, '_>,
         cancel: Option<&CancelToken>,
+        selection: &FieldSelection,
     ) -> Result<(), CatalogError> {
+        if matches!(selection, FieldSelection::Subtree(None)) {
+            return Ok(());
+        }
         let mut walk = scope.walk(cancel);
         while let Some(event) = walk.next_event()? {
             match event {
                 OriginalValueEvent::Value(site) => {
-                    self.visit(site.neutral(), Some((capture, &site)))?;
+                    self.visit(
+                        site.neutral(),
+                        Some((capture, &site)),
+                        selection.includes(site.ordinal())?,
+                    )?;
                     if matches!(site.value(), Value::Struct(_) | Value::Array(_)) {
                         capture.enter(&site)?;
                     }
@@ -106,7 +174,7 @@ impl Inspector<'_, '_> {
         let mut walk = OwnedValueWalk::new(record, tree, cancel)?;
         while let Some(event) = walk.next_event()? {
             match event {
-                OwnedValueEvent::Value(visit) => self.visit(&visit, None)?,
+                OwnedValueEvent::Value(visit) => self.visit(&visit, None, true)?,
                 OwnedValueEvent::EndContainer { ordinal, .. } => self.positions.leave(ordinal)?,
             }
         }
@@ -120,12 +188,13 @@ impl Inspector<'_, '_> {
             &ReferenceCapture<'_, '_, '_>,
             &OriginalValueSite<'_, '_, '_, '_>,
         )>,
+        selected: bool,
     ) -> Result<(), CatalogError> {
         let position = self.positions.at(visit)?;
         match visit.value() {
             Value::Struct(_) => self.positions.enter(visit.ordinal(), position),
             Value::Array(values) => {
-                if values.is_empty() {
+                if selected && values.is_empty() {
                     self.collector.note(
                         visit.logical_path(),
                         visit.owner_type(),
@@ -137,7 +206,8 @@ impl Inspector<'_, '_> {
                 }
                 self.positions.enter(visit.ordinal(), position);
             }
-            _ => self.scalar(visit, position.contract(visit.value()), original)?,
+            _ if selected => self.scalar(visit, position.contract(visit.value()), original)?,
+            _ => {}
         }
         Ok(())
     }

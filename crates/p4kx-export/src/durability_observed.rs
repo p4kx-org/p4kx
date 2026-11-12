@@ -83,6 +83,18 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         }
     }
 
+    pub(super) const fn configuration(
+        originals: &'reader OriginalFlowFields<'scope, 'read, 'source>,
+        input: &'reader OriginalCatalogInput<'reader, 'source>,
+        capture: &'reader dyn FieldCapture<'source>,
+        numbers: &'reader RefCell<Vec<CapturedNumber>>,
+    ) -> Self {
+        Self {
+            number_owner: AuthoredNumberOwner::Configuration,
+            ..Self::definition(originals, input, capture, numbers)
+        }
+    }
+
     pub(super) fn single(
         &self,
         name: &str,
@@ -98,7 +110,9 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
     ) -> Result<SourcedValue<ResourceNumber>, CatalogError> {
         self.scalar(name, "a nullable number", notes, |fact| {
             let value = ResourceNumber::read(fact.value());
-            if let Some(number) = CapturedNumber::item_component_raw(self.originals, fact)? {
+            if let Some(number) =
+                CapturedNumber::authored_raw(self.originals, fact, self.number_owner)?
+            {
                 self.numbers.borrow_mut().push(number);
             }
             Ok(value)

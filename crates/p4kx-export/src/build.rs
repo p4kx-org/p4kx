@@ -18,10 +18,10 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition;
+use crate::catalog_v3::catalog_global_configurations::{self, GlobalConfigurations};
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
 use crate::mission_data::link_scenario_factions;
-use crate::recovery::{Recovery, read_recovery};
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
 use crate::texts::{TextSources, Texts};
@@ -133,19 +133,17 @@ fn assemble<R>(
         options.cancel,
     )?);
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
-    let Recovery {
-        economy: item_recovery_economy,
-        overrides: item_recovery_overrides,
-        policy: item_recovery_policy,
-        numbers: recovery_numbers,
-        failures,
-        ledger,
-    } = read_recovery(&forge, &projection, options.filter, options.cancel)?;
-    collected.ledger.merge(ledger);
-    collected.add_failures(failures);
+    let GlobalConfigurations {
+        tables: globals,
+        recovery_numbers,
+        configuration_numbers,
+    } = catalog_global_configurations::read(&forge, &projection, options, &mut collected)?;
     let kinds = collected.summary(options.filter.is_none());
     let mut catalog_rows = crate::catalog_rows::snapshot(&mut collected, options.filter);
     catalog_rows.recovery_numbers = recovery_numbers;
+    catalog_rows
+        .configuration_numbers
+        .extend(configuration_numbers);
     if collected
         .ledger
         .catalog_rows
@@ -304,9 +302,7 @@ fn assemble<R>(
         },
         configurations: crate::catalog_configurations::CatalogConfigurations {
             blueprint_tiers: blueprints.tiers,
-            item_recovery_economy,
-            item_recovery_overrides,
-            item_recovery_policy,
+            globals,
             durability: components.durability.health,
             degradation: components.durability.degradation,
             distortion: components.durability.distortion,

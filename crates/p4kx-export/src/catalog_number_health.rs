@@ -80,7 +80,7 @@ fn emitted_record_numbers<'source>(
 ) -> BTreeMap<u32, RecordNumbers<'source>> {
     let mut records = BTreeMap::<u32, RecordNumbers<'source>>::new();
     if let Some((rows, targets)) = sources {
-        index_configurations(&mut records, &rows.entity_configuration_numbers);
+        index_configurations(&mut records, &rows.configuration_numbers);
         for number in &rows.numbers {
             let actual = &number.value;
             // Item component receipts come from the emitted component rows.
@@ -100,9 +100,6 @@ fn emitted_record_numbers<'source>(
                     .or_default()
                     .ammo_definition = true;
             }
-            if matches!(actual.occurrence, NumberOccurrence::TemplateValue { .. }) {
-                continue;
-            }
             if matches!(actual.occurrence, NumberOccurrence::LootValue { .. })
                 && number.kind != Kind::LootPoolFilters
             {
@@ -117,7 +114,9 @@ fn emitted_record_numbers<'source>(
                         .entry(actual.field.as_str())
                         .or_insert(actual);
                 }
-                NumberOccurrence::TemplateValue { .. } => {}
+                NumberOccurrence::TemplateValue { .. }
+                | NumberOccurrence::ConfigurationValue { .. }
+                | NumberOccurrence::ConfigurationRawValue { .. } => {}
                 NumberOccurrence::LootValue { ordinal }
                 | NumberOccurrence::BlueprintValue { ordinal }
                 | NumberOccurrence::ItemComponentValue { ordinal }
@@ -147,7 +146,9 @@ fn index_configurations<'source>(
 ) {
     for number in numbers {
         let (NumberOccurrence::ItemComponentValue { ordinal }
-        | NumberOccurrence::ItemComponentRawValue { ordinal }) = number.occurrence
+        | NumberOccurrence::ItemComponentRawValue { ordinal }
+        | NumberOccurrence::ConfigurationValue { ordinal }
+        | NumberOccurrence::ConfigurationRawValue { ordinal }) = number.occurrence
         else {
             continue;
         };
@@ -321,8 +322,10 @@ impl Coverage<'_, '_> {
             .configurations
             .get(&required.original_ordinal)?;
         let contract = match actual.occurrence {
-            NumberOccurrence::ItemComponentValue { .. } => ResourceNumberContract::Single,
-            NumberOccurrence::ItemComponentRawValue { .. } => ResourceNumberContract::Number,
+            NumberOccurrence::ItemComponentValue { .. }
+            | NumberOccurrence::ConfigurationValue { .. } => ResourceNumberContract::Single,
+            NumberOccurrence::ItemComponentRawValue { .. }
+            | NumberOccurrence::ConfigurationRawValue { .. } => ResourceNumberContract::Number,
             _ => return None,
         };
         Some(

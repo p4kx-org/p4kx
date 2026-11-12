@@ -38,9 +38,30 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         notes: &mut Vec<FieldError>,
         decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<T>, CatalogError> {
-        self.read_class(name, ClassShape::Scalar, notes, |fact, expected, notes| {
-            self.owned_state(name, fact, expected, notes, decode)
-        })
+        self.read_class(
+            name,
+            ClassShape::Scalar,
+            None,
+            notes,
+            |fact, expected, notes| self.owned_state(name, fact, expected, notes, decode),
+        )
+    }
+
+    /// Reads an inline class bound to the expected original declaration.
+    pub(in crate::catalog_v3) fn declared_class_to<T>(
+        &self,
+        name: &str,
+        target: &str,
+        notes: &mut Vec<FieldError>,
+        decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        self.read_class(
+            name,
+            ClassShape::Scalar,
+            Some(target),
+            notes,
+            |fact, expected, notes| self.owned_state(name, fact, expected, notes, decode),
+        )
     }
 
     pub(in crate::catalog_v3) fn declared_class_array<T>(
@@ -49,10 +70,16 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         notes: &mut Vec<FieldError>,
         decode: impl FnMut(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
     ) -> Result<SourcedValue<Vec<SourcedValue<T>>>, CatalogError> {
-        self.read_class(name, ClassShape::Array, notes, |fact, expected, notes| {
-            let state = self.array_state(name, fact, expected, notes, decode)?;
-            Ok((OriginalValuePart::Value, state))
-        })
+        self.read_class(
+            name,
+            ClassShape::Array,
+            None,
+            notes,
+            |fact, expected, notes| {
+                let state = self.array_state(name, fact, expected, notes, decode)?;
+                Ok((OriginalValuePart::Value, state))
+            },
+        )
     }
 
     /// Reads original owned slots stored inline or as pointers to their declared family.
@@ -76,6 +103,7 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         &self,
         name: &str,
         shape: ClassShape,
+        target: Option<&str>,
         notes: &mut Vec<FieldError>,
         read: impl FnOnce(
             &'reader Fact<'scope, 'read, 'source>,
@@ -94,7 +122,7 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
             return self.bind_storage(fact, state);
         }
         let declared = fact.observe_declared_target(self.input)?;
-        let target = declared.0.as_ref().ok().copied();
+        let target = target.or_else(|| declared.0.as_ref().ok().copied());
         self.read_declared_value(fact, target.as_slice(), declared, notes, |notes| {
             let (part, state) = read(fact, target.as_slice(), notes)?;
             fact.bind(part, state, SourceUseRole::Selector, true)
@@ -177,7 +205,9 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         &self,
         original: &Fact<'scope, 'read, 'source>,
     ) -> Result<(), CatalogError> {
-        if let Some(number) = CapturedNumber::item_component_raw(self.originals, original)? {
+        if let Some(number) =
+            CapturedNumber::authored_raw(self.originals, original, self.number_owner)?
+        {
             self.numbers.borrow_mut().push(number);
         }
         Ok(())
