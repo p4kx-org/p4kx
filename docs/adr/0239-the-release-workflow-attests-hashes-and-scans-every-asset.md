@@ -42,7 +42,7 @@ Decided for issue #822.
 ## v0.5.0 tag publication
 
 The v0.5.0 acceptance criteria in #1116, #1114 and #1022 require a completed VirusTotal
-report for the exact SHA-256 of each native package in the four-target matrix. Tag assembly
+report for the exact SHA-256 of each native package in the five-target matrix. Tag assembly
 requires successful scanning and checks that every required package matches the structured
 report receipt from the same version, revision and workflow run. An incomplete scan prevents
 publication. Pull requests and operating-system-specific dry runs skip the external scan.

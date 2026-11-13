@@ -78,7 +78,7 @@ for both CPUs and checks database/rollback-probe authoring without installing ei
 
 The target runtime artifact includes both package hashes and executed binary hashes. Final
 assembly rejects missing, skipped or mismatched package evidence and requires the complete
-[four-target release matrix](supported-platforms.md). Native hardware GPU, dialogs, clipboard and
+[five-target release matrix](supported-platforms.md). Native hardware GPU, dialogs, clipboard and
 audio evidence remains part of the final integration verification; hosted frame success does not
 assert those capabilities. Native CI/device run URLs must be retained with the final release audit.
 
