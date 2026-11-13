@@ -55,7 +55,7 @@ pub(crate) fn materials(
     image_textures: &[Index<json::Texture>],
 ) -> Vec<MaterialIds> {
     let mut shared: HashMap<(String, bool), Index<json::Material>> = HashMap::new();
-    instances
+    let ids = instances
         .iter()
         .enumerate()
         .map(|(part, instance)| {
@@ -86,7 +86,17 @@ pub(crate) fn materials(
             }
             by_id
         })
-        .collect()
+        .collect();
+    if root.materials.iter().any(|material| {
+        material
+            .extensions
+            .as_ref()
+            .is_some_and(|extensions| extensions.emissive_strength.is_some())
+    }) {
+        root.extensions_used
+            .push("KHR_materials_emissive_strength".to_owned());
+    }
+    ids
 }
 
 /// Returns how many materials the instances ask for: one per distinct material slot of each

@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use gltf_json as json;
 use json::Index;
+use json::extensions::material::{EmissiveStrength, EmissiveStrengthFactor};
 use json::material::{
     AlphaCutoff, EmissiveFactor, PbrBaseColorFactor, PbrMetallicRoughness, StrengthFactor,
 };
@@ -267,6 +268,7 @@ pub(crate) fn build_material(
         extensions: None,
         extras: json::extras::Extras::default(),
     };
+    let (emissive_factor, extensions) = emissive(material);
     json::Material {
         name: Some(if material.name.is_empty() {
             fallback_name.to_owned()
@@ -301,7 +303,8 @@ pub(crate) fn build_material(
             extensions: None,
             extras: json::extras::Extras::default(),
         }),
-        emissive_factor: EmissiveFactor(emissive(material)),
+        emissive_factor,
+        extensions,
         ..json::Material::default()
     }
 }
@@ -320,12 +323,33 @@ pub fn base_colour_factor(material: &Material) -> [f32; 3] {
     shading(material).colour
 }
 
-/// The emissive colour times the glow, scaled into 0 to 1 by its brightest channel.
-fn emissive(material: &Material) -> [f32; 3] {
-    let glow = material.glow.max(0.0);
-    let scaled = material.emissive.map(|channel| channel.max(0.0) * glow);
-    let brightest = scaled.into_iter().fold(1.0_f32, f32::max);
-    scaled.map(|channel| channel / brightest)
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "GLB material scalars are f32 and both values are bounded before conversion"
+)]
+fn emissive(material: &Material) -> (EmissiveFactor, Option<json::extensions::material::Material>) {
+    let glow = emission_input(material.glow);
+    let scaled = material
+        .emissive
+        .map(|channel| emission_input(channel) * glow);
+    let brightest = scaled.into_iter().fold(1.0, f64::max);
+    let factor = EmissiveFactor(scaled.map(|channel| (channel / brightest) as f32));
+    let mut extensions: Option<json::extensions::material::Material> = None;
+    if brightest > 1.0 {
+        let strength = brightest.min(f64::from(f32::MAX)) as f32;
+        extensions.get_or_insert_default().emissive_strength = Some(EmissiveStrength {
+            emissive_strength: EmissiveStrengthFactor(strength),
+        });
+    }
+    (factor, extensions)
+}
+
+fn emission_input(value: f32) -> f64 {
+    if value.is_finite() {
+        f64::from(value.max(0.0))
+    } else {
+        0.0
+    }
 }
 
 #[cfg(test)]

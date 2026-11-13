@@ -759,8 +759,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   chunks it skipped. `--lod` picks the level of detail, 0 by default; the LODs come from the
   companions `<name>_lod<n>.<extension>m`, and a level the model lacks exits with code 2.
   `--materials colours` (the default) gives every sub-material of the model's `.mtl` file a glTF
-  material with base colour, opacity, roughness, metalness and emissive colour and no textures;
-  submeshes whose material draws nothing (collision and helper geometry) are left out, and a
+  material with base colour, opacity, roughness, metalness and emissive colour without textures.
+  When the static emissive magnitude exceeds the core range, a normalized emissive colour and the
+  optional `KHR_materials_emissive_strength` extension retain its tint and strength.
+  Submeshes whose material draws nothing (collision and helper geometry) are left out, and a
   missing or unreadable `.mtl` file is reported while the model exports with a grey default
   material. `--materials textures` also embeds the textures of the materials as PNG images: the
   diffuse map as base colour, the normal map (green flipped to glTF's up, the blue channel
