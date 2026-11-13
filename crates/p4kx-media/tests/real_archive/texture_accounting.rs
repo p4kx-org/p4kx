@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::io::{self, Read};
+use std::io::{self, Read, Write as _};
 use std::path::Path;
 
 use p4kx_extraction::{Archive, ArchiveWatch, Entry, PathIndex, TextureMemberKeys};
@@ -33,6 +33,11 @@ fn verify() -> TestResult {
     watch.check()?;
     let paths = PathIndex::new(&archive);
     let survey = survey::read(&archive, &paths, &watch)?;
+    for transfer in [survey::Class::LinearPng, survey::Class::SrgbPng] {
+        if !survey.samples.contains_key(&transfer) {
+            return Err("installed root lacks a representative tagged PNG transfer".into());
+        }
+    }
     let selected: BTreeMap<_, _> = survey
         .samples
         .values()
@@ -57,6 +62,12 @@ fn verify() -> TestResult {
         compare::one(&archive, &paths, entry, entry, &direct)?;
         watch.check()?;
     }
+    writeln!(
+        io::stdout().lock(),
+        "Verified Media conversion in {} source strata with {} distinct DDS families",
+        survey.samples.len(),
+        selected.len()
+    )?;
     drop(replay_paths);
     drop(replay);
     output.close()?;

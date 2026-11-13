@@ -6579,6 +6579,31 @@
       ],
       "type": "object"
     },
+    "DdsPngTransform": {
+      "description": "Channel or transfer processing of a standalone DDS PNG.",
+      "oneOf": [
+        {
+          "const": "preserve_colour_transfer",
+          "description": "Decoded colour samples retain their source transfer.",
+          "type": "string"
+        },
+        {
+          "const": "reinhard_srgb",
+          "description": "Float RGB is Reinhard tone-mapped and encoded as sRGB.",
+          "type": "string"
+        },
+        {
+          "const": "reconstructed_normal",
+          "description": "BC5 reconstructs the normal's Z component.",
+          "type": "string"
+        },
+        {
+          "const": "data_channels",
+          "description": "Alpha or integer data is represented without an RGB transfer declaration.",
+          "type": "string"
+        }
+      ]
+    },
     "DdsRawHeaderInfo": {
       "description": "Authored source header, including an explicitly absent DX10 extension.",
       "properties": {
@@ -17309,8 +17334,28 @@
           "minimum": 0,
           "type": "integer"
         },
+        "output_transfer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTransfer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "placement": {
           "$ref": "#/$defs/TextureDdsImagePlacement"
+        },
+        "png_transform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsPngTransform"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "slice": {
           "format": "uint32",
@@ -17326,6 +17371,16 @@
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
+        },
+        "source_transfer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTransfer"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "source_width": {
           "format": "uint32",

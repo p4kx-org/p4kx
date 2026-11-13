@@ -4,6 +4,7 @@
 use std::collections::BTreeMap;
 use std::io::{self, Read};
 
+use p4kx_extraction::texture_codec::{DdsPngEncoding, DdsTransfer};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DdsHeader, DdsRawHeader, DdsSourceInfo, Entry, MAX_DDS_HEADER_LEN,
     PathIndex, Texture,
@@ -22,6 +23,8 @@ pub(super) enum Class {
     Volume,
     HighRange,
     Integer,
+    LinearPng,
+    SrgbPng,
 }
 
 pub(super) struct Survey<'a> {
@@ -80,7 +83,16 @@ pub(super) fn read<'a>(
         }
         dispositions.valid += 1;
         if let Ok(parts) = header.part_count(entry.uncompressed_size()) {
-            admit(archive, paths, entry, &header, parts, &mut samples)?;
+            let png = DdsPngEncoding::of(header.format(), raw.transfer().effective);
+            admit(
+                archive,
+                paths,
+                entry,
+                &header,
+                parts,
+                png.transfer,
+                &mut samples,
+            )?;
         }
     }
     if dispositions.valid == 0
@@ -97,6 +109,7 @@ fn admit<'a>(
     entry: &'a Entry,
     header: &DdsHeader,
     parts: u32,
+    png_transfer: DdsTransfer,
     samples: &mut BTreeMap<Class, &'a Entry>,
 ) -> TestResult {
     if !header.format().is_decodable()
@@ -131,6 +144,14 @@ fn admit<'a>(
         ),
         (header.depth() > 1, Class::Volume),
         (header.format().is_high_range(), Class::HighRange),
+        (
+            !header.format().is_high_range() && png_transfer == DdsTransfer::Linear,
+            Class::LinearPng,
+        ),
+        (
+            !header.format().is_high_range() && png_transfer == DdsTransfer::Srgb,
+            Class::SrgbPng,
+        ),
         (
             header.format().to_string().contains("_UINT"),
             Class::Integer,

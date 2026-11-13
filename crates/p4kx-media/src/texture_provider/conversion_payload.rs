@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::texture_codec::{DdsPngTransform, DdsTransfer};
 use p4kx_extraction::{TextureImageFace, TextureImageFormat};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -36,6 +37,12 @@ pub(super) struct Image {
     pub(super) suffix: String,
     pub(super) alpha: Alpha,
     pub(super) channel_transform: ChannelTransform,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) source_transfer: Option<DdsTransfer>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) output_transfer: Option<DdsTransfer>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) png_transform: Option<DdsPngTransform>,
     pub(super) artifact: Artifact,
     pub(super) placement: Placement,
 }

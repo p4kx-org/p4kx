@@ -72,7 +72,11 @@ and verified PNG or OpenEXR digest. The placement distinguishes a newly written 
 from an identical artifact already placed in this generation. PNG merges the selected DDS
 alpha or smoothness tail into the alpha channel when present. High-range sources use linear
 floating-point OpenEXR and retain any authored channels of the high-range mip. Per-image
-field origins record the exact original surface byte spans. Required siblings are read only
+field origins record the exact original surface byte spans. Converted image rows distinguish
+the source declaration from the actual RGB encoding in `source_transfer` and `output_transfer`.
+For PNG, `png_transform` identifies how DDS samples became the encoded channels. Known RGB
+transfer is tagged. A directly selected DDS alpha tail carries no RGB transfer tag.
+Required siblings are read only
 when the immediate owning directory proves a unique lossless Entry. An excluded required
 sibling remains private while still contributing its source evidence.
 

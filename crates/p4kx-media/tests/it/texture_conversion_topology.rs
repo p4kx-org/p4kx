@@ -90,6 +90,16 @@ fn check_cube_volume(base: &Path, images: &[&Value]) -> TestResult {
             Some(&json!(4)),
             "full volume depth"
         );
+        assert_eq!(
+            image.get("output_transfer"),
+            Some(&json!("unknown")),
+            "integer channels have no RGB transfer"
+        );
+        assert_eq!(
+            image.get("png_transform"),
+            Some(&json!("data_channels")),
+            "integer channel transform is retained"
+        );
         png(base, image, 4, 2)?;
     }
     Ok(())
@@ -169,6 +179,16 @@ fn check_float_artifact(base: &Path, first: &Value, second: &Value) -> TestResul
         first.get("alpha"),
         Some(&json!("decoded-channels")),
         "stored float alpha"
+    );
+    assert_eq!(
+        first.get("output_transfer"),
+        Some(&json!("linear")),
+        "OpenEXR samples are linear"
+    );
+    assert_eq!(
+        first.get("png_transform"),
+        None,
+        "OpenEXR omits PNG processing"
     );
     let bytes = artifact(base, first)?;
     assert_eq!(

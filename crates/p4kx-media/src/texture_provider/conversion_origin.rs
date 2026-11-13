@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::texture_codec::DdsPngEncoding;
 use p4kx_extraction::{DdsHeaderField, InputScope, SourceUseRole};
 
 use super::conversion_mip::Loaded;
@@ -20,6 +21,7 @@ pub(super) struct ImageOrigins {
     pub(super) shape: OriginContributions,
     format: OriginContributions,
     channels: OriginContributions,
+    transfer: TransferOrigins,
     bytes: OriginContributions,
 }
 
@@ -29,6 +31,8 @@ impl ImageOrigins {
         alpha: Option<&Loaded>,
         directory: Option<&OriginContributions>,
         index: u64,
+        png: Option<DdsPngEncoding>,
+        alpha_header: bool,
         writer: &MediaWriter<'_>,
     ) -> Result<Self, MediaError> {
         use DdsHeaderField::{ArraySize, Depth, Faces, Format, Height, MipCount, Width};
@@ -61,7 +65,9 @@ impl ImageOrigins {
             )?;
         }
         let channels = channels.finish();
+        let transfer = TransferOrigins::of(color, &format, png, alpha_header, writer)?;
         let mut bytes = writer.capture_origins();
+        bytes.include(&transfer.output, writer)?;
         bytes.include(&channels, writer)?;
         bytes.include(&color.pixels(index, writer)?, writer)?;
         if let Some(alpha) = alpha {
@@ -74,6 +80,7 @@ impl ImageOrigins {
             shape,
             format,
             channels,
+            transfer,
             bytes: bytes.finish(),
         })
     }
@@ -110,6 +117,8 @@ impl ImageOrigins {
             ("suffix", &self.shape),
             ("alpha", &self.channels),
             ("channel_transform", &self.format),
+            ("source_transfer", &self.transfer.source),
+            ("output_transfer", &self.transfer.output),
         ] {
             origin::put(
                 &mut origins,
@@ -124,6 +133,14 @@ impl ImageOrigins {
             self.shape.clone(),
             writer,
         )?;
+        if let Some(transform) = &self.transfer.png_transform {
+            origin::put(
+                &mut origins,
+                "/data/payload/png_transform",
+                transform.clone(),
+                writer,
+            )?;
+        }
         self.artifact_fields(&mut origins, "/data/payload/artifact", writer)?;
         Ok(origins)
     }
@@ -145,6 +162,50 @@ impl ImageOrigins {
             origin::put(origins, &format!("{base}/{field}"), source.clone(), writer)?;
         }
         Ok(())
+    }
+}
+
+struct TransferOrigins {
+    source: OriginContributions,
+    output: OriginContributions,
+    png_transform: Option<OriginContributions>,
+}
+
+impl TransferOrigins {
+    fn of(
+        color: &Loaded,
+        format: &OriginContributions,
+        png: Option<DdsPngEncoding>,
+        alpha_header: bool,
+        writer: &MediaWriter<'_>,
+    ) -> Result<Self, MediaError> {
+        use DdsHeaderField::{CryTransfer, DxgiTransfer};
+
+        let header = color.origins();
+        let raw = &color.mip.raw_header;
+        let source = header
+            .fields(raw, &[DxgiTransfer, CryTransfer], writer)?
+            .finish();
+        let Some(encoding) = png else {
+            return Ok(Self {
+                source,
+                output: format.clone(),
+                png_transform: None,
+            });
+        };
+        let mut output = header.fields(raw, encoding.output_transfer_fields(), writer)?;
+        let mut transform = writer.capture_origins();
+        transform.include(format, writer)?;
+        if alpha_header {
+            let name = header.entry_field("path", SourceUseRole::Selector, writer)?;
+            output.include(&name, writer)?;
+            transform.include(&name, writer)?;
+        }
+        Ok(Self {
+            source,
+            output: output.finish(),
+            png_transform: Some(transform.finish()),
+        })
     }
 }
 

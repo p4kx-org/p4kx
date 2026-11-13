@@ -39,6 +39,11 @@ fn texture_conversion_uses_private_encrypted_alpha_and_exact_surface_proofs() ->
         Some(b"\x89PNG\r\n\x1a\n".as_slice()),
         "actual PNG file"
     );
+    assert_eq!(
+        fs::read(&artifact)?.get(37..41),
+        Some(b"sRGB".as_slice()),
+        "real PNG sRGB chunk after IHDR"
+    );
     let sources: Vec<Value> = read_rows(base.join("sources.jsonl"))?;
     assert!(
         sources
@@ -63,7 +68,7 @@ fn split_fixture(root: &Path) -> TestResult<Archive> {
     let alpha = color.alpha_tail().ok_or("fixture alpha")?;
     let path = root.join("Data.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::stored(HEADER, color.header_bytes()))
+        .entry(TestEntry::stored(HEADER, cry_srgb(color.header_bytes())?))
         .entry(TestEntry::stored("Data/paired.dds.1", color.part(1)))
         .entry(TestEntry::stored("Data/paired.dds.a", alpha.header_bytes()))
         .entry(TestEntry::stored("Data/paired.dds.1a", alpha.part(1)).encrypted())
@@ -74,6 +79,18 @@ fn split_fixture(root: &Path) -> TestResult<Archive> {
     )?)
 }
 
+fn cry_srgb(mut header: Vec<u8>) -> TestResult<Vec<u8>> {
+    header
+        .get_mut(124..128)
+        .ok_or("Cry marker")?
+        .copy_from_slice(b"FYRC");
+    header
+        .get_mut(36..40)
+        .ok_or("Cry flags")?
+        .copy_from_slice(&0x800_u32.to_le_bytes());
+    Ok(header)
+}
+
 fn check_png(row: &MediaRecord) -> TestResult<&str> {
     let payload = row.data.pointer("/payload").ok_or("image payload")?;
     for (field, value) in [
@@ -82,6 +99,9 @@ fn check_png(row: &MediaRecord) -> TestResult<&str> {
         ("height", json!(4)),
         ("alpha", json!("decoded-split-channel")),
         ("format", json!("png")),
+        ("source_transfer", json!("srgb")),
+        ("output_transfer", json!("srgb")),
+        ("png_transform", json!("preserve_colour_transfer")),
         ("bit_depth", json!(8)),
         ("placement", json!("written")),
     ] {
@@ -112,6 +132,27 @@ fn check_split_origins(base: &Path, ordinal: usize) -> TestResult {
         width.get("containsEncryptedSource"),
         Some(&json!(false)),
         "width only uses the color header"
+    );
+    for path in ["source_transfer", "output_transfer", "png_transform"] {
+        let field = field(&fields, ordinal, &format!("/data/payload/{path}"))?;
+        assert_eq!(
+            field.get("containsEncryptedSource"),
+            Some(&json!(false)),
+            "texture transfer proof uses plain colour header"
+        );
+    }
+    let transfer = field(&fields, ordinal, "/data/payload/output_transfer")?;
+    let references = transfer
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("transfer source refs")?;
+    assert!(
+        uses.iter().any(|row| {
+            row.get("id").is_some_and(|id| references.contains(id))
+                && row.pointer("/location/field") == Some(&json!("reserved1"))
+                && row.pointer("/location/indices/0") == Some(&json!("36"))
+        }),
+        "output transfer cites the original Cry flags"
     );
     let references = artifact
         .get("sourceUsesRefs")
@@ -231,7 +272,7 @@ fn texture_conversion_keeps_wrong_key_distinct_from_a_bad_payload() -> TestResul
         };
         let path = folder.path().join("Data.p4k");
         ArchiveBuilder::new()
-            .entry(TestEntry::stored(HEADER, color.header_bytes()))
+            .entry(TestEntry::stored(HEADER, cry_srgb(color.header_bytes())?))
             .entry(part)
             .write_to(&path)?;
         let archive = Archive::open_with(path, OpenOptions::new().key(Some(other_test_key())))?;

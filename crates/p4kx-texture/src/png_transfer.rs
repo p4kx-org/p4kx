@@ -4,7 +4,7 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::{DdsTransfer, TextureFormat};
+use crate::{DdsHeaderField, DdsTransfer, TextureFormat};
 
 /// The RGB transfer and channel transform used by standalone DDS-to-PNG conversion.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -60,6 +60,23 @@ impl DdsPngEncoding {
     #[must_use]
     pub const fn uses_source_transfer(self) -> bool {
         matches!(self.transform, DdsPngTransform::PreserveColourTransfer)
+    }
+
+    /// Determines an output whose role identifies the samples as linear data channels.
+    #[must_use]
+    pub const fn data_channels() -> Self {
+        Self::data(DdsPngTransform::DataChannels)
+    }
+
+    /// Returns the source header fields that decide the output transfer.
+    #[must_use]
+    pub const fn output_transfer_fields(self) -> &'static [DdsHeaderField] {
+        use DdsHeaderField::{CryTransfer, DxgiTransfer, Format};
+        if self.uses_source_transfer() {
+            &[Format, DxgiTransfer, CryTransfer]
+        } else {
+            &[Format]
+        }
     }
 
     const fn data(transform: DdsPngTransform) -> Self {

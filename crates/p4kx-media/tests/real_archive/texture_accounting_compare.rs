@@ -4,6 +4,7 @@
 use std::fs;
 use std::path::Path;
 
+use p4kx_extraction::texture_codec::{DdsPngEncoding, DdsTransfer};
 use p4kx_extraction::{
     Archive, CubemapLayout, Entry, Exclusion, Filter, PathIndex, Texture, TextureImage,
     TextureImageFormat, TextureImagePlan,
@@ -92,6 +93,7 @@ fn compare_images(
     for ((planned, image), direct) in plan.zip(images).zip(filenames) {
         let payload = image.data.get("payload").ok_or("image payload")?;
         geometry(&planned, payload)?;
+        transfer(texture, planned.format, payload)?;
         content(base, payload, &direct)?;
     }
     Ok(())
@@ -117,6 +119,27 @@ fn geometry(planned: &TextureImage, payload: &Value) -> TestResult {
         if payload.get(field) != Some(&expected) {
             return Err("original topology and Media image geometry disagree".into());
         }
+    }
+    Ok(())
+}
+
+fn transfer(texture: &Texture<'_>, format: TextureImageFormat, payload: &Value) -> TestResult {
+    let source = texture
+        .source_metadata()
+        .transfer
+        .ok_or("DDS transfer metadata")?
+        .effective;
+    let (output, transform) = if format == TextureImageFormat::Exr {
+        (DdsTransfer::Linear, None)
+    } else {
+        let png = DdsPngEncoding::of(texture.header().format(), source);
+        (png.transfer, Some(json!(png.transform)))
+    };
+    if payload.get("source_transfer") != Some(&json!(source))
+        || payload.get("output_transfer") != Some(&json!(output))
+        || payload.get("png_transform") != transform.as_ref()
+    {
+        return Err("original and converted DDS transfer evidence disagree".into());
     }
     Ok(())
 }

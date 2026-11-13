@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::texture_codec;
+use p4kx_extraction::texture_codec::{self, DdsPngEncoding, DdsTransfer};
 use p4kx_extraction::{
     CubemapLayout, DdsHeader, DdsRawHeader, DecimalU64, DxgiFormat, HdrImage, RgbaImage,
     TextureError, TextureFormat, TextureImage, TextureImageFormat, TextureImagePlan,
@@ -177,6 +177,13 @@ impl Request<'_> {
         let mut all = writer.capture_origins();
         let directory = self.family.evidence();
         let count = DecimalU64::new(plan.len() as u64);
+        let source = color.mip.mip.header();
+        let source_transfer = color.mip.raw_header.transfer().effective;
+        let png = if self.role.alpha {
+            DdsPngEncoding::data_channels()
+        } else {
+            DdsPngEncoding::of(source.format(), source_transfer)
+        };
         for (position, image) in plan.enumerate() {
             writer.checkpoint()?;
             let index = position as u64;
@@ -186,14 +193,16 @@ impl Request<'_> {
             };
             let uses_family = color.payload_input.is_some()
                 || image.format == TextureImageFormat::Png && !self.role.alpha;
+            let png = (image.format == TextureImageFormat::Png).then_some(png);
             let origins = ImageOrigins::of(
                 color,
                 alpha,
                 uses_family.then_some(directory),
                 index,
+                png,
+                self.role.alpha,
                 writer,
             )?;
-            let source = color.mip.mip.header();
             let alpha = decoded.alpha(alpha.is_some());
             let subresource = Subresource::new(IMAGE, vec![u64::from(self.level), index]);
             all.include(&origins.shape, writer)?;
@@ -201,6 +210,8 @@ impl Request<'_> {
                 image,
                 source,
                 decoded,
+                source_transfer,
+                png,
                 alpha,
             }
             .publish(context, &color.header_input, &subresource, &origins, writer)?;
@@ -213,6 +224,8 @@ struct ImageWrite<'a> {
     image: TextureImage,
     source: &'a DdsHeader,
     decoded: Pixels,
+    source_transfer: DdsTransfer,
+    png: Option<DdsPngEncoding>,
     alpha: Alpha,
 }
 
@@ -226,11 +239,12 @@ impl ImageWrite<'_> {
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
         let image = self.image;
+        let transfer = self.png.map_or(DdsTransfer::Linear, |png| png.transfer);
         let occurrence = writer.converted_occurrence_with_origins(
             ArtifactExtension::new(image.format.extension())?,
             &origins.manifest(writer)?,
             |sink| {
-                self.decoded.encode(sink).map_err(|cause| {
+                self.decoded.encode(transfer, sink).map_err(|cause| {
                     let cause = match cause {
                         TextureError::Write(source) => source,
                         other => std::io::Error::other(other),
@@ -258,6 +272,9 @@ impl ImageWrite<'_> {
                 suffix: image.suffix,
                 alpha: self.alpha,
                 channel_transform: channel_transform(image.format, self.source.format()),
+                source_transfer: Some(self.source_transfer),
+                output_transfer: Some(transfer),
+                png_transform: self.png.map(|png| png.transform),
                 artifact: occurrence.artifact,
                 placement: if occurrence.created {
                     Placement::Written
@@ -307,9 +324,13 @@ impl Pixels {
         Ok(Self::Png(rgba))
     }
 
-    fn encode(&self, sink: &mut dyn std::io::Write) -> Result<(), TextureError> {
+    fn encode(
+        &self,
+        transfer: DdsTransfer,
+        sink: &mut dyn std::io::Write,
+    ) -> Result<(), TextureError> {
         match self {
-            Self::Png(image) => texture_codec::write_png(image, sink),
+            Self::Png(image) => texture_codec::write_png_with_transfer(image, transfer, sink),
             Self::Exr(image) => texture_codec::write_exr(image, sink),
         }
     }

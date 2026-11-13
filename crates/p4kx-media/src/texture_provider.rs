@@ -28,7 +28,7 @@ impl Provider for TextureProvider {
         let mut capability = Capability::new(
             MediaKind::Texture,
             "p4kx.texture.dds",
-            "1.3.0",
+            "1.4.0",
             "Exact decoded DDS source Entries remain in the common RawReference. Header metadata retains authored words and separates reader-derived topology from codec support.",
         );
         capability.field_groups = vec![
@@ -42,7 +42,7 @@ impl Provider for TextureProvider {
             ),
             FieldGroup::new(
                 "texture-conversion",
-                "Optional conversion emits the requested mip as PNG or OpenEXR with exact original surface spans.",
+                "Optional conversion emits the requested mip as PNG or OpenEXR with exact original surface spans and source and output transfer evidence.",
             ),
         ];
         capability

@@ -76,16 +76,9 @@ impl PreviewHeaderEvidence {
         encoding: DdsPngEncoding,
     ) -> Result<Vec<SourceUse>, SourceEvidenceError> {
         let mut uses = self.header_uses(&[DdsHeaderField::Prefix], SourceUseRole::Selector)?;
-        let fields = if encoding.uses_source_transfer() {
-            &[
-                DdsHeaderField::Format,
-                DdsHeaderField::DxgiTransfer,
-                DdsHeaderField::CryTransfer,
-            ][..]
-        } else {
-            &[DdsHeaderField::Format][..]
-        };
-        uses.extend(self.header_uses(fields, SourceUseRole::Conversion)?);
+        uses.extend(
+            self.header_uses(encoding.output_transfer_fields(), SourceUseRole::Conversion)?,
+        );
         Ok(uses)
     }
 
