@@ -8,8 +8,9 @@ use p4kx_extraction::bank::{
 };
 use p4kx_extraction::{BankError, DecimalU64, MediaClass};
 
+use crate::audio_bank_didx_index::DidxSite;
 use crate::audio_bank_failure::BankPhase;
-use crate::audio_bank_inventory::DataInventory;
+use crate::audio_bank_inventory::{BankInventory, DataInventory};
 use crate::audio_bank_payload::{BankDataLink, BankEntryRange, BankMediaRecord, BankPayload};
 use crate::audio_bank_projection::BankProjection;
 use crate::audio_wem_projection::{self, WemProjection};
@@ -37,7 +38,7 @@ pub(crate) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,
     source: &mut BankSource<R>,
     section: &BankSourceSection,
-    data: Option<&DataInventory>,
+    inventory: &BankInventory,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let mut index = match source.didx(section) {
@@ -53,9 +54,14 @@ pub(crate) fn project<R: Read + Seek>(
                 return projection.failure(BankPhase::MediaIndex, Some(section), cause, writer);
             }
         };
-        let resolution =
-            resolve(&mut index, &entry, data).map_err(|cause| projection.replay_failure(cause))?;
-        emit(projection, &entry, &resolution, writer)?;
+        let resolution = resolve(&mut index, &entry, inventory.data())
+            .map_err(|cause| projection.replay_failure(cause))?;
+        let first = inventory
+            .didx_entries
+            .candidates(entry.media_id())
+            .first()
+            .filter(|first| first.offset < entry.triplet_offset());
+        emit(projection, &entry, &resolution, first, writer)?;
         project_embedded(projection, &mut index, &entry, &resolution, writer)?;
     }
     Ok(())
@@ -112,6 +118,7 @@ fn emit(
     projection: &BankProjection<'_>,
     entry: &BankDidxEntry,
     resolution: &DataResolution<'_>,
+    first: Option<&DidxSite>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let index_start = entry.triplet_offset();
@@ -127,17 +134,34 @@ fn emit(
         index_range: BankEntryRange::new(index_start, index_end),
         data: resolution.payload(),
     });
-    let (status, issue) = resolution.status();
-    audio_bank_media_origins::prepare(projection.input, entry, resolution, writer)?.write(
-        writer,
-        &Subresource::new(
-            MEDIA_NAMESPACE,
-            vec![entry.section_ordinal(), entry.ordinal()],
+    let (status, resolution_issue) = resolution.status();
+    let duplicate = first.map(|_| {
+        MediaIssue::new(
+            "audio.bank.duplicate-media",
+            "DIDX",
+            Severity::Info,
+            "The soundbank declares this media ID more than once",
+        )
+    });
+    let origins =
+        audio_bank_media_origins::prepare(projection.input, entry, resolution, first, writer)?;
+    let subresource = Subresource::new(
+        MEDIA_NAMESPACE,
+        vec![entry.section_ordinal(), entry.ordinal()],
+    );
+    match (duplicate, resolution_issue) {
+        (Some(duplicate), Some(resolution)) => origins.write(
+            writer,
+            &subresource,
+            status,
+            &payload,
+            &[duplicate, resolution],
         ),
-        status,
-        &payload,
-        issue.as_slice(),
-    )
+        (Some(issue), None) | (None, Some(issue)) => {
+            origins.write(writer, &subresource, status, &payload, &[issue])
+        }
+        (None, None) => origins.write(writer, &subresource, status, &payload, &[]),
+    }
 }
 
 impl DataResolution<'_> {

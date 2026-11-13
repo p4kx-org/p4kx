@@ -257,6 +257,7 @@ fn check_media(
             Some(bytes),
             "independent expected embedded bytes"
         );
+        origins.check_duplicate_media(*ordinal, owner, row, fixture, position)?;
         origins.media(*ordinal, owner, expected_start, prefetch)?;
         expected_start = end;
     }

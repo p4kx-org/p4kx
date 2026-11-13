@@ -120,7 +120,9 @@ language ID and reader version support. Ranges are half-open in decoded Entry co
 Their starts, exclusive ends and payload ordinals use unsigned decimal strings.
 
 Each original DIDX triplet retains its ID, authored DATA offset and length, and the
-range of its declaration. Repeated media IDs are separate rows in original order. DATA
+range of its declaration. Repeated media IDs are separate rows in original order. Every
+repeat carries an informational `audio.bank.duplicate-media` issue linked to the first
+and repeated ID words in that physical bank. DATA
 resolution reports `resolved`, `missing`, `ambiguous`, `unavailable` or `outside-data`.
 A resolved row links the exact DATA section and retained byte range. A bounded prefix
 read supplies the observed media class, optional RIFF length and prefetch decision.

@@ -123,7 +123,7 @@ fn subresources<R: Read + Seek>(
             .map_err(|cause| projection.replay_failure(cause))?;
         match section.id() {
             SectionId::DIDX => {
-                audio_bank_media::project(projection, source, &section, inventory.data(), writer)?;
+                audio_bank_media::project(projection, source, &section, inventory, writer)?;
             }
             SectionId::HIRC => {
                 audio_bank_hirc::project(projection, source, &section, inventory, writer)?;

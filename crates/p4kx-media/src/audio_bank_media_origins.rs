@@ -6,6 +6,7 @@ use p4kx_extraction::bank::{
     BankDeclaredLengthSource, BankDidxEntry, BankMediaClassSource, BankMediaInfo, BankSourceSection,
 };
 
+use crate::audio_bank_didx_index::DidxSite;
 use crate::audio_bank_media::DataResolution;
 use crate::audio_bank_origins::{BankOrigins, EvidenceSite, complete_directory, section_routing};
 use crate::audio_record_origins as origins;
@@ -61,6 +62,7 @@ pub(crate) fn prepare(
     input: &MediaOriginInput,
     entry: &BankDidxEntry,
     resolution: &DataResolution<'_>,
+    first: Option<&DidxSite>,
     writer: &MediaWriter<'_>,
 ) -> Result<PreparedRecordOrigins, MediaError> {
     let mut prepared = BankOrigins::new(input, writer)?;
@@ -92,8 +94,45 @@ pub(crate) fn prepare(
         ])?;
         prepared.field(path, evidence)?;
     }
-    data_origins(&mut prepared, route, &triplet, resolution)?;
+    let data_issue = data_origins(&mut prepared, route, &triplet, resolution)?;
+    let duplicate = first
+        .map(|first| {
+            prepared.capture([
+                section_routing(&[first.section]),
+                section_routing(&section_ordinal),
+                (
+                    OriginSite::new("bnkDidx", &[first.offset], "mediaId"),
+                    SourceUseRole::Conversion,
+                ),
+                (
+                    OriginSite::new("bnkDidx", &triplet, "mediaId"),
+                    SourceUseRole::Conversion,
+                ),
+            ])
+        })
+        .transpose()?;
+    issue_origins(&mut prepared, writer, duplicate, data_issue)?;
     Ok(prepared.finish())
+}
+
+fn issue_origins(
+    prepared: &mut BankOrigins<'_, '_, '_>,
+    writer: &MediaWriter<'_>,
+    duplicate: Option<OriginContributions>,
+    data: Option<OriginContributions>,
+) -> Result<(), MediaError> {
+    match (duplicate, data) {
+        (Some(duplicate), Some(data)) => {
+            let mut combined = writer.capture_origins();
+            combined.include(&duplicate, writer)?;
+            combined.include(&data, writer)?;
+            prepared.field("/issues", combined.finish())?;
+            prepared.subtree("/issues/0", duplicate)?;
+            prepared.subtree("/issues/1", data)
+        }
+        (Some(issue), None) | (None, Some(issue)) => prepared.subtree("/issues", issue),
+        (None, None) => Ok(()),
+    }
 }
 
 fn data_origins(
@@ -101,10 +140,11 @@ fn data_origins(
     route: EvidenceSite<'_>,
     triplet: &[u64],
     resolution: &DataResolution<'_>,
-) -> Result<(), MediaError> {
+) -> Result<Option<OriginContributions>, MediaError> {
     match resolution {
         DataResolution::Resolved { section, info } => {
-            resolved(prepared, route, triplet, section, info)
+            resolved(prepared, route, triplet, section, info)?;
+            Ok(None)
         }
         DataResolution::OutsideData { section } => {
             let sites = data_selection(route, triplet, section);
@@ -113,7 +153,7 @@ fn data_origins(
             prepared.field("/data/payload/data/status", evidence.clone())?;
             prepared.field("/data/payload/data/section_ordinal", evidence.clone())?;
             prepared.field("/data/payload/data/data_length", evidence.clone())?;
-            prepared.subtree("/issues", evidence)
+            Ok(Some(evidence))
         }
         other => {
             let inventory = match other {
@@ -128,10 +168,9 @@ fn data_origins(
             prepared.field("/data/payload/data/status", evidence.clone())?;
             if matches!(other, DataResolution::Ambiguous(_)) {
                 prepared.field("/data/payload/data/candidates", evidence)?;
-            } else if matches!(other, DataResolution::Missing) {
-                prepared.subtree("/issues", evidence)?;
+                return Ok(None);
             }
-            Ok(())
+            Ok(matches!(other, DataResolution::Missing).then_some(evidence))
         }
     }
 }
