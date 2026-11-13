@@ -5,6 +5,7 @@ use p4kx_extraction::chunks::{ByteOrder as ChunkByteOrder, Chunk, Container};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::lod_distances::LodDistanceWords;
 use crate::{ByteOrder, OffsetBasis, SourceRange};
 
 pub(super) const ENTRY: &str = "model-entry";
@@ -134,4 +135,5 @@ impl ModelChunkRecord {
 pub(super) enum ModelSourcePayload {
     Entry(ModelEntryRecord),
     Chunk(ModelChunkRecord),
+    LodDistanceWords(LodDistanceWords),
 }

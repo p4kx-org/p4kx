@@ -15,3 +15,6 @@ pub(crate) use schema::bind_record_schema;
 
 #[path = "model_source/physics.rs"]
 mod physics;
+
+#[path = "model_source/lod_distances.rs"]
+mod lod_distances;

@@ -18,6 +18,7 @@ mod layout_inventory;
 mod layout_records;
 mod manifests;
 mod model_collision_replay;
+mod model_lod_distance_replay;
 mod preservation_provider;
 mod privacy;
 mod shader_accounting;

@@ -153,7 +153,13 @@ fn assert_chunk_origins(
         ),
         ("range", "modelChunkOffset", row.offset),
     ] {
-        let uses = field_uses(base, ordinal, &format!("/data/payload/{field}"), owner)?;
+        let uses = field_uses(
+            base,
+            ordinal,
+            &format!("/data/payload/{field}"),
+            owner,
+            owner == 1,
+        )?;
         assert_exact_use(&uses, name, range);
     }
     Ok(())
@@ -173,11 +179,12 @@ fn assert_exact_use(uses: &[Value], field: &str, range: Range<u64>) {
     );
 }
 
-fn field_uses(
+pub(super) fn field_uses(
     base: &Path,
     ordinal: usize,
     field: &str,
     owner: usize,
+    encrypted: bool,
 ) -> Result<Vec<Value>, Box<dyn Error>> {
     let ordinal = ordinal.to_string();
     let data = fs::read_to_string(base.join("field-origins.jsonl"))?;
@@ -195,7 +202,7 @@ fn field_uses(
         .ok_or_else(|| format!("actual model field origin for {field}"))??;
     assert_eq!(
         row.get("containsEncryptedSource"),
-        Some(&json!(owner == 1)),
+        Some(&json!(encrypted)),
         "encryption is specific to the original Entry"
     );
     assert_eq!(
@@ -308,7 +315,7 @@ fn a_physical_model_row_failure_links_the_authored_fault_instead_of_only_its_hea
     let root = diagnostic.parent().ok_or("diagnostic generation base")?;
     for path in ["/status", "/issues/0/detail"] {
         assert_exact_use(
-            &field_uses(root, 0, path, 0)?,
+            &field_uses(root, 0, path, 0, false)?,
             "modelChunkRowFailure",
             original_row.clone(),
         );

@@ -100,6 +100,13 @@ The provider reads the original header and table from retained bytes and charges
 row count to the common metadata work budget before allocating the table. A malformed table
 is diagnosed in diagnostic output with its original Entry bytes.
 
+Measured IVO LodDistances chunks emit one `model-lod-distance-words` row per physical
+chunk. The v0x900 layout with a 48-byte inferred range carries twelve ordered original
+little-endian words. Each word has its unsigned bits and, when finite, its binary32
+interpretation. The projection keeps the complete range, including trailing words. It
+assigns no switch thresholds, distance units or companion levels to individual words.
+Other versions and extents keep their original bytes and an explicit opaque disposition.
+
 IVO StatObjPhysics table version 0x900 additionally emits `model-physics-table` and
 `model-physics-slot` rows. The chunk ordinal locates the table. A second ordinal locates each
 slot, including duplicate packed keys and the whole-object sentinel. Declared and available

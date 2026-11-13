@@ -8612,6 +8612,80 @@
       ],
       "type": "object"
     },
+    "LodDistanceWord": {
+      "additionalProperties": false,
+      "properties": {
+        "bits": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "finite_binary32": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "bits",
+        "finite_binary32"
+      ],
+      "type": "object"
+    },
+    "LodDistanceWords": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "words",
+              "type": "string"
+            },
+            "words": {
+              "items": {
+                "$ref": "#/$defs/LodDistanceWord"
+              },
+              "maxItems": 12,
+              "minItems": 12,
+              "type": "array"
+            }
+          },
+          "required": [
+            "disposition",
+            "words"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "unsupported-version",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "unmeasured-extent",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "LooseInventoryPayload": {
       "oneOf": [
         {
@@ -10192,6 +10266,23 @@
             },
             "record_type": {
               "const": "chunk",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/LodDistanceWords"
+            },
+            "record_type": {
+              "const": "lod-distance-words",
               "type": "string"
             }
           },
@@ -36456,6 +36547,61 @@
                 "properties": {
                   "record_type": {
                     "const": "chunk"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-lod-distance-words"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelSourcePayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "lod-distance-words"
                   }
                 },
                 "required": [

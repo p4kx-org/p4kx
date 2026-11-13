@@ -3,6 +3,7 @@
 
 use serde_json::{Value, json};
 
+use super::lod_distances;
 use super::payload::{self, ModelSourcePayload};
 use crate::{MediaError, schema_merge};
 
@@ -18,9 +19,11 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         .get_mut("allOf")
         .and_then(Value::as_array_mut)
         .ok_or_else(|| MediaError::Contract("media schema has no built-in constraints".into()))?;
-    for (namespace, record_type, count) in
-        [(payload::ENTRY, "entry", 0), (payload::CHUNK, "chunk", 1)]
-    {
+    for (namespace, record_type, count) in [
+        (payload::ENTRY, "entry", 0),
+        (payload::CHUNK, "chunk", 1),
+        (lod_distances::NAMESPACE, "lod-distance-words", 1),
+    ] {
         branches.push(json!({
             "if": {
                 "properties": {

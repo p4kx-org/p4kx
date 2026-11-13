@@ -8,6 +8,7 @@ use std::path::Path;
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::chunks::{ChunkDirectory, ChunkDirectoryError, ChunkError, Container};
 
+use super::lod_distances;
 use super::origins::{self, ModelOrigins};
 use super::payload::{
     self, ModelChunkRecord, ModelEntryRecord, ModelSourceFamily, ModelSourcePayload,
@@ -27,7 +28,7 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.1.0",
+            "1.2.0",
             "Selected original model and geometry Entry bytes with positioned chunk table records.",
         );
         capability.field_groups = vec![
@@ -38,6 +39,10 @@ impl Provider for ModelSourceProvider {
             FieldGroup::new(
                 "collision-shapes",
                 "Original StatObjPhysics table slots and validated source-frame geometry.",
+            ),
+            FieldGroup::new(
+                "lod-distance-words",
+                "Positioned original words of measured LodDistances chunks.",
             ),
             FieldGroup::new_with_unsupported_projection(
                 "model-semantics",
@@ -84,6 +89,7 @@ impl Provider for ModelSourceProvider {
                     writer.checkpoint()?;
                     chunk(&file, index, &origins, writer)?;
                     physics::emit(&file, index, &mut reader, &origins, writer)?;
+                    lod_distances::emit(&file, index, &mut reader, &origins, writer)?;
                 }
             }
             Err(ChunkDirectoryError::Format(ChunkError::Allocation)) => {
