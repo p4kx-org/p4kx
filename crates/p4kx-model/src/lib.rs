@@ -223,7 +223,7 @@ pub use prefab::{
     PrefabObject, PrefabRef,
 };
 pub use rig_logic_bytes::RigLogicBytes;
-pub use skeleton_source::SkeletonSource;
+pub use skeleton_source::{PositionedSkeleton, SkeletonSource};
 pub use soc_area_component::{SocAreaComponent, SocAreaLink};
 pub use soc_container_descriptor::{
     SocContainerDeclaration, SocContainerDescriptor, SocContainerDescriptorError,

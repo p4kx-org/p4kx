@@ -143,7 +143,7 @@ pub(crate) struct AtlBinaryText<'document> {
     pub(crate) value: &'document str,
 }
 
-#[derive(Serialize, JsonSchema)]
+#[derive(Clone, Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct AtlLocation {
     pub(crate) parent: Option<DecimalU64>,

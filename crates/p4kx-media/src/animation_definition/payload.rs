@@ -5,6 +5,7 @@ use p4kx_extraction::DecimalU64;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::graph_source::{GraphAttribute, GraphNode};
 use super::timeline_payload::{Event, EventAttribute, EventTimeline};
 use crate::Reference;
 use crate::audio_control_payload::{
@@ -21,6 +22,8 @@ pub(super) const NAMED_CAF: &str = "animation-definition-named-caf";
 pub(super) const EVENT_TIMELINE: &str = "animation-definition-event-timeline";
 pub(super) const EVENT: &str = "animation-definition-event";
 pub(super) const EVENT_ATTRIBUTE: &str = "animation-definition-event-attribute";
+pub(super) const GRAPH_NODE: &str = "animation-definition-graph-node";
+pub(super) const GRAPH_ATTRIBUTE: &str = "animation-definition-graph-attribute";
 
 #[derive(Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -69,6 +72,8 @@ pub(super) enum DefinitionPayload<'source> {
     EventTimeline(EventTimeline<'source>),
     Event(Event),
     EventAttribute(EventAttribute<'source>),
+    GraphNode(GraphNode<'source>),
+    GraphAttribute(GraphAttribute<'source>),
 }
 
 #[derive(Serialize, JsonSchema)]

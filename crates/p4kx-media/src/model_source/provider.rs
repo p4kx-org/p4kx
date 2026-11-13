@@ -16,6 +16,7 @@ use super::payload::{
     self, ModelChunkRecord, ModelEntryRecord, ModelSourceFamily, ModelSourcePayload,
 };
 use super::physics;
+use super::skeleton;
 use super::vehicle_grid;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::required_reader::RequiredReader;
@@ -31,7 +32,7 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.6.0",
+            "1.7.0",
             "Selected original models, geometry and character definitions with positioned source declarations.",
         );
         capability.field_groups = vec![
@@ -62,6 +63,10 @@ impl Provider for ModelSourceProvider {
             FieldGroup::new(
                 "collision-frames",
                 "Original NMC node declarations and composed collision frames with physical parent evidence.",
+            ),
+            FieldGroup::new(
+                "physical-skeletons",
+                "Measured original IVO skeleton chunks, bind poses and exact bone field coordinates.",
             ),
             FieldGroup::new_with_unsupported_projection(
                 "model-semantics",
@@ -338,6 +343,7 @@ fn chunks(
         chunk(file, index, origins, writer)?;
         physics::emit(file, index, reader, frames.as_ref(), origins, writer)?;
         lod_distances::emit(file, index, reader, origins, writer)?;
+        skeleton::emit(file, index, reader, origins, writer)?;
     }
     Ok(())
 }

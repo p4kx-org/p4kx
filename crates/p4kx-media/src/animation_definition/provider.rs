@@ -21,7 +21,7 @@ impl Provider for AnimationDefinitionProvider {
         let mut capability = Capability::new(
             MediaKind::AnimationDefinition,
             "p4kx.animation-definition",
-            "1.0.0",
+            "1.1.0",
             "Original character parameters, animation event definitions and Mannequin XML source.",
         );
         capability.field_groups = vec![
@@ -36,6 +36,10 @@ impl Provider for AnimationDefinitionProvider {
             FieldGroup::new(
                 "event-timelines",
                 "Ordered authored timelines, event attributes and exact CAF references.",
+            ),
+            FieldGroup::new(
+                "animation-graphs",
+                "Positioned Mannequin and blend-space node roles and original attributes.",
             ),
         ];
         capability

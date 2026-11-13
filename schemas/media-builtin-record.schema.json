@@ -1081,6 +1081,40 @@
             "payload"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/GraphNode"
+            },
+            "record_type": {
+              "const": "graph-node",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/GraphAttribute"
+            },
+            "record_type": {
+              "const": "graph-attribute",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
         }
       ],
       "title": "DefinitionPayload"
@@ -8764,6 +8798,134 @@
       ],
       "type": "string"
     },
+    "GraphAttribute": {
+      "additionalProperties": false,
+      "properties": {
+        "declaration": {
+          "$ref": "#/$defs/AtlDeclaration"
+        },
+        "field": {
+          "$ref": "#/$defs/GraphField"
+        }
+      },
+      "required": [
+        "field",
+        "declaration"
+      ],
+      "type": "object"
+    },
+    "GraphField": {
+      "enum": [
+        "name",
+        "guid",
+        "tags",
+        "fragment-tags",
+        "flags",
+        "option-weight",
+        "blend-out-duration",
+        "start-time",
+        "exit-time",
+        "enter-time",
+        "select-time",
+        "duration",
+        "from",
+        "to",
+        "sync-group",
+        "terminal",
+        "transition-fragment",
+        "transition-tags",
+        "speed",
+        "weight",
+        "weight-list",
+        "procedure-type",
+        "procedure-string",
+        "procedure-string2",
+        "procedure-crc-string",
+        "file",
+        "tag-definition",
+        "fragment-definition",
+        "version",
+        "min",
+        "max",
+        "cells",
+        "joint-name",
+        "start-key",
+        "end-key",
+        "scale",
+        "locked",
+        "delta-extraction",
+        "animation-name",
+        "alias",
+        "playback-scale",
+        "parameter-assignment",
+        "direct-delta-motion",
+        "face-point",
+        "example-index",
+        "example-weight",
+        "fixed-parameter",
+        "choose-blend-space",
+        "weight-blend-space",
+        "parameter-scale",
+        "unknown"
+      ],
+      "type": "string"
+    },
+    "GraphNode": {
+      "additionalProperties": false,
+      "properties": {
+        "location": {
+          "$ref": "#/$defs/AtlLocation"
+        },
+        "name": {
+          "type": "string"
+        },
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "role": {
+          "$ref": "#/$defs/GraphRole"
+        }
+      },
+      "required": [
+        "role",
+        "name",
+        "location",
+        "position"
+      ],
+      "type": "object"
+    },
+    "GraphRole": {
+      "enum": [
+        "database",
+        "fragment-list",
+        "fragment-group",
+        "transition-list",
+        "transition",
+        "transition-option",
+        "fragment",
+        "animation-layer",
+        "procedural-layer",
+        "animation",
+        "procedural",
+        "layer-blend",
+        "sub-databases",
+        "sub-database",
+        "blend-space",
+        "combined-space",
+        "dimensions",
+        "extraction",
+        "parameter",
+        "example-list",
+        "example-pseudo",
+        "example",
+        "pseudo",
+        "faces",
+        "face",
+        "blend-spaces",
+        "blend-space-input"
+      ],
+      "type": "string"
+    },
     "GridDatabaseState": {
       "enum": [
         "ready",
@@ -11082,6 +11244,45 @@
         "table"
       ],
       "type": "object"
+    },
+    "ModelSkeletonRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SkeletonChunk"
+            },
+            "record_type": {
+              "const": "skeleton-chunk",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SkeletonBone"
+            },
+            "record_type": {
+              "const": "skeleton-bone",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "SkeletonRecord"
     },
     "ModelSourceFamily": {
       "enum": [
@@ -14862,6 +15063,34 @@
       ],
       "type": "object"
     },
+    "Pose": {
+      "additionalProperties": false,
+      "properties": {
+        "rotation_xyzw": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "translation_z_up_metres": {
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "rotation_xyzw",
+        "translation_z_up_metres"
+      ],
+      "type": "object"
+    },
     "PositioningCoordinate": {
       "additionalProperties": false,
       "properties": {
@@ -17339,6 +17568,83 @@
         "file"
       ],
       "type": "object"
+    },
+    "SkeletonBone": {
+      "additionalProperties": false,
+      "properties": {
+        "controller_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model_space": {
+          "$ref": "#/$defs/Pose"
+        },
+        "name": {
+          "type": "string"
+        },
+        "name_lossy": {
+          "type": "boolean"
+        },
+        "node": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "parent": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "relative": {
+          "$ref": "#/$defs/Pose"
+        }
+      },
+      "required": [
+        "name",
+        "name_lossy",
+        "parent",
+        "controller_id",
+        "node",
+        "relative",
+        "model_space"
+      ],
+      "type": "object"
+    },
+    "SkeletonChunk": {
+      "additionalProperties": false,
+      "properties": {
+        "bone_count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "disposition": {
+          "$ref": "#/$defs/SkeletonState"
+        }
+      },
+      "required": [
+        "disposition",
+        "bone_count"
+      ],
+      "type": "object"
+    },
+    "SkeletonState": {
+      "enum": [
+        "readable",
+        "unsupported-version",
+        "malformed"
+      ],
+      "type": "string"
     },
     "SoundMediaCandidate": {
       "additionalProperties": false,
@@ -37826,6 +38132,116 @@
       "if": {
         "properties": {
           "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-graph-node"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "graph-node"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-graph-attribute"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "graph-attribute"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
             "const": "texture"
           },
           "subresource": {
@@ -38685,6 +39101,116 @@
                 "properties": {
                   "record_type": {
                     "const": "character-attachment"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-skeleton-chunk"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelSkeletonRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "skeleton-chunk"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-skeleton-bone"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelSkeletonRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "skeleton-bone"
                   }
                 },
                 "required": [

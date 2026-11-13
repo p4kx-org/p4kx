@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+mod graph_field;
+mod graph_source;
 mod links;
 mod named_clip;
 mod origins;

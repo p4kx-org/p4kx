@@ -98,7 +98,7 @@ mod tests {
         let source = [bone("head", None), bone("ROOT", None)];
         let matched = BoneMatch::new(&target, &source);
         assert_eq!((matched.target(0), matched.target(1)), (2, 0));
-        assert_eq!(matched.unmatched(), []);
+        assert_eq!(matched.unmatched(), [] as [usize; 0]);
     }
 
     #[test]

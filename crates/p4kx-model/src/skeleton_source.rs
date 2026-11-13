@@ -3,14 +3,16 @@
 
 use std::ops::Range;
 
-use p4kx_chunks::{ChunkFile, ivo};
+use p4kx_chunks::{Chunk, ChunkFile, ivo};
 
 use crate::build::corrupt;
 use crate::controller_binding::{BoneControllers, ControllerBinder};
 use crate::skeleton::{
     COMPACT_HEADER_LEN, COMPACT_RECORD_LEN, ENTRY_LEN, read_bones, read_compact_bones,
 };
-use crate::{Bone, ModelBoneSources, ModelError, ModelFile, PrimarySkeletonSelection};
+use crate::{
+    Bone, CorruptChunk, ModelBoneSources, ModelError, ModelFile, PrimarySkeletonSelection,
+};
 
 /// An admitted primary skeleton and its original controller table positions.
 #[derive(Debug)]
@@ -29,6 +31,32 @@ enum Layout {
 }
 
 impl Layout {
+    const fn measured(chunk: &Chunk) -> Option<Self> {
+        match (chunk.chunk_type(), chunk.version()) {
+            (ivo::COMPILED_BONES_2, 0x900) => Some(Self::Compiled2),
+            (ivo::COMPILED_BONES, 0x901) => Some(Self::Compiled),
+            _ => None,
+        }
+    }
+
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Compiled2 => "CompiledBones2",
+            Self::Compiled => "CompiledBones",
+        }
+    }
+
+    fn read(
+        self,
+        bytes: &[u8],
+        sources: Option<&mut ModelBoneSources>,
+    ) -> Result<Vec<Bone>, CorruptChunk> {
+        match self {
+            Self::Compiled2 => read_bones(bytes, sources),
+            Self::Compiled => read_compact_bones(bytes, sources),
+        }
+    }
+
     const fn controller_table(self) -> (usize, usize) {
         match self {
             Self::Compiled => (COMPACT_HEADER_LEN, COMPACT_RECORD_LEN),
@@ -65,11 +93,9 @@ impl<'file> SkeletonChunk<'file> {
         name: &str,
         sources: Option<&mut ModelBoneSources>,
     ) -> Result<Vec<Bone>, ModelError> {
-        let (chunk_name, bones) = match self.layout {
-            Layout::Compiled2 => ("CompiledBones2", read_bones(self.bytes, sources)),
-            Layout::Compiled => ("CompiledBones", read_compact_bones(self.bytes, sources)),
-        };
-        bones.map_err(corrupt(name, self.index, chunk_name))
+        self.layout
+            .read(self.bytes, sources)
+            .map_err(corrupt(name, self.index, self.layout.name()))
     }
 }
 
@@ -161,3 +187,56 @@ impl SkeletonSource {
         self.start..self.start + size_of::<u32>() as u64
     }
 }
+/// One original version-qualified skeleton with entry-relative bone field ranges.
+#[derive(Debug)]
+pub struct PositionedSkeleton {
+    bones: Vec<Bone>,
+    sources: ModelBoneSources,
+}
+
+impl PositionedSkeleton {
+    /// Returns whether the original chunk uses a measured IVO skeleton layout.
+    #[must_use]
+    pub const fn supports(chunk: &Chunk) -> bool {
+        Layout::measured(chunk).is_some()
+    }
+
+    /// Reads the bounded bytes of one original skeleton chunk.
+    ///
+    /// Returns absent for other chunk types or versions.
+    ///
+    /// # Errors
+    /// Returns a positional read error for malformed bytes in a supported skeleton chunk.
+    pub fn read(chunk: &Chunk, index: usize, bytes: &[u8]) -> Result<Option<Self>, CorruptChunk> {
+        let Some(layout) = Layout::measured(chunk) else {
+            return Ok(None);
+        };
+        let span = usize::try_from(chunk.size())
+            .ok()
+            .and_then(|size| bytes.get(..size))
+            .ok_or_else(|| p4kx_foundation::ParseError::UnexpectedEnd {
+                offset: chunk.offset(),
+                needed: chunk.size(),
+                available: bytes.len() as u64,
+            })?;
+        let mut sources = ModelBoneSources::new(ModelFile::Model, index, chunk.offset(), None);
+        let bones = layout.read(span, Some(&mut sources))?;
+        Ok(Some(Self { bones, sources }))
+    }
+
+    /// Returns all decoded bones in original table order.
+    #[must_use]
+    pub fn bones(&self) -> &[Bone] {
+        &self.bones
+    }
+
+    /// Returns original fields for every decoded bone.
+    #[must_use]
+    pub const fn sources(&self) -> &ModelBoneSources {
+        &self.sources
+    }
+}
+
+#[cfg(test)]
+#[path = "skeleton_source_tests.rs"]
+mod tests;

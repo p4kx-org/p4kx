@@ -169,6 +169,14 @@ fields and unfamiliar markers or shape selectors keep their bytes with explicit 
 Malformed or truncated collision data produces partial diagnostic rows and keeps readable
 siblings in that diagnostic generation.
 
+IVO skeleton chunks expose one model-skeleton-chunk row per original CompiledBones2
+(version 0x900) or CompiledBones (version 0x901) occurrence, including unsupported
+versions and malformed data. Each admitted model-skeleton-bone row uses the
+physical chunk and original bone ordinals. It carries the authored name with a
+UTF-8 repair indicator, controller ID, parent and optional driven node, and the
+stored relative and model-space bind poses as XYZW quaternions and Z-up metres.
+The exact original bytes of every field remain reachable through the source receipt.
+
 Model collision Media additionally retains each supported NodeMeshCombo row, including helper
 nodes and nodes with no rendered mesh. The `model-physics-node` record carries its original
 chunk and physical row positions, the separate stored ID, parent and geometry words, both
@@ -584,3 +592,12 @@ Timeline targets keep the source selector and its attribute position.
 Conventional rooted CAF paths resolve against the archive directory. Missing
 and repeated timeline names and unsupported paths have explicit states.
 The source strings carry no inferred timing units or coordinate conversions.
+
+The `graph-node` and `graph-attribute` rows identify Mannequin fragment
+alternatives, transitions, layers, sub-databases, blend-space examples,
+parameters, pseudo examples and blend faces. Source element ordinals identify
+nodes and parent links. Duplicate names and attribute occurrences retain
+their positions. Attribute roles describe known declarations and preserve the
+original values. Unknown procedural subtrees remain in the ordered XML
+stream. Alias names remain declarations until a separately observed reference
+establishes a target.

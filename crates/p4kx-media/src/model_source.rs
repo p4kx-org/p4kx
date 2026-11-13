@@ -31,6 +31,11 @@ mod character_payload;
 #[path = "model_source/character_reference.rs"]
 mod character_reference;
 
+#[path = "model_source/skeleton.rs"]
+mod skeleton;
+#[path = "model_source/skeleton_record.rs"]
+mod skeleton_record;
+
 #[path = "model_source/path_reference.rs"]
 mod path_reference;
 #[path = "model_source/vehicle_grid.rs"]
