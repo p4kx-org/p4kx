@@ -18,18 +18,27 @@ fn nested_shader_sources_properties_and_raw_artifacts_reconcile()
 }
 
 fn verify_configured() -> TestResult {
-    verify_path(&p4kx_testkit::real_archive_path()?)?;
+    let first = verify_path(&p4kx_testkit::real_archive_path()?);
     if let Some(second) = p4kx_testkit::real_archive_b_path() {
-        verify_path(&second)?;
+        let second = verify_path(&second);
+        return first.and(second);
     }
-    Ok(())
+    first
 }
 
 fn verify_path(path: &Path) -> TestResult {
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::real_archive_key()?))?;
-    let watch = ArchiveWatch::new(&archive);
+    let counts = verify_archive(&archive)?;
+    require(
+        counts.definitions > 0,
+        "no readable shader definitions were selected",
+    )
+}
+
+fn verify_archive(archive: &Archive) -> TestResult<shader_record_accounting::Report> {
+    let watch = ArchiveWatch::new(archive);
     let cancel = CancelToken::new();
-    let selection = shader_inventory::discover(&archive, &watch, &cancel)?;
+    let selection = shader_inventory::discover(archive, &watch, &cancel)?;
     let shader_inventory::Selection {
         include,
         exclude,
@@ -51,7 +60,7 @@ fn verify_path(path: &Path) -> TestResult {
     options.limits.output_bytes = shader_artifacts::OUTPUT_BYTES;
     options.limits.records = shader_record_accounting::MAX_RECORDS;
     let folder = tempfile::tempdir()?;
-    let result = p4kx_media::export(&archive, folder.path(), &options)?;
+    let result = p4kx_media::export(archive, folder.path(), &options)?;
     let (index, output) = match result {
         ExportOutcome::Published { index, .. } => (index, folder.path().to_path_buf()),
         ExportOutcome::Incomplete { index, diagnostic } => (
@@ -74,12 +83,9 @@ fn verify_path(path: &Path) -> TestResult {
         counts.partial,
         compiled,
     );
-    if counts.failed != 0 || counts.partial != 0 {
-        return Err("shader accounting is explicit but selected sources remain incomplete".into());
-    }
     folder.close()?;
     watch.check()?;
-    Ok(())
+    Ok(counts)
 }
 
 #[expect(
@@ -98,4 +104,37 @@ pub(super) fn require(condition: bool, message: &'static str) -> TestResult {
     } else {
         Err(message.into())
     }
+}
+
+#[test]
+fn shader_census_reconciles_valid_sources_and_exact_retained_parse_failures() -> TestResult {
+    use p4kx_testkit::{ArchiveBuilder, TestEntry};
+
+    let directory = tempfile::tempdir()?;
+    let input = directory.path().join("fixture.p4k");
+    let nested = ArchiveBuilder::new()
+        .entry(TestEntry::stored(
+            "Data/complete.ext",
+            b"Property { Description(pilot's controls); }",
+        ))
+        .entry(TestEntry::stored(
+            "Data/failed.ext",
+            b"Property { Description(unquoted value)); }",
+        ))
+        .build();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/fixture.pak", nested))
+        .write_to(&input)?;
+    let counts = verify_archive(&Archive::open(input)?)?;
+    assert_eq!(counts.definitions, 1, "valid definitions are exported");
+    assert_eq!(counts.properties, 1, "valid Property remains usable");
+    assert_eq!(
+        counts.failed, 1,
+        "unmatched close is an exact source failure"
+    );
+    assert_eq!(
+        counts.partial, 0,
+        "the original bytes remain separate from typing"
+    );
+    Ok(())
 }

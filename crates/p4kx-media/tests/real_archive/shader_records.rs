@@ -15,6 +15,9 @@ use super::TestResult;
 use super::shader_accounting::require;
 use super::shader_artifacts::Retained;
 use super::shader_expected::{ExpectedCounts, ExpectedSource};
+#[path = "shader_expected_failure.rs"]
+mod expected_failure;
+use self::expected_failure::check_failure;
 
 #[derive(Default)]
 pub(super) struct Observed {
@@ -62,10 +65,7 @@ impl Observed {
                     record.status == Status::Failed,
                     "source failure is not failed",
                 )?;
-                let span = expected
-                    .failure
-                    .ok_or("readable source was exported as failed")?;
-                check_span(failure.span, span.start, span.end_exclusive)?;
+                check_failure(&failure, expected, &retained.bytes)?;
                 self.failures += 1;
             }
             _ => {

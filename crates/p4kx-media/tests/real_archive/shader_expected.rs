@@ -15,7 +15,7 @@ pub(super) struct ExpectedSource {
     pub(super) size: u64,
     pub(super) digest: String,
     pub(super) counts: Option<ExpectedCounts>,
-    pub(super) failure: Option<p4kx_shader::Span>,
+    pub(super) failure: Option<p4kx_shader::SyntaxError>,
 }
 
 pub(super) struct ExpectedCounts {

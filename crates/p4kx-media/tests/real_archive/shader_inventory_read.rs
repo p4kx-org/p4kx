@@ -45,7 +45,7 @@ impl Family<'_> {
                 budget.checkpoint()
             }) {
                 Ok(definition) => (Some(ExpectedCounts::of(&definition)?), None),
-                Err(p4kx_shader::ReadError::Syntax(error)) => (None, Some(error.span)),
+                Err(p4kx_shader::ReadError::Syntax(error)) => (None, Some(error)),
                 Err(p4kx_shader::ReadError::Interrupted(error)) => return Err(error),
                 Err(_) => return Err("unsupported shader reader result".into()),
             };

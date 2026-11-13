@@ -121,6 +121,8 @@ source receipts, limits, schema and unchanged selected-source accounting. The ig
 `shader_accounting::nested_shader_sources_properties_and_raw_artifacts_reconcile` test discovers a
 bounded available nested `.pak` shader family without private hardcoded names and reconciles actual
 source/Property/JSONL/raw/index accounting. Its `.socpak` exclusion is explicit test scope; production
-supports both container types. A missing or incomplete family is not a successful empty test.
+supports both container types. An empty or incompletely enumerated family fails verification.
+A diagnosed parse failure is reconciled only when independently rereading the retained raw bytes
+reproduces the exact error and byte span and the diagnostic generation remains incomplete.
 Installed LIVE/PTU execution and any applicable native/consumer acceptance must be recorded
 separately; adding or compiling the ignored test does not prove those runs occurred.
