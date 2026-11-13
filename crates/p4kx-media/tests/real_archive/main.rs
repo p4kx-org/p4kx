@@ -22,6 +22,7 @@ mod shader_expected;
 mod shader_inventory;
 mod shader_record_accounting;
 mod shader_records;
+mod texture_accounting;
 
 use preservation_provider::PreservationProvider;
 

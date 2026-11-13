@@ -76,6 +76,14 @@ field origins record the exact original surface byte spans. Required siblings ar
 when the immediate owning directory proves a unique lossless Entry. An excluded required
 sibling remains private while still contributing its source evidence.
 
+For installed texture verification, set `P4KX_DATA_P4K` and run
+`cargo test --release -p p4kx-media --test real_archive texture_headers_and_stratified_media_outputs_match_original_reads -- --ignored`.
+Repeat with the LIVE and PTU installations. The test inventories all root DDS header Entries,
+verifies the selected families against their original stored payload checks, and compares the
+private replay’s Media images byte for byte with ordinary conversion from the installed source.
+Set `P4KX_TEXTURE_ORIGINAL_ROOT=1` to also compare one selection directly through the original
+root Media export. That option reads and hashes the complete installed Archive.
+
 `--kind animation` retains CAF, DBA and AIM sources with chunk and clip inventory, original
 metadata and controller words, and typed decoded frame and key chunks.
 [Animation source export](media-animation-source.md) describes the layouts and dispositions.
