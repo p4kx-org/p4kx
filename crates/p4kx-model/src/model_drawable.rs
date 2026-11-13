@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::{Lod, Mesh, Submesh};
-use crate::MaterialStatus;
+use crate::{MaterialStatus, MeshOrigin};
 
 impl Lod {
     /// Returns the material IDs of geometry-bearing submeshes in mesh order, with repeats.
@@ -26,6 +26,12 @@ impl Lod {
 }
 
 impl Mesh {
+    /// Returns the physical IVO source that supplied the mesh's stream vertices.
+    #[must_use]
+    pub const fn origin(&self) -> Option<MeshOrigin> {
+        self.origin
+    }
+
     /// Returns the nonempty index range of this submesh when the mesh carries geometry.
     #[must_use]
     pub fn submesh_indices(&self, submesh: &Submesh) -> Option<&[u32]> {

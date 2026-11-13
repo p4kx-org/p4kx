@@ -105,6 +105,7 @@ impl<'s, 'a> MeshBuilder<'s, 'a> {
                 node,
                 positions: Vec::new(),
                 source: Vec::new(),
+                origin: None,
                 normals: skin.streams.normals.map(|_| Vec::new()),
                 normals_computed: false,
                 tangents: skin.streams.tangents.map(|_| Vec::new()),

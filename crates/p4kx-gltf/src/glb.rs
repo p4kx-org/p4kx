@@ -16,6 +16,7 @@ use crate::instance::{Content, Instance, material_requests};
 use crate::layout::Layout;
 use crate::material_index::index_materials;
 use crate::materials::MaterialPlan;
+use crate::mesh_vertex_map::{self, MeshVertexMap, ObserveMesh};
 use crate::scene_rig::SceneRig;
 use crate::texture_loader::{NoTextures, TextureLoader};
 use crate::texture_plan::TextureSet;
@@ -175,6 +176,45 @@ pub fn write_glb_animated_with_fallback(
     fallback: Option<&Material>,
     out: &mut impl Write,
 ) -> Result<GlbSummary, GltfError> {
+    write_model(model, animations, options, textures, fallback, out, None)
+}
+
+/// Writes a model and visits each emitted mesh in GLB order with its source vertex map.
+///
+/// The visitor borrows the map without copying vertex ordinals. It runs after the GLB
+/// writer flushes successfully.
+///
+/// # Errors
+/// Returns the same errors as the ordinary writer, or a write error from the visitor.
+pub fn write_glb_observed(
+    model: &Model,
+    animations: &[Animation],
+    options: &GlbOptions,
+    textures: Option<&dyn TextureLoader>,
+    fallback: Option<&Material>,
+    out: &mut impl Write,
+    visitor: &mut impl FnMut(MeshVertexMap<'_>) -> std::io::Result<()>,
+) -> Result<GlbSummary, GltfError> {
+    write_model(
+        model,
+        animations,
+        options,
+        textures,
+        fallback,
+        out,
+        Some(visitor),
+    )
+}
+
+fn write_model(
+    model: &Model,
+    animations: &[Animation],
+    options: &GlbOptions,
+    textures: Option<&dyn TextureLoader>,
+    fallback: Option<&Material>,
+    out: &mut impl Write,
+    visitor: Option<&mut ObserveMesh<'_>>,
+) -> Result<GlbSummary, GltfError> {
     let lod = find_lod(model, options.lod)?;
     let instance = Instance {
         model,
@@ -190,7 +230,14 @@ pub fn write_glb_animated_with_fallback(
         rig: None,
         animations: &animations,
     };
-    write_instances(&content, options, textures.unwrap_or(&NoTextures), 0, out)
+    write_instances(
+        &content,
+        options,
+        textures.unwrap_or(&NoTextures),
+        0,
+        out,
+        visitor,
+    )
 }
 
 /// Returns how many meshes the twin instances reuse instead of writing them again.
@@ -214,6 +261,7 @@ pub(crate) fn write_instances(
     textures: &dyn TextureLoader,
     lod_fallbacks: usize,
     out: &mut impl Write,
+    visitor: Option<&mut ObserveMesh<'_>>,
 ) -> Result<GlbSummary, GltfError> {
     let Content {
         wrappers,
@@ -241,6 +289,9 @@ pub(crate) fn write_instances(
         index_materials(&mut root);
     }
     let total = write_file(&root, &layout, &images, out)?;
+    if let Some(visitor) = visitor {
+        mesh_vertex_map::observe(&root, &layout, instances, options.lod, visitor)?;
+    }
     let defaulted = instances
         .iter()
         .map(|instance| instance.plan.defaulted())

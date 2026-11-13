@@ -40,6 +40,7 @@ pub(crate) struct PrimitiveLayout {
 pub(crate) struct MeshLayout {
     pub(crate) part: usize,
     pub(crate) node: usize,
+    pub(crate) model_mesh: usize,
     pub(crate) positions: usize,
     pub(crate) normals: Option<usize>,
     pub(crate) uvs: Option<usize>,
@@ -123,7 +124,14 @@ impl<'m> Layout<'m> {
                 .and_then(|all| all.get(position))
                 .map(Vec::as_slice);
             let before = self.meshes.len();
-            self.plan_mesh(part, mesh, colours, materials, (rigging.binds, own));
+            self.plan_mesh(
+                part,
+                position,
+                mesh,
+                colours,
+                materials,
+                (rigging.binds, own),
+            );
             if position == 0 && self.meshes.len() > before {
                 self.plan_morphs(mesh, rigging.morphs);
             }
@@ -166,6 +174,7 @@ impl<'m> Layout<'m> {
     fn plan_mesh(
         &mut self,
         part: usize,
+        model_mesh: usize,
         mesh: &'m Mesh,
         colours: VertexColours,
         materials: &MaterialPlan<'_>,
@@ -218,6 +227,7 @@ impl<'m> Layout<'m> {
         self.meshes.push(MeshLayout {
             part,
             node: mesh.node,
+            model_mesh,
             positions,
             normals,
             uvs,

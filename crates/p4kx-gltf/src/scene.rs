@@ -11,6 +11,7 @@ use crate::GltfError;
 use crate::glb::{GlbOptions, GlbSummary, MaterialMode, write_instances};
 use crate::instance::{Content, Instance, Wrapper};
 use crate::materials::MaterialPlan;
+use crate::mesh_vertex_map::ObserveMesh;
 use crate::scene_light::{LIGHT_FRAME, SceneLight};
 use crate::scene_rig::SceneRig;
 use crate::texture_loader::{NoTextures, TextureLoader};
@@ -246,6 +247,16 @@ pub fn write_scene_glb_with(
     textures: &dyn TextureLoader,
     out: &mut impl Write,
 ) -> Result<GlbSummary, GltfError> {
+    write_scene(scene, options, textures, out, None)
+}
+
+pub(crate) fn write_scene(
+    scene: &Scene<'_>,
+    options: &GlbOptions,
+    textures: &dyn TextureLoader,
+    out: &mut impl Write,
+    visitor: Option<&mut ObserveMesh<'_>>,
+) -> Result<GlbSummary, GltfError> {
     let nodes = scene.nodes();
     let splits = light_splits(nodes);
     let light_names: Vec<String> = nodes
@@ -300,7 +311,7 @@ pub fn write_scene_glb_with(
         rig: rig.as_ref(),
         animations: &scene.animations,
     };
-    write_instances(&content, options, textures, fallbacks, out)
+    write_instances(&content, options, textures, fallbacks, out, visitor)
 }
 
 /// Returns for each node whether it holds a light and also a model or children, so that the

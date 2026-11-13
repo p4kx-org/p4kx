@@ -9,7 +9,7 @@ mod drawable;
 use crate::model_node_sources::{self, ReadCapture};
 use crate::{
     Bone, CompanionResolver, Influences, LodSkeletonOrigin, MaterialReading, MaterialStatus,
-    ModelChunkLayout, ModelError, ModelIssue, PositionBox, RigLogicBytes, Transform,
+    MeshOrigin, ModelChunkLayout, ModelError, ModelIssue, PositionBox, RigLogicBytes, Transform,
 };
 
 /// A model read from a chunk file and its companions, in `CryEngine` coordinates: Z up, metres.
@@ -137,6 +137,7 @@ pub struct Mesh {
     /// mesh keeps only the vertices its triangles use, in the order they are first used, so this
     /// is how data stored per stream vertex, such as a DNA rig, is matched to the mesh.
     pub source: Vec<u32>,
+    pub(crate) origin: Option<MeshOrigin>,
     /// The unit vertex normals: the stored ones, or the computed smooth ones when the mesh
     /// stores none, see [`Self::normals_computed`]. `None` only for a mesh without triangles.
     pub normals: Option<Vec<[f32; 3]>>,

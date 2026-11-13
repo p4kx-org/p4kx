@@ -66,6 +66,7 @@ mod material_read_observation;
 mod material_request;
 mod mesh;
 mod mesh_chunk_source;
+mod mesh_origin;
 mod mesh_stream_source;
 mod model;
 mod model_bone_sources;
@@ -188,6 +189,7 @@ pub use material_emission::{
 pub use material_read_observation::{MaterialReadField, MaterialReadObservation, MaterialReadUse};
 pub use material_request::MaterialRequest;
 pub use mesh_chunk_source::{MeshChunkSource, MeshCounts, MeshSubmeshSource, MeshVertexReference};
+pub use mesh_origin::MeshOrigin;
 pub use mesh_stream_source::{MeshStreamHeader, MeshStreamOccurrence, MeshStreamSource};
 pub use model::{ChunkUsage, Lod, LodSelection, Mesh, Model, ModelChunk, ModelFile, Node, Submesh};
 pub use model_bone_sources::{ModelBoneSource, ModelBoneSources, PrimarySkeletonSelection};

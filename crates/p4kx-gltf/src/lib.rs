@@ -48,6 +48,7 @@ mod layout;
 mod material_alpha;
 mod material_index;
 mod materials;
+mod mesh_vertex_map;
 mod morphs;
 mod nodes;
 mod package_support;
@@ -77,11 +78,12 @@ pub use animations::AnimationSummary;
 pub use error::GltfError;
 pub use glb::{
     GlbOptions, GlbSummary, MaterialMode, VertexColours, write_glb, write_glb_animated,
-    write_glb_animated_with, write_glb_animated_with_fallback, write_glb_with,
+    write_glb_animated_with, write_glb_animated_with_fallback, write_glb_observed, write_glb_with,
 };
 pub use layer_plan::draws_layer_diffuse;
 pub use layer_view::{layered_base_key, layered_base_texture, layered_base_textures};
 pub use materials::base_colour_factor;
+pub use mesh_vertex_map::{MeshVertexMap, write_scene_glb_observed};
 pub use morphs::MorphTarget;
 pub use package_support::{
     DrawnMaterial, NodeTransform, TextureFile, drawn_materials, drawn_materials_with_fallback,

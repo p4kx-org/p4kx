@@ -15,7 +15,7 @@ use crate::skeleton_source;
 use crate::skin::read_skin;
 use crate::{
     Bone, ChunkUsage, CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection,
-    LodSkeletonOrigin, MaterialReading, Mesh, Model, ModelBoneSources, ModelChunk,
+    LodSkeletonOrigin, MaterialReading, Mesh, MeshOrigin, Model, ModelBoneSources, ModelChunk,
     ModelChunkLayout, ModelError, ModelFile, ModelIssue, Node, PositionBox, RigLogicBytes,
     Transform,
 };
@@ -245,7 +245,7 @@ fn read_base_lod<B: AsRef<[u8]>>(
                 read.push((ModelFile::Geometry, index));
                 read_meshes(
                     companion_name,
-                    index,
+                    MeshOrigin::new(ModelFile::Geometry, index, 0),
                     companion.chunk_data(index),
                     rig,
                     true,
@@ -261,7 +261,13 @@ fn read_base_lod<B: AsRef<[u8]>>(
         (None, Some(index)) => {
             read.push((ModelFile::Model, index));
             let data = file.chunk_data(index);
-            read_meshes(name, index, data, rig, true)?
+            read_meshes(
+                name,
+                MeshOrigin::new(ModelFile::Model, index, 0),
+                data,
+                rig,
+                true,
+            )?
         }
         (None, None) => Vec::new(),
     };
@@ -303,16 +309,19 @@ fn geometry_companion<B: AsRef<[u8]>>(
 
 pub(crate) fn read_meshes(
     file: &str,
-    index: usize,
+    origin: MeshOrigin,
     data: Option<&[u8]>,
     rig: Rig<'_>,
     check_bones: bool,
 ) -> Result<Vec<Mesh>, ModelError> {
-    let corrupt = corrupt(file, index, "Skin");
+    let corrupt = corrupt(file, origin.chunk, "Skin");
     let skin = read_skin(data.unwrap_or_default(), rig.position_box).map_err(&corrupt)?;
-    let meshes = split_by_node(&skin, rig.nodes).map_err(&corrupt)?;
+    let mut meshes = split_by_node(&skin, rig.nodes).map_err(&corrupt)?;
     if check_bones {
         check_joints(&meshes, rig.bones.len()).map_err(&corrupt)?;
+    }
+    for mesh in &mut meshes {
+        mesh.origin = Some(origin);
     }
     Ok(meshes)
 }

@@ -10,8 +10,8 @@ use crate::companion::lod_file_name;
 use crate::model::MESH_TYPES;
 use crate::skeleton_source;
 use crate::{
-    Bone, CompanionResolver, Lod, LodSelection, LodSkeletonOrigin, Mesh, ModelBoneSources,
-    ModelChunk, ModelError, ModelFile, ModelIssue,
+    Bone, CompanionResolver, Lod, LodSelection, LodSkeletonOrigin, Mesh, MeshOrigin,
+    ModelBoneSources, ModelChunk, ModelError, ModelFile, ModelIssue,
 };
 
 struct LevelSkeleton {
@@ -101,7 +101,7 @@ pub(crate) fn read_lod_companions(
         read.push((ModelFile::LodGeometry(level), index));
         let meshes = read_meshes(
             &companion_name,
-            index,
+            MeshOrigin::new(ModelFile::LodGeometry(level), index, level),
             companion.chunk_data(index),
             rig,
             false,
