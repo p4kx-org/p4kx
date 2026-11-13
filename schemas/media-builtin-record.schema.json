@@ -1426,6 +1426,19 @@
     "AnimationImageRecord": {
       "additionalProperties": false,
       "properties": {
+        "caf_path_crc32": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dba_path_crc32": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "path": {
           "$ref": "#/$defs/AnimationImagePath"
         },
@@ -1439,6 +1452,8 @@
       "required": [
         "range",
         "path_field",
+        "caf_path_crc32",
+        "dba_path_crc32",
         "path"
       ],
       "type": "object"

@@ -167,7 +167,7 @@ pub use bone_extend::{
 };
 pub use bone_map::{Influences, MAX_INFLUENCES};
 pub use bone_match::BoneMatch;
-pub use caf_image::{CafImage, CafImageError, CafImagePath, CafImageRecord};
+pub use caf_image::{CafImage, CafImageError, CafImagePath, CafImageRecord, CafImageWord};
 pub use companion::{
     CompanionError, CompanionPath, CompanionResolver, GREY_PROBE_MIP, MAX_GREY_SATURATION,
     companion_file_names,

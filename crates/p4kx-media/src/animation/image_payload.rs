@@ -38,6 +38,8 @@ pub(super) enum ImageLayout {
 pub(super) struct ImageRecord<'a> {
     pub(super) range: SourceRange,
     pub(super) path_field: SourceRange,
+    pub(super) caf_path_crc32: u32,
+    pub(super) dba_path_crc32: Option<u32>,
     pub(super) path: ImagePath<'a>,
 }
 

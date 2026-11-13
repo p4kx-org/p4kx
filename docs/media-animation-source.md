@@ -58,7 +58,9 @@ The provider recognizes the canonical `Data/Animations/Animations.img` and
 A CAF image chunk of type `0x370275B7` v0x902 with prefix format word 2 has an
 eight-byte prefix, ordered 308-byte records and an eight-byte trailer. The 256-byte
 path field starts at each record's beginning. The ranges recover each original record,
-its path bytes and the trailer from the retained Entry. Duplicate paths keep their own
+its path bytes and the trailer from the retained Entry. The CAF and DBA path CRC32
+words are retained from their original four-byte intervals. The DBA word is null in
+the projection when its original value is zero. Duplicate paths keep their own
 ordinals. An invalid UTF-8 or unterminated field keeps its physical interval and explicit
 disposition while later fixed-width records remain readable. Unknown versions and
 malformed framing expose the original chunk and a diagnostic disposition.

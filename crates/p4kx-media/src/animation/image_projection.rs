@@ -3,6 +3,8 @@
 
 use std::ops::Range;
 
+#[path = "caf_image_hashes.rs"]
+mod caf_image_hashes;
 #[path = "directional_projection.rs"]
 mod directional_projection;
 
@@ -315,6 +317,7 @@ impl ImageSource<'_, '_> {
                 writer,
             )?;
         }
+        let hashes = self.hashes(record, &mut prepared, writer)?;
         let path = self.path(record.path(), "caf", &path, &mut prepared, writer)?;
         prepared.write(
             writer,
@@ -323,6 +326,8 @@ impl ImageSource<'_, '_> {
             &AnimationPayload::ImageRecord(ImageRecord {
                 range: wire::entry_range(record_range),
                 path_field: wire::entry_range(field_range),
+                caf_path_crc32: hashes.caf.value,
+                dba_path_crc32: (hashes.dba.value != 0).then_some(hashes.dba.value),
                 path,
             }),
             &[],

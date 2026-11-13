@@ -11,6 +11,7 @@ const RECORD_LENGTH: usize = 308;
 const PATH_FIELD_LENGTH: usize = 256;
 const TRAILER_LENGTH: usize = 8;
 const FORMAT_WORD: u32 = 2;
+const WORD_LENGTH: usize = size_of::<u32>();
 
 /// The physical CAF index records in a supported image chunk.
 #[derive(Debug, Clone, Copy)]
@@ -25,6 +26,24 @@ pub struct CafImage<'a> {
 pub struct CafImageRecord<'a> {
     offset: u64,
     bytes: &'a [u8; RECORD_LENGTH],
+}
+
+/// An original 32-bit CAF image word and its exact source coordinates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct CafImageWord {
+    /// Original little-endian word.
+    pub value: u32,
+    /// Entry-relative offset of the word.
+    pub offset: u64,
+}
+
+impl CafImageWord {
+    /// Returns the original four-byte interval.
+    #[must_use]
+    pub const fn range(self) -> Range<u64> {
+        self.offset..self.offset + WORD_LENGTH as u64
+    }
 }
 
 /// A failure to establish the CAF image's counted framing.
@@ -131,6 +150,26 @@ impl<'a> CafImageRecord<'a> {
     #[must_use]
     pub const fn path_field_range(&self) -> Range<u64> {
         self.offset..self.offset + PATH_FIELD_LENGTH as u64
+    }
+
+    /// Returns the stored CAF path CRC32 word.
+    #[must_use]
+    pub fn caf_path_crc32(&self) -> Option<CafImageWord> {
+        self.word(PATH_FIELD_LENGTH)
+    }
+
+    /// Returns the stored DBA path CRC32 word, including the zero sentinel.
+    #[must_use]
+    pub fn dba_path_crc32(&self) -> Option<CafImageWord> {
+        self.word(PATH_FIELD_LENGTH + WORD_LENGTH)
+    }
+
+    fn word(&self, offset: usize) -> Option<CafImageWord> {
+        let bytes = *self.bytes.get(offset..)?.first_chunk::<WORD_LENGTH>()?;
+        Some(CafImageWord {
+            value: u32::from_le_bytes(bytes),
+            offset: self.offset + offset as u64,
+        })
     }
 
     /// Returns the source path without consuming its padding.

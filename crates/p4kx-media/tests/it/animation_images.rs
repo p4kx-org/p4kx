@@ -243,7 +243,9 @@ fn image<const COUNT: usize>(fields: &[[u8; PATH_BYTES]; COUNT]) -> TestResult<V
     bytes.extend(2_u32.to_le_bytes());
     for path in fields {
         bytes.extend(path);
-        bytes.extend([0xA5; RECORD_BYTES - PATH_BYTES]);
+        bytes.extend(0x1020_3040_u32.to_le_bytes());
+        bytes.extend(u32::from(COUNT != 0 && path.first() == Some(&b'D')).to_le_bytes());
+        bytes.extend([0xA5; RECORD_BYTES - PATH_BYTES - 8]);
     }
     bytes.extend(*b"raw-tail");
     Ok(bytes)
@@ -324,6 +326,21 @@ fn check_paths(records: &[(usize, &MediaRecord)]) -> TestResult {
     let [first, second, missing, invalid] = fields.as_slice() else {
         return Err("CAF image occurrence count differs".into());
     };
+    assert_eq!(
+        first.pointer("/payload/caf_path_crc32"),
+        Some(&json!(0x1020_3040_u32)),
+        "stored CAF path word"
+    );
+    assert_eq!(
+        first.pointer("/payload/dba_path_crc32"),
+        Some(&Value::Null),
+        "original zero is the no-bank sentinel"
+    );
+    assert_eq!(
+        second.pointer("/payload/dba_path_crc32"),
+        Some(&json!(1)),
+        "original nonzero DBA selector"
+    );
     for field in [first, second] {
         assert_eq!(
             field.pointer("/payload/path/loose_entry/resolution/status"),
