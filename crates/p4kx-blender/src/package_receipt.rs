@@ -150,3 +150,21 @@ pub(crate) fn write_json(
 #[cfg(test)]
 #[path = "package_receipt_tests.rs"]
 mod tests;
+
+pub(super) fn scene_files(
+    meshes: Vec<crate::meshes::WrittenMesh>,
+    outcomes: &[crate::textures::Outcome],
+    authored_soc: Option<PackageFile>,
+) -> Vec<PackageFile> {
+    meshes
+        .into_iter()
+        .map(|mesh| mesh.file)
+        .chain(
+            outcomes
+                .iter()
+                .enumerate()
+                .flat_map(|(position, outcome)| crate::textures::package_files(position, outcome)),
+        )
+        .chain(authored_soc)
+        .collect()
+}

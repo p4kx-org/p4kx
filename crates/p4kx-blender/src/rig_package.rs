@@ -88,6 +88,7 @@ pub(crate) fn rig_manifest(
         default_material: None,
         entity_provenance: None,
         light_placements: None,
+        entity_glow: None,
         issues,
     }
 }

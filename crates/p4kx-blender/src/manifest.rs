@@ -18,7 +18,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 /// A new minor version only adds fields and values readers may ignore; a new major version changes
 /// the meaning of existing ones.
 pub const FORMAT_VERSION: &str = "1.17";
-pub(crate) const COLLISION_HELPER_FORMAT_VERSION: &str = "1.18";
+pub(crate) const AUTHORED_HELPER_FORMAT_VERSION: &str = "1.18";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
@@ -132,6 +132,10 @@ pub struct Manifest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<crate::package_light_placements::LightPlacements>")]
     pub light_placements: Option<serde_json::Value>,
+    /// Original Entity Glow declarations and their separate owner model associations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<crate::package_glow::PackageGlow>")]
+    pub entity_glow: Option<serde_json::Value>,
     /// The GLB meshes, one per distinct mesh set; nodes reference them.
     pub meshes: Vec<Mesh>,
     /// The PNG textures, each written once.

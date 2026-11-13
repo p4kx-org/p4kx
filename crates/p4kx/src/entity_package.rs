@@ -92,12 +92,7 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
     let applied = resolver.resolve_changed(&record, &changes)?;
     crate::entity_ignored::warn(&applied)?;
     let tree = applied.node();
-    let models = ArchiveModels::new(&archive);
-    let models = if args.collision_helpers {
-        models.with_model_node_sources()
-    } else {
-        models
-    };
+    let models = ArchiveModels::new(&archive).with_model_node_sources();
     let palettes = ForgePalettes::new(&forge);
     let options = AssemblyOptions::default().with_lod(args.lod);
     let assembly = Assembly::build_with_palettes(tree, &models, &palettes, &options)?;
@@ -108,6 +103,7 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
         assembly
     };
     let info = info_of(&archive, &changes)?;
+    let context = context.with_entity_effects_source(&entry, &forge);
     let summary = write(args, &info, &archive, &models, &assembly, context)?;
     if as_json {
         json::print(&PackageJson::of(

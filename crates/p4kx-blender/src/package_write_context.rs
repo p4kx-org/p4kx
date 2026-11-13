@@ -4,7 +4,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use p4kx_extraction::{Archive, ArchiveTextures};
+use p4kx_extraction::{Archive, ArchiveTextures, DataForge, DataForgeEntry};
 use p4kx_guard::{ArchiveWriteProtection, CreatedOutputFile, OwnedDirectoryPermit, OwnedFileToken};
 
 use crate::{PackageError, PackageResult, PackageTextureContainer};
@@ -15,6 +15,7 @@ pub struct PackageWriteContext<'a> {
     scope: Scope<'a>,
     pub(crate) texture_container: PackageTextureContainer,
     pub(crate) texture_source: Option<&'a ArchiveTextures<'a, 'a>>,
+    pub(crate) glow_source: Option<crate::package_glow::Source<'a>>,
     pub(crate) collision_source: Option<&'a Archive>,
 }
 
@@ -38,6 +39,7 @@ impl<'a> PackageWriteContext<'a> {
             scope: Scope::Archive { protection, cancel },
             texture_container: PackageTextureContainer::Png,
             texture_source: None,
+            glow_source: None,
             collision_source: None,
         }
     }
@@ -59,6 +61,17 @@ impl<'a> PackageWriteContext<'a> {
         self
     }
 
+    /// Supplies the physical DataForge already used to assemble the package's Entities.
+    #[must_use]
+    pub const fn with_entity_effects_source(
+        mut self,
+        entry: &'a DataForgeEntry,
+        forge: &'a DataForge<'a>,
+    ) -> Self {
+        self.glow_source = Some(crate::package_glow::Source { entry, forge });
+        self
+    }
+
     /// Selects a texture container accepted by the package consumer.
     #[must_use]
     pub const fn with_texture_container(mut self, container: PackageTextureContainer) -> Self {
@@ -73,6 +86,7 @@ impl<'a> PackageWriteContext<'a> {
         Self {
             texture_container: PackageTextureContainer::Png,
             texture_source: None,
+            glow_source: None,
             collision_source: None,
             scope: Scope::Standalone {
                 cancelled,

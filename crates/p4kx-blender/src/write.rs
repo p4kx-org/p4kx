@@ -292,7 +292,7 @@ fn write_scene_files(
     let authored_soc_file =
         complete_manifest(&mut manifest, scene, fallback.as_deref(), staging, context)?;
     let mut summary = summarise(&manifest, &outcomes, &written);
-    let mut files = package_files(written, &outcomes, authored_soc_file);
+    let mut files = package_receipt::scene_files(written, &outcomes, authored_soc_file);
     files.extend(crate::collision_helpers::write(
         &mut manifest,
         scene.classification,
@@ -326,27 +326,10 @@ fn complete_manifest(
         EntityClassifications::capture(assembly.parts(), assembly.forge_origin())?.apply(manifest);
         manifest.light_placements =
             crate::package_light_placements::capture(assembly, &scene.items, context)?;
+        crate::package_glow::attach(manifest, assembly, context)?;
     }
     sanitise(manifest);
     Ok(authored_soc)
-}
-
-fn package_files(
-    meshes: Vec<meshes::WrittenMesh>,
-    outcomes: &[Outcome],
-    authored_soc: Option<PackageFile>,
-) -> Vec<PackageFile> {
-    meshes
-        .into_iter()
-        .map(|mesh| mesh.file)
-        .chain(
-            outcomes
-                .iter()
-                .enumerate()
-                .flat_map(|(position, outcome)| textures::package_files(position, outcome)),
-        )
-        .chain(authored_soc)
-        .collect()
 }
 
 fn count(manifest: &crate::Manifest, kind: NodeKind) -> usize {

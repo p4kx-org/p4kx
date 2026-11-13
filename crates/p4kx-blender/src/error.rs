@@ -135,6 +135,9 @@ pub enum PackageError {
     /// Original collision source or placement evidence could not be recorded.
     #[error("cannot record package collision helper evidence")]
     CollisionEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original Entity Glow declarations or their bindings could not be recorded.
+    #[error("cannot record package Glow evidence")]
+    GlowEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
     /// The caller asked to stop.
     #[error("cancelled")]
     Cancelled,

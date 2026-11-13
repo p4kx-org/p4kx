@@ -47,6 +47,7 @@ mod meshes;
 mod owned_output_tests;
 mod package_default_material;
 mod package_destination;
+mod package_glow;
 mod package_light_placements;
 mod package_paths;
 mod package_receipt;

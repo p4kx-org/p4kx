@@ -31,7 +31,7 @@ pub(crate) fn write(
     };
     let file = helpers.write(staging, context)?;
     manifest.collision_helpers = Some(crate::CollisionHelperReference::new());
-    crate::manifest::COLLISION_HELPER_FORMAT_VERSION.clone_into(&mut manifest.version);
+    crate::manifest::AUTHORED_HELPER_FORMAT_VERSION.clone_into(&mut manifest.version);
     Ok(Some(file))
 }
 

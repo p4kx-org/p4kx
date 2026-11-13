@@ -247,6 +247,23 @@
       ],
       "type": "object"
     },
+    "CandidateNode": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "node": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node",
+        "name"
+      ],
+      "type": "object"
+    },
     "CharacterSource": {
       "description": "What a Character was made from.",
       "properties": {
@@ -316,6 +333,29 @@
           "type": "string"
         }
       ]
+    },
+    "Component": {
+      "properties": {
+        "authored": true,
+        "field_origins": {
+          "$ref": "#/$defs/FieldOrigins"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ordinal",
+        "source_type",
+        "authored",
+        "field_origins"
+      ],
+      "type": "object"
     },
     "Coordinates": {
       "description": "The coordinate system of a package.",
@@ -1279,6 +1319,34 @@
       "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|1844674407370955[0-0][0-9]{3}|18446744073709551[0-5][0-9]{2}|184467440737095516[0-0][0-9]{1}|1844674407370955161[0-4][0-9]{0}|18446744073709551615)$",
       "type": "string"
     },
+    "Declaration": {
+      "properties": {
+        "components": {
+          "items": {
+            "$ref": "#/$defs/Component"
+          },
+          "type": "array"
+        },
+        "guid": {
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory"
+        },
+        "record_index": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "record_index",
+        "guid",
+        "components",
+        "provenance"
+      ],
+      "type": "object"
+    },
     "DefaultMaterialContainer": {
       "description": "Original directory coordinate of a containing Archive Entry.",
       "properties": {
@@ -1419,6 +1487,58 @@
           "type": "string"
         }
       ]
+    },
+    "DrawBinding": {
+      "properties": {
+        "first_index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "index_count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lod": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "material": {
+          "$ref": "#/$defs/Surface"
+        },
+        "model_node": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "node_name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "source_node_id": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "subset": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "lod",
+        "model_node",
+        "source_node_id",
+        "subset",
+        "first_index",
+        "index_count",
+        "node_name",
+        "material"
+      ],
+      "type": "object"
     },
     "Element": {
       "description": "An XML element of a material file the writer does not interpret.",
@@ -1910,6 +2030,13 @@
         }
       ]
     },
+    "Kind": {
+      "enum": [
+        "tag",
+        "trigger"
+      ],
+      "type": "string"
+    },
     "Light": {
       "description": "A punctual light at a node of the kind `light`.\n\nThe node's transform is already turned so that the light shines along its local -Z axis, as\nglTF and Blender lights do.",
       "properties": {
@@ -2056,6 +2183,39 @@
       "required": [
         "rows",
         "sourceInventory"
+      ],
+      "type": "object"
+    },
+    "Link": {
+      "properties": {
+        "component": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "effect": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selection": {
+          "$ref": "#/$defs/Selection"
+        }
+      },
+      "required": [
+        "component",
+        "kind",
+        "effect",
+        "ordinal",
+        "selection"
       ],
       "type": "object"
     },
@@ -3311,6 +3471,57 @@
       ],
       "type": "object"
     },
+    "Owner": {
+      "properties": {
+        "declaration": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "type": "array"
+        },
+        "node": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory"
+        }
+      },
+      "required": [
+        "node",
+        "declaration",
+        "links",
+        "provenance"
+      ],
+      "type": "object"
+    },
+    "PackageGlow": {
+      "properties": {
+        "declarations": {
+          "items": {
+            "$ref": "#/$defs/Declaration"
+          },
+          "type": "array"
+        },
+        "owners": {
+          "items": {
+            "$ref": "#/$defs/Owner"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "declarations",
+        "owners"
+      ],
+      "type": "object"
+    },
     "Palette": {
       "description": "A tint palette: the colours a livery gives the materials that take a palette entry.\n\nA palette is written once; meshes reference it by id.",
       "properties": {
@@ -3751,6 +3962,132 @@
           "const": "skin",
           "description": "A skin of a creature, bound to the skeleton of its root.",
           "type": "string"
+        }
+      ]
+    },
+    "Selection": {
+      "oneOf": [
+        {
+          "properties": {
+            "status": {
+              "const": "absent",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "invalid_selector",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "missing_model",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "unobserved_nodes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "unmatched",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "nodes": {
+              "items": {
+                "$ref": "#/$defs/CandidateNode"
+              },
+              "type": "array"
+            },
+            "status": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "nodes"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "no_drawable_subsets",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "bound",
+              "type": "string"
+            },
+            "subsets": {
+              "items": {
+                "$ref": "#/$defs/DrawBinding"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "status",
+            "subsets"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "unsupported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -5016,6 +5353,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfboolean": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfstring": {
       "allOf": [
         {
@@ -5276,6 +5743,40 @@
         "sourceUsesRefs",
         "state",
         "value"
+      ],
+      "type": "object"
+    },
+    "Surface": {
+      "properties": {
+        "no_draw": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "packaged_material": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "resolves": {
+          "type": "boolean"
+        },
+        "shader": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "source_slot": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_slot",
+        "resolves",
+        "shader",
+        "no_draw"
       ],
       "type": "object"
     },
@@ -5634,6 +6135,17 @@
         }
       ],
       "description": "Physical fallback lookup for drawn mesh assignments that require one."
+    },
+    "entity_glow": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageGlow"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Original Entity Glow declarations and their separate owner model associations."
     },
     "entity_provenance": {
       "anyOf": [

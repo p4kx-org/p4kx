@@ -746,6 +746,29 @@ counts to supported DDS rows and records alpha unassociation when applied to PNG
 separate DDS normal and smoothness pairs with linked source and per-file evidence.
 **1.18** adds the optional collision-helper companion.
 
+### Authored Entity Glow
+
+Entity packages use format 1.18 when they contain authored Glow links. The optional
+`entity_glow` member contains declarations and owners. Each declaration names the original
+DataForge record index and GUID. Its components retain their original array ordinals,
+canonical material-effect values and field origins, including disabled effects, trigger or
+tag references, and ordered modifiers. The component's field origins use paths relative to
+its `authored` value and resolve in the declaration's provenance inventory.
+
+Each owner names the package scene node and its declaration ordinal. Its links point to the
+original component, effect array, effect ordinal and link ordinal. An exact authored name can
+associate an observed model node and its original subsets. A repeated name remains ambiguous.
+An empty selector or `*` associates all drawable subsets of the direct owner. Each subset
+retains its model node, source node ID, LOD, subset ordinal and local triangle index range.
+Material assignments retain the original slot and the package mesh material index when that
+slot is represented. Source evidence for the observed model-node name and selected material
+belongs to the owner's independent provenance inventory. Material evidence records the observed
+library and source slots. Subset-byte and material-selection routes are partial when their
+original coordinates were unavailable.
+
+The declaration is available for inspection and tooling. The importer leaves trigger evaluation
+and runtime modifier execution to the original game logic.
+
 ## Authored SOC scene
 
 An interior package written with `--authored-soc` has an `authored_soc` reference in
