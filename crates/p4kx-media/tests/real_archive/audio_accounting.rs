@@ -7,7 +7,7 @@ use std::path::Path;
 
 use p4kx_extraction::{Archive, ArchiveWatch, Entry, Exclusion, Filter, Soundbank, Wem};
 use p4kx_media::{ExportOptions, ExportOutcome, Identity, Index, MediaKind, MediaRecord, Status};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use super::shader_accounting::require;
 use super::{TestResult, privacy};
@@ -19,6 +19,8 @@ mod container;
 
 #[path = "audio_loose_accounting.rs"]
 mod loose;
+#[path = "audio_wem_accounting.rs"]
+mod wem;
 
 const MAX_SAMPLE_BYTES: u64 = 8 << 20;
 const MAX_PROBES_PER_KIND: usize = 32;
@@ -67,7 +69,7 @@ fn verify_synthetic_accounting() -> TestResult {
             original,
         },
         &schema,
-        verify_wem,
+        wem::verify,
     )
 }
 
@@ -127,7 +129,7 @@ fn verify_archive(path: &Path) -> TestResult {
         })?;
         verify_sample(&archive, sample, &schema, |original, rows| {
             if suffix == ".wem" {
-                verify_wem(original, rows)?;
+                wem::verify(original, rows)?;
                 report_loose_coverage(rows);
             } else {
                 bank::verify(original, rows)?;
@@ -336,42 +338,6 @@ fn selected_raw(base: &Path, rows: &[MediaRecord], original: &[u8], ordinal: usi
         require(
             row.status == Status::Complete,
             "complete projection on every selected row",
-        )?;
-    }
-    Ok(())
-}
-
-fn verify_wem(original: &[u8], rows: &[MediaRecord]) -> TestResult {
-    let wem = Wem::parse(original)?;
-    let mut summaries = at(rows, "audio-wem");
-    let summary = summaries.next().ok_or("standalone WEM summary")?;
-    require(summaries.next().is_none(), "one standalone WEM summary")?;
-    require(
-        summary.data.pointer("/payload/format_tag") == Some(&json!(wem.format_tag())),
-        "original WEM format tag",
-    )?;
-    let actual = at(rows, "audio-wem-chunk").collect::<Vec<_>>();
-    let expected = wem.chunks().collect::<Vec<_>>();
-    require(
-        actual.len() == expected.len(),
-        "complete RIFF/RIFX directory",
-    )?;
-    for (ordinal, (row, chunk)) in actual.into_iter().zip(expected).enumerate() {
-        require(
-            row.subresource.indices == [u64::try_from(ordinal)?],
-            "original WEM chunk position",
-        )?;
-        require(
-            row.data.pointer("/payload/tag") == Some(&json!(chunk.id)),
-            "original WEM tag",
-        )?;
-        require(
-            range(row, "/payload/body_range", original)? == chunk.body,
-            "original WEM chunk body",
-        )?;
-        require(
-            range(row, "/payload/header_range", original)?.starts_with(&chunk.id),
-            "original WEM chunk header",
         )?;
     }
     Ok(())
