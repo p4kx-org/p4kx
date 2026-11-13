@@ -16,6 +16,7 @@ mod audio_device;
 mod audio_playback;
 mod audio_preview;
 mod banking;
+mod catalog_location_configuration;
 mod catalog_model;
 mod catalog_publication;
 mod catalog_render;
