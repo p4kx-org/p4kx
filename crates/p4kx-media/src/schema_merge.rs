@@ -67,3 +67,7 @@ fn insert_definition(
 fn contract(detail: &str) -> MediaError {
     MediaError::Contract(detail.into())
 }
+
+#[cfg(test)]
+#[path = "schema_merge_tests.rs"]
+mod tests;

@@ -60,7 +60,9 @@ fn definitions_preserve_original_xml_and_independent_link_evidence() -> TestResu
         assert_eq!(row.status, Status::Complete);
     }
     verify_links(&rows);
-    verify_source(&rows, &output.join(index.artifact_base))?;
+    let base = output.join(index.artifact_base);
+    verify_source(&rows, &base)?;
+    verify_link_origins(&rows, &base)?;
     Ok(())
 }
 
@@ -85,6 +87,61 @@ fn verify_links(rows: &[MediaRecord]) {
         ],
         "ordered source link dispositions"
     );
+}
+
+fn verify_link_origins(rows: &[MediaRecord], base: &std::path::Path) -> TestResult {
+    let (ordinal, _) = rows
+        .iter()
+        .enumerate()
+        .find(|(_, row)| {
+            row.data.pointer("/payload/kind").and_then(Value::as_str) == Some("tracks-database")
+        })
+        .ok_or("authored tracks directive link")?;
+    let ordinal = ordinal.to_string();
+    let file = fs::read_to_string(base.join("field-origins.jsonl"))?;
+    let mut rows = file.lines().map(serde_json::from_str::<Value>);
+    let expected = [
+        ("/data/payload/authored_path", 1),
+        ("/data/payload/archive_path", 2),
+    ];
+    let mut matched = 0;
+    for row in rows.by_ref() {
+        let row = row?;
+        if row.pointer("/scope/stream/kind").and_then(Value::as_str) != Some("animation-definition")
+            || row.pointer("/scope/ordinal").and_then(Value::as_str) != Some(ordinal.as_str())
+        {
+            continue;
+        }
+        if let Some((field, count)) = expected
+            .iter()
+            .find(|(field, _)| row.get("field").and_then(Value::as_str) == Some(*field))
+        {
+            assert_eq!(
+                row.get("containsEncryptedSource").and_then(Value::as_bool),
+                Some(true),
+                "encrypted origin for {field}"
+            );
+            assert_eq!(
+                row.get("sourceSetComplete").and_then(Value::as_bool),
+                Some(true),
+                "complete source set for {field}"
+            );
+            assert_eq!(
+                row.get("sourceUsesRefs")
+                    .and_then(Value::as_array)
+                    .map(Vec::len),
+                Some(*count),
+                "actual contributing XML positions for {field}"
+            );
+            matched += 1;
+        }
+    }
+    assert_eq!(
+        matched,
+        expected.len(),
+        "all required link fields have receipts"
+    );
+    Ok(())
 }
 
 fn verify_source(rows: &[MediaRecord], base: &std::path::Path) -> TestResult {

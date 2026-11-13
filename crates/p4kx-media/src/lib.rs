@@ -290,8 +290,6 @@ mod retained_source;
 mod root_source_read;
 mod schema;
 mod schema_merge;
-#[cfg(test)]
-mod schema_merge_tests;
 mod shader_declaration;
 mod shader_diagnostic;
 mod shader_flags;
