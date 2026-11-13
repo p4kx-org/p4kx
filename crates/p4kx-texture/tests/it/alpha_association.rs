@@ -61,50 +61,52 @@ fn legacy_association_uses_the_authored_four_cc() -> Check {
 #[test]
 fn dx10_association_retains_reserved_bits_and_original_word() -> Check {
     use DdsAlphaAssociation::{Custom, Opaque, Premultiplied, Reserved, Straight, Unknown};
-    let fixture = SplitDds::new(
-        TestTextureFormat::Dx10Block {
-            dxgi_format: 74,
-            block_bytes: 16,
-        },
-        4,
-        4,
-    );
-    for (mode, expected) in [
-        Unknown,
-        Straight,
-        Premultiplied,
-        Opaque,
-        Custom,
-        Reserved,
-        Reserved,
-        Reserved,
-    ]
-    .into_iter()
-    .enumerate()
-    {
-        let original = 0x8000_0000_u32 | u32::try_from(mode)?;
-        let mut bytes = fixture.header_bytes();
-        bytes
-            .get_mut(DX10_FLAGS2..DX10_FLAGS2 + 4)
-            .ok_or("miscFlags2")?
-            .copy_from_slice(&original.to_le_bytes());
-        for (header, magic) in [(bytes.as_slice(), 4), (&bytes[4..], 0)] {
-            let raw = DdsRawHeader::parse(header)?;
-            assert_eq!(raw.alpha_association(), expected, "DX10 mode {mode}");
-            assert_eq!(
-                raw.dx10().ok_or("DX10")?.misc_flags2,
-                original,
-                "entire authored word"
-            );
-            let words: Vec<_> = raw
-                .words_for(DdsHeaderField::AlphaAssociation)
-                .map(|word| word.offset)
-                .collect();
-            assert_eq!(
-                words,
-                [80 + magic, 140 + magic],
-                "DX10 FourCC and miscFlags2"
-            );
+    for dxgi_format in [74, 77] {
+        let fixture = SplitDds::new(
+            TestTextureFormat::Dx10Block {
+                dxgi_format,
+                block_bytes: 16,
+            },
+            4,
+            4,
+        );
+        for (mode, expected) in [
+            Unknown,
+            Straight,
+            Premultiplied,
+            Opaque,
+            Custom,
+            Reserved,
+            Reserved,
+            Reserved,
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let original = 0x8000_0000_u32 | u32::try_from(mode)?;
+            let mut bytes = fixture.header_bytes();
+            bytes
+                .get_mut(DX10_FLAGS2..DX10_FLAGS2 + 4)
+                .ok_or("miscFlags2")?
+                .copy_from_slice(&original.to_le_bytes());
+            for (header, magic) in [(bytes.as_slice(), 4), (&bytes[4..], 0)] {
+                let raw = DdsRawHeader::parse(header)?;
+                assert_eq!(raw.alpha_association(), expected, "DX10 mode {mode}");
+                assert_eq!(
+                    raw.dx10().ok_or("DX10")?.misc_flags2,
+                    original,
+                    "entire authored word"
+                );
+                let words: Vec<_> = raw
+                    .words_for(DdsHeaderField::AlphaAssociation)
+                    .map(|word| word.offset)
+                    .collect();
+                assert_eq!(
+                    words,
+                    [80 + magic, 140 + magic],
+                    "DX10 FourCC and miscFlags2"
+                );
+            }
         }
     }
     Ok(())

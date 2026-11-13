@@ -78,8 +78,14 @@ fn check_texture_fields(texture: &Value) {
         "/png_transform",
         "/alpha_association",
     ] {
+        let encrypted = texture
+            .get("field_origins")
+            .and_then(|origins| origins.get(field))
+            .and_then(|origin| origin.get("containsEncryptedSource"))
+            .and_then(Value::as_bool);
         assert_eq!(
-            texture["field_origins"][field]["containsEncryptedSource"], false,
+            encrypted,
+            Some(false),
             "the plain colour header owns {field} without the private alpha tail"
         );
     }
