@@ -1626,11 +1626,8 @@ not part of the kind): `guid`, `className`, `recordPath`, `disabled`, `isSecurit
 text; the German file lacks 3,246 of the 3,297 variants on LIVE, so `de` is `null` and the Basetool
 falls back to `en`) and `entityClusterMemberGuid`. The sourced `classification` holds the three
 original location class, function and size References. See [the location vocabulary contract](catalog-location-vocabulary.md).
-Not exported of a location template: the NPC auto spawn settings of its
-`locationData` (not the NPC spawn descriptions of contracts, see "NPC and entity spawns"), the
-mission modules and limits and the security network manifest.
-The sourced location configuration retains authored mission limits and its default security
-manifest Reference. See [mission location configuration](catalog-location-configuration.md).
+The sourced location configuration retains authored NPC auto-spawn settings, mission limits and
+the default security-manifest Reference. See [mission location configuration](catalog-location-configuration.md).
 
 Not exported: SCMDB's own pools, waves and region lists, which are derived and not stated by the
 Archive.

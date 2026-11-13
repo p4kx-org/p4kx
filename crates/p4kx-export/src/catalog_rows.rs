@@ -55,7 +55,7 @@ pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -
         emitted,
         filter: filter.cloned(),
         numbers: numbers(collected),
-        configuration_numbers: std::mem::take(&mut collected.entity_configurations.numbers),
+        configuration_numbers: collected.take_configuration_numbers(),
         template_numbers: template_numbers(collected),
         recovery_numbers: Vec::new(),
     }

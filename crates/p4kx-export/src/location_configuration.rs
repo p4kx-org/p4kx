@@ -10,6 +10,7 @@ use serde::Serialize;
 use super::super::authored_fields::Observed;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::schema_fields::every_field_required;
@@ -17,14 +18,20 @@ use crate::source_fields::FieldError;
 use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 use crate::template_field_capture::TemplateFieldCapture;
 
+#[path = "location_auto_spawn.rs"]
+mod auto_spawn;
+
+use auto_spawn::LocationAutoSpawnSettings;
+
 const SOURCE_TYPE: &str = "MissionLocationData";
 pub(crate) const SECURITY_MANIFEST_TYPE: &str = "SecurityNetworkManifest";
 
-/// Location-owned limits and its authored default security definition link.
+/// Location-owned spawn settings, limits and default security definition link.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct MissionLocationConfiguration<'source> {
+    auto_spawn_settings: SourcedValue<Vec<SourcedValue<LocationAutoSpawnSettings<'source>>>>,
     mission_limits: SourcedValue<Vec<SourcedValue<LocationMissionLimit<'source>>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     default_security_network_manifest: SourcedValue<Box<SourceRecordReference<'source>>>,
@@ -36,6 +43,12 @@ impl<'source> MissionLocationConfiguration<'source> {
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
+            auto_spawn_settings: fields.class_array_to(
+                "autoSpawnSettings",
+                "AutoSpawnSettings",
+                notes,
+                LocationAutoSpawnSettings::read,
+            )?,
             mission_limits: fields.class_array_to(
                 "missionLimits",
                 "LocationMissionLimit",
@@ -92,10 +105,10 @@ pub(crate) fn read<'source>(
     originals: &OriginalFlowFields<'_, '_, 'source>,
     input: &OriginalCatalogInput<'_, 'source>,
     capture: &TemplateFieldCapture<'_, '_, '_, 'source>,
+    numbers: &RefCell<Vec<CapturedNumber>>,
     notes: &mut Vec<FieldError>,
 ) -> Result<SourcedValue<MissionLocationConfiguration<'source>>, CatalogError> {
-    let numbers = RefCell::default();
-    let fields = Observed::definition(originals, input, capture, &numbers);
+    let fields = Observed::configuration(originals, input, capture, numbers);
     fields.declared_class_to(
         "locationData",
         SOURCE_TYPE,

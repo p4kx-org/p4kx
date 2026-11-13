@@ -19296,6 +19296,118 @@
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
+    "LocationAutoSpawnSettings": {
+      "description": "Authored location NPC spawn settings with source rules and inventory.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "closetNegativeTags": {
+          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+        },
+        "closetPositiveTags": {
+          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+        },
+        "defendAreaNegativeTags": {
+          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+        },
+        "defendAreaPositiveTags": {
+          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+        },
+        "entityTags": {
+          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+        },
+        "excludeShipCrew": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "excludeSpawnGender": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "factionOverride": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "initialActivity": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "inventoryItems": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSpawnInventory"
+        },
+        "isCritical": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "maxConcurrentSpawns": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "maxGroupSize": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "maxSpawnDelay": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxSpawns": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "minGroupSize": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "minSpawnDelay": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "missionAlliedMarker": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "negativeCharacterTags": {
+          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+        },
+        "positiveCharacterTags": {
+          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+        },
+        "roomNegativeTags": {
+          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+        },
+        "roomPositiveTags": {
+          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+        },
+        "scheduleAreaNegativeTags": {
+          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+        },
+        "scheduleAreaPositiveTags": {
+          "$ref": "#/$defs/SourcedValueOfSpawnTags"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "closetNegativeTags",
+        "closetPositiveTags",
+        "defendAreaNegativeTags",
+        "defendAreaPositiveTags",
+        "entityTags",
+        "excludeShipCrew",
+        "excludeSpawnGender",
+        "factionOverride",
+        "initialActivity",
+        "inventoryItems",
+        "isCritical",
+        "maxConcurrentSpawns",
+        "maxGroupSize",
+        "maxSpawnDelay",
+        "maxSpawns",
+        "minGroupSize",
+        "minSpawnDelay",
+        "missionAlliedMarker",
+        "name",
+        "negativeCharacterTags",
+        "positiveCharacterTags",
+        "roomNegativeTags",
+        "roomPositiveTags",
+        "scheduleAreaNegativeTags",
+        "scheduleAreaPositiveTags"
+      ],
+      "type": "object"
+    },
     "LocationClassDefinition": {
       "description": "An authored mission location class and the ordered scopes it exposes.",
       "properties": {
@@ -21928,8 +22040,11 @@
       "type": "object"
     },
     "MissionLocationConfiguration": {
-      "description": "Location-owned limits and its authored default security definition link.",
+      "description": "Location-owned spawn settings, limits and default security definition link.",
       "properties": {
+        "autoSpawnSettings": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfLocationAutoSpawnSettings"
+        },
         "defaultSecurityNetworkManifest": {
           "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
         },
@@ -21938,6 +22053,7 @@
         }
       },
       "required": [
+        "autoSpawnSettings",
         "defaultSecurityNetworkManifest",
         "missionLimits"
       ],
@@ -41809,6 +41925,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfLinkedInteraction"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfLocationAutoSpawnSettings": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfLocationAutoSpawnSettings"
                 },
                 "type": "array"
               }
@@ -65130,6 +65379,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/LocalContractGeneratorParams"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfLocationAutoSpawnSettings": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/LocationAutoSpawnSettings"
               }
             }
           }

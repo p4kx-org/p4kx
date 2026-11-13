@@ -7,6 +7,9 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult, at, guid};
 
+#[path = "catalog_location_auto_spawn.rs"]
+mod auto_spawn;
+
 const TEMPLATE: u128 = 0x1074_0001;
 const MISSING: u128 = 0x1074_00ff;
 

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cell::RefCell;
+
 use p4kx_extraction::{
     CancelToken, DataForge, Filter, RecordTree, SourcedValue, StructValue, TagTree,
 };
@@ -10,6 +12,7 @@ use serde::Serialize;
 use crate::CatalogError;
 use crate::blueprint::as_struct;
 use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_v3::location_classification::configuration::{
     self, MissionLocationConfiguration,
@@ -44,6 +47,8 @@ pub(crate) struct MissionLocationTemplate<'a> {
     /// The original classification of the location data.
     classification: SourcedValue<LocationClassification<'a>>,
     configuration: SourcedValue<MissionLocationConfiguration<'a>>,
+    #[serde(skip)]
+    pub(crate) configuration_numbers: Vec<CapturedNumber>,
     /// The `isSecurityNetworkHost` flag, `null` when absent.
     pub(crate) is_security_network_host: Option<bool>,
     /// The `generalTags`: what the queries of `contractLocationQueries` match.
@@ -115,7 +120,8 @@ fn template<'f>(
     let data = one(Some(tree.root()), "locationData");
     let mut notes = Vec::new();
     let classification = location_classification::read(&fields, input, &capture, &mut notes)?;
-    let configuration = configuration::read(&fields, input, &capture, &mut notes)?;
+    let numbers = RefCell::default();
+    let configuration = configuration::read(&fields, input, &capture, &numbers, &mut notes)?;
     let value = MissionLocationTemplate {
         guid: CatalogGuid(tree.guid()),
         class_name: class_name(tree),
@@ -123,6 +129,7 @@ fn template<'f>(
         disabled: boolean(data, "disabled"),
         classification,
         configuration,
+        configuration_numbers: numbers.into_inner(),
         is_security_network_host: boolean(data, "isSecurityNetworkHost"),
         tags: reader.tag_list(data, "generalTags"),
         produces_tags: term(&reader, data, "producesTags"),

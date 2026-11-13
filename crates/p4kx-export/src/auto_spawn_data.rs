@@ -93,7 +93,7 @@ impl<'source> AutoSpawnData<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SpawnLimits {
+pub(super) struct SpawnLimits {
     min_group_size: SourcedValue<i32>,
     max_group_size: SourcedValue<i32>,
     max_concurrent_spawns: SourcedValue<i32>,
@@ -103,7 +103,7 @@ struct SpawnLimits {
 }
 
 impl SpawnLimits {
-    fn read(
+    pub(super) fn read(
         fields: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
@@ -117,7 +117,7 @@ impl SpawnLimits {
         })
     }
 
-    const fn projected(&self) -> [SourceField; 6] {
+    pub(super) const fn projected(&self) -> [SourceField; 6] {
         [
             ("minGroupSize", self.min_group_size.state()),
             ("maxGroupSize", self.max_group_size.state()),
@@ -183,14 +183,14 @@ impl<'source> SpawnAssignment<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SpawnTags<'source> {
+pub(super) struct SpawnTags<'source> {
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
     tags: SourcedValue<Vec<RecordLink<'source>>>,
     authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> SpawnTags<'source> {
-    fn read_field(
+    pub(super) fn read_field(
         fields: Observed<'_, '_, '_, 'source>,
         name: &str,
         notes: &mut Vec<FieldError>,
@@ -214,7 +214,7 @@ impl<'source> SpawnTags<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct SpawnInventory<'source> {
+pub(super) struct SpawnInventory<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     entity_class: RecordLink<'source>,
     quantity: SourcedValue<i32>,
@@ -224,7 +224,7 @@ struct SpawnInventory<'source> {
 }
 
 impl<'source> SpawnInventory<'source> {
-    fn read(
+    pub(super) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {

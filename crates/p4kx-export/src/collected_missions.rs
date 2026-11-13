@@ -3,6 +3,7 @@
 
 use crate::broker_definition::BrokerDefinition;
 use crate::broker_entry::BrokerProjection;
+use crate::catalog_number_capture::CapturedNumber;
 use crate::contract_missions::ContractWithTitles;
 use crate::crafting_warning::CraftingWarning;
 use crate::location_template::LocationTemplates;
@@ -17,6 +18,14 @@ use crate::{CatalogError, CatalogReadFailure, Kind};
 use super::Collected;
 
 impl<'f> Collected<'f> {
+    pub(crate) fn take_configuration_numbers(&mut self) -> Vec<CapturedNumber> {
+        let mut numbers = std::mem::take(&mut self.entity_configurations.numbers);
+        for location in &mut self.mission_location_templates {
+            numbers.append(&mut location.configuration_numbers);
+        }
+        numbers
+    }
+
     /// Stores the contracts, counts the entries left out as `skipped` and adds the failures.
     pub(crate) fn add_contracts(
         &mut self,
