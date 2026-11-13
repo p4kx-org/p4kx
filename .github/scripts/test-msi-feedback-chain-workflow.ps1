@@ -10,15 +10,19 @@ function Get-ChainWorkflowStep([string]$Workflow,[string]$Name) {
     return $matches[0].Value
 }
 $release=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/release-windows.yml')
-$prepare=Get-ChainWorkflowStep $release 'Prepare the independent installer step allowance'
+$prepare=Get-ChainWorkflowStep $release 'Prepare installer inputs and the independent step allowance'
 $installer=Get-ChainWorkflowStep $release 'Installer metadata, upgrade, downgrade, rollback, CPU replacement and preservation'
-$early=Get-ChainWorkflowStep $release 'Preserve prepared allowance and executed parent controls'
+$early=Get-ChainWorkflowStep $release 'Preserve prepared allowance, inputs and executed parent controls'
 Assert-ChainWorkflow ($release.IndexOf($prepare,[StringComparison]::Ordinal) -lt $release.IndexOf($early,[StringComparison]::Ordinal) -and
     $release.IndexOf($early,[StringComparison]::Ordinal) -lt $release.IndexOf($installer,[StringComparison]::Ordinal)) 'Actual prepared receipt must upload after preparation and before native installer work.'
 Assert-ChainWorkflow ($early -cmatch '(?m)^        timeout-minutes: 1\r?$' -and $early.Contains('installer-check/feedback/*.json') -and
     $early.Contains('contracts/msi-feedback-parent/**/*.jsonl') -and $early.Contains('contracts/msi-feedback-parent/**/*.log') -and
     $early -cmatch '(?m)^          if-no-files-found: error\r?$') 'Actual pre-risk upload lacks bounded original prepared and parent-control evidence.'
 Assert-ChainWorkflow (-not ($early -match '(?m)^        (if|continue-on-error):')) 'Actual pre-risk evidence failure must refuse installer admission.'
+Assert-ChainWorkflow ($prepare.Contains('Write-P4kxMsiDiagnosticInputs $parameters $feedback') -and
+    $prepare.Contains("'msi-invocation.json'") -and $installer.Contains("'msi-invocation.json'") -and
+    $installer.Contains('ConvertFrom-Json -AsHashtable') -and $installer.Contains('check-msi.ps1 @parameters') -and
+    -not $early.Contains('msi-invocation.json')) 'Prepared MSI input hashes must upload before the same runner-local invocation is used, without publishing its paths.'
 
 $chain=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/msi-feedback-chain-probe.yml')
 $step=Get-ChainWorkflowStep $chain 'Dynamic parent and Portal fixture'

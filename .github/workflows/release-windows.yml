@@ -196,14 +196,42 @@ jobs:
             cargo build --release --locked --target $env:P4KX_TARGET -p p4kx-msi-path --example p4kx-msi-registry-fixture --features native-fixtures
             if ($LASTEXITCODE -ne 0) { throw 'Opt-in Registry fixture compilation failed.' }
           } finally { $env:P4KX_FIXTURE_SOURCE_REVISION = $original }
-      - name: Prepare the independent installer step allowance
+      - name: Prepare installer inputs and the independent step allowance
         id: msi-budget
         timeout-minutes: 1
         run: |
-          .github/scripts/prepare-msi-feedback.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/feedback')
+          . .github/scripts/platform-contract.ps1
           . .github/scripts/msi-diagnostic-runner.ps1
-          Write-P4kxMsiDiagnosticSources @{Target=$env:P4KX_TARGET} .github/scripts (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/feedback')
-      - name: Preserve prepared allowance and executed parent controls
+          $row = Get-P4kxPlatform -Target $env:P4KX_TARGET
+          $other = @((Get-P4kxPlatformContract).targets | Where-Object { $_.os -eq 'windows' -and $_.arch -ne $row.arch })[0]
+          $base = "artifacts/windows-build-$($row.target)"
+          $otherBase = "artifacts/windows-build-$($other.target)"
+          $msiName = Get-P4kxAssetName -Target $row.target -Version $env:VERSION -Package msi
+          $otherName = Get-P4kxAssetName -Target $other.target -Version $env:VERSION -Package msi
+          $registryFixture = "target/$($row.target)/release/examples/p4kx-msi-registry-fixture.exe"
+          $output = Join-Path $env:P4KX_PACKAGE_TASK 'installer-check'
+          $parameters = @{
+            Target = $row.target
+            Msi = "$base/package/$msiName"
+            NextMsi = "$base/validation/next.msi"
+            NextVersion = $env:NEXT_MSI_VERSION
+            UpgradeCode = ([xml](Get-Content crates/p4kx-gui/wix/main.wxs)).Wix.Package.UpgradeCode
+            OtherArchitectureMsi = "$otherBase/package/$otherName"
+            FixtureDirectory = "$base/fixture"
+            OutputDirectory = $output
+            RegistryFixture = $registryFixture
+            RegistryFixtureSha256 = (Get-FileHash -LiteralPath $registryFixture -Algorithm SHA256).Hash.ToLowerInvariant()
+            HelperExecutable = "$base/msi-helper/payload/p4kx-msi-path.exe"
+          }
+          if ($row.arch -ceq 'amd64') {
+            $parameters.PreviousMsi = Join-Path $env:P4KX_PACKAGE_TASK 'previous/P4K-Extractor-0.2.0-x86_64.msi'
+          }
+          $parameters | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath (Join-Path $env:P4KX_PACKAGE_TASK 'msi-invocation.json') -Encoding utf8NoBOM
+          $feedback = Join-Path $output 'feedback'
+          .github/scripts/prepare-msi-feedback.ps1 -Directory $feedback
+          Write-P4kxMsiDiagnosticSources $parameters .github/scripts $feedback
+          Write-P4kxMsiDiagnosticInputs $parameters $feedback
+      - name: Preserve prepared allowance, inputs and executed parent controls
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         timeout-minutes: 1
         with:
@@ -219,17 +247,9 @@ jobs:
         run: |
           . .github/scripts/msi-diagnostic-budget.ps1
           Assert-P4kxMsiStepAdmission $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC $env:P4KX_MSI_STEP_MINUTES $env:P4KX_MSI_STEP_COMPUTED_AT_UTC
-          . .github/scripts/platform-contract.ps1
-          $row = Get-P4kxPlatform -Target $env:P4KX_TARGET
-          $other = @((Get-P4kxPlatformContract).targets | Where-Object { $_.os -eq 'windows' -and $_.arch -ne $row.arch })[0]
-          $base = "artifacts/windows-build-$env:P4KX_TARGET"
-          $msiName = Get-P4kxAssetName -Target $row.target -Version $env:VERSION -Package msi
-          $otherName = Get-P4kxAssetName -Target $other.target -Version $env:VERSION -Package msi
-          $previous = if ($row.arch -eq 'amd64') { @{PreviousMsi=(Join-Path $env:P4KX_PACKAGE_TASK 'previous/P4K-Extractor-0.2.0-x86_64.msi')} } else { @{} }
-          $upgradeCode = ([xml](Get-Content crates/p4kx-gui/wix/main.wxs)).Wix.Package.UpgradeCode
-          $registryFixture = "target/$env:P4KX_TARGET/release/examples/p4kx-msi-registry-fixture.exe"
-          $registryHash = (Get-FileHash -LiteralPath $registryFixture -Algorithm SHA256).Hash.ToLowerInvariant()
-          .github/scripts/check-msi.ps1 -Target $row.target -Msi "$base/package/$msiName" -NextMsi "$base/validation/next.msi" -NextVersion $env:NEXT_MSI_VERSION -UpgradeCode $upgradeCode -OtherArchitectureMsi "artifacts/windows-build-$($other.target)/package/$otherName" -FixtureDirectory "$base/fixture" -OutputDirectory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check') -RegistryFixture $registryFixture -RegistryFixtureSha256 $registryHash -HelperExecutable "$base/msi-helper/payload/p4kx-msi-path.exe" @previous
+          $invocation = Join-Path $env:P4KX_PACKAGE_TASK 'msi-invocation.json'
+          $parameters = Get-Content -LiteralPath $invocation -Raw | ConvertFrom-Json -AsHashtable
+          .github/scripts/check-msi.ps1 @parameters
       - name: Record executed release payload evidence
         run: |
           $base = "artifacts/windows-build-$env:P4KX_TARGET"
