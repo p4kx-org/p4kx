@@ -116,6 +116,7 @@ mod shader_support;
 mod source_errors;
 mod streaming;
 mod support;
+mod texture_provider;
 mod transactions;
 mod unsupported_source;
 mod write_protection;

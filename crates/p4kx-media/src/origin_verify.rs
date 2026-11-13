@@ -144,63 +144,49 @@ fn field(
 }
 
 fn verify_profile(stream: OriginStream, profile: OriginProfile) -> Result<(), MediaError> {
-    let valid = matches!(
-        (stream, profile),
-        (
-            OriginStream::Records { .. } | OriginStream::Sources | OriginStream::Artifacts,
-            OriginProfile::Unmigrated
-        ) | (OriginStream::IndexBuild, OriginProfile::IndexBuild)
-            | (
-                OriginStream::Records {
-                    kind: MediaKind::Audio
-                },
-                OriginProfile::AudioWem | OriginProfile::AudioBank
-            )
-            | (
-                OriginStream::Records {
-                    kind: MediaKind::AudioControl
-                },
-                OriginProfile::AudioControl
-            )
-            | (
-                OriginStream::Records {
-                    kind: MediaKind::Animation
-                },
-                OriginProfile::Animation
-            )
-            | (
-                OriginStream::Records {
-                    kind: MediaKind::Material
-                },
-                OriginProfile::MaterialLibrary
-                    | OriginProfile::MaterialFailure
-                    | OriginProfile::MaterialSourceLimit
-                    | OriginProfile::MaterialConfigurationFailure
-            )
-            | (
-                OriginStream::Records {
-                    kind: MediaKind::Archive
-                },
-                OriginProfile::ArchiveEntry
-                    | OriginProfile::ArchiveLayout
-                    | OriginProfile::ArchiveBuild,
-            )
-            | (
-                OriginStream::Records {
-                    kind: MediaKind::Shader
-                },
-                OriginProfile::ShaderDefinition
-                    | OriginProfile::ShaderProperty
-                    | OriginProfile::ShaderDeclaration
-                    | OriginProfile::ShaderFailure
-                    | OriginProfile::ShaderSourceLimit
-                    | OriginProfile::ShaderConfigurationFailure,
-            )
-    );
+    let valid = match stream {
+        OriginStream::Records { kind } => {
+            profile == OriginProfile::Unmigrated || record_profile(kind, profile)
+        }
+        OriginStream::Sources | OriginStream::Artifacts => profile == OriginProfile::Unmigrated,
+        OriginStream::IndexBuild => profile == OriginProfile::IndexBuild,
+    };
     if !valid {
         return Err(invalid("origin profile does not own this payload stream"));
     }
     Ok(())
+}
+
+fn record_profile(kind: MediaKind, profile: OriginProfile) -> bool {
+    match kind {
+        MediaKind::Audio => matches!(profile, OriginProfile::AudioWem | OriginProfile::AudioBank),
+        MediaKind::AudioControl => profile == OriginProfile::AudioControl,
+        MediaKind::Animation => profile == OriginProfile::Animation,
+        MediaKind::Texture => profile == OriginProfile::TextureHeader,
+        MediaKind::Material => matches!(
+            profile,
+            OriginProfile::MaterialLibrary
+                | OriginProfile::MaterialFailure
+                | OriginProfile::MaterialSourceLimit
+                | OriginProfile::MaterialConfigurationFailure
+        ),
+        MediaKind::Archive => matches!(
+            profile,
+            OriginProfile::ArchiveEntry
+                | OriginProfile::ArchiveLayout
+                | OriginProfile::ArchiveBuild
+        ),
+        MediaKind::Shader => matches!(
+            profile,
+            OriginProfile::ShaderDefinition
+                | OriginProfile::ShaderProperty
+                | OriginProfile::ShaderDeclaration
+                | OriginProfile::ShaderFailure
+                | OriginProfile::ShaderSourceLimit
+                | OriginProfile::ShaderConfigurationFailure
+        ),
+        _ => false,
+    }
 }
 
 fn invalid(message: &str) -> MediaError {

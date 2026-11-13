@@ -98,6 +98,7 @@ impl MediaWriter<'_> {
             | OriginProfile::AudioBank
             | OriginProfile::AudioControl
             | OriginProfile::Animation
+            | OriginProfile::TextureHeader
             | OriginProfile::MaterialLibrary
             | OriginProfile::MaterialFailure
             | OriginProfile::MaterialSourceLimit

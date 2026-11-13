@@ -312,6 +312,7 @@ mod source;
 mod source_selection;
 mod staged_directory;
 mod temporary_file;
+mod texture_provider;
 mod traversal;
 mod traversal_container;
 mod traversal_projection;

@@ -76,6 +76,8 @@ pub enum OriginProfile {
     AudioControl,
     /// Original CAF, DBA and AIM inventory and decoded channels.
     Animation,
+    /// Original DDS header words and their normalized topology.
+    TextureHeader,
     /// Successfully parsed material library and its actually used companions.
     MaterialLibrary,
     /// Material parser failure after actual source-content inspection.

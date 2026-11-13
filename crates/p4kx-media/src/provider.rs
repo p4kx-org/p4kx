@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::animation::AnimationProvider;
 use crate::audio_control_provider::AudioControlProvider;
 use crate::audio_provider::AudioProvider;
+use crate::texture_provider::TextureProvider;
 use crate::{
     ArchiveProvider, MaterialProvider, MediaError, MediaKind, MediaWriter, RootSource,
     ShaderProvider, SourceContext,
@@ -170,6 +171,7 @@ impl Default for ProviderRegistry {
                 Box::new(ArchiveProvider),
                 Box::new(ShaderProvider::default()),
                 Box::new(MaterialProvider::default()),
+                Box::new(TextureProvider),
                 Box::new(AnimationProvider),
                 Box::new(AudioProvider),
                 Box::new(AudioControlProvider),

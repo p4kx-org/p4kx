@@ -43,7 +43,7 @@ fn record(
     let mut capture = OriginCapture::with_limit(resolver.owner, resolver.detail_bytes);
     capture.include_original(&origin_source::whole(resolver)?)?;
     capture.include_original(&data(resolver, prepared)?)?;
-    if resolver.builtin.is_some() && !audio(resolver) {
+    if resolver.builtin.is_some() && !explicit_data(resolver) {
         capture.include_original(&resolver.resolve("/subresource", None)?)?;
     }
     if let Some(prepared) = prepared {
@@ -51,7 +51,7 @@ fn record(
     }
     if material(resolver) {
         capture.include_original(&resolver.resolve("/issues", None)?)?;
-    } else if audio(resolver) {
+    } else if explicit_data(resolver) {
         capture.include_original(&resolver.resolve("/issues", prepared)?)?;
     } else {
         capture.include_original(&OriginContributions::unknown(resolver.owner))?;
@@ -156,6 +156,7 @@ const fn known_members(profile: OriginProfile) -> &'static [&'static str] {
         | OriginProfile::AudioBank
         | OriginProfile::AudioControl
         | OriginProfile::Animation
+        | OriginProfile::TextureHeader
         | OriginProfile::ArchiveBuild
         | OriginProfile::IndexBuild => &[],
     }
@@ -179,7 +180,7 @@ fn material(resolver: &OriginResolver<'_>) -> bool {
         .builtin
         .is_some_and(|builtin| crate::origin_material_profile::owns(builtin.profile))
 }
-fn audio(resolver: &OriginResolver<'_>) -> bool {
+fn explicit_data(resolver: &OriginResolver<'_>) -> bool {
     resolver.builtin.is_some_and(|builtin| {
         matches!(
             builtin.profile,
@@ -187,11 +188,12 @@ fn audio(resolver: &OriginResolver<'_>) -> bool {
                 | OriginProfile::AudioBank
                 | OriginProfile::AudioControl
                 | OriginProfile::Animation
+                | OriginProfile::TextureHeader
         )
     })
 }
 fn prepared_data(resolver: &OriginResolver<'_>) -> bool {
-    material(resolver) || audio(resolver)
+    material(resolver) || explicit_data(resolver)
 }
 fn known_data(
     resolver: &OriginResolver<'_>,

@@ -27,7 +27,7 @@ p4kx media schema --source
 
 Repeat `--kind` for an explicit selection. The known names are `archive`, `model`, `material`,
 `texture`, `shader`, `animation`, `animation-definition`, `audio` and `audio-control`. Omission
-selects every registered provider. The built-in providers are `archive`, `shader`, `material`,
+selects every registered provider. The built-in providers are `archive`, `shader`, `material`, `texture`,
 `animation`, `audio` and `audio-control`. An explicitly requested kind without an available provider returns a typed
 capability failure and a non-zero exit status, even when the selection is empty.
 
@@ -41,6 +41,15 @@ defines its precise typed fields, statuses and counting units.
 ordered authored fields, layer/texture references and existing interpreted surfaces without
 geometry conversion. [Material source metadata](media-material-metadata.md) defines raw
 preservation, physical candidate resolution, bounds and the separate target-readability contract.
+
+`--kind texture` emits a `texture.dds-header` row for each selected colour or alpha DDS
+header. The payload shares `texture info --json`'s `source_metadata` fields and adds
+the declared header role, available image decoder and expected split count when the stored
+length and topology establish it. The fields retain exact original header byte ranges or
+Entry directory metadata in the common field-origin receipts. A malformed header produces
+a diagnosed row in diagnostic output. Structurally readable words survive normalization
+failure. Raw source preservation includes selected split parts. This provider projects
+header metadata without opening sibling inputs or producing converted images.
 
 `--kind animation` retains CAF, DBA and AIM sources with chunk and clip inventory, original
 metadata and controller words, and typed decoded frame and key chunks.
