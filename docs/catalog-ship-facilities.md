@@ -63,6 +63,26 @@ Reference with target identity and resolution status. The component's
 Cargo capacity in ShipBase comes from the selected `InventoryContainer` Record.
 [Ship base data](ship-base-data.md) describes the capacity and cell projections.
 
+## Logout and outfit storage facilities
+
+The `logout` kind identifies `LogoutComponentParams`. Its ordered
+`logoutInteractions` retains original StrongPointer slots, including null
+slots. Each populated slot carries its logout and respawn interaction and
+point WeakPointers with their target coordinates. The component declares a
+logout capability. A bed role needs an independently authored source.
+
+The `outfitHanger` kind identifies `SEntityComponentOutfitHangerParams`.
+It retains the equip, hang, swap and disguise interaction WeakPointers,
+ordered `itemPortTypeSubtypes`, the concrete animated swap and hang
+payloads and `destroyPlayerItems`. This component's restrictions and the
+owner's individual port restrictions are separate declarations.
+
+For personal-weapon holders, `configurations.itemPorts` exposes the original
+owner and port ordinal and the accepted type `WeaponPersonal` in
+`ports.value[].value.restrictions.types` where declared. The same port row
+retains subtype slots, size bounds, tags and rules. This is a port
+capability. Physical port counts come from the authored port slots.
+
 ## Ship Loadout placements
 
 `placements.facilityInstances` links physical facility and inventory configurations to their

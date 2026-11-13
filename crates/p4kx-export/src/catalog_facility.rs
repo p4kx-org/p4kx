@@ -16,11 +16,17 @@ use crate::source_fields::FieldError;
 
 #[path = "facility_cargo_grid.rs"]
 mod cargo_grid;
+#[path = "facility_logout.rs"]
+mod logout;
+#[path = "facility_outfit_hanger.rs"]
+mod outfit_hanger;
 
 pub(super) const SOURCE_TYPES: &[&str] = &[
     catalog_seat::COMPONENT,
     med_bed::COMPONENT,
     cargo_grid::COMPONENT,
+    logout::COMPONENT,
+    outfit_hanger::COMPONENT,
 ];
 
 #[derive(Clone, Copy)]
@@ -28,6 +34,8 @@ pub(super) enum FacilityKind {
     Seat,
     MedBed,
     CargoGrid,
+    Logout,
+    OutfitHanger,
 }
 
 impl FacilityKind {
@@ -36,6 +44,8 @@ impl FacilityKind {
             catalog_seat::COMPONENT => Some(Self::Seat),
             med_bed::COMPONENT => Some(Self::MedBed),
             cargo_grid::COMPONENT => Some(Self::CargoGrid),
+            logout::COMPONENT => Some(Self::Logout),
+            outfit_hanger::COMPONENT => Some(Self::OutfitHanger),
             _ => None,
         }
     }
@@ -59,6 +69,8 @@ enum FacilityFields<'source> {
     Seat(Box<Seat<'source>>),
     MedBed(Box<MedBed<'source>>),
     CargoGrid(Box<cargo_grid::CargoGrid<'source>>),
+    Logout(Box<logout::Logout<'source>>),
+    OutfitHanger(Box<outfit_hanger::OutfitHanger<'source>>),
 }
 
 impl<'source> Facility<'source> {
@@ -74,6 +86,12 @@ impl<'source> Facility<'source> {
             FacilityKind::MedBed => {
                 FacilityFields::MedBed(Box::new(MedBed::read(source, projection, notes)?))
             }
+            FacilityKind::Logout => {
+                FacilityFields::Logout(Box::new(logout::Logout::read(source, notes)?))
+            }
+            FacilityKind::OutfitHanger => FacilityFields::OutfitHanger(Box::new(
+                outfit_hanger::OutfitHanger::read(source, notes)?,
+            )),
             FacilityKind::CargoGrid => {
                 FacilityFields::CargoGrid(Box::new(cargo_grid::CargoGrid::read(source, notes)?))
             }

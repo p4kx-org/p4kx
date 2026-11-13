@@ -185,7 +185,10 @@ A facility definition is identified by the original Entity Record index and
 `Components` slot. The `configurations.facilities` `seat` kind carries the original
 `SCItemSeatParams` member data and its owned ejection and actor-attachment
 definitions. Placement consumers can use the physical component key with
-their contextual placement identity. See [ship facility configurations](../catalog-ship-facilities.md).
+their contextual placement identity. Logout and outfit hanger kinds use their
+own declared components. A personal-weapon holder is an authored item port
+capability identified in the canonical port table by its owner and ordinal.
+See [ship facility configurations](../catalog-ship-facilities.md).
 
 A direct ship-room placement uses the physical RoomAssociation slot, the
 actual SOCpak and descriptor Entry, the original streaming declaration node,

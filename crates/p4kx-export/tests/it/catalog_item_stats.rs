@@ -28,6 +28,8 @@ mod ammo_source;
 mod cargo_grid;
 #[path = "catalog_durability.rs"]
 mod durability;
+#[path = "catalog_facility_capabilities.rs"]
+mod facility_capabilities;
 #[path = "catalog_facility_instances.rs"]
 mod facility_instances;
 #[path = "catalog_facility_medbed.rs"]
