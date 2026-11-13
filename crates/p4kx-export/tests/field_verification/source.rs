@@ -13,6 +13,7 @@ use super::schema::Schema;
 pub(crate) struct Observation {
     pub(crate) present: u64,
     pub(crate) populated: u64,
+    pub(crate) null: u64,
     pub(crate) read_errors: u64,
     pub(crate) missing_targets: u64,
 }
@@ -31,6 +32,7 @@ fn populated(value: &Value<'_>) -> bool {
 fn record(observation: &mut Observation, value: &Value<'_>) {
     observation.present += 1;
     observation.populated += u64::from(populated(value));
+    observation.null += u64::from(matches!(value, Value::Null));
     match value {
         Value::Error(ValueError::DanglingReference { .. }) => observation.missing_targets += 1,
         Value::Error(_) => observation.read_errors += 1,

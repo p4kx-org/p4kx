@@ -4,6 +4,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+use super::arena_path::{self, Selection};
 use super::error::{self, Error, Kind};
 
 const MAX_STEPS: usize = 64;
@@ -16,6 +17,7 @@ pub(crate) enum Step {
     Each,
     Matching { field: String, value: String },
     OwnedArenaReference { owner: String, name: String },
+    ArenaRootMember { name: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -34,11 +36,15 @@ impl Path {
         )
     }
 
+    pub(super) fn counts_original_occurrences(&self) -> bool {
+        matches!(self.0.last(), Some(Step::ArenaRootMember { .. }))
+    }
+
     pub(crate) fn validate(&self) -> super::Result<()> {
         if self.0.len() > MAX_STEPS {
             return Err(Error::new(Kind::Bounds, "projection path exceeds its step bound").into());
         }
-        for step in &self.0 {
+        for (index, step) in self.0.iter().enumerate() {
             let valid = |text: &str| {
                 !text.is_empty() && text.len() <= 4096 && !text.chars().any(char::is_control)
             };
@@ -46,6 +52,7 @@ impl Path {
                 Step::Field { name } => valid(name),
                 Step::Matching { field, value } => valid(field) && valid(value),
                 Step::OwnedArenaReference { owner, name } => valid(owner) && valid(name),
+                Step::ArenaRootMember { name } => valid(name) && index + 1 == self.0.len(),
                 Step::Each => true,
             };
             if !valid {
@@ -69,12 +76,21 @@ impl Path {
                 match step {
                     Step::Field { name } => {
                         if let Some(value) = value.get(name) {
-                            next.push(value);
+                            push(&mut next, value)?;
                         }
                     }
-                    Step::OwnedArenaReference { owner, name } => {
-                        super::arena_path::select(value, owner, name, &mut next, cancelled)?;
-                    }
+                    Step::OwnedArenaReference { owner, name } => arena_path::select(
+                        value,
+                        Selection::OwnedReference { owner, name },
+                        &mut next,
+                        cancelled,
+                    )?,
+                    Step::ArenaRootMember { name } => arena_path::select(
+                        value,
+                        Selection::RootMember { name },
+                        &mut next,
+                        cancelled,
+                    )?,
                     Step::Each => {
                         if let Some(values) = value.as_array() {
                             if next.len().saturating_add(values.len()) > MAX_VALUES {
@@ -96,26 +112,22 @@ impl Path {
                                 value.get(field).and_then(Value::as_str) == Some(expected.as_str())
                             });
                             for value in matching {
-                                if next.len() >= MAX_VALUES {
-                                    return Err(Error::new(
-                                        Kind::Bounds,
-                                        "projection result exceeds its bound",
-                                    )
-                                    .into());
-                                }
-                                next.push(value);
+                                push(&mut next, value)?;
                             }
                         }
                     }
-                }
-                if next.len() > MAX_VALUES {
-                    return Err(
-                        Error::new(Kind::Bounds, "projection result exceeds its bound").into(),
-                    );
                 }
             }
             current = next;
         }
         Ok(current)
     }
+}
+
+fn push<'a>(values: &mut Vec<&'a Value>, value: &'a Value) -> super::Result<()> {
+    if values.len() >= MAX_VALUES {
+        return Err(Error::new(Kind::Bounds, "projection result exceeds its bound").into());
+    }
+    values.push(value);
+    Ok(())
 }

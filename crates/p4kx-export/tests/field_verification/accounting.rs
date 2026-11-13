@@ -127,12 +127,20 @@ pub(crate) fn count_fields(
                 .groups
                 .get(group)
                 .and_then(|index| index.get(guid));
-            let exported = count_exported(rows, path, cancelled)?;
-            count.exported += exported;
+            let compared = count_exported(rows, path, cancelled)?;
+            count.exported += compared.exported;
             if rows.is_none() {
                 count.missing_export_guid += observed.present;
             }
-            count.unhandled += observed.populated.saturating_sub(exported);
+            count.unhandled += if path.counts_original_occurrences() {
+                observed
+                    .present
+                    .abs_diff(compared.exported)
+                    .max(observed.populated.abs_diff(compared.populated))
+                    .max(observed.null.abs_diff(compared.null))
+            } else {
+                observed.populated.saturating_sub(compared.exported)
+            };
         }
     }
     for key in mappings.keys() {
@@ -141,21 +149,33 @@ pub(crate) fn count_fields(
     Ok(counts)
 }
 
+#[derive(Default)]
+struct Compared {
+    exported: u64,
+    populated: u64,
+    null: u64,
+}
+
 fn count_exported(
     rows: Option<&Vec<&Value>>,
     path: &super::path::Path,
     cancelled: &impl Fn() -> bool,
-) -> super::Result<u64> {
-    let mut count = 0_u64;
-    let rows = rows.into_iter().flatten();
-    for row in rows {
-        count += path
-            .select(row, cancelled)?
-            .iter()
-            .filter(|value| populated(value))
-            .count() as u64;
+) -> super::Result<Compared> {
+    let mut counts = Compared::default();
+    let original_occurrences = path.counts_original_occurrences();
+    for row in rows.into_iter().flatten() {
+        for value in path.select(row, cancelled)? {
+            if original_occurrences {
+                counts.exported += 1;
+                counts.null +=
+                    u64::from(value.get("state").and_then(Value::as_str) == Some("null"));
+                counts.populated += u64::from(super::arena_path::member_populated(value)?);
+            } else {
+                counts.exported += u64::from(populated(value));
+            }
+        }
     }
-    Ok(count)
+    Ok(counts)
 }
 
 pub(crate) fn regressions(counts: &BTreeMap<FieldKey, Counts>) -> usize {

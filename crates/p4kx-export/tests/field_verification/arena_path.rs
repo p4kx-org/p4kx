@@ -15,10 +15,15 @@ struct Edge<'arena> {
     selected: bool,
 }
 
+#[derive(Clone, Copy)]
+pub(super) enum Selection<'path> {
+    RootMember { name: &'path str },
+    OwnedReference { owner: &'path str, name: &'path str },
+}
+
 pub(super) fn select<'arena>(
     arena: &'arena Value,
-    owner: &str,
-    name: &str,
+    selection: Selection<'_>,
     output: &mut Vec<&'arena Value>,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<()> {
@@ -30,7 +35,11 @@ pub(super) fn select<'arena>(
         return Err(Error::new(Kind::Bounds, "authored arena exceeds the projection bound").into());
     }
     let mut stack = Vec::new();
-    push_fields(&mut stack, array(arena, "roots")?, None, cancelled)?;
+    let root_name = match selection {
+        Selection::RootMember { name } => Some(name),
+        Selection::OwnedReference { .. } => None,
+    };
+    push_fields(&mut stack, array(arena, "roots")?, root_name, cancelled)?;
     let mut visited = HashSet::new();
     while let Some(edge) = stack.pop() {
         error::check(cancelled)?;
@@ -44,23 +53,13 @@ pub(super) fn select<'arena>(
             .get(index)
             .ok_or("authored arena valueIndex is outside its arena")?;
         let cell = field(node, "value")?;
-        let Some(payload) = consumer::source_value(cell)? else {
-            continue;
-        };
+        let payload = consumer::source_value(cell)?;
         if edge.selected {
-            if payload.get("type").and_then(Value::as_str) != Some("recordReference") {
-                return Err(Error::new(
-                    Kind::Mapping,
-                    "reviewed arena field is not a Record Reference",
-                )
-                .into());
-            }
-            if output.len() >= MAX_VALUES {
-                return Err(Error::new(Kind::Bounds, "projection result exceeds its bound").into());
-            }
-            output.push(payload);
+            push_selected(output, selection, cell, payload)?;
         }
-        push_children(&mut stack, payload, owner, name, cancelled)?;
+        if let Some(payload) = payload {
+            push_children(&mut stack, payload, selection, cancelled)?;
+        }
     }
     if visited.len() != values.len() {
         return Err(Error::new(Kind::Input, "authored arena has unreachable values").into());
@@ -68,11 +67,63 @@ pub(super) fn select<'arena>(
     Ok(())
 }
 
+pub(super) fn member_populated(cell: &Value) -> super::Result<bool> {
+    let Some(payload) = consumer::source_value(cell)? else {
+        return Ok(false);
+    };
+    match field(payload, "type")?.as_str() {
+        Some("array") => Ok(!array(payload, "elements")?.is_empty()),
+        Some("string" | "locale") => Ok(!field(field(payload, "value")?, "sourceText")?
+            .as_str()
+            .ok_or("authored source text")?
+            .is_empty()),
+        Some(_) => Ok(true),
+        None => Err(Error::new(Kind::Input, "authored arena node has no payload type").into()),
+    }
+}
+
+fn push_selected<'arena>(
+    output: &mut Vec<&'arena Value>,
+    selection: Selection<'_>,
+    cell: &'arena Value,
+    payload: Option<&'arena Value>,
+) -> super::Result<()> {
+    let value = match selection {
+        Selection::RootMember { .. } => match field(cell, "state")?.as_str() {
+            Some("present" | "null" | "unreadable") => cell,
+            _ => {
+                return Err(Error::new(
+                    Kind::Input,
+                    "arena root must represent an original member",
+                )
+                .into());
+            }
+        },
+        Selection::OwnedReference { .. } => {
+            let Some(payload) = payload else {
+                return Ok(());
+            };
+            if payload.get("type").and_then(Value::as_str) != Some("recordReference") {
+                return Err(Error::new(
+                    Kind::Mapping,
+                    "reviewed arena field is not a Record Reference",
+                )
+                .into());
+            }
+            payload
+        }
+    };
+    if output.len() >= MAX_VALUES {
+        return Err(Error::new(Kind::Bounds, "projection result exceeds its bound").into());
+    }
+    output.push(value);
+    Ok(())
+}
+
 fn push_children<'arena>(
     stack: &mut Vec<Edge<'arena>>,
     payload: &'arena Value,
-    owner: &str,
-    name: &str,
+    selection: Selection<'_>,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<()> {
     match payload.get("type").and_then(Value::as_str) {
@@ -80,12 +131,11 @@ fn push_children<'arena>(
             let kind = consumer::present(field(payload, "sourceType")?)?
                 .as_str()
                 .ok_or("authored arena concrete owner type")?;
-            push_fields(
-                stack,
-                array(payload, "fields")?,
-                (kind == owner).then_some(name),
-                cancelled,
-            )
+            let selected_name = match selection {
+                Selection::OwnedReference { owner, name } if kind == owner => Some(name),
+                _ => None,
+            };
+            push_fields(stack, array(payload, "fields")?, selected_name, cancelled)
         }
         Some("array") => {
             for reference in array(payload, "elements")?.iter().rev() {

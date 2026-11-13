@@ -58,6 +58,12 @@ It follows the arena's local indices from its roots and rejects out-of-range or
 repeated or unreachable nodes. Same-named fields in other owners do not count.
 The quantum profile mapping applies this to its original effect-tag Reference.
 
+Use `{"kind":"arenaRootMember","name":"<field>"}` as the final step for a reviewed
+generic arena root member. It matches direct root entries only and counts retained
+occurrences, including explicit null and unreadable states, against the original
+present count. Null and populated counts must also reconcile. Source read errors
+still fail independently.
+
 ## Real source survey
 
 Use existing private Archive/key configuration and task-local `TMP`/`TEMP`:
