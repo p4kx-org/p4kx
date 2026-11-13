@@ -1132,6 +1132,57 @@
             "payload"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SubDatabaseEdge"
+            },
+            "record_type": {
+              "const": "sub-database-edge",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SubDatabaseCycle"
+            },
+            "record_type": {
+              "const": "sub-database-cycle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/Frontier"
+            },
+            "record_type": {
+              "const": "sub-database-frontier",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
         }
       ],
       "title": "DefinitionPayload"
@@ -8790,6 +8841,43 @@
         "cycle",
         "non-finite",
         "singular"
+      ],
+      "type": "string"
+    },
+    "Frontier": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "$ref": "#/$defs/FrontierReason"
+        },
+        "source_declaration_ordinal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "source_element_index": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "source_element_index",
+        "source_declaration_ordinal",
+        "reason"
+      ],
+      "type": "object"
+    },
+    "FrontierReason": {
+      "enum": [
+        "missing-file",
+        "duplicate-file",
+        "unsupported-target-root",
+        "repaired-target",
+        "invalid-target"
       ],
       "type": "string"
     },
@@ -18614,6 +18702,50 @@
         "other"
       ],
       "type": "string"
+    },
+    "SubDatabaseCycle": {
+      "additionalProperties": false,
+      "properties": {
+        "edge_count": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "member_count": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "representative_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "representative_entry_index",
+        "member_count",
+        "edge_count"
+      ],
+      "type": "object"
+    },
+    "SubDatabaseEdge": {
+      "additionalProperties": false,
+      "properties": {
+        "source_declaration_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "source_element_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "source_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_entry_index": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "source_entry_index",
+        "target_entry_index",
+        "source_element_index",
+        "source_declaration_ordinal"
+      ],
+      "type": "object"
     },
     "Subresource": {
       "description": "Source-local identity of a metadata object or ordered subresource.",
@@ -38415,6 +38547,226 @@
               "indices": {
                 "maxItems": 2,
                 "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-sub-database-edge"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "sub-database-edge"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-sub-database-cycle"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "sub-database-cycle"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-sub-database-attribute-frontier"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "sub-database-frontier"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-sub-database-target-frontier"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "sub-database-frontier"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
               }
             }
           }

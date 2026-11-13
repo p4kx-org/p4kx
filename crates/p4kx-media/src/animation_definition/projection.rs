@@ -5,12 +5,12 @@ use std::io;
 
 use p4kx_extraction::cryxml::{
     SourceContent, SourceContents, SourceDeclaration, SourceDocument, SourceElement,
-    SourceSpanError,
+    SourceSpanError, SourceSyntax,
 };
 use p4kx_extraction::{DecimalU64, SourceUseRole};
 
 use super::graph_source::GraphRole;
-use super::links;
+use super::links::{self, SubDatabaseSelector};
 use super::named_clip::Filepath;
 use super::payload::{self as wire, DefinitionFamily, DefinitionPayload};
 use super::timeline::{TimelineIdentity, TimelineNode};
@@ -51,9 +51,18 @@ struct Frame<'document> {
     parent_name: Option<&'document str>,
     filepath: Option<Filepath<'document>>,
     timeline: TimelineNode,
-    graph: Option<GraphRole>,
+    graph: Option<(GraphRole, AtlPosition)>,
     siblings: SourceContents<'document>,
     next_sibling: u64,
+}
+
+struct ElementDeclarations<'element, 'document> {
+    element: SourceElement<'document>,
+    syntax: &'element SourceSyntax<'document>,
+    index: u64,
+    timeline: TimelineNode,
+    graph: Option<GraphRole>,
+    sub_database: Option<&'element SubDatabaseSelector>,
 }
 
 impl DefinitionProjection<'_, '_> {
@@ -123,7 +132,8 @@ impl DefinitionProjection<'_, '_> {
     ) -> Result<Frame<'document>, Failure> {
         let syntax = element.syntax()?;
         let position = element_position(&element.position())?;
-        let graph = GraphRole::of(self.family, parent.graph, parent.parent.is_none(), element);
+        let (graph, sub_database) =
+            self.graph_element(element, parent, (index, position), writer)?;
         let timeline = TimelineNode::at(
             parent.timeline,
             self.family,
@@ -131,19 +141,16 @@ impl DefinitionProjection<'_, '_> {
             parent.parent,
             TimelineIdentity { index, position },
         );
-        self.write(
-            position,
-            wire::ELEMENT,
-            vec![index],
-            &DefinitionPayload::Element(AtlElement {
+        self.write_element(
+            AtlElement {
                 qualified_name: syntax.qualified_name(),
                 namespace: element.namespace(),
                 location: location.clone(),
                 position,
-            }),
+            },
+            index,
             writer,
         )?;
-        let budget = &self.context.directory.input_state()?.budget;
         timeline.write(self, element, index, position, writer)?;
         if let Some(graph) = graph {
             graph.write(
@@ -155,26 +162,90 @@ impl DefinitionProjection<'_, '_> {
                 writer,
             )?;
         }
-        for (ordinal, declaration) in syntax.declarations().enumerate() {
-            budget.metadata(0, 1, writer.limits(), writer.checkpoint)?;
-            let declaration = declaration?;
-            let indices = [index, ordinal as u64];
-            let position = self.declaration(element, parent, &declaration, indices, writer)?;
-            timeline.write_attribute(self, &declaration, indices, position, writer)?;
-            if let Some(graph) = graph {
-                graph.write_attribute(self, &declaration, indices, position, writer)?;
-            }
-        }
+        self.declarations(
+            &ElementDeclarations {
+                element,
+                syntax: &syntax,
+                index,
+                timeline,
+                graph,
+                sub_database: sub_database.as_ref(),
+            },
+            parent,
+            writer,
+        )?;
         self.binary_text(syntax.binary_text(), index, writer)?;
         Ok(Frame {
             parent: Some(index),
             parent_name: element.namespace().is_none().then(|| element.name()),
             filepath: Filepath::for_list(self, element, parent.parent_name, writer)?,
             timeline,
-            graph,
+            graph: graph.map(|role| (role, position)),
             siblings: syntax.content()?,
             next_sibling: 0,
         })
+    }
+
+    fn graph_element(
+        &self,
+        element: SourceElement<'_>,
+        parent: &Frame<'_>,
+        site: (u64, AtlPosition),
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(Option<GraphRole>, Option<SubDatabaseSelector>), Failure> {
+        let graph = GraphRole::of(
+            self.family,
+            parent.graph.map(|(role, _)| role),
+            parent.parent.is_none(),
+            element,
+        );
+        let sub_database =
+            SubDatabaseSelector::of(graph, parent.graph, element, self, site, writer)?;
+        Ok((graph, sub_database))
+    }
+
+    fn write_element(
+        &self,
+        element: AtlElement<'_>,
+        index: u64,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        self.write(
+            element.position,
+            wire::ELEMENT,
+            vec![index],
+            &DefinitionPayload::Element(element),
+            writer,
+        )
+    }
+
+    fn declarations<'document>(
+        &self,
+        element: &ElementDeclarations<'_, 'document>,
+        parent: &mut Frame<'document>,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), Failure> {
+        let budget = self.context.directory.input_state()?.budget;
+        for (ordinal, declaration) in element.syntax.declarations().enumerate() {
+            budget.metadata(0, 1, writer.limits(), writer.checkpoint)?;
+            let declaration = declaration?;
+            let indices = [element.index, ordinal as u64];
+            let position = self.declaration(
+                element.element,
+                parent,
+                &declaration,
+                indices,
+                element.sub_database,
+                writer,
+            )?;
+            element
+                .timeline
+                .write_attribute(self, &declaration, indices, position, writer)?;
+            if let Some(graph) = element.graph {
+                graph.write_attribute(self, &declaration, indices, position, writer)?;
+            }
+        }
+        Ok(())
     }
 
     fn binary_text(
@@ -205,6 +276,7 @@ impl DefinitionProjection<'_, '_> {
         parent: &mut Frame<'document>,
         declaration: &SourceDeclaration<'document>,
         indices: [u64; 2],
+        sub_database: Option<&SubDatabaseSelector>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<AtlPosition, Failure> {
         let position = declaration_position(declaration.position())?;
@@ -222,7 +294,16 @@ impl DefinitionProjection<'_, '_> {
             writer,
         )?;
         if let Some(kind) = links::kind(self.family, element, parent.parent_name, declaration) {
-            links::write(self, &kind, declaration.value(), position, indices, writer)?;
+            let sub_database = sub_database.filter(|selector| selector.matches(declaration));
+            links::write(
+                self,
+                &kind,
+                declaration.value(),
+                position,
+                indices,
+                sub_database,
+                writer,
+            )?;
         }
         if let Some(filepath) = &mut parent.filepath {
             filepath.observe(self, element, declaration, position, indices, writer)?;

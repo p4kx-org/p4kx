@@ -6,17 +6,20 @@ use p4kx_extraction::cryxml::{
 };
 use p4kx_extraction::{FieldPath, SourceUseRole};
 
+use super::graph_source::GraphRole;
 use super::origins;
 use super::payload::{self as wire, DefinitionFamily, DefinitionLink, DefinitionPayload, LinkKind};
 use super::projection::DefinitionProjection;
+use super::sub_database_cycles::Edge;
+use super::sub_database_frontier::{self, FrontierReason};
 use crate::audio_control_payload::AtlPosition;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::origin_reference::{ReferenceIdentifier, ReferenceOriginInputs, ReferenceSubresource};
 use crate::xml_source_projection::declaration_position;
 use crate::{
-    CandidateInventory, MediaError, MediaKind, MediaWriter, OriginalIdentifier, Reference,
-    ReferenceUnavailable, Status, Subresource, origin_error,
+    CandidateInventory, Identity, MediaError, MediaKind, MediaWriter, OriginalIdentifier,
+    Reference, ReferenceResolution, ReferenceUnavailable, Status, Subresource, origin_error,
 };
 
 pub(super) struct LinkSelector {
@@ -98,12 +101,109 @@ fn mannequin_kind(tag: &str, parent: Option<&str>, name: &str) -> Option<LinkKin
         .then_some(LinkKind::SubDatabase)
 }
 
+pub(super) struct SubDatabaseSelector {
+    file: SourceAttributePosition,
+    parent: AtlPosition,
+}
+
+impl SubDatabaseSelector {
+    pub(super) fn of(
+        role: Option<GraphRole>,
+        parent: Option<(GraphRole, AtlPosition)>,
+        element: SourceElement<'_>,
+        projection: &DefinitionProjection<'_, '_>,
+        site: (u64, AtlPosition),
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<Option<Self>, super::projection::Failure> {
+        if !matches!(role, Some(GraphRole::SubDatabase)) {
+            return Ok(None);
+        }
+        let Some((_, parent)) = parent else {
+            return Ok(None);
+        };
+        let mut files = element
+            .attributes()
+            .filter(|attr| attr.namespace().is_none() && attr.name().eq_ignore_ascii_case("File"));
+        let first = files.next();
+        if let (Some(first), None) = (&first, files.next()) {
+            return Ok(Some(Self {
+                file: first.position().clone(),
+                parent,
+            }));
+        }
+        let reason = if first.is_some() {
+            FrontierReason::DuplicateFile
+        } else {
+            FrontierReason::MissingFile
+        };
+        sub_database_frontier::write_attribute_issue(projection, site, reason, writer)?;
+        Ok(None)
+    }
+
+    pub(super) fn matches(&self, declaration: &SourceDeclaration<'_>) -> bool {
+        declaration.position() == &self.file
+    }
+
+    fn observe(
+        &self,
+        projection: &DefinitionProjection<'_, '_>,
+        indices: [u64; 2],
+        reference: &Reference,
+        prepared: &PreparedRecordOrigins,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        let ReferenceResolution::Resolved { target } = reference.resolution() else {
+            return Ok(());
+        };
+        let Identity::Entry { entry, .. } = &target.source else {
+            return Err(MediaError::Contract(
+                "SubADB target has no physical Entry".into(),
+            ));
+        };
+        let original = prepared
+            .visit("/data/payload/authored_path")
+            .ok_or_else(|| {
+                MediaError::Contract("SubADB reference lost its original declaration".into())
+            })?;
+        let proof = prepared
+            .visit("/data/payload/reference/resolution")
+            .ok_or_else(|| {
+                MediaError::Contract("SubADB reference has no observed resolution receipt".into())
+            })?;
+        let parent = origins::position(
+            projection.input,
+            self.parent,
+            SourceUseRole::Selector,
+            writer,
+        )?;
+        let mut evidence = writer.capture_origins();
+        evidence.include(proof, writer)?;
+        evidence.include(&parent, writer)?;
+        projection
+            .context
+            .directory
+            .index
+            .animation_sub_databases
+            .edge(
+                Edge {
+                    original: original.clone(),
+                    source: projection.context.entry.index(),
+                    target: entry.entry_index,
+                    indices,
+                    evidence: evidence.finish(),
+                },
+                writer,
+            )
+    }
+}
+
 pub(super) fn write(
     projection: &DefinitionProjection<'_, '_>,
     selector: &LinkSelector,
     authored_path: &str,
     position: AtlPosition,
     indices: [u64; 2],
+    sub_database: Option<&SubDatabaseSelector>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let proof = origins::position(projection.input, position, SourceUseRole::Selector, writer)?;
@@ -131,6 +231,9 @@ pub(super) fn write(
         selector: &selection,
     }
     .resolve(projection, &mut prepared, writer)?;
+    if let Some(sub_database) = sub_database {
+        sub_database.observe(projection, indices, &reference, &prepared, writer)?;
+    }
     prepared.write(
         writer,
         &Subresource::new(wire::LINK, indices.to_vec()),

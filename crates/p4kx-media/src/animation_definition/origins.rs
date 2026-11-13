@@ -68,14 +68,7 @@ pub(super) fn document(
     size: u64,
     writer: &MediaWriter<'_>,
 ) -> Result<PreparedRecordOrigins, MediaError> {
-    let proof = records::capture(
-        input,
-        [(
-            OriginSite::new("animation-definition-file", &[0, size], "document"),
-            SourceUseRole::Payload,
-        )],
-        writer,
-    )?;
+    let proof = file(input, size, writer)?;
     let mut prepared = records::prepare_for(input, OriginProfile::AnimationDefinition)?;
     records::subtree(&mut prepared, "/data/payload", proof.clone(), writer)?;
     records::subtree(&mut prepared, "/issues", proof, writer)?;
@@ -94,4 +87,19 @@ pub(super) fn document(
         writer,
     )?;
     Ok(prepared)
+}
+
+pub(super) fn file(
+    input: &MediaOriginInput,
+    size: u64,
+    writer: &MediaWriter<'_>,
+) -> Result<OriginContributions, MediaError> {
+    records::capture(
+        input,
+        [(
+            OriginSite::new("animation-definition-file", &[0, size], "document"),
+            SourceUseRole::Payload,
+        )],
+        writer,
+    )
 }

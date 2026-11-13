@@ -614,3 +614,18 @@ their positions. Attribute roles describe known declarations and preserve the
 original values. Unknown procedural subtrees remain in the ordered XML
 stream. Alias names remain declarations until a separately observed reference
 establishes a target.
+
+Mannequin SubADB edges join a direct `AnimDB/SubADBs/SubADB` declaration with
+a unique selected, readable database in the same owning archive. The closing
+`sub-database-edge` rows link physical source and target entry ordinals to the
+original link's element and declaration ordinals. Repeated links are retained.
+`sub-database-cycle` rows summarize each observed cyclic strongly connected
+component with its lowest physical entry ordinal and the counts of its members
+and internal edges. Reconstruct membership from the corresponding edge rows
+in the same owning archive. A selected projection with a missing or repeated
+`File` attribute, an unsupported target root or malformed target has an
+explicit `sub-database-frontier` row. Lookup failure, ambiguity and selection
+remain visible in the corresponding original `link` rows. A reported cycle
+proves the edges that close it, including when other branches are unresolved.
+The absence of a cycle row carries no claim about edges outside the observed
+graph.

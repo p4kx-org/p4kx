@@ -4,14 +4,17 @@
 use p4kx_extraction::DecimalU64;
 use p4kx_extraction::cryxml::{SourceDocument, SourceReadOptions};
 
+use super::graph_source::GraphRole;
 use super::origins;
 use super::payload::{
     self as wire, DefinitionDocument, DefinitionFamily, DefinitionPayload, DocumentProjection,
 };
 use super::projection::{DefinitionProjection, Failure};
+use super::sub_database_cycles::DocumentState;
+use super::sub_database_frontier::FrontierReason;
 use crate::{
-    Capability, FieldGroup, MediaError, MediaIssue, MediaKind, MediaWriter, Projection, Provider,
-    Severity, SourceContext, Status, Subresource, required_reader,
+    Capability, DirectoryContext, FieldGroup, MediaError, MediaIssue, MediaKind, MediaWriter,
+    Projection, Provider, Severity, SourceContext, Status, Subresource, required_reader,
 };
 
 pub(crate) struct AnimationDefinitionProvider;
@@ -21,7 +24,7 @@ impl Provider for AnimationDefinitionProvider {
         let mut capability = Capability::new(
             MediaKind::AnimationDefinition,
             "p4kx.animation-definition",
-            "1.2.0",
+            "1.3.0",
             "Original character parameters, animation event definitions and Mannequin XML source.",
         );
         capability.field_groups = vec![
@@ -45,8 +48,24 @@ impl Provider for AnimationDefinitionProvider {
                 "animation-graphs",
                 "Positioned Mannequin and blend-space node roles and original attributes.",
             ),
+            FieldGroup::new(
+                "sub-database-cycles",
+                "Positive cycles in the observed, directory-local Mannequin source graph.",
+            ),
         ];
         capability
+    }
+
+    fn directory_complete(
+        &self,
+        context: &mut DirectoryContext<'_, '_, '_>,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        context
+            .lookup
+            .index
+            .animation_sub_databases
+            .write(context, writer)
     }
 
     fn source(
@@ -92,12 +111,68 @@ impl Provider for AnimationDefinitionProvider {
     }
 }
 
+fn observe_sub_database(
+    projection: &DefinitionProjection<'_, '_>,
+    document: Option<&SourceDocument<'_>>,
+    state: &DocumentProjection,
+    writer: &MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    if !matches!(projection.family, DefinitionFamily::Adb) {
+        return Ok(());
+    }
+    let state = match state {
+        DocumentProjection::Readable => {
+            let root = document
+                .ok_or_else(|| {
+                    MediaError::Contract("readable animation source has no document".into())
+                })?
+                .root();
+            if matches!(
+                GraphRole::of(projection.family, None, true, root),
+                Some(GraphRole::Database)
+            ) {
+                let position = crate::xml_source_projection::element_position(&root.position())
+                    .map_err(|_| {
+                        MediaError::Contract("invalid animation database root position".into())
+                    })?;
+                DocumentState::Readable(position)
+            } else {
+                DocumentState::Unavailable(FrontierReason::UnsupportedTargetRoot)
+            }
+        }
+        DocumentProjection::RepairedStrings => {
+            DocumentState::Unavailable(FrontierReason::RepairedTarget)
+        }
+        DocumentProjection::InvalidSource | DocumentProjection::InvalidSourceSpan => {
+            DocumentState::Unavailable(FrontierReason::InvalidTarget)
+        }
+    };
+    projection
+        .context
+        .directory
+        .index
+        .animation_sub_databases
+        .document(
+            projection.context.entry.index(),
+            projection.input,
+            state,
+            projection.context.source.size,
+            writer,
+        )
+}
+
 fn write_document(
     projection: &DefinitionProjection<'_, '_>,
     source: Option<(&SourceDocument<'_>, u64)>,
     state: DocumentProjection,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
+    observe_sub_database(
+        projection,
+        source.map(|(document, _)| document),
+        &state,
+        writer,
+    )?;
     let (status, issue) = match state {
         DocumentProjection::Readable => (Status::Complete, None),
         DocumentProjection::RepairedStrings => (

@@ -11,6 +11,7 @@ mod animation_mannequin_links;
 mod animation_named_caf_provider;
 mod animation_named_dba;
 mod animation_provider;
+mod animation_sub_database_cycles;
 mod archive;
 mod archive_layout;
 mod audio_bank_action_properties_provider;

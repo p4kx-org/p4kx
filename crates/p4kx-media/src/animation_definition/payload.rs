@@ -7,6 +7,8 @@ use serde::Serialize;
 
 use super::graph_source::{GraphAttribute, GraphNode};
 use super::named_dba::Binding;
+use super::sub_database_cycles::{SubDatabaseCycle, SubDatabaseEdge};
+use super::sub_database_frontier::Frontier;
 use super::timeline_payload::{Event, EventAttribute, EventTimeline};
 use crate::Reference;
 use crate::audio_control_payload::{
@@ -25,6 +27,12 @@ pub(super) const EVENT_TIMELINE: &str = "animation-definition-event-timeline";
 pub(super) const EVENT: &str = "animation-definition-event";
 pub(super) const EVENT_ATTRIBUTE: &str = "animation-definition-event-attribute";
 pub(super) const GRAPH_NODE: &str = "animation-definition-graph-node";
+pub(super) const SUB_DATABASE_EDGE: &str = "animation-definition-sub-database-edge";
+pub(super) const SUB_DATABASE_CYCLE: &str = "animation-definition-sub-database-cycle";
+pub(super) const SUB_DATABASE_ATTRIBUTE_FRONTIER: &str =
+    "animation-definition-sub-database-attribute-frontier";
+pub(super) const SUB_DATABASE_TARGET_FRONTIER: &str =
+    "animation-definition-sub-database-target-frontier";
 pub(super) const GRAPH_ATTRIBUTE: &str = "animation-definition-graph-attribute";
 
 #[derive(Clone, Copy, Serialize, JsonSchema)]
@@ -77,6 +85,9 @@ pub(super) enum DefinitionPayload<'source> {
     EventAttribute(EventAttribute<'source>),
     GraphNode(GraphNode<'source>),
     GraphAttribute(GraphAttribute<'source>),
+    SubDatabaseEdge(SubDatabaseEdge),
+    SubDatabaseCycle(SubDatabaseCycle),
+    SubDatabaseFrontier(Frontier),
 }
 
 #[derive(Serialize, JsonSchema)]
