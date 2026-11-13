@@ -196,7 +196,8 @@ impl<E, Checkpoint: FnMut() -> Result<(), E>> Lexer<'_, '_, Checkpoint> {
     fn atom(&mut self, start: usize) -> Result<(), ReadError<E>> {
         while let Some(byte) = self.source.get(self.position).copied() {
             if byte.is_ascii_whitespace()
-                || b"\"'=}{();".contains(&byte)
+                || b"\"=}{();".contains(&byte)
+                || (byte == b'\'' && !self.word_apostrophe(start))
                 || self.starts(b"//")
                 || self.starts(b"/*")
             {
@@ -205,5 +206,16 @@ impl<E, Checkpoint: FnMut() -> Result<(), E>> Lexer<'_, '_, Checkpoint> {
             self.step(start)?;
         }
         Ok(())
+    }
+    fn word_apostrophe(&self, atom_start: usize) -> bool {
+        self.position > atom_start
+            && self
+                .source
+                .get(self.position - 1)
+                .is_some_and(u8::is_ascii_alphabetic)
+            && self
+                .source
+                .get(self.position + 1)
+                .is_some_and(u8::is_ascii_alphabetic)
     }
 }

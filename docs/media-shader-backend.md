@@ -26,6 +26,8 @@ of JSON Schema.
 Version, common flags, Property names/labels/descriptions, dependencies and Hidden occurrences
 retain their authored forms. Absent fields create no invented occurrence. Bare markers have no
 value; explicit empty values stay present. A filename stem is labelled as the display-name origin.
+An apostrophe between ASCII letters belongs to the unquoted word. Single- and double-quoted
+tokens still keep their closing delimiter and escapes.
 No version grammar, common-flag inheritance, escape interpretation or dependency path is inferred.
 
 ## Interpretation and counting

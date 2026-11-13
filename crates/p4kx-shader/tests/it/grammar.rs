@@ -206,3 +206,45 @@ fn comments_unknown_scopes_and_case_variants_are_never_collapsed() -> TestResult
     );
     Ok(())
 }
+
+#[test]
+fn unquoted_description_contractions_preserve_their_original_text() -> TestResult {
+    let source = br#"Property {
+        Description(pilot's controls)
+        Description("pilot's controls (safe)")
+        Description('quoted (value)')
+        Description(pilot's)
+    }"#;
+    let definition = p4kx_shader::read(source, Limits::default())?;
+    let property = definition.properties().next().ok_or("original Property")?;
+    let descriptions: Vec<_> = property.fields_of(PropertyFieldKind::Description).collect();
+    let [unquoted, double, single, word] = descriptions.as_slice() else {
+        return Err("the four original descriptions must survive".into());
+    };
+    assert_eq!(
+        definition.source(),
+        source,
+        "the source bytes are unchanged"
+    );
+    assert_eq!(
+        unquoted.value(),
+        Some("pilot's controls"),
+        "the intra-word apostrophe is literal"
+    );
+    assert_eq!(
+        double.literal(),
+        Some("\"pilot's controls (safe)\""),
+        "double quotes still protect punctuation"
+    );
+    assert_eq!(
+        single.literal(),
+        Some("'quoted (value)'"),
+        "a standalone single-quoted value remains quoted"
+    );
+    assert_eq!(
+        word.literal(),
+        Some("pilot's"),
+        "a contraction remains one unquoted atom"
+    );
+    Ok(())
+}

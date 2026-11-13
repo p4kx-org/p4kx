@@ -40,6 +40,10 @@ fn mismatched_or_unowned_closing_delimiters_are_not_silently_skipped() -> TestRe
         (b"A{ ) }", Construct::Parenthesis),
         (b"A( } )", Construct::Brace),
         (b"A = x)", Construct::Parenthesis),
+        (
+            b"Property { Description(unquoted value)) }",
+            Construct::Parenthesis,
+        ),
     ];
     for &(source, construct) in cases {
         let error = p4kx_shader::read(source, Limits::default())
