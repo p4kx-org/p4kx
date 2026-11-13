@@ -13,6 +13,9 @@ use super::audio_bank_state_provider::{check_retained, options, row, verify_layo
 use super::support;
 use super::support::audio_provider::TestResult;
 
+#[path = "audio_bank_voice_property_provider.rs"]
+mod voice;
+
 const SUMMARY: &str = "audio-bank-hirc-node-properties";
 const PROPERTY: &str = "audio-bank-hirc-node-property";
 

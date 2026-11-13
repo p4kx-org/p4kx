@@ -8,7 +8,7 @@ use p4kx_extraction::bank::{BankHircField, BankHircObject};
 
 use crate::audio_bank_hirc_origins::ObjectSites;
 use crate::audio_bank_inventory::VersionSite;
-use crate::audio_bank_origins::{BankOrigins, section_routing};
+use crate::audio_bank_origins::{BankOrigins, EvidenceSite, section_routing};
 use crate::audio_bank_payload::BankField;
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
@@ -99,6 +99,7 @@ impl NodeKind {
 pub(crate) struct NodeSites {
     object: ObjectSites,
     header: [u64; 1],
+    version: u32,
     kind: NodeKind,
 }
 
@@ -107,12 +108,21 @@ impl NodeSites {
         Self {
             object: ObjectSites::new(object),
             header: [version.body_offset],
+            version: version.version,
             kind,
         }
     }
 
     pub(crate) const fn indices(&self) -> [u64; 2] {
         self.object.indices()
+    }
+
+    pub(crate) const fn version(&self) -> u32 {
+        self.version
+    }
+
+    pub(crate) const fn property_context(&self) -> [EvidenceSite<'_>; 4] {
+        self.object.versioned(&self.header)
     }
 
     pub(crate) fn record<'source, 'writer, 'run>(

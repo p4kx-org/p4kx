@@ -4,6 +4,7 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::audio_bank_node_property_rows::PropertyInterpretation;
 use crate::audio_bank_payload::{BankEntryRange, BankField};
 
 #[derive(Serialize, JsonSchema)]
@@ -70,6 +71,8 @@ pub(crate) struct NodePropertyRecord {
     pub(crate) ordinal: u8,
     pub(crate) property_id: BankField<u8>,
     pub(crate) words: NodePropertyWords,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) interpretation: Option<PropertyInterpretation>,
 }
 
 #[derive(Serialize, JsonSchema)]

@@ -3,6 +3,11 @@
 
 //! Bounded soundbank reads, source inspection, and extraction.
 
+#[path = "voice_property.rs"]
+mod voice_property;
+
+pub use self::voice_property::{VoiceProperty, VoicePropertyName};
+
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};

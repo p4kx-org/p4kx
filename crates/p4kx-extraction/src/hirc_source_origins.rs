@@ -130,6 +130,49 @@ impl ObjectOrigins {
         Ok(self.value(value, &[version, body]))
     }
 
+    pub(in crate::hirc_view) fn property_type<T>(
+        &self,
+        value: T,
+        version: &Range<u64>,
+        id: &Range<u64>,
+    ) -> Result<SourcedValue<T>, SourceEvidenceError> {
+        let [version, id] = self.property_selectors(version, id)?;
+        Ok(self.value(value, &[version, id]))
+    }
+
+    pub(in crate::hirc_view) fn property_value<T>(
+        &self,
+        value: T,
+        version: &Range<u64>,
+        id: &Range<u64>,
+        word: &Range<u64>,
+    ) -> Result<SourcedValue<T>, SourceEvidenceError> {
+        let [version, id] = self.property_selectors(version, id)?;
+        let word = self.site(
+            self.namespace,
+            "nodePropertyWord",
+            word,
+            SourceUseRole::Conversion,
+        )?;
+        Ok(self.value(value, &[version, id, word]))
+    }
+
+    fn property_selectors(
+        &self,
+        version: &Range<u64>,
+        id: &Range<u64>,
+    ) -> Result<[SourceUse; 2], SourceEvidenceError> {
+        Ok([
+            self.site("bnkBkhd", "version", version, SourceUseRole::Selector)?,
+            self.site(
+                self.namespace,
+                "nodePropertyId",
+                id,
+                SourceUseRole::Selector,
+            )?,
+        ])
+    }
+
     fn site(
         &self,
         namespace: &'static str,

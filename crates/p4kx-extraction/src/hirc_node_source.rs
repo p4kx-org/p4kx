@@ -33,7 +33,7 @@ use self::routing::{NodeAdvancedSettings, NodeAux, NodeFx};
 use self::rtpc::{RtpcGroup, RtpcSchema};
 use self::state::{InlineStateGroup, InlineStateSchema};
 use super::Status;
-use super::node_property::{PropertyExtent, PropertyWords};
+use super::node_property::{PropertyExtent, PropertyInterpretation, PropertyWords};
 use super::source_fields::origins::ObjectOrigins;
 
 pub(super) type NodeSourceSchema =
@@ -130,7 +130,15 @@ pub(super) struct NodeDocument<Inventory, Positioning, State, Rtpc> {
 #[schemars(rename = "NodePropertyList")]
 struct PropertyList {
     coverage: PropertyExtent,
-    rows: Vec<PropertyWords>,
+    rows: Vec<SharedPropertyRow>,
+}
+
+#[derive(Serialize, JsonSchema)]
+struct SharedPropertyRow {
+    #[serde(flatten)]
+    words: PropertyWords,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    interpretation: Option<PropertyInterpretation>,
 }
 
 fn project<R: Read + Seek, S: Serializer>(
@@ -166,10 +174,12 @@ fn project<R: Read + Seek, S: Serializer>(
         properties: property_list::<_, S::Error>(
             origins,
             reader.properties(BankNodePropertyKind::Properties),
+            header,
         )?,
         ranged_modifiers: property_list::<_, S::Error>(
             origins,
             reader.properties(BankNodePropertyKind::RangedModifiers),
+            header,
         )?,
         effects: NodeFx::read::<_, S::Error>(origins, &mut reader, BankNodeFxKind::Effects)?,
         metadata_effects: NodeFx::read::<_, S::Error>(
@@ -215,11 +225,27 @@ fn positioning<'view, 'source, 'input, R, E: serde::ser::Error>(
 fn property_list<R: Read + Seek, E: serde::ser::Error>(
     origins: &ObjectOrigins,
     rows: Option<BankNodePropertyRows<'_, R>>,
+    header: &BankObservedHeader,
 ) -> Result<Option<PropertyList>, E> {
+    let start = header.section().body_offset();
+    let version_range = start..start + size_of::<u32>() as u64;
+    let version = header.header().version;
     rows.map(|rows| {
         let coverage = PropertyExtent::read(origins, rows.extent()).map_err(E::custom)?;
         let rows = rows
-            .map(|row| PropertyWords::read(origins, &row.map_err(E::custom)?))
+            .map(|row| {
+                let row = row.map_err(E::custom)?;
+                Ok(SharedPropertyRow {
+                    words: PropertyWords::read(origins, &row)?,
+                    interpretation: PropertyInterpretation::read(
+                        origins,
+                        version,
+                        &version_range,
+                        &row,
+                    )
+                    .map_err(E::custom)?,
+                })
+            })
             .collect::<Result<_, E>>()?;
         Ok(PropertyList { coverage, rows })
     })

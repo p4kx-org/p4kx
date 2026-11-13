@@ -69,6 +69,15 @@ fn verify_fields(node: &Value) -> TestResult {
         ("/rtpc/rows/0/rtpc_id", json!(0x984F_8A08_u32)),
         ("/rtpc/rows/1/from_bits", json!(0)),
         ("/properties/rows/0/scalar_bits", json!(3.0_f32.to_bits())),
+        (
+            "/properties/rows/0/interpretation/property",
+            json!("volume-decibels"),
+        ),
+        ("/properties/rows/0/interpretation/scalar", json!(3.0)),
+        (
+            "/ranged_modifiers/rows/0/interpretation/property",
+            json!("low-pass-filter-percent"),
+        ),
     ] {
         let datum = node.pointer(pointer).ok_or("sourced node field")?;
         assert_eq!(datum.get("value"), Some(&value), "{pointer}");

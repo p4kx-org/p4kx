@@ -329,6 +329,12 @@ and original byte ranges. A malformed prefix retains independently readable IDs 
 absent optional Sound node and an unsupported bank version each have their own layout status.
 A later State, RTPC or child failure leaves a completed property prefix available.
 
+Qualified shared-node property rows also include interpretation for volume
+(decibels), pitch (cents), and low-pass and high-pass controls (percent). Their
+original IDs and bits remain present. Nonfinite words yield a null interpreted
+number. Missing words and unqualified IDs have no interpreted number. Derived
+values refer to the owning bank version, property ID and original word span.
+
 Version-154 Sound, ActorMixer and container effect declarations use list index 0 for initial
 effects and 1 for metadata. A list records its original override byte, count and
 checked slot extent. A nonempty initial effect list also carries its bypass-all

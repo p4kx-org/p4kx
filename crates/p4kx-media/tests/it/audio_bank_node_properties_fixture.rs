@@ -240,4 +240,45 @@ impl<'a> Evidence<'a> {
         );
         Ok(())
     }
+
+    pub(super) fn interpretation(
+        &self,
+        (position, record): (usize, &MediaRecord),
+        field: &str,
+        original_word: Option<&str>,
+    ) -> TestResult {
+        let datum = self.origins.field(
+            "records",
+            position,
+            &format!("/data/payload/interpretation/{field}"),
+            self.owner.payload,
+        )?;
+        let uses = self.origins.require_owner(datum, self.owner)?;
+        for label in ["version", "nodePropertyId"]
+            .into_iter()
+            .filter(|label| *label != "nodePropertyId" || original_word.is_some())
+        {
+            assert!(
+                uses.iter()
+                    .any(|used| used.pointer("/location/field") == Some(&json!(label))),
+                "interpreted {field} selects original {label}"
+            );
+        }
+        if let Some(word) = original_word {
+            let range = record
+                .data
+                .pointer(&format!("/payload/words/{word}/range"))
+                .ok_or("raw word source extent")?;
+            let indices = json!([range.get("start"), range.get("end_exclusive")]);
+            assert!(
+                uses.iter().any(|used| {
+                    used.get("role") == Some(&json!("conversion"))
+                        && used.pointer("/location/field") == Some(&json!("nodePropertyWord"))
+                        && used.pointer("/location/indices") == Some(&indices)
+                }),
+                "interpreted {field} uses the exact original word bytes"
+            );
+        }
+        Ok(())
+    }
 }

@@ -12,8 +12,17 @@ unknown codes, zero, signed zero and nonfinite binary32 encodings.
 
 The original words use the authored property vocabulary. A property ID may name
 a reference or another nonfloat representation. The reader exposes bits and
-original byte ranges for every checked word. It leaves numeric and reference
-interpretation to independently qualified property mappings.
+original byte ranges for every checked word. For the version-154 shared node
+bundle, IDs 0x00 through 0x03 additionally carry a binary32 interpretation:
+voice volume in decibels, pitch in cents, and low-pass and high-pass controls in
+percent. The interpreted number is null for a nonfinite word, and the original
+bits remain present. Missing words remain absent. The type interpretation links
+the original ID and bank version. The numeric interpretation also links the
+original word. Play Action and DialogueEvent bundles keep their own layouts.
+
+The scoped mapping follows [wwiser's v154 property IDs](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wdefs.py)
+and [Audiokinetic's Wwise User Guide, Chapter 17](https://www.audiokinetic.com/files/?get=2015.1.9_5624%2FWwise_UserGuide_en.pdf).
+Other IDs and their words remain available for independent interpretation.
 
 A truncated ID array provides its readable prefix and no word position. A
 truncated word array retains every complete word, including a ranged minimum

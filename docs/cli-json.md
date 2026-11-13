@@ -1761,7 +1761,10 @@ Version-154 Sound, ActorMixer, Random/Sequence, Switch, Blend and music nodes al
 include `node_fields`. The document binds the object status, bank version, original
 parent ID (including zero), override bus ID and packed priority/MIDI byte to the owning
 bank. The ordinary and ranged property lists preserve authored order, original IDs,
-raw words and each list's checked counts. Effect and metadata slots retain their
+raw words and each list's checked counts. Qualified version-154 voice properties
+also include their property name and unit plus any readable finite number.
+Nonfinite values carry a null interpretation beside their exact raw bits.
+Effect and metadata slots retain their
 physical order, indices, reference IDs and raw flag bytes. Aux routing retains the
 four authored user send slots and reflections ID. Advanced settings preserve the
 original instance limit, behavior codes and flags. Positioning rows preserve original

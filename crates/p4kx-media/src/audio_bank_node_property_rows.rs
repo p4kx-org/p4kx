@@ -19,6 +19,10 @@ use crate::audio_bank_node_property_payload::{
 use crate::audio_bank_origins::BankOrigins;
 use crate::audio_bank_projection::BankProjection;
 use crate::audio_bank_property_labels::{self, PropertyLabels};
+#[path = "audio_bank_voice_property.rs"]
+mod voice;
+
+pub(super) use self::voice::PropertyInterpretation;
 use crate::{MediaError, MediaWriter, Status, Subresource};
 
 #[derive(Clone, Copy)]
@@ -89,10 +93,15 @@ fn emit_row(
     sites.converted(&mut prepared, "ordinal", &row.id.range, labels.position)?;
     sites.converted(&mut prepared, "words/kind", count, labels.word_layout)?;
     let words = observed_words(sites, &mut prepared, &row.value, labels)?;
+    let interpretation = match projection.scope {
+        PropertyScope::Node => voice::project(sites, &mut prepared, row)?,
+        PropertyScope::Action => None,
+    };
     let data = NodePropertyRecord {
         ordinal: row.ordinal,
         property_id: (&row.id).into(),
         words,
+        interpretation,
     };
     let [section, object] = sites.indices();
     let indices = vec![section, object, list, u64::from(row.ordinal)];

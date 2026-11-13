@@ -79,6 +79,7 @@ mod hirc_rtpc;
 mod hirc_source;
 mod hirc_state;
 mod hirc_switch_container;
+mod hirc_voice_property;
 mod ima;
 mod loops;
 mod media_class;
@@ -226,6 +227,7 @@ pub use hirc_source::{
 };
 pub use hirc_state::{StateObject, StateProperties, StateProperty};
 pub use hirc_switch_container::{BankSwitchContainerFields, BankSwitchExtent};
+pub use hirc_voice_property::VoiceProperty;
 pub use loops::Loop;
 pub use media_class::{BankDeclaredLengthSource, BankMediaClassSource, MediaClass};
 pub use ogg::OggWriter;

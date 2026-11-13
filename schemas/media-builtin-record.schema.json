@@ -12090,6 +12090,16 @@
     "NodePropertyRecord": {
       "additionalProperties": false,
       "properties": {
+        "interpretation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyInterpretation"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "ordinal": {
           "format": "uint8",
           "maximum": 255,
@@ -13127,6 +13137,64 @@
         "malformed"
       ],
       "type": "string"
+    },
+    "PropertyInterpretation": {
+      "additionalProperties": false,
+      "properties": {
+        "maximum": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "minimum": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "property": {
+          "$ref": "#/$defs/VoicePropertyName"
+        },
+        "scalar": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PropertyValue"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "property"
+      ],
+      "type": "object"
+    },
+    "PropertyValue": {
+      "additionalProperties": false,
+      "properties": {
+        "value": {
+          "format": "float",
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "value"
+      ],
+      "type": "object"
     },
     "RandomSequenceItemRecord": {
       "oneOf": [
@@ -18772,6 +18840,32 @@
           "type": "string"
         }
       ]
+    },
+    "VoicePropertyName": {
+      "description": "Wire identity of a qualified Wwise node property, including its unit.",
+      "oneOf": [
+        {
+          "const": "volume-decibels",
+          "description": "Relative voice level in decibels.",
+          "type": "string"
+        },
+        {
+          "const": "pitch-cents",
+          "description": "Relative voice pitch in cents.",
+          "type": "string"
+        },
+        {
+          "const": "low-pass-filter-percent",
+          "description": "Relative low-pass filtering in percent.",
+          "type": "string"
+        },
+        {
+          "const": "high-pass-filter-percent",
+          "description": "Relative high-pass filtering in percent.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "VorbisInputs": {
       "additionalProperties": false,

@@ -8,6 +8,10 @@ use serde::Serialize;
 use crate::source_evidence_error::SourceEvidenceError;
 use crate::source_value::SourcedValue;
 
+#[path = "hirc_node_property_interpretation.rs"]
+mod interpretation;
+
+pub(super) use self::interpretation::PropertyInterpretation;
 use super::source_fields::origins::ObjectOrigins;
 
 #[derive(Serialize, JsonSchema)]
