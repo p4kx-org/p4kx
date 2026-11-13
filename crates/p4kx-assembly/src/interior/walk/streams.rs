@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_model::Transform;
+
 use super::{Todo, Walker, container_part};
 use crate::IssueKind;
 use crate::interior::InteriorPartKind;
