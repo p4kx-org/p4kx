@@ -194,13 +194,13 @@ fn canonical_quantum_modes_join_by_owner_and_actual_source_type() -> super::Resu
     *catalog.pointer_mut(path).ok_or("canonical quantum table")? = json!([
         {
             "ownerGuid":{"state":"present","value":owner},
-            "standard":profile(super::coverage::QUANTUM_PROFILE_TYPE, 1),
-            "spline":profile(super::coverage::QUANTUM_PROFILE_TYPE, 2),
+            "standard":profile("SQuantumDriveParams", 1),
+            "spline":profile("SQuantumDriveParams", 2),
         },
         {
             "ownerGuid":{"state":"present","value":owner},
             "standard":profile("FixtureUnmappedQuantumMode", 3),
-            "spline":profile(super::coverage::QUANTUM_PROFILE_TYPE, 4),
+            "spline":profile("SQuantumDriveParams", 4),
         },
     ]);
     let mut inventory = super::baseline::inventory();
@@ -233,5 +233,68 @@ fn canonical_quantum_modes_join_by_owner_and_actual_source_type() -> super::Resu
         [1, 2, 4],
         "shared source-type audit visits both modes and excludes the distinct type"
     );
+    Ok(())
+}
+
+#[test]
+fn reviewed_baseline_resolves_nested_shield_and_thermal_projection_values() -> super::Result<()> {
+    let inventory = super::baseline::inventory();
+    let payload = json!({
+        "stunParams": {"value": {"minStunTime": {"value": 0}}},
+        "shieldAbsorption": {"value": [{"value": {"max": {"value": 1}}}, {"value": {"max": {"value": 2}}}]},
+        "shieldResistance": {"value": [{"value": {"max": {"value": 9}}}]},
+        "heat": {"value": {"inFlightThermalEnergyDraw": {"value": 4}}},
+    });
+    let mappings = inventory.reviewed()?;
+    for (owner, name, expected) in [
+        ("SShieldStunParams", "minStunTime", vec![0]),
+        ("SShieldAbsorption", "Max", vec![1, 2]),
+        ("SShieldResistance", "Max", vec![9]),
+        (
+            "QuantumDriveHeatParams",
+            "inFlightThermalEnergyDraw",
+            vec![4],
+        ),
+    ] {
+        let mapping = mappings
+            .get(&FieldKey::new(owner, name))
+            .ok_or("reviewed nested field")?;
+        let Disposition::Exported { path, .. } = &mapping.disposition else {
+            return Err("nested field must remain mapped to its typed output".into());
+        };
+        let values = path.select(&payload, &|| false)?;
+        let numbers: Vec<_> = values.iter().filter_map(|value| value.as_u64()).collect();
+        assert_eq!(
+            numbers, expected,
+            "the map follows the canonical {owner}.{name} payload"
+        );
+    }
+    for (owner, name, target) in [
+        (
+            "SCItemShieldGeneratorParams",
+            "ShieldResistance",
+            "SShieldResistance",
+        ),
+        (
+            "SCItemQuantumDriveParams",
+            "splineJumpParams",
+            "SQuantumDriveParams",
+        ),
+        (
+            "SCItemQuantumDriveParams",
+            "heatParams",
+            "QuantumDriveHeatParams",
+        ),
+        ("SQuantumDriveParams", "idleState", "ItemResourceState"),
+    ] {
+        let mapping = mappings
+            .get(&FieldKey::new(owner, name))
+            .ok_or("reviewed source declaration")?;
+        assert_eq!(
+            mapping.declared_target.as_deref(),
+            Some(target),
+            "the map names the original target declaration"
+        );
+    }
     Ok(())
 }

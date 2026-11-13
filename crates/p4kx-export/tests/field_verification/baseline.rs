@@ -8,7 +8,7 @@ use super::published_model::{Family, Field};
 use super::units::Unit;
 
 fn shield_mappings() -> impl Iterator<Item = Mapping> {
-    [
+    let outer = [
         ("MaxShieldHealth", "maxHealth"),
         ("MaxShieldRegen", "maxRegen"),
         ("DecayRatio", "decayRatio"),
@@ -30,15 +30,63 @@ fn shield_mappings() -> impl Iterator<Item = Mapping> {
         ("ShieldAbsorption", "shieldAbsorption"),
     ]
     .into_iter()
-    .map(|(source, target)| Mapping {
-        source: FieldKey::new("SCItemShieldGeneratorParams", source),
-        declared_target: None,
-        disposition: Disposition::Exported {
-            group: super::coverage::SHIELD_GENERATORS.to_owned(),
-            path: Path::fields(&[target, "value"]),
-        },
-        previously_empty: false,
-    })
+    .map(|(source, target)| {
+        let declared_target = match source {
+            "ShieldResistance" => Some("SShieldResistance"),
+            "ShieldAbsorption" => Some("SShieldAbsorption"),
+            "stunParams" => Some("SShieldStunParams"),
+            _ => None,
+        };
+        mapped(
+            "SCItemShieldGeneratorParams",
+            source,
+            super::coverage::SHIELD_GENERATORS,
+            Path::fields(&[target, "value"]),
+            declared_target,
+        )
+    });
+    outer.chain(shield_nested_mappings())
+}
+
+fn shield_nested_mappings() -> impl Iterator<Item = Mapping> {
+    let stun = [
+        "minAlphaDamageRatio",
+        "maxAlphaDamageRatio",
+        "minStunTime",
+        "maxStunTime",
+    ]
+    .into_iter()
+    .map(|name| {
+        mapped(
+            "SShieldStunParams",
+            name,
+            super::coverage::SHIELD_GENERATORS,
+            Path::fields(&["stunParams", "value", name, "value"]),
+            None,
+        )
+    });
+    let ranges = [
+        ("SShieldAbsorption", "shieldAbsorption"),
+        ("SShieldResistance", "shieldResistance"),
+    ]
+    .into_iter()
+    .flat_map(|(owner, group)| {
+        [("Min", "min"), ("Max", "max")]
+            .into_iter()
+            .map(move |(source, target)| {
+                let mut path = Path::fields(&[group, "value"]);
+                path.0.push(Step::Each);
+                path.0.extend(Path::fields(&["value", target, "value"]).0);
+                mapped(
+                    owner,
+                    source,
+                    super::coverage::SHIELD_GENERATORS,
+                    path,
+                    None,
+                )
+            })
+    });
+    stun.chain(ranges)
 }
 
 fn quantum_mappings() -> impl Iterator<Item = Mapping> {
@@ -53,15 +101,21 @@ fn quantum_mappings() -> impl Iterator<Item = Mapping> {
     ]
     .into_iter()
     .map(|(source, target)| {
-        quantum_mapped(
+        mapped(
             "SCItemQuantumDriveParams",
             source,
             super::coverage::QUANTUM_DRIVES,
-            target,
-            (source == "params").then_some(super::coverage::QUANTUM_PROFILE_TYPE),
+            Path::fields(&[target, "value"]),
+            match source {
+                "params" | "splineJumpParams" => Some(super::coverage::QUANTUM_PROFILE_TYPE),
+                "heatParams" => Some("QuantumDriveHeatParams"),
+                _ => None,
+            },
         )
     });
-    roots.chain(quantum_profile_mappings())
+    roots
+        .chain(quantum_profile_mappings())
+        .chain(quantum_heat_mappings())
 }
 
 fn quantum_profile_mappings() -> impl Iterator<Item = Mapping> {
@@ -108,21 +162,45 @@ fn quantum_profile_mappings() -> impl Iterator<Item = Mapping> {
     ]
     .into_iter()
     .map(|(source, target)| {
-        quantum_mapped(
+        mapped(
             super::coverage::QUANTUM_PROFILE_TYPE,
             source,
             super::coverage::QUANTUM_PROFILES,
-            target,
+            Path::fields(&[target, "value"]),
+            match source {
+                "idleState" | "travellingState" => Some("ItemResourceState"),
+                "effectTags" => Some("SQuantumDriveEffectBaseParams"),
+                _ => None,
+            },
+        )
+    })
+}
+
+fn quantum_heat_mappings() -> impl Iterator<Item = Mapping> {
+    [
+        "preRampUpThermalEnergyDraw",
+        "rampUpThermalEnergyDraw",
+        "inFlightThermalEnergyDraw",
+        "rampDownThermalEnergyDraw",
+        "postRampDownThermalEnergyDraw",
+    ]
+    .into_iter()
+    .map(|name| {
+        mapped(
+            "QuantumDriveHeatParams",
+            name,
+            super::coverage::QUANTUM_DRIVES,
+            Path::fields(&["heat", "value", name, "value"]),
             None,
         )
     })
 }
 
-fn quantum_mapped(
+fn mapped(
     owner: &str,
     field: &str,
     group: &str,
-    target: &str,
+    path: Path,
     declared_target: Option<&str>,
 ) -> Mapping {
     Mapping {
@@ -130,7 +208,7 @@ fn quantum_mapped(
         declared_target: declared_target.map(str::to_owned),
         disposition: Disposition::Exported {
             group: group.to_owned(),
-            path: Path::fields(&[target, "value"]),
+            path,
         },
         previously_empty: false,
     }

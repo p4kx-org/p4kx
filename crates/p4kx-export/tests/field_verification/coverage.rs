@@ -21,7 +21,7 @@ use super::source_scope;
 pub(super) const SHIELD_GENERATORS: &str = "shieldGenerators";
 pub(super) const QUANTUM_DRIVES: &str = "quantumDrives";
 pub(super) const QUANTUM_PROFILES: &str = "quantumDriveProfiles";
-pub(super) const QUANTUM_PROFILE_TYPE: &str = "QuantumDriveParams";
+pub(super) const QUANTUM_PROFILE_TYPE: &str = "SQuantumDriveParams";
 
 fn observations(
     forge: &DataForge<'_>,
