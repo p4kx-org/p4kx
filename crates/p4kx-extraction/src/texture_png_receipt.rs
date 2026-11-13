@@ -5,7 +5,8 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use p4kx_texture::{
-    DdsHeaderField, DdsPngEncoding, MipPayloadLocation, RgbaImage, write_png_with_transfer,
+    DdsAlphaTransform, DdsHeaderField, DdsPngEncoding, MipPayloadLocation, RgbaImage,
+    write_png_with_transfer,
 };
 
 use crate::output_file::write_error;
@@ -39,7 +40,7 @@ impl<'source> PreparedPng<'source> {
         texture: &'source Texture<'_>,
         inputs: &PreviewInputs<'_, MipPayloadLocation>,
         layout: CubemapLayout,
-        encoding: DdsPngEncoding,
+        encoding: (DdsPngEncoding, DdsAlphaTransform),
         destinations: &[PathBuf],
         out: &Path,
     ) -> Result<Self, ConversionError> {
@@ -69,7 +70,7 @@ impl<'source> PreparedPng<'source> {
         &self,
         inputs: &PreviewInputs<'_, MipPayloadLocation>,
         level: u32,
-        encoding: DdsPngEncoding,
+        encoding: (DdsPngEncoding, DdsAlphaTransform),
         files: &[PathBuf],
         images: &[RgbaImage],
     ) -> Result<(), ConversionError> {
@@ -80,7 +81,7 @@ impl<'source> PreparedPng<'source> {
             let surfaces = first..first + self.surfaces as u64;
             let (origin, inventory) = image_origin(inputs, level, encoding, surfaces)
                 .map_err(|error| write_error(file, error))?;
-            write(receipt, file, image, encoding, &origin, &inventory)?;
+            write(receipt, file, image, encoding.0, &origin, &inventory)?;
         }
         Ok(())
     }
@@ -101,7 +102,7 @@ impl<'source> PreparedPng<'source> {
 fn image_origin(
     inputs: &PreviewInputs<'_, MipPayloadLocation>,
     level: u32,
-    encoding: DdsPngEncoding,
+    (encoding, alpha): (DdsPngEncoding, DdsAlphaTransform),
     surfaces: std::ops::Range<u64>,
 ) -> io::Result<(FieldOrigin, SourceInventory)> {
     let uses = SourceUses::with_compact_use_refs();
@@ -118,6 +119,9 @@ fn image_origin(
         observed
             .append_output_transfer_uses(&mut contributions, encoding)
             .map_err(io::Error::other)?;
+        observed
+            .append_alpha_transform_uses(&mut contributions, alpha)
+            .map_err(io::Error::other)?;
         complete &= observed.is_complete();
     }
     let origin = uses.origin(&contributions, complete);
@@ -126,7 +130,7 @@ fn image_origin(
 
 fn summary_fields(
     inputs: &PreviewInputs<'_, MipPayloadLocation>,
-    encoding: DdsPngEncoding,
+    (encoding, alpha): (DdsPngEncoding, DdsAlphaTransform),
 ) -> io::Result<(FieldOrigins, SourceInventory)> {
     let uses = SourceUses::with_compact_use_refs();
     let (header, complete) = inputs
@@ -141,8 +145,23 @@ fn summary_fields(
             SourceUseRole::Conversion,
         )
         .map_err(io::Error::other)?;
+    let association = header.alpha_association_uses().map_err(io::Error::other)?;
     let mut fields = FieldOrigins::new();
-    for (path, contributors) in [("/output_transfer", transfer), ("/png_transform", format)] {
+    if alpha != DdsAlphaTransform::Preserve {
+        let mut contributors = association.clone();
+        contributors.extend(transfer.iter().cloned());
+        fields
+            .insert(
+                FieldPath::parse("/alpha_transform").map_err(io::Error::other)?,
+                uses.origin(&contributors, complete),
+            )
+            .map_err(io::Error::other)?;
+    }
+    for (path, contributors) in [
+        ("/output_transfer", transfer),
+        ("/png_transform", format),
+        ("/alpha_association", association),
+    ] {
         let path = FieldPath::parse(path).map_err(io::Error::other)?;
         fields
             .insert(path, uses.origin(&contributors, complete))

@@ -61,6 +61,83 @@ fn texture_conversion_uses_private_encrypted_alpha_and_exact_surface_proofs() ->
     Ok(())
 }
 
+#[test]
+fn texture_conversion_binds_alpha_declaration_coverage_and_transformation_separately() -> TestResult
+{
+    let folder = tempfile::tempdir()?;
+    let archive = associated_bc2(folder.path())?;
+    let output = folder.path().join("out");
+    let options = ExportOptions {
+        kinds: vec![MediaKind::Texture],
+        include: Some(Filter::parse("*paired.dds")?),
+        texture_mip: Some(0),
+        ..ExportOptions::default()
+    };
+    let index = support::published(p4kx_media::export(&archive, &output, &options)?)?;
+    let rows = support::records(&output, &index, "texture.jsonl")?;
+    let (ordinal, row) = find(&rows, "texture.dds-image")?;
+    for (path, expected) in [
+        ("/payload/alpha_association", json!("premultiplied")),
+        ("/payload/alpha_transform", json!("unassociate_stored")),
+        (
+            "/payload/alpha_coverage",
+            json!({"zero": 1, "partial": 1, "full": 1}),
+        ),
+    ] {
+        assert_eq!(
+            row.data.pointer(path),
+            Some(&expected),
+            "exact Media datum {path}"
+        );
+    }
+    let base = output.join(&index.artifact_base);
+    let fields: Vec<Value> = read_rows(base.join("field-origins.jsonl"))?;
+    for (path, encrypted) in [
+        ("alpha_association", false),
+        ("alpha_transform", false),
+        ("alpha_coverage/zero", true),
+        ("alpha_coverage/partial", true),
+        ("alpha_coverage/full", true),
+    ] {
+        let origin = field(&fields, ordinal, &format!("/data/payload/{path}"))?;
+        assert_eq!(
+            origin["containsEncryptedSource"], encrypted,
+            "origin of {path}"
+        );
+        assert_eq!(
+            origin["sourceSetComplete"], true,
+            "complete origin of {path}"
+        );
+    }
+    let validator = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
+    validator
+        .validate(&serde_json::to_value(row)?)
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+fn associated_bc2(root: &Path) -> TestResult<Archive> {
+    let dds = SplitDds::new(TestTextureFormat::LegacyDxt5, 3, 1)
+        .mips(1)
+        .split(1);
+    let mut header = dds.header_bytes();
+    header
+        .get_mut(84..88)
+        .ok_or("FourCC")?
+        .copy_from_slice(b"DXT2");
+    let mut block = 0x0F80_u64.to_le_bytes().to_vec();
+    block.extend([0, 0x40, 0, 0, 0, 0, 0, 0]);
+    let path = root.join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(HEADER, header))
+        .entry(TestEntry::stored("Data/paired.dds.1", block).encrypted())
+        .write_to(&path)?;
+    Ok(Archive::open_with(
+        path,
+        OpenOptions::new().key(Some(test_key())),
+    )?)
+}
+
 fn split_fixture(root: &Path) -> TestResult<Archive> {
     let color = SplitDds::new(BGRA, 4, 4)
         .split(1)
@@ -98,6 +175,7 @@ fn check_png(row: &MediaRecord) -> TestResult<&str> {
         ("width", json!(4)),
         ("height", json!(4)),
         ("alpha", json!("decoded-split-channel")),
+        ("alpha_association", json!("unknown")),
         ("format", json!("png")),
         ("source_transfer", json!("srgb")),
         ("output_transfer", json!("srgb")),

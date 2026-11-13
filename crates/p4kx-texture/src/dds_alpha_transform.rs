@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::pixels::float_unorm;
-use crate::{DdsAlphaAssociation, DdsTransfer, RgbaImage, TextureError};
+use crate::{DdsAlphaAssociation, DdsPngEncoding, DdsTransfer, RgbaImage, TextureError};
 
 /// Alpha-associated colour processing for an output image.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -29,6 +29,16 @@ impl DdsAlphaTransform {
             (DdsAlphaAssociation::Premultiplied, DdsTransfer::Unknown) => Self::UnassociateStored,
             (DdsAlphaAssociation::Premultiplied, _) => Self::UnassociateLinear,
             _ => Self::Preserve,
+        }
+    }
+
+    /// Chooses a straight-opacity transform for decoded colour PNG channels.
+    #[must_use]
+    pub const fn for_png(association: DdsAlphaAssociation, encoding: DdsPngEncoding) -> Self {
+        if encoding.uses_source_transfer() {
+            Self::for_opacity(association, encoding.transfer)
+        } else {
+            Self::Preserve
         }
     }
 

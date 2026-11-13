@@ -4,8 +4,8 @@
 use p4kx_archive::ObservedEntry;
 use p4kx_gltf::{TextureComponents, TextureReadUse};
 use p4kx_texture::{
-    DdsAlphaAssociation, DdsHeader, DdsHeaderField, DdsPngEncoding, DdsRawHeader, DdsTransfer,
-    MipByteSpans, MipPayloadLocation, TextureError,
+    DdsAlphaAssociation, DdsAlphaTransform, DdsHeader, DdsHeaderField, DdsPngEncoding,
+    DdsRawHeader, DdsTransfer, MipByteSpans, MipPayloadLocation, TextureError,
 };
 
 use crate::source::SourceEntry;
@@ -183,6 +183,7 @@ impl<'a> PreviewInputs<'a, MipPayloadLocation> {
         };
         Ok(Some(PreviewPngEvidence {
             png_encoding: None,
+            alpha_transform: DdsAlphaTransform::Preserve,
             color: self.color.register_spans(uses, level, color)?,
             alpha,
         }))
@@ -240,6 +241,7 @@ impl PreviewInputs<'_, MipByteSpans> {
     ) -> Result<PreviewPngEvidence, SourceEvidenceError> {
         Ok(PreviewPngEvidence {
             png_encoding: None,
+            alpha_transform: DdsAlphaTransform::Preserve,
             color: self.color.register(uses, level)?,
             alpha: self
                 .alpha

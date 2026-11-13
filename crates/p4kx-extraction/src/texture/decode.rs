@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_texture::{
-    DdsAlphaAssociation, LocatedMip, Mip, MipByteSpans, MipPayloadLocation, RgbaImage,
-    TextureError, merge_alpha, read_mip_with_location,
+    DdsAlphaAssociation, DdsAlphaTransform, DdsPngEncoding, DdsRawHeader, LocatedMip, Mip,
+    MipByteSpans, MipPayloadLocation, RgbaImage, TextureError, merge_alpha, read_mip_with_location,
 };
 
 use super::disk_mip;
@@ -67,8 +67,10 @@ impl<'a> Texture<'a> {
             return Err(several());
         }
         let (mut images, inputs, opacity) =
-            self.decode_surfaces_observing(level, |images, association, has_tail| {
-                (retain_opacity && has_tail && association == DdsAlphaAssociation::Premultiplied)
+            self.decode_surfaces_observing(level, |images, raw, has_tail| {
+                (retain_opacity
+                    && has_tail
+                    && raw.alpha_association() == DdsAlphaAssociation::Premultiplied)
                     .then(|| {
                         images
                             .iter()
@@ -108,10 +110,33 @@ impl<'a> Texture<'a> {
             .map(|(images, inputs, ())| (images, inputs))
     }
 
+    pub(crate) fn decode_png_surfaces(
+        &self,
+        level: u32,
+    ) -> Result<
+        (
+            Vec<RgbaImage>,
+            PreviewInputs<'a, MipPayloadLocation>,
+            DdsAlphaTransform,
+        ),
+        ConversionError,
+    > {
+        self.decode_surfaces_observing(level, |images, raw, _| {
+            let encoding = DdsPngEncoding::of(self.header().format(), raw.transfer().effective);
+            let transform = DdsAlphaTransform::for_png(raw.alpha_association(), encoding);
+            if transform != DdsAlphaTransform::Preserve {
+                for image in images {
+                    transform.image(encoding.transfer, image);
+                }
+            }
+            transform
+        })
+    }
+
     fn decode_surfaces_observing<Observation>(
         &self,
         level: u32,
-        observe: impl FnOnce(&[RgbaImage], DdsAlphaAssociation, bool) -> Observation,
+        observe: impl FnOnce(&mut [RgbaImage], DdsRawHeader, bool) -> Observation,
     ) -> Result<
         (
             Vec<RgbaImage>,
@@ -140,11 +165,7 @@ impl<'a> Texture<'a> {
             (read, color)
         };
         let mut images = self.decode_mip_data(&read.mip)?;
-        let observation = observe(
-            &images,
-            read.raw_header.alpha_association(),
-            alpha.is_some(),
-        );
+        let observation = observe(&mut images, read.raw_header, alpha.is_some());
         let alpha = Self::merge_alpha_input(alpha, level, &mut images)?;
         Ok((images, PreviewInputs { color, alpha }, observation))
     }

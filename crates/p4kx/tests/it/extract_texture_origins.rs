@@ -57,7 +57,16 @@ fn converted_array_images_bind_their_own_colour_and_alpha_bytes() -> TestResult 
         texture["png_transform"], "preserve_colour_transfer",
         "the alpha merge leaves RGB transfer unchanged"
     );
-    for field in ["/source_transfer", "/output_transfer", "/png_transform"] {
+    assert_eq!(
+        texture["alpha_association"], "unknown",
+        "the original colour header makes no association claim"
+    );
+    for field in [
+        "/source_transfer",
+        "/output_transfer",
+        "/png_transform",
+        "/alpha_association",
+    ] {
         assert_eq!(
             texture["field_origins"][field]["containsEncryptedSource"], false,
             "the plain colour header owns {field} without the private alpha tail"

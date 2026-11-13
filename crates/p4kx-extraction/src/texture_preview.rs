@@ -3,7 +3,7 @@
 
 //! Observed reads of decoded texture previews and their source headers.
 
-use p4kx_texture::{MipByteSpans, RgbaImage, TextureError, sheet_columns, tile};
+use p4kx_texture::{DdsAlphaTransform, MipByteSpans, RgbaImage, TextureError, sheet_columns, tile};
 
 use crate::texture_job::{Member, Role, role};
 use crate::texture_preview_png::input::PreviewInputs;
@@ -175,7 +175,27 @@ impl<'a> Texture<'a> {
         level: u32,
         face: Option<usize>,
     ) -> Result<ObservedPreviewImage<'a>, ConversionError> {
-        let (mut images, inputs) = self.decode_surfaces_with_inputs(level)?;
+        let (images, inputs) = self.decode_surfaces_with_inputs(level)?;
+        self.select_preview(level, face, images, inputs)
+    }
+
+    pub(crate) fn decode_png_preview(
+        &self,
+        level: u32,
+        face: Option<usize>,
+    ) -> Result<(ObservedPreviewImage<'a>, DdsAlphaTransform), ConversionError> {
+        let (images, inputs, alpha) = self.decode_png_surfaces(level)?;
+        self.select_preview(level, face, images, inputs)
+            .map(|observed| (observed, alpha))
+    }
+
+    fn select_preview(
+        &self,
+        level: u32,
+        face: Option<usize>,
+        mut images: Vec<RgbaImage>,
+        inputs: PreviewInputs<'a, p4kx_texture::MipPayloadLocation>,
+    ) -> Result<ObservedPreviewImage<'a>, ConversionError> {
         let bad_face = || {
             ConversionError::of_texture(
                 self.name(),

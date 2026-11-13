@@ -4,7 +4,7 @@
 mod evidence;
 pub(crate) mod input;
 
-use p4kx_texture::{DdsPngEncoding, MipByteSpans, write_png_with_transfer};
+use p4kx_texture::{DdsAlphaTransform, DdsPngEncoding, MipByteSpans, write_png_with_transfer};
 
 use self::input::PreviewInputs;
 use crate::{ConversionError, SourceEvidenceError, SourceUses, Texture};
@@ -30,6 +30,7 @@ pub struct PreviewPng {
 pub struct ObservedPreviewPng<'a> {
     image: PreviewPng,
     encoding: DdsPngEncoding,
+    alpha_transform: DdsAlphaTransform,
     inputs: PreviewInputs<'a, MipByteSpans>,
 }
 
@@ -54,6 +55,7 @@ impl ObservedPreviewPng<'_> {
     pub fn evidence(&self, uses: &SourceUses) -> Result<PreviewPngEvidence, SourceEvidenceError> {
         let mut evidence = self.inputs.register(uses, self.image.level)?;
         evidence.png_encoding = Some(self.encoding);
+        evidence.alpha_transform = self.alpha_transform;
         Ok(evidence)
     }
 }
@@ -86,7 +88,7 @@ impl<'a> Texture<'a> {
         level: u32,
         face: Option<usize>,
     ) -> Result<ObservedPreviewPng<'a>, ConversionError> {
-        let observed = self.decode_preview_selected(level, face)?;
+        let (observed, alpha_transform) = self.decode_png_preview(level, face)?;
         let image = observed.image;
         let mut png = Vec::new();
         let encoding = observed
@@ -103,6 +105,7 @@ impl<'a> Texture<'a> {
                 png,
             },
             encoding,
+            alpha_transform,
             inputs: observed.inputs,
         })
     }

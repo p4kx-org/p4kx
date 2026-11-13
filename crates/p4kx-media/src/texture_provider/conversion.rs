@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::texture_codec::{self, DdsPngEncoding, DdsTransfer};
+use p4kx_extraction::texture_codec::{
+    DdsAlphaAssociation, DdsAlphaCoverage, DdsAlphaTransform, DdsPngEncoding, DdsTransfer,
+};
 use p4kx_extraction::{
-    CubemapLayout, DdsHeader, DdsRawHeader, DecimalU64, DxgiFormat, HdrImage, RgbaImage,
-    TextureError, TextureFormat, TextureImage, TextureImageFormat, TextureImagePlan,
+    CubemapLayout, DdsHeader, DdsRawHeader, DecimalU64, DxgiFormat, TextureError, TextureFormat,
+    TextureImage, TextureImageFormat, TextureImagePlan,
 };
 
 use super::conversion_mip::{Loaded, MipRead, ReadFailure};
@@ -14,6 +16,7 @@ use super::conversion_payload::{
     ImageFormat, Outcome, Placement,
 };
 use super::family_inputs::{FamilyInputs, MipBranch};
+
 use super::header::HeaderRole;
 use super::origin::{self, TextureHeaderOrigins};
 use crate::origin_contributions::OriginContributions;
@@ -21,6 +24,10 @@ use crate::{
     ArtifactExtension, MediaError, MediaIssue, MediaWriter, Severity, SourceContext, Status,
     Subresource,
 };
+#[path = "conversion_pixels.rs"]
+mod conversion_pixels;
+
+use conversion_pixels::Pixels;
 
 pub(super) struct Request<'a> {
     pub(super) level: u32,
@@ -187,20 +194,25 @@ impl Request<'_> {
         for (position, image) in plan.enumerate() {
             writer.checkpoint()?;
             let index = position as u64;
-            let decoded = match Pixels::decode(color, alpha, &image, index) {
+            let png = (image.format == TextureImageFormat::Png).then_some(png);
+            let alpha_association = color.mip.raw_header.alpha_association();
+            let transform = png.map_or(DdsAlphaTransform::Preserve, |encoding| {
+                DdsAlphaTransform::for_png(alpha_association, encoding)
+            });
+            let decoded = match Pixels::decode(color, alpha, &image, index, png, transform) {
                 Ok(decoded) => decoded,
                 Err(cause) => return Ok(Err(dds_failure(&cause))),
             };
             let uses_family = color.payload_input.is_some()
                 || image.format == TextureImageFormat::Png && !self.role.alpha;
-            let png = (image.format == TextureImageFormat::Png).then_some(png);
+            let coverage = color.mip.mip.alpha_coverage(index);
             let origins = ImageOrigins::of(
                 color,
                 alpha,
                 uses_family.then_some(directory),
                 index,
                 png,
-                self.role.alpha,
+                (self.role.alpha, coverage.is_some(), transform),
                 writer,
             )?;
             let alpha = decoded.alpha(alpha.is_some());
@@ -213,6 +225,9 @@ impl Request<'_> {
                 source_transfer,
                 png,
                 alpha,
+                alpha_association,
+                coverage,
+                transform,
             }
             .publish(context, &color.header_input, &subresource, &origins, writer)?;
         }
@@ -227,6 +242,9 @@ struct ImageWrite<'a> {
     source_transfer: DdsTransfer,
     png: Option<DdsPngEncoding>,
     alpha: Alpha,
+    alpha_association: DdsAlphaAssociation,
+    coverage: Option<DdsAlphaCoverage>,
+    transform: DdsAlphaTransform,
 }
 
 impl ImageWrite<'_> {
@@ -271,6 +289,10 @@ impl ImageWrite<'_> {
                 bit_depth: image.format.bit_depth(),
                 suffix: image.suffix,
                 alpha: self.alpha,
+                alpha_association: self.alpha_association,
+                alpha_coverage: self.coverage,
+                alpha_transform: (self.transform != DdsAlphaTransform::Preserve)
+                    .then_some(self.transform),
                 channel_transform: channel_transform(image.format, self.source.format()),
                 source_transfer: Some(self.source_transfer),
                 output_transfer: Some(transfer),
@@ -286,65 +308,6 @@ impl ImageWrite<'_> {
         )
     }
 }
-enum Pixels {
-    Png(RgbaImage),
-    Exr(HdrImage),
-}
-
-impl Pixels {
-    fn decode(
-        color: &Loaded,
-        alpha: Option<&Loaded>,
-        image: &TextureImage,
-        index: u64,
-    ) -> Result<Self, TextureError> {
-        let color = &color.mip.mip;
-        let format = color.header().format();
-        let unavailable = || TextureError::UnsupportedImage {
-            images: color.surfaces(),
-        };
-        let surface = color.surface(index).ok_or_else(unavailable)?;
-        if image.format == TextureImageFormat::Exr {
-            return texture_codec::decode_hdr(format, image.width, image.height, surface)
-                .map(Self::Exr);
-        }
-        let mut rgba = texture_codec::decode(format, image.width, image.height, surface)?;
-        if let Some(alpha) = alpha {
-            let alpha = &alpha.mip.mip;
-            if alpha.surfaces() != color.surfaces() {
-                return Err(TextureError::UnsupportedImage {
-                    images: alpha.surfaces(),
-                });
-            }
-            let surface = alpha.surface(index).ok_or_else(unavailable)?;
-            let format = alpha.header().format();
-            let decoded = texture_codec::decode(format, alpha.width(), alpha.height(), surface)?;
-            texture_codec::merge_alpha(&mut rgba, &decoded, format)?;
-        }
-        Ok(Self::Png(rgba))
-    }
-
-    fn encode(
-        &self,
-        transfer: DdsTransfer,
-        sink: &mut dyn std::io::Write,
-    ) -> Result<(), TextureError> {
-        match self {
-            Self::Png(image) => texture_codec::write_png_with_transfer(image, transfer, sink),
-            Self::Exr(image) => texture_codec::write_exr(image, sink),
-        }
-    }
-
-    fn alpha(&self, split: bool) -> Alpha {
-        match self {
-            Self::Png(_) if split => Alpha::DecodedSplitChannel,
-            Self::Png(_) => Alpha::DecodedChannels,
-            Self::Exr(image) if image.alpha().is_some() => Alpha::DecodedChannels,
-            Self::Exr(_) => Alpha::NoAlphaChannel,
-        }
-    }
-}
-
 fn channel_transform(image: TextureImageFormat, source: TextureFormat) -> ChannelTransform {
     if image == TextureImageFormat::Exr {
         return ChannelTransform::LinearFloat;

@@ -3,7 +3,10 @@
 
 use std::path::{Path, PathBuf};
 
-use p4kx_texture::{DdsPngEncoding, RgbaImage, TextureError, cube_cross, write_png_with_transfer};
+use p4kx_texture::{
+    DdsAlphaAssociation, DdsAlphaTransform, DdsPngEncoding, RgbaImage, TextureError, cube_cross,
+    write_png_with_transfer,
+};
 use rayon::prelude::*;
 
 #[path = "texture_png_receipt.rs"]
@@ -45,6 +48,10 @@ pub struct PngReport {
     pub alpha_tail: bool,
     /// The transfer and channel processing of the encoded PNG samples.
     pub encoding: DdsPngEncoding,
+    /// Original declaration from the DDS colour header.
+    pub alpha_association: DdsAlphaAssociation,
+    /// RGB unassociation applied to produce straight colour.
+    pub alpha_transform: DdsAlphaTransform,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -124,7 +131,7 @@ impl Texture<'_> {
         for file in &files {
             self.refuse_input(file)?;
         }
-        let (surfaces, inputs) = self.decode_surfaces_with_inputs(level)?;
+        let (surfaces, inputs, alpha_transform) = self.decode_png_surfaces(level)?;
         let encoding = inputs
             .png_encoding()
             .map_err(|error| ConversionError::of_texture(self.name(), error))?;
@@ -138,8 +145,15 @@ impl Texture<'_> {
             ));
         }
         let origins = if publication == Publication::Receipts {
-            let plan = receipt::PreparedPng::new(self, &inputs, layout, encoding, &files, out)?;
-            plan.write_images(&inputs, level, encoding, &files, &images)?;
+            let plan = receipt::PreparedPng::new(
+                self,
+                &inputs,
+                layout,
+                (encoding, alpha_transform),
+                &files,
+                out,
+            )?;
+            plan.write_images(&inputs, level, (encoding, alpha_transform), &files, &images)?;
             Some(plan.finish())
         } else {
             files
@@ -159,6 +173,8 @@ impl Texture<'_> {
                 files,
                 alpha_tail: self.has_alpha_tail(),
                 encoding,
+                alpha_association: inputs.source_alpha().0,
+                alpha_transform,
             },
             origins,
         ))

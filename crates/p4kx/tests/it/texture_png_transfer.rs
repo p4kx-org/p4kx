@@ -123,6 +123,73 @@ fn preview_uses_the_same_transfer_policy_and_byte_samples() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn legacy_dxt_pairs_keep_alpha_and_only_straighten_premultiplied_colour() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let header = dir.path().join("texture.dds");
+    let output = dir.path().join("texture.png");
+    for (four_cc, alpha) in [
+        (b"DXT2", bc2_alpha()),
+        (b"DXT3", bc2_alpha()),
+        (b"DXT4", bc3_alpha()),
+        (b"DXT5", bc3_alpha()),
+    ] {
+        let dds = SplitDds::new(TestTextureFormat::LegacyDxt5, 3, 1).mips(1);
+        let mut bytes = dds.header_bytes();
+        bytes
+            .get_mut(84..88)
+            .ok_or("FourCC")?
+            .copy_from_slice(four_cc);
+        bytes.truncate(dds.header_len());
+        bytes.extend(alpha);
+        bytes.extend([0x00, 0x40, 0, 0, 0, 0, 0, 0]);
+        fs::write(&header, bytes)?;
+        let report = export(&header, &output)?;
+        let premultiplied = matches!(four_cc, b"DXT2" | b"DXT4");
+        let is_bc2 = matches!(four_cc, b"DXT2" | b"DXT3");
+        let mid = if is_bc2 { 136 } else { 128 };
+        let red = if premultiplied {
+            if is_bc2 { 124 } else { 131 }
+        } else {
+            66
+        };
+        let zero = if premultiplied { 0 } else { 66 };
+        assert_eq!(
+            read_rgba(&output)?.2,
+            [zero, 0, 0, 0, red, 0, 0, mid, 66, 0, 0, 255],
+            "the three in-bounds texels of {four_cc:?}"
+        );
+        assert_eq!(
+            report["alpha_association"],
+            if premultiplied {
+                "premultiplied"
+            } else {
+                "straight"
+            },
+            "actual legacy declaration"
+        );
+        let transform = report.get("alpha_transform").and_then(Value::as_str);
+        assert_eq!(
+            transform,
+            premultiplied.then_some("unassociate_stored"),
+            "no invented colour transfer"
+        );
+        assert_eq!(
+            report["field_origins"]["/alpha_association"]["sourceSetComplete"], true,
+            "exact original FourCC"
+        );
+    }
+    Ok(())
+}
+
+fn bc2_alpha() -> [u8; 8] {
+    0x0F80_u64.to_le_bytes()
+}
+
+fn bc3_alpha() -> [u8; 8] {
+    [0, 128, 0xC8, 0x01, 0, 0, 0, 0]
+}
+
 fn fixture(
     path: &Path,
     format: u32,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_texture::{DdsHeaderField, DdsPngEncoding};
+use p4kx_texture::{DdsAlphaTransform, DdsHeaderField, DdsPngEncoding};
 
 use crate::textures::preview_header::PreviewHeaderEvidence;
 use crate::{FieldOrigin, SourceEvidenceError, SourceUse, SourceUseRole, SourceUses};
@@ -15,6 +15,7 @@ pub struct PreviewPngEvidence {
     /// The successfully merged alpha or smoothness tail.
     pub alpha: Option<PreviewTextureEvidence>,
     pub(super) png_encoding: Option<DdsPngEncoding>,
+    pub(super) alpha_transform: DdsAlphaTransform,
 }
 
 impl PreviewPngEvidence {
@@ -50,7 +51,8 @@ impl PreviewPngEvidence {
         let Some(encoding) = self.png_encoding else {
             return Ok(());
         };
-        self.append_output_transfer_uses(uses, encoding)
+        self.append_output_transfer_uses(uses, encoding)?;
+        self.append_alpha_transform_uses(uses, self.alpha_transform)
     }
 
     pub(crate) fn append_output_transfer_uses(
@@ -59,6 +61,17 @@ impl PreviewPngEvidence {
         encoding: DdsPngEncoding,
     ) -> Result<(), SourceEvidenceError> {
         uses.extend(self.color.header.output_transfer_uses(encoding)?);
+        Ok(())
+    }
+
+    pub(crate) fn append_alpha_transform_uses(
+        &self,
+        uses: &mut Vec<SourceUse>,
+        alpha: DdsAlphaTransform,
+    ) -> Result<(), SourceEvidenceError> {
+        if alpha != DdsAlphaTransform::Preserve {
+            uses.extend(self.color.header.alpha_association_uses()?);
+        }
         Ok(())
     }
 

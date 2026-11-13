@@ -3,8 +3,18 @@ source: crates/p4kx/tests/it/json.rs
 expression: json
 ---
 {
+  "alpha_association": "unknown",
   "alpha_tail": false,
   "field_origins": {
+    "/alpha_association": {
+      "containsEncryptedSource": null,
+      "sourceSetComplete": true,
+      "sourceUsesRefs": [
+        "u3",
+        "u4",
+        "u6"
+      ]
+    },
     "/output_transfer": {
       "containsEncryptedSource": null,
       "sourceSetComplete": true,

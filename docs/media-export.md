@@ -76,6 +76,11 @@ field origins record the exact original surface byte spans. Converted image rows
 the source declaration from the actual RGB encoding in `source_transfer` and `output_transfer`.
 For PNG, `png_transform` identifies how DDS samples became the encoded channels. Known RGB
 transfer is tagged. A directly selected DDS alpha tail carries no RGB transfer tag.
+`alpha_association` comes from the selected DDS header. For BC1, BC2 and BC3,
+`alpha_coverage` counts the original in-bounds zero, partial and full alpha samples
+of each image. `alpha_transform` records RGB unassociation when PNG colour requires
+it. A separate alpha tail supplies output alpha. The header declaration, block counts,
+transformation choice and written artifact each carry their own source origins.
 Required siblings are read only
 when the immediate owning directory proves a unique lossless Entry. An excluded required
 sibling remains private while still contributing its source evidence.

@@ -5,7 +5,9 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use p4kx_extraction::texture_codec::{DdsPngTransform, DdsTransfer};
+use p4kx_extraction::texture_codec::{
+    DdsAlphaAssociation, DdsAlphaTransform, DdsPngTransform, DdsTransfer,
+};
 use p4kx_extraction::texture_preview::PngOrigins;
 use p4kx_extraction::{CubemapLayout, FieldOrigins, SourceInventory, Texture};
 use serde::Serialize;
@@ -33,6 +35,10 @@ struct ImageJson<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     output_transfer: Option<DdsTransfer>,
     png_transform: Option<DdsPngTransform>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    alpha_association: Option<DdsAlphaAssociation>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    alpha_transform: Option<DdsAlphaTransform>,
     #[serde(flatten)]
     origins: Option<ReportOrigins>,
 }
@@ -62,6 +68,8 @@ struct Written {
     alpha_tail: bool,
     output_transfer: Option<DdsTransfer>,
     png_transform: Option<DdsPngTransform>,
+    alpha_association: Option<DdsAlphaAssociation>,
+    alpha_transform: Option<DdsAlphaTransform>,
     origins: Option<PngOrigins>,
 }
 
@@ -94,6 +102,8 @@ pub(crate) fn export_image(
             alpha_tail: written.alpha_tail,
             output_transfer: written.output_transfer,
             png_transform: written.png_transform,
+            alpha_association: written.alpha_association,
+            alpha_transform: written.alpha_transform,
             origins: written.origins.map(|origins| ReportOrigins {
                 origin_receipts: origins
                     .receipts
@@ -133,6 +143,8 @@ fn write_image(
             alpha_tail: false,
             output_transfer: None,
             png_transform: None,
+            alpha_association: None,
+            alpha_transform: None,
             origins: None,
         })
     } else {
@@ -147,6 +159,9 @@ fn write_image(
             alpha_tail: report.alpha_tail,
             output_transfer: Some(report.encoding.transfer),
             png_transform: Some(report.encoding.transform),
+            alpha_association: Some(report.alpha_association),
+            alpha_transform: (report.alpha_transform != DdsAlphaTransform::Preserve)
+                .then_some(report.alpha_transform),
             origins: Some(origins),
         })
     }

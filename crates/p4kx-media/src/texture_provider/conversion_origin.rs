@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::texture_codec::DdsPngEncoding;
+use p4kx_extraction::texture_codec::{DdsAlphaTransform, DdsPngEncoding};
 use p4kx_extraction::{DdsHeaderField, InputScope, SourceUseRole};
 
 use super::conversion_mip::Loaded;
@@ -22,6 +22,7 @@ pub(super) struct ImageOrigins {
     format: OriginContributions,
     channels: OriginContributions,
     transfer: TransferOrigins,
+    alpha: AlphaOrigins,
     bytes: OriginContributions,
 }
 
@@ -32,7 +33,7 @@ impl ImageOrigins {
         directory: Option<&OriginContributions>,
         index: u64,
         png: Option<DdsPngEncoding>,
-        alpha_header: bool,
+        (alpha_header, has_coverage, transform): (bool, bool, DdsAlphaTransform),
         writer: &MediaWriter<'_>,
     ) -> Result<Self, MediaError> {
         use DdsHeaderField::{ArraySize, Depth, Faces, Format, Height, MipCount, Width};
@@ -66,10 +67,21 @@ impl ImageOrigins {
         }
         let channels = channels.finish();
         let transfer = TransferOrigins::of(color, &format, png, alpha_header, writer)?;
+        let pixels = color.pixels(index, writer)?;
+        let alpha_origins = AlphaOrigins::of(
+            color,
+            &transfer,
+            has_coverage.then_some(&pixels),
+            transform,
+            writer,
+        )?;
         let mut bytes = writer.capture_origins();
         bytes.include(&transfer.output, writer)?;
         bytes.include(&channels, writer)?;
-        bytes.include(&color.pixels(index, writer)?, writer)?;
+        bytes.include(&pixels, writer)?;
+        if let Some(transform) = &alpha_origins.transform {
+            bytes.include(transform, writer)?;
+        }
         if let Some(alpha) = alpha {
             bytes.include(&alpha.pixels(index, writer)?, writer)?;
         }
@@ -81,6 +93,7 @@ impl ImageOrigins {
             format,
             channels,
             transfer,
+            alpha: alpha_origins,
             bytes: bytes.finish(),
         })
     }
@@ -141,6 +154,7 @@ impl ImageOrigins {
                 writer,
             )?;
         }
+        self.alpha.fields(&mut origins, writer)?;
         self.artifact_fields(&mut origins, "/data/payload/artifact", writer)?;
         Ok(origins)
     }
@@ -160,6 +174,76 @@ impl ImageOrigins {
             ("digest/scope", &independent),
         ] {
             origin::put(origins, &format!("{base}/{field}"), source.clone(), writer)?;
+        }
+        Ok(())
+    }
+}
+
+struct AlphaOrigins {
+    association: OriginContributions,
+    coverage: Option<OriginContributions>,
+    transform: Option<OriginContributions>,
+}
+
+impl AlphaOrigins {
+    fn of(
+        color: &Loaded,
+        transfer: &TransferOrigins,
+        coverage: Option<&OriginContributions>,
+        transform: DdsAlphaTransform,
+        writer: &MediaWriter<'_>,
+    ) -> Result<Self, MediaError> {
+        let association = color
+            .origins()
+            .fields(
+                &color.mip.raw_header,
+                &[DdsHeaderField::AlphaAssociation],
+                writer,
+            )?
+            .finish();
+        let transform = if transform == DdsAlphaTransform::Preserve {
+            None
+        } else {
+            let mut contributors = writer.capture_origins();
+            contributors.include(&association, writer)?;
+            contributors.include(&transfer.output, writer)?;
+            Some(contributors.finish())
+        };
+        Ok(Self {
+            association,
+            coverage: coverage.cloned(),
+            transform,
+        })
+    }
+
+    fn fields(
+        &self,
+        origins: &mut PreparedRecordOrigins,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        origin::put(
+            origins,
+            "/data/payload/alpha_association",
+            self.association.clone(),
+            writer,
+        )?;
+        if let Some(coverage) = &self.coverage {
+            for name in ["zero", "partial", "full"] {
+                origin::put(
+                    origins,
+                    &format!("/data/payload/alpha_coverage/{name}"),
+                    coverage.clone(),
+                    writer,
+                )?;
+            }
+        }
+        if let Some(transform) = &self.transform {
+            origin::put(
+                origins,
+                "/data/payload/alpha_transform",
+                transform.clone(),
+                writer,
+            )?;
         }
         Ok(())
     }

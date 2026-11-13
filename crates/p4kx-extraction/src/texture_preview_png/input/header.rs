@@ -18,6 +18,12 @@ pub struct PreviewHeaderEvidence {
 }
 
 impl PreviewHeaderEvidence {
+    pub(crate) fn alpha_association_uses(&self) -> Result<Vec<SourceUse>, SourceEvidenceError> {
+        self.header_uses(
+            &[DdsHeaderField::Prefix, DdsHeaderField::AlphaAssociation],
+            SourceUseRole::Conversion,
+        )
+    }
     pub(crate) fn of_header(
         uses: &SourceUses,
         parts: &Parts<'_>,

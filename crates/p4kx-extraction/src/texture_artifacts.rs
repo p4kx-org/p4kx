@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_texture::{DdsHeaderField, DdsPngEncoding, DdsPngTransform, DdsTransfer};
+use p4kx_texture::{
+    DdsAlphaAssociation, DdsAlphaTransform, DdsHeaderField, DdsPngEncoding, DdsPngTransform,
+    DdsTransfer,
+};
 use serde::Serialize;
 
 use crate::texture_preview::DdsInfoOriginError;
@@ -24,6 +27,11 @@ pub struct TextureArtifacts {
     /// Channel processing for PNG output.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub png_transform: Option<DdsPngTransform>,
+    /// Original DDS alpha declaration from the same selected read.
+    pub alpha_association: DdsAlphaAssociation,
+    /// RGB unassociation applied to the emitted PNG samples.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub alpha_transform: Option<DdsAlphaTransform>,
     /// Exact source contributions of the transfer and transform values.
     pub field_origins: FieldOrigins,
     /// The inventory in which each image's source use references resolve.
@@ -55,6 +63,8 @@ pub(crate) struct TextureImageTransfer {
     source: DdsTransfer,
     output: DdsTransfer,
     png: Option<DdsPngEncoding>,
+    alpha_association: DdsAlphaAssociation,
+    alpha_transform: Option<DdsAlphaTransform>,
     origins: FieldOrigins,
 }
 
@@ -63,6 +73,7 @@ impl TextureImageTransfer {
         inputs: &PreviewInputs<'_, Spans>,
         source: DdsTransfer,
         png: Option<DdsPngEncoding>,
+        transform: DdsAlphaTransform,
         uses: &SourceUses,
     ) -> Result<Self, DdsInfoOriginError> {
         use DdsHeaderField::{CryTransfer, DxgiTransfer, Format, Prefix};
@@ -91,10 +102,26 @@ impl TextureImageTransfer {
             FieldPath::parse("/output_transfer")?,
             uses.origin(&output, complete),
         )?;
+        let association = header.alpha_association_uses()?;
+        origins.insert(
+            FieldPath::parse("/alpha_association")?,
+            uses.origin(&association, complete),
+        )?;
+        let alpha_transform = (transform != DdsAlphaTransform::Preserve).then_some(transform);
+        if alpha_transform.is_some() {
+            let mut transform_uses = association;
+            transform_uses.extend(output);
+            origins.insert(
+                FieldPath::parse("/alpha_transform")?,
+                uses.origin(&transform_uses, complete),
+            )?;
+        }
         Ok(Self {
             source,
             output: png.map_or(DdsTransfer::Linear, |encoding| encoding.transfer),
             png,
+            alpha_association: inputs.source_alpha().0,
+            alpha_transform,
             origins,
         })
     }
@@ -109,6 +136,8 @@ impl TextureImageTransfer {
             source_transfer: self.source,
             output_transfer: self.output,
             png_transform: self.png.map(|encoding| encoding.transform),
+            alpha_association: self.alpha_association,
+            alpha_transform: self.alpha_transform,
             field_origins: self.origins,
             provenance,
         }
