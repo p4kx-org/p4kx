@@ -146,6 +146,9 @@ pub(crate) struct EntityPackageArgs {
     /// Leaves the vertex colours out of the parts.
     #[arg(long)]
     pub(crate) no_vertex_colours: bool,
+    /// Writes opt-in collision helpers alongside the package's render meshes.
+    #[arg(long)]
+    pub(crate) collision_helpers: bool,
     /// Includes the Interior as for `entity glb --interior`: the socpak containers the Records of
     /// the Entity and of its attached Entities name, each placed at its bone of the Entity that
     /// names it, as nodes below an `Interior` node of that Entity, with their models and props

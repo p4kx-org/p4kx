@@ -279,6 +279,29 @@
       ],
       "type": "object"
     },
+    "CollisionHelperReference": {
+      "description": "Reference to a versioned collision-helper companion in a package.",
+      "properties": {
+        "file": {
+          "const": "collision-helpers.json",
+          "description": "The package-relative file carrying the source facts and helper placements.",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "description": "The collision-helper document's schema version.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "file",
+        "schema_version"
+      ],
+      "type": "object"
+    },
     "ColourSpace": {
       "description": "How the colour channels of a texture are encoded.",
       "oneOf": [
@@ -5585,6 +5608,17 @@
         }
       ],
       "description": "The optional authored SOC scene companion."
+    },
+    "collision_helpers": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CollisionHelperReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional collision helpers and their original frame evidence."
     },
     "coordinates": {
       "$ref": "#/$defs/Coordinates",

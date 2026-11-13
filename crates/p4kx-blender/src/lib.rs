@@ -23,6 +23,10 @@
 mod build;
 mod character;
 mod collect;
+mod collision_helper_cdf;
+mod collision_helper_document;
+mod collision_helper_model;
+mod collision_helpers;
 mod creature;
 mod describe;
 mod entity_classification;
@@ -95,6 +99,7 @@ mod write;
 pub use character::{
     CharacterScene, write_character_package, write_character_package_with_context,
 };
+pub use collision_helper_document::{CollisionHelperReference, collision_helpers_schema};
 pub use error::PackageError;
 pub use interior::{InteriorScene, write_interior_package, write_interior_package_with_context};
 pub use manifest::{

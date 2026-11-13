@@ -12,6 +12,8 @@ from pathlib import Path
 import bpy
 from mathutils import Quaternion, Vector
 
+from . import collision_helpers as collisions
+from .collision_importer import import_helpers
 from .glass_tint import drop_tint_without_colours
 from .lights import gltf_to_blender_light_quaternion, light_settings
 from .material_surface import GLTF_COLOUR_ATTRIBUTE
@@ -46,11 +48,16 @@ class ImportResult:
     armatures: int = 0
     shape_keys: int = 0
     actions: int = 0
+    collision_helpers: int = 0
     warnings: list[str] = field(default_factory=list)
 
 
 def import_package(
-    context: bpy.types.Context, package: Package, light_strength: float = 1.0
+    context: bpy.types.Context,
+    package: Package,
+    light_strength: float = 1.0,
+    *,
+    collision_helpers: bool = False,
 ) -> ImportResult:
     """Imports ``package`` into the scene of ``context`` and returns what was created.
 
@@ -65,6 +72,11 @@ def import_package(
     if not hasattr(bpy.ops.import_scene, "gltf"):
         raise PackageError("Enable Blender's 'glTF 2.0 format' add-on first.")
     authored = soc_scene.load(package.root, package.authored_soc) if package.authored_soc else []
+    helpers = (
+        collisions.load(package.root, {node.index for node in package.nodes})
+        if collision_helpers and package.collision_helpers
+        else None
+    )
     preflight = preflight_meshes(package)
     root = bpy.data.collections.new(blender_name(package.entity_name))
     context.scene.collection.children.link(root)
@@ -85,6 +97,7 @@ def import_package(
         result.objects += 1
         result.instances += template is not None
     import_soc_nodes(root, authored)
+    result.collision_helpers = import_helpers(root, helpers, created)
     result.warnings.extend(package.warnings)
     return result
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import bpy
-from bpy.props import FloatProperty, StringProperty
+from bpy.props import BoolProperty, FloatProperty, StringProperty
 from bpy_extras.io_utils import ImportHelper
 
 from .importer import import_package
@@ -33,11 +33,19 @@ class IMPORT_SCENE_OT_p4kx_package(bpy.types.Operator, ImportHelper):
         max=1000.0,
     )
 
+    collision_helpers: BoolProperty(
+        name="Collision helpers",
+        description="Import source collider meshes in a separate nonrendering collection",
+        default=False,
+    )
+
     def execute(self, context: bpy.types.Context) -> set[str]:
         """Loads the selected package and builds its objects, or reports why it cannot."""
         try:
             package = load_package(Path(self.filepath))
-            result = import_package(context, package, self.light_strength)
+            result = import_package(
+                context, package, self.light_strength, collision_helpers=self.collision_helpers
+            )
         except PackageError as error:
             self.report({"ERROR"}, str(error))
             return {"CANCELLED"}
@@ -52,6 +60,8 @@ class IMPORT_SCENE_OT_p4kx_package(bpy.types.Operator, ImportHelper):
                 f", {result.armatures} armatures, {result.shape_keys} shape keys, "
                 f"{result.actions} actions"
             )
+        if result.collision_helpers:
+            summary += f", {result.collision_helpers} collision helpers"
         self.report({"INFO"}, summary + ".")
         return {"FINISHED"}
 

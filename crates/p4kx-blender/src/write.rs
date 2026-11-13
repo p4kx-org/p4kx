@@ -191,6 +191,11 @@ pub fn write_package_with_context(
         .creature_skins()
         .is_some_and(|mut skins| skins.next().is_some())
     {
+        if context.collision_source.is_some() {
+            return Err(crate::collision_helper_model::error(std::io::Error::other(
+                "collision helpers require a decomposed Assembly package",
+            )));
+        }
         return write_creature_package(assembly, textures, options, info, out, context);
     }
     let scene = Scene {
@@ -287,7 +292,14 @@ fn write_scene_files(
     let authored_soc_file =
         complete_manifest(&mut manifest, scene, fallback.as_deref(), staging, context)?;
     let mut summary = summarise(&manifest, &outcomes, &written);
-    let files = package_files(written, &outcomes, authored_soc_file);
+    let mut files = package_files(written, &outcomes, authored_soc_file);
+    files.extend(crate::collision_helpers::write(
+        &mut manifest,
+        scene.classification,
+        options.lod,
+        staging,
+        context,
+    )?);
     let totals = package_receipt::write_metadata(staging, &manifest, files, context)?;
     summary.files = totals.files;
     summary.bytes = totals.bytes;

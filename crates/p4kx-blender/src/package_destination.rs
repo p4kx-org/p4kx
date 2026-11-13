@@ -23,6 +23,7 @@ const MIN_ID_DIGITS: usize = 4;
 struct Marker {
     format: String,
     authored_soc: Option<ManifestSocScene>,
+    collision_helpers: Option<crate::CollisionHelperReference>,
     #[serde(default)]
     textures: Vec<TextureMarker>,
 }
@@ -66,6 +67,7 @@ fn check_replaceable(out: &Path) -> PackageResult<()> {
         MESHES_FOLDER,
         TEXTURES_FOLDER,
         package_soc_scene::DIRECTORY,
+        crate::collision_helper_document::FILE,
     ];
     if !names
         .iter()
@@ -77,6 +79,17 @@ fn check_replaceable(out: &Path) -> PackageResult<()> {
         return Err(not_a_package());
     }
     if !matches_asset_folders(out, &marker)? {
+        return Err(not_a_package());
+    }
+    let collision = crate::collision_helper_document::FILE;
+    let exists = names.iter().any(|name| name == collision);
+    let valid_collision = marker
+        .collision_helpers
+        .as_ref()
+        .map_or(!exists, |reference| {
+            reference.is_valid() && exists && is_plain_file(&out.join(collision))
+        });
+    if !valid_collision {
         return Err(not_a_package());
     }
     let authored = out.join(package_soc_scene::DIRECTORY);

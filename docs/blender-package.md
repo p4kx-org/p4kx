@@ -420,7 +420,29 @@ the writer inverts the green channel of the engine's maps, exactly as the GLB wr
 red channel and the reconstructed blue channel are as the Archive has them. A reader that wants
 the DirectX convention inverts green again.
 
-#### Optional DDS textures
+#### Optional collision helpers
+
+`p4kx entity package --collision-helpers` writes a version 1.18 package with an optional
+collision companion for supported decomposed Entity models. In Blender, enable **Collision
+helpers** when selecting `scene.json`. The add-on creates tagged wire objects in a separate
+nonrendering collection, using the original node-local triangle vertices and measured NMC
+affines. Identical physical source meshes share one helper definition across occurrences.
+The manifest node indexes place the resulting objects below their existing owners.
+
+`collision-helpers.json` records each source model and its original `StatObjPhysics` chunk
+and slot ordinals. It keeps the packed key, placement and triangulation with individual
+source contributions. `receipt.json` binds the companion bytes to the package. The CDF
+placement exposes the authored `Model.File` separately from the selected rig Entry,
+skeleton chunk and original bone used by the Assembly. CDF attachments with an unavailable
+bind pose and whole-object collider keys remain documented without a preview placement.
+The helper preview currently draws indexed triangles. Analytic primitives and other
+collision blob kinds retain their Media records and original bytes.
+
+The ordinary package uses version 1.17, and the standard add-on import reads the render
+hierarchy. Render GLBs do not depend on the opt-in flag. The source companion has a
+separate `schemas/blender-collision-helpers.schema.json` contract.
+
+## Optional DDS textures
 
 `entity package` and `interior package` accept `--texture-container dds`. This is intended for
 the Blender 5.3 package importer. PNG is the default for package writers. GLB textures follow
@@ -722,6 +744,7 @@ asset and explicit PNG fallback reason. **1.15** adds selected BC1, BC2 and BC3 
 counts to supported DDS rows and records alpha unassociation when applied to PNG.
 **1.16** adds optional entity classifications and light-placement evidence. **1.17** adds
 separate DDS normal and smoothness pairs with linked source and per-file evidence.
+**1.18** adds the optional collision-helper companion.
 
 ## Authored SOC scene
 

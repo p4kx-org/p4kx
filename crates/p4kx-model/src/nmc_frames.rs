@@ -5,6 +5,7 @@
 
 use std::ops::Range;
 
+use p4kx_chunks::{Chunk, ivo};
 use p4kx_foundation::{ByteReader, ParseError};
 
 use crate::nmc::{GEOMETRY_TYPE_AT, LOCAL_TRANSFORM_AT, NODE_LEN, PARENT_AT, SCALE_AT};
@@ -28,6 +29,15 @@ pub struct NmcFrames<'source> {
 }
 
 impl<'source> NmcFrames<'source> {
+    /// Returns whether an original chunk uses the measured NMC layout.
+    #[must_use]
+    pub const fn supports(chunk: &Chunk) -> bool {
+        matches!(
+            (chunk.chunk_type(), chunk.version()),
+            (ivo::NODE_MESH_COMBO, 0x900)
+        )
+    }
+
     /// Reads the variable-length record table without decoding geometry or strings.
     ///
     /// # Errors

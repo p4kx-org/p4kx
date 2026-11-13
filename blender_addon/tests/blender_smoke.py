@@ -29,6 +29,7 @@ sys.path.insert(0, str(HERE))
 if not INSTALLED_ROOT:
     sys.path.insert(1, str(HERE.parent))
 
+import blender_collision_smoke  # noqa: E402
 import blender_soc_scene_smoke  # noqa: E402
 import synthetic  # noqa: E402
 import synthetic_character  # noqa: E402
@@ -273,6 +274,7 @@ def main() -> None:
         check(spaces == {"sRGB", "Non-Color"}, f"colour spaces: {spaces}")
         check(not result.warnings, f"warnings: {result.warnings}")
 
+        blender_collision_smoke.run(Path(folder) / "collision", ADDON)
         check_interior(Path(folder) / "lit")
         check_interior_alone(Path(folder) / "interior_alone")
         blender_soc_scene_smoke.run()

@@ -4,7 +4,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use p4kx_extraction::ArchiveTextures;
+use p4kx_extraction::{Archive, ArchiveTextures};
 use p4kx_guard::{ArchiveWriteProtection, CreatedOutputFile, OwnedDirectoryPermit, OwnedFileToken};
 
 use crate::{PackageError, PackageResult, PackageTextureContainer};
@@ -15,6 +15,7 @@ pub struct PackageWriteContext<'a> {
     scope: Scope<'a>,
     pub(crate) texture_container: PackageTextureContainer,
     pub(crate) texture_source: Option<&'a ArchiveTextures<'a, 'a>>,
+    pub(crate) collision_source: Option<&'a Archive>,
 }
 
 #[derive(Clone, Copy)]
@@ -37,6 +38,7 @@ impl<'a> PackageWriteContext<'a> {
             scope: Scope::Archive { protection, cancel },
             texture_container: PackageTextureContainer::Png,
             texture_source: None,
+            collision_source: None,
         }
     }
 
@@ -47,6 +49,13 @@ impl<'a> PackageWriteContext<'a> {
         source: &'a ArchiveTextures<'a, 'a>,
     ) -> Self {
         self.texture_source = Some(source);
+        self
+    }
+
+    /// Includes optional collision helpers from the same Archive used by the Assembly.
+    #[must_use]
+    pub const fn with_collision_helpers(mut self, archive: &'a Archive) -> Self {
+        self.collision_source = Some(archive);
         self
     }
 
@@ -64,6 +73,7 @@ impl<'a> PackageWriteContext<'a> {
         Self {
             texture_container: PackageTextureContainer::Png,
             texture_source: None,
+            collision_source: None,
             scope: Scope::Standalone {
                 cancelled,
                 observed,

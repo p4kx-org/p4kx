@@ -70,7 +70,13 @@ pub(crate) fn write_metadata(
                 .iter()
                 .map(|texture| texture.file.as_str()),
         )
-        .chain(manifest.authored_soc.iter().map(|soc| soc.file.as_str()));
+        .chain(manifest.authored_soc.iter().map(|soc| soc.file.as_str()))
+        .chain(
+            manifest
+                .collision_helpers
+                .iter()
+                .map(|helper| helper.file.as_str()),
+        );
     let mut expected: Vec<_> = expected.collect();
     expected.sort_unstable();
     if expected

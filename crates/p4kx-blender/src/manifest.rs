@@ -18,6 +18,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 /// A new minor version only adds fields and values readers may ignore; a new major version changes
 /// the meaning of existing ones.
 pub const FORMAT_VERSION: &str = "1.17";
+pub(crate) const COLLISION_HELPER_FORMAT_VERSION: &str = "1.18";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
@@ -151,6 +152,9 @@ pub struct Manifest {
     /// The optional authored SOC scene companion.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authored_soc: Option<crate::ManifestSocScene>,
+    /// Optional collision helpers and their original frame evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collision_helpers: Option<crate::CollisionHelperReference>,
     /// What could not be resolved or written, with the node or texture it concerns.
     pub issues: Vec<Issue>,
 }

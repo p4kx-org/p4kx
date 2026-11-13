@@ -67,3 +67,20 @@ fn the_schema_requires_the_fields_a_reader_depends_on() {
         assert!(required.contains(&name), "{name} is required: {required:?}");
     }
 }
+
+#[test]
+fn the_collision_helpers_schema_is_current() -> TestResult {
+    let schema = p4kx_blender::collision_helpers_schema();
+    jsonschema::draft202012::meta::validate(&schema).map_err(|error| error.to_string())?;
+    let generated = serde_json::to_string_pretty(&schema)? + "\n";
+    let path = schema_file().with_file_name("blender-collision-helpers.schema.json");
+    if std::env::var_os("P4KX_BLESS").is_some_and(|value| value == "1") {
+        std::fs::write(&path, &generated)?;
+    }
+    assert_eq!(
+        std::fs::read_to_string(&path)?,
+        generated,
+        "regenerate the collision helper schema with P4KX_BLESS=1 cargo test -p p4kx-blender --test schema",
+    );
+    Ok(())
+}

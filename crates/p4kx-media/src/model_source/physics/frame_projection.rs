@@ -3,18 +3,18 @@
 
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::chunks::{ChunkDirectory, ivo};
-use p4kx_extraction::model::{NmcFrame, NmcFrameField, NmcFrames, StatObjPhysicsSlot};
+use p4kx_extraction::model::{
+    NmcFrame, NmcFrameField, NmcFrames, NmcTransforms, StatObjPhysicsSlot,
+};
 
 use super::evidence::{PhysicsOrigins, bind};
-use super::frame_hierarchy::{FrameDisposition, FrameHierarchy, PhysicsFrame};
+use super::frame_hierarchy::{self, FrameDisposition, PhysicsFrame};
 use super::payload::{FRAME, NODE, PhysicsNode, PhysicsPayload};
 use crate::origin_contributions::OriginContributions;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::provider::model_source::origins::{self, ModelOrigins};
 use crate::required_reader::RequiredReader;
 use crate::{MediaError, MediaWriter, Status, Subresource};
-
-const NMC_VERSION: u32 = 0x900;
 
 pub(in crate::provider::model_source) struct NodeFrames {
     owner: Option<usize>,
@@ -70,7 +70,7 @@ impl NodeFrames {
         loaded.source = source.finish();
         loaded.owner = Some(index);
         loaded.offset = chunk.offset();
-        if chunk.version() != NMC_VERSION {
+        if !NmcFrames::supports(chunk) {
             loaded.disposition = FrameDisposition::UnsupportedNodeTable;
             return Ok(loaded);
         }
@@ -93,7 +93,7 @@ impl NodeFrames {
             .owner
             .zip(NmcFrames::read(&self.bytes).ok())
             .map(|(chunk, frames)| {
-                let source = FrameHierarchy::new(frames, writer)?;
+                let source = frame_hierarchy::read(frames, writer)?;
                 for node in frames.frames() {
                     writer.checkpoint()?;
                     self.node(chunk, node, origins, writer)?;
@@ -185,7 +185,7 @@ impl NodeFrames {
 }
 
 pub(in crate::provider::model_source) struct FrameProjection<'data> {
-    table: Option<(usize, NmcFrames<'data>, FrameHierarchy)>,
+    table: Option<(usize, NmcFrames<'data>, NmcTransforms<'data>)>,
     loaded: &'data NodeFrames,
 }
 
@@ -263,7 +263,7 @@ impl FrameProjection<'_> {
         bind(prepared, "local", local, writer)?;
         bind(prepared, "entity", world.clone(), writer)?;
         bind(prepared, "disposition", world, writer)?;
-        Ok(hierarchy.frame(*frames, *chunk, index))
+        Ok(frame_hierarchy::frame(hierarchy, *chunk, index))
     }
 
     fn chain_evidence(

@@ -9,6 +9,7 @@ mod material_source_metadata;
 mod package_alpha_association;
 mod package_bone_attachment;
 mod package_character;
+mod package_collision_helpers;
 mod package_creature;
 mod package_ddna_pair;
 mod package_dds_fallback;

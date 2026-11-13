@@ -73,6 +73,18 @@ impl<'a> BonePlacementSource<'a> {
         self.fields.chunk()
     }
 
+    /// Returns which model file supplied the selected bone.
+    #[must_use]
+    pub const fn file(&self) -> ModelFile {
+        self.fields.file()
+    }
+
+    /// Returns the original selected bone ordinal.
+    #[must_use]
+    pub const fn bone_ordinal(&self) -> usize {
+        self.ordinal
+    }
+
     /// Returns the original fields from the chosen bone to its root.
     pub fn bones(&self) -> impl Iterator<Item = (usize, &'a ModelBoneSource)> {
         self.fields.lineage(self.skeleton, self.ordinal)

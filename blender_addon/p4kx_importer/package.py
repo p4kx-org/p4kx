@@ -16,6 +16,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any
 
+from . import collision_helpers as collisions
 from . import ddna_pair
 from .glb_preflight import check_glb as check_glb
 from .manifest_fields import (
@@ -37,7 +38,7 @@ from .soc_scene import parse_ref as parse_soc_ref
 
 FORMAT_NAME = "p4kx-blender-package"
 SUPPORTED_MAJOR = 1
-SUPPORTED_MINOR = ddna_pair.MINOR
+SUPPORTED_MINOR = collisions.MINOR
 MANIFEST_NAME = "scene.json"
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
 BLENDER_NAME_BYTES = 63
@@ -108,6 +109,7 @@ class Package:
     material_descriptions: dict[str, MaterialDesc] = field(default_factory=dict)
     palettes: dict[str, Palette] = field(default_factory=dict)
     authored_soc: str | None = None
+    collision_helpers: str | None = None
 
 
 def load_package(location: Path) -> Package:
@@ -155,6 +157,7 @@ def parse_manifest(data: object, root: Path) -> Package:
         material_descriptions=parse_materials(manifest.get("materials"), warnings),
         palettes=parse_palettes(manifest.get("palettes"), warnings),
         authored_soc=parse_soc_ref(manifest.get("authored_soc")),
+        collision_helpers=collisions.parse_ref(manifest.get("collision_helpers"), version[1]),
     )
 
 

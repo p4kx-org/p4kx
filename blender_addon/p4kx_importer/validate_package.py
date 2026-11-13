@@ -12,7 +12,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any
 
-from . import soc_scene
+from . import collision_helpers as collisions, soc_scene
 from .manifest_fields import PackageError
 from .mesh_preflight import preflight_all_meshes
 from .package import MANIFEST_NAME, load_package, resolve_file
@@ -49,6 +49,14 @@ def validate_package(location: Path, receipt: Path | None = None) -> dict[str, A
             if companion.is_file():
                 files[reference] = companion
             soc_scene.load(package.root, reference)
+        except PackageError as error:
+            asset_problems.append({"path": reference, "detail": str(error)})
+    if package.collision_helpers:
+        reference = package.collision_helpers
+        declared.add(reference)
+        try:
+            files[reference] = collisions.path_of(package.root)
+            collisions.load(package.root, {node.index for node in package.nodes})
         except PackageError as error:
             asset_problems.append({"path": reference, "detail": str(error)})
     for texture in package.textures.values():
