@@ -67,7 +67,11 @@ fn a_missing_node_footer_keeps_the_observed_physics_frame_in_diagnostics() -> Te
         .collect::<Result<Vec<MediaRecord>, _>>()?;
     verify_rows(&rows)?;
     let (_, table) = find(&rows, "model-node-table", &[1])?;
-    assert_eq!(table.status, Status::Partial, "original table remains partial");
+    assert_eq!(
+        table.status,
+        Status::Partial,
+        "original table remains partial"
+    );
     assert_eq!(
         table.data.pointer("/payload/disposition"),
         Some(&json!("malformed")),
