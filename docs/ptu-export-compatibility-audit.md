@@ -8,6 +8,21 @@ of the current checkout. This report contains technical structures and implement
 only. Game values, text dumps, concrete test-build Record identities, build payloads and
 extracted assets are not included. Public technical issue updates were explicitly authorized.
 
+## Schema v3 follow-through
+
+Schema v3 exports the original item-recovery economy, override and policy tables. The
+normal source-to-catalog check passed on the installed LIVE direct layout and on the
+installed TECH-PREVIEW layout with all three nested groups. The installed PTU checked
+during follow-through used the direct layout. A separate malformed offline inventory
+prevents normal publication on that PTU build. [#1080](https://github.com/p4kx-org/p4kx/issues/1080) · [#1070](https://github.com/p4kx-org/p4kx/issues/1070)
+
+Both mission action wrappers are typed in schema v3. The current installed PTU lacked
+both original declarations. The installed TECH-PREVIEW contained both, and the positive
+test matched their ordered actions and stored weights against their original Template
+owners. [#1081](https://github.com/p4kx-org/p4kx/issues/1081)
+
+The following findings describe the source baseline above.
+
 ## Scope and method
 
 - Open both Archives and compare directory metadata (path, size and checksum) across all Entries.
