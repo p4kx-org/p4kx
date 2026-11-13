@@ -116,6 +116,7 @@ fn quantum_mappings() -> impl Iterator<Item = Mapping> {
     roots
         .chain(quantum_profile_mappings())
         .chain(quantum_heat_mappings())
+        .chain(std::iter::once(quantum_effect_reference()))
 }
 
 fn quantum_profile_mappings() -> impl Iterator<Item = Mapping> {
@@ -194,6 +195,24 @@ fn quantum_heat_mappings() -> impl Iterator<Item = Mapping> {
             None,
         )
     })
+}
+
+fn quantum_effect_reference() -> Mapping {
+    const OWNER: &str = "SQuantumDriveEffectTemplateRef";
+    const FIELD: &str = "tagRecord";
+    let mut path = Path::fields(&["effectTags", "value"]);
+    path.0.push(Step::OwnedArenaReference {
+        owner: OWNER.to_owned(),
+        name: FIELD.to_owned(),
+    });
+    path.0.extend(Path::fields(&["value", "guid", "value"]).0);
+    mapped(
+        OWNER,
+        FIELD,
+        super::coverage::QUANTUM_PROFILES,
+        path,
+        Some("SQuantumDriveEffectTemplate"),
+    )
 }
 
 fn mapped(

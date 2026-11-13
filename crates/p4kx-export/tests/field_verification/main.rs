@@ -4,6 +4,7 @@
 //! Development-only field accounting and published offline reference comparisons.
 
 mod accounting;
+mod arena_path;
 mod audit_scope;
 mod baseline;
 #[path = "../real_archive/catalog_v3_consumer.rs"]
@@ -18,6 +19,7 @@ mod joins;
 mod mission_property_metadata;
 mod mission_property_metadata_fixture;
 mod mutations_accounting;
+mod mutations_arena_path;
 mod mutations_audit_scope;
 mod mutations_boundaries;
 mod mutations_compare;

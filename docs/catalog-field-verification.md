@@ -51,6 +51,13 @@ Typed projection steps are `{"kind":"field","name":"stats"}`, `{"kind":"each"}` 
 `{"kind":"matching","field":"kind","value":"SyntheticVariant"}`. An empty path selects the root.
 Array multiplicity is preserved. Paths never resolve Record links as filesystem names.
 
+For raw authored arenas, the audit can select Record References by exact
+concrete owner type and original member name using
+`{"kind":"ownedArenaReference","owner":"<type>","name":"<field>"}`.
+It follows the arena's local indices from its roots and rejects out-of-range or
+repeated or unreachable nodes. Same-named fields in other owners do not count.
+The quantum profile mapping applies this to its original effect-tag Reference.
+
 ## Real source survey
 
 Use existing private Archive/key configuration and task-local `TMP`/`TEMP`:

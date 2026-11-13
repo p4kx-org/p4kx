@@ -7,7 +7,7 @@ use serde_json::Value;
 use super::error::{self, Error, Kind};
 
 const MAX_STEPS: usize = 64;
-const MAX_VALUES: usize = 1_000_000;
+pub(super) const MAX_VALUES: usize = 1_000_000;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "camelCase", deny_unknown_fields)]
@@ -15,6 +15,7 @@ pub(crate) enum Step {
     Field { name: String },
     Each,
     Matching { field: String, value: String },
+    OwnedArenaReference { owner: String, name: String },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -44,6 +45,7 @@ impl Path {
             let valid = match step {
                 Step::Field { name } => valid(name),
                 Step::Matching { field, value } => valid(field) && valid(value),
+                Step::OwnedArenaReference { owner, name } => valid(owner) && valid(name),
                 Step::Each => true,
             };
             if !valid {
@@ -69,6 +71,9 @@ impl Path {
                         if let Some(value) = value.get(name) {
                             next.push(value);
                         }
+                    }
+                    Step::OwnedArenaReference { owner, name } => {
+                        super::arena_path::select(value, owner, name, &mut next, cancelled)?;
                     }
                     Step::Each => {
                         if let Some(values) = value.as_array() {
