@@ -116,6 +116,8 @@ mod shader_support;
 mod source_errors;
 mod streaming;
 mod support;
+mod texture_family;
+mod texture_family_nested;
 mod texture_provider;
 mod transactions;
 mod unsupported_source;

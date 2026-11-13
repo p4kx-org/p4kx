@@ -78,6 +78,8 @@ pub enum OriginProfile {
     Animation,
     /// Original DDS header words and their normalized topology.
     TextureHeader,
+    /// Physical DDS family members and expected split relationships.
+    TextureFamily,
     /// Successfully parsed material library and its actually used companions.
     MaterialLibrary,
     /// Material parser failure after actual source-content inspection.

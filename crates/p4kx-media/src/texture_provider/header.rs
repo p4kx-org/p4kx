@@ -11,6 +11,7 @@ use p4kx_extraction::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::family;
 use super::origin::TextureHeaderOrigins;
 use crate::required_reader::RequiredReader;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, SourceContext, Status, Subresource};
@@ -57,10 +58,16 @@ pub(super) struct InvalidHeader {
     raw: Option<DdsRawHeaderInfo>,
 }
 
+#[derive(Clone, Copy)]
+pub(super) struct HeaderRole<'a> {
+    pub(super) family: &'a str,
+    pub(super) alpha: bool,
+}
+
 pub(super) fn project(
     context: &SourceContext<'_>,
     writer: &mut MediaWriter<'_>,
-    alpha: bool,
+    role: HeaderRole<'_>,
 ) -> Result<(), MediaError> {
     let input = context.origin_input(writer)?;
     let bytes = read_prefix(context, writer)?;
@@ -75,8 +82,9 @@ pub(super) fn project(
     let (raw, detail) = match parsed {
         Ok(raw) => match DdsSourceInfo::from_raw_with_header(&raw, size) {
             Ok((metadata, normalized)) => {
-                let header = Header::new(alpha, metadata, &normalized)?;
-                return origins
+                let header = Header::new(role.alpha, metadata, &normalized)?;
+                let expected = header.split_parts.expected_count();
+                origins
                     .valid(&raw, normalized.format().layout().is_some(), writer)?
                     .write(
                         writer,
@@ -84,7 +92,14 @@ pub(super) fn project(
                         Status::Complete,
                         &TextureHeaderPayload::Header(header),
                         &[],
-                    );
+                    )?;
+                return family::project(
+                    context,
+                    writer,
+                    role,
+                    &origins,
+                    expected.map(|count| (&raw, &normalized, count)),
+                );
             }
             Err(error) => (Some(raw), error.to_string()),
         },
@@ -95,7 +110,7 @@ pub(super) fn project(
         &subresource,
         Status::Partial,
         &TextureHeaderPayload::InvalidHeader(InvalidHeader {
-            alpha_tail: alpha,
+            alpha_tail: role.alpha,
             header_source_bytes: DecimalU64::new(size),
             raw: raw.as_ref().map(DdsRawHeaderInfo::of),
         }),
@@ -105,7 +120,17 @@ pub(super) fn project(
             Severity::Warning,
             detail,
         )],
-    )
+    )?;
+    family::project(context, writer, role, &origins, None)
+}
+
+impl SplitParts {
+    const fn expected_count(&self) -> Option<u32> {
+        match self {
+            Self::Known { expected_count } => Some(*expected_count),
+            _ => None,
+        }
+    }
 }
 
 impl Header {

@@ -157,6 +157,7 @@ const fn known_members(profile: OriginProfile) -> &'static [&'static str] {
         | OriginProfile::AudioControl
         | OriginProfile::Animation
         | OriginProfile::TextureHeader
+        | OriginProfile::TextureFamily
         | OriginProfile::ArchiveBuild
         | OriginProfile::IndexBuild => &[],
     }
@@ -189,6 +190,7 @@ fn explicit_data(resolver: &OriginResolver<'_>) -> bool {
                 | OriginProfile::AudioControl
                 | OriginProfile::Animation
                 | OriginProfile::TextureHeader
+                | OriginProfile::TextureFamily
         )
     })
 }

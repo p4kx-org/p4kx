@@ -48,8 +48,16 @@ the declared header role, available image decoder and expected split count when 
 length and topology establish it. The fields retain exact original header byte ranges or
 Entry directory metadata in the common field-origin receipts. A malformed header produces
 a diagnosed row in diagnostic output. Structurally readable words survive normalization
-failure. Raw source preservation includes selected split parts. This provider projects
-header metadata without opening sibling inputs or producing converted images.
+failure. Raw source preservation includes selected split parts.
+
+Each selected physical header owns one family graph. `texture.dds-member` identifies every
+directory candidate by its original Entry index, with its role, declared size, selection
+and key availability. Duplicate paths and unproved raw paths remain separate occurrences.
+`texture.dds-expected-part` reports the mip, expected size and physical-match disposition
+for each split number established by that header's topology. Missing or mismatched parts
+remain explicit. A matching size describes the directory declaration. `texture.dds-family`
+records directory completeness and whether all matched path spellings were lossless.
+The graph reads the owning Archive directory. Image conversion has a separate output contract.
 
 `--kind animation` retains CAF, DBA and AIM sources with chunk and clip inventory, original
 metadata and controller words, and typed decoded frame and key chunks.

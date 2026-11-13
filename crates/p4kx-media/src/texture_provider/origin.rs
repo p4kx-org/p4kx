@@ -61,16 +61,7 @@ impl<'a> TextureHeaderOrigins<'a> {
             writer,
         )?;
         let split = if has_layout {
-            let mut capture = self.fields(
-                raw,
-                &[Format, Width, Height, Depth, MipCount, Faces, ArraySize],
-                writer,
-            )?;
-            capture.include(
-                &self.entry_field("uncompressedSize", SourceUseRole::Selector, writer)?,
-                writer,
-            )?;
-            capture.finish()
+            self.split_layout(raw, writer)?
         } else {
             format
         };
@@ -143,7 +134,24 @@ impl<'a> TextureHeaderOrigins<'a> {
         Ok(prepared)
     }
 
-    fn entry_field(
+    pub(super) fn split_layout(
+        &self,
+        raw: &DdsRawHeader,
+        writer: &MediaWriter<'_>,
+    ) -> Result<OriginContributions, MediaError> {
+        let mut capture = self.fields(
+            raw,
+            &[Format, Width, Height, Depth, MipCount, Faces, ArraySize],
+            writer,
+        )?;
+        capture.include(
+            &self.entry_field("uncompressedSize", SourceUseRole::Selector, writer)?,
+            writer,
+        )?;
+        Ok(capture.finish())
+    }
+
+    pub(super) fn entry_field(
         &self,
         field: &str,
         role: SourceUseRole,
@@ -251,7 +259,7 @@ impl<'a> TextureHeaderOrigins<'a> {
     }
 }
 
-fn put(
+pub(super) fn put(
     prepared: &mut PreparedRecordOrigins,
     path: &str,
     evidence: OriginContributions,

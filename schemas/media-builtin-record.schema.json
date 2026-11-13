@@ -16686,6 +16686,307 @@
       ],
       "type": "string"
     },
+    "TextureDdsDirectory": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "complete",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/ReferenceUnavailable"
+            },
+            "status": {
+              "const": "incomplete",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TextureDdsExpectedPart": {
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "$ref": "#/$defs/TextureDdsPartDisposition"
+        },
+        "expected_bytes": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "level": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "matching_members": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "number": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "number",
+        "level",
+        "expected_bytes",
+        "matching_members",
+        "disposition"
+      ],
+      "type": "object"
+    },
+    "TextureDdsFamily": {
+      "additionalProperties": false,
+      "properties": {
+        "directory": {
+          "$ref": "#/$defs/TextureDdsDirectory"
+        },
+        "member_paths": {
+          "$ref": "#/$defs/TextureDdsMemberPaths"
+        },
+        "observed_members": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "observed_members",
+        "directory",
+        "member_paths"
+      ],
+      "type": "object"
+    },
+    "TextureDdsMember": {
+      "additionalProperties": false,
+      "properties": {
+        "declared_bytes": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "entry": {
+          "$ref": "#/$defs/TextureDdsMemberIdentity"
+        },
+        "filter": {
+          "$ref": "#/$defs/TextureDdsMemberFilter"
+        },
+        "payload_access": {
+          "$ref": "#/$defs/TextureMemberPayloadAccess"
+        },
+        "relation": {
+          "$ref": "#/$defs/TextureDdsRelation"
+        },
+        "selection": {
+          "$ref": "#/$defs/CandidateState"
+        }
+      },
+      "required": [
+        "entry",
+        "relation",
+        "selection",
+        "filter",
+        "declared_bytes",
+        "payload_access"
+      ],
+      "type": "object"
+    },
+    "TextureDdsMemberFilter": {
+      "enum": [
+        "included",
+        "unmatched",
+        "excluded"
+      ],
+      "type": "string"
+    },
+    "TextureDdsMemberIdentity": {
+      "additionalProperties": false,
+      "properties": {
+        "entry_index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        },
+        "raw_path_hex": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "entry_index",
+        "path"
+      ],
+      "type": "object"
+    },
+    "TextureDdsMemberPaths": {
+      "enum": [
+        "lossless",
+        "unproved"
+      ],
+      "type": "string"
+    },
+    "TextureDdsPartDisposition": {
+      "enum": [
+        "missing",
+        "declared-size-matches",
+        "declared-size-mismatch",
+        "ambiguous",
+        "unproved"
+      ],
+      "type": "string"
+    },
+    "TextureDdsRelation": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "role": {
+              "const": "color-header",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "number": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "role": {
+              "const": "color-part",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "number"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "role": {
+              "const": "alpha-header",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "number": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "role": {
+              "const": "alpha-part",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role",
+            "number"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "role": {
+              "const": "unproved-path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "role"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TextureFamilyPayload": {
+      "oneOf": [
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TextureDdsMember"
+            },
+            "record_type": {
+              "const": "member",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TextureDdsExpectedPart"
+            },
+            "record_type": {
+              "const": "expected-part",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TextureDdsFamily"
+            },
+            "record_type": {
+              "const": "family",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "FamilyPayload"
+    },
     "TextureHeaderPayload": {
       "oneOf": [
         {
@@ -16722,6 +17023,13 @@
         }
       ],
       "title": "TextureHeaderPayload"
+    },
+    "TextureMemberPayloadAccess": {
+      "enum": [
+        "not-inspected",
+        "key-required"
+      ],
+      "type": "string"
     },
     "TrackAutomationCoverage": {
       "enum": [
@@ -33797,6 +34105,241 @@
             }
           }
         }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "texture"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "texture.dds-member"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/TextureFamilyPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "member"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "const": "complete"
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "texture"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "texture.dds-expected-part"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/TextureFamilyPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "expected-part"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "const": "complete"
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "texture"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "texture.dds-family"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "directory": {
+                          "properties": {
+                            "status": {
+                              "const": "complete"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "complete"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "directory": {
+                          "properties": {
+                            "status": {
+                              "const": "incomplete"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/TextureFamilyPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "family"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "partial"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 0,
+                "minItems": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
       }
     }
   ],

@@ -33,13 +33,25 @@ fn default_provider_retains_authored_words_and_exact_field_owners() -> TestResul
     )?;
     let output = root.path().join("out");
     let index = support::published(p4kx_media::export(&archive, &output, &options(false))?)?;
-    let rows = support::records(&output, &index, "texture.jsonl")?;
+    let all_rows = support::records(&output, &index, "texture.jsonl")?;
+    let rows: Vec<_> = all_rows
+        .iter()
+        .filter(|row| row.subresource.namespace == "texture.dds-header")
+        .collect();
+    let color_ordinal = all_rows
+        .iter()
+        .position(|row| row.subresource.namespace == "texture.dds-header")
+        .ok_or("colour header position")?;
+    let alpha_ordinal = all_rows
+        .iter()
+        .rposition(|row| row.subresource.namespace == "texture.dds-header")
+        .ok_or("alpha header position")?;
     let [color, alpha] = rows.as_slice() else {
         return Err("exactly two selected DDS header rows".into());
     };
     verify_rows(color, alpha)?;
     let base = output.join(&index.artifact_base);
-    verify_origins(&base)?;
+    verify_origins(&base, [color_ordinal, alpha_ordinal])?;
     verify_schema(color)
 }
 
@@ -70,7 +82,11 @@ fn malformed_header_retains_raw_words_only_in_diagnostic_output() -> TestResult 
         return Err("expected a diagnostic generation".into());
     };
     let directory = diagnostic.parent().ok_or("diagnostic directory")?;
-    let rows = support::records(directory, &index, "texture.jsonl")?;
+    let all_rows = support::records(directory, &index, "texture.jsonl")?;
+    let rows: Vec<_> = all_rows
+        .iter()
+        .filter(|row| row.subresource.namespace == "texture.dds-header")
+        .collect();
     assert!(
         !output.join("media-index.json").exists(),
         "diagnostics do not replace a complete index"
@@ -158,17 +174,19 @@ fn verify_rows(color: &MediaRecord, alpha: &MediaRecord) -> TestResult {
     Ok(())
 }
 
-fn verify_origins(base: &Path) -> TestResult {
+fn verify_origins(base: &Path, [color, alpha]: [usize; 2]) -> TestResult {
     let fields: Vec<Value> = read_rows(base.join("field-origins.jsonl"))?;
     let uses: Vec<Value> = read_rows(base.join("origin-uses.jsonl"))?;
     let sources: Vec<Value> = read_rows(base.join("origin-sources.jsonl"))?;
     let value = "/data/payload/source_metadata/raw/dx10/misc_flags2";
-    for (ordinal, encrypted, entry) in [("0", true, 0), ("1", false, 2)] {
+    for (ordinal, encrypted, entry) in [(color, true, 0), (alpha, false, 2)] {
+        let ordinal = ordinal.to_string();
         let field = fields
             .iter()
             .find(|row| {
                 row.get("field").and_then(Value::as_str) == Some(value)
-                    && row.pointer("/scope/ordinal").and_then(Value::as_str) == Some(ordinal)
+                    && row.pointer("/scope/ordinal").and_then(Value::as_str)
+                        == Some(ordinal.as_str())
                     && row.pointer("/scope/stream/kind").and_then(Value::as_str) == Some("texture")
             })
             .ok_or("immediate field origin")?;

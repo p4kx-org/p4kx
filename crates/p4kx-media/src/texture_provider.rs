@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+mod family;
+mod family_expected;
+mod family_origin;
+mod family_payload;
 mod header;
 mod origin;
 pub(crate) mod schema;
@@ -18,7 +22,7 @@ impl Provider for TextureProvider {
         let mut capability = Capability::new(
             MediaKind::Texture,
             "p4kx.texture.dds",
-            "1.0.0",
+            "1.1.0",
             "Exact decoded DDS source Entries remain in the common RawReference. Header metadata retains authored words and separates reader-derived topology from codec support.",
         );
         capability.field_groups = vec![
@@ -26,9 +30,9 @@ impl Provider for TextureProvider {
                 "header-metadata",
                 "Selected DDS and alpha headers, original legacy and DX10 words, normalized topology, codec capability and expected split-part count.",
             ),
-            FieldGroup::new_with_unsupported_projection(
+            FieldGroup::new(
                 "sibling-graph",
-                "Selected split payloads retain exact raw bytes; physical sibling graph projection is unavailable.",
+                "Physical duplicate-aware DDS family members, selection and declared sizes, and the observed disposition of each expected split part.",
             ),
             FieldGroup::new_with_unsupported_projection(
                 "texture-conversion",
@@ -43,12 +47,21 @@ impl Provider for TextureProvider {
         context: &SourceContext<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<Projection, MediaError> {
-        let alpha = match texture_role(context.entry.path()) {
-            Some(TextureMemberRole::Header) => false,
-            Some(TextureMemberRole::Member(_, TextureMember::AlphaHeader)) => true,
+        let path = context.entry.path();
+        let header = match texture_role(path) {
+            Some(TextureMemberRole::Header) => header::HeaderRole {
+                family: path,
+                alpha: false,
+            },
+            Some(TextureMemberRole::Member(family, TextureMember::AlphaHeader)) => {
+                header::HeaderRole {
+                    family,
+                    alpha: true,
+                }
+            }
             _ => return Ok(Projection::Skipped),
         };
-        header::project(context, writer, alpha)?;
+        header::project(context, writer, header)?;
         Ok(Projection::Written)
     }
 }

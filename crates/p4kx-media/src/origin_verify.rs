@@ -162,7 +162,10 @@ fn record_profile(kind: MediaKind, profile: OriginProfile) -> bool {
         MediaKind::Audio => matches!(profile, OriginProfile::AudioWem | OriginProfile::AudioBank),
         MediaKind::AudioControl => profile == OriginProfile::AudioControl,
         MediaKind::Animation => profile == OriginProfile::Animation,
-        MediaKind::Texture => profile == OriginProfile::TextureHeader,
+        MediaKind::Texture => matches!(
+            profile,
+            OriginProfile::TextureHeader | OriginProfile::TextureFamily
+        ),
         MediaKind::Material => matches!(
             profile,
             OriginProfile::MaterialLibrary
