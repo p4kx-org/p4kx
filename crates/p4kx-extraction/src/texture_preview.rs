@@ -14,7 +14,9 @@ mod info_origins;
 
 pub use self::info_origins::{DdsInfoOriginError, dds_info_origins};
 pub use crate::dds_source_info::{DDS_TRANSFER_ORIGIN_FIELDS, DdsSourceWord, raw_dds_source_words};
-pub use crate::model_textures::{ModelDdsRefusal, ObservedModelDds, ObservedModelTexture};
+pub use crate::model_textures::{
+    DdnaMipReason, ModelDdsRefusal, ObservedDdnaDds, ObservedModelDds, ObservedModelTexture,
+};
 pub use crate::texture_png::PngOrigins;
 pub use crate::texture_preview_png::input::PreviewHeaderEvidence;
 pub use p4kx_texture::{DdsTransfer, DdsTransferEvidence};

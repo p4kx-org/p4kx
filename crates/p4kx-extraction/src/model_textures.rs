@@ -10,11 +10,16 @@ use crate::path_index::PathIndex;
 use crate::texture_preview::ObservedPreviewImage;
 use crate::{ConversionError, DdsSourceInfo, Texture};
 
+#[path = "model_ddna_dds.rs"]
+mod ddna_dds;
 #[path = "model_texture_dds.rs"]
 mod dds;
+#[path = "model_texture_mip.rs"]
+mod mip_selection;
 #[path = "model_texture_origins.rs"]
 mod origin;
 
+pub use ddna_dds::{DdnaMipReason, ObservedDdnaDds};
 pub use dds::{ModelDdsRefusal, ObservedModelDds};
 pub use origin::{ArchiveTextureReads, TextureTransferUses};
 
@@ -132,39 +137,13 @@ impl<'a> ArchiveTextures<'_, 'a> {
             .alpha_tail()
             .transpose()
             .map_err(|error| TextureLoadError::Unreadable(describe(&error)))?;
-        let color_last = header.mip_count().saturating_sub(1);
-        let alpha_last = tail
-            .as_ref()
-            .map(|tail| tail.header().mip_count().saturating_sub(1));
-        let last = alpha_last.map_or(color_last, |alpha| color_last.min(alpha));
-        let level = mip.min(last);
-        let alpha_limits_level = alpha_last.is_some_and(|alpha| alpha < color_last && mip > alpha);
-        let halved = |full: u32| (full >> level).max(1);
-        let size = (halved(header.width()), halved(header.height()));
-        if let Some(tail) = &tail {
-            let tail_size = (
-                halved(tail.header().width()),
-                halved(tail.header().height()),
-            );
-            if tail_size != size {
-                return Err(TextureLoadError::Unreadable(format!(
-                    "the alpha tail is {}x{} at this mip, the texture {}x{}",
-                    tail_size.0, tail_size.1, size.0, size.1
-                )));
-            }
-        }
-        let pixels = u64::from(size.0) * u64::from(size.1);
-        if pixels > MAX_MODEL_TEXTURE_PIXELS {
-            return Err(TextureLoadError::Unreadable(format!(
-                "the texture has {pixels} pixels at this mip, more than the limit of \
-                 {MAX_MODEL_TEXTURE_PIXELS}; use a higher --texture-mip"
-            )));
-        }
+        let selection = mip_selection::select(header, tail.as_ref().map(Texture::header), mip)
+            .map_err(|error| TextureLoadError::Unreadable(error.to_string()))?;
         Ok(OpenTexture {
             texture,
-            level,
-            size,
-            alpha_limits_level,
+            level: selection.level,
+            size: selection.size,
+            alpha_limits_level: selection.cause == mip_selection::MipSelectionCause::Tail,
         })
     }
 }

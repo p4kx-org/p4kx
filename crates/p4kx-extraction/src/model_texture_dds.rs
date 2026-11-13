@@ -9,7 +9,8 @@ use p4kx_texture::{
 };
 use thiserror::Error;
 
-use super::{ArchiveTextures, MAX_MODEL_TEXTURE_PIXELS, archive_path, format_has_alpha};
+use super::mip_selection::{self, ModelMipError};
+use super::{ArchiveTextures, archive_path, format_has_alpha};
 use crate::texture_preview_png::input::{PreviewInputs, TexturePreviewInput};
 use crate::{
     DdsSourceInfo, Entry, InputScope, PathIndex, PreviewPngEvidence, SourceEvidenceError,
@@ -35,6 +36,18 @@ pub enum ModelDdsRefusal {
     /// The material image slot accepts a single two-dimensional surface.
     #[error("the DDS has a cube, array or volume topology")]
     Topology,
+    /// The primary texture and separate tail select images of different dimensions.
+    #[error("the separate DDS surfaces have different selected mip dimensions")]
+    MismatchedDimensions,
+    /// The requested material texture has no DDNA smoothness role.
+    #[error("the selected DDS is not a DDNA normal texture")]
+    NotDdna,
+    /// The tail is not a consumer-supported single-channel linear DDS.
+    #[error("the smoothness tail is not linear BC4_UNORM with a DX10 2D header")]
+    UnsupportedSmoothness,
+    /// RGB is associated with a separate or undefined alpha channel.
+    #[error("a DDS member has incompatible alpha association")]
+    AlphaAssociation,
     /// The selected mip exceeds the model image extent.
     #[error("the selected DDS mip exceeds the model texture pixel budget")]
     TooLarge,
@@ -111,66 +124,101 @@ impl<'a> ArchiveTextures<'_, 'a> {
         if unique(self.index, &format!("{path}.a"))?.is_some() {
             return Err(ModelDdsRefusal::SplitAlpha);
         }
-        let (raw, normalized) = inspect(self.index, header)?;
-        let level = single_image_level(&normalized, mip)?;
-        let archive = self.index.archive();
-        let size = header.uncompressed_size();
-        let count = normalized.part_count(size)?;
-        let part = if level < count {
-            let ordinal = count - level;
-            let entry = unique(self.index, &format!("{path}.{ordinal}"))?
-                .ok_or(ModelDdsRefusal::Missing)?;
-            Some((ordinal, entry))
-        } else {
-            None
-        };
-        let siblings = SelectedSibling { archive, part };
-        let source = archive
-            .open_entry_verified(header)
-            .map_err(input)?
-            .reject_overlong();
-        let read = LocatedMip::read_complete(source, size, &siblings, level)?;
-        if read.raw_header != raw {
-            return Err(TextureError::InvalidHeader(
-                "the DDS changed between header and mip reads",
-            )
-            .into());
-        }
-        let metadata = DdsSourceInfo::from_raw(&read.raw_header, size)?;
-        let part = part.map(|(_, entry)| entry);
-        let color = TexturePreviewInput::from_archive(
-            read.raw_header,
-            read.payload,
-            archive.observed_entry(header),
-            part.and_then(|entry| archive.observed_entry(entry)),
-        );
-        let inputs = PreviewInputs { color, alpha: None }.selected(None).ok_or(
-            TextureError::InvalidHeader("the selected DDS mip has no source span"),
-        )?;
-        Ok(ObservedModelDds {
-            has_alpha: format_has_alpha(normalized.format()),
-            header_checksum: header.checksum(),
-            part_checksum: part.map(Entry::checksum),
-            read,
-            metadata,
-            inputs,
-            archive,
-            header,
-            part,
-        })
+        let header = SelectedHeader::read(self.index, header)?;
+        let level = mip_selection::select(&header.normalized, None, mip)?.level;
+        read_selected(self.index, &path, TextureMember::Primary, &header, level)
     }
 }
 
-fn single_image_level(header: &DdsHeader, mip: u32) -> Result<u32, ModelDdsRefusal> {
-    if header.surfaces() != 1 || header.depth() != 1 {
-        return Err(ModelDdsRefusal::Topology);
+impl From<ModelMipError> for ModelDdsRefusal {
+    fn from(error: ModelMipError) -> Self {
+        match error {
+            ModelMipError::Topology => Self::Topology,
+            ModelMipError::MismatchedDimensions { .. } => Self::MismatchedDimensions,
+            ModelMipError::TooLarge(_) => Self::TooLarge,
+        }
     }
-    let level = mip.min(header.mip_count().saturating_sub(1));
-    let extent = |side: u32| u64::from(side.checked_shr(level).unwrap_or(0).max(1));
-    if extent(header.width()) * extent(header.height()) > MAX_MODEL_TEXTURE_PIXELS {
-        return Err(ModelDdsRefusal::TooLarge);
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum TextureMember {
+    Primary,
+    AlphaTail,
+}
+
+impl TextureMember {
+    const fn part_suffix(self) -> &'static str {
+        match self {
+            Self::Primary => "",
+            Self::AlphaTail => "a",
+        }
     }
-    Ok(level)
+}
+
+pub(super) struct SelectedHeader<'a> {
+    pub(super) raw: DdsRawHeader,
+    pub(super) normalized: DdsHeader,
+    entry: &'a Entry,
+}
+
+pub(super) fn read_selected<'a>(
+    index: &PathIndex<'a>,
+    base: &str,
+    member: TextureMember,
+    selected: &SelectedHeader<'a>,
+    level: u32,
+) -> Result<ObservedModelDds<'a>, ModelDdsRefusal> {
+    let header = selected.entry;
+    let raw = &selected.raw;
+    let normalized = &selected.normalized;
+    let archive = index.archive();
+    let size = header.uncompressed_size();
+    let count = normalized.part_count(size)?;
+    let part = if level < count {
+        let ordinal = count - level;
+        let suffix = member.part_suffix();
+        let entry =
+            unique(index, &format!("{base}.{ordinal}{suffix}"))?.ok_or(ModelDdsRefusal::Missing)?;
+        Some((ordinal, entry))
+    } else {
+        None
+    };
+    let siblings = SelectedSibling { archive, part };
+    let source = archive
+        .open_entry_verified(header)
+        .map_err(input)?
+        .reject_overlong();
+    let read = LocatedMip::read_complete(source, size, &siblings, level)?;
+    if read.raw_header != *raw {
+        return Err(
+            TextureError::InvalidHeader("the DDS changed between header and mip reads").into(),
+        );
+    }
+    let metadata = DdsSourceInfo::from_raw(&read.raw_header, size)?;
+    let part = part.map(|(_, entry)| entry);
+    let color = TexturePreviewInput::from_archive(
+        read.raw_header,
+        read.payload,
+        archive.observed_entry(header),
+        part.and_then(|entry| archive.observed_entry(entry)),
+    );
+    let inputs =
+        PreviewInputs { color, alpha: None }
+            .selected(None)
+            .ok_or(TextureError::InvalidHeader(
+                "the selected DDS mip has no source span",
+            ))?;
+    Ok(ObservedModelDds {
+        has_alpha: format_has_alpha(normalized.format()),
+        header_checksum: header.checksum(),
+        part_checksum: part.map(Entry::checksum),
+        read,
+        metadata,
+        inputs,
+        archive,
+        header,
+        part,
+    })
 }
 
 struct SelectedSibling<'a> {
@@ -204,7 +252,10 @@ impl SiblingReader for SelectedSibling<'_> {
     }
 }
 
-fn unique<'a>(index: &PathIndex<'a>, path: &str) -> Result<Option<&'a Entry>, ModelDdsRefusal> {
+pub(super) fn unique<'a>(
+    index: &PathIndex<'a>,
+    path: &str,
+) -> Result<Option<&'a Entry>, ModelDdsRefusal> {
     let mut found = index
         .matching_entries_with(path, |_| Ok::<_, io::Error>(()))
         .map_err(input)?;
@@ -218,20 +269,24 @@ fn unique<'a>(index: &PathIndex<'a>, path: &str) -> Result<Option<&'a Entry>, Mo
     Ok(first)
 }
 
-fn inspect(
-    index: &PathIndex<'_>,
-    entry: &Entry,
-) -> Result<(DdsRawHeader, DdsHeader), ModelDdsRefusal> {
-    let mut prefix = Vec::with_capacity(MAX_HEADER_LEN);
-    index
-        .archive()
-        .open_entry(entry)
-        .map_err(input)?
-        .take(MAX_HEADER_LEN as u64)
-        .read_to_end(&mut prefix)
-        .map_err(ModelDdsRefusal::Input)?;
-    let raw = DdsRawHeader::parse(&prefix)?;
-    Ok((raw, DdsHeader::from_raw(&raw)?))
+impl<'a> SelectedHeader<'a> {
+    pub(super) fn read(index: &PathIndex<'_>, entry: &'a Entry) -> Result<Self, ModelDdsRefusal> {
+        let mut prefix = Vec::with_capacity(MAX_HEADER_LEN);
+        index
+            .archive()
+            .open_entry(entry)
+            .map_err(input)?
+            .take(MAX_HEADER_LEN as u64)
+            .read_to_end(&mut prefix)
+            .map_err(ModelDdsRefusal::Input)?;
+        let raw = DdsRawHeader::parse(&prefix)?;
+        let normalized = DdsHeader::from_raw(&raw)?;
+        Ok(Self {
+            raw,
+            normalized,
+            entry,
+        })
+    }
 }
 
 fn input(error: impl std::error::Error + Send + Sync + 'static) -> ModelDdsRefusal {

@@ -41,6 +41,7 @@ mod material_reference_regression;
 mod material_reference_security;
 mod material_reference_support;
 mod model_chunk_source_info;
+mod model_ddna_dds;
 mod model_dds;
 mod model_observed;
 mod model_textures;
