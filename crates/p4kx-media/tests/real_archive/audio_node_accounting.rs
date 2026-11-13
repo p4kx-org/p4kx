@@ -21,6 +21,35 @@ pub(super) fn verify_inline_state(path: &std::path::Path) -> TestResult {
     verify_selection(path, Selection::InlineState)
 }
 
+pub(super) fn verify_selected_families(path: &std::path::Path) -> TestResult {
+    let archive = Archive::open_with_key(path, Some(p4kx_testkit::real_archive_key()?))?;
+    let watch = ArchiveWatch::new(&archive);
+    let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
+    let families = [Coverage::Fx, Coverage::Paths, Coverage::Music];
+    let mut selected = Visitor::scan();
+    for sample in super::sampling::survey(&archive, &watch, ".bnk") {
+        let (index, original) = sample?;
+        let mut observed = Visitor::scan();
+        source::scan(&original, &mut observed)?;
+        if families
+            .iter()
+            .any(|&family| observed.has(family) && !selected.has(family))
+        {
+            let Some(sample) = super::sampling::survey_sample(&archive, index, original)? else {
+                continue;
+            };
+            super::verify_sample(&archive, sample, &schema, verify_bank)?;
+            selected.include(&observed);
+        }
+        if families.iter().all(|&family| selected.has(family)) {
+            break;
+        }
+    }
+    watch.check()?;
+    report(&selected, &selected);
+    Ok(())
+}
+
 #[derive(Clone, Copy)]
 enum Selection {
     Broad,
@@ -95,6 +124,7 @@ fn report(seen: &Visitor<'_>, selected: &Visitor<'_>) {
         ("advanced_settings", Coverage::Advanced),
         ("inline_state", Coverage::InlineState),
         ("rtpc", Coverage::Rtpc),
+        ("music_nodes", Coverage::Music),
         ("standalone_state", Coverage::StandaloneState),
         ("typed_standalone_state", Coverage::TypedStandaloneState),
     ] {

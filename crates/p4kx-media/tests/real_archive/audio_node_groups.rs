@@ -20,6 +20,8 @@ mod compare;
 #[path = "audio_node_modulation.rs"]
 mod modulation;
 
+pub(super) use self::music::music;
+
 type Owner = [u64; 2];
 type Input<'a> = Cursor<&'a [u8]>;
 const PROPERTIES: &str = "audio-bank-hirc-node-properties";
@@ -44,6 +46,7 @@ pub(super) enum Coverage {
     Rtpc,
     StandaloneState,
     TypedStandaloneState,
+    Music,
 }
 
 #[derive(Clone, Copy)]
@@ -280,6 +283,9 @@ macro_rules! verify_node_rows {
         compare::aux(output, owner, node.user_aux_buses()?)
     }};
 }
+
+#[path = "audio_node_music.rs"]
+mod music;
 
 pub(super) fn actor(
     visitor: &mut Visitor<'_>,

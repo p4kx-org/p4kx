@@ -42,6 +42,13 @@ fn populated_inline_wwise_state_reconciles() -> Result<(), privacy::Verification
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn populated_effect_positioning_and_music_nodes_reconcile()
+-> Result<(), privacy::VerificationFailure> {
+    privacy::redact(verify_archives(node::verify_selected_families))
+}
+
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn original_audio_directories_and_retained_ranges_reconcile()
 -> Result<(), privacy::VerificationFailure> {
     privacy::redact(verify_archives(verify_archive))

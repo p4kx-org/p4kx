@@ -90,6 +90,30 @@ fn visit(
                 node_groups::sound(visitor, owner, &mut sound)?;
             }
         }
+        semantic if version == 154 => music(semantic, owner, visitor)?,
+        _ => {}
+    }
+    Ok(())
+}
+
+fn music(
+    semantic: BankHircSemantic<'_, Cursor<&[u8]>>,
+    owner: [u64; 2],
+    visitor: &mut node_groups::Visitor<'_>,
+) -> TestResult {
+    match semantic {
+        BankHircSemantic::MusicSegment(mut node) => {
+            node_groups::music(visitor, owner, &mut node.shared_node())?;
+        }
+        BankHircSemantic::MusicPlaylist(mut node) => {
+            node_groups::music(visitor, owner, &mut node.shared_node())?;
+        }
+        BankHircSemantic::MusicSwitch(mut node) => {
+            node_groups::music(visitor, owner, &mut node.shared_node())?;
+        }
+        BankHircSemantic::MusicTrack(mut node) => {
+            node_groups::music(visitor, owner, &mut node.shared_node())?;
+        }
         _ => {}
     }
     Ok(())

@@ -29,6 +29,41 @@ pub(super) fn samples<'archive>(
     watch: &'archive ArchiveWatch,
     suffix: &'archive str,
 ) -> impl Iterator<Item = TestResult<Sample>> + 'archive {
+    candidates(archive, suffix)
+        .take(MAX_PROBES_PER_KIND)
+        .filter_map(move |(index, entry)| read_sample(archive, watch, index, entry).transpose())
+}
+
+pub(super) fn survey<'archive>(
+    archive: &'archive Archive,
+    watch: &'archive ArchiveWatch,
+    suffix: &'archive str,
+) -> impl Iterator<Item = TestResult<(usize, Vec<u8>)>> + 'archive {
+    candidates(archive, suffix).map(move |(index, entry)| {
+        read_original(archive, watch, entry).map(|original| (index, original))
+    })
+}
+
+pub(super) fn survey_sample(
+    archive: &Archive,
+    index: usize,
+    original: Vec<u8>,
+) -> TestResult<Option<Sample>> {
+    let entry = archive
+        .entries()
+        .get(index)
+        .ok_or("physical root audio Entry")?;
+    Ok(unique_filter(archive, entry)?.map(|filter| Sample {
+        filter,
+        entry_index: index,
+        original,
+    }))
+}
+
+fn candidates<'archive>(
+    archive: &'archive Archive,
+    suffix: &'archive str,
+) -> impl Iterator<Item = (usize, &'archive Entry)> + 'archive {
     archive
         .entries()
         .iter()
@@ -38,10 +73,6 @@ pub(super) fn samples<'archive>(
                 && has_suffix(entry, suffix)
                 && (1..=MAX_SAMPLE_BYTES).contains(&entry.uncompressed_size())
         })
-        .take(MAX_PROBES_PER_KIND)
-        .filter_map(move |(entry_index, entry)| {
-            read_sample(archive, watch, entry_index, entry).transpose()
-        })
 }
 
 fn read_sample(
@@ -50,23 +81,32 @@ fn read_sample(
     entry_index: usize,
     entry: &Entry,
 ) -> TestResult<Option<Sample>> {
-    watch.check()?;
-    let filter = Filter::parse(entry.path())?;
-    let matches = archive.entries().iter().filter(|other| {
-        filter.matches(other.path()) && !has_suffix(other, ".pak") && !has_suffix(other, ".socpak")
-    });
-    if matches.take(2).count() != 1 {
+    let Some(filter) = unique_filter(archive, entry)? else {
         return Ok(None);
-    }
-    let mut original = Vec::new();
-    archive
-        .open_entry_verified(entry)?
-        .read_to_end(&mut original)?;
+    };
+    let original = read_original(archive, watch, entry)?;
     Ok(Some(Sample {
         filter,
         entry_index,
         original,
     }))
+}
+
+fn unique_filter(archive: &Archive, entry: &Entry) -> TestResult<Option<Filter>> {
+    let filter = Filter::parse(entry.path())?;
+    let matches = archive.entries().iter().filter(|other| {
+        filter.matches(other.path()) && !has_suffix(other, ".pak") && !has_suffix(other, ".socpak")
+    });
+    Ok((matches.take(2).count() == 1).then_some(filter))
+}
+
+fn read_original(archive: &Archive, watch: &ArchiveWatch, entry: &Entry) -> TestResult<Vec<u8>> {
+    watch.poll()?;
+    let mut original = Vec::new();
+    archive
+        .open_entry_verified(entry)?
+        .read_to_end(&mut original)?;
+    Ok(original)
 }
 
 fn has_suffix(entry: &Entry, suffix: &str) -> bool {
