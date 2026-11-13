@@ -14,6 +14,9 @@ use p4kx_extraction::{
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::{Value, json};
 
+#[path = "real_archive_durability_sample.rs"]
+mod sample;
+
 #[path = "real_archive_item_durability_values.rs"]
 mod values;
 

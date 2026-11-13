@@ -100,11 +100,12 @@ Vehicle hull and armour data have their own source families.
 
 ## Verification
 
-The opt-in test `item_durability_matches_original_health_only_shield_and_armour_fields` independently
-reads the original selected components from the owner's Archive. It checks the values against
-their exact Record and original field positions and prints only the number of fields checked
-per representative category. Set `P4KX_DATA_P4K` and run this test.
+The opt-in test `source_selected_health_only_shield_and_armour_match_original_durability`
+selects one original Item per category directly from its components. It compares the Health slots,
+scalar values and field origins in a path-scoped diagnostic catalog and reports aggregate counts.
+Set `P4KX_DATA_P4K` and configure the Archive key through the testkit. The sibling opt-in test
+`item_durability_matches_original_health_only_shield_and_armour_fields` surveys the broader catalog.
 
 ```powershell
-cargo test -p p4kx-export --test real_archive item_durability_matches_original_health_only_shield_and_armour_fields -- --ignored --nocapture
+cargo test -p p4kx-export --test real_archive source_selected_health_only_shield_and_armour_match_original_durability -- --ignored --nocapture
 ```
