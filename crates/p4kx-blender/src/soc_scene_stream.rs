@@ -13,6 +13,7 @@ use crate::soc_scene::SocSceneError;
 use crate::soc_scene_entities::Entity;
 use crate::soc_scene_occurrence::{InputState, Member, Selector};
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
+use crate::soc_scene_tile_ports::TilePorts;
 use crate::soc_scene_xml::XmlDocuments;
 
 pub(crate) struct IndexedStream<'a> {
@@ -21,6 +22,7 @@ pub(crate) struct IndexedStream<'a> {
     pub(crate) admitted: BTreeMap<usize, &'a EntryOrigin>,
     pub(crate) complete: bool,
     pub(crate) room: Option<crate::soc_scene_rooms::IndexedRoom<'a>>,
+    pub(crate) tile_ports: Option<&'a TilePorts<'a>>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

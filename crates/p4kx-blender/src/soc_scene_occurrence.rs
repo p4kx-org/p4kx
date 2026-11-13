@@ -11,7 +11,7 @@ use p4kx_extraction::{
     CancelToken, EntryOrigin, InputScope, PhysicalSourceRef, SourceInput, SourceUses, SourceValue,
     SourcedValue,
 };
-use p4kx_model::{SocEntityFile, SocRoomRegistry};
+use p4kx_model::{SocContainerDescriptor, SocEntityFile, SocRoomRegistry};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -20,6 +20,7 @@ use crate::soc_scene_classes::Classes;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 use crate::soc_scene_rooms::{IndexedRoom, RoomRegistry};
 use crate::soc_scene_stream::{IndexedStream, Stream};
+use crate::soc_scene_tile_ports::TilePorts;
 use crate::soc_scene_xml::XmlDocuments;
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -42,10 +43,12 @@ impl Occurrence {
         cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
         let container = physical(&original.origin, sources)?;
+        let descriptor_input = read_xml(&original.descriptor, sources, |bytes| {
+            SocContainerDescriptor::parse(bytes).ok()
+        })?;
         let mut children = Vec::new();
-        let descriptor = Member::read(&original.descriptor, sources, |bytes, origin| {
-            let descriptor = p4kx_model::SocContainerDescriptor::parse(bytes)
-                .map_err(|_| InputState::Invalid)?;
+        let descriptor = Member::read(&original.descriptor, sources, |_, origin| {
+            let (descriptor, _) = descriptor_input.as_ref().ok_or(InputState::Invalid)?;
             for (child, declaration) in original.children.iter().zip(descriptor.children()) {
                 if child.selector.position != declaration.element().position() {
                     return Err(InputState::Capture(SocSceneError::Position));
@@ -62,14 +65,20 @@ impl Occurrence {
                 .bind(descriptor.document(), origin)
                 .map_err(InputState::Capture)
         })?;
-        let room_input = room_input(&original.registry, sources)?;
+        let room_input = read_xml(&original.registry, sources, |bytes| {
+            SocRoomRegistry::parse(bytes).ok()
+        })?;
         let registry = Member::read(&original.registry, sources, |_, _| {
             let (room, origin) = room_input.as_ref().ok_or(InputState::Invalid)?;
             RoomRegistry::read(room, origin, documents).map_err(InputState::Capture)
         })?;
+        let tile_ports = descriptor_input
+            .as_ref()
+            .map(|(descriptor, origin)| TilePorts::new(descriptor, origin));
         let streams = streams(
             original,
             room_input.as_ref(),
+            tile_ports.as_ref(),
             sources,
             documents,
             classes,
@@ -86,22 +95,19 @@ impl Occurrence {
     }
 }
 
-fn room_input<'a>(
+fn read_xml<'a, T>(
     selection: &'a SocMemberSelection,
     sources: &'a SourceUses,
-) -> Result<Option<(SocRoomRegistry<'a>, XmlOrigin<'a>)>, SocSceneError> {
+    parse: impl FnOnce(&'a [u8]) -> Option<T>,
+) -> Result<Option<(T, XmlOrigin<'a>)>, SocSceneError> {
     let Some(member) = selection.selected() else {
         return Ok(None);
     };
-    let Some(registry) = member
-        .payload()
-        .ok()
-        .and_then(|bytes| SocRoomRegistry::parse(bytes).ok())
-    else {
+    let Some(document) = member.payload().ok().and_then(parse) else {
         return Ok(None);
     };
     Ok(Some((
-        registry,
+        document,
         XmlOrigin::new(sources, member.origin(), None)?,
     )))
 }
@@ -109,6 +115,7 @@ fn room_input<'a>(
 fn streams(
     occurrence: &SocContainerOccurrence,
     room: Option<&(SocRoomRegistry<'_>, XmlOrigin<'_>)>,
+    tile_ports: Option<&TilePorts<'_>>,
     sources: &SourceUses,
     documents: &mut XmlDocuments,
     classes: &Classes,
@@ -127,6 +134,7 @@ fn streams(
         admitted,
         complete,
         classes,
+        tile_ports,
         room: room_index.as_ref().map(|(index, origin, xml)| IndexedRoom {
             index,
             origin,

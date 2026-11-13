@@ -46,6 +46,18 @@ declaration. A proximity sensor retains its class's original exit
 delay and, for the declared box shape, the sensor-local extent and offset. Its authored
 links identify the target independently of trigger shape.
 
+An entity with authored light components includes `lights` and/or `lightGroups`.
+Modes retain source order, including repeated or empty declarations. Type, intensity,
+temperature, style and the temperature switch carry their original value states and
+source uses. Colour elements, empty baked sections and relative-frame declarations
+point to their original XML coordinates in the same chunk. These fields describe
+authored inputs to light assembly.
+
+An entity's `tileAttachments` refer to the port declarations of its own descriptor.
+Each matched or ambiguous candidate retains its original position and interaction
+offset in the container owner's frame. An unavailable descriptor leaves the
+target incomplete. The source row does not assume a container-to-owner transform.
+
 Each sourced value includes `containsEncryptedSource`, `sourceSetComplete` and
 `sourceUsesRefs`. References resolve in the same document's `sourceInventory`. The inventory
 distinguishes selector and payload roles. A matched link includes both the selecting source

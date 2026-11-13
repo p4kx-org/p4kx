@@ -140,6 +140,35 @@
       ],
       "type": "object"
     },
+    "BakedLight": {
+      "properties": {
+        "components": {
+          "items": {
+            "$ref": "#/$defs/Light"
+          },
+          "type": "array"
+        },
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        },
+        "relativeFrames": {
+          "items": {
+            "$ref": "#/$defs/SocXmlPosition"
+          },
+          "type": "array"
+        },
+        "section": {
+          "$ref": "#/$defs/SocXmlPosition"
+        }
+      },
+      "required": [
+        "section",
+        "position",
+        "relativeFrames",
+        "components"
+      ],
+      "type": "object"
+    },
     "BoxShape": {
       "properties": {
         "extent": {
@@ -640,6 +669,18 @@
         "guid": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
+        "lightGroups": {
+          "items": {
+            "$ref": "#/$defs/LightGroup"
+          },
+          "type": "array"
+        },
+        "lights": {
+          "items": {
+            "$ref": "#/$defs/Light"
+          },
+          "type": "array"
+        },
         "links": {
           "items": {
             "$ref": "#/$defs/Link"
@@ -656,6 +697,12 @@
         },
         "position": {
           "$ref": "#/$defs/SocXmlPosition"
+        },
+        "tileAttachments": {
+          "items": {
+            "$ref": "#/$defs/TileAttachment"
+          },
+          "type": "array"
         }
       },
       "required": [
@@ -901,6 +948,57 @@
           "type": "object"
         }
       ]
+    },
+    "Light": {
+      "properties": {
+        "lightType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "modes": {
+          "items": {
+            "$ref": "#/$defs/Mode"
+          },
+          "type": "array"
+        },
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        },
+        "useTemperature": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "position",
+        "lightType",
+        "useTemperature",
+        "modes"
+      ],
+      "type": "object"
+    },
+    "LightGroup": {
+      "properties": {
+        "bakedSections": {
+          "items": {
+            "$ref": "#/$defs/SocXmlPosition"
+          },
+          "type": "array"
+        },
+        "lights": {
+          "items": {
+            "$ref": "#/$defs/BakedLight"
+          },
+          "type": "array"
+        },
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        }
+      },
+      "required": [
+        "position",
+        "bakedSections",
+        "lights"
+      ],
+      "type": "object"
     },
     "Link": {
       "properties": {
@@ -1332,6 +1430,50 @@
         }
       ]
     },
+    "Mode": {
+      "properties": {
+        "colours": {
+          "items": {
+            "$ref": "#/$defs/SocXmlPosition"
+          },
+          "type": "array"
+        },
+        "intensity": {
+          "$ref": "#/$defs/SourcedValueOffloat"
+        },
+        "kind": {
+          "$ref": "#/$defs/ModeKind"
+        },
+        "lightStyle": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        },
+        "temperature": {
+          "$ref": "#/$defs/SourcedValueOffloat"
+        }
+      },
+      "required": [
+        "position",
+        "kind",
+        "intensity",
+        "temperature",
+        "lightStyle",
+        "colours"
+      ],
+      "type": "object"
+    },
+    "ModeKind": {
+      "enum": [
+        "default",
+        "auxiliary",
+        "emergency",
+        "cinematic",
+        "other"
+      ],
+      "type": "string"
+    },
     "Occurrence": {
       "properties": {
         "children": {
@@ -1536,6 +1678,21 @@
         "ordinal",
         "position",
         "coordinates"
+      ],
+      "type": "object"
+    },
+    "Port": {
+      "properties": {
+        "interactionOffset": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+        },
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        }
+      },
+      "required": [
+        "position",
+        "interactionOffset"
       ],
       "type": "object"
     },
@@ -4850,6 +5007,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfTileTarget": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/TileTarget"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfVector": {
       "allOf": [
         {
@@ -5241,6 +5528,137 @@
       ],
       "type": "object"
     },
+    "SourcedValueOffloat": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "format": "float",
+                "type": "number"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfstring": {
       "allOf": [
         {
@@ -5504,6 +5922,138 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfuint32": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "Stream": {
       "properties": {
         "member": {
@@ -5528,6 +6078,88 @@
         "member"
       ],
       "type": "object"
+    },
+    "TileAttachment": {
+      "properties": {
+        "portName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        },
+        "target": {
+          "$ref": "#/$defs/SourcedValueOfTileTarget"
+        }
+      },
+      "required": [
+        "position",
+        "portName",
+        "target"
+      ],
+      "type": "object"
+    },
+    "TileTarget": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "descriptorUnavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "unmatched",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "port": {
+              "$ref": "#/$defs/Port"
+            },
+            "type": {
+              "const": "matched",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "port"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "ports": {
+              "items": {
+                "$ref": "#/$defs/Port"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "ports"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "Vector": {
       "properties": {

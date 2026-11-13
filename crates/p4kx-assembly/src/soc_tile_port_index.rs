@@ -4,12 +4,12 @@
 use std::collections::BTreeMap;
 
 use p4kx_extraction::cryxml::SourceElementPosition;
-use p4kx_model::{SocContainerDescriptor, SocSourceValue, SocTileAttachment};
+use p4kx_model::{SocContainerDescriptor, SocSourceValue, SocTileAttachment, SocTileItemPort};
 
 /// Tile item ports indexed within one physical container descriptor.
 #[derive(Debug, Default)]
 pub struct SocTilePortIndex<'document> {
-    by_name: BTreeMap<&'document str, Vec<SocTilePortSite>>,
+    by_name: BTreeMap<&'document str, Vec<SocTilePortSite<'document>>>,
 }
 
 impl<'document> SocTilePortIndex<'document> {
@@ -27,6 +27,7 @@ impl<'document> SocTilePortIndex<'document> {
                 .or_default()
                 .push(SocTilePortSite {
                     position: port.element().position(),
+                    port,
                     offset: port.interaction_offset(),
                 });
         }
@@ -38,7 +39,7 @@ impl<'document> SocTilePortIndex<'document> {
     pub fn resolve<'index>(
         &'index self,
         attachment: SocTileAttachment<'_>,
-    ) -> SocTilePortTarget<'index> {
+    ) -> SocTilePortTarget<'index, 'document> {
         let name = match attachment.item_port() {
             SocSourceValue::Present(name) => name,
             SocSourceValue::Absent => return SocTilePortTarget::Absent,
@@ -55,11 +56,13 @@ impl<'document> SocTilePortIndex<'document> {
 }
 
 /// The original port coordinate and independently read offset.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
-pub struct SocTilePortSite {
+pub struct SocTilePortSite<'document> {
     /// Original descriptor XML coordinate.
     pub position: SourceElementPosition,
+    /// Original port element and attribute positions.
+    pub port: SocTileItemPort<'document>,
     /// Original interaction offset in the container owner's frame.
     pub offset: SocSourceValue<[f64; 3]>,
 }
@@ -67,7 +70,7 @@ pub struct SocTilePortSite {
 /// The outcome of resolving an original tile attachment selector.
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
-pub enum SocTilePortTarget<'index> {
+pub enum SocTilePortTarget<'index, 'document> {
     /// The attachment does not declare a port name.
     Absent,
     /// The attachment declares an empty, malformed or repeated port name.
@@ -75,7 +78,7 @@ pub enum SocTilePortTarget<'index> {
     /// The original selector has no port in this descriptor.
     Unmatched,
     /// One original port matches the selector.
-    Matched(&'index SocTilePortSite),
+    Matched(&'index SocTilePortSite<'document>),
     /// Several original ports match the selector.
-    Ambiguous(&'index [SocTilePortSite]),
+    Ambiguous(&'index [SocTilePortSite<'document>]),
 }

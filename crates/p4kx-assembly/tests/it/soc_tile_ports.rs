@@ -164,9 +164,9 @@ fn tile_anchor_requires_a_group_and_an_invertible_container_frame() -> TestResul
     Ok(())
 }
 
-fn first_target<'index>(
-    index: &'index SocTilePortIndex<'_>,
-) -> Result<SocTilePortTarget<'index>, Box<dyn std::error::Error>> {
+fn first_target<'index, 'document>(
+    index: &'index SocTilePortIndex<'document>,
+) -> Result<SocTilePortTarget<'index, 'document>, Box<dyn std::error::Error>> {
     let bytes = TestChunkFile::crch().chunk(0x0004, 3, ENTITIES).bytes();
     let file = SocEntityFile::parse(&bytes)?;
     let chunk = file.entity_chunks().next().ok_or("Entity chunk")??;

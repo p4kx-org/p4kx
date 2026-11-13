@@ -10,10 +10,12 @@ use serde::Serialize;
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_class_mannequin::{children, string_attribute};
 use crate::soc_scene_classes::ClassTarget;
+use crate::soc_scene_lights::{Light, LightGroup};
 use crate::soc_scene_loadouts::Loadout;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 use crate::soc_scene_rooms::{Area, guid_value, position};
 use crate::soc_scene_stream::IndexedStream;
+use crate::soc_scene_tile_ports::TileAttachment;
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +32,12 @@ pub(crate) struct Entity {
     areas: Vec<Area>,
     components: Vec<Component>,
     links: Vec<Link>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    lights: Vec<Light>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    light_groups: Vec<LightGroup>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    tile_attachments: Vec<TileAttachment>,
 }
 
 impl Entity {
@@ -67,6 +75,18 @@ impl Entity {
                 .entity_links()
                 .flat_map(|group| group.links().map(move |link| (group.ordinal(), link)))
                 .map(|(group, link)| Link::read(group, link, index, origin))
+                .collect::<Result<_, _>>()?,
+            lights: entity
+                .authored_lights()
+                .map(|light| Light::read(light, origin))
+                .collect::<Result<_, _>>()?,
+            light_groups: entity
+                .authored_light_groups()
+                .map(|group| LightGroup::read(group, origin))
+                .collect::<Result<_, _>>()?,
+            tile_attachments: entity
+                .tile_attachments()
+                .map(|attachment| TileAttachment::read(attachment, index.tile_ports, origin))
                 .collect::<Result<_, _>>()?,
         })
     }

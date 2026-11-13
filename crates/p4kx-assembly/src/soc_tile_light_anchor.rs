@@ -19,7 +19,7 @@ impl SocTileLightAnchor {
     /// # Errors
     /// Returns the reason a unique port offset or a usable transform is unavailable.
     pub fn resolve(
-        target: SocTilePortTarget<'_>,
+        target: SocTilePortTarget<'_, '_>,
         owner_from_container: Option<Transform>,
         container_from_group: Option<Transform>,
     ) -> Result<Self, SocTileLightAnchorError> {
@@ -98,9 +98,11 @@ pub enum SocTileLightAnchorError {
     UnrepresentableAnchor,
 }
 
-const fn owner_offset(target: SocTilePortTarget<'_>) -> Result<[f64; 3], SocTileLightAnchorError> {
+const fn owner_offset(
+    target: SocTilePortTarget<'_, '_>,
+) -> Result<[f64; 3], SocTileLightAnchorError> {
     use SocTileLightAnchorError as Error;
-    let site: &SocTilePortSite = match target {
+    let site: &SocTilePortSite<'_> = match target {
         SocTilePortTarget::Absent => return Err(Error::AbsentSelector),
         SocTilePortTarget::Invalid => return Err(Error::InvalidSelector),
         SocTilePortTarget::Unmatched => return Err(Error::UnmatchedSelector),
