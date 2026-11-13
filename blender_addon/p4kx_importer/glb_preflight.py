@@ -12,6 +12,7 @@ from struct import Struct
 from typing import Any, BinaryIO
 
 from .glb_geometry import GeometryCounts, geometry_counts
+from .glb_material_slots import material_slot_issue
 from .glb_references import validate_references
 from .manifest_fields import PackageError, read_object
 
@@ -31,6 +32,7 @@ class GlbInfo:
     materials: int
     geometry: GeometryCounts | None
     positions: tuple[tuple[int, int] | None, ...]
+    material_slot_issue: str | None
 
 
 def check_glb(path: Path) -> GlbInfo:
@@ -69,7 +71,13 @@ def _check_stream(stream: BinaryIO) -> GlbInfo:
         padding = stream.read(bin_length - data_length)
         if padding != bytes(bin_length - data_length):
             raise PackageError("GLB BIN padding is invalid.")
-    return GlbInfo(actual_size, material_count, geometry_counts(document), _position_accessors(document))
+    return GlbInfo(
+        actual_size,
+        material_count,
+        geometry_counts(document),
+        _position_accessors(document),
+        material_slot_issue(document.get("materials", [])),
+    )
 
 
 def _position_accessors(document: dict[str, Any]) -> tuple[tuple[int, int] | None, ...]:

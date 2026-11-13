@@ -70,6 +70,8 @@ def _preflight_mesh(root: Path, mesh: Mesh) -> tuple[Path, bool]:
     if not path.is_file():
         raise PackageError(f"{path.name} is missing or is not a regular file.")
     info = check_glb(path)
+    if mesh.rig is None and info.material_slot_issue is not None:
+        raise PackageError(f"{path.name}: {info.material_slot_issue}")
     if mesh.bytes and mesh.bytes != info.bytes:
         raise PackageError(f"{path.name}: GLB size does not match the manifest.")
     if info.geometry is not None:

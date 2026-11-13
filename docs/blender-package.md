@@ -384,6 +384,8 @@ file's `materials` array, the `index` of the matching entry in the manifest's `m
 the mesh. Blender's glTF importer creates materials in first-use order and renames duplicates
 (`.001`), so an importer matches materials by this custom property, not by name. `p4kx entity
 glb` files do not carry it.
+The package preflight rejects a static mesh whose explicit slot tag differs from its GLB
+material array index. Older meshes with missing tags can still use the name fallback.
 
 Each material assignment records `source_material_ids`, the raw geometry material IDs mapped to its dense
 GLB index. A library with one authored material can serve several IDs. For defaulted IDs,
