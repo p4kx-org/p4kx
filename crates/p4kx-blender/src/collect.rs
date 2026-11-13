@@ -15,16 +15,17 @@ use crate::manifest_materials::MaterialDescription;
 use crate::material_library_sources::MaterialLibrarySources;
 use crate::plan::MeshPlan;
 use crate::roles::{classify_in, has_smoothness};
+use crate::texture_encoding::TextureMode;
 use crate::textures::Wanted;
 
 /// How many material layers deep a layer's own layers are followed.
 const MAX_LAYER_DEPTH: usize = 8;
 
-/// A material description and, for each of its texture slots, the path of the texture it names.
+/// A material description and the selected output texture of each slot.
 #[derive(Debug)]
 pub(crate) struct Described {
     pub(crate) description: MaterialDescription,
-    pub(crate) paths: Vec<Option<String>>,
+    pub(crate) texture_positions: Vec<Option<usize>>,
     followed_at: Option<usize>,
 }
 
@@ -50,7 +51,7 @@ pub(crate) struct Collected {
     pub(crate) wanted: Vec<Wanted>,
     pub(crate) refused: Vec<Refused>,
     pub(crate) issues: Vec<Issue>,
-    index_of: HashMap<String, usize>,
+    index_of: HashMap<(String, TextureMode), usize>,
     keys: HashMap<MaterialKey, usize>,
     layer_budget: LayerBudget,
     layer_issues: HashSet<(String, String, String)>,
@@ -145,6 +146,9 @@ impl Collected {
             if shallower && depth < MAX_LAYER_DEPTH {
                 self.follow_layers(known, material, models, depth);
             }
+            if let Some(drawn) = drawn {
+                self.want_drawn(drawn);
+            }
             return Some(known);
         }
         let at = self.descriptions.len();
@@ -156,11 +160,14 @@ impl Collected {
             library.default_palette.as_deref(),
         );
         description.source_library = Some(source_library);
-        let paths = self.want_textures(material, drawn);
+        let texture_positions = self.want_textures(material, drawn);
+        if let Some(drawn) = drawn {
+            self.want_drawn(drawn);
+        }
         self.keys.insert(key, at);
         self.descriptions.push(Described {
             description,
-            paths,
+            texture_positions,
             followed_at: None,
         });
         self.note_truncation(&path, material);
@@ -287,7 +294,7 @@ impl Collected {
         &mut self,
         material: &Material,
         drawn: Option<&DrawnMaterial>,
-    ) -> Vec<Option<String>> {
+    ) -> Vec<Option<usize>> {
         material
             .textures
             .iter()
@@ -301,52 +308,82 @@ impl Collected {
                     }
                     return None;
                 };
-                let role = drawn
-                    .and_then(|drawn| gltf_role(drawn, &path))
-                    .unwrap_or_else(|| classify_in(material, &slot.map, &slot.file));
-                let gloss = role == TextureUse::Normal && has_smoothness(&slot.file);
-                self.want(&path, &slot.file, role, gloss, &material.name);
-                Some(path)
+                let role = classify_in(material, &slot.map, &slot.file);
+                let mode = drawn
+                    .and_then(|drawn| drawn_mode(drawn, &path, role))
+                    .unwrap_or_else(|| TextureMode::of(role, has_smoothness(&slot.file)));
+                Some(self.want(&path, &slot.file, mode, &material.name))
             })
             .collect()
     }
 
-    fn want(&mut self, path: &str, file: &str, role: TextureUse, gloss: bool, material: &str) {
-        let identity = path.to_ascii_lowercase();
-        if self.index_of.contains_key(&identity) {
-            return;
+    fn want_drawn(&mut self, drawn: &DrawnMaterial) {
+        for (texture, role) in [
+            (drawn.diffuse.as_ref(), TextureUse::Diffuse),
+            (drawn.normal.as_ref(), TextureUse::Normal),
+            (drawn.specular.as_ref(), TextureUse::Specular),
+        ] {
+            if let Some(file) = texture {
+                self.want(
+                    &file.path,
+                    &file.file,
+                    TextureMode::drawn(file, role),
+                    &drawn.name,
+                );
+            }
         }
-        self.index_of.insert(identity, self.wanted.len());
+    }
+
+    fn want(&mut self, path: &str, file: &str, mode: TextureMode, material: &str) -> usize {
+        let identity = (path.to_ascii_lowercase(), mode);
+        if let Some(&position) = self.index_of.get(&identity) {
+            return position;
+        }
+        let position = self.wanted.len();
+        self.index_of.insert(identity, position);
         self.wanted.push(Wanted {
             path: path.to_owned(),
             file: file.to_owned(),
             material: material.to_owned(),
-            role,
-            gloss,
+            mode,
         });
+        position
     }
 
-    /// Returns the position among the wanted textures of the texture at `path`.
-    pub(crate) fn position_of(&self, path: &str) -> Option<usize> {
-        self.index_of.get(&path.to_ascii_lowercase()).copied()
+    pub(crate) fn position_of(&self, path: &str, mode: TextureMode) -> Option<usize> {
+        self.index_of
+            .get(&(path.to_ascii_lowercase(), mode))
+            .copied()
     }
 }
+
+#[cfg(test)]
+mod tests;
 
 /// Returns the id of the description at position `at`.
 pub(crate) fn id_of(at: usize) -> String {
     format!("x{:04}", at + 1)
 }
 
-fn gltf_role(drawn: &DrawnMaterial, path: &str) -> Option<TextureUse> {
-    [
-        (&drawn.diffuse, TextureUse::Diffuse),
-        (&drawn.normal, TextureUse::Normal),
-        (&drawn.specular, TextureUse::Specular),
-    ]
-    .into_iter()
-    .find_map(|(file, role)| {
-        file.as_ref()
-            .is_some_and(|file| file.path.eq_ignore_ascii_case(path))
-            .then_some(role)
-    })
+fn drawn_mode(drawn: &DrawnMaterial, path: &str, role: TextureUse) -> Option<TextureMode> {
+    let role_for = |file: &p4kx_gltf::TextureFile, role| {
+        file.path
+            .eq_ignore_ascii_case(path)
+            .then(|| TextureMode::drawn(file, role))
+    };
+    match role {
+        TextureUse::Diffuse | TextureUse::Mask | TextureUse::Stencil => drawn
+            .diffuse
+            .as_ref()
+            .and_then(|file| role_for(file, TextureUse::Diffuse)),
+        TextureUse::Normal => drawn
+            .normal
+            .as_ref()
+            .and_then(|file| role_for(file, TextureUse::Normal)),
+        TextureUse::Specular => drawn
+            .specular
+            .as_ref()
+            .and_then(|file| role_for(file, TextureUse::Specular)),
+        _ => None,
+    }
 }

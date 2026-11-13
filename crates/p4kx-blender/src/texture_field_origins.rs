@@ -9,6 +9,7 @@ use p4kx_extraction::{
 use crate::PackageResult;
 use crate::texture_source_metadata::metadata_error;
 use p4kx_extraction::texture_preview;
+use p4kx_texture::DdsPngEncoding;
 
 pub(super) fn capture(
     dds: &DdsSourceInfo,
@@ -41,13 +42,42 @@ pub(super) fn capture(
 
 pub(super) fn image_origin(
     evidence: &PreviewPngEvidence,
+    encoding: DdsPngEncoding,
     uses: &SourceUses,
 ) -> PackageResult<FieldOrigin> {
     let mut contributors = Vec::new();
     evidence
         .append_pixel_uses(&mut contributors)
         .map_err(metadata_error)?;
+    contributors.extend(
+        evidence
+            .color
+            .header()
+            .output_transfer_uses(encoding)
+            .map_err(metadata_error)?,
+    );
     Ok(uses.origin(&contributors, evidence.is_complete()))
+}
+
+pub(super) fn output_fields(
+    fields: &mut FieldOrigins,
+    evidence: &PreviewPngEvidence,
+    encoding: DdsPngEncoding,
+    uses: &SourceUses,
+) -> PackageResult<()> {
+    let header = evidence.color.header();
+    let transfer = header
+        .output_transfer_uses(encoding)
+        .map_err(metadata_error)?;
+    let transform = header
+        .header_uses(
+            &[DdsHeaderField::Prefix, DdsHeaderField::Format],
+            SourceUseRole::Conversion,
+        )
+        .map_err(metadata_error)?;
+    let complete = evidence.color.is_complete();
+    insert(fields, "/output_transfer", uses.origin(&transfer, complete))?;
+    insert(fields, "/png_transform", uses.origin(&transform, complete))
 }
 
 pub(super) fn insert(

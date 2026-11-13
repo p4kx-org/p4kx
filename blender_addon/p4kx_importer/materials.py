@@ -25,7 +25,12 @@ from .package import Mesh, Package, PackageError, Texture, resolve_file
 if TYPE_CHECKING:
     from .package import MeshMaterial
 
-_COLOUR_SPACE_NAMES = {"srgb": "sRGB", "linear": "Non-Color"}
+_COLOUR_SPACE_NAMES = {
+    "srgb": "sRGB",
+    "linear": "Non-Color",
+    "data": "Non-Color",
+    "linear_colour": "Linear Rec.709",
+}
 _ALPHA_MODES = {"opacity": "STRAIGHT", "smoothness": "CHANNEL_PACKED", "none": "NONE"}
 _COLUMN = 280.0
 _ROW = 260.0
@@ -56,7 +61,7 @@ class ImageCache:
         except (PackageError, RuntimeError):
             self._package.warnings.append(f"Texture {texture.id} could not be loaded.")
             return None
-        image.colorspace_settings.name = _COLOUR_SPACE_NAMES[texture.colour_space]
+        image.colorspace_settings.name = _COLOUR_SPACE_NAMES[texture.encoding or texture.colour_space]
         image.alpha_mode = _ALPHA_MODES[texture.alpha]
         return image
 

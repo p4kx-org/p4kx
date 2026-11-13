@@ -602,6 +602,31 @@
       ],
       "type": "object"
     },
+    "DdsPngTransform": {
+      "description": "Channel or transfer processing of a standalone DDS PNG.",
+      "oneOf": [
+        {
+          "const": "preserve_colour_transfer",
+          "description": "Decoded colour samples retain their source transfer.",
+          "type": "string"
+        },
+        {
+          "const": "reinhard_srgb",
+          "description": "Float RGB is Reinhard tone-mapped and encoded as sRGB.",
+          "type": "string"
+        },
+        {
+          "const": "reconstructed_normal",
+          "description": "BC5 reconstructs the normal's Z component.",
+          "type": "string"
+        },
+        {
+          "const": "data_channels",
+          "description": "Alpha or integer data is represented without an RGB transfer declaration.",
+          "type": "string"
+        }
+      ]
+    },
     "DdsRawHeaderInfo": {
       "description": "Authored source header, including an explicitly absent DX10 extension.",
       "properties": {
@@ -3983,6 +4008,17 @@
           "$ref": "#/$defs/ColourSpace",
           "description": "How the colour channels are encoded."
         },
+        "encoding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureEncoding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The importer input encoding for this specific output role."
+        },
         "file": {
           "description": "The image file relative to the package folder, e.g. `textures/t0001.png`.",
           "type": "string"
@@ -4036,6 +4072,41 @@
       ],
       "type": "object"
     },
+    "TextureChannelTransform": {
+      "description": "Channel handling applied after decoding a DDS image.",
+      "oneOf": [
+        {
+          "const": "preserve",
+          "description": "The decoded channels are used in their original order.",
+          "type": "string"
+        },
+        {
+          "const": "flip_normal_green",
+          "description": "The normal Y component is flipped to the consumer's coordinate convention.",
+          "type": "string"
+        }
+      ]
+    },
+    "TextureEncoding": {
+      "description": "How the package importer samples the PNG's colour channels.",
+      "oneOf": [
+        {
+          "const": "srgb",
+          "description": "RGB uses the sRGB transfer function.",
+          "type": "string"
+        },
+        {
+          "const": "linear_colour",
+          "description": "RGB carries scene-linear colour in Rec.709 primaries.",
+          "type": "string"
+        },
+        {
+          "const": "data",
+          "description": "Values are linear shader inputs without a colour-space transform.",
+          "type": "string"
+        }
+      ]
+    },
     "TextureFormat": {
       "description": "The image format of a texture file.",
       "oneOf": [
@@ -4050,6 +4121,17 @@
       "additionalProperties": false,
       "description": "Same-read DDS source metadata and provenance for one written texture.",
       "properties": {
+        "channel_transform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureChannelTransform"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Additional channel handling selected by the material role."
+        },
         "dds": {
           "$ref": "#/$defs/DdsSourceInfo",
           "description": "Shared raw and normalized DDS header projection."
@@ -4063,6 +4145,28 @@
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
+        },
+        "output_transfer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTransfer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "RGB transfer proved for the output PNG, independent of importer fallback."
+        },
+        "png_transform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsPngTransform"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Channel processing used to represent the DDS samples in the PNG."
         },
         "provenance": {
           "$ref": "#/$defs/SourceInventory",

@@ -5,7 +5,11 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use p4kx_blender::{Manifest, PackageInfo, PackageWriteContext, write_package_with_context};
+use p4kx_blender::{
+    Manifest, PackageInfo, PackageWriteContext, TextureChannelTransform, TextureEncoding,
+    write_package_with_context,
+};
+use p4kx_extraction::texture_codec::{DdsPngTransform, DdsTransfer};
 use p4kx_extraction::{Archive, ArchiveWriteProtection, CancelToken, FieldPath, OpenOptions};
 use p4kx_testkit::{SplitDds, TestEntry, TestTextureFormat, layered_entries, test_key};
 
@@ -20,6 +24,7 @@ fn package_texture_keeps_plain_dds_words_separate_from_used_encrypted_alpha() ->
     let path = "Data\\Objects\\Test\\layers\\textures\\base_ddna.dds";
     let input = archive(folder, path)?;
     let manifest = write(&input, folder)?;
+    verify_linear_colour(&manifest, folder)?;
     let receipt = manifest
         .textures
         .iter()
@@ -27,30 +32,7 @@ fn package_texture_keeps_plain_dds_words_separate_from_used_encrypted_alpha() ->
         .and_then(|texture| texture.source_metadata.as_deref())
         .ok_or("same-read DDS metadata")?;
     assert_eq!(receipt.mip_level, 0, "actual requested mip");
-    let width = receipt
-        .field_origins
-        .get(&FieldPath::parse("/dds/normalized/width")?)
-        .ok_or("width origin")?;
-    assert_eq!(
-        width.contains_encrypted_source(),
-        Some(false),
-        "plain color header supplies width"
-    );
-    let transfer = receipt.dds.transfer.ok_or("transfer declarations")?;
-    assert_eq!(
-        transfer.effective,
-        p4kx_extraction::texture_preview::DdsTransfer::Unknown,
-        "unmarked legacy source"
-    );
-    let origin = receipt
-        .field_origins
-        .get(&FieldPath::parse("/dds/transfer/effective")?)
-        .ok_or("transfer origin")?;
-    assert_eq!(
-        origin.contains_encrypted_source(),
-        Some(false),
-        "alpha does not affect colour transfer"
-    );
+    verify_normal_header(receipt)?;
     let image = receipt
         .field_origins
         .get(&FieldPath::parse("/image")?)
@@ -67,6 +49,88 @@ fn package_texture_keeps_plain_dds_words_separate_from_used_encrypted_alpha() ->
     Ok(())
 }
 
+fn verify_normal_header(receipt: &p4kx_blender::TextureSourceMetadata) -> TestResult {
+    let width = receipt
+        .field_origins
+        .get(&FieldPath::parse("/dds/normalized/width")?)
+        .ok_or("width origin")?;
+    assert_eq!(
+        width.contains_encrypted_source(),
+        Some(false),
+        "plain color header supplies width"
+    );
+    let transfer = receipt.dds.transfer.ok_or("transfer declarations")?;
+    assert_eq!(
+        transfer.effective,
+        DdsTransfer::Unknown,
+        "unmarked legacy source"
+    );
+    assert_eq!(
+        receipt.output_transfer,
+        Some(DdsTransfer::Unknown),
+        "normal remains untagged"
+    );
+    assert_eq!(
+        receipt.png_transform,
+        Some(DdsPngTransform::DataChannels),
+        "normal role keeps data channels"
+    );
+    assert_eq!(
+        receipt.channel_transform,
+        Some(TextureChannelTransform::FlipNormalGreen),
+        "consumer Y transform remains independent from source transfer"
+    );
+    let origin = receipt
+        .field_origins
+        .get(&FieldPath::parse("/dds/transfer/effective")?)
+        .ok_or("transfer origin")?;
+    assert_eq!(
+        origin.contains_encrypted_source(),
+        Some(false),
+        "alpha does not affect colour transfer"
+    );
+    Ok(())
+}
+
+fn verify_linear_colour(manifest: &Manifest, root: &Path) -> TestResult {
+    let colour = manifest
+        .textures
+        .iter()
+        .find(|texture| texture.source.ends_with("base_diff.dds"))
+        .ok_or("linear colour texture")?;
+    assert_eq!(
+        colour.encoding,
+        Some(TextureEncoding::LinearColour),
+        "linear colour is distinct from data"
+    );
+    let metadata = colour
+        .source_metadata
+        .as_deref()
+        .ok_or("linear DDS metadata")?;
+    assert_eq!(
+        metadata.output_transfer,
+        Some(DdsTransfer::Linear),
+        "the package PNG is linear"
+    );
+    let origin = metadata
+        .field_origins
+        .get(&FieldPath::parse("/output_transfer")?)
+        .ok_or("output transfer origin")?;
+    assert_eq!(
+        origin.contains_encrypted_source(),
+        Some(false),
+        "the colour header is plain"
+    );
+    let image = fs::File::open(root.join("ship").join(&colour.file))?;
+    let png = png::Decoder::new(std::io::BufReader::new(image)).read_info()?;
+    assert_eq!(
+        png.info().gama_chunk.map(png::ScaledFloat::into_value),
+        Some(1.0),
+        "real PNG transfer"
+    );
+    Ok(())
+}
+
 fn archive(folder: &Path, path: &str) -> Result<Archive, Box<dyn Error>> {
     let normal = SplitDds::new(TestTextureFormat::LegacyBgra8, 8, 8)
         .alpha(TestTextureFormat::R8)
@@ -75,12 +139,33 @@ fn archive(folder: &Path, path: &str) -> Result<Archive, Box<dyn Error>> {
     let mut archive = p4kx_testkit::ArchiveBuilder::new();
     let part = format!("{path}.1");
     for entry in layered_entries() {
-        if entry.path() != path && entry.path() != part {
+        if entry.path() != path && entry.path() != part && !entry.path().ends_with("base_diff.dds")
+        {
             archive = archive.entry(entry);
         }
     }
+    let colour = SplitDds::new(
+        TestTextureFormat::Dx10Pixel {
+            dxgi_format: 28,
+            pixel_bytes: 4,
+        },
+        8,
+        8,
+    )
+    .mips(1);
+    let mut color_bytes = colour.header_bytes();
+    let body = color_bytes
+        .get_mut(colour.header_len()..)
+        .ok_or("colour payload")?;
+    for pixel in body.as_chunks_mut::<4>().0 {
+        *pixel = [128, 64, 16, 81];
+    }
     let output = folder.join("Data.p4k");
     archive
+        .entry(TestEntry::stored(
+            "Data\\Objects\\Test\\layers\\textures\\base_diff.dds",
+            color_bytes,
+        ))
         .entry(TestEntry::stored(path, normal.header_bytes()))
         .entry(TestEntry::stored(part, normal.part(1)))
         .entry(TestEntry::stored(format!("{path}.a"), alpha.header_bytes()))

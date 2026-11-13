@@ -34,7 +34,7 @@ from .rig_model import Rig, RigError, parse_rig
 
 FORMAT_NAME = "p4kx-blender-package"
 SUPPORTED_MAJOR = 1
-SUPPORTED_MINOR = 11
+SUPPORTED_MINOR = 12
 MANIFEST_NAME = "scene.json"
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
 BLENDER_NAME_BYTES = 63
@@ -46,6 +46,7 @@ _MESH_FILE = re.compile(r"^meshes/m[0-9]{4,}\.glb$")
 _TEXTURE_FILE = re.compile(r"^textures/t[0-9]{4,}\.png$")
 _ROLES = ("diffuse", "normal", "specular")
 _COLOUR_SPACES = frozenset({"srgb", "linear"})
+_TEXTURE_ENCODINGS = frozenset({"srgb", "linear_colour", "data"})
 _ALPHA_MEANINGS = frozenset({"none", "opacity", "smoothness"})
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +81,7 @@ class Texture:
     file: str
     colour_space: str
     alpha: str
+    encoding: str | None = None
 
 
 @dataclass(slots=True)
@@ -248,7 +250,13 @@ def _parse_textures(items: list[Any], warnings: list[str]) -> dict[str, Texture]
         if colour_space not in _COLOUR_SPACES or alpha not in _ALPHA_MEANINGS:
             warnings.append(f"Texture {texture_id} has a colour space or alpha this add-on does not know.")
             continue
-        textures[texture_id] = Texture(texture_id, file, colour_space, alpha)
+        encoding = entry.get("encoding")
+        if encoding is not None and (
+            not isinstance(encoding, str) or encoding not in _TEXTURE_ENCODINGS
+        ):
+            warnings.append(f"Texture {texture_id} has an unknown input encoding.")
+            encoding = None
+        textures[texture_id] = Texture(texture_id, file, colour_space, alpha, encoding)
     return textures
 
 

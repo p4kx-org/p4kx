@@ -71,7 +71,11 @@ impl PreviewHeaderEvidence {
             .collect()
     }
 
-    pub(crate) fn output_transfer_uses(
+    /// Registers the original words used by the chosen output transfer.
+    ///
+    /// # Errors
+    /// Returns an error if the evidence inventory was interrupted.
+    pub fn output_transfer_uses(
         &self,
         encoding: DdsPngEncoding,
     ) -> Result<Vec<SourceUse>, SourceEvidenceError> {

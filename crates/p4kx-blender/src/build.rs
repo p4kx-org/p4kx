@@ -151,13 +151,18 @@ fn meshes(inputs: &Inputs<'_>) -> Vec<Mesh> {
         .collect()
 }
 
-fn written_path(inputs: &Inputs<'_>, path: &str) -> Option<String> {
-    let position = inputs.collected.position_of(path)?;
+fn written_position(inputs: &Inputs<'_>, position: usize) -> Option<String> {
     matches!(inputs.outcomes.get(position), Some(Outcome::Written { .. })).then(|| id_of(position))
 }
 
-fn written_id(inputs: &Inputs<'_>, file: Option<&TextureFile>) -> Option<String> {
-    written_path(inputs, &file?.path)
+fn written_id(
+    inputs: &Inputs<'_>,
+    file: Option<&TextureFile>,
+    role: crate::TextureUse,
+) -> Option<String> {
+    let file = file?;
+    let mode = crate::texture_encoding::TextureMode::drawn(file, role);
+    written_position(inputs, inputs.collected.position_of(&file.path, mode)?)
 }
 
 fn palette_id(position: usize) -> String {
@@ -170,7 +175,7 @@ fn mesh_material(
     index: usize,
     material: &DrawnMaterial,
 ) -> MeshMaterial {
-    let normal = written_id(inputs, material.normal.as_ref());
+    let normal = written_id(inputs, material.normal.as_ref(), crate::TextureUse::Normal);
     MeshMaterial {
         index,
         name: material.name.clone(),
@@ -183,9 +188,17 @@ fn mesh_material(
             .flatten()
             .map(material_id),
         textures: MaterialTextures {
-            diffuse: written_id(inputs, material.diffuse.as_ref()),
+            diffuse: written_id(
+                inputs,
+                material.diffuse.as_ref(),
+                crate::TextureUse::Diffuse,
+            ),
             normal,
-            specular: written_id(inputs, material.specular.as_ref()),
+            specular: written_id(
+                inputs,
+                material.specular.as_ref(),
+                crate::TextureUse::Specular,
+            ),
         },
     }
 }
@@ -197,8 +210,12 @@ fn materials(inputs: &Inputs<'_>) -> Vec<MaterialDescription> {
         .iter()
         .map(|described| {
             let mut description = described.description.clone();
-            for (texture, path) in description.textures.iter_mut().zip(&described.paths) {
-                texture.texture = path.as_deref().and_then(|path| written_path(inputs, path));
+            for (texture, position) in description
+                .textures
+                .iter_mut()
+                .zip(&described.texture_positions)
+            {
+                texture.texture = position.and_then(|position| written_position(inputs, position));
             }
             settle_stencil(&mut description);
             description
@@ -241,6 +258,7 @@ fn textures(inputs: &Inputs<'_>) -> Vec<Texture> {
                 width,
                 height,
                 colour_space,
+                encoding,
                 alpha,
                 source_metadata,
                 ..
@@ -253,6 +271,7 @@ fn textures(inputs: &Inputs<'_>) -> Vec<Texture> {
                     format: TextureFormat::Png,
                     bit_depth: 8,
                     colour_space: *colour_space,
+                    encoding: Some(*encoding),
                     alpha: *alpha,
                     source_metadata: source_metadata.clone(),
                     width: *width,

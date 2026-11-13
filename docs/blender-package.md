@@ -124,7 +124,7 @@ written (there are no `null`s).
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.11` today. |
+| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.12` today. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
@@ -340,7 +340,8 @@ materials from them; the `textures` of a material description say which slot use
 | `id`, `file` | The id and the file relative to the package folder (`textures/t0001.png`). |
 | `source` | The texture's path in the Archive, below `Data`. |
 | `format`, `bit_depth` | `png` and `8` in version 1. High-range textures (EXR, 16 bits) will be new `format` values in a later minor version. |
-| `colour_space` | `srgb` for a diffuse map, `linear` for normal and specular maps (and any data texture): the importer sets Blender's colour space of the image accordingly. The role is that of the first material that names the texture. |
+| `colour_space` | Compatibility setting for readers of earlier 1.x packages. |
+| `encoding` | Importer input for this image: `srgb`, `linear_colour` (Linear Rec.709) or `data` (Non-Color). The same source can supply different image files when its uses require different sampling or channel transforms. |
 | `alpha` | What the alpha channel holds: `none` (opaque, ignore it), `opacity`, or `smoothness` (the alpha channel of a `_ddna` normal map). |
 | `width`, `height` | Pixels of the mip level that was written (`options.texture_mip`, or the smallest the texture has). |
 | `source_metadata` | Optional same-read DDS header, actual `mip_level`, `field_origins` and source-use inventory. Origin paths are relative to this object. `/image` addresses the encoded PNG. |
@@ -594,3 +595,8 @@ the rules above.
 
 A reader of a 1.0 package finds no `materials` and `palettes` (read them as empty) and builds
 from the glTF materials of the meshes and the `diffuse`, `normal` and `specular` textures.
+
+**1.12** adds an optional texture input encoding and captures the actual PNG transfer and
+channel transform in same-read source metadata. Older manifests use their authored
+compatibility colour-space field. Missing or conflicting declarations retain their
+role's compatibility sampling, with unknown actual transfer and an untagged PNG.

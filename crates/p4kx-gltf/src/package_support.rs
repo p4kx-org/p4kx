@@ -53,6 +53,8 @@ pub struct TextureFile {
     pub file: String,
     /// Whether the texture carries the smoothness in its alpha channel.
     pub gloss: bool,
+    /// Whether the authored map supplies opacity or density rather than diffuse RGB.
+    pub opacity: bool,
 }
 
 fn texture_file(source: Source) -> TextureFile {
@@ -60,6 +62,7 @@ fn texture_file(source: Source) -> TextureFile {
         path: source.path,
         file: source.file,
         gloss: source.gloss,
+        opacity: source.opacity,
     }
 }
 

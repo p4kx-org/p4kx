@@ -118,6 +118,12 @@ impl PreviewTextureEvidence {
         self.header.header_uses(fields, role)
     }
 
+    /// Returns whether the observed inputs are physically bound.
+    #[must_use]
+    pub const fn is_complete(&self) -> bool {
+        self.complete
+    }
+
     /// Returns the original header evidence.
     #[must_use]
     pub const fn header(&self) -> &PreviewHeaderEvidence {

@@ -15,7 +15,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 ///
 /// A new minor version only adds fields and values readers may ignore; a new major version changes
 /// the meaning of existing ones.
-pub const FORMAT_VERSION: &str = "1.11";
+pub const FORMAT_VERSION: &str = "1.12";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
@@ -360,6 +360,9 @@ pub struct Texture {
     pub bit_depth: u8,
     /// How the colour channels are encoded.
     pub colour_space: ColourSpace,
+    /// The importer input encoding for this specific output role.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub encoding: Option<crate::TextureEncoding>,
     /// What the alpha channel holds.
     pub alpha: AlphaMeaning,
     /// Original DDS header and actual mip evidence, when the loader exposes its physical input.

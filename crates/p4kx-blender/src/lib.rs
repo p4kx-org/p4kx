@@ -55,6 +55,7 @@ mod soc_scene_rooms;
 mod soc_scene_stream;
 mod soc_scene_xml;
 mod stage;
+mod texture_encoding;
 mod texture_field_origins;
 mod texture_source_metadata;
 mod textures;
@@ -81,6 +82,7 @@ pub use package_write_context::PackageWriteContext;
 pub use schema::manifest_schema;
 pub use soc_scene::{SOC_SCENE_VERSION, SocScene, SocSceneError, SocXmlPosition, soc_scene_schema};
 pub use stage::{check_output, check_output_with_context};
+pub use texture_encoding::{TextureChannelTransform, TextureEncoding};
 pub use texture_source_metadata::TextureSourceMetadata;
 pub use write::{PackageInfo, PackageSummary, write_package, write_package_with_context};
 

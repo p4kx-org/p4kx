@@ -58,6 +58,14 @@ impl<'a> ObservedPreviewImage<'a> {
         self.image
     }
 
+    /// Returns the transfer and channel transform of the decoded RGB samples.
+    ///
+    /// # Errors
+    /// Returns an error when the observed DDS header cannot be interpreted.
+    pub fn png_encoding(&self) -> Result<p4kx_texture::DdsPngEncoding, TextureError> {
+        self.inputs.png_encoding()
+    }
+
     /// Takes the pixels and their independent observed source.
     #[must_use]
     pub fn into_parts(self) -> (RgbaImage, ObservedMipInput<'a>) {

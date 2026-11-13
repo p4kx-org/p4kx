@@ -4,13 +4,14 @@
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+use crate::texture_encoding::TextureMode;
 use crate::texture_source_metadata;
 use p4kx_gltf::TextureLoader;
-use p4kx_texture::{RgbaImage, TextureError, write_png};
+use p4kx_texture::{RgbaImage, TextureError, write_png_with_transfer};
 use rayon::prelude::*;
 
 use crate::{
-    AlphaMeaning, ColourSpace, PackageError, PackageResult, PackageWriteContext, TextureUse,
+    AlphaMeaning, ColourSpace, PackageError, PackageResult, PackageWriteContext, TextureEncoding,
 };
 
 /// How many textures are decoded and encoded at once; a texture can hold 64 megapixels.
@@ -22,8 +23,7 @@ pub(crate) struct Wanted {
     pub(crate) path: String,
     pub(crate) file: String,
     pub(crate) material: String,
-    pub(crate) role: TextureUse,
-    pub(crate) gloss: bool,
+    pub(crate) mode: TextureMode,
 }
 
 /// What became of one wanted texture.
@@ -34,6 +34,7 @@ pub(crate) enum Outcome {
         height: u32,
         bytes: u64,
         colour_space: ColourSpace,
+        encoding: TextureEncoding,
         alpha: AlphaMeaning,
         source_metadata: Option<Box<crate::TextureSourceMetadata>>,
     },
@@ -86,17 +87,17 @@ fn write_one(
     folder: &Path,
     context: &PackageWriteContext<'_>,
 ) -> PackageResult<Outcome> {
-    let (decoded, source_metadata) =
-        match texture_source_metadata::load(loader, &texture.path, mip, context)? {
+    let (decoded, source_metadata, transfer) =
+        match texture_source_metadata::load(loader, &texture.path, mip, texture.mode, context)? {
             Ok(decoded) => decoded,
             Err(error) => return Ok(Outcome::Failed(error.to_string())),
         };
-    let alpha = match (decoded.has_alpha, texture.role, texture.gloss) {
-        (false, _, _) => AlphaMeaning::None,
-        (true, TextureUse::Normal, true) => AlphaMeaning::Smoothness,
-        (true, _, _) => AlphaMeaning::Opacity,
+    let alpha = match (decoded.has_alpha, texture.mode) {
+        (false, _) => AlphaMeaning::None,
+        (true, TextureMode::Normal { gloss: true }) => AlphaMeaning::Smoothness,
+        (true, _) => AlphaMeaning::Opacity,
     };
-    let image = if texture.role == TextureUse::Normal {
+    let image = if matches!(texture.mode, TextureMode::Normal { .. }) {
         match flip_green(decoded.image) {
             Ok(image) => image,
             Err(error) => return Ok(Outcome::Failed(error.to_string())),
@@ -107,7 +108,7 @@ fn write_one(
     let path = folder.join(format!("{id}.png"));
     let (file, ownership) = context.create_file(&path)?.into_parts();
     let mut writer = BufWriter::new(file);
-    let written = write_png(&image, &mut writer);
+    let written = write_png_with_transfer(&image, texture.mode.tag(transfer), &mut writer);
     match written {
         Ok(()) => {}
         Err(TextureError::Write(source)) => return Err(PackageError::write(&path, source)),
@@ -134,11 +135,8 @@ fn write_one(
         width: image.width(),
         height: image.height(),
         bytes,
-        colour_space: if texture.role == TextureUse::Diffuse {
-            ColourSpace::Srgb
-        } else {
-            ColourSpace::Linear
-        },
+        colour_space: texture.mode.legacy_space(),
+        encoding: texture.mode.encoding(transfer),
         alpha,
         source_metadata,
     })
@@ -164,6 +162,7 @@ mod tests {
     use p4kx_texture::RgbaImage;
 
     use super::{Outcome, Wanted, write_all};
+    use crate::texture_encoding::TextureMode;
     use crate::{AlphaMeaning, ColourSpace, PackageWriteContext, TextureUse};
 
     struct One(LoadedTexture);
@@ -179,8 +178,7 @@ mod tests {
             path: "a/b.dds".to_owned(),
             file: "a/b.tif".to_owned(),
             material: "m".to_owned(),
-            role,
-            gloss,
+            mode: TextureMode::of(role, gloss),
         }
     }
 
