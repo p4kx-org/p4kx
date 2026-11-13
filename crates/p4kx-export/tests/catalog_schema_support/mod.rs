@@ -334,7 +334,11 @@ pub(crate) fn minimal_catalog() -> Value {
         "cargoManifests": contracts::manifests(),
         "shipStoreSlugs": slugs::ship_store_slugs()
     });
-    for kind in ["factionIdentities", "securityNetworkManifests"] {
+    for kind in [
+        "factionIdentities",
+        "securityNetworkManifests",
+        "missionModuleDeclarations",
+    ] {
         for (section, value) in [
             ("completeness", json!({"status": "complete"})),
             ("definitions", absent_table()),

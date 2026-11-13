@@ -535,6 +535,7 @@ catalog-summary-kind = { $kind ->
     [infractionSets] Infraction sets
     [jurisdictions] Jurisdictions
     [securityNetworkManifests] Security network manifests
+    [missionModuleDeclarations] Mission module declarations
     [locationClasses] Location classes
     [locationFunctions] Location functions
     [locationSizes] Location sizes

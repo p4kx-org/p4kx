@@ -20,8 +20,11 @@ use crate::template_field_capture::TemplateFieldCapture;
 
 #[path = "location_auto_spawn.rs"]
 mod auto_spawn;
+#[path = "location_mission_module.rs"]
+mod mission_module;
 
 use auto_spawn::LocationAutoSpawnSettings;
+use mission_module::LocationMissionModule;
 
 const SOURCE_TYPE: &str = "MissionLocationData";
 
@@ -30,6 +33,7 @@ const SOURCE_TYPE: &str = "MissionLocationData";
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct MissionLocationConfiguration<'source> {
+    mission_modules: SourcedValue<Vec<SourcedValue<LocationMissionModule<'source>>>>,
     auto_spawn_settings: SourcedValue<Vec<SourcedValue<LocationAutoSpawnSettings<'source>>>>,
     mission_limits: SourcedValue<Vec<SourcedValue<LocationMissionLimit<'source>>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
@@ -42,6 +46,12 @@ impl<'source> MissionLocationConfiguration<'source> {
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
+            mission_modules: fields.class_array_to(
+                "missionModules",
+                "SMissionLocationModule",
+                notes,
+                LocationMissionModule::read,
+            )?,
             auto_spawn_settings: fields.class_array_to(
                 "autoSpawnSettings",
                 "AutoSpawnSettings",

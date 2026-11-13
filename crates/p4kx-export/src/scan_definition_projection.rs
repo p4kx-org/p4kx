@@ -76,9 +76,27 @@ impl<'f> Scan<'_, '_, 'f> {
                 (Picked::ResourceType(Box::new(read.value)), read.notes)
             }
             Kind::ResourceGroups => self.resource_group(admission, tree)?,
+            Kind::MissionModuleDeclarations => self.module_declaration(admission, tree)?,
             _ => return self.read_mission_definition(kind, admission, tree),
         };
         Ok(Some(projection))
+    }
+
+    fn module_declaration(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (definition, notes) = crate::catalog_v3::mission_sources::module_declaration::read(
+            tree,
+            self.projection,
+            admission,
+            self.options.cancel,
+        )?;
+        Ok((
+            Picked::Mission(MissionPick::ModuleDeclaration(Box::new(definition))),
+            notes,
+        ))
     }
 
     fn faction_identity_definition(

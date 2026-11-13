@@ -535,6 +535,7 @@ catalog-summary-kind = { $kind ->
     [infractionSets] Verstoßsammlungen
     [jurisdictions] Rechtsgebiete
     [securityNetworkManifests] Sicherheitsnetzwerk-Manifeste
+    [missionModuleDeclarations] Missionsmodul-Deklarationen
     [locationClasses] Ortsklassen
     [locationFunctions] Ortsfunktionen
     [locationSizes] Ortsgrößen

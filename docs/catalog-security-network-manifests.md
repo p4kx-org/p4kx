@@ -29,3 +29,17 @@ Every sourced value, array slot, and Reference identity has its own `containsEnc
 `sourceUsesRefs` and `sourceSetComplete`. Consumers can resolve current faction and manifest
 links through the catalog's physical identities and inspect filter exclusions in export health.
 The data describes authored policies and preserves every original occurrence.
+
+## Joining an objective override
+
+A contract template retains the authored override in its canonical source arena. Start from
+`configurations.contractTemplates.rows[].objectives[].source` and follow the owner-local
+`valueIndex` into the matching physical template row's `source.values`. Follow the
+`objectiveHandler` and then `securityManifestToOverride` field references. A present
+`recordReference` payload carries the manifest GUID and physical Record index. Join those
+sourced values to `definitions.securityNetworkManifests.rows[].guid` and `recordIndex`
+within the same catalog build.
+
+An explicit null remains a null source cell. A dangling reference keeps its authored GUID in
+`originalError`. A filter exclusion keeps the physical link on the objective and is recorded in
+`exportHealth.unresolvedReferences`.

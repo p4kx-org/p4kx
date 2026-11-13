@@ -163,6 +163,7 @@ impl<'f> Picked<'f> {
             | Kind::Jurisdictions
             | Kind::SecurityNetworkManifests
             | Kind::MissionScenarios
+            | Kind::MissionModuleDeclarations
             | Kind::LocationClasses
             | Kind::LocationFunctions
             | Kind::LocationSizes

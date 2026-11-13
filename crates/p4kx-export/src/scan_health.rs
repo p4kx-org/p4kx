@@ -127,6 +127,9 @@ impl SourceTrace {
                     crate::catalog_v3::mission_scenario_definition::SOURCE_TYPE => {
                         Some(Kind::MissionScenarios)
                     }
+                    crate::catalog_v3::mission_sources::module_declaration::SOURCE_TYPE => {
+                        Some(Kind::MissionModuleDeclarations)
+                    }
                     _ => crate::catalog_v3::law_kinds::kind_for_type(type_name)
                         .or_else(|| {
                             crate::catalog_v3::npc_spawn_definitions::kind_for_type(type_name)

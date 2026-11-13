@@ -228,6 +228,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.starmapObjects` | Authored starmap objects with original links, presentation and navigation settings, ordered by GUID and physical Record index |
 | `placements.starmapPlacements` | The selected world placement of each physical starmap object |
 | `definitions.contractGenerators`, `projections.contracts`, `projections.missionTitles` | Physical Generator definitions, logical contract and sub-contract rows, and their sourced titles and descriptions ([contract](catalog-contract-generators.md)) |
+| `definitions.missionModuleDeclarations` | Physical `ModuleDeclaration` Records and authored location acquisition, spawned entities and variable bindings. [Mission module declarations](catalog-location-configuration.md#physical-module-declarations) |
 | `definitions.missionScenarios` | Physical `MissionScenario` Records with authored variables, cycles, schedule and flags. [Mission scenario definitions](catalog-contract-generators.md#physical-mission-scenario-definitions) |
 | `configurations.missionBoards` | Authored mission-board components with physical Entity and component identity, declared board type, and ordered faction reputation links. [Mission location vocabulary](catalog-location-vocabulary.md) |
 | `configurations.localContractGenerators` | Ordered authored Handler scope and mission-board availability. [Contract generator sources](catalog-contract-generators.md#local-generator-configuration) |
@@ -1627,7 +1628,8 @@ text; the German file lacks 3,246 of the 3,297 variants on LIVE, so `de` is `nul
 falls back to `en`) and `entityClusterMemberGuid`. The sourced `classification` holds the three
 original location class, function and size References. See [the location vocabulary contract](catalog-location-vocabulary.md).
 The sourced location configuration retains authored NPC auto-spawn settings, mission limits and
-the default Reference to [security network manifests](catalog-security-network-manifests.md).
+the default Reference to [security network manifests](catalog-security-network-manifests.md),
+plus authored mission modules and their initialization inputs.
 See [mission location configuration](catalog-location-configuration.md).
 
 Not exported: SCMDB's own pools, waves and region lists, which are derived and not stated by the
@@ -1698,12 +1700,13 @@ the struct does not have is `null`: `module` (a mission scripting file), `module
 `disableTravelObjectives`, `disableReturnObjectives`, `travelRadiusKm`, `allPlayersLeftGracePeriod`,
 `locationProperty`, `organizationProperty`, `haulingLimitProperty` and `targetProperty` (the
 `missionVariableName` of the property the weak pointer names), `minDistance`, `maxDistance`,
-`hideMarkers`, `securityManifestGuid`, `navPoint` (`entityClassGuid`, `displayName`, a game text,
+`hideMarkers`, `navPoint` (`entityClassGuid`, `displayName`, a game text,
 and `extendedTextTokens`), `travelObjective` and `returnObjective` (displays as above), `hauling`
 (the `Hauling_ObjectiveSettings`: five extended text tokens and seven displays) and `instance`
 (`completePhaseOnPlayerEnter`, `enterTravelRadiusKm`, `hudObjectiveText`, a game text,
 `tagIdentifier`, `searchTags`, `objectiveMarker`). The orders of a hauling handler are
-`haulingOrders` of the template.
+`haulingOrders` of the template. The local handler's original `securityManifestToOverride`
+Reference joins the [canonical security network manifest](catalog-security-network-manifests.md#joining-an-objective-override).
 
 **Objective properties.** An entry of `objectiveProperties` has `kind` (`referenced`, `output`,
 `embedded` or `input`, the struct `ObjectiveProperty_*`), `variable` and `token` (the
@@ -2771,6 +2774,7 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `reputationContexts` | `libs/foundry/records/reputation/contexts/` | `SReputationContextUI` |
 | `missionTypes` | `libs/foundry/records/missiontype/` | `MissionType` |
 | `missionLocalities` | `libs/foundry/records/missiondata/pu_missionlocality/` | `MissionLocality` |
+| `missionModuleDeclarations` | Any Record path | `ModuleDeclaration` |
 | `missionScenarios` | `libs/foundry/records/` | `MissionScenario` |
 | `contractScenarios` | `libs/foundry/records/contracts/contractscenarios/` | `ScenarioProgress` |
 | `cargoManifests` | `libs/foundry/records/cargomanifest/` | `CargoManifest` |

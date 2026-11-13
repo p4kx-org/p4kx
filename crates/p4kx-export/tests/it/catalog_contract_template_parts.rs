@@ -17,6 +17,9 @@ use crate::template_fixture_text as texts;
 #[path = "catalog_contract_template_flow.rs"]
 mod flow;
 
+#[path = "catalog_security_objective_overrides.rs"]
+mod security_objective_overrides;
+
 const OWNER: &str = "80000000-0000-4000-8000-000000000001";
 const SCOPE: &str = "80000000-0000-4000-8000-000000000002";
 

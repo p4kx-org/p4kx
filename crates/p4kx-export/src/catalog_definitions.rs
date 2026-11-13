@@ -17,6 +17,7 @@ use crate::catalog_v3::law_kinds::LawTables;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyTables;
 use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
 use crate::catalog_v3::medical::medical_tier_config::MedicalItemTierConfig;
+use crate::catalog_v3::mission_sources::module_declaration::MissionModuleDeclaration;
 use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsTables;
 use crate::catalog_v3::reputation_context_definition::ContextDefinition;
 use crate::catalog_v3::reputation_faction_definition::FactionReputationDefinition;
@@ -44,6 +45,7 @@ use crate::template_definition::TemplateDefinition;
 pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) blueprints: CatalogTable<crate::blueprint_definition::BlueprintDefinition<'source>>,
     pub(crate) contract_generators: CatalogTable<GeneratorDefinition<'source>>,
+    pub(crate) mission_module_declarations: CatalogTable<MissionModuleDeclaration<'source>>,
     pub(crate) mission_scenarios:
         CatalogTable<super::mission_scenario_definition::MissionScenarioDefinition<'source>>,
     pub(crate) contract_templates: CatalogTable<TemplateDefinition<'source>>,
