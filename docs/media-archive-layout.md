@@ -75,7 +75,12 @@ these namespaces under kind `archive`. Other kinds and custom provider namespace
 generic data contract. The shared Entry metadata is the same DTO used by CLI and MCP. The
 CLI exposes `--max-metadata-work`. CLI `info --json` and MCP `archive_info` include the same
 cached `ArchiveLayoutInfo` as their additive `metadata` field, without reading lazy records.
-Human-readable summaries retain their existing lines and counting meanings.
+Their `fieldOrigins` records the observed owning directory or Container for each layout field.
+Original header facts identify the source-local header extent and logical field. The marker follows
+the containing Entries when reading an already opened nested layout. The root directory does not
+inherit encryption from its Entry payloads. Unknown recovery declarations remain unknown, and the
+tool-authored metadata version has a complete empty contributor set. Human-readable summaries
+retain their existing lines and counting meanings.
 
 The reader's [source metadata contract](archive-source-metadata.md) defines record ownership,
 section extents, recovery limits and lazy-access failures.

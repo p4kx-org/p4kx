@@ -89,20 +89,29 @@ impl SourceUses {
         archive: &Archive,
         location: impl FnOnce(DecimalU64) -> Result<SourceLocation, SourceEvidenceError>,
     ) -> Result<Option<SourceUse>, SourceEvidenceError> {
+        let Some(scope) = self.root_directory_scope(archive)? else {
+            return Ok(None);
+        };
+        let count = DecimalU64::new(archive.entries().len() as u64);
+        Ok(Some(scope.at(location(count)?, SourceUseRole::Selector)?))
+    }
+
+    pub(crate) fn root_directory_scope(
+        &self,
+        archive: &Archive,
+    ) -> Result<Option<SourceScope>, SourceEvidenceError> {
         let Some(count) = archive.root_directory_entry_count() else {
             return Ok(None);
         };
-        let count = DecimalU64::new(count as u64);
-        let location = location(count)?;
-        let mut registry = source_evidence_error::lock(&self.registry)?;
-        let source = registry.root_directory(archive.input_origin(), count);
-        Ok(Some(registry.register_use(
-            &source,
-            InputScope::ArchiveDirectoryMetadata,
-            location,
-            SourceUseRole::Selector,
-            SourceEncryptionState::Unencrypted,
-        )))
+        let source = source_evidence_error::lock(&self.registry)?
+            .root_directory(archive.input_origin(), DecimalU64::new(count as u64));
+        Ok(Some(SourceScope {
+            registry: Arc::clone(&self.registry),
+            source,
+            payload: SourceEncryptionState::Unknown,
+            metadata: SourceEncryptionState::Unencrypted,
+            scope: InputScope::ArchiveDirectoryMetadata,
+        }))
     }
 
     /// Retains the actual input once and returns a shared payload or metadata scope.

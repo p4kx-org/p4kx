@@ -93,6 +93,21 @@ fn archive_info_by_channel_name_summarises_the_archive() -> TestResult {
         .remove("metadata")
         .ok_or("cached source metadata")?;
     assert_cached_layout(&metadata, &install)?;
+    let fields = info.as_object_mut().ok_or("Archive summary object")?;
+    let origins = fields
+        .remove("fieldOrigins")
+        .ok_or("layout field origins")?;
+    assert_eq!(
+        origins.pointer(
+            "/~1structuredContent~1metadata~1zip~1end~1directoryOffset/containsEncryptedSource"
+        ),
+        Some(&json!(false)),
+        "root directory words stay plain with an encrypted payload elsewhere"
+    );
+    assert!(
+        fields.remove("provenance").is_some(),
+        "the summary carries its source inventory"
+    );
     assert_eq!(
         info,
         json!({

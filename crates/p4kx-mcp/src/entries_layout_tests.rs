@@ -16,7 +16,18 @@ fn archive_info_uses_the_shared_cached_header_dto_without_changing_existing_coun
         .entry(TestEntry::stored("x", b""))
         .write_to(&path)?;
     let archive = Archive::open(path)?;
-    let info = serde_json::to_value(super::info(&archive, &PublicPatches::default()))?;
+    let info = serde_json::to_value(super::info(&archive, &PublicPatches::default())?)?;
+    assert_eq!(
+        info.pointer(
+            "/fieldOrigins/~1structuredContent~1metadata~1v2~1sectorSize/containsEncryptedSource"
+        ),
+        Some(&json!(false)),
+        "MCP addresses each layout field"
+    );
+    assert!(
+        info.pointer("/provenance/uses/0").is_some(),
+        "MCP carries the referenced inventory"
+    );
     let expected: Value = serde_json::from_str(include_str!(
         "../../p4kx-testkit/fixtures/archive-layout-v2-empty.json"
     ))?;
@@ -53,6 +64,14 @@ fn archive_info_output_schema_requires_all_shared_header_fields() -> TestResult 
         schema.pointer("/properties/metadata/$ref"),
         Some(&json!("#/$defs/ArchiveLayoutInfo")),
         "MCP output schema shares the header DTO"
+    );
+    assert!(
+        schema.pointer("/properties/fieldOrigins").is_some(),
+        "MCP schema exposes field origins"
+    );
+    assert!(
+        schema.pointer("/properties/provenance").is_some(),
+        "MCP schema exposes the source inventory"
     );
     let required = schema
         .pointer("/$defs/ArchiveLayoutInfo/required")

@@ -175,7 +175,7 @@ fn info_with_a_build() -> TestResult {
     let archive = fixture.channel("PTU", true)?;
 
     let json = fixture.json(fixture.p4kx()?.arg("info").arg(&archive), 0)?;
-
+    let json = super::info_layout::without_origin_companion(&json)?;
     insta::assert_snapshot!(json);
     Ok(())
 }
@@ -186,7 +186,7 @@ fn info_without_a_build() -> TestResult {
     let archive = fixture.channel("LIVE", false)?;
 
     let json = fixture.json(fixture.p4kx()?.arg("info").arg(&archive), 0)?;
-
+    let json = super::info_layout::without_origin_companion(&json)?;
     insta::assert_snapshot!(json);
     Ok(())
 }

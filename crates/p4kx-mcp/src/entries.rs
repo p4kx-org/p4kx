@@ -16,7 +16,9 @@ use crate::shapes::{
 const MAX_SHOWN_ISSUES: usize = 50;
 
 /// Returns the summary of `archive`, its Build with the public patch `patches` knows.
-pub(crate) fn info(archive: &Archive, patches: &PublicPatches) -> ArchiveInfo {
+pub(crate) fn info(archive: &Archive, patches: &PublicPatches) -> Result<ArchiveInfo, ToolError> {
+    let (metadata, origins) =
+        ArchiveLayoutInfo::project_with_origins(archive, "/structuredContent/metadata")?;
     let entries = archive.entries();
     let (encrypted_count, compressed_size, size) =
         entries
@@ -28,13 +30,14 @@ pub(crate) fn info(archive: &Archive, patches: &PublicPatches) -> ArchiveInfo {
                     size.saturating_add(entry.uncompressed_size()),
                 )
             });
-    ArchiveInfo {
+    Ok(ArchiveInfo {
         archive: archive.path().display().to_string(),
         channel: p4kx_channels::channel_name(archive.path()),
         build: archive
             .build()
             .map(|build| BuildShape::from(&patches.attach(build))),
-        metadata: ArchiveLayoutInfo::of(archive.metadata()),
+        metadata,
+        origins,
         entry_count: entries.len(),
         encrypted_count,
         issue_count: archive.issue_count(),
@@ -52,7 +55,7 @@ pub(crate) fn info(archive: &Archive, patches: &PublicPatches) -> ArchiveInfo {
             .collect(),
         compressed_size,
         size,
-    }
+    })
 }
 
 /// Returns one page of the Entries of `archive` that `filter` matches, in Archive order.

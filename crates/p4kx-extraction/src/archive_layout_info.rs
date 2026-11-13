@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_archive::{ArchiveLayoutKind, ArchiveMetadata, ArchiveMetadataStatus};
+use p4kx_archive::{Archive, ArchiveLayoutKind, ArchiveMetadata, ArchiveMetadataStatus};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -60,6 +60,20 @@ pub struct ArchiveLayoutInfo {
 }
 
 impl ArchiveLayoutInfo {
+    /// Projects cached declarations and the exact field origins rooted at the given JSON Pointer.
+    ///
+    /// # Errors
+    /// Returns an error if original source evidence or a field address cannot be represented.
+    pub fn project_with_origins(
+        archive: &Archive,
+        address: &str,
+    ) -> Result<(Self, crate::ArchiveLayoutOrigins), crate::ArchiveLayoutOriginError> {
+        let layout = Self::of(archive.metadata());
+        let origins =
+            crate::source_provenance::archive_layout_origins::capture(archive, &layout, address)?;
+        Ok((layout, origins))
+    }
+
     /// Projects cached declarations without reading bodies, signatures or table rows.
     #[must_use]
     pub fn of(metadata: &ArchiveMetadata) -> Self {

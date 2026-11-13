@@ -98,6 +98,9 @@ pub(crate) enum ToolError {
     /// The Entry read's original input evidence could not be retained.
     #[error("cannot retain the Entry read source evidence")]
     EntryEvidence(#[source] SourceEvidenceError),
+    /// The cached Archive layout's original source evidence could not be retained.
+    #[error("cannot retain the Archive layout source evidence")]
+    ArchiveLayoutEvidence(#[from] p4kx_extraction::ArchiveLayoutOriginError),
     /// The Entry listing's original directory evidence could not be retained.
     #[error("cannot retain the Entry listing source evidence")]
     EntryListingEvidence(#[from] crate::entry_directory_origins::EvidenceError),
