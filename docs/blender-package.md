@@ -79,6 +79,23 @@ Mesh and texture paths use forward slashes and match the case of every directory
 the package. The add-on reports the expected and actual spelling when an existing asset path
 has different case, including on case-insensitive filesystems.
 
+## Mesh validation before import
+
+The Blender add-on checks each mesh referenced by a supported scene node before it creates
+collections or objects. It checks the GLB version, file length, chunk order and bounds, embedded
+buffer ranges, and references used by geometry, materials, rigs and animations. The check bounds
+the JSON chunk to 16 MiB and seeks over the geometry payload. A GLB that refers to an external
+buffer or image is refused.
+
+If a mesh is missing or fails validation, Blender reports the mesh ID and the reason. The
+remaining valid meshes and scene nodes still import. The add-on checks any recorded nonzero
+file size and requires manifest material indices to be unique and within the GLB material
+array. Older packages may omit the file size. Blender's glTF importer still verifies that it
+can read the valid assets.
+
+For native release fixtures, the package exchange checks the receipt's SHA-256 inventory and
+the structure of referenced GLBs. Ordinary Blender imports work without a receipt.
+
 ## `scene.json`
 
 All lengths are metres, all transforms are relative to the parent node. Writers add fields in
