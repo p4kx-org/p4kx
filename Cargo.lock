@@ -3585,7 +3585,6 @@ version = "0.4.2"
 dependencies = [
  "lewton",
  "opus-pure",
- "p4kx-foundation",
  "p4kx-testkit",
  "rayon",
  "thiserror 2.0.21",
