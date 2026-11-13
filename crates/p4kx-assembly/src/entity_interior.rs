@@ -6,6 +6,7 @@ mod build;
 pub(crate) mod lookup;
 mod placement;
 
+use p4kx_extraction::ModelArchiveSource;
 use p4kx_gltf::{GltfError, Scene, SceneNode};
 use p4kx_model::{MaterialStatus, Transform};
 
@@ -155,6 +156,7 @@ impl EntityInterior {
         &'s self,
         scene: &mut Scene<'s>,
         parts: usize,
+        observe: &mut impl FnMut(usize, &'s [ModelArchiveSource]),
     ) -> Result<(), GltfError> {
         let mut group: Option<(usize, usize)> = None;
         for container in &self.containers {
@@ -168,9 +170,12 @@ impl EntityInterior {
                     node
                 }
             };
-            container
-                .interior
-                .add_to_scene(scene, Some(node), container.placement)?;
+            container.interior.add_to_scene_observing_models(
+                scene,
+                Some(node),
+                container.placement,
+                observe,
+            )?;
         }
         Ok(())
     }

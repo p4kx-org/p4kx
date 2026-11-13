@@ -13,35 +13,28 @@ use p4kx_extraction::{
 use p4kx_gltf::MeshVertexMap;
 use p4kx_model::{MeshOrigin, Model, ModelChunk};
 
-use crate::items::Drawn;
 use crate::mesh_vertex_map_wire::{self as wire, Mapping, Row};
 use crate::package_receipt::PackageFile;
 use crate::{MESHES_FOLDER, PackageError, PackageResult, PackageWriteContext};
 
 const VERTICES_PER_USE_BATCH: u64 = 4096;
 
-pub(super) struct Writer<'a> {
+pub(super) struct Writer {
     sink: OriginDigestWriter<BufWriter<std::fs::File>>,
     ownership: p4kx_guard::OwnedFileToken,
     inventory: SourceUses,
-    drawn: Drawn<'a>,
     meshes: u64,
     vertices: u64,
     uses: u64,
 }
 
-impl<'a> Writer<'a> {
-    pub(super) fn new(
-        path: &Path,
-        drawn: Drawn<'a>,
-        context: &PackageWriteContext<'_>,
-    ) -> PackageResult<Self> {
+impl Writer {
+    pub(super) fn new(path: &Path, context: &PackageWriteContext<'_>) -> PackageResult<Self> {
         let (file, ownership) = context.create_file(path)?.into_parts();
         let mut writer = Self {
             sink: OriginDigestWriter::new(BufWriter::new(file)),
             ownership,
             inventory: SourceUses::with_batched_use_refs(),
-            drawn,
             meshes: 0,
             vertices: 0,
             uses: 0,
@@ -58,9 +51,11 @@ impl<'a> Writer<'a> {
     pub(super) fn observe(
         &mut self,
         map: &MeshVertexMap<'_>,
+        model: &Model,
+        sources: &[ModelArchiveSource],
         context: &PackageWriteContext<'_>,
     ) -> io::Result<()> {
-        let evidence = source_of(self.drawn.model, self.drawn.model_sources, map.origin);
+        let evidence = source_of(model, sources, map.origin);
         let scope = evidence
             .map(|(entry, chunk)| {
                 Ok::<_, io::Error>(Bound {

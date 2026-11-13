@@ -24,7 +24,7 @@ pub(crate) struct PackageMeshArgs {
     /// Leaves the vertex colours out of the parts.
     #[arg(long)]
     no_vertex_colours: bool,
-    /// Writes source vertex maps for the package's static scene meshes.
+    /// Writes source vertex maps for the package's meshes.
     #[arg(long)]
     pub(crate) vertex_maps: bool,
 }

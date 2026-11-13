@@ -4,7 +4,7 @@
 use std::io::Write;
 use std::sync::Arc;
 
-use p4kx_extraction::ArchiveDefaultMaterial;
+use p4kx_extraction::{ArchiveDefaultMaterial, ModelArchiveSource};
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, Scene, SceneNode, ScenePart, TextureLoader, write_scene_glb,
     write_scene_glb_with,
@@ -63,6 +63,16 @@ impl Interior {
         parent: Option<usize>,
         placement: Transform,
     ) -> Result<Option<usize>, GltfError> {
+        self.add_to_scene_observing_models(scene, parent, placement, &mut |_, _| {})
+    }
+
+    pub(crate) fn add_to_scene_observing_models<'s>(
+        &'s self,
+        scene: &mut Scene<'s>,
+        parent: Option<usize>,
+        placement: Transform,
+        observe: &mut impl FnMut(usize, &'s [ModelArchiveSource]),
+    ) -> Result<Option<usize>, GltfError> {
         let mut nodes = Vec::with_capacity(self.parts.len());
         let fallback = self
             .default_material
@@ -85,7 +95,9 @@ impl Interior {
             if let Some(light) = part.scene_light() {
                 node = node.with_light(light);
             }
-            nodes.push(scene.push(node)?);
+            let index = scene.push(node)?;
+            observe(index, part.model_archive_sources());
+            nodes.push(index);
         }
         Ok(nodes.first().copied())
     }

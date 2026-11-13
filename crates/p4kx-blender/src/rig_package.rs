@@ -18,6 +18,8 @@ use crate::manifest::{
     Source,
 };
 use crate::manifest_rig::Rig;
+use crate::mesh_vertex_map::Writer;
+use crate::mesh_vertex_map_wire;
 use crate::package_receipt::{self, PackageFile, PackageTotals};
 use crate::plan::mesh_id;
 use crate::stage::Staging;
@@ -117,6 +119,14 @@ impl<W: Write> Write for Stoppable<'_, W> {
 pub(crate) type RigWriter<'a, 'sink> =
     Stoppable<'a, OriginDigestWriter<&'sink mut BufWriter<File>>>;
 
+#[derive(Clone, Copy)]
+pub(crate) enum RigPackageKind {
+    Character,
+    Creature,
+}
+
+type OptionalMap<'a> = Option<&'a mut Writer>;
+
 /// Writes a package into the folder `out` whose only mesh, `meshes/m0001.glb`, `write_glb` writes
 /// to the writer it is given with the GLB options of a package mesh (`options` with the vertex
 /// colours of layered surfaces, which the add-on reads as layer shares), and whose manifest `manifest_of` makes from what was written.
@@ -128,7 +138,12 @@ pub(crate) fn write_rig_package(
     name: &str,
     options: &GlbOptions,
     cancelled: &PackageWriteContext<'_>,
-    write_glb: impl FnOnce(&GlbOptions, &mut RigWriter<'_, '_>) -> Result<GlbSummary, GltfError>,
+    kind: RigPackageKind,
+    write_glb: impl FnOnce(
+        &GlbOptions,
+        &mut RigWriter<'_, '_>,
+        OptionalMap<'_>,
+    ) -> Result<GlbSummary, GltfError>,
     manifest_of: impl FnOnce(&GlbSummary) -> Manifest,
 ) -> PackageResult<PackageSummary> {
     let staging = Staging::create(out, *cancelled)?;
@@ -137,6 +152,7 @@ pub(crate) fn write_rig_package(
         name,
         options,
         cancelled,
+        kind,
         write_glb,
         manifest_of,
     );
@@ -148,20 +164,30 @@ fn write_rig_files(
     name: &str,
     options: &GlbOptions,
     cancelled: &PackageWriteContext<'_>,
-    write_glb: impl FnOnce(&GlbOptions, &mut RigWriter<'_, '_>) -> Result<GlbSummary, GltfError>,
+    kind: RigPackageKind,
+    write_glb: impl FnOnce(
+        &GlbOptions,
+        &mut RigWriter<'_, '_>,
+        OptionalMap<'_>,
+    ) -> Result<GlbSummary, GltfError>,
     manifest_of: impl FnOnce(&GlbSummary) -> Manifest,
 ) -> PackageResult<PackageSummary> {
     cancelled.check()?;
     let id = mesh_id(0);
     let relative = format!("{MESHES_FOLDER}/{id}.glb");
     let path = staging.join(&relative);
+    let map_name = format!("{id}.vertex-map.jsonl");
+    let map_path = staging.join(MESHES_FOLDER).join(&map_name);
+    let mut map = (matches!(kind, RigPackageKind::Creature) && cancelled.vertex_maps)
+        .then(|| Writer::new(&map_path, cancelled))
+        .transpose()?;
     let (file, ownership) = cancelled.create_file(&path)?.into_parts();
     let mut sink = BufWriter::new(file);
     let mut writer = Stoppable {
         inner: OriginDigestWriter::new(&mut sink),
         cancelled,
     };
-    let written = write_glb(&package_mesh_options(options), &mut writer)
+    let written = write_glb(&package_mesh_options(options), &mut writer, map.as_mut())
         .map_err(|error| glb_error(error, &path, (&id, name), cancelled))?;
     let digest = writer
         .inner
@@ -174,8 +200,23 @@ fn write_rig_files(
     drop(sink);
     cancelled.check()?;
     let mut manifest = manifest_of(&written);
+    let sidecar = map
+        .map(|map| map.finish(&map_path, &map_name, &relative, &digest, cancelled))
+        .transpose()?;
+    if let Some(sidecar) = &sidecar {
+        let mesh = manifest.meshes.first_mut().ok_or_else(|| {
+            PackageError::write(
+                &map_path,
+                io::Error::other("rigged mesh is missing from its manifest"),
+            )
+        })?;
+        mesh.vertex_map = Some(sidecar.path.clone());
+        mesh_vertex_map_wire::PACKAGE_VERSION.clone_into(&mut manifest.version);
+    }
     sanitise(&mut manifest);
-    let files = vec![PackageFile::new(relative, &digest)];
+    let files = std::iter::once(PackageFile::new(relative, &digest))
+        .chain(sidecar)
+        .collect();
     let totals = package_receipt::write_metadata(staging, &manifest, files, cancelled)?;
     let summary = summarise(&manifest, &written, totals);
     cancelled.check()?;

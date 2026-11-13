@@ -196,15 +196,7 @@ pub fn write_package_with_context(
                 "collision helpers require a decomposed Assembly package",
             )));
         }
-        if context.vertex_maps {
-            return Err(crate::PackageError::write(
-                out,
-                std::io::Error::new(
-                    std::io::ErrorKind::Unsupported,
-                    "vertex maps require a decomposed Assembly package",
-                ),
-            ));
-        }
+
         return write_creature_package(assembly, textures, options, info, out, context);
     }
     let scene = Scene {

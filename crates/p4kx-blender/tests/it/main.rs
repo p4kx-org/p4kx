@@ -12,6 +12,7 @@ mod package_bone_attachment;
 mod package_character;
 mod package_collision_helpers;
 mod package_creature;
+mod package_creature_vertex_map;
 mod package_ddna_pair;
 mod package_dds_fallback;
 mod package_default_material;

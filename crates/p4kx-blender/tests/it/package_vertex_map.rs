@@ -104,7 +104,7 @@ fn write_pair(archive: &Archive, plain: &Path, observed: &Path) -> TestResult {
     Ok(())
 }
 
-fn rows(path: &Path) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
+pub(super) fn rows(path: &Path) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
     io::BufReader::new(fs::File::open(path)?)
         .lines()
         .map(|line| Ok(serde_json::from_str::<Value>(&line?)?))
@@ -223,7 +223,7 @@ fn row<'a>(rows: &'a [Value], kind: &str) -> Result<&'a Value, Box<dyn std::erro
         .ok_or_else(|| format!("missing {kind} row").into())
 }
 
-fn assert_receipt(out: &Path, name: &str) -> TestResult {
+pub(super) fn assert_receipt(out: &Path, name: &str) -> TestResult {
     let receipt: Value = serde_json::from_slice(&fs::read(out.join("receipt.json"))?)?;
     let files = receipt
         .get("files")

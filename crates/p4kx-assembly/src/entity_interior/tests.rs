@@ -57,7 +57,7 @@ fn an_assembly_without_parts_still_writes_the_interior_at_the_top() {
     let mut scene = Scene::new();
     let written = assembly
         .interior()
-        .map(|interior| interior.add_to_scene(&mut scene, 0));
+        .map(|interior| interior.add_to_scene(&mut scene, 0, &mut |_, _| {}));
 
     assert!(matches!(written, Some(Ok(()))));
     let [group] = scene.nodes() else {

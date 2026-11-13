@@ -89,15 +89,15 @@ fn write_files(
     let map_path = folder.join(&map_name);
     let mut vertex_map = drawn
         .filter(|_| context.vertex_maps)
-        .map(|drawn| mesh_vertex_map::Writer::new(&map_path, drawn, context))
+        .map(|_| mesh_vertex_map::Writer::new(&map_path, context))
         .transpose()?;
     let (file, ownership) = context.create_file(&path)?.into_parts();
     let mut sink = BufWriter::new(file);
     let mut writer = OriginDigestWriter::new(&mut sink);
     let options = package_mesh_options(options).with_material_indices();
-    let summary = if let Some(map) = &mut vertex_map {
+    let summary = if let (Some(map), Some(drawn)) = (&mut vertex_map, drawn) {
         write_scene_glb_observed(scene, &options, None, &mut writer, &mut |row| {
-            map.observe(&row, context)
+            map.observe(&row, drawn.model, drawn.model_sources, context)
         })
     } else {
         write_scene_glb(scene, &options, &mut writer)

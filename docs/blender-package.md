@@ -808,11 +808,13 @@ material emission. Dynamic Entity links and shader-specific coverage controls su
 ### Source vertex maps
 
 Use `entity package --vertex-maps` or `interior package --vertex-maps` to include
-`meshes/mNNNN.vertex-map.jsonl` alongside each emitted static scene GLB. In Rust, enable
-this option with `PackageWriteContext::with_vertex_maps`. The package declares each file
+`meshes/mNNNN.vertex-map.jsonl` alongside each emitted GLB. In Rust, enable this
+option with `PackageWriteContext::with_vertex_maps`. The package declares each file
 as `mesh.vertex_map`, and `receipt.json` records its SHA-256. The package uses minor
-version 1.19 when it contains a map. An explicit request for a single rigged creature
-package fails with an unsupported-layout error.
+version 1.19 when it contains a map. A creature's single rigged GLB has one map with
+a row for each emitted mesh, linked to the part or attachment that supplied it.
+When two instances share one GLB mesh, the source is the writer's first producer
+instance.
 
 Each JSONL file begins with the format and version. A `mesh` row identifies the actual GLB
 mesh and POSITION accessor, its element count, the requested level, the selected model

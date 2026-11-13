@@ -251,6 +251,7 @@ fn scene_reuses_one_observed_mesh_and_keeps_requested_selected_and_physical_leve
     let fixture = Fixture::new()?;
     let model = fixture.read(LodSelection::All)?;
     let mut scene = Scene::new();
+    scene.push(SceneNode::new("wrapper only", None, Transform::IDENTITY))?;
     for label in ["first", "twin"] {
         scene.push(
             SceneNode::new(label, None, Transform::IDENTITY)
@@ -266,6 +267,8 @@ fn scene_reuses_one_observed_mesh_and_keeps_requested_selected_and_physical_leve
         &mut |map| {
             calls += 1;
             assert_map(map, 3, 1, 1, ModelFile::LodGeometry(1), 1);
+            assert_eq!(map.part, 0, "first producing model instance");
+            assert_eq!(map.scene_node, Some(1), "producer's actual scene wrapper");
             Ok(())
         },
     )?;

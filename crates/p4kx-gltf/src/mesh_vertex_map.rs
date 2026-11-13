@@ -26,6 +26,8 @@ pub struct MeshVertexMap<'a> {
     pub vertices: u64,
     /// The model instance that supplied the geometry, in producer order.
     pub part: usize,
+    /// The scene node whose model produced this mesh, when writing a scene.
+    pub scene_node: Option<usize>,
     /// The originating node index in that instance's model.
     pub model_node: usize,
     /// The requested GLB level.
@@ -83,10 +85,8 @@ pub(crate) fn observe(
         return Err(layout_error());
     }
     for (index, (written, plan)) in document.meshes.iter().zip(&layout.meshes).enumerate() {
-        let lod = instances
-            .get(plan.part)
-            .and_then(|instance| instance.lod)
-            .ok_or_else(layout_error)?;
+        let instance = instances.get(plan.part).ok_or_else(layout_error)?;
+        let lod = instance.lod.ok_or_else(layout_error)?;
         let source = lod.meshes.get(plan.model_mesh).ok_or_else(layout_error)?;
         let position = written
             .primitives
@@ -104,6 +104,7 @@ pub(crate) fn observe(
             position_accessor: position.value(),
             vertices: accessor.count.0,
             part: plan.part,
+            scene_node: instance.wrapper,
             model_node: source.node,
             requested_lod,
             model_lod: lod.level,

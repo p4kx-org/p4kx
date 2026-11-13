@@ -13,7 +13,7 @@ use crate::entity_classification::EntityClassifications;
 use crate::items::entity_ref;
 use crate::manifest::{Issue, IssueOrigin, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigPart, RigPartOrigin};
-use crate::rig_package::{RigScene, rig_manifest, write_rig_package};
+use crate::rig_package::{RigPackageKind, RigScene, rig_manifest, write_rig_package};
 use crate::{PackageInfo, PackageResult, PackageSummary, PackageWriteContext};
 
 /// Writes the creature `assembly` as a package: `meshes/m0001.glb` is the Assembly as
@@ -46,7 +46,19 @@ pub(crate) fn write_creature_package(
         name,
         &options,
         context,
-        |options, writer| assembly.write_glb_with(options, textures, writer),
+        RigPackageKind::Creature,
+        |options, writer, map| {
+            if let Some(map) = map {
+                assembly.write_glb_with_vertex_origins(
+                    options,
+                    textures,
+                    writer,
+                    &mut |row, model, sources| map.observe(&row, model, sources, context),
+                )
+            } else {
+                assembly.write_glb_with(options, textures, writer)
+            }
+        },
         |written| {
             let mut manifest = manifest(assembly, interior_left_out, info, &options, written);
             classifications.apply(&mut manifest);
