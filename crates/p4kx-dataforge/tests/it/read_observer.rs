@@ -7,7 +7,7 @@ use std::ops::ControlFlow;
 use std::sync::{Arc, Mutex};
 
 use p4kx_dataforge::{
-    CanonicalReadObserver, DataForge, DataForgeError, Record, RecordTree, TreeBuilder,
+    CanonicalReadObserver, DataForge, DataForgeError, Guid, Record, RecordTree, TreeBuilder,
 };
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
@@ -130,6 +130,30 @@ fn observer_stop_is_distinct_from_game_data_failure_and_can_be_removed() -> Test
         capture.calls.lock().map_err(|_| "capture lock")?.len(),
         1,
         "unobserved reads produce no callback"
+    );
+    Ok(())
+}
+
+#[test]
+fn exact_guid_lookup_keeps_every_physical_record_in_definition_order() -> TestResult {
+    let bytes = database(8, false);
+    let forge = DataForge::open(&bytes)?;
+    let original = forge.record(0).ok_or("original first Record")?;
+    let matches: Vec<_> = forge
+        .records_by_guid(original.guid())
+        .map(|record| record.index())
+        .collect();
+    assert_eq!(matches, [0, 1], "both physical matches remain visible");
+    assert_eq!(
+        forge
+            .record_by_guid(original.guid())
+            .map(|record| record.index()),
+        Some(0),
+        "the single-record API still selects the first physical occurrence"
+    );
+    assert!(
+        forge.records_by_guid(Guid::default()).next().is_none(),
+        "missing GUID"
     );
     Ok(())
 }

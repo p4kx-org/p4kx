@@ -167,13 +167,25 @@ impl<'a> DataForge<'a> {
     /// Returns the Record with `guid`, or `None` when there is none.
     #[must_use]
     pub fn record_by_guid(&self, guid: Guid) -> Option<Record<'_>> {
+        self.records_by_guid(guid).next()
+    }
+
+    /// Visits all Records with the GUID in definition order.
+    pub fn records_by_guid(&self, guid: Guid) -> impl Iterator<Item = Record<'_>> + '_ {
         let index = self.guid_index.get_or_init(|| self.build_guid_index());
-        let guid_of = |record: &u32| self.record_def(*record).map(|def| def.guid);
-        let first = index.partition_point(|record| guid_of(record) < Some(guid.stored()));
+        let stored = guid.stored();
+        let first = index.partition_point(|&record| {
+            self.record_def(record).map(|definition| definition.guid) < Some(stored)
+        });
         index
-            .get(first)
-            .and_then(|record| self.record(*record))
-            .filter(|record| record.def.guid == guid.stored())
+            .get(first..)
+            .into_iter()
+            .flatten()
+            .copied()
+            .map_while(move |record| {
+                self.record(record)
+                    .filter(|record| record.def.guid == stored)
+            })
     }
 
     /// Returns the Records at a record path in definition order, ignoring ASCII case, the kind of
