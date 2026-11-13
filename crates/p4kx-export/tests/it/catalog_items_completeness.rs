@@ -108,6 +108,7 @@ fn expected_completeness() -> Value {
         "contractScenarios": {"status": "complete"},
         "missionScenarios": {"status": "complete"},
         "missionModuleDeclarations": {"status": "complete"},
+        "contractScopes": {"status": "complete"},
         "cargoManifests": {"status": "complete"},
         "missionLocationTemplates": {"status": "complete"},
         "contractShipSpawns": {"status": "complete"},

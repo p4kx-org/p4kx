@@ -189,6 +189,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::ContractScopes
             | Kind::NpcArchetypes
             | Kind::NpcClassPools
             | Kind::AutoSpawns

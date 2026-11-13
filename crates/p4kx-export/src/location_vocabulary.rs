@@ -4,6 +4,10 @@
 use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree};
 use schemars::JsonSchema;
 use serde::Serialize;
+#[path = "contract_scope_global_params.rs"]
+mod contract_scope_global_params;
+
+use contract_scope_global_params::{ContractScopeGlobalParams, SOURCE_TYPE as SCOPE_SOURCE_TYPE};
 
 use super::location_vocabulary_definition::{
     LocationClassDefinition, LocationDictionaryEntry, LocationRegistry,
@@ -23,6 +27,7 @@ pub(crate) const SIZE: &str = "MissionLocationSize";
 pub(crate) const CLASS_REGISTRY: &str = "MissionLocationClasses";
 pub(crate) const FUNCTION_REGISTRY: &str = "MissionLocationFunctions";
 pub(crate) const SIZE_REGISTRY: &str = "MissionLocationSizes";
+pub(crate) const CONTRACT_SCOPE: &str = SCOPE_SOURCE_TYPE;
 
 pub(crate) fn kind_for_type(source_type: &str) -> Option<Kind> {
     Some(match source_type {
@@ -32,6 +37,7 @@ pub(crate) fn kind_for_type(source_type: &str) -> Option<Kind> {
         CLASS_REGISTRY => Kind::LocationClassRegistries,
         FUNCTION_REGISTRY => Kind::LocationFunctionRegistries,
         SIZE_REGISTRY => Kind::LocationSizeRegistries,
+        CONTRACT_SCOPE => Kind::ContractScopes,
         _ => return None,
     })
 }
@@ -44,6 +50,7 @@ pub(crate) const fn source_type(kind: Kind) -> Option<&'static str> {
         Kind::LocationClassRegistries => CLASS_REGISTRY,
         Kind::LocationFunctionRegistries => FUNCTION_REGISTRY,
         Kind::LocationSizeRegistries => SIZE_REGISTRY,
+        Kind::ContractScopes => CONTRACT_SCOPE,
         _ => return None,
     })
 }
@@ -55,6 +62,7 @@ pub(crate) enum LocationVocabularyPick<'source> {
     ClassRegistry(Box<PreparedDefinition<'source, LocationRegistry<'source>>>),
     FunctionRegistry(Box<PreparedDefinition<'source, LocationRegistry<'source>>>),
     SizeRegistry(Box<PreparedDefinition<'source, LocationRegistry<'source>>>),
+    ContractScope(Box<PreparedDefinition<'source, ContractScopeGlobalParams<'source>>>),
 }
 
 impl<'source> LocationVocabularyPick<'source> {
@@ -118,8 +126,24 @@ impl<'source> LocationVocabularyPick<'source> {
                 )
                 .map(|(row, notes)| (variant(Box::new(row)), notes))
             }
+            Kind::ContractScopes => Self::contract_scope(tree, projection, admission, cancel),
             _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),
         }
+    }
+    fn contract_scope(
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self, Vec<FieldError>), CatalogError> {
+        let (row, notes) = PreparedDefinition::read(
+            tree,
+            projection,
+            admission,
+            cancel,
+            ContractScopeGlobalParams::read,
+        )?;
+        Ok((Self::ContractScope(Box::new(row)), notes))
     }
 }
 
@@ -131,6 +155,7 @@ pub(crate) struct LocationVocabulary<'source> {
     class_registries: Vec<PreparedDefinition<'source, LocationRegistry<'source>>>,
     function_registries: Vec<PreparedDefinition<'source, LocationRegistry<'source>>>,
     size_registries: Vec<PreparedDefinition<'source, LocationRegistry<'source>>>,
+    contract_scopes: Vec<PreparedDefinition<'source, ContractScopeGlobalParams<'source>>>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -145,6 +170,7 @@ pub(crate) struct LocationVocabularyTables<'source> {
     sizes: CatalogTable<LocationDictionaryEntry<'source>>,
     #[serde(rename = "locationRegistries")]
     registries: LocationRegistries<'source>,
+    contract_scopes: CatalogTable<ContractScopeGlobalParams<'source>>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -165,6 +191,7 @@ impl<'source> LocationVocabulary<'source> {
             LocationVocabularyPick::ClassRegistry(row) => self.class_registries.push(*row),
             LocationVocabularyPick::FunctionRegistry(row) => self.function_registries.push(*row),
             LocationVocabularyPick::SizeRegistry(row) => self.size_registries.push(*row),
+            LocationVocabularyPick::ContractScope(row) => self.contract_scopes.push(*row),
         }
     }
 
@@ -175,6 +202,7 @@ impl<'source> LocationVocabulary<'source> {
         PreparedDefinition::order(&mut self.class_registries);
         PreparedDefinition::order(&mut self.function_registries);
         PreparedDefinition::order(&mut self.size_registries);
+        PreparedDefinition::order(&mut self.contract_scopes);
     }
 
     pub(crate) const fn count(&self, kind: Kind) -> usize {
@@ -185,6 +213,7 @@ impl<'source> LocationVocabulary<'source> {
             Kind::LocationClassRegistries => self.class_registries.len(),
             Kind::LocationFunctionRegistries => self.function_registries.len(),
             Kind::LocationSizeRegistries => self.size_registries.len(),
+            Kind::ContractScopes => self.contract_scopes.len(),
             _ => 0,
         }
     }
@@ -213,6 +242,10 @@ impl<'source> LocationVocabulary<'source> {
                 Kind::LocationSizeRegistries,
                 &self.size_registries,
             ))
+            .chain(PreparedDefinition::sources(
+                Kind::ContractScopes,
+                &self.contract_scopes,
+            ))
     }
 
     pub(crate) fn number_groups(&self) -> impl Iterator<Item = (Kind, &[CapturedNumber])> {
@@ -224,6 +257,7 @@ impl<'source> LocationVocabulary<'source> {
             classes: PreparedDefinition::table(forge, CLASS, self.classes),
             functions: PreparedDefinition::table(forge, FUNCTION, self.functions),
             sizes: PreparedDefinition::table(forge, SIZE, self.sizes),
+            contract_scopes: PreparedDefinition::table(forge, CONTRACT_SCOPE, self.contract_scopes),
             registries: LocationRegistries {
                 classes: PreparedDefinition::table(forge, CLASS_REGISTRY, self.class_registries),
                 functions: PreparedDefinition::table(

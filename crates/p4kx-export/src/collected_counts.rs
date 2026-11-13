@@ -25,7 +25,8 @@ impl Collected<'_> {
             | Kind::LocationSizes
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
-            | Kind::LocationSizeRegistries => self.location_vocabulary.count(kind),
+            | Kind::LocationSizeRegistries
+            | Kind::ContractScopes => self.location_vocabulary.count(kind),
             Kind::NpcArchetypes
             | Kind::NpcClassPools
             | Kind::AutoSpawns

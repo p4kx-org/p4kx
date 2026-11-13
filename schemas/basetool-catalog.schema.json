@@ -4533,6 +4533,9 @@
         "contractGenerators": {
           "$ref": "#/$defs/CatalogTableOfGeneratorDefinition"
         },
+        "contractScopes": {
+          "$ref": "#/$defs/CatalogTableOfContractScopeGlobalParams"
+        },
         "contractTemplates": {
           "$ref": "#/$defs/CatalogTableOfTemplateDefinition"
         },
@@ -4662,6 +4665,7 @@
         "blueprints",
         "commodities",
         "contractGenerators",
+        "contractScopes",
         "contractTemplates",
         "encounterIndices",
         "explosionDefinitions",
@@ -5193,6 +5197,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ContractScenarioRequirements"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfContractScopeGlobalParams": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ContractScopeGlobalParams"
           },
           "type": "array"
         }
@@ -7500,6 +7523,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `contractScenarios`."
         },
+        "contractScopes": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The filtered physical contract scope vocabulary."
+        },
         "contractShipSpawns": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `contractShipSpawns`."
@@ -7782,6 +7809,7 @@
         "contractLocationQueries",
         "contractNpcSpawns",
         "contractScenarios",
+        "contractScopes",
         "contractShipSpawns",
         "contractTemplates",
         "contracts",
@@ -8858,6 +8886,102 @@
       "required": [
         "scenarios",
         "source"
+      ],
+      "type": "object"
+    },
+    "ContractScopeGlobalParams": {
+      "description": "One physical declaration of the contract scope labels and icons.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "cluster": {
+          "$ref": "#/$defs/SourcedValueOfContractScopeItem"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "location": {
+          "$ref": "#/$defs/SourcedValueOfContractScopeItem"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "planetaryBody": {
+          "$ref": "#/$defs/SourcedValueOfContractScopeItem"
+        },
+        "planetarySystem": {
+          "$ref": "#/$defs/SourcedValueOfContractScopeItem"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sector": {
+          "$ref": "#/$defs/SourcedValueOfContractScopeItem"
+        },
+        "solarSystem": {
+          "$ref": "#/$defs/SourcedValueOfContractScopeItem"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "universe": {
+          "$ref": "#/$defs/SourcedValueOfContractScopeItem"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "className",
+        "cluster",
+        "fileName",
+        "guid",
+        "location",
+        "metadataTag",
+        "planetaryBody",
+        "planetarySystem",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sector",
+        "solarSystem",
+        "sourceType",
+        "universe"
+      ],
+      "type": "object"
+    },
+    "ContractScopeItem": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "displayName": {
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+        },
+        "icon": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "displayName",
+        "icon",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -18577,6 +18701,10 @@
         {
           "description": "Physical module declarations linked by objective handlers and other modules.",
           "value": "missionModuleDeclarations"
+        },
+        {
+          "description": "Physical global definitions of the authored contract scope labels and icons.",
+          "value": "contractScopes"
         }
       ]
     },
@@ -56362,6 +56490,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ContractLocationTags"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfContractScopeItem": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ContractScopeItem"
               }
             }
           }

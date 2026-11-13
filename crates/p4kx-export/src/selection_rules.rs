@@ -41,6 +41,10 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::mission_sources::module_declaration::SOURCE_TYPE,
             },
+            Self::ContractScopes => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::CONTRACT_SCOPE,
+            },
             Self::LocationClasses => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::location_vocabulary::CLASS,

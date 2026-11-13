@@ -75,6 +75,7 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::Jurisdictions
                 | Kind::SecurityNetworkManifests
                 | Kind::MissionModuleDeclarations
+                | Kind::ContractScopes
                 | Kind::LocationClasses
                 | Kind::LocationFunctions
                 | Kind::LocationSizes

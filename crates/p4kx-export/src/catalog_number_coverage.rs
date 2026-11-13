@@ -35,6 +35,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::ContractScopes
             | Kind::NpcArchetypes
             | Kind::NpcClassPools
             | Kind::AutoSpawns
@@ -122,6 +123,7 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::ContractScopes
             | Kind::NpcArchetypes
             | Kind::NpcClassPools
             | Kind::AutoSpawns

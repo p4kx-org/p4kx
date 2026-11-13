@@ -170,6 +170,7 @@ impl<'f> Picked<'f> {
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::ContractScopes
             | Kind::NpcArchetypes
             | Kind::NpcClassPools
             | Kind::AutoSpawns

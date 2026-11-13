@@ -1,12 +1,13 @@
 # Catalog mission location vocabulary
 
-The catalog v3 keeps six physical Record families as definition tables. Each row has the
+The catalog v3 keeps seven physical Record families as definition tables. Each row has the
 [canonical Record header](catalog-record-headers.md) with the original GUID and physical
 Record index. The exact Record type selects a family at any path. Rows sort by GUID and
 physical index.
 
 | Catalog table | Original Record type | Original typed field |
 | --- | --- | --- |
+| `definitions.contractScopes` | `ContractScopeGlobalParams` | Seven named `ContractScope_Item` StrongPointer slots with a Locale label and an icon String |
 | `definitions.locationClasses` | `MissionLocationClass` | `scopesVisibleTo`, an ordered Enum array of `ContractScope` |
 | `definitions.locationFunctions` | `MissionLocationFunction` | The Record identity |
 | `definitions.locationSizes` | `MissionLocationSize` | The Record identity |
@@ -36,6 +37,16 @@ and AI tag values still describe their original tag fields.
 Mission location filters that reference these definitions join to their original GUID
 and physical Record identity when available. The registry membership and visible scopes
 describe configuration stored in the Archive.
+
+## Global contract scopes
+
+The physical global scope table retains `location`, `cluster`, `sector`, `planetaryBody`,
+`planetarySystem`, `solarSystem` and `universe` as individually sourced pointer slots.
+Each present item keeps its original concrete type, `displayName` as a public short name
+reference and `icon` as the exact stored String. The public name table retains the original
+Locale key and resolved translations. This vocabulary describes authored labels and icons.
+The source `ContractScope` Enum on location and contract configuration retains its own
+authored label. Availability is explicit for Builds where the global Record type is absent.
 
 ## Mission board providers
 

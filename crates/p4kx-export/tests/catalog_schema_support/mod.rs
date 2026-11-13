@@ -338,6 +338,7 @@ pub(crate) fn minimal_catalog() -> Value {
         "factionIdentities",
         "securityNetworkManifests",
         "missionModuleDeclarations",
+        "contractScopes",
     ] {
         for (section, value) in [
             ("completeness", json!({"status": "complete"})),

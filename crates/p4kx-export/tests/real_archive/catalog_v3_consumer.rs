@@ -34,7 +34,7 @@ pub(crate) fn named_rows<'catalog>(
 }
 
 fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
-    if is_npc_spawn_definition(kind) {
+    if uses_named_definition_table(kind) {
         return checked_table(catalog, kind, &format!("/definitions/{}", kind.name()));
     }
     let path = match kind {
@@ -96,7 +96,7 @@ fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
     checked_table(catalog, kind, path)
 }
 
-const fn is_npc_spawn_definition(kind: Kind) -> bool {
+const fn uses_named_definition_table(kind: Kind) -> bool {
     matches!(
         kind,
         Kind::NpcArchetypes
@@ -104,6 +104,7 @@ const fn is_npc_spawn_definition(kind: Kind) -> bool {
             | Kind::AutoSpawns
             | Kind::AutoSpawnSets
             | Kind::EncounterIndices
+            | Kind::ContractScopes
     )
 }
 
@@ -148,6 +149,7 @@ fn checked_table<'catalog>(
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries
+                | Kind::ContractScopes
                 | Kind::NpcArchetypes
                 | Kind::NpcClassPools
                 | Kind::AutoSpawns
@@ -278,6 +280,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::ContractScopes
             | Kind::NpcArchetypes
             | Kind::NpcClassPools
             | Kind::AutoSpawns
