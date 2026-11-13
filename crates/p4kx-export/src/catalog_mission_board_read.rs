@@ -15,6 +15,7 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::export_diagnostic::ExportSourceRole;
+use crate::export_field_inspection::ConfigurationInspection;
 use crate::export_field_walk;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::export_source_failure;
@@ -126,11 +127,19 @@ impl<'source> MissionBoardRead<'source> {
         }
         self.numbers.extend(numbers.into_inner());
         self.ledger.merge(export_field_walk::inspect_configuration(
-            input, tree, admission, &spans, cancel,
+            input,
+            tree,
+            admission,
+            &spans,
+            ConfigurationInspection::MissionBoard,
+            cancel,
         )?);
         source_projection_notes::record_dependency(admission, tree, notes, &mut self.ledger)?;
-        self.ledger
-            .observe(admission.source(None, DEPENDENCY, SourceDisposition::Projected)?);
+        self.ledger.observe(
+            admission
+                .source(None, DEPENDENCY, SourceDisposition::Projected)?
+                .for_configuration(ConfigurationInspection::MissionBoard),
+        );
         Ok(())
     }
 

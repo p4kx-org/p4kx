@@ -91,6 +91,32 @@ fn mission_board_owner_filter_keeps_the_independent_table_availability() -> Test
     Ok(())
 }
 
+#[test]
+fn a_board_provider_can_share_its_physical_owner_with_a_selected_item() -> TestResult {
+    let (_folder, archive) = common::open(&fixture::shared_item_database(), DcbOrigin::Encrypted)?;
+    let mut options = common::options();
+    options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
+    let built = build_catalog(&archive, &options)?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    let items = at(&catalog, "/items")?
+        .as_array()
+        .ok_or("published item rows")?;
+    let boards = at(&catalog, BOARDS)?
+        .as_array()
+        .ok_or("published board rows")?;
+    assert_eq!(items.len(), 1, "the entity also exports as an item");
+    assert_eq!(
+        boards.len(),
+        4,
+        "the same entity's board components all survive"
+    );
+    assert!(
+        at(&boards[0], "/owner/ownerGuid/value")? == at(&items[0], "/guid")?,
+        "the item and board refer to the same original owner"
+    );
+    Ok(())
+}
+
 fn export(origin: DcbOrigin, filter: Option<&Filter>) -> TestResult<Value> {
     let (_folder, archive) = common::open(&fixture::database(), origin)?;
     let mut options = common::options();

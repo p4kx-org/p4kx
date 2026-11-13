@@ -20,6 +20,9 @@ const SCENARIO: &str = "MissionScenario";
 const GENERATOR: &str = "ContractGenerator";
 const REQUIREMENT: &str = "required_active_scenarios";
 
+#[path = "real_archive_scoped_scenario_witness.rs"]
+mod scoped;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 #[test]
@@ -41,7 +44,7 @@ fn authored_mission_scenarios_match_their_physical_records_and_requirement_slots
     let forge = entry.open().map_err(|_| "open original DataForge")?;
     let definitions = rows(&catalog, "/definitions/missionScenarios/rows")?;
     let requirements = rows(&catalog, "/declarations/contractScenarioRequirements/rows")?;
-    verify_definitions(&forge, definitions)?;
+    verify_definitions(&forge, definitions, None)?;
     verify_requirements(&forge, requirements)?;
     verify_local_generators(&forge, &catalog)?;
     watch
@@ -63,7 +66,11 @@ fn rows<'row>(catalog: &'row Value, path: &str) -> TestResult<&'row [Value]> {
         .ok_or_else(|| format!("missing scenario table {path}").into())
 }
 
-fn verify_definitions(forge: &DataForge<'_>, rows: &[Value]) -> TestResult {
+fn verify_definitions(
+    forge: &DataForge<'_>,
+    rows: &[Value],
+    filter: Option<&Filter>,
+) -> TestResult {
     let paths = Filter::new("libs/foundry/records/*");
     let mut emitted = BTreeMap::new();
     for row in rows {
@@ -75,16 +82,18 @@ fn verify_definitions(forge: &DataForge<'_>, rows: &[Value]) -> TestResult {
     let mut trees = TreeBuilder::new();
     for record in forge.records() {
         if record.type_name().ok() != Some(SCENARIO)
-            || !record.record_path().is_ok_and(|path| paths.matches(path))
+            || !record.record_path().is_ok_and(|path| {
+                paths.matches(path) && filter.is_none_or(|filter| filter.matches(path))
+            })
         {
             continue;
         }
         let row = emitted
             .remove(&record.index())
             .ok_or("missing physical scenario definition")?;
-        assert_eq!(
-            consumer::present(field(row, "guid")?)?.as_str(),
-            Some(record.guid().to_string().as_str()),
+        assert!(
+            consumer::present(field(row, "guid")?)?.as_str()
+                == Some(record.guid().to_string().as_str()),
             "the emitted definition identifies the exact Record"
         );
         let tree = trees
@@ -178,7 +187,7 @@ fn record_index(value: &Value) -> TestResult<u32> {
     )?)
 }
 
-fn verify_local_generators(forge: &DataForge<'_>, catalog: &Value) -> TestResult {
+fn verify_local_availability(forge: &DataForge<'_>, catalog: &Value) -> TestResult {
     let table = field(field(catalog, "configurations")?, "localContractGenerators")?;
     let mut declared = false;
     for structure in forge.structs() {
@@ -197,6 +206,11 @@ fn verify_local_generators(forge: &DataForge<'_>, catalog: &Value) -> TestResult
         Some(if declared { "available" } else { "absent" }),
         "availability reflects the original generator and board declarations"
     );
+    Ok(())
+}
+
+fn verify_local_generators(forge: &DataForge<'_>, catalog: &Value) -> TestResult {
+    verify_local_availability(forge, catalog)?;
     let mut trees = TreeBuilder::new();
     for row in rows(catalog, "/configurations/localContractGenerators/rows")? {
         let source = field(row, "source")?;

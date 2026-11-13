@@ -7,13 +7,19 @@ use crate::export_diagnostic::{
     ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
     ExportSourceRole,
 };
+use crate::export_field_inspection::ConfigurationInspection;
 use crate::export_health::{ExportSourceCounts, ExportSourceMode};
 use crate::export_ledger::{ExportAccountingError, SourceDisposition, SourceObservation};
 use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
 use crate::health_failed_observation::FailedRecordObservation as FailedExportRecord;
 use crate::selection::Kind;
 
-type SourceKey = (Option<usize>, u32, ExportSourceRole);
+type SourceKey = (
+    Option<usize>,
+    u32,
+    ExportSourceRole,
+    Option<ConfigurationInspection>,
+);
 
 /// Deduplicates identical production observations and rejects contradictory dispositions.
 pub(crate) fn sources(
@@ -26,6 +32,7 @@ pub(crate) fn sources(
             source.kind.map(Kind::index),
             source.record_index,
             source.role,
+            source.configuration,
         );
         if let Some(previous) = sources.get_mut(&key) {
             previous.merge(source)?;

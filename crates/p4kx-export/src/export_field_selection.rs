@@ -8,6 +8,7 @@ use p4kx_extraction::{CancelToken, RecordTree, Value};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::OriginalValueSite;
 use crate::export_diagnostic::ExportSourceRole;
+use crate::export_field_inspection::ConfigurationInspection;
 use crate::export_ledger::ExportLedger;
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, ExportAccountingError, Kind};
@@ -39,7 +40,10 @@ pub(crate) fn inspect_record_field<'source>(
 
 pub(super) enum FieldSelection<'read, 'source> {
     All,
-    Subtrees(&'read [Range<usize>]),
+    Subtrees {
+        spans: &'read [Range<usize>],
+        configuration: ConfigurationInspection,
+    },
     RecordField {
         name: &'static str,
         value: Option<&'read Value<'source>>,
@@ -54,7 +58,7 @@ impl FieldSelection<'_, '_> {
         match self {
             Self::All => Ok(true),
             Self::RecordField { value: None, .. } => Ok(false),
-            Self::Subtrees(spans) => {
+            Self::Subtrees { spans, .. } => {
                 let index = usize::try_from(site.ordinal())
                     .map_err(|_| ExportAccountingError::CounterOverflow)?;
                 let position = spans.partition_point(|span| span.end <= index);
@@ -70,16 +74,23 @@ impl FieldSelection<'_, '_> {
 
     pub(super) const fn is_empty(&self) -> bool {
         match self {
-            Self::Subtrees(spans) => spans.is_empty(),
+            Self::Subtrees { spans, .. } => spans.is_empty(),
             Self::RecordField { value, .. } => value.is_none(),
             Self::All => false,
+        }
+    }
+
+    pub(super) const fn configuration(&self) -> Option<ConfigurationInspection> {
+        match self {
+            Self::Subtrees { configuration, .. } => Some(*configuration),
+            Self::RecordField { .. } | Self::All => None,
         }
     }
 
     pub(super) const fn root_field(&self) -> Option<&'static str> {
         match self {
             Self::RecordField { name, .. } => Some(name),
-            Self::All | Self::Subtrees(_) => None,
+            Self::All | Self::Subtrees { .. } => None,
         }
     }
 }

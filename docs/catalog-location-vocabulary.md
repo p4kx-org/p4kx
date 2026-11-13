@@ -65,3 +65,17 @@ and complete authored fields. A null pointer has its own sourced state.
 
 The table describes authored Entity configuration. Contract availability belongs to the
 contract source.
+
+## Installed verification
+
+Set the standard `P4KX_DATA_P4K` and Archive key inputs. Each command builds filtered
+catalogs for independently selected physical Records rather than a full catalog.
+
+    cargo test --locked --release -p p4kx-export --test real_archive mission_location_vocabulary_matches_original_records_and_ordered_slots -- --ignored
+    cargo test --locked --release -p p4kx-export --test real_archive mission_board_providers_match_original_component_slots -- --ignored
+
+The location test compares physical dictionaries and registries, ordered arrays and classification
+links with per-datum provenance. The board test selects one original Entity owner per observed
+board alternative and compares every original board component on each selected owner.
+Set `P4KX_EXPECT_LOCATION_VOCABULARY=1` or `P4KX_EXPECT_MISSION_BOARD_PROVIDERS=1` for positive
+source requirements. Optional categories without an original owner report source absence.

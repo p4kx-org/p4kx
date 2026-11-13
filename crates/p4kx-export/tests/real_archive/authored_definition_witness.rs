@@ -56,9 +56,8 @@ pub(crate) fn verify_link(
     };
     let payload = consumer::source_value(row)?.ok_or("expected original Reference payload")?;
     let actual = consumer::source_value(field(payload, "guid")?)?;
-    assert_eq!(
-        actual,
-        Some(&json!(guid.to_string())),
+    assert!(
+        actual.is_some_and(|value| value.as_str() == Some(guid.to_string().as_str())),
         "exact Reference GUID"
     );
     assert_eq!(

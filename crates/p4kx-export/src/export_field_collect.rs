@@ -270,6 +270,7 @@ impl<'t, 'f> FieldCollector<'t, 'f> {
             role: self.role,
             complete: true,
             root_field: None,
+            configuration: None,
             diagnostics,
             number_requirements,
             unresolved_references: self.unresolved,

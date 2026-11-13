@@ -15,6 +15,13 @@ use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnos
 use crate::selection::Kind;
 use crate::{ExportAccountingError, HealthText};
 
+/// Independently exported configuration fields on one physical Record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) enum ConfigurationInspection {
+    MissionBoard,
+    ResourceNetwork,
+}
+
 /// Inspection of the canonical values relevant to one source scope.
 #[derive(Debug, Clone)]
 #[must_use]
@@ -27,6 +34,7 @@ pub(crate) struct FieldInspection {
     pub(crate) role: ExportSourceRole,
     pub(crate) complete: bool,
     pub(crate) root_field: Option<&'static str>,
+    pub(crate) configuration: Option<ConfigurationInspection>,
     pub(crate) diagnostics: Vec<ExportDiagnostic>,
     /// Conditional failures until the exact physical source has an emitted lossless row.
     pub(crate) number_requirements: Vec<NumberRequirement>,
@@ -94,6 +102,7 @@ impl PartialEq for FieldInspection {
             && self.role == other.role
             && self.complete == other.complete
             && self.root_field == other.root_field
+            && self.configuration == other.configuration
             && self.diagnostics == other.diagnostics
             && self.number_requirements == other.number_requirements
             && self.unresolved_references == other.unresolved_references
@@ -108,13 +117,23 @@ impl Eq for FieldInspection {}
 pub(crate) struct FieldInspections {
     whole: BTreeMap<u32, FieldInspection>,
     scoped: BTreeMap<(u32, usize, ExportSourceRole), FieldInspection>,
+    configurations: BTreeMap<(u32, ConfigurationInspection), FieldInspection>,
 }
 
 impl FieldInspections {
     pub(crate) fn index(inspections: Vec<FieldInspection>) -> Result<Self, ExportAccountingError> {
         let mut indexed = Self::default();
         for mut inspection in inspections {
-            if inspection.root_field.is_some() {
+            if let Some(configuration) = inspection.configuration {
+                if inspection.root_field.is_some()
+                    || inspection.kind.is_some()
+                    || inspection.role != ExportSourceRole::Dependency
+                {
+                    return Err(ExportAccountingError::ConflictingFieldInspection);
+                }
+                let key = (inspection.record_index, configuration);
+                Self::merge(indexed.configurations.entry(key), inspection)?;
+            } else if inspection.root_field.is_some() {
                 let kind = inspection
                     .kind
                     .ok_or(ExportAccountingError::ConflictingFieldInspection)?;
@@ -154,13 +173,22 @@ impl FieldInspections {
     }
 
     pub(crate) fn all(&self) -> impl Iterator<Item = &FieldInspection> {
-        self.whole.values().chain(self.scoped.values())
+        self.whole
+            .values()
+            .chain(self.scoped.values())
+            .chain(self.configurations.values())
     }
 
     pub(crate) fn for_source(
         &self,
         source: &SourceObservation,
     ) -> Result<&FieldInspection, ExportAccountingError> {
+        if let Some(configuration) = source.configuration {
+            return self
+                .configurations
+                .get(&(source.record_index, configuration))
+                .ok_or(ExportAccountingError::MissingFieldInspection);
+        }
         source
             .kind
             .and_then(|kind| {

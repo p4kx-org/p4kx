@@ -6,6 +6,7 @@ use p4kx_extraction::{Guid, Record, RecordTree, SourceEvidenceError};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::{RecordSubject, RecordSubjectKey};
 use crate::export_diagnostic::ExportSourceRole;
+use crate::export_field_inspection::ConfigurationInspection;
 use crate::record_source_status::{SourceDiagnosis, SourceDisposition};
 use crate::selection::Kind;
 use crate::{CatalogError, ExportAccountingError, HealthText};
@@ -71,6 +72,7 @@ impl<'read, 'source> RecordObservation<'read, 'source> {
             role,
             disposition,
             diagnosis: SourceDiagnosis::default(),
+            configuration: None,
             subject: self.subject.clone(),
         })
     }
@@ -87,6 +89,7 @@ pub(crate) struct SourceObservation {
     pub(crate) role: ExportSourceRole,
     pub(crate) disposition: SourceDisposition,
     pub(crate) diagnosis: SourceDiagnosis,
+    pub(crate) configuration: Option<ConfigurationInspection>,
     subject: RecordSubject,
 }
 
@@ -108,6 +111,7 @@ impl SourceObservation {
             role,
             disposition,
             diagnosis: SourceDiagnosis::default(),
+            configuration: None,
             subject: RecordSubject::accounting(index, guid, path),
         }
     }
@@ -137,6 +141,7 @@ impl SourceObservation {
             role,
             disposition,
             diagnosis: SourceDiagnosis::default(),
+            configuration: None,
             subject: RecordObservation::accounting(record).subject,
         }
     }
@@ -146,6 +151,14 @@ impl SourceObservation {
         self.kind = Some(kind);
         self
     }
+    pub(crate) const fn for_configuration(
+        mut self,
+        configuration: ConfigurationInspection,
+    ) -> Self {
+        self.configuration = Some(configuration);
+        self
+    }
+
     pub(crate) fn diagnosed(mut self, diagnosis: SourceDiagnosis) -> Self {
         self.diagnosis = diagnosis;
         self
@@ -191,6 +204,7 @@ impl PartialEq for SourceObservation {
             && self.role == other.role
             && self.disposition == other.disposition
             && self.diagnosis == other.diagnosis
+            && self.configuration == other.configuration
     }
 }
 

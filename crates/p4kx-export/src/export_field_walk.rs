@@ -15,6 +15,7 @@ use crate::catalog_read::original::{
 use crate::catalog_reference;
 use crate::export_diagnostic::{ExportDiagnosticCode, ExportDiagnosticSeverity, ExportSourceRole};
 use crate::export_field_collect::FieldCollector;
+use crate::export_field_inspection::ConfigurationInspection;
 use crate::export_ledger::{ExportAccountingError, ExportLedger};
 use crate::number_position::NumberPosition;
 use crate::record_observation::RecordObservation;
@@ -72,6 +73,7 @@ pub(crate) fn inspect_configuration<'source>(
     tree: &RecordTree<'source>,
     admission: &RecordObservation<'_, 'source>,
     spans: &[Range<usize>],
+    configuration: ConfigurationInspection,
     cancel: Option<&CancelToken>,
 ) -> Result<ExportLedger, CatalogError> {
     if spans.iter().any(Range::is_empty)
@@ -88,7 +90,10 @@ pub(crate) fn inspect_configuration<'source>(
         None,
         ExportSourceRole::Dependency,
         cancel,
-        &FieldSelection::Subtrees(spans),
+        &FieldSelection::Subtrees {
+            spans,
+            configuration,
+        },
     )
 }
 
@@ -119,6 +124,7 @@ fn inspect_values<'source>(
     let mut ledger = ExportLedger::default();
     let mut inspection = inspector.collector.finish();
     inspection.root_field = selection.root_field();
+    inspection.configuration = selection.configuration();
     ledger.field_inspections.push(inspection);
     Ok(ledger)
 }

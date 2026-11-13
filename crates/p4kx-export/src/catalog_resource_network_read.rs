@@ -16,6 +16,7 @@ use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
 use crate::export_diagnostic::ExportSourceRole;
+use crate::export_field_inspection::ConfigurationInspection;
 use crate::export_field_walk;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::export_source_failure;
@@ -124,10 +125,15 @@ fn project<'source>(
         tree,
         admission,
         span.as_slice(),
+        ConfigurationInspection::ResourceNetwork,
         cancel,
     )?);
     source_projection_notes::record_dependency(admission, tree, notes, ledger)?;
-    ledger.observe(admission.source(None, ROLE, SourceDisposition::Projected)?);
+    ledger.observe(
+        admission
+            .source(None, ROLE, SourceDisposition::Projected)?
+            .for_configuration(ConfigurationInspection::ResourceNetwork),
+    );
     Ok(NetworkProjection {
         row,
         numbers: numbers.into_inner(),

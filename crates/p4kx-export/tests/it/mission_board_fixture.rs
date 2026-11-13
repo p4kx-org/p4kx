@@ -17,6 +17,14 @@ const FUTURE: &str = "FixtureFutureMissionBoardType";
 const REPUTATION: &str = "FactionReputation";
 
 pub(super) fn database() -> DataForgeBuilder {
+    database_at("libs/foundry/records/fixture_board/owner.xml")
+}
+
+pub(super) fn shared_item_database() -> DataForgeBuilder {
+    database_at("libs/foundry/records/entities/scitem/fixture_board/owner.xml")
+}
+
+fn database_at(path: &str) -> DataForgeBuilder {
     DataForgeBuilder::new()
         .version(8)
         .structure(TestStruct::new(REPUTATION))
@@ -49,7 +57,7 @@ pub(super) fn database() -> DataForgeBuilder {
         )
         .record(faction(FIRST, "first"))
         .record(faction(SECOND, "second"))
-        .record(owner())
+        .record(owner(path))
 }
 
 fn faction(guid: u128, name: &str) -> TestRecord {
@@ -61,7 +69,7 @@ fn faction(guid: u128, name: &str) -> TestRecord {
     )
 }
 
-fn owner() -> TestRecord {
+fn owner(path: &str) -> TestRecord {
     let career = TestInstance::new(CAREER)
         .value("guildFactionReputation", TestValue::Reference(SECOND))
         .value(
@@ -89,7 +97,7 @@ fn owner() -> TestRecord {
         OWNER,
         "EntityClassDefinition",
         "EntityClassDefinition.FixtureBoardOwner",
-        "libs/foundry/records/fixture_board/owner.xml",
+        path,
     )
     .value("Components", TestValue::Array(components))
 }
