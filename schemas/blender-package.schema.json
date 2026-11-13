@@ -40,6 +40,78 @@
         }
       ]
     },
+    "Anchor": {
+      "oneOf": [
+        {
+          "properties": {
+            "status": {
+              "const": "undeclared",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "port": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Port"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reason": {
+              "type": "string"
+            },
+            "status": {
+              "const": "unresolved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "effective_group": {
+              "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+            },
+            "owner_from_container": {
+              "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+            },
+            "port": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Port"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "const": "anchored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "effective_group",
+            "owner_from_container"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "ArchiveDirectorySource": {
       "description": "Admitted Entry positions from the original root Archive directory.",
       "properties": {
@@ -1495,6 +1567,128 @@
       ],
       "type": "object"
     },
+    "Helper": {
+      "oneOf": [
+        {
+          "properties": {
+            "status": {
+              "const": "undeclared",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "reason": {
+              "type": "string"
+            },
+            "status": {
+              "const": "unresolved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "helper_from_light": {
+              "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+            },
+            "model_node": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "name": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "owner_from_helper": {
+              "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+            },
+            "source": {
+              "$ref": "#/$defs/HelperSource"
+            },
+            "status": {
+              "const": "matched",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "model_node",
+            "name",
+            "owner_from_helper",
+            "helper_from_light",
+            "source"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "HelperSource": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "group",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "origin": {
+              "type": "string"
+            },
+            "part": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "point": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "type": {
+              "const": "vehicle_point",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "part",
+            "point",
+            "document",
+            "origin"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "unknown",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "InputScope": {
       "description": "The source byte domain interpreted by one use.",
       "oneOf": [
@@ -1647,6 +1841,81 @@
           "type": "string"
         }
       ]
+    },
+    "LightPlacement": {
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "container": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "declared_helper": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "effective_light": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+        },
+        "helper": {
+          "$ref": "#/$defs/Helper"
+        },
+        "node": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "original_group": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+        },
+        "original_light": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+        },
+        "owner": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "preview_state": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "tile_selector": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "node",
+        "owner",
+        "container",
+        "preview_state",
+        "original_light",
+        "original_group",
+        "tile_selector",
+        "declared_helper",
+        "effective_light",
+        "anchor",
+        "helper"
+      ],
+      "type": "object"
+    },
+    "LightPlacements": {
+      "properties": {
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/LightPlacement"
+          },
+          "type": "array"
+        },
+        "sourceInventory": {
+          "$ref": "#/$defs/SourceInventory"
+        }
+      },
+      "required": [
+        "rows",
+        "sourceInventory"
+      ],
+      "type": "object"
     },
     "ManifestSocScene": {
       "description": "An optional versioned authored SOC scene file in a package.",
@@ -3158,6 +3427,21 @@
       "description": "A document-local physical-source reference, without a machine address.",
       "type": "string"
     },
+    "Port": {
+      "properties": {
+        "interaction_offset": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "name",
+        "interaction_offset"
+      ],
+      "type": "object"
+    },
     "Replacement": {
       "description": "An Entity attached to a port instead of what the Loadout puts there.",
       "properties": {
@@ -4016,6 +4300,283 @@
                   "minimum": 0,
                   "type": "integer"
                 },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_size_3_of_Array_size_4_of_float": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "items": {
+                    "format": "float",
+                    "type": "number"
+                  },
+                  "maxItems": 4,
+                  "minItems": 4,
+                  "type": "array"
+                },
+                "maxItems": 3,
+                "minItems": 3,
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_size_3_of_double": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "maxItems": 3,
+                "minItems": 3,
                 "type": "array"
               }
             }
@@ -4935,6 +5496,17 @@
         "$ref": "#/$defs/Issue"
       },
       "type": "array"
+    },
+    "light_placements": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LightPlacements"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Placement evidence for baked lights in directly owned vehicle containers."
     },
     "material_libraries": {
       "description": "Authored material-library roots retained once, without inheriting values into children.",

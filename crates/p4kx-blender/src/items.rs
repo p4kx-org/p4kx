@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::package_light_placements::PlacedLight;
 use p4kx_assembly::{Assembly, INTERIOR_NODE, Interior, InteriorPart, InteriorPartKind, Part};
 use p4kx_gltf::{NodeTransform, SceneLight, light_node_transform, node_transform};
 use p4kx_model::{MaterialStatus, Model, TintPalette, Transform};
@@ -29,6 +30,7 @@ pub(crate) struct Item<'a> {
     pub(crate) geometry: Option<&'a str>,
     pub(crate) drawn: Option<Drawn<'a>>,
     pub(crate) light: Option<SceneLight>,
+    pub(crate) light_placement: Option<PlacedLight<'a>>,
 }
 
 /// Lists the nodes of `assembly`, parts first, then the bone attachments of the parts, then its
@@ -63,6 +65,7 @@ pub(crate) fn items(assembly: &Assembly) -> Vec<Item<'_>> {
             container.interior(),
             Some(node),
             container.placement(),
+            Some((container.part(), container.reference())),
         );
     }
     items
@@ -88,7 +91,7 @@ pub(crate) fn entity_ref(root: Option<&Part>) -> EntityRef {
 /// files, models, props, lights and nested containers. A node comes after its parent.
 pub(crate) fn interior_items(interior: &Interior) -> Vec<Item<'_>> {
     let mut items = Vec::with_capacity(interior.parts().len());
-    push_parts(&mut items, interior, None, &Transform::IDENTITY);
+    push_parts(&mut items, interior, None, &Transform::IDENTITY, None);
     items
 }
 
@@ -97,6 +100,7 @@ fn push_parts<'a>(
     interior: &'a Interior,
     group: Option<usize>,
     placement: &Transform,
+    owner: Option<(usize, &'a p4kx_assembly::ObjectContainerRef)>,
 ) {
     let base = items.len();
     for part in interior.parts() {
@@ -112,7 +116,18 @@ fn push_parts<'a>(
         } else {
             part.local()
         };
-        items.push(interior_item(part, parent, path, local));
+        let mut item = interior_item(part, parent, path, local);
+        item.light_placement = owner.and_then(|(owner, reference)| {
+            Some(PlacedLight {
+                owner,
+                container: base,
+                reference,
+                part,
+                light: part.light()?,
+                placement: part.light_placement()?,
+            })
+        });
+        items.push(item);
     }
 }
 
@@ -135,6 +150,7 @@ fn push_attachments<'a>(items: &mut Vec<Item<'a>>, assembly: &'a Assembly) {
                 label: attached.name(),
             }),
             light: None,
+            light_placement: None,
         });
     }
 }
@@ -164,6 +180,7 @@ fn part_item(part: &Part) -> Item<'_> {
             label: part.class_name(),
         }),
         light: None,
+        light_placement: None,
     }
 }
 
@@ -198,6 +215,7 @@ fn interior_item<'a>(
             label: part.name(),
         }),
         light,
+        light_placement: None,
     }
 }
 
@@ -212,6 +230,7 @@ fn group_item(name: &str, parent: Option<usize>, path: String) -> Item<'_> {
         geometry: None,
         drawn: None,
         light: None,
+        light_placement: None,
     }
 }
 

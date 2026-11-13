@@ -94,6 +94,7 @@ pub(crate) fn load_observed(
         definition
     };
     let (path, bytes) = read_definition(files, &candidates, shown, caller, observation, trace)?;
+    let physical = bytes.entry_origin();
     let mut budget = Budget::new(bytes.len());
     let (mut root, selected_element) =
         file_read::base(&path, bytes, &mut budget, modification, observation)?;
@@ -123,7 +124,7 @@ pub(crate) fn load_observed(
     } else {
         AppliedModification::default()
     };
-    Ok(project(path, selected, &root, modified, issues))
+    Ok(project(path, selected, &root, modified, issues, physical))
 }
 
 fn project(
@@ -132,10 +133,15 @@ fn project(
     root: &Element,
     modified: AppliedModification,
     issues: Vec<LoadoutError>,
+    physical: Option<p4kx_extraction::EntryOrigin>,
 ) -> VehicleImplementation {
     let parts = super::read::parts(root);
     VehicleImplementation {
         structure: super::structure::digest(root),
+        declarations: super::origin::DeclarationOrigins {
+            base: physical,
+            patch: modified.patch_origin,
+        },
         path,
         patch_path: modified.patch_path,
         modification: selected,

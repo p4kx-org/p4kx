@@ -11,6 +11,7 @@ fn reference(position: [f32; 3]) -> ObjectContainerRef {
         position,
         rotation: [0.0; 3],
         source: ContainerSource::Vehicle,
+        coordinate: None,
     }
 }
 

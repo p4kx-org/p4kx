@@ -5,10 +5,11 @@ use p4kx_chunks::{ByteOrder, ChunkFile, ChunkType, Container};
 use p4kx_cryxml::{CryXmlError, Xml};
 use thiserror::Error;
 
+use crate::Transform;
 use crate::mtl_xml::XmlElement;
 use crate::soc_geometry::{EntityGeometry, read_geometry};
-use crate::soc_light::{SocLight, read_light};
-use crate::{SocGroupPlacement, Transform};
+use crate::soc_light::SocLight;
+use crate::soc_light_projection::read_lights;
 
 pub(crate) const ENTITIES: ChunkType = ChunkType::new(Container::CrCh, 0x0004);
 
@@ -132,7 +133,7 @@ impl SocEntities {
                 return Err(SocEntitiesError::BigEndian);
             }
             let data = file.chunk_data(index).unwrap_or_default();
-            let mut chunk = Self::parse(data)?;
+            let mut chunk = Self::parse_with_chunk(data, Some(index))?;
             found = Some(match found.take() {
                 Some(mut first) => {
                     first.props.append(&mut chunk.props);
@@ -171,13 +172,26 @@ impl SocEntities {
     ///
     /// Returns [`SocEntitiesError`] when `bytes` is no XML or lists more than is read.
     pub fn parse(bytes: &[u8]) -> Result<Self, SocEntitiesError> {
+        Self::parse_with_chunk(bytes, None)
+    }
+
+    fn parse_with_chunk(bytes: &[u8], chunk: Option<usize>) -> Result<Self, SocEntitiesError> {
         match p4kx_cryxml::read(bytes)? {
-            Xml::CryXml(document) => entities(document.root()),
+            Xml::CryXml(document) => {
+                entities(document.root(), chunk.filter(|_| !document.is_lossy()))
+            }
             Xml::Text(text) => {
                 let text = String::from_utf8_lossy(text);
                 p4kx_cryxml::check_text_depth(&text)?;
                 let document = roxmltree::Document::parse(&text)?;
-                entities(document.root_element())
+                entities(
+                    document.root_element(),
+                    if matches!(text, std::borrow::Cow::Borrowed(_)) {
+                        chunk
+                    } else {
+                        None
+                    },
+                )
             }
         }
     }
@@ -237,7 +251,10 @@ pub(crate) fn transform_fields(
     Transform::from_quaternion(rotation, position)?.scaled(scale)
 }
 
-fn entities<'a>(root: impl XmlElement<'a>) -> Result<SocEntities, SocEntitiesError> {
+fn entities<'a>(
+    root: impl XmlElement<'a>,
+    chunk: Option<usize>,
+) -> Result<SocEntities, SocEntitiesError> {
     let mut result = SocEntities::default();
     let mut seen = 0_usize;
     for entity in root.children() {
@@ -251,13 +268,14 @@ fn entities<'a>(root: impl XmlElement<'a>) -> Result<SocEntities, SocEntitiesErr
                 limit: MAX_SOC_ENTITIES,
             });
         }
-        read_entity(entity, &mut result)?;
+        read_entity(entity, chunk, &mut result)?;
     }
     Ok(result)
 }
 
 fn read_entity<'a>(
     entity: impl XmlElement<'a>,
+    chunk: Option<usize>,
     out: &mut SocEntities,
 ) -> Result<(), SocEntitiesError> {
     let name = entity.attribute("Name").unwrap_or_default();
@@ -286,7 +304,7 @@ fn read_entity<'a>(
         }
         _ => false,
     };
-    read_lights(entity, (name, class), transform, out)?;
+    read_lights(entity, (name, class), transform, chunk, out)?;
     if !classed && (out.props.len(), out.lights.len(), out.invalid) == before {
         out.other += 1;
     }
@@ -318,73 +336,4 @@ fn push_prop(
         palette: geometry.palette.clone(),
     });
     Ok(())
-}
-
-fn read_lights<'a>(
-    entity: impl XmlElement<'a>,
-    (name, class): (&str, &str),
-    transform: Option<Transform>,
-    out: &mut SocEntities,
-) -> Result<(), SocEntitiesError> {
-    if class.eq_ignore_ascii_case("Light") {
-        if let Some(component) =
-            child(entity, "PropertiesDataCore").and_then(|data| child(data, "EntityComponentLight"))
-        {
-            push_light(out, name, None, transform, component, None)?;
-        }
-    } else if let Some(group) = child(entity, "EntityComponentLightGroup")
-        && let Some(baked) = child(group, "BakedInLights")
-    {
-        let group_placement = transform.map(|frame| SocGroupPlacement::read(entity, group, frame));
-        for light in baked.children() {
-            if !light.name().eq_ignore_ascii_case("Light") {
-                continue;
-            }
-            let Some(component) = child(light, "EntityComponentLight") else {
-                continue;
-            };
-            let relative = child(light, "RelativeXForm");
-            let own = light.attribute("Name").unwrap_or(name);
-            let before = out.lights.len();
-            push_light(out, own, Some(name), transform, component, relative)?;
-            if let Some(placed) = out.lights.get_mut(before) {
-                placed.group_placement.clone_from(&group_placement);
-            }
-        }
-    }
-    Ok(())
-}
-
-fn push_light<'a, E: XmlElement<'a>>(
-    out: &mut SocEntities,
-    name: &str,
-    group: Option<&str>,
-    entity: Option<Transform>,
-    component: E,
-    relative: Option<E>,
-) -> Result<(), SocEntitiesError> {
-    if out.lights.len() >= MAX_SOC_PLACED {
-        return Err(SocEntitiesError::TooMany {
-            what: "lights",
-            limit: MAX_SOC_PLACED,
-        });
-    }
-    let placed = match (entity, relative) {
-        (Some(entity), None) => Some(entity),
-        (Some(entity), Some(relative)) => {
-            relative_transform(relative).and_then(|r| entity.then(&r).finite())
-        }
-        (None, _) => None,
-    };
-    match placed.and_then(|transform| read_light(name, group, transform, component)) {
-        Some(light) => out.lights.push(light),
-        None => out.invalid += 1,
-    }
-    Ok(())
-}
-
-fn relative_transform<'a>(element: impl XmlElement<'a>) -> Option<Transform> {
-    let rotation = numbers::<4>(element.attribute("rotation"))?;
-    let translation = numbers::<3>(element.attribute("translation"))?;
-    Transform::from_quaternion(rotation, translation)
 }

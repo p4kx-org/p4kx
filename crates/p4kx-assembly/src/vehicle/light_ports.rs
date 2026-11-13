@@ -18,6 +18,7 @@ pub struct VehicleLightAttachment {
     pub ordinal: usize,
     name: Field,
     bone: Field,
+    bone_position: Option<p4kx_cryxml::SourceAttributePosition>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -63,6 +64,12 @@ impl VehicleLightAttachment {
             .0
             .iter()
             .map(|(value, origin)| (value.as_str(), *origin))
+    }
+
+    /// Returns the winning bone attribute's original physical coordinate.
+    #[must_use]
+    pub const fn bone_position(&self) -> Option<&p4kx_cryxml::SourceAttributePosition> {
+        self.bone_position.as_ref()
     }
 
     /// Visits original bone attribute values with their file or modification origins.
@@ -124,6 +131,7 @@ pub(super) fn attachments(port: &Element) -> Vec<VehicleLightAttachment> {
                     ordinal,
                     name: Field::read(element, "name"),
                     bone: Field::read(element, "bone"),
+                    bone_position: element.light_bone.clone(),
                 })
         })
         .collect()

@@ -215,6 +215,7 @@ impl LandingGear {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VehicleImplementation {
     pub(crate) path: String,
+    declarations: origin::DeclarationOrigins,
     pub(crate) patch_path: Option<String>,
     pub(crate) modification: Option<String>,
     pub(crate) report: Option<ModificationReport>,
@@ -296,6 +297,18 @@ impl VehicleImplementation {
             .iter()
             .rev()
             .find(|elem| elem.id_ref == id && elem.name.eq_ignore_ascii_case(attribute))
+    }
+
+    /// Returns the original archive input supplying the effective declaration.
+    #[must_use]
+    pub const fn declaration_origin(
+        &self,
+        origin: ValueOrigin,
+    ) -> Option<&p4kx_extraction::EntryOrigin> {
+        match origin {
+            ValueOrigin::Base | ValueOrigin::Elem => self.declarations.base.as_ref(),
+            ValueOrigin::Patch => self.declarations.patch.as_ref(),
+        }
     }
 
     /// Returns the path of the file a value with `origin` was read from: the implementation file

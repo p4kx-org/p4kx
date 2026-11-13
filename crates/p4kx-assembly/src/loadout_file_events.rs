@@ -33,6 +33,7 @@ pub struct LoadoutFileIdentity<'a> {
 pub(crate) struct Document {
     bytes: Vec<u8>,
     observed: Option<ObservedDocument>,
+    vehicle_source: Option<crate::LoadoutFileSource>,
 }
 
 struct ObservedDocument {
@@ -42,6 +43,14 @@ struct ObservedDocument {
 }
 
 impl Document {
+    pub(crate) fn entry_origin(&self) -> Option<p4kx_extraction::EntryOrigin> {
+        self.observation()
+            .map(LoadoutFileObservation::source)
+            .or(self.vehicle_source.as_ref())?
+            .entry_origin()
+            .cloned()
+    }
+
     pub(crate) fn observation(&self) -> Option<&LoadoutFileObservation> {
         self.observed.as_ref().map(|observed| &observed.observation)
     }
@@ -67,9 +76,17 @@ pub(crate) fn read(
         return Err(LoadoutFileError::ObservationStopped);
     }
     let Some(observer) = observation else {
-        return files.read(request).map(|bytes| Document {
+        let (vehicle_source, outcome) = match kind {
+            LoadoutDocumentKind::VehicleImplementation | LoadoutDocumentKind::VehiclePatch => {
+                let (source, outcome) = files.read_observed(request).into_parts();
+                (Some(source), outcome)
+            }
+            LoadoutDocumentKind::XmlLoadout => (None, files.read(request)),
+        };
+        return outcome.map(|bytes| Document {
             bytes,
             observed: None,
+            vehicle_source,
         });
     };
     let (source, outcome) = files.read_observed(request).into_parts();
@@ -89,6 +106,7 @@ pub(crate) fn read(
     }
     outcome.map(|bytes| Document {
         bytes,
+        vehicle_source: None,
         observed: Some(ObservedDocument {
             observation: document,
             request: request.clone(),

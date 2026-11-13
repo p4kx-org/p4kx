@@ -3,6 +3,8 @@
 
 use std::sync::Arc;
 
+use p4kx_cryxml::SourceElementPosition;
+
 use crate::mtl_xml::XmlElement;
 use crate::soc_entities::{child, number};
 use crate::{SocGroupPlacement, Transform};
@@ -68,6 +70,12 @@ pub struct SocLight {
     pub group: Option<String>,
     /// The authored group frame and selectors, when this light belongs to a baked group.
     pub group_placement: Option<Arc<SocGroupPlacement>>,
+    /// Original baked-light element in the group's SOC chunk.
+    pub baked_position: Option<SourceElementPosition>,
+    /// Original component supplying the selected preview state.
+    pub component_position: Option<SourceElementPosition>,
+    /// Original relative transform element in the group's SOC chunk.
+    pub relative_position: Option<SourceElementPosition>,
     /// The transform from the light's space to the container's, in `CryEngine` coordinates, Z up
     /// and in metres; the light shines along its +X axis.
     pub transform: Transform,
@@ -141,6 +149,9 @@ pub(crate) fn read_light<'a>(
         name: name.to_owned(),
         group: group.map(str::to_owned),
         group_placement: None,
+        baked_position: None,
+        component_position: None,
+        relative_position: None,
         transform,
         light_type,
         state: values.state,

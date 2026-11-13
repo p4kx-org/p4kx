@@ -65,6 +65,7 @@ pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
         authored_soc: None,
         default_material: None,
         entity_provenance: None,
+        light_placements: None,
         issues: issues(inputs),
     }
 }

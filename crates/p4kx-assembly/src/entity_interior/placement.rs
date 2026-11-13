@@ -11,6 +11,7 @@ use crate::{ContainerSource, IssueKind, ObjectContainerRef, RoomModelHelper};
 pub(super) struct ContainerPlacement {
     pub(super) transform: Transform,
     pub(super) tile_owner: Option<Transform>,
+    pub(super) helper_node: Option<usize>,
 }
 
 impl EntityInterior {
@@ -40,7 +41,7 @@ impl EntityInterior {
         let bone = reference.bone();
         let proven = finite && reference.source() == ContainerSource::Vehicle;
         if bone.is_empty() {
-            return ContainerPlacement::new(moved, proven);
+            return ContainerPlacement::new(moved, proven, None);
         }
         let Some((model, helper)) = model
             .and_then(|model| RoomModelHelper::find(model, bone).map(|helper| (model, helper)))
@@ -52,7 +53,7 @@ impl EntityInterior {
                     helper: bone.to_owned(),
                 },
             );
-            return ContainerPlacement::new(moved, false);
+            return ContainerPlacement::new(moved, false, None);
         };
         let unique = model
             .nodes
@@ -62,8 +63,22 @@ impl EntityInterior {
             .is_none();
         let anchor = helper.transform();
         if helper.uses_offset() {
-            return ContainerPlacement::new(anchor.then(&moved), proven && unique);
+            return ContainerPlacement::new(
+                anchor.then(&moved),
+                proven && unique,
+                Some(helper.node()),
+            );
         }
+        self.check_position_offset(at, reference, anchor, finite);
+        ContainerPlacement::new(anchor, proven && unique, Some(helper.node()))
+    }
+    fn check_position_offset(
+        &mut self,
+        at: &str,
+        reference: &ObjectContainerRef,
+        anchor: Transform,
+        finite: bool,
+    ) {
         if finite
             && !near(reference.position(), [0.0; 3])
             && !near(reference.position(), anchor.translation())
@@ -72,19 +87,19 @@ impl EntityInterior {
                 at,
                 reference,
                 IssueKind::OffsetDiffers {
-                    bone: bone.to_owned(),
+                    bone: reference.bone().to_owned(),
                 },
             );
         }
-        ContainerPlacement::new(anchor, proven && unique)
     }
 }
 
 impl ContainerPlacement {
-    fn new(transform: Transform, proven: bool) -> Self {
+    fn new(transform: Transform, proven: bool, helper_node: Option<usize>) -> Self {
         Self {
             transform,
             tile_owner: proven.then_some(transform),
+            helper_node: helper_node.filter(|_| proven),
         }
     }
 }

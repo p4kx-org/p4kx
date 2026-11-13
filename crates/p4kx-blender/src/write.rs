@@ -312,6 +312,8 @@ fn complete_manifest(
     manifest.default_material = fallback.map(ArchiveDefaultMaterial::receipt);
     if let Some(assembly) = scene.classification {
         EntityClassifications::capture(assembly.parts(), assembly.forge_origin())?.apply(manifest);
+        manifest.light_placements =
+            crate::package_light_placements::capture(assembly, &scene.items, context)?;
     }
     sanitise(manifest);
     Ok(authored_soc)

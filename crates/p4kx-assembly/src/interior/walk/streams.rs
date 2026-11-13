@@ -62,7 +62,13 @@ impl Walker<'_> {
                 }
             }
             if let Some(entities) = &stream.entities
-                && !self.add_entities(todo, (at, world), file, entities, tile)
+                && !self.add_entities(
+                    todo,
+                    (at, world),
+                    file,
+                    entities,
+                    tile.map(|tile| (tile, stream.origin.as_ref())),
+                )
             {
                 return;
             }

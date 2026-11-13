@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_dataforge::Guid;
+use p4kx_extraction::EntryOrigin;
 use p4kx_model::{MaterialStatus, SocEntities, SocPalette, Transform};
 
 use super::{Placement, Todo, Walker};
@@ -87,7 +88,7 @@ impl Walker<'_> {
         (at, world): (usize, Transform),
         file: &str,
         entities: &SocEntities,
-        tile: Option<&TileLightPlacement<'_>>,
+        tile: Option<(&TileLightPlacement<'_>, Option<&Arc<EntryOrigin>>)>,
     ) -> bool {
         let mut invalid = entities.invalid;
         for prop in &entities.props {
@@ -176,7 +177,7 @@ impl Walker<'_> {
         (at, world): (usize, Transform),
         file: &str,
         entities: &SocEntities,
-        tile: Option<&TileLightPlacement<'_>>,
+        tile: Option<(&TileLightPlacement<'_>, Option<&Arc<EntryOrigin>>)>,
     ) -> bool {
         let mut unsupported: Vec<(String, usize)> = Vec::new();
         for light in &entities.lights {
@@ -190,9 +191,9 @@ impl Walker<'_> {
                 }
                 continue;
             }
-            let evidence = tile.and_then(|tile| {
+            let evidence = tile.and_then(|(tile, origin)| {
                 let group = light.group_placement.as_deref()?;
-                Some(tile.resolve(light, group))
+                Some(tile.resolve(light, group, origin.cloned()))
             });
             if let Some((_, evidence)) = &evidence
                 && let Some(Err(error)) = evidence.anchor

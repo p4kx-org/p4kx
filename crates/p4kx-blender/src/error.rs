@@ -129,6 +129,9 @@ pub enum PackageError {
     /// Original entity classification evidence could not be recorded.
     #[error("cannot record package entity classification")]
     EntityEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original light placement evidence could not be recorded.
+    #[error("cannot record package light placement")]
+    LightEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
     /// The caller asked to stop.
     #[error("cancelled")]
     Cancelled,

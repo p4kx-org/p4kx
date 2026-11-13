@@ -130,14 +130,14 @@ pub(super) fn walk<'a>(
         walker.report(&todo, scan.issues);
         let descriptor = scan.descriptor.as_ref().and_then(|source| {
             let descriptor = SocContainerDescriptor::parse(&source.bytes).ok()?;
-            (!descriptor.document().is_lossy()).then_some((source.name.as_str(), descriptor))
+            (!descriptor.document().is_lossy()).then_some((source, descriptor))
         });
         let tile = direct_owner.map(|owner| {
             TileLightPlacement::new(
                 owner,
                 descriptor
                     .as_ref()
-                    .map(|(name, descriptor)| (*name, descriptor)),
+                    .map(|(source, descriptor)| (*source, descriptor)),
             )
         });
         walker.add_streams(&todo, scan.streams, tile.as_ref());

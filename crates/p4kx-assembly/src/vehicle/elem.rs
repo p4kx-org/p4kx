@@ -60,6 +60,9 @@ pub(super) fn find_modification(
             name: name.to_owned(),
             value: value.map_or("", |(_, value)| value).to_owned(),
             port_name,
+            light_bone: value
+                .filter(|_| name.eq_ignore_ascii_case("bone"))
+                .and_then(|(attribute, _)| scope.attribute_ascii_position(node, attribute)),
         });
     }
     Ok(Some(Modification { patch, elems }))
@@ -103,6 +106,7 @@ pub struct ElemOverride {
     pub(super) name: String,
     pub(super) value: String,
     pub(super) port_name: Option<LoadoutPath>,
+    pub(super) light_bone: Option<p4kx_cryxml::SourceAttributePosition>,
 }
 
 impl ElemOverride {

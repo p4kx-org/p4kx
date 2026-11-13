@@ -3,8 +3,8 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::PathIndex;
-use p4kx_extraction::cryxml::SourceElementPosition;
+use p4kx_extraction::cryxml::{SourceAttributePosition, SourceElementPosition};
+use p4kx_extraction::{EntryOrigin, PathIndex};
 use p4kx_model::{
     Model, SocContainerDescriptor, SocGroupPlacement, SocLight, SocSourceValue, Transform,
     tile_attachment_point_suffix,
@@ -19,6 +19,7 @@ use crate::{
 #[derive(Clone, Copy)]
 pub(crate) struct TileLightOwner<'a> {
     pub(crate) frame: Option<Transform>,
+    pub(crate) container_helper_node: Option<usize>,
     pub(crate) model: Option<&'a Model>,
     pub(crate) vehicle: Option<&'a VehicleImplementation>,
 }
@@ -26,14 +27,19 @@ pub(crate) struct TileLightOwner<'a> {
 pub(super) struct TileDescriptor {
     pub(super) name: String,
     pub(super) bytes: Vec<u8>,
+    pub(super) origin: Option<Arc<EntryOrigin>>,
 }
 
 /// Authored and resolved placement of one baked light in its direct vehicle container.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct InteriorLightPlacement {
+    /// Physical SOC entry supplying the baked light and group.
+    pub stream_origin: Option<Arc<EntryOrigin>>,
     /// Direct owner frame used for the correction when it was proven.
     pub owner_from_container: Option<Transform>,
+    /// Exact selected container helper node of the owning model.
+    pub container_helper_node: Option<usize>,
     /// Exact source port element in its owning descriptor.
     pub port: Option<InteriorTilePort>,
     /// Effective group frame or the reason authored placement was retained.
@@ -43,11 +49,19 @@ pub struct InteriorLightPlacement {
 }
 
 /// The physical tile descriptor and the selected `ItemPort` within it.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct InteriorTilePort {
     /// Package-relative path of the original descriptor inside its SOC container.
     pub descriptor: Arc<str>,
+    /// Observed descriptor entry and its containing archive chain.
+    pub origin: Option<Arc<EntryOrigin>>,
+    /// Exact name in the selected declaration.
+    pub name: String,
+    /// Position of the descriptor item-port name attributes.
+    pub name_positions: Vec<SourceAttributePosition>,
+    /// Position of the descriptor item-port offset attributes.
+    pub offset_positions: Vec<SourceAttributePosition>,
     /// Position of the original item-port declaration in the descriptor.
     pub position: SourceElementPosition,
     /// Original interaction offset in owner space.
@@ -55,7 +69,7 @@ pub struct InteriorTilePort {
 }
 
 /// How a baked group's helper was selected within the actual owner.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum InteriorLightHelper {
     /// The group declares no usable helper or attachment point.
@@ -91,7 +105,7 @@ pub enum InteriorLightHelperError {
 }
 
 /// Where the helper name came from.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum InteriorLightHelperSource {
     /// The original group's helper attribute.
@@ -106,11 +120,15 @@ pub enum InteriorLightHelperSource {
         document: String,
         /// The selected value came from the base, patch or an Elem.
         origin: ValueOrigin,
+        /// Actual original XML entry that supplied the selected bone.
+        entry_origin: Option<Box<EntryOrigin>>,
+        /// Physical coordinate of the selected bone or Elem value attribute.
+        bone_position: Option<SourceAttributePosition>,
     },
 }
 
 /// A rest-frame binding to a unique node of the owning vehicle.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 #[non_exhaustive]
 pub struct InteriorLightHelperFrame {
     /// The exact name read from the group or effective vehicle definition.
@@ -127,14 +145,14 @@ pub struct InteriorLightHelperFrame {
 
 pub(super) struct TileLightPlacement<'a> {
     owner: TileLightOwner<'a>,
-    descriptor: Option<&'a str>,
+    descriptor: Option<&'a TileDescriptor>,
     ports: Option<SocTilePortIndex<'a>>,
 }
 
 impl<'a> TileLightPlacement<'a> {
     pub(super) fn new(
         owner: TileLightOwner<'a>,
-        descriptor: Option<(&'a str, &'a SocContainerDescriptor<'_>)>,
+        descriptor: Option<(&'a TileDescriptor, &'a SocContainerDescriptor<'_>)>,
     ) -> Self {
         Self {
             owner,
@@ -147,6 +165,7 @@ impl<'a> TileLightPlacement<'a> {
         &self,
         light: &SocLight,
         group: &SocGroupPlacement,
+        stream_origin: Option<Arc<EntryOrigin>>,
     ) -> (Transform, InteriorLightPlacement) {
         let (anchor, port) = self.anchor(group);
         let transform = match anchor {
@@ -164,7 +183,9 @@ impl<'a> TileLightPlacement<'a> {
         (
             transform,
             InteriorLightPlacement {
+                stream_origin,
                 owner_from_container: self.owner.frame,
+                container_helper_node: self.owner.container_helper_node,
                 port,
                 anchor,
                 helper,
@@ -191,7 +212,19 @@ impl<'a> TileLightPlacement<'a> {
         let target = ports.named(name);
         let port = if let SocTilePortTarget::Matched(site) = target {
             Some(InteriorTilePort {
-                descriptor: descriptor.into(),
+                descriptor: descriptor.name.as_str().into(),
+                origin: descriptor.origin.clone(),
+                name: name.clone(),
+                name_positions: site
+                    .port
+                    .name_attributes()
+                    .map(|attr| attr.position().clone())
+                    .collect(),
+                offset_positions: site
+                    .port
+                    .offset_attributes()
+                    .map(|attr| attr.position().clone())
+                    .collect(),
                 position: site.position.clone(),
                 offset: site.offset,
             })
@@ -302,6 +335,8 @@ fn vehicle_helper<'a>(
             point: point.to_owned(),
             document: document.to_owned(),
             origin,
+            entry_origin: vehicle.declaration_origin(origin).cloned().map(Box::new),
+            bone_position: attachment.bone_position().cloned(),
         },
     ))
 }

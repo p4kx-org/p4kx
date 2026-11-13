@@ -103,6 +103,12 @@ impl<'a> ModelPlacementInput<'a> {
 }
 
 impl Assembly {
+    /// Returns the physical model inputs for one already resolved helper node.
+    #[must_use]
+    pub fn model_node_input(&self, owner: usize, node: usize) -> Option<ModelPlacementInput<'_>> {
+        ModelPlacementInput::new(self.parts.get(owner)?, index(node)?)
+    }
+
     /// Returns the observed original model nodes used by the part's local placement.
     pub fn model_placement_inputs(
         &self,

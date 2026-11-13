@@ -23,6 +23,7 @@ const LISTED: usize = 8;
 #[derive(Default)]
 pub(super) struct AppliedModification {
     pub(super) patch_path: Option<String>,
+    pub(super) patch_origin: Option<p4kx_extraction::EntryOrigin>,
     pub(super) report: Option<ModificationReport>,
     pub(super) elems: Vec<ElemOverride>,
 }
@@ -64,9 +65,11 @@ pub(super) fn apply(
     }
     match read {
         Ok(Some((path, bytes))) => {
+            let physical = bytes.entry_origin();
             budget.grow(bytes.len());
             if let Some(done) = apply_patch(root, bytes, &path, budget, issues, observation)? {
                 modified.patch_path = Some(path);
+                modified.patch_origin = physical;
                 modified.report = Some(done);
             }
         }

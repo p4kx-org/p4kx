@@ -179,7 +179,7 @@ impl EntitySpec {
             docked_vehicle: is_docked_vehicle_type(classification.item_type_text()),
             classification,
             container: inventory_container(&components),
-            object_containers: crate::object_containers::read(&components).into(),
+            object_containers: crate::object_containers::read(tree, component_slots(tree)).into(),
             zones: read_zones(&components),
             animation_database: crate::creature_animation::database_of(&components),
             record_index: Some(tree.record_index()),

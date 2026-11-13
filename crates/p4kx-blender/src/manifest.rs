@@ -127,6 +127,10 @@ pub struct Manifest {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<p4kx_extraction::SourceInventory>")]
     pub entity_provenance: Option<serde_json::Value>,
+    /// Placement evidence for baked lights in directly owned vehicle containers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<crate::package_light_placements::LightPlacements>")]
+    pub light_placements: Option<serde_json::Value>,
     /// The GLB meshes, one per distinct mesh set; nodes reference them.
     pub meshes: Vec<Mesh>,
     /// The PNG textures, each written once.

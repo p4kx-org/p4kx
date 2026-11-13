@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_cryxml::SourceAttributePosition;
+
 use crate::ValueOrigin;
 
 /// The deepest element nesting that is read.
@@ -16,6 +18,7 @@ pub(crate) struct Element {
     pub(crate) attributes: Vec<(String, String)>,
     pub(crate) origins: Vec<(String, ValueOrigin)>,
     pub(crate) port_name: Option<crate::LoadoutPath>,
+    pub(crate) light_bone: Option<SourceAttributePosition>,
     pub(crate) children: Vec<Self>,
 }
 
@@ -32,6 +35,7 @@ impl Element {
             attributes,
             origins: Vec::new(),
             port_name: None,
+            light_bone: None,
             children,
         }
     }
@@ -322,8 +326,14 @@ fn from_node(
     } else {
         None
     };
+    let light_bone = if node.name() == "AttachmentPoint" {
+        scope.attribute_ascii_position(node, "bone")
+    } else {
+        None
+    };
     Ok(Element {
         port_name,
+        light_bone,
         name: node.name().to_owned(),
         attributes,
         children,

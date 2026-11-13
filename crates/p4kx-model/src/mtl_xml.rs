@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_cryxml::Element;
+use p4kx_cryxml::{Element, SourceElementPosition};
 
 use crate::MaterialError;
 use crate::mtl_xml_source::{self, Syntax};
@@ -16,6 +16,7 @@ pub(crate) struct PositionedAttribute<'source> {
 pub(crate) trait XmlElement<'a>: Copy {
     fn syntax(self) -> Result<Syntax<'a>, MaterialError>;
 
+    fn position(self) -> SourceElementPosition;
     fn name(self) -> &'a str;
     fn attribute(self, name: &str) -> Option<&'a str> {
         self.positioned_attribute(name)
@@ -31,6 +32,10 @@ pub(crate) trait XmlElement<'a>: Copy {
 impl<'a> XmlElement<'a> for Element<'a> {
     fn syntax(self) -> Result<Syntax<'a>, MaterialError> {
         mtl_xml_source::cryxml(self)
+    }
+
+    fn position(self) -> SourceElementPosition {
+        SourceElementPosition::CryXml(self.index())
     }
 
     fn name(self) -> &'a str {
@@ -60,6 +65,10 @@ impl<'a> XmlElement<'a> for Element<'a> {
 impl<'a> XmlElement<'a> for roxmltree::Node<'a, '_> {
     fn syntax(self) -> Result<Syntax<'a>, MaterialError> {
         mtl_xml_source::text(self)
+    }
+
+    fn position(self) -> SourceElementPosition {
+        SourceElementPosition::Text(self.range())
     }
 
     fn name(self) -> &'a str {

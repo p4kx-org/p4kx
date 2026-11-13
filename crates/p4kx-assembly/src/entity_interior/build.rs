@@ -124,6 +124,7 @@ impl EntityInterior {
             let tile_owner =
                 (reference.source() == ContainerSource::Vehicle).then(|| TileLightOwner {
                     frame: placement.tile_owner,
+                    container_helper_node: placement.helper_node,
                     model,
                     vehicle: owner.and_then(|part| {
                         owners

@@ -130,6 +130,7 @@ mod soc_geometry;
 mod soc_group_placement;
 mod soc_inline_loadout;
 mod soc_light;
+mod soc_light_projection;
 mod soc_light_source;
 mod soc_room_registry;
 mod soc_room_segment;
@@ -231,7 +232,7 @@ pub use soc_entities::{
 pub use soc_entity_component::{SocEntityComponent, SocEntityComponentKind};
 pub use soc_entity_links::{SocEntityLink, SocEntityLinks};
 pub use soc_entity_source::{SocEntity, SocEntityChunk, SocEntityFile, SocEntitySourceError};
-pub use soc_group_placement::SocGroupPlacement;
+pub use soc_group_placement::{SocGroupCoordinates, SocGroupPlacement};
 pub use soc_inline_loadout::{
     SocInlineLoadout, SocInlineLoadoutEntries, SocInlineLoadoutEntry, SocInlineLoadoutKind,
 };

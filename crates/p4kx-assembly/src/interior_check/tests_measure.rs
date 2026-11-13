@@ -133,6 +133,7 @@ fn container_of(parts: Vec<InteriorPart>) -> EntityContainer {
             position: [0.0; 3],
             rotation: [0.0; 3],
             source: ContainerSource::Vehicle,
+            coordinate: None,
         },
         placement: moved(0.0, 0.0, 5.0),
         interior: Interior {

@@ -19,6 +19,7 @@ mod package_layer_limits;
 mod package_layer_reader;
 mod package_layer_shares;
 mod package_layout;
+mod package_light_placements;
 mod package_materials;
 mod package_mesh_extras;
 mod package_safety;

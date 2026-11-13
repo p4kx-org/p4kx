@@ -71,7 +71,7 @@ impl SocXmlPosition {
         }
     }
 
-    fn location(&self, chunk: Option<usize>, field: String) -> SourceLocation {
+    pub(crate) fn location(&self, chunk: Option<usize>, field: String) -> SourceLocation {
         let mut indices = Vec::new();
         let document = chunk.map_or("socXml", |chunk| {
             indices.push(chunk as u64);

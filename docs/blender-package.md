@@ -35,6 +35,29 @@ Interior groups do not carry an Entity classification. Shared mesh identities ar
 Package version 1.16 adds these optional fields. Older manifests remain
 readable, and Blender can import the scene independently of the metadata.
 
+## Baked vehicle light placement
+
+The optional v1.16 `light_placements` member contains one evidence row per supported
+baked light in a directly declared vehicle container. Each row references the exact
+light `node`, its `owner` entity node and the direct `container` node by ordinal in
+`nodes`. Repeated source containers may have separate rows and different results.
+Nested containers have no inherited vehicle owner.
+
+The matrices in this member are three row-major affine rows in original CryEngine
+Z-up coordinates and metres. `original_light` is the retained baked frame,
+`original_group` is the authored group transform, and `effective_light` is the
+frame used before the package's glTF basis and light-axis conversion.
+`anchor` retains the matched interaction offset and corrected group frame, or a
+specific unresolved status. `helper` retains the observed same-owner helper origin
+and its rest frame when the helper could be bound. `preview_state` records the
+selected state used by the existing static preview.
+
+Resolve each sourced datum's `sourceUsesRefs` in this member's `sourceInventory`.
+An encrypted contributing entry is reflected immediately in
+`containsEncryptedSource`. An incomplete contribution set without affirmative
+encryption evidence has an unknown marker. The rendering importer uses the
+ordinary `nodes` hierarchy and transforms.
+
 ## Layout
 
 ```text

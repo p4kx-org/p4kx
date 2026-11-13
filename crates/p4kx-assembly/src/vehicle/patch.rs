@@ -246,6 +246,7 @@ fn overlay_children(
         let mut element = Element {
             name: source.name.clone(),
             port_name: source.port_name.clone(),
+            light_bone: source.light_bone.clone(),
             attributes: source.attributes.clone(),
             children: Vec::new(),
             origins: Vec::new(),
@@ -261,6 +262,9 @@ fn overlay_children(
                         element.set_attribute(name, value);
                         if name.eq_ignore_ascii_case("name") {
                             element.port_name.clone_from(&partner.port_name);
+                        }
+                        if name.eq_ignore_ascii_case("bone") {
+                            element.light_bone.clone_from(&partner.light_bone);
                         }
                         match partner.origin_of(name) {
                             ValueOrigin::Base => {}
@@ -303,6 +307,9 @@ fn merge_by_id(
                 child.set_attribute(name, value);
                 if name.eq_ignore_ascii_case("name") {
                     child.port_name.clone_from(&patch.port_name);
+                }
+                if name.eq_ignore_ascii_case("bone") {
+                    child.light_bone.clone_from(&patch.light_bone);
                 }
                 child.mark(name, ValueOrigin::Patch);
             }
@@ -358,7 +365,10 @@ fn set_elems<'e>(
             budget.charge_set(element.attributes.len(), &elem.name, &elem.value)?;
             element.set_attribute(&elem.name, &elem.value);
             if elem.name.eq_ignore_ascii_case("name") {
-                element.port_name = elem.port_name.clone();
+                element.port_name.clone_from(&elem.port_name);
+            }
+            if elem.name.eq_ignore_ascii_case("bone") {
+                element.light_bone.clone_from(&elem.light_bone);
             }
             element.mark(&elem.name, ValueOrigin::Elem);
         }
