@@ -85,6 +85,7 @@ starmapPresets: 0 written, 0 skipped, complete
 starmapAmenities: 0 written, 0 skipped, complete
 missionScenarios: 0 written, 0 skipped, complete
 missionModuleDeclarations: 0 written, 0 skipped, complete
+missionItems: 0 written, 0 skipped, complete
 contractScopes: 0 written, 0 skipped, complete
 item classes: 1 read, 0 other values, 0 without a Class: line or English description
 paint assignment: 0 of 0 paints fit a ship, 0 fit none, 0 ships have paints, 0 vehicle files unreadable
@@ -99,4 +100,4 @@ ships variants: 0 in 0 groups
 quality quantizations: 0 used by no ResourceType, 0 links reach no quantization
 en: 16 texts resolved, 1 unresolved, 0 placeholders
 de: 2 texts resolved, 15 unresolved, 0 placeholders
-wrote [DIR]/basetool-catalog.json: 228121 bytes, 1 Records skipped, 0 failed
+wrote [DIR]/basetool-catalog.json: 228986 bytes, 1 Records skipped, 0 failed
