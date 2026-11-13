@@ -152,10 +152,15 @@ packages on both Linux CPUs and Linux packages on both Windows CPUs. The native 
 tests in the same CI matrix cover the export transaction, including occupied destinations,
 missing parents, directory replacement and cleanup.
 
-Windows AMD64/ARM64, Ubuntu 24.04 AMD64 and macOS ARM64 use the upstream Python 3.13 wheels for
-Blender 5.2.3 and 5.3.0. Both run the existing headless synthetic smoke and import the actual
-exchanged packages to check authored geometry, transforms and material bindings. The CI import
-omits the optional CPU renders used for interactive visual review. [Blender 5.2.3 wheel files](https://pypi.org/project/bpy/5.2.3/#files) · [Blender 5.3.0 wheel files](https://pypi.org/project/bpy/5.3.0/#files)
+Windows AMD64, Ubuntu 24.04 AMD64 and macOS ARM64 use the upstream Python 3.13 wheels for
+Blender 5.2.3 and 5.3.0. Windows ARM64 uses the 5.2.3 wheel and the official 5.3.0 portable
+distribution. Its 5.3.0 job verifies the pinned ZIP digest and the executable's ARM64 PE
+machine before running Blender with an isolated profile. Each version runs the same headless
+synthetic smoke and imports the actual exchanged packages to check authored geometry, transforms
+and material bindings. The CI import omits the optional CPU renders used for interactive visual
+review. [Blender 5.2.3 wheel files](https://pypi.org/project/bpy/5.2.3/#files) ·
+[Blender 5.3.0 wheel files](https://pypi.org/project/bpy/5.3.0/#files) ·
+[Blender 5.3.0 official ZIP checksums](https://download.blender.org/release/Blender5.3/blender-5.3.0.sha256)
 
 The Ubuntu 24.04 ARM64 row runs the native P4KX producer and pure Python validation directly.
 Its native Blender 5.2 headless check runs separately in a pinned ARM64 Debian container using

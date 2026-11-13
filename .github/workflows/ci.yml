@@ -257,7 +257,8 @@ jobs:
       - name: Import synthetic packages in native Blender 5.2 and 5.3
         if: matrix.os != 'linux' || matrix.arch != 'arm64'
         run: |
-          foreach ($version in '5.2.3', '5.3.0') {
+          $versions = if ($env:P4KX_TARGET -ceq 'aarch64-pc-windows-msvc') { '5.2.3' } else { @('5.2.3', '5.3.0') }
+          foreach ($version in $versions) {
             python -m pip install --only-binary=bpy "bpy==$version"
             if ($LASTEXITCODE -ne 0) { throw "Native bpy $version could not be installed." }
             python tests/blender_smoke.py
@@ -265,6 +266,11 @@ jobs:
             python tests/verify_portable_packages.py $env:P4KX_BLENDER_EXCHANGE --target $env:P4KX_TARGET --bpy-version $version
             if ($LASTEXITCODE -ne 0) { throw "Blender $version native package exchange failed." }
           }
+
+      - name: Import the exchanged packages in native Windows ARM64 Blender 5.3
+        if: matrix.os == 'windows' && matrix.arch == 'arm64'
+        working-directory: .
+        run: .github/scripts/verify-windows-arm64-blender.ps1 -Target $env:P4KX_TARGET -ArtifactDirectory $env:P4KX_BLENDER_EXCHANGE -BuildDirectory (Join-Path $env:RUNNER_TEMP 'p4kx-blender-windows-arm64')
 
       - name: Import the exchanged packages in native Debian ARM64 Blender 5.2
         if: matrix.os == 'linux' && matrix.arch == 'arm64'
