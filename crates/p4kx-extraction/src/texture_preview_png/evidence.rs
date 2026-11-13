@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_texture::DdsHeaderField;
+use p4kx_texture::{DdsHeaderField, DdsPngEncoding};
 
 use crate::textures::preview_header::PreviewHeaderEvidence;
 use crate::{FieldOrigin, SourceEvidenceError, SourceUse, SourceUseRole, SourceUses};
@@ -14,6 +14,7 @@ pub struct PreviewPngEvidence {
     pub color: PreviewTextureEvidence,
     /// The successfully merged alpha or smoothness tail.
     pub alpha: Option<PreviewTextureEvidence>,
+    pub(super) png_encoding: Option<DdsPngEncoding>,
 }
 
 impl PreviewPngEvidence {
@@ -35,6 +36,29 @@ impl PreviewPngEvidence {
             uses.push(texture.header_size_use()?);
             uses.push(texture.mip().clone());
         }
+        Ok(())
+    }
+
+    /// Registers the original header words used to choose encoded PNG transfer metadata.
+    ///
+    /// # Errors
+    /// Returns an error if the evidence inventory was interrupted.
+    pub fn append_png_encoding_uses(
+        &self,
+        uses: &mut Vec<SourceUse>,
+    ) -> Result<(), SourceEvidenceError> {
+        let Some(encoding) = self.png_encoding else {
+            return Ok(());
+        };
+        self.append_output_transfer_uses(uses, encoding)
+    }
+
+    pub(crate) fn append_output_transfer_uses(
+        &self,
+        uses: &mut Vec<SourceUse>,
+        encoding: DdsPngEncoding,
+    ) -> Result<(), SourceEvidenceError> {
+        uses.extend(self.color.header.output_transfer_uses(encoding)?);
         Ok(())
     }
 

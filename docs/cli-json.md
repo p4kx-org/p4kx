@@ -1587,6 +1587,16 @@ written image. `alpha_tail` says whether an alpha or smoothness tail was merged 
 channel. `--tone-map` on a texture that is not high-range writes the PNG as usual and prints a
 note on stderr. A format without a decoder fails with exit code 1 and a
 message naming the format; a level the texture does not have fails with exit code 2.
+
+PNG reports include the output transfer, channel transform and companion filenames.
+The JSON keys are `output_transfer`, `png_transform` and `origin_receipts`. Resolve each
+companion filename beside the corresponding image in `files`. Each companion binds the
+exact PNG bytes and their physical DDS sources. The `field_origins` and `provenance`
+members identify the header words used for the two report values. Linear RGB carries
+a `gAMA` value of 1.0, sRGB RGB carries an `sRGB` chunk, and unknown or data samples stay
+untagged. Floating-point tone mapping produces sRGB. The transfer tag leaves the encoded
+RGB and alpha samples unchanged.
+
 ## `p4kx audio info <archive> <entry> --json`
 
 Also `p4kx audio info <file> --json` for a WEM file on disk.

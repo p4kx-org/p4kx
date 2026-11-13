@@ -5,7 +5,9 @@ use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use anyhow::Result;
-use p4kx_extraction::{CubemapLayout, Texture};
+use p4kx_extraction::texture_codec::{DdsPngTransform, DdsTransfer};
+use p4kx_extraction::texture_preview::PngOrigins;
+use p4kx_extraction::{CubemapLayout, FieldOrigins, SourceInventory, Texture};
 use serde::Serialize;
 
 use crate::json;
@@ -28,6 +30,18 @@ struct ImageJson<'a> {
     width: u32,
     height: u32,
     alpha_tail: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    output_transfer: Option<DdsTransfer>,
+    png_transform: Option<DdsPngTransform>,
+    #[serde(flatten)]
+    origins: Option<ReportOrigins>,
+}
+
+#[derive(Serialize)]
+struct ReportOrigins {
+    origin_receipts: Vec<String>,
+    field_origins: FieldOrigins,
+    provenance: SourceInventory,
 }
 
 /// What `p4kx texture png` exports: the mip, the cubemap layout and whether a high-range
@@ -46,6 +60,9 @@ struct Written {
     height: u32,
     files: Vec<PathBuf>,
     alpha_tail: bool,
+    output_transfer: Option<DdsTransfer>,
+    png_transform: Option<DdsPngTransform>,
+    origins: Option<PngOrigins>,
 }
 
 /// Runs `p4kx texture png`: an 8-bit PNG, or OpenEXR for a high-range texture without
@@ -64,28 +81,7 @@ pub(crate) fn export_image(
             "note: --tone-map has no effect: {format} is not a high-range format"
         )?;
     }
-    let written = if high_range && !options.tone_map {
-        let exr = out.with_extension("exr");
-        let report = texture.exr_to_file_as(&exr, options.mip, options.layout)?;
-        Written {
-            format: ImageFormat::Exr,
-            level: report.level,
-            width: report.width,
-            height: report.height,
-            files: report.files,
-            alpha_tail: false,
-        }
-    } else {
-        let report = texture.png_to_file_as(out, options.mip, options.layout)?;
-        Written {
-            format: ImageFormat::Png,
-            level: report.level,
-            width: report.width,
-            height: report.height,
-            files: report.files,
-            alpha_tail: report.alpha_tail,
-        }
-    };
+    let written = write_image(texture, out, options, high_range)?;
     if as_json {
         json::print(&ImageJson {
             texture: texture.name(),
@@ -96,11 +92,64 @@ pub(crate) fn export_image(
             width: written.width,
             height: written.height,
             alpha_tail: written.alpha_tail,
+            output_transfer: written.output_transfer,
+            png_transform: written.png_transform,
+            origins: written.origins.map(|origins| ReportOrigins {
+                origin_receipts: origins
+                    .receipts
+                    .iter()
+                    .map(|path| {
+                        path.file_name()
+                            .unwrap_or(path.as_os_str())
+                            .to_string_lossy()
+                            .into_owned()
+                    })
+                    .collect(),
+                field_origins: origins.fields,
+                provenance: origins.inventory,
+            }),
         })?;
         return Ok(());
     }
     writeln!(io::stdout().lock(), "{}", describe(texture, out, &written))?;
     Ok(())
+}
+
+fn write_image(
+    texture: &Texture<'_>,
+    out: &Path,
+    options: ImageOptions,
+    high_range: bool,
+) -> Result<Written> {
+    if high_range && !options.tone_map {
+        let exr = out.with_extension("exr");
+        let report = texture.exr_to_file_as(&exr, options.mip, options.layout)?;
+        Ok(Written {
+            format: ImageFormat::Exr,
+            level: report.level,
+            width: report.width,
+            height: report.height,
+            files: report.files,
+            alpha_tail: false,
+            output_transfer: None,
+            png_transform: None,
+            origins: None,
+        })
+    } else {
+        let (report, origins) =
+            texture.png_to_file_with_origins(out, options.mip, options.layout)?;
+        Ok(Written {
+            format: ImageFormat::Png,
+            level: report.level,
+            width: report.width,
+            height: report.height,
+            files: report.files,
+            alpha_tail: report.alpha_tail,
+            output_transfer: Some(report.encoding.transfer),
+            png_transform: Some(report.encoding.transform),
+            origins: Some(origins),
+        })
+    }
 }
 
 fn describe(texture: &Texture<'_>, out: &Path, written: &Written) -> String {

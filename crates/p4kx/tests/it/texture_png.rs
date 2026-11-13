@@ -14,6 +14,9 @@ use predicates::prelude::predicate;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "texture_png_transfer.rs"]
+mod transfer;
+
 const HEADER: &str = "Data\\Textures\\panel_diff.dds";
 
 fn p4kx() -> Result<Command, Box<dyn Error>> {

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_texture::{DdsHeaderField, DdsRawHeader};
+use p4kx_texture::{DdsHeaderField, DdsPngEncoding, DdsRawHeader};
 
 use crate::texture_parts::Parts;
 use crate::{
@@ -69,6 +69,24 @@ impl PreviewHeaderEvidence {
                 )
             })
             .collect()
+    }
+
+    pub(crate) fn output_transfer_uses(
+        &self,
+        encoding: DdsPngEncoding,
+    ) -> Result<Vec<SourceUse>, SourceEvidenceError> {
+        let mut uses = self.header_uses(&[DdsHeaderField::Prefix], SourceUseRole::Selector)?;
+        let fields = if encoding.uses_source_transfer() {
+            &[
+                DdsHeaderField::Format,
+                DdsHeaderField::DxgiTransfer,
+                DdsHeaderField::CryTransfer,
+            ][..]
+        } else {
+            &[DdsHeaderField::Format][..]
+        };
+        uses.extend(self.header_uses(fields, SourceUseRole::Conversion)?);
+        Ok(uses)
     }
 
     /// Registers an exact retained byte range inside the observed DDS header.

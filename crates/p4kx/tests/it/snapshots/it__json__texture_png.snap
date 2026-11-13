@@ -1,16 +1,174 @@
 ---
-source: crates/p4kx/tests/json.rs
+source: crates/p4kx/tests/it/json.rs
 expression: json
 ---
 {
   "alpha_tail": false,
+  "field_origins": {
+    "/output_transfer": {
+      "containsEncryptedSource": null,
+      "sourceSetComplete": true,
+      "sourceUsesRefs": [
+        "u2",
+        "u3",
+        "u4",
+        "u5"
+      ]
+    },
+    "/png_transform": {
+      "containsEncryptedSource": null,
+      "sourceSetComplete": true,
+      "sourceUsesRefs": [
+        "u3",
+        "u4",
+        "u6"
+      ]
+    }
+  },
   "files": [
     "[DIR]/hull_diff.png"
   ],
   "format": "png",
   "height": 16,
   "mip": 1,
+  "origin_receipts": [
+    "hull_diff.png.p4kx-origin.jsonl"
+  ],
   "output": "[DIR]/hull_diff.png",
+  "output_transfer": "unknown",
+  "png_transform": "preserve_colour_transfer",
+  "provenance": {
+    "sources": [
+      {
+        "ancestors": [],
+        "byteLength": {
+          "containsEncryptedSource": null,
+          "sourceSetComplete": true,
+          "sourceUsesRefs": [
+            "u1"
+          ],
+          "state": "present",
+          "value": "152"
+        },
+        "id": "f0",
+        "kind": "file",
+        "name": {
+          "containsEncryptedSource": null,
+          "sourceSetComplete": true,
+          "sourceUsesRefs": [
+            "u0"
+          ],
+          "state": "present",
+          "value": "hull_diff.dds"
+        },
+        "storedEncryption": "unknown"
+      }
+    ],
+    "uses": [
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u0",
+        "location": {
+          "field": "name",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "fileMetadata",
+        "source": "f0"
+      },
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u1",
+        "location": {
+          "field": "byteLength",
+          "type": "metadata"
+        },
+        "role": "payload",
+        "scope": "fileMetadata",
+        "source": "f0"
+      },
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u2",
+        "location": {
+          "field": "magic",
+          "indices": [
+            "0",
+            "4"
+          ],
+          "namespace": "ddsHeader",
+          "type": "subresource"
+        },
+        "role": "selector",
+        "scope": "payload",
+        "source": "f0"
+      },
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u3",
+        "location": {
+          "field": "pixelFormat.flags",
+          "indices": [
+            "80",
+            "4"
+          ],
+          "namespace": "ddsHeader",
+          "type": "subresource"
+        },
+        "role": "conversion",
+        "scope": "payload",
+        "source": "f0"
+      },
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u4",
+        "location": {
+          "field": "pixelFormat.fourCc",
+          "indices": [
+            "84",
+            "4"
+          ],
+          "namespace": "ddsHeader",
+          "type": "subresource"
+        },
+        "role": "conversion",
+        "scope": "payload",
+        "source": "f0"
+      },
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u5",
+        "location": {
+          "field": "reserved2",
+          "indices": [
+            "124",
+            "4"
+          ],
+          "namespace": "ddsHeader",
+          "type": "subresource"
+        },
+        "role": "conversion",
+        "scope": "payload",
+        "source": "f0"
+      },
+      {
+        "effectiveEncryption": "unknown",
+        "id": "u6",
+        "location": {
+          "field": "magic",
+          "indices": [
+            "0",
+            "4"
+          ],
+          "namespace": "ddsHeader",
+          "type": "subresource"
+        },
+        "role": "conversion",
+        "scope": "payload",
+        "source": "f0"
+      }
+    ]
+  },
   "texture": "[DIR]/hull_diff.dds",
   "width": 32
 }

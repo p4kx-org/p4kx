@@ -3,7 +3,10 @@
 
 use p4kx_archive::ObservedEntry;
 use p4kx_gltf::TextureComponents;
-use p4kx_texture::{DdsHeaderField, DdsRawHeader, MipByteSpans, MipPayloadLocation};
+use p4kx_texture::{
+    DdsHeader, DdsHeaderField, DdsPngEncoding, DdsRawHeader, MipByteSpans, MipPayloadLocation,
+    TextureError,
+};
 
 use crate::source::SourceEntry;
 use crate::texture_parts::Parts;
@@ -41,6 +44,27 @@ enum ReadInput<'archive> {
     Archive(ObservedEntry<'archive>),
     File(ObservedFileOrigin),
     Unknown,
+}
+
+impl<Spans> PreviewInputs<'_, Spans> {
+    pub(crate) fn color_header_evidence(
+        &self,
+        uses: &SourceUses,
+    ) -> Result<(PreviewHeaderEvidence, bool), SourceEvidenceError> {
+        let header = &self.color.header;
+        Ok((
+            PreviewHeaderEvidence::of_read(uses, header.input(), self.color.raw)?,
+            header.is_bound(),
+        ))
+    }
+
+    pub(crate) fn png_encoding(&self) -> Result<DdsPngEncoding, TextureError> {
+        let raw = &self.color.raw;
+        Ok(DdsPngEncoding::of(
+            DdsHeader::from_raw(raw)?.format(),
+            raw.transfer().effective,
+        ))
+    }
 }
 
 impl ReadInput<'_> {
@@ -145,6 +169,7 @@ impl<'a> PreviewInputs<'a, MipPayloadLocation> {
             None => None,
         };
         Ok(Some(PreviewPngEvidence {
+            png_encoding: None,
             color: self.color.register_spans(uses, level, color)?,
             alpha,
         }))
@@ -189,6 +214,7 @@ impl PreviewInputs<'_, MipByteSpans> {
         level: u32,
     ) -> Result<PreviewPngEvidence, SourceEvidenceError> {
         Ok(PreviewPngEvidence {
+            png_encoding: None,
             color: self.color.register(uses, level)?,
             alpha: self
                 .alpha

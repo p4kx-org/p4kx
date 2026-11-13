@@ -139,6 +139,7 @@ fn rendered_origins(
     let mut png = mip_selector.to_vec();
     png.extend_from_slice(face_selector);
     evidence.append_pixel_uses(&mut png)?;
+    evidence.append_png_encoding_uses(&mut png)?;
     png.extend_from_slice(&alpha_lookup);
     Ok((uses.origin(&png, true), uses.origin(&alpha_lookup, true)))
 }

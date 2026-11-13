@@ -4,7 +4,7 @@
 mod evidence;
 pub(crate) mod input;
 
-use p4kx_texture::{MipByteSpans, write_png};
+use p4kx_texture::{DdsPngEncoding, MipByteSpans, write_png_with_transfer};
 
 use self::input::PreviewInputs;
 use crate::{ConversionError, SourceEvidenceError, SourceUses, Texture};
@@ -29,6 +29,7 @@ pub struct PreviewPng {
 #[non_exhaustive]
 pub struct ObservedPreviewPng<'a> {
     image: PreviewPng,
+    encoding: DdsPngEncoding,
     inputs: PreviewInputs<'a, MipByteSpans>,
 }
 
@@ -51,7 +52,9 @@ impl ObservedPreviewPng<'_> {
     ///
     /// Returns an error if the evidence inventory was interrupted.
     pub fn evidence(&self, uses: &SourceUses) -> Result<PreviewPngEvidence, SourceEvidenceError> {
-        self.inputs.register(uses, self.image.level)
+        let mut evidence = self.inputs.register(uses, self.image.level)?;
+        evidence.png_encoding = Some(self.encoding);
+        Ok(evidence)
     }
 }
 
@@ -86,7 +89,11 @@ impl<'a> Texture<'a> {
         let observed = self.decode_preview_selected(level, face)?;
         let image = observed.image;
         let mut png = Vec::new();
-        write_png(&image, &mut png)
+        let encoding = observed
+            .inputs
+            .png_encoding()
+            .map_err(|error| ConversionError::of_texture(self.name(), error))?;
+        write_png_with_transfer(&image, encoding.transfer, &mut png)
             .map_err(|error| ConversionError::of_texture(self.name(), error))?;
         Ok(ObservedPreviewPng {
             image: PreviewPng {
@@ -95,6 +102,7 @@ impl<'a> Texture<'a> {
                 height: image.height(),
                 png,
             },
+            encoding,
             inputs: observed.inputs,
         })
     }

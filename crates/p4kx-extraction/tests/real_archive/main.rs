@@ -70,6 +70,7 @@ mod texture_hdr_cube;
 mod texture_known;
 mod texture_survey;
 mod texture_tails;
+mod texture_transfer_png;
 mod textured_materials;
 mod ui;
 mod ui_fonts;
