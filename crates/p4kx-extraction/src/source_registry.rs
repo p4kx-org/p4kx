@@ -42,7 +42,13 @@ pub(crate) struct SourceRegistry {
     pub(crate) inputs: Vec<InputIdentity>,
     pub(crate) sources: BTreeMap<PhysicalSourceRef, PhysicalSource>,
     pub(crate) uses: BTreeMap<SourceUseRef, Arc<SourceUseDescription>>,
-    compact_use_refs: Option<HashMap<SourceUseRef, SourceUseRef>>,
+    compact_use_refs: Option<CompactUseRefs>,
+}
+
+#[derive(Default)]
+struct CompactUseRefs {
+    aliases: HashMap<SourceUseRef, SourceUseRef>,
+    batch: Option<u64>,
 }
 
 impl SourceRegistry {
@@ -58,9 +64,36 @@ impl SourceRegistry {
 
     pub(crate) fn with_compact_use_refs(identity: Arc<()>) -> Self {
         Self {
-            compact_use_refs: Some(HashMap::new()),
+            compact_use_refs: Some(CompactUseRefs::default()),
             ..Self::new(identity)
         }
+    }
+
+    pub(crate) fn with_batched_use_refs(identity: Arc<()>) -> Self {
+        Self {
+            compact_use_refs: Some(CompactUseRefs {
+                batch: Some(0),
+                ..CompactUseRefs::default()
+            }),
+            ..Self::new(identity)
+        }
+    }
+
+    pub(crate) fn take_use_batch(
+        &mut self,
+    ) -> std::io::Result<BTreeMap<SourceUseRef, Arc<SourceUseDescription>>> {
+        let compact = self
+            .compact_use_refs
+            .as_mut()
+            .ok_or_else(|| std::io::Error::other("source inventory does not support batches"))?;
+        compact.batch = Some(
+            compact
+                .batch
+                .and_then(|batch| batch.checked_add(1))
+                .ok_or_else(|| std::io::Error::other("origin batch index exceeds u64"))?,
+        );
+        compact.aliases.clear();
+        Ok(std::mem::take(&mut self.uses))
     }
 
     pub(crate) fn observe(
@@ -185,11 +218,18 @@ impl SourceRegistry {
             role.key(),
             location.key()
         ));
-        let id = if let Some(aliases) = &mut self.compact_use_refs {
-            let ordinal = aliases.len();
-            aliases
+        let id = if let Some(compact) = &mut self.compact_use_refs {
+            let ordinal = compact.aliases.len();
+            let batch = compact.batch;
+            compact
+                .aliases
                 .entry(id)
-                .or_insert_with(|| SourceUseRef(format!("u{ordinal}")))
+                .or_insert_with(|| {
+                    SourceUseRef(batch.map_or_else(
+                        || format!("u{ordinal}"),
+                        |batch| format!("u{batch}.{ordinal}"),
+                    ))
+                })
                 .clone()
         } else {
             id

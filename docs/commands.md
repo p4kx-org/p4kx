@@ -397,7 +397,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   it. UTF-8 with or without a byte order mark and UTF-16 files are read; invalid bytes become
   U+FFFD and lines without `=` are skipped, and a `note:` line on stderr names each such Entry
   (also for `catalog`). `loc export --format csv` writes a UTF-8 byte order mark and CRLF line
-  ends. `--fallback en` is the usual choice; there is no default. `--json` gives the shapes in [docs/cli-json.md](cli-json.md).
+  ends. File exports write a sibling origin companion. Raw stdout can carry a separate receipt
+  through `--origin-stderr` or `--origin-out <file>`. See [localisation origins](source-origin.md#localisation-tables).
+  `--fallback en` is the usual choice; there is no default. `--json` gives the shapes in [docs/cli-json.md](cli-json.md).
 - `p4kx actionmap export <archive> [--format json|csv] [--csv-raw] [--language <language>]
   [--out <file>]` writes the action maps of `Data\Libs\Config\defaultProfile.xml`: every action with the
   localised label of its key and its default bindings for the keyboard, mouse, gamepad and

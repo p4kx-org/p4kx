@@ -33,7 +33,10 @@ pub use crate::error::CatalogError;
 pub use crate::failure::CatalogFailure;
 pub use crate::form::{FLAT_CSV_FILE, FLAT_NDJSON_FILE, NDJSON_FILE, RecordForm};
 pub use crate::item_class::{ItemClass, ItemClassSummary};
-pub use crate::localization_table::{TableFormat, write_localization_table};
+pub use crate::localization_table::{
+    LocalizationTableDatum, TableFormat, write_localization_table,
+    write_observed_localization_table,
+};
 pub use crate::options::{CatalogOptions, CatalogPhase, CatalogProgress};
 pub use crate::playability::{Playability, PlayabilityCounts, PlayabilitySummary};
 pub use crate::quantization_summary::QuantizationSummary;

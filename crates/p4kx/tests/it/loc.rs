@@ -13,6 +13,8 @@ use predicates::prelude::predicate;
 
 #[path = "loc_json_origin.rs"]
 mod json_origin;
+#[path = "loc_table_origins.rs"]
+mod table_origins;
 
 use json_origin::payload_snapshot;
 

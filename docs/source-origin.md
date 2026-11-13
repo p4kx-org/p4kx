@@ -113,6 +113,28 @@ carries the profile selector alone. Bindings identify their own input and
 their inherited or overridden activation mode. A device cell uses the
 bindings actually joined into it.
 
+## Localisation tables
+
+`p4kx loc export --out <file>` publishes `<file>.p4kx-origin.jsonl` beside
+the table. JSON addresses use `/languages/<column>`, `/entries/<row>/key`
+and `/entries/<row>/texts/<language>`. CSV addresses carry the same logical
+fields and half-open byte ranges, including quotes or formula neutralisation
+as emitted. An empty CSV cell may have a zero-length address.
+
+The row key uses the exact decoded source spelling and the earlier language
+lookups that selected it. Translation cells retain the row-key selectors and
+the actual language's lookup, selected payload and conversion evidence. An
+authored empty value has a source payload with a zero-length range. An absent
+value has only lookup evidence. A language selected by an argument is a
+tool control. An automatically selected column comes from the Archive's
+directory survey. File summaries also include provenance for their key count
+and language values.
+
+Use `--origin-out <file>` for a durable stdout receipt or `--origin-stderr`
+for a JSONL block after any localisation notes. Both preserve the original
+JSON or CSV stdout bytes. Require the terminal record and verify the binding
+before using origin markers.
+
 ## CHF conversion
 
 `p4kx chf to-json` addresses the exact scalar and empty-container JSON values

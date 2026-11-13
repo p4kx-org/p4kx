@@ -7,6 +7,9 @@ use std::sync::{Arc, Mutex};
 
 use p4kx_archive::Archive;
 
+#[path = "source_use_batches.rs"]
+mod batches;
+
 use crate::DecimalU64;
 use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
 use crate::source_details::{SourceCoordinateOmission, SourceDetails};

@@ -1459,12 +1459,13 @@ rows, with an empty cell for either; cells with a comma, quote or line break are
 left out only when none of the chosen languages' `global.ini` holds a line for it; a key held
 only with an empty text stays.
 
-CSV cells are written as they are. A text that starts with `=`, `+`, `-` or `@` is read as a
-formula by a spreadsheet program, so open a table of untrusted texts as text, not as formulas, or
-use the JSON format.
+CSV neutralises spreadsheet formulas by default. `--csv-raw` writes the original cell text.
 
-With `--out` and `--json` the command prints `{"archive": "…", "out": "…", "format": "csv",
-"languages": ["en"], "keys": 101234}`.
+With `--out` and `--json`, the summary contains `archive`, `out`, `format`, `languages`,
+`keys`, `originReceipt`, `fieldOrigins` and `provenance`. The artifact itself retains the table
+shape shown above. The companion identifies each emitted table value and is saved beside the
+file. For stdout use `--origin-stderr` or `--origin-out <file>`. See
+[localisation origins](source-origin.md#localisation-tables).
 
 ## `p4kx actionmap export <archive> [--format json|csv] [--csv-raw] [--language <language>] [--out <file>]`
 

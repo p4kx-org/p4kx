@@ -6,6 +6,9 @@ use std::io::{self, Write};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+#[path = "origin_companion_spool.rs"]
+pub(crate) mod spool;
+
 use crate::{
     DecimalU64, FieldOrigin, FieldPath, OriginArtifactDigest, OriginArtifactName, PhysicalSource,
     SourceInventory, SourceUseDescription,
@@ -231,11 +234,16 @@ pub(crate) fn write_inventory(
     writer: &mut impl Write,
     inventory: &SourceInventory,
 ) -> io::Result<()> {
-    for source in inventory.sources() {
-        row(writer, &OriginCompanionRow::Source { source })?;
-    }
+    write_sources(writer, inventory.sources())?;
     for source_use in inventory.uses() {
         row(writer, &OriginCompanionRow::SourceUse { source_use })?;
+    }
+    Ok(())
+}
+
+pub(crate) fn write_sources(writer: &mut impl Write, sources: &[PhysicalSource]) -> io::Result<()> {
+    for source in sources {
+        row(writer, &OriginCompanionRow::Source { source })?;
     }
     Ok(())
 }
@@ -245,12 +253,26 @@ pub(crate) fn write_end(
     inventory: &SourceInventory,
     count: u64,
 ) -> io::Result<()> {
+    write_end_counts(
+        writer,
+        inventory.sources().len() as u64,
+        inventory.uses().len() as u64,
+        count,
+    )
+}
+
+pub(crate) fn write_end_counts(
+    writer: &mut impl Write,
+    sources: u64,
+    source_uses: u64,
+    fields: u64,
+) -> io::Result<()> {
     row(
         writer,
         &OriginCompanionRow::End {
-            sources: DecimalU64::new(inventory.sources().len() as u64),
-            source_uses: DecimalU64::new(inventory.uses().len() as u64),
-            fields: DecimalU64::new(count),
+            sources: DecimalU64::new(sources),
+            source_uses: DecimalU64::new(source_uses),
+            fields: DecimalU64::new(fields),
         },
     )?;
     writer.flush()

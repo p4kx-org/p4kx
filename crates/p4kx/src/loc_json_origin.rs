@@ -4,13 +4,12 @@
 use anyhow::{Context, Result};
 use p4kx_export::Language;
 use p4kx_extraction::{
-    Archive, Entry, EntryDirectoryOrigins, FieldOrigin, FieldOrigins, FieldPath, InputScope,
-    LocalizationEntry, LocalizationSet, Lookup, SourceInput, SourceInventory, SourceLocation,
-    SourceScope, SourceUse, SourceUseRole, SourceUses, TextSet,
+    Archive, Entry, EntryDirectoryOrigins, FieldOrigin, FieldOrigins, FieldPath, LocalizationSet,
+    Lookup, SourceInventory, SourceUseRole, SourceUses, TextSet,
 };
 use serde::Serialize;
 
-use super::{GetJson, LanguagesJson};
+use super::{GetJson, LanguagesJson, LocaleScope};
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -73,7 +72,8 @@ pub(super) fn get<'output>(
             selection.push(scope.scope.at(location.clone(), SourceUseRole::Selector)?);
             complete &= scope.complete;
             if lookup.language() == Some(language) {
-                payload = scope.text_uses(location, stored)?;
+                payload =
+                    scope.text_uses(location, stored.context("winning localization value")?)?;
                 break;
             }
         }
@@ -84,62 +84,6 @@ pub(super) fn get<'output>(
     selection.append(&mut payload);
     put(&mut fields, "/text", uses.origin(&selection, complete))?;
     finish(data, fields, &uses)
-}
-
-struct LocaleScope<'entry> {
-    entry: &'entry LocalizationEntry,
-    scope: SourceScope,
-    complete: bool,
-}
-
-impl<'entry> LocaleScope<'entry> {
-    fn new(uses: &SourceUses, entry: &'entry LocalizationEntry) -> Result<Self> {
-        let origin = entry.origin();
-        let input = origin.map_or(SourceInput::Unknown, SourceInput::Archive);
-        Ok(Self {
-            entry,
-            scope: uses.observe(input, InputScope::Payload)?,
-            complete: origin
-                .is_some_and(|entry| entry.ancestors().all(|ancestor| ancestor.is_some())),
-        })
-    }
-
-    fn location(&self, key: &str, stored: Option<&str>) -> Result<SourceLocation> {
-        let Some(value) = stored else {
-            return Ok(SourceLocation::Subresource {
-                namespace: "globalIniLookup".to_owned(),
-                indices: Vec::new(),
-                field: key.trim_prefix('@').to_ascii_lowercase(),
-            });
-        };
-        let range = self
-            .entry
-            .text()
-            .text()
-            .as_bytes()
-            .subslice_range(value.as_bytes())
-            .context("resolved localization value does not belong to its original Entry")?;
-        Ok(SourceLocation::Subresource {
-            namespace: "globalIniDecodedText".to_owned(),
-            indices: vec![u64::try_from(range.start)?, u64::try_from(range.end)?],
-            field: "value".to_owned(),
-        })
-    }
-
-    fn text_uses(&self, location: SourceLocation, stored: Option<&str>) -> Result<Vec<SourceUse>> {
-        let value = stored
-            .filter(|text| !text.is_empty())
-            .context("winning localization value")?;
-        let mut inputs: Vec<SourceUse> =
-            vec![self.scope.at(location.clone(), SourceUseRole::Payload)?];
-        if value.contains("\\n")
-            || self.entry.text().is_lossy()
-            || self.entry.text().encoding() != p4kx_extraction::IniEncoding::Utf8
-        {
-            inputs.push(self.scope.at(location, SourceUseRole::Conversion)?);
-        }
-        Ok(inputs)
-    }
 }
 
 fn put(fields: &mut FieldOrigins, path: &str, origin: FieldOrigin) -> Result<()> {
