@@ -45,6 +45,7 @@ mod soc_door_source;
 mod soc_entities;
 mod soc_entity_source;
 mod soc_room_source;
+mod stat_obj_physics;
 mod structured;
 mod transform;
 mod unresolved_layers;

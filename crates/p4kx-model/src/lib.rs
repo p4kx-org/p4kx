@@ -108,6 +108,8 @@ mod nmc;
 mod nmc_properties;
 mod object_container;
 mod palette;
+mod physics_blob;
+mod physics_trimesh;
 mod positioned_animation;
 mod prefab;
 mod reader;
@@ -129,6 +131,7 @@ mod soc_light;
 mod soc_room_registry;
 mod soc_room_segment;
 mod soc_source_node;
+mod stat_obj_physics;
 mod streams;
 mod transform;
 mod vector;
@@ -200,6 +203,11 @@ pub use object_container::{
     ObjectContainer, ObjectContainerError, is_external_child_value,
 };
 pub use palette::{PaletteSlot, TintEntry, TintPalette, srgb8_to_linear};
+pub use physics_blob::{
+    PhysicsAxial, PhysicsBlob, PhysicsBlobError, PhysicsBox, PhysicsFloat, PhysicsGeometry,
+    PhysicsSphere,
+};
+pub use physics_trimesh::PhysicsTrimesh;
 pub use positioned_animation::{PositionedAnimation, PositionedDba};
 pub use prefab::{
     MAX_GROUP_DEPTH, MAX_LIBRARY_OBJECTS, MAX_LIBRARY_PREFABS, Prefab, PrefabError, PrefabLibrary,
@@ -228,4 +236,5 @@ pub use soc_room_segment::{
     SocRoomSegment, SocSegmentGeometry, SocSegmentPoint, SocSegmentTransform,
 };
 pub use soc_source_node::SocSourceValue;
+pub use stat_obj_physics::{StatObjPhysics, StatObjPhysicsError, StatObjPhysicsSlot};
 pub use transform::Transform;
