@@ -21,7 +21,16 @@ fn material_tokens_and_used_encrypted_shader_properties_have_distinct_immediate_
     let property = format!("{LINKS}/1/reference/resolution/target/subresource/indices/0");
     fixture.marker(MTL, &token, Some(false))?;
     fixture.marker(MTL, &property, Some(true))?;
-    fixture.marker(MTL, &format!("{LINKS}/1/input/digest/hex"), Some(true))?;
+    let input = format!("{LINKS}/1/input");
+    fixture.marker(MTL, &format!("{input}/digest/hex"), Some(true))?;
+    for pointer in [
+        "digest/algorithm",
+        "digest/scope",
+        "source/root/algorithm",
+        "source/root/scope",
+    ] {
+        fixture.independent(MTL, &format!("{input}/{pointer}"))?;
+    }
     assert!(
         fixture.has_use(
             MTL,

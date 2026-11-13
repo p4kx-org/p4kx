@@ -47,6 +47,38 @@ fn encrypted_artifact_and_digest_aggregates_retain_their_known_converted_childre
         )?);
     }
     aggregate::assert_union(&digest, &components)?;
+    assert_computed_digest_origins(&components)
+}
+
+fn assert_computed_digest_origins(components: &[Value]) -> TestResult {
+    let [algorithm, scope, hex] = components else {
+        return Err("the three computed digest components".into());
+    };
+    for field in [algorithm, scope] {
+        assert_eq!(
+            support::marker(field),
+            Some(false),
+            "fixed digest descriptor"
+        );
+        assert_eq!(
+            support::complete(field),
+            Some(true),
+            "known independent value"
+        );
+        assert!(
+            aggregate::references(field)?.is_empty(),
+            "no bytes read for the descriptor"
+        );
+    }
+    assert_eq!(
+        support::marker(hex),
+        Some(true),
+        "computed hash uses encrypted bytes"
+    );
+    assert!(
+        !aggregate::references(hex)?.is_empty(),
+        "the actual bytes remain bound"
+    );
     Ok(())
 }
 

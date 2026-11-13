@@ -351,8 +351,9 @@ targets remain inventory observations and do not taint the contributing field se
 The built-in Archive Entry/layout and decoded Shader profiles map their own data domains.
 A shader filename comes from directory metadata; its parsed content comes from the payload.
 Containing encrypted Entries influence both domains, while a leaf's own encryption does not
-change its directory metadata. Computed intrinsic artifact digests use their actual bytes,
-independently of relationship selectors. Public custom-provider records remain explicitly
+change its directory metadata. Computed intrinsic hash values use their actual bytes,
+independently of relationship selectors. Their fixed algorithm and scope labels have no source
+inputs. A directory-declared checksum and its interpretation still use directory metadata. Public custom-provider records remain explicitly
 `unmigrated`, even if they reuse a built-in kind, capability spelling or namespace.
 
 Shader failure origins distinguish the early directory-size check from a diagnostic formed after

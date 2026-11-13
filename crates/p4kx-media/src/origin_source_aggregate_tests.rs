@@ -48,6 +48,50 @@ fn plain_source_aggregate_includes_its_unknown_root_and_all_actual_source_member
 }
 
 #[test]
+fn retained_source_digest_descriptors_do_not_inherit_source_encryption() -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let (_, output, index) = support::export(
+        folder.path(),
+        [TestEntry::zstd("encrypted.ext", SHADER).encrypted()],
+    )?;
+    for pointer in [
+        "/root/algorithm",
+        "/root/scope",
+        "/raw/digest/algorithm",
+        "/raw/digest/scope",
+    ] {
+        let field = aggregate::field(&output, &index, "sources", 0, pointer)?;
+        assert_eq!(
+            support::marker(&field),
+            Some(false),
+            "fixed digest descriptor {pointer}"
+        );
+        assert_eq!(
+            support::complete(&field),
+            Some(true),
+            "known independent value"
+        );
+        assert!(
+            aggregate::references(&field)?.is_empty(),
+            "no source bytes determine {pointer}"
+        );
+    }
+    for (pointer, encryption) in [("/root/hex", None), ("/raw/digest/hex", Some(true))] {
+        let field = aggregate::field(&output, &index, "sources", 0, pointer)?;
+        assert_eq!(
+            support::marker(&field),
+            encryption,
+            "original hash input {pointer}"
+        );
+        assert!(
+            !aggregate::references(&field)?.is_empty(),
+            "original bytes remain bound"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn directory_source_without_raw_does_not_acquire_the_containing_entry_payload() -> TestResult {
     let folder = tempfile::tempdir()?;
     let nested = TestContainer::new()

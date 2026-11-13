@@ -54,6 +54,11 @@ fn member(
     source: &Source,
     field: &str,
 ) -> Result<OriginContributions, MediaError> {
+    if origin_resolver::is_computed_digest_descriptor(field, "/root")
+        || origin_resolver::is_computed_digest_descriptor(field, "/raw/digest")
+    {
+        return Ok(OriginContributions::independent(resolver.owner));
+    }
     if origin_resolver::within(field, "/root") {
         return resolver.root.map_or_else(
             || Ok(OriginContributions::unknown(resolver.owner)),

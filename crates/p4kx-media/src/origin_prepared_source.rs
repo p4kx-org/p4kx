@@ -9,7 +9,8 @@ use crate::origin_prepared::PreparedRecordOrigins;
 use crate::origin_resolver::OriginResolver;
 use crate::origin_subject::OriginSubject;
 use crate::{
-    Identity, MediaError, MediaWriter, Source, origin_error, origin_source, origin_source_identity,
+    Identity, MediaError, MediaWriter, Source, origin_error, origin_reference, origin_source,
+    origin_source_identity,
 };
 
 pub(crate) fn source(
@@ -40,6 +41,19 @@ pub(crate) fn source(
             selected(&contribution, selector, writer)?
         };
         prepared.insert_subtree(&path, contribution, writer)?;
+        if member == "root" || (member == "raw" && source.raw.is_some()) {
+            let mut digest = path;
+            if member == "raw" {
+                digest = origin_reference::child(&digest, "digest")?;
+            }
+            for field in ["algorithm", "scope"] {
+                origin_reference::independent(
+                    prepared,
+                    &origin_reference::child(&digest, field)?,
+                    writer,
+                )?;
+            }
+        }
     }
     let mut path = prefix.clone();
     path.push_field("identity")

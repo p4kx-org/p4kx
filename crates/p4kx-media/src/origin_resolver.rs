@@ -65,6 +65,11 @@ impl OriginResolver<'_> {
         if let Some(actual) = prepared.and_then(|prepared| prepared.visit(pointer)) {
             return Ok(actual.clone());
         }
+        if matches!(self.subject, OriginSubject::Artifact)
+            && is_computed_digest_descriptor(pointer, "/digest")
+        {
+            return Ok(OriginContributions::independent(self.owner));
+        }
         if let Some((input, scope)) = self.artifact
             && ["/path", "/size", "/digest"]
                 .iter()
@@ -176,6 +181,10 @@ impl OriginResolver<'_> {
         )?;
         Ok(capture.finish())
     }
+}
+
+pub(crate) fn is_computed_digest_descriptor(pointer: &str, digest: &str) -> bool {
+    matches!(pointer.strip_prefix(digest), Some("/algorithm" | "/scope"))
 }
 
 fn is_record_control(pointer: &str) -> bool {
