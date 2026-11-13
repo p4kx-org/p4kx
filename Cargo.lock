@@ -3574,6 +3574,7 @@ dependencies = [
  "p4kx-testkit",
  "rayon",
  "roxmltree",
+ "serde_json",
  "sha2",
  "tempfile",
  "thiserror 2.0.21",

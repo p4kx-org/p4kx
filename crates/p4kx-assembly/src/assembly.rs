@@ -114,6 +114,7 @@ pub struct Part {
     pub(crate) name: String,
     pub(crate) path: String,
     pub(crate) guid: Guid,
+    pub(crate) entity_record_index: Option<u32>,
     pub(crate) class_name: String,
     pub(crate) classification: Option<crate::ItemClassification>,
     pub(crate) landing_gear: Option<GearPlacementSource>,

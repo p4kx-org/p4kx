@@ -23,6 +23,11 @@ pub(super) fn build_part(
         name: draft.name.clone(),
         path: draft.path.clone(),
         guid: draft.node.guid(),
+        entity_record_index: if draft.gear.is_none() {
+            draft.node.record_index()
+        } else {
+            None
+        },
         class_name: draft.class_name().to_owned(),
         classification: draft
             .gear

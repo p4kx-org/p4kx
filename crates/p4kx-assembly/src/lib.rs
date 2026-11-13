@@ -98,6 +98,7 @@ mod compat;
 mod creature_animation;
 mod creature_rig;
 mod entities;
+mod entity_glow;
 mod entity_interior;
 mod error;
 mod files;
@@ -206,6 +207,10 @@ pub use chf_names::{archive_names, archive_names_observed};
 pub use compat::{AcceptedType, Incompatibility, ItemFacts, PortConstraints};
 pub use creature_animation::{CreatureAnimations, CreatureClips, creature_animations};
 pub use entities::{ENTITY_TYPE, Entities};
+pub use entity_glow::{
+    EntityGlow, EntityGlowBindingError, EntityGlowLink, GlowEffectKind, GlowSelection, GlowSubset,
+    GlowSubsetMaterial,
+};
 pub use entity_interior::{EntityContainer, EntityInterior, INTERIOR_NODE};
 pub use error::{AssemblyError, EntityLookupError, LoadoutError};
 pub use files::{ArchiveFiles, LoadoutFileError, LoadoutFiles, MAX_XML_LOADOUT_LEN};
