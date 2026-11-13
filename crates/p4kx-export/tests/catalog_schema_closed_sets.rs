@@ -27,6 +27,7 @@ const CONTROL_TYPES: &[&str] = &[
     "ExportStageStatus",
     "FuseEvidence",
     "InputScope",
+    "InteriorFindingKind",
     "InventoryMeaning",
     "LinkFamily",
     "LocalizationMeaning",
