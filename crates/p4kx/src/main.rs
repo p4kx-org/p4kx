@@ -115,6 +115,7 @@ mod info;
 mod interior_forge;
 mod interior_glb;
 mod interior_package;
+mod interior_source;
 mod issues;
 mod json;
 mod key;

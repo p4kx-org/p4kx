@@ -1,0 +1,307 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::collections::BTreeMap;
+
+use p4kx_assembly::{
+    SocChildInput, SocChildState, SocContainerOccurrence, SocEntityIndex, SocMemberSelection,
+    SocMemberSelector, SocStreamInput,
+};
+use p4kx_extraction::{
+    CancelToken, EntryOrigin, InputScope, PhysicalSourceRef, SourceInput, SourceUses,
+};
+use p4kx_model::{SocEntityFile, SocRoomRegistry};
+use schemars::JsonSchema;
+use serde::Serialize;
+
+use crate::soc_scene::SocSceneError;
+use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
+use crate::soc_scene_rooms::{IndexedRoom, RoomRegistry};
+use crate::soc_scene_stream::{IndexedStream, Stream};
+use crate::soc_scene_xml::XmlDocuments;
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct Occurrence {
+    placement: Option<(usize, usize)>,
+    container: PhysicalSourceRef,
+    descriptor: Member<usize>,
+    registry: Member<RoomRegistry>,
+    children: Vec<Child>,
+    streams: Vec<Stream>,
+}
+
+impl Occurrence {
+    pub(super) fn read(
+        original: &SocContainerOccurrence,
+        sources: &SourceUses,
+        documents: &mut XmlDocuments,
+        cancel: &CancelToken,
+    ) -> Result<Self, SocSceneError> {
+        let container = physical(&original.origin, sources)?;
+        let descriptor = Member::read(&original.descriptor, sources, |bytes, origin| {
+            let descriptor = p4kx_model::SocContainerDescriptor::parse(bytes)
+                .map_err(|_| InputState::Invalid)?;
+            documents
+                .bind(descriptor.document(), origin)
+                .map_err(InputState::Capture)
+        })?;
+        let room_input = room_input(&original.registry, sources)?;
+        let registry = Member::read(&original.registry, sources, |_, _| {
+            let (room, origin) = room_input.as_ref().ok_or(InputState::Invalid)?;
+            RoomRegistry::read(room, origin, documents).map_err(InputState::Capture)
+        })?;
+        let children = original
+            .children
+            .iter()
+            .map(|child| Child::read(child, sources))
+            .collect::<Result<_, _>>()?;
+        let streams = streams(original, room_input.as_ref(), sources, documents, cancel)?;
+        Ok(Self {
+            placement: original.placement,
+            container,
+            descriptor,
+            registry,
+            children,
+            streams,
+        })
+    }
+}
+
+fn room_input<'a>(
+    selection: &'a SocMemberSelection,
+    sources: &'a SourceUses,
+) -> Result<Option<(SocRoomRegistry<'a>, XmlOrigin<'a>)>, SocSceneError> {
+    let Some(member) = selection.selected() else {
+        return Ok(None);
+    };
+    let Some(registry) = member
+        .payload()
+        .ok()
+        .and_then(|bytes| SocRoomRegistry::parse(bytes).ok())
+    else {
+        return Ok(None);
+    };
+    Ok(Some((
+        registry,
+        XmlOrigin::new(sources, member.origin(), None)?,
+    )))
+}
+
+fn streams(
+    occurrence: &SocContainerOccurrence,
+    room: Option<&(SocRoomRegistry<'_>, XmlOrigin<'_>)>,
+    sources: &SourceUses,
+    documents: &mut XmlDocuments,
+    cancel: &CancelToken,
+) -> Result<Vec<Stream>, SocSceneError> {
+    let (index, admitted, complete) = index_streams(&occurrence.streams, cancel)?;
+    let room_index = room.map(|(registry, origin)| {
+        (
+            p4kx_assembly::SocRoomIndex::new(registry),
+            origin,
+            registry.document(),
+        )
+    });
+    let indexed = IndexedStream {
+        index,
+        admitted,
+        complete,
+        room: room_index.as_ref().map(|(index, origin, xml)| IndexedRoom {
+            index,
+            origin,
+            root: xml.root(),
+            complete: !xml.is_lossy(),
+        }),
+    };
+    occurrence
+        .streams
+        .iter()
+        .map(|declaration| {
+            if cancel.is_cancelled() {
+                return Err(SocSceneError::Cancelled);
+            }
+            Stream::read(declaration, &indexed, sources, documents)
+        })
+        .collect()
+}
+
+fn index_streams<'a>(
+    declarations: &'a [SocStreamInput],
+    cancel: &CancelToken,
+) -> Result<(SocEntityIndex, BTreeMap<usize, &'a EntryOrigin>, bool), SocSceneError> {
+    let mut by_member = BTreeMap::new();
+    let mut complete = true;
+    for declaration in declarations {
+        if cancel.is_cancelled() {
+            return Err(SocSceneError::Cancelled);
+        }
+        let Some(member) = declaration
+            .member
+            .as_ref()
+            .and_then(SocMemberSelection::selected)
+        else {
+            complete = false;
+            continue;
+        };
+        let physical_index = member.origin().entry().index();
+        by_member.entry(physical_index).or_insert_with(|| {
+            member
+                .payload()
+                .ok()
+                .and_then(|bytes| SocEntityFile::parse(bytes).ok())
+                .map(|file| (member.origin(), file))
+        });
+    }
+    let mut index = SocEntityIndex::new();
+    let mut admitted = BTreeMap::new();
+    for (stream, parsed) in &by_member {
+        let Some((origin, file)) = parsed else {
+            complete = false;
+            continue;
+        };
+        for chunk in file.entity_chunks() {
+            if cancel.is_cancelled() {
+                return Err(SocSceneError::Cancelled);
+            }
+            let Ok(chunk) = chunk else {
+                complete = false;
+                continue;
+            };
+            complete &= !chunk.document().is_lossy();
+            index.add_chunk(*stream, &chunk);
+        }
+        admitted.insert(*stream, *origin);
+    }
+    Ok((index, admitted, complete))
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(
+    tag = "state",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(super) enum Member<T> {
+    UnusableSelector,
+    Missing,
+    Ambiguous { candidates: Vec<PhysicalSourceRef> },
+    Unreadable { source: PhysicalSourceRef },
+    Invalid { source: PhysicalSourceRef },
+    Present { source: PhysicalSourceRef, data: T },
+}
+
+pub(super) enum InputState {
+    Invalid,
+    Capture(SocSceneError),
+}
+
+impl<T> Member<T> {
+    pub(super) fn read(
+        selection: &SocMemberSelection,
+        sources: &SourceUses,
+        read: impl FnOnce(&[u8], &XmlOrigin<'_>) -> Result<T, InputState>,
+    ) -> Result<Self, SocSceneError> {
+        match selection {
+            SocMemberSelection::Missing => Ok(Self::Missing),
+            SocMemberSelection::Ambiguous(origins) => Ok(Self::Ambiguous {
+                candidates: physical_list(origins, sources)?,
+            }),
+            SocMemberSelection::Selected(member) => {
+                let origin = XmlOrigin::new(sources, member.origin(), None)?;
+                let source = origin.source();
+                let Ok(payload) = member.payload() else {
+                    return Ok(Self::Unreadable { source });
+                };
+                match read(payload, &origin) {
+                    Ok(data) => Ok(Self::Present { source, data }),
+                    Err(InputState::Invalid) => Ok(Self::Invalid { source }),
+                    Err(InputState::Capture(error)) => Err(error),
+                }
+            }
+            _ => Err(SocSceneError::Position),
+        }
+    }
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct Child {
+    selector: Selector,
+    target: ChildTarget,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(
+    tag = "state",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+enum ChildTarget {
+    InvalidSelector,
+    Missing,
+    Ambiguous { candidates: Vec<PhysicalSourceRef> },
+    Cycle { source: PhysicalSourceRef },
+    Unreadable { source: PhysicalSourceRef },
+    Opened { occurrence: usize },
+}
+
+impl Child {
+    fn read(original: &SocChildInput, sources: &SourceUses) -> Result<Self, SocSceneError> {
+        let target = match &original.state {
+            SocChildState::InvalidSelector => ChildTarget::InvalidSelector,
+            SocChildState::Missing => ChildTarget::Missing,
+            SocChildState::Ambiguous(origins) => ChildTarget::Ambiguous {
+                candidates: physical_list(origins, sources)?,
+            },
+            SocChildState::Cycle(origin) => ChildTarget::Cycle {
+                source: physical(origin, sources)?,
+            },
+            SocChildState::Unreadable { target, .. } => ChildTarget::Unreadable {
+                source: physical(target, sources)?,
+            },
+            SocChildState::Opened { occurrence } => ChildTarget::Opened {
+                occurrence: *occurrence,
+            },
+            _ => return Err(SocSceneError::Position),
+        };
+        Ok(Self {
+            selector: Selector::read(&original.selector)?,
+            target,
+        })
+    }
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct Selector {
+    ordinal: (usize, usize),
+    position: SocXmlPosition,
+}
+
+impl Selector {
+    pub(super) fn read(original: &SocMemberSelector) -> Result<Self, SocSceneError> {
+        Ok(Self {
+            ordinal: original.ordinal,
+            position: SocXmlPosition::element(original.position.clone())?,
+        })
+    }
+}
+
+fn physical(input: &EntryOrigin, sources: &SourceUses) -> Result<PhysicalSourceRef, SocSceneError> {
+    let scope = sources.observe(
+        SourceInput::Archive(input),
+        InputScope::ArchiveDirectoryMetadata,
+    )?;
+    Ok(scope.source_ref().clone())
+}
+
+fn physical_list(
+    inputs: &[EntryOrigin],
+    sources: &SourceUses,
+) -> Result<Vec<PhysicalSourceRef>, SocSceneError> {
+    inputs
+        .iter()
+        .map(|input| physical(input, sources))
+        .collect()
+}

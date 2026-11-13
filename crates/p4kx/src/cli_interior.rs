@@ -21,6 +21,7 @@ pub(crate) fn dispatch(action: InteriorAction, as_json: bool) -> Result<()> {
     match action {
         InteriorAction::Glb(args) => crate::interior_glb::run(&args, as_json),
         InteriorAction::Package(args) => crate::interior_package::run(&args, as_json),
+        InteriorAction::Source(args) => crate::interior_source::run(&args),
     }
 }
 
@@ -56,6 +57,9 @@ pub(crate) enum InteriorAction {
     /// replaced.
     #[command(after_help = EXIT_CODES_HELP)]
     Package(InteriorPackageArgs),
+    /// Writes the authored room, door, link and loadout sources as versioned JSON.
+    #[command(after_help = EXIT_CODES_HELP)]
+    Source(InteriorSourceArgs),
 }
 
 /// Arguments of `p4kx interior glb`.
@@ -107,4 +111,17 @@ pub(crate) struct InteriorPackageArgs {
     /// Leaves the vertex colours out of the models.
     #[arg(long)]
     pub(crate) no_vertex_colours: bool,
+}
+
+/// Arguments of `p4kx interior source`.
+#[derive(Debug, Args)]
+pub(crate) struct InteriorSourceArgs {
+    /// Path of the Data.p4k Archive.
+    pub(crate) archive: PathBuf,
+    /// Container Entry paths from the outermost to the selected container.
+    #[arg(required = true, value_name = "CONTAINER")]
+    pub(crate) containers: Vec<String>,
+    /// The JSON file to replace after the original sources have been captured.
+    #[arg(long, value_name = "FILE")]
+    pub(crate) out: PathBuf,
 }

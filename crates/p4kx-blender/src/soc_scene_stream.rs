@@ -1,0 +1,121 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::collections::BTreeMap;
+
+use p4kx_assembly::{SocEntityIndex, SocStreamInput};
+use p4kx_extraction::{DecimalU64, EntryOrigin, SourceUses};
+use p4kx_model::{SocEntityChunk, SocEntityFile};
+use schemars::JsonSchema;
+use serde::Serialize;
+
+use crate::soc_scene::SocSceneError;
+use crate::soc_scene_entities::Entity;
+use crate::soc_scene_occurrence::{InputState, Member, Selector};
+use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
+use crate::soc_scene_xml::XmlDocuments;
+
+pub(crate) struct IndexedStream<'a> {
+    pub(crate) index: SocEntityIndex,
+    pub(crate) admitted: BTreeMap<usize, &'a EntryOrigin>,
+    pub(crate) complete: bool,
+    pub(crate) room: Option<crate::soc_scene_rooms::IndexedRoom<'a>>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct Stream {
+    selector: Selector,
+    parent: Option<SocXmlPosition>,
+    member: Member<Vec<Chunk>>,
+}
+
+impl Stream {
+    pub(crate) fn read(
+        stream: &SocStreamInput,
+        index: &IndexedStream<'_>,
+        sources: &SourceUses,
+        documents: &mut XmlDocuments,
+    ) -> Result<Self, SocSceneError> {
+        let member = match &stream.member {
+            Some(selection) => Member::read(selection, sources, |bytes, origin| {
+                let file = SocEntityFile::parse(bytes).map_err(|_| InputState::Invalid)?;
+                file.entity_chunks()
+                    .map(|chunk| match chunk {
+                        Ok(chunk) => Chunk::read(&chunk, index, origin, documents)
+                            .map_err(InputState::Capture),
+                        Err(error) => Ok(Chunk::invalid(&error)),
+                    })
+                    .collect()
+            })?,
+            None => Member::UnusableSelector,
+        };
+        Ok(Self {
+            selector: Selector::read(&stream.selector)?,
+            parent: stream
+                .parent
+                .clone()
+                .map(SocXmlPosition::element)
+                .transpose()?,
+            member,
+        })
+    }
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(
+    tag = "state",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+enum Chunk {
+    Invalid {
+        ordinal: Option<usize>,
+    },
+    Present {
+        ordinal: usize,
+        byte_offset: DecimalU64,
+        byte_length: DecimalU64,
+        xml: usize,
+        entities: Vec<Entity>,
+    },
+}
+
+impl Chunk {
+    fn read(
+        chunk: &SocEntityChunk<'_>,
+        index: &IndexedStream<'_>,
+        member: &XmlOrigin<'_>,
+        documents: &mut XmlDocuments,
+    ) -> Result<Self, SocSceneError> {
+        let origin = XmlOrigin {
+            sources: member.sources,
+            scope: member.scope.clone(),
+            chunk: Some(chunk.chunk_index()),
+        };
+        let xml = documents.bind(chunk.document(), &origin)?;
+        let entities = chunk
+            .entities()
+            .map(|entity| Entity::read(entity, index, &origin))
+            .collect::<Result<_, _>>()?;
+        Ok(Self::Present {
+            ordinal: chunk.chunk_index(),
+            byte_offset: DecimalU64::new(chunk.header().offset()),
+            byte_length: DecimalU64::new(chunk.header().size()),
+            xml,
+            entities,
+        })
+    }
+
+    const fn invalid(error: &p4kx_model::SocEntitySourceError) -> Self {
+        use p4kx_model::SocEntitySourceError::{BigEndian, ChunkRange, Root, Xml};
+        let ordinal = match error {
+            BigEndian { chunk_index }
+            | ChunkRange { chunk_index }
+            | Root { chunk_index }
+            | Xml { chunk_index, .. } => Some(*chunk_index),
+            _ => None,
+        };
+        Self::Invalid { ordinal }
+    }
+}

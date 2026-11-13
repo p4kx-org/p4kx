@@ -311,6 +311,11 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `--lod <n>`, `--materials colours` and `--no-vertex-colours` apply to every model. Containers nested in themselves,
   and containers, files and models that cannot be resolved, are listed; with `--json` the report
   has the shape described in [docs/cli-json.md](cli-json.md).
+- `p4kx interior source <archive> <container>... --out <file>` writes the versioned authored
+  SOC scene JSON. It includes nested placements, room registries and area shapes, entity links
+  and inline loadout overrides with source coordinates and per-value encryption evidence.
+  [SOC scene format](soc-scene.md).
+
 - `p4kx interior package <archive> <container>... --out <folder>` writes the Interior of a socpak
   container on its own as a Blender package: the same container, object and light nodes, props
   and lights as `entity package --interior`, without an Entity around them. `--lod`,

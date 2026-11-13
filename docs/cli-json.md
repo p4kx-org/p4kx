@@ -601,6 +601,12 @@ part keeps the next choice), `too_many_parts`, `too_many_containers`,
 ([ADR-0081](adr/0081-an-interior-is-the-socpaks-soc-files-placed-in-nested-containers.md)). The
 file is written even when parts are skipped.
 
+## `p4kx interior source <archive> <container>... --out <file>`
+
+The JSON document is written to the requested file. It uses the independently versioned
+[authored SOC scene schema](../schemas/soc-scene.schema.json). See [SOC scene](soc-scene.md)
+for occurrence ownership, source coordinates and origin fields.
+
 ## `p4kx interior package <archive> <container>... --out <folder> --json`
 
 ```json
