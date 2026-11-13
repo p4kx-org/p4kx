@@ -316,6 +316,7 @@ fn assemble<R>(
             hacking_chips: components.hacking_chips,
             ammo_containers: components.ammo_containers,
             weapon_actions: components.weapon_actions,
+            missile_configurations: components.missile_configurations,
             quantum_drives: components.quantum_drives,
             shield_generators: components.shield_generators,
             entity_configurations: collected.entity_configurations.into_tables(&forge),

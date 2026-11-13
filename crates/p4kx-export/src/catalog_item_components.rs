@@ -9,6 +9,7 @@ use super::authored_fields::Observed;
 use super::catalog_ammo_bindings::{self, AmmoBinding};
 use super::catalog_ammo_containers::{self, AmmoContainer};
 use super::catalog_durability::{self, DurabilityComponent, DurabilityRows, DurabilityTables};
+use super::catalog_explosives::catalog_missile_configuration::{self, MissileConfiguration};
 use super::catalog_explosives::{self, Explosive, ExplosiveComponent};
 use super::catalog_hacking_chips::{self, HackingChip, HackingComponent};
 use super::catalog_quantum_drive::{self, QuantumDrive};
@@ -38,6 +39,7 @@ pub(crate) struct ItemComponentRows<'source> {
     pub(crate) ammo_containers: Vec<AmmoContainer<'source>>,
     pub(crate) ammo_bindings: Vec<AmmoBinding<'source>>,
     pub(crate) weapon_actions: Vec<WeaponActions<'source>>,
+    pub(crate) missile_configurations: Vec<MissileConfiguration<'source>>,
     pub(crate) quantum_drives: Vec<QuantumDrive<'source>>,
     pub(crate) shield_generators: Vec<ShieldGenerator<'source>>,
     pub(crate) magazine_resolutions: Vec<WeaponMagazineResolution>,
@@ -52,6 +54,8 @@ impl<'source> ItemComponentRows<'source> {
         self.ammo_containers.extend(other.ammo_containers);
         self.ammo_bindings.extend(other.ammo_bindings);
         self.weapon_actions.extend(other.weapon_actions);
+        self.missile_configurations
+            .extend(other.missile_configurations);
         self.quantum_drives.extend(other.quantum_drives);
         self.shield_generators.extend(other.shield_generators);
         self.magazine_resolutions.extend(other.magazine_resolutions);
@@ -66,6 +70,10 @@ impl<'source> ItemComponentRows<'source> {
             ammo_containers: catalog_ammo_containers::table(forge, self.ammo_containers),
             ammo_bindings: catalog_ammo_bindings::table(forge, self.ammo_bindings),
             weapon_actions: catalog_weapon_actions::table(forge, self.weapon_actions),
+            missile_configurations: catalog_missile_configuration::table(
+                forge,
+                self.missile_configurations,
+            ),
             quantum_drives: catalog_quantum_drive::table(forge, self.quantum_drives),
             shield_generators: catalog_shield_generator::table(forge, self.shield_generators),
             magazine_resolutions: resolution::table(forge, self.magazine_resolutions),
@@ -80,6 +88,7 @@ pub(crate) struct ItemComponentTables<'source> {
     pub(crate) ammo_containers: CatalogTable<AmmoContainer<'source>>,
     pub(crate) ammo_bindings: CatalogTable<AmmoBinding<'source>>,
     pub(crate) weapon_actions: CatalogTable<WeaponActions<'source>>,
+    pub(crate) missile_configurations: CatalogTable<MissileConfiguration<'source>>,
     pub(crate) quantum_drives: CatalogTable<QuantumDrive<'source>>,
     pub(crate) shield_generators: CatalogTable<ShieldGenerator<'source>>,
     pub(crate) magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
@@ -109,11 +118,7 @@ impl<'source> ItemComponentsRead<'source> {
                     self.legacy_health = Some(legacy);
                 }
             }
-            Component::Explosive(kind) => {
-                self.rows
-                    .explosives
-                    .push(Explosive::read(kind, owner, observed, &mut self.notes)?);
-            }
+            Component::Explosive(kind) => self.push_explosive(kind, owner, observed)?,
             Component::AmmoContainer => {
                 self.rows.ammo_containers.push(AmmoContainer::read(
                     owner.clone(),
@@ -150,6 +155,31 @@ impl<'source> ItemComponentsRead<'source> {
                 )?);
             }
         }
+        Ok(())
+    }
+
+    fn push_explosive(
+        &mut self,
+        kind: ExplosiveComponent,
+        owner: ComponentOwner,
+        observed: Observed<'_, '_, '_, 'source>,
+    ) -> Result<(), CatalogError> {
+        let missile_owner = matches!(kind, ExplosiveComponent::Missile).then(|| owner.clone());
+        let explosive = Explosive::read(kind, owner, observed, &mut self.notes)?;
+        if let Some(owner) = missile_owner {
+            let ordnance = explosive
+                .missile_ordnance()
+                .ok_or(crate::ExportAccountingError::ConflictingSourceDatum)?;
+            self.rows
+                .missile_configurations
+                .push(MissileConfiguration::read(
+                    owner,
+                    observed,
+                    ordnance,
+                    &mut self.notes,
+                )?);
+        }
+        self.rows.explosives.push(explosive);
         Ok(())
     }
 

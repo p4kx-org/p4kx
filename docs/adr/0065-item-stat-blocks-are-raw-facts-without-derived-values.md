@@ -105,6 +105,16 @@ Their mode-specific meanings map to the standard block sourced from `params`. Th
 configuration is the source-typed row. Source paths and units are documented in
 [Quantum drive configurations](../catalog-quantum-drives.md).
 
+## Catalog schema 3 missile configuration
+
+Schema 3 publishes the original missile guidance, targeting and shake in
+`configurations.missileConfigurations`. Join the inherited ordnance data in
+`configurations.explosives` by the same physical owner Record and component ordinal.
+The shared reader retains original explosion parameters, launch settings and emissions once.
+The missile row keeps independent phase vectors, PID terms and targeting labels with per-value
+source evidence. The older item stat fields retain their original meanings.
+[Missile configurations](../catalog-missiles.md) describes the source declarations and units.
+
 ## Catalog schema 3 fuel and resource capacity
 
 Under ADR-0356, fuel tanks, fuel intakes and ResourceContainer components have independent

@@ -36,6 +36,29 @@ pub(crate) struct OrdnanceFields<'source> {
 }
 
 impl<'source> OrdnanceFields<'source> {
+    pub(super) const fn projected(
+        &self,
+    ) -> [(&'static str, p4kx_extraction::SourceValueState); 13] {
+        [
+            ("audioParams", self.audio_params.state()),
+            ("requiresLauncher", self.requires_launcher.state()),
+            ("enableLifetime", self.enable_lifetime.state()),
+            ("maxLifetime", self.max_lifetime.state()),
+            ("armTime", self.arm_time.state()),
+            ("maxArmableOverride", self.max_armable_override.state()),
+            ("igniteTime", self.ignite_time.state()),
+            ("collisionDelayTime", self.collision_delay_time.state()),
+            (
+                "explosionSafetyDistance",
+                self.explosion_safety_distance.state(),
+            ),
+            ("projectileProximity", self.projectile_proximity.state()),
+            ("explosionParams", self.explosion_params.state()),
+            ("clusterParams", self.cluster_params.state()),
+            ("emissionsParams", self.emissions_params.state()),
+        ]
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

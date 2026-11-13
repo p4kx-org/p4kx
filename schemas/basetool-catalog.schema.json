@@ -4384,6 +4384,9 @@
         "localContractGenerators": {
           "$ref": "#/$defs/CatalogTableOfLocalContractGeneratorConfiguration"
         },
+        "missileConfigurations": {
+          "$ref": "#/$defs/CatalogTableOfMissileConfiguration"
+        },
         "missionBoards": {
           "$ref": "#/$defs/CatalogTableOfMissionBoard"
         },
@@ -4445,6 +4448,7 @@
         "itemRecoveryOverrides",
         "itemRecoveryPolicy",
         "localContractGenerators",
+        "missileConfigurations",
         "missionBoards",
         "missionBrokerEntries",
         "missionFlows",
@@ -5923,6 +5927,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/MedicalItemTierConfig"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfMissileConfiguration": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/MissileConfiguration"
           },
           "type": "array"
         }
@@ -22166,6 +22189,218 @@
       ],
       "type": "object"
     },
+    "MissileAxes": {
+      "description": "Three original axis components in the source declaration's own units.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "x": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "y": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "z": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "sourceType",
+        "x",
+        "y",
+        "z"
+      ],
+      "type": "object"
+    },
+    "MissileConfiguration": {
+      "description": "One missile's authored guidance, targeting and shake on its physical item slot.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "guidance": {
+          "$ref": "#/$defs/SourcedValueOfMissileGuidance"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "shake": {
+          "$ref": "#/$defs/SourcedValueOfMissileShake"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "targeting": {
+          "$ref": "#/$defs/SourcedValueOfMissileTargeting"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "componentOrdinal",
+        "guidance",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "shake",
+        "sourceType",
+        "targeting"
+      ],
+      "type": "object"
+    },
+    "MissileGuidance": {
+      "description": "Original guidance and control settings with independently authored phases.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "boostPhase": {
+          "$ref": "#/$defs/SourcedValueOfMissileGuidancePhase"
+        },
+        "boostPhaseDuration": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "dumbfireRotationScale": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "fuelTankSize": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "interceptPhase": {
+          "$ref": "#/$defs/SourcedValueOfMissileGuidancePhase"
+        },
+        "isDumbMissile": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "linearSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "pidDerivativeTerm": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "pidIntegralTerm": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "pidProportionalTerm": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "terminalPhase": {
+          "$ref": "#/$defs/SourcedValueOfMissileGuidancePhase"
+        },
+        "terminalPhaseEngagementAngle": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "terminalPhaseEngagementTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "boostPhase",
+        "boostPhaseDuration",
+        "dumbfireRotationScale",
+        "fuelTankSize",
+        "interceptPhase",
+        "isDumbMissile",
+        "linearSpeed",
+        "pidDerivativeTerm",
+        "pidIntegralTerm",
+        "pidProportionalTerm",
+        "sourceType",
+        "terminalPhase",
+        "terminalPhaseEngagementAngle",
+        "terminalPhaseEngagementTime"
+      ],
+      "type": "object"
+    },
+    "MissileGuidancePhase": {
+      "description": "Original controller settings and acceleration vectors for one guidance phase.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "angularSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxLinearAccelerationNegative": {
+          "$ref": "#/$defs/SourcedValueOfMissileAxes"
+        },
+        "maxLinearAccelerationPositive": {
+          "$ref": "#/$defs/SourcedValueOfMissileAxes"
+        },
+        "maxRotationAccel": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "pidAggression": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "angularSpeed",
+        "maxLinearAccelerationNegative",
+        "maxLinearAccelerationPositive",
+        "maxRotationAccel",
+        "pidAggression",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "MissileShake": {
+      "description": "The stored shake settings and their original offset declarations.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "duration": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "frequency": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "offsetAngle": {
+          "$ref": "#/$defs/SourcedValueOfMissileAxes"
+        },
+        "offsetPosition": {
+          "$ref": "#/$defs/SourcedValueOfMissileAxes"
+        },
+        "randomness": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "range": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "duration",
+        "frequency",
+        "offsetAngle",
+        "offsetPosition",
+        "randomness",
+        "range",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "MissileStats": {
       "description": "A missile.",
       "properties": {
@@ -22253,6 +22488,86 @@
         "lockRangeMin",
         "lockTime",
         "lockingAngle",
+        "trackingSignalType"
+      ],
+      "type": "object"
+    },
+    "MissileTargeting": {
+      "description": "The stored targeting limits and original tracking-signal label.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "allowDumbFiring": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "lockDecreaseRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "lockIncreaseRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "lockRangeMax": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "lockRangeMin": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "lockResolutionFalloffPower": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "lockResolutionRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "lockSignalAmplifier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "lockTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "lockingAngle": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxTimesCanMiss": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "minRatioForLock": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "signalResilienceMax": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "signalResilienceMin": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "trackingSignalMin": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "trackingSignalType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "allowDumbFiring",
+        "lockDecreaseRate",
+        "lockIncreaseRate",
+        "lockRangeMax",
+        "lockRangeMin",
+        "lockResolutionFalloffPower",
+        "lockResolutionRadius",
+        "lockSignalAmplifier",
+        "lockTime",
+        "lockingAngle",
+        "maxTimesCanMiss",
+        "minRatioForLock",
+        "signalResilienceMax",
+        "signalResilienceMin",
+        "sourceType",
+        "trackingSignalMin",
         "trackingSignalType"
       ],
       "type": "object"
@@ -70533,6 +70848,656 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/MedBedTier"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMissileAxes": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MissileAxes"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMissileGuidance": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MissileGuidance"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMissileGuidancePhase": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MissileGuidancePhase"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMissileShake": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MissileShake"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMissileTargeting": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MissileTargeting"
               }
             }
           }

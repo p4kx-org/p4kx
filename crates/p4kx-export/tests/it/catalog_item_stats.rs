@@ -45,6 +45,8 @@ mod inventory_interactions;
 
 #[path = "catalog_inventory_containers.rs"]
 mod inventory_containers;
+#[path = "catalog_missile_configuration.rs"]
+mod missile_configuration;
 #[path = "catalog_quantum.rs"]
 mod quantum;
 #[path = "catalog_resource_components.rs"]

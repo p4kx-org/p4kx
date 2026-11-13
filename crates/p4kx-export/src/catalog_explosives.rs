@@ -6,6 +6,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+#[path = "catalog_missile_configuration.rs"]
+pub(crate) mod catalog_missile_configuration;
+
 use super::item_component_owner::ComponentOwner;
 use super::ordnance_fields::{BombFields, OrdnanceFields};
 use super::sensor_mine::SensorMine;
@@ -13,12 +16,12 @@ use crate::CatalogError;
 use crate::catalog_table::CatalogTable;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use catalog_missile_configuration as missile;
 
 const SENSOR_MINE: &str = "SSensorMineComponentParams";
 const ORDNANCE: &str = "SExplosiveOrdnanceParams";
 const BOMB: &str = "SCItemBombParams";
 const SPACE_MINE: &str = "SCItemSpaceMineParams";
-const MISSILE: &str = "SCItemMissileParams";
 
 #[derive(Clone, Copy)]
 pub(super) enum ExplosiveComponent {
@@ -36,7 +39,7 @@ impl ExplosiveComponent {
             ORDNANCE => Some(Self::Ordnance),
             BOMB => Some(Self::Bomb),
             SPACE_MINE => Some(Self::SpaceMine),
-            MISSILE => Some(Self::Missile),
+            missile::SOURCE_TYPE => Some(Self::Missile),
             _ => None,
         }
     }
@@ -68,6 +71,13 @@ impl<'source> Explosive<'source> {
             source_type,
             configuration,
         })
+    }
+
+    pub(super) fn missile_ordnance(&self) -> Option<&OrdnanceFields<'source>> {
+        match self.configuration.value()? {
+            ExplosiveConfiguration::Missile { value } => Some(value),
+            _ => None,
+        }
     }
 }
 
@@ -121,7 +131,13 @@ pub(crate) fn table<'source>(
     rows.sort_by_key(|row| row.owner.key());
     CatalogTable::new(
         forge,
-        &[SENSOR_MINE, ORDNANCE, BOMB, SPACE_MINE, MISSILE],
+        &[
+            SENSOR_MINE,
+            ORDNANCE,
+            BOMB,
+            SPACE_MINE,
+            missile::SOURCE_TYPE,
+        ],
         rows,
     )
 }
