@@ -35,42 +35,218 @@ struct Counts {
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn quantum_drives_match_both_original_modes_heat_and_observed_boost() -> TestResult {
+    verify_archive(Selection::AllItems)
+}
+
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn source_selected_quantum_modes_and_heat_match_exact_original_fields() -> TestResult {
+    verify_archive(Selection::Representative)
+}
+
+#[derive(Clone, Copy)]
+enum Selection {
+    AllItems,
+    Representative,
+}
+
+fn verify_archive(selection: Selection) -> TestResult {
     let path = real_archive_path().map_err(|_| "configured Archive path")?;
     let key = real_archive_key().map_err(|_| "configured Archive key")?;
     let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
     let watch = ArchiveWatch::new(&archive);
     let entry = DataForgeEntry::read(&archive).map_err(|_| "read configured DataForge")?;
-    let filter = Filter::new(components::FILTER);
-    let options = CatalogOptions {
-        filter: Some(&filter),
-        publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..CatalogOptions::new(UNIX_EPOCH)
-    };
-    let built = build_catalog_from(&archive, &entry, &options)
-        .map_err(|_| "build selected Item catalog")?;
-    let catalog: Value = serde_json::from_slice(built.json()).map_err(|_| "read catalog JSON")?;
-    real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
     let forge = entry.open().map_err(|_| "open original DataForge")?;
-    let counts = compare(&forge, entry.origin(), &catalog, &filter, &watch)?;
+    let mut counts = Counts::default();
+    match selection {
+        Selection::AllItems => {
+            let filter = Filter::new(components::FILTER);
+            verify_catalog(
+                &archive,
+                &entry,
+                &forge,
+                &filter,
+                &watch,
+                &mut counts,
+                selection,
+            )?;
+        }
+        Selection::Representative => {
+            let witnesses = witnesses(&forge, &watch)?;
+            for path in witnesses.paths() {
+                let filter = Filter::new(path);
+                verify_catalog(
+                    &archive,
+                    &entry,
+                    &forge,
+                    &filter,
+                    &watch,
+                    &mut counts,
+                    selection,
+                )?;
+            }
+            verify_witness_coverage(&witnesses, &counts);
+        }
+    }
     watch
         .check()
         .map_err(|_| "Archive changed during comparison")?;
+    report(&archive, counts)
+}
+
+fn verify_witness_coverage(witnesses: &Witnesses<'_>, counts: &Counts) {
+    assert!(
+        ["standard", "spline", "heat"]
+            .into_iter()
+            .all(|block| counts
+                .blocks
+                .contains_key(&(block, observation::State::Present))),
+        "all three required source blocks are present and compared"
+    );
+    if witnesses.boost_path.is_some() {
+        assert!(
+            counts
+                .blocks
+                .contains_key(&("boost", observation::State::Present)),
+            "observed boost has a typed export"
+        );
+    }
+    real_archive_verification::print_line(&format!(
+        "quantum source selection: {} owner filters, boost declaration: {}, boost observed: {}",
+        witnesses.paths().count(),
+        witnesses.boost_declared,
+        witnesses.boost_path.is_some()
+    ));
+}
+
+fn report(archive: &Archive, counts: Counts) -> TestResult {
     assert!(
         counts.components > 0,
         "the configured Build must exercise an original quantum drive"
     );
     let identity = archive.build().ok_or("complete actual Build identity")?;
     real_archive_verification::print_line(&format!(
-        "quantum drives in {} {} {} {}: {} component slots, {} original numeric cells",
+        "quantum drives in {}: {} component slots, {} original numeric cells",
         identity.branch(),
-        identity.version(),
-        identity.change_number(),
-        identity.build_id(),
         counts.components,
         counts.numbers,
     ));
     for ((block, state), count) in counts.blocks {
         real_archive_verification::print_line(&format!("{block} {}: {count}", state.label()));
+    }
+    Ok(())
+}
+
+fn verify_catalog(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    forge: &DataForge<'_>,
+    filter: &Filter,
+    watch: &ArchiveWatch,
+    counts: &mut Counts,
+    selection: Selection,
+) -> TestResult {
+    let options = CatalogOptions {
+        filter: Some(filter),
+        publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        ..CatalogOptions::new(UNIX_EPOCH)
+    };
+    let built =
+        build_catalog_from(archive, entry, &options).map_err(|_| "build selected Item catalog")?;
+    if matches!(selection, Selection::Representative) {
+        let health = built.summary().export_health();
+        let items = health.kind(Kind::Items).ok_or("selected Item health")?;
+        assert!(
+            items.source_inventory_complete
+                && items.field_inventory_complete
+                && items.failed_records().is_empty()
+                && items.failed_entries().is_empty(),
+            "the selected Item scope has a complete source inventory with no failed reads"
+        );
+    }
+    let catalog: Value = serde_json::from_slice(built.json()).map_err(|_| "read catalog JSON")?;
+    real_archive_shop_inventory_v3::verify_build(archive, &catalog)?;
+    compare(forge, entry.origin(), &catalog, filter, watch, counts)
+}
+
+#[derive(Default)]
+struct Witnesses<'source> {
+    modes_and_heat: Option<&'source str>,
+    boost_path: Option<&'source str>,
+    boost_declared: bool,
+}
+
+impl<'source> Witnesses<'source> {
+    fn paths(&self) -> impl Iterator<Item = &'source str> {
+        self.modes_and_heat.into_iter().chain(
+            self.boost_path
+                .filter(|path| Some(*path) != self.modes_and_heat),
+        )
+    }
+}
+
+fn witnesses<'source>(
+    forge: &'source DataForge<'source>,
+    watch: &ArchiveWatch,
+) -> TestResult<Witnesses<'source>> {
+    let rule = Kind::Items.rule().ok_or("selected Item rule")?;
+    let filter = Filter::new(components::FILTER);
+    let probe = forge
+        .pointer_probe("Components", SOURCE_TYPE)
+        .ok_or("original quantum declaration")?;
+    let mut trees = TreeBuilder::new();
+    let mut selection = Witnesses::default();
+    for record in forge.records() {
+        watch
+            .poll()
+            .map_err(|_| "Archive changed during source selection")?;
+        if !components::selected_item(&record, &rule, &filter)?
+            || !components::has_component(&mut trees, &record, std::slice::from_ref(&probe))?
+        {
+            continue;
+        }
+        let path = record
+            .record_path()
+            .map_err(|_| "read original Quantum Record path")?;
+        let tree = trees
+            .build(&record)
+            .map_err(|_| "read original quantum owner")?;
+        observe_witnesses(&mut selection, &tree, path)?;
+        if selection.modes_and_heat.is_some() && selection.boost_path.is_some() {
+            break;
+        }
+    }
+    assert!(
+        selection.modes_and_heat.is_some(),
+        "an original owner must have distinct standard and spline drive speeds and all five thermal values"
+    );
+    Ok(selection)
+}
+
+fn observe_witnesses<'source>(
+    selection: &mut Witnesses<'source>,
+    tree: &RecordTree<'source>,
+    path: &'source str,
+) -> TestResult {
+    let Some(Original::Array(components)) = tree.field("Components") else {
+        return Err("original Quantum Components array".into());
+    };
+    for value in components {
+        let Original::Struct(component) = value else {
+            continue;
+        };
+        if component.type_name() != SOURCE_TYPE {
+            continue;
+        }
+        if selection.modes_and_heat.is_none() && observation::witnesses_modes_and_heat(component)? {
+            selection.modes_and_heat = Some(path);
+        }
+        if let Some(boost) = component.field("quantumBoostParams") {
+            selection.boost_declared = true;
+            if matches!(boost, Original::Struct(_)) {
+                selection.boost_path.get_or_insert(path);
+            }
+        }
     }
     Ok(())
 }
@@ -81,7 +257,8 @@ fn compare(
     catalog: &Value,
     filter: &Filter,
     watch: &ArchiveWatch,
-) -> TestResult<Counts> {
+    counts: &mut Counts,
+) -> TestResult {
     let mut rows = components::component_rows(catalog, ROWS)?;
     let uses = proof::indexed(catalog, "/provenance/uses", "id")?;
     let DataForgeOrigin::Archive(entry) = origin else {
@@ -101,7 +278,6 @@ fn compare(
         .pointer_probe("Components", SOURCE_TYPE)
         .ok_or("original quantum declaration")?;
     let mut trees = TreeBuilder::new();
-    let mut counts = Counts::default();
     for record in forge.records() {
         watch
             .poll()
@@ -115,7 +291,7 @@ fn compare(
             .build(&record)
             .map_err(|_| "read original quantum owner")?;
         let trace = Trace::of(&tree, &uses, &scope, encrypted);
-        compare_components(forge, &tree, &trace, &mut rows, &mut counts)?;
+        compare_components(forge, &tree, &trace, &mut rows, counts)?;
     }
     assert!(
         rows.is_empty(),
@@ -125,7 +301,7 @@ fn compare(
         proof::text(catalog, "/configurations/quantumDrives/availability")? == "available",
         "the original quantum source family is available"
     );
-    Ok(counts)
+    Ok(())
 }
 
 fn compare_components<'source>(

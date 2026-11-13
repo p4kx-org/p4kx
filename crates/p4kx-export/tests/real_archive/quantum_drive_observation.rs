@@ -115,6 +115,32 @@ impl State {
     }
 }
 
+pub(super) fn witnesses_modes_and_heat(source: &StructValue<'_>) -> TestResult<bool> {
+    let speed = |name| {
+        let Some(Original::Struct(profile)) = source.field(name) else {
+            return Ok(None);
+        };
+        profile
+            .field("driveSpeed")
+            .map_or(Ok(None), numbers::expected)
+    };
+    let (Some(standard), Some(spline)) = (speed("params")?, speed("splineJumpParams")?) else {
+        return Ok(false);
+    };
+    let Some(Original::Struct(heat)) = source.field("heatParams") else {
+        return Ok(false);
+    };
+    for &(name, _) in HEAT {
+        let Some(raw) = heat.field(name) else {
+            return Ok(false);
+        };
+        if numbers::expected(raw)?.is_none() {
+            return Ok(false);
+        }
+    }
+    Ok(standard != spline)
+}
+
 pub(super) fn compare<'source>(
     forge: &DataForge<'_>,
     trace: &Trace<'_, 'source>,

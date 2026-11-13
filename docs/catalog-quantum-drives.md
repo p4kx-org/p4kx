@@ -48,3 +48,11 @@ For consumers migrating from the draft flat `items[].stats.quantumDrive`, the th
 map to the same-named row cells. The former `driveSpeed`, `cooldownTime`, `spoolUpTime`,
 `stageOneAccelRate`, `stageTwoAccelRate` and `engageSpeed` map to `standard.value`. Select the
 actual component slot before presenting an item-level value. A missing standard mode remains absent.
+
+For installed-Archive verification, run the ignored
+`real_archive_quantum_drives::source_selected_quantum_modes_and_heat_match_exact_original_fields`
+test with the configured testkit Archive path and key. It selects an original owner with
+different standard and spline speeds and all five thermal fields, then compares the exact values,
+states and origins in a path-scoped diagnostic catalog. The original Item census also records
+whether a boost block is declared or observed. If observed on a separate owner, the test compares
+that owner as well. The sibling ignored test checks the broader Item catalog.
