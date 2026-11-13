@@ -208,7 +208,7 @@ jobs:
           $otherBase = "artifacts/windows-build-$($other.target)"
           $msiName = Get-P4kxAssetName -Target $row.target -Version $env:VERSION -Package msi
           $otherName = Get-P4kxAssetName -Target $other.target -Version $env:VERSION -Package msi
-          $registryFixture = "target/$($row.target)/release/examples/p4kx-msi-registry-fixture.exe"
+          $registryFixture = "target/$env:P4KX_TARGET/release/examples/p4kx-msi-registry-fixture.exe"
           $output = Join-Path $env:P4KX_PACKAGE_TASK 'installer-check'
           $parameters = @{
             Target = $row.target
