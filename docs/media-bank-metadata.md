@@ -471,3 +471,11 @@ class identifies the admitted signature and form used to classify it. A declared
 length identifies its own consulted size word. The raw media range and its originating
 DIDX declaration remain separate fields. Record status, directory metadata and payload
 encryption retain their distinct meanings.
+
+The opt-in `original_shared_wwise_node_groups_reconcile` test selects one small physical bank
+from a bounded original-source probe. It compares checked shared node groups, ActorMixer children,
+inline State and RTPC rows with their original bank-relative spans. It reports which groups had
+populated examples in the source probe and in the selected bank. Standalone State is reported
+separately from inline State.
+
+    cargo test --release --locked -p p4kx-media --test real_archive original_shared_wwise_node_groups_reconcile -- --ignored --nocapture

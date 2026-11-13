@@ -2,10 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fs::{self, File};
-use std::io::{BufRead, BufReader, Read};
+use std::io::{BufRead, BufReader};
 use std::path::Path;
 
-use p4kx_extraction::{Archive, ArchiveWatch, Entry, Exclusion, Filter, Soundbank, Wem};
+use p4kx_extraction::{Archive, ArchiveWatch, Exclusion, Filter, Soundbank, Wem};
 use p4kx_media::{ExportOptions, ExportOutcome, Identity, Index, MediaKind, MediaRecord, Status};
 use serde_json::Value;
 
@@ -19,11 +19,20 @@ mod container;
 
 #[path = "audio_loose_accounting.rs"]
 mod loose;
+#[path = "audio_node_accounting.rs"]
+mod node;
+#[path = "audio_samples.rs"]
+mod sampling;
 #[path = "audio_wem_accounting.rs"]
 mod wem;
 
 const MAX_SAMPLE_BYTES: u64 = 8 << 20;
-const MAX_PROBES_PER_KIND: usize = 32;
+
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn original_shared_wwise_node_groups_reconcile() -> Result<(), privacy::VerificationFailure> {
+    privacy::redact(verify_archives(node::verify_archive))
+}
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
@@ -119,7 +128,7 @@ fn verify_archive(path: &Path) -> TestResult {
     let watch = ArchiveWatch::new(&archive);
     let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
     for suffix in [".wem", ".bnk"] {
-        let sample = sample(&archive, &watch, suffix, |original| {
+        let sample = sampling::sample(&archive, &watch, suffix, |original| {
             if suffix == ".wem" {
                 Wem::parse(original).is_ok()
             } else {
@@ -181,7 +190,7 @@ fn verify_archive_containers(path: &Path) -> TestResult {
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::real_archive_key()?))?;
     let watch = ArchiveWatch::new(&archive);
     let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
-    let sample = sample(
+    let sample = sampling::sample(
         &archive,
         &watch,
         ".bnk",
@@ -241,50 +250,6 @@ struct Sample {
     filter: Filter,
     entry_index: usize,
     original: Vec<u8>,
-}
-
-fn sample(
-    archive: &Archive,
-    watch: &ArchiveWatch,
-    suffix: &str,
-    applicable: impl Fn(&[u8]) -> bool,
-) -> TestResult<Sample> {
-    let candidates = archive.entries().iter().enumerate().filter(|(_, entry)| {
-        !entry.path().contains(['*', '?'])
-            && has_suffix(entry, suffix)
-            && (1..=MAX_SAMPLE_BYTES).contains(&entry.uncompressed_size())
-    });
-    for (entry_index, entry) in candidates.take(MAX_PROBES_PER_KIND) {
-        watch.check()?;
-        let filter = Filter::parse(entry.path())?;
-        let matches = archive.entries().iter().filter(|other| {
-            filter.matches(other.path())
-                && !has_suffix(other, ".pak")
-                && !has_suffix(other, ".socpak")
-        });
-        if matches.take(2).count() != 1 {
-            continue;
-        }
-        let mut original = Vec::new();
-        archive
-            .open_entry_verified(entry)?
-            .read_to_end(&mut original)?;
-        if applicable(&original) {
-            return Ok(Sample {
-                filter,
-                entry_index,
-                original,
-            });
-        }
-    }
-    Err("no bounded real root audio Entry with the required directory".into())
-}
-
-fn has_suffix(entry: &Entry, suffix: &str) -> bool {
-    entry
-        .path()
-        .get(entry.path().len().saturating_sub(suffix.len())..)
-        .is_some_and(|actual| actual.eq_ignore_ascii_case(suffix))
 }
 
 fn records(
