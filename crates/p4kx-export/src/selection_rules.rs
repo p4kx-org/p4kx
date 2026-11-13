@@ -65,6 +65,18 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::npc_spawn_definitions::POOL_TYPE,
             },
+            Self::AutoSpawns => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::npc_spawn_definitions::SPAWN_TYPE,
+            },
+            Self::AutoSpawnSets => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::npc_spawn_definitions::SET_TYPE,
+            },
+            Self::EncounterIndices => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::npc_spawn_definitions::ENCOUNTER_TYPE,
+            },
             Self::ReputationPerks => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::reputation_perk_list::SOURCE_TYPE,

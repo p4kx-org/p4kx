@@ -30,6 +30,13 @@ pub(crate) fn named_rows<'catalog>(
         .into_iter()
         .find(|kind| kind.name() == name)
         .ok_or("unknown catalog Kind")?;
+    rows_of_kind(catalog, kind)
+}
+
+fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
+    if is_npc_spawn_definition(kind) {
+        return checked_table(catalog, kind, &format!("/definitions/{}", kind.name()));
+    }
     let path = match kind {
         Kind::GameplayProperties => "/definitions/gameplayProperties",
         Kind::LootPoolFilters => "/definitions/lootPoolFilters",
@@ -58,8 +65,6 @@ pub(crate) fn named_rows<'catalog>(
         Kind::InfractionSets => "/definitions/infractionSets",
         Kind::Jurisdictions => "/definitions/jurisdictions",
         Kind::LocationClasses => "/definitions/locationClasses",
-        Kind::NpcArchetypes => "/definitions/npcArchetypes",
-        Kind::NpcClassPools => "/definitions/npcClassPools",
         Kind::LocationFunctions => "/definitions/locationFunctions",
         Kind::LocationSizes => "/definitions/locationSizes",
         Kind::LocationClassRegistries => "/definitions/locationRegistries/classes",
@@ -86,6 +91,17 @@ pub(crate) fn named_rows<'catalog>(
         }
     };
     checked_table(catalog, kind, path)
+}
+
+const fn is_npc_spawn_definition(kind: Kind) -> bool {
+    matches!(
+        kind,
+        Kind::NpcArchetypes
+            | Kind::NpcClassPools
+            | Kind::AutoSpawns
+            | Kind::AutoSpawnSets
+            | Kind::EncounterIndices
+    )
 }
 
 fn checked_table<'catalog>(
@@ -128,6 +144,9 @@ fn checked_table<'catalog>(
                 | Kind::LocationSizeRegistries
                 | Kind::NpcArchetypes
                 | Kind::NpcClassPools
+                | Kind::AutoSpawns
+                | Kind::AutoSpawnSets
+                | Kind::EncounterIndices
                 | Kind::StarmapObjects
                 | Kind::StarmapTypes
                 | Kind::StarmapPresets
@@ -252,6 +271,9 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::LocationSizeRegistries
             | Kind::NpcArchetypes
             | Kind::NpcClassPools
+            | Kind::AutoSpawns
+            | Kind::AutoSpawnSets
+            | Kind::EncounterIndices
             | Kind::StarmapObjects
             | Kind::StarmapTypes
             | Kind::StarmapPresets

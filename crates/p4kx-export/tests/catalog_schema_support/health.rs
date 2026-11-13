@@ -88,6 +88,9 @@ fn row_count(kind: Kind, catalog: &Value) -> usize {
         Kind::LocationClasses => catalog.pointer("/definitions/locationClasses/rows"),
         Kind::NpcArchetypes => catalog.pointer("/definitions/npcArchetypes/rows"),
         Kind::NpcClassPools => catalog.pointer("/definitions/npcClassPools/rows"),
+        Kind::AutoSpawns => catalog.pointer("/definitions/autoSpawns/rows"),
+        Kind::AutoSpawnSets => catalog.pointer("/definitions/autoSpawnSets/rows"),
+        Kind::EncounterIndices => catalog.pointer("/definitions/encounterIndices/rows"),
         Kind::LocationFunctions => catalog.pointer("/definitions/locationFunctions/rows"),
         Kind::LocationSizes => catalog.pointer("/definitions/locationSizes/rows"),
         Kind::LocationClassRegistries => {

@@ -22,7 +22,11 @@ impl Collected<'_> {
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries => self.location_vocabulary.count(kind),
-            Kind::NpcArchetypes | Kind::NpcClassPools => self.npc_spawn_definitions.count(kind),
+            Kind::NpcArchetypes
+            | Kind::NpcClassPools
+            | Kind::AutoSpawns
+            | Kind::AutoSpawnSets
+            | Kind::EncounterIndices => self.npc_spawn_definitions.count(kind),
             Kind::Items => self.items.len(),
             Kind::Ships => self.ships.len(),
             Kind::Commodities => self.commodities.len(),

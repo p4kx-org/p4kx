@@ -185,6 +185,12 @@ pub enum Kind {
     NpcArchetypes,
     /// Physical weighted NPC class pool Records.
     NpcClassPools,
+    /// Physical automatic spawn Records.
+    AutoSpawns,
+    /// Physical ordered spawn set Records.
+    AutoSpawnSets,
+    /// Physical encounter index Records.
+    EncounterIndices,
     /// All physical inventory storage Records.
     InventoryContainers,
     /// Physical shared medical tier and consumption configuration Records.
@@ -201,7 +207,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 75] = [
+    pub const ALL: [Self; 78] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -271,6 +277,9 @@ impl Kind {
         Self::LocationSizeRegistries,
         Self::NpcArchetypes,
         Self::NpcClassPools,
+        Self::AutoSpawns,
+        Self::AutoSpawnSets,
+        Self::EncounterIndices,
         Self::InventoryContainers,
         Self::MedicalItemTierConfigs,
         Self::StarmapTypes,
@@ -357,6 +366,9 @@ impl Kind {
             Self::LocationSizeRegistries => "locationSizeRegistries",
             Self::NpcArchetypes => "npcArchetypes",
             Self::NpcClassPools => "npcClassPools",
+            Self::AutoSpawns => "autoSpawns",
+            Self::AutoSpawnSets => "autoSpawnSets",
+            Self::EncounterIndices => "encounterIndices",
             Self::InventoryContainers => "inventoryContainers",
             Self::MedicalItemTierConfigs => "medicalItemTierConfigs",
             Self::StarmapTypes => "starmapTypes",

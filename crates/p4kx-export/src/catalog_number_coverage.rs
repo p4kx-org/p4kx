@@ -34,6 +34,9 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
             | Kind::LocationSizeRegistries
             | Kind::NpcArchetypes
             | Kind::NpcClassPools
+            | Kind::AutoSpawns
+            | Kind::AutoSpawnSets
+            | Kind::EncounterIndices
             | Kind::StarmapObjects
             | Kind::StarmapTypes
             | Kind::StarmapPresets
@@ -82,7 +85,9 @@ pub(super) const fn expected_owned_number(
             | Kind::StarmapObjects
             | Kind::StarmapTypes
             | Kind::StarmapPresets
-            | Kind::NpcClassPools,
+            | Kind::NpcClassPools
+            | Kind::AutoSpawns
+            | Kind::AutoSpawnSets,
             _,
         ) => (AuthoredDefinitionValue { ordinal }, Single),
         _ => return None,
@@ -112,6 +117,9 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
             | Kind::LocationSizeRegistries
             | Kind::NpcArchetypes
             | Kind::NpcClassPools
+            | Kind::AutoSpawns
+            | Kind::AutoSpawnSets
+            | Kind::EncounterIndices
             | Kind::StarmapObjects
             | Kind::StarmapTypes
             | Kind::StarmapPresets

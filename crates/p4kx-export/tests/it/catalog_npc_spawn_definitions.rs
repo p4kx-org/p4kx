@@ -7,6 +7,11 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult, at, guid};
 
+#[path = "catalog_auto_spawn_definitions.rs"]
+mod auto_spawn_definitions;
+#[path = "catalog_auto_spawn_fixture.rs"]
+mod auto_spawn_fixture;
+
 const ARCHETYPE: u128 = 0x1084_0001;
 const POOL: u128 = 0x1084_0002;
 const EMPTY_POOL: u128 = 0x1084_0003;

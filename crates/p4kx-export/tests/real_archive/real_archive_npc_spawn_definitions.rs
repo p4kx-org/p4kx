@@ -16,6 +16,9 @@ use crate::authored_definition_witness::{field, verify_array, verify_link, verif
 use crate::catalog_v3_consumer as consumer;
 use crate::real_archive_verification::print_line;
 
+#[path = "npc_spawn_definition_witness.rs"]
+mod spawn;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 struct Family {
@@ -25,7 +28,7 @@ struct Family {
     verify_entry: fn(&DataForge<'_>, Option<&Original<'_>>, &Value) -> TestResult,
 }
 
-const FAMILIES: [Family; 2] = [
+const FAMILIES: [Family; 5] = [
     Family {
         kind: Kind::NpcClassPools,
         source_type: "NPCClassPool",
@@ -38,11 +41,29 @@ const FAMILIES: [Family; 2] = [
         field: "identity",
         verify_entry: verify_identity_branch,
     },
+    Family {
+        kind: Kind::AutoSpawns,
+        source_type: "AutoSpawn",
+        field: "autoSpawnData",
+        verify_entry: spawn::verify_spawn,
+    },
+    Family {
+        kind: Kind::AutoSpawnSets,
+        source_type: "AutoSpawns",
+        field: "autoSpawnData",
+        verify_entry: spawn::verify_set_entry,
+    },
+    Family {
+        kind: Kind::EncounterIndices,
+        source_type: "EncounterIndex",
+        field: "encounters",
+        verify_entry: spawn::verify_encounter,
+    },
 ];
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn npc_class_pools_and_archetypes_match_original_entries() -> TestResult {
+fn npc_spawn_definitions_match_original_entries() -> TestResult {
     let path = real_archive_path().map_err(|_| "configured Archive path")?;
     let key = real_archive_key().map_err(|_| "configured Archive key")?;
     let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
@@ -131,6 +152,9 @@ fn verify_record(
         Some(tree.record_path()),
         "catalog row uses the original physical Record path"
     );
+    if family.kind == Kind::AutoSpawns {
+        return (family.verify_entry)(forge, tree.field(family.field), field(row, family.field)?);
+    }
     verify_array(
         tree.field(family.field),
         field(row, family.field)?,
@@ -147,16 +171,7 @@ fn verify_pool_entry(
         return verify_state(source, row);
     };
     let row = consumer::present(row)?;
-    let weight = field(row, "weight")?;
-    if let Some(Original::Single(number)) = source.field("weight") {
-        assert_eq!(
-            field(consumer::present(weight)?, "rawBits")?,
-            &json!(format!("{:08x}", number.to_bits())),
-            "each original Single has exact exported bits"
-        );
-    } else {
-        verify_state(source.field("weight"), weight)?;
-    }
+    spawn::verify_single(source.field("weight"), field(row, "weight")?)?;
     verify_link(
         forge,
         "EntityClassDefinition",

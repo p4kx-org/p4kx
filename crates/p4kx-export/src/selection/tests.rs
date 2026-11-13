@@ -80,6 +80,9 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::LocationSizeRegistries
                 | Kind::NpcArchetypes
                 | Kind::NpcClassPools
+                | Kind::AutoSpawns
+                | Kind::AutoSpawnSets
+                | Kind::EncounterIndices
                 | Kind::InventoryContainers
                 | Kind::MedicalItemTierConfigs
                 | Kind::StarmapTypes

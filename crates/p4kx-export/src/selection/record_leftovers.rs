@@ -57,6 +57,9 @@ pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
         | Kind::LocationSizeRegistries
         | Kind::NpcArchetypes
         | Kind::NpcClassPools
+        | Kind::AutoSpawns
+        | Kind::AutoSpawnSets
+        | Kind::EncounterIndices
         | Kind::MissionScenarios
         | Kind::InventoryContainers
         | Kind::MedicalItemTierConfigs

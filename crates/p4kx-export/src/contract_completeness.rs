@@ -100,6 +100,9 @@ pub(crate) struct Completeness<'a> {
     pub(crate) location_size_registries: KindCompleteness<'a>,
     pub(crate) npc_archetypes: KindCompleteness<'a>,
     pub(crate) npc_class_pools: KindCompleteness<'a>,
+    pub(crate) auto_spawns: KindCompleteness<'a>,
+    pub(crate) auto_spawn_sets: KindCompleteness<'a>,
+    pub(crate) encounter_indices: KindCompleteness<'a>,
     /// The physical `starmapTypes` selection.
     pub(crate) starmap_types: KindCompleteness<'a>,
     /// The physical `starmapPresets` selection.
@@ -211,6 +214,9 @@ impl<'a> Completeness<'a> {
             location_size_registries: completeness,
             npc_archetypes: completeness,
             npc_class_pools: completeness,
+            auto_spawns: completeness,
+            auto_spawn_sets: completeness,
+            encounter_indices: completeness,
             starmap_types: completeness,
             starmap_presets: completeness,
             starmap_amenities: completeness,

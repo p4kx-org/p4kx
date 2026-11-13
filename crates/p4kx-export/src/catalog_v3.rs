@@ -45,6 +45,12 @@ mod sandbox_trigger;
 #[path = "sandbox_trigger_record_definition.rs"]
 pub(crate) mod sandbox_trigger_record_definition;
 
+#[path = "auto_spawn_class.rs"]
+mod auto_spawn_class;
+#[path = "auto_spawn_data.rs"]
+mod auto_spawn_data;
+#[path = "auto_spawn_definition.rs"]
+mod auto_spawn_definition;
 #[path = "catalog_placements.rs"]
 pub(crate) mod catalog_placements;
 #[path = "explosion_definition.rs"]
@@ -375,16 +381,12 @@ pub(crate) mod commodity_presentation;
 
 #[path = "commodity_resource.rs"]
 pub(crate) mod commodity_resource;
-
 #[path = "commodity_resource_presentation.rs"]
 pub(crate) mod commodity_resource_presentation;
-
 #[path = "commodity_source.rs"]
 pub(crate) mod commodity_source;
-
 #[path = "commodity_text_choice.rs"]
 pub(crate) mod commodity_text_choice;
-
 #[path = "commodity_text_input.rs"]
 pub(crate) mod commodity_text_input;
 

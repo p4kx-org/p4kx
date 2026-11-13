@@ -33,9 +33,11 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::StarmapTypes | Kind::StarmapPresets | Kind::StarmapAmenities => {
                 self.starmap_definition(kind, admission, tree)?
             }
-            Kind::NpcArchetypes | Kind::NpcClassPools => {
-                self.npc_spawn_definition(kind, admission, tree)?
-            }
+            Kind::NpcArchetypes
+            | Kind::NpcClassPools
+            | Kind::AutoSpawns
+            | Kind::AutoSpawnSets
+            | Kind::EncounterIndices => self.npc_spawn_definition(kind, admission, tree)?,
             Kind::Infractions | Kind::InfractionSets | Kind::Jurisdictions => {
                 self.law_definition(kind, admission, tree)?
             }

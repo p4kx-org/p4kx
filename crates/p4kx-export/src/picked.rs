@@ -166,6 +166,9 @@ impl<'f> Picked<'f> {
             | Kind::LocationSizeRegistries
             | Kind::NpcArchetypes
             | Kind::NpcClassPools
+            | Kind::AutoSpawns
+            | Kind::AutoSpawnSets
+            | Kind::EncounterIndices
             | Kind::StarmapTypes
             | Kind::StarmapPresets
             | Kind::StarmapAmenities
