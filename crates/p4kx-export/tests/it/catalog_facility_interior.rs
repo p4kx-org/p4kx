@@ -13,6 +13,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_facility_interior_fixture.rs"]
 mod fixture;
+#[path = "catalog_facility_nested_interior.rs"]
+mod nested;
 
 #[test]
 fn catalog_links_original_soc_entity_slots_to_their_physical_facility_owner() -> TestResult {
@@ -78,10 +80,16 @@ fn catalog_records_partial_direct_room_coverage_and_ambiguous_sources() -> TestR
                 .find(|row| row["kind"] == "missingStream")
                 .ok_or("the authored missing stream declaration")?;
             proof::present(missing, "stream", &json!("missing.soc"), Some(true))?;
-            assert!(
-                findings.iter().any(|row| row["kind"] == "unexaminedChild"),
-                "nested child scope remains visible"
-            );
+            let child = findings
+                .iter()
+                .find(|row| row["kind"] == "missingContainer")
+                .ok_or("missing actual Child source")?;
+            proof::present(
+                proof::at(child, "/child")?,
+                "name",
+                &json!("missing_child"),
+                Some(true),
+            )?;
         }
         if matches!(case, fixture::Case::LossyChunk) {
             let placement = rows

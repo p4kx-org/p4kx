@@ -195,3 +195,11 @@ Entity class selector joins to one physical DataForge Record before linking
 its published component definitions. The original coordinates remain
 container-local. Room coverage records incomplete or unexamined branches
 so an empty result can be interpreted within its inspected scope.
+
+
+Room coverage stores each opened Child occurrence once under its physical
+room key. Its parent and original Child descriptor node preserve the logical
+route even when multiple nodes select the same physical Entry. Facility rows
+join the occurrence by its local ordinal. Composed root-room coordinates use
+the original Child transforms in route order and the original entity-local
+matrix. The direct local matrix also serves as the root-room matrix.

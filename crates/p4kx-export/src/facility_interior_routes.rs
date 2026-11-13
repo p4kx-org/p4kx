@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, Entry, PathIndex, SourceUse};
+use std::collections::BTreeSet;
+
+use p4kx_assembly::ChildContainerPath;
+use p4kx_extraction::{Archive, CancelToken, Entry, PathIndex, PathKeys, SourceUse, SourceValue};
 
 use super::types::InteriorFindingKind;
 use crate::catalog_read::original::{
@@ -11,47 +14,133 @@ use crate::catalog_read::original::{
 use crate::starmap_xml::Node;
 use crate::{CatalogError, ExportAccountingError};
 
-pub(super) struct OpenedRoom<'archive> {
+pub(super) struct OpenedRoom {
     pub(super) archive: Archive,
-    entry: &'archive Entry,
     pub(super) container: OriginalDatum<PhysicalEntryRef>,
+    keys: PathKeys,
+    owner: Option<usize>,
+    entry_index: usize,
 }
 
-pub(super) fn open_room<'archive>(
+#[derive(Clone, Copy)]
+pub(super) struct ContainerOwner<'archive> {
     archive: &'archive Archive,
-    index: &PathIndex<'archive>,
+    entry: &'archive Entry,
+}
+
+pub(super) fn open_room(
+    archive: &Archive,
+    index: &PathIndex<'_>,
     capture: &EntryCapture<'_>,
     name: &str,
     cancel: Option<&CancelToken>,
-) -> Result<Result<OpenedRoom<'archive>, InteriorFindingKind>, CatalogError> {
+) -> Result<Result<OpenedRoom, InteriorFindingKind>, CatalogError> {
     let path = name.trim().trim_start_matches(['/', '\\']);
     let data = format!("Data\\{path}");
-    let entry = match select(index, &[&data, path], cancel)? {
+    let selected = select(index, [data.as_str(), path], cancel)?;
+    open_selected(archive, selected, capture, None, &BTreeSet::new())
+}
+
+pub(super) fn open_child<'room>(
+    archive: &Archive,
+    index: &PathIndex<'_>,
+    capture: &EntryCapture<'_>,
+    ancestors: impl DoubleEndedIterator<Item = &'room OpenedRoom> + ExactSizeIterator,
+    active: &BTreeSet<PhysicalEntryRef>,
+    name: &str,
+    cancel: Option<&CancelToken>,
+) -> Result<Result<OpenedRoom, InteriorFindingKind>, CatalogError> {
+    let Some(path) = ChildContainerPath::new(name) else {
+        return Ok(Err(InteriorFindingKind::InvalidChildPath));
+    };
+    for (owner, room) in ancestors.enumerate().rev() {
+        check_cancel(cancel)?;
+        let index = room.index();
+        let selection = select(&index, [path.relative()], cancel)?;
+        if !matches!(selection, Selection::Missing) {
+            return open_selected(&room.archive, selection, capture, Some(owner), active);
+        }
+    }
+    let selection = select(index, path.root_candidates(), cancel)?;
+    open_selected(archive, selection, capture, None, active)
+}
+
+fn open_selected(
+    archive: &Archive,
+    selected: Selection<'_>,
+    capture: &EntryCapture<'_>,
+    owner: Option<usize>,
+    active: &BTreeSet<PhysicalEntryRef>,
+) -> Result<Result<OpenedRoom, InteriorFindingKind>, CatalogError> {
+    let entry = match selected {
         Selection::One(entry) => entry,
         Selection::Missing => return Ok(Err(InteriorFindingKind::MissingContainer)),
         Selection::Ambiguous => return Ok(Err(InteriorFindingKind::AmbiguousContainer)),
     };
     let receipt = EntryReceipt::outer(capture, archive, entry)?;
+    let container = receipt.physical_reference(capture)?;
+    if active.contains(physical_ref(&container)?) {
+        return Ok(Err(InteriorFindingKind::ChildCycle));
+    }
     receipt.attempted_payload()?;
     let Ok(opened) = archive.open_container(entry) else {
         return Ok(Err(InteriorFindingKind::UnreadableContainer));
     };
     Ok(Ok(OpenedRoom {
+        keys: PathKeys::new(&opened),
         archive: opened,
-        entry,
-        container: receipt.physical_reference(capture)?,
+        container,
+        owner,
+        entry_index: entry.index(),
     }))
 }
 
-impl OpenedRoom<'_> {
+pub(super) fn physical_ref(
+    datum: &OriginalDatum<PhysicalEntryRef>,
+) -> Result<&PhysicalEntryRef, CatalogError> {
+    match datum.value() {
+        SourceValue::Present(entry) => Ok(entry),
+        _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),
+    }
+}
+
+impl OpenedRoom {
+    pub(super) fn index(&self) -> PathIndex<'_> {
+        self.keys.index(&self.archive)
+    }
+
+    pub(super) fn owner<'room>(
+        &self,
+        archive: &'room Archive,
+        mut ancestors: impl Iterator<Item = &'room Self>,
+    ) -> Result<ContainerOwner<'room>, CatalogError> {
+        let owner = match self.owner {
+            None => archive,
+            Some(layer) => {
+                &ancestors
+                    .nth(layer)
+                    .ok_or(ExportAccountingError::ConflictingSourceDatum)?
+                    .archive
+            }
+        };
+        let entry = owner
+            .entries()
+            .get(self.entry_index)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        Ok(ContainerOwner {
+            archive: owner,
+            entry,
+        })
+    }
+
     pub(super) fn descriptor(
         &self,
-        archive: &Archive,
+        owner: ContainerOwner<'_>,
         index: &PathIndex<'_>,
         capture: &EntryCapture<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<Result<EntryRead, InteriorFindingKind>, CatalogError> {
-        let leaf = self
+        let leaf = owner
             .entry
             .path()
             .rsplit(['/', '\\'])
@@ -60,46 +149,48 @@ impl OpenedRoom<'_> {
         let stem = leaf.rsplit_once('.').map_or(leaf, |(stem, _)| stem);
         let direct = format!("{stem}.xml");
         let nested = format!("{stem}\\{stem}.xml");
-        let entry = match select(index, &[&direct, &nested], cancel)? {
+        let entry = match select(index, [direct, nested], cancel)? {
             Selection::One(entry) => entry,
             Selection::Missing => return Ok(Err(InteriorFindingKind::MissingDescriptor)),
             Selection::Ambiguous => return Ok(Err(InteriorFindingKind::AmbiguousDescriptor)),
         };
         Ok(self
-            .read(archive, capture, entry, cancel)?
+            .read(owner, capture, entry, cancel)?
             .map_err(|_| InteriorFindingKind::UnreadableDescriptor))
     }
 
     pub(super) fn stream(
         &self,
-        archive: &Archive,
+        owner: ContainerOwner<'_>,
         index: &PathIndex<'_>,
         capture: &EntryCapture<'_>,
         name: &str,
         cancel: Option<&CancelToken>,
     ) -> Result<Result<EntryRead, InteriorFindingKind>, CatalogError> {
-        let entry = match select(index, &[name], cancel)? {
+        let entry = match select(index, [name], cancel)? {
             Selection::One(entry) => entry,
             Selection::Missing => return Ok(Err(InteriorFindingKind::MissingStream)),
             Selection::Ambiguous => return Ok(Err(InteriorFindingKind::AmbiguousStream)),
         };
         Ok(self
-            .read(archive, capture, entry, cancel)?
+            .read(owner, capture, entry, cancel)?
             .map_err(|_| InteriorFindingKind::UnreadableStream))
     }
 
     fn read(
         &self,
-        archive: &Archive,
+        owner: ContainerOwner<'_>,
         capture: &EntryCapture<'_>,
         entry: &Entry,
         cancel: Option<&CancelToken>,
     ) -> Result<Result<EntryRead, EntryReadError>, CatalogError> {
-        let receipt = EntryReceipt::inner(capture, archive, self.entry, &self.archive, entry)?;
+        let receipt =
+            EntryReceipt::inner(capture, owner.archive, owner.entry, &self.archive, entry)?;
         EntryRead::read_all(receipt, &self.archive, entry, cancel)
     }
 }
 
+#[derive(Clone, Copy)]
 enum Selection<'archive> {
     One(&'archive Entry),
     Missing,
@@ -108,12 +199,12 @@ enum Selection<'archive> {
 
 fn select<'archive>(
     index: &PathIndex<'archive>,
-    paths: &[&str],
+    paths: impl IntoIterator<Item = impl AsRef<str>>,
     cancel: Option<&CancelToken>,
 ) -> Result<Selection<'archive>, CatalogError> {
     for path in paths {
         let mut candidates = index
-            .matching_entries_with(path, |_| check_cancel(cancel))
+            .matching_entries_with(path.as_ref(), |_| check_cancel(cancel))
             .map_err(path_error)?;
         let Some(first) = candidates.next().transpose().map_err(path_error)? else {
             continue;
@@ -156,15 +247,6 @@ pub(super) fn declared_streams(
     let mut declarations = Vec::new();
     let mut findings = Vec::new();
     for section in xml.root().children() {
-        if section.name().eq_ignore_ascii_case("ChildObjectContainers") {
-            if section
-                .children()
-                .any(|child| child.name().eq_ignore_ascii_case("Child"))
-            {
-                findings.push(InteriorFindingKind::UnexaminedChild);
-            }
-            continue;
-        }
         if !section.name().eq_ignore_ascii_case("StreamingOCs") {
             continue;
         }

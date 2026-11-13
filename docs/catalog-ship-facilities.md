@@ -83,7 +83,7 @@ catalog selection determines which configuration rows can be joined.
 Failed attachment resolution stays visible in the published Loadout.
 A Loadout path identifies a contextual occurrence.
 
-## Direct SOC room placements
+## SOC room placements
 
 The `interior` source in `placements.facilityInstances` joins an original
 `EntityClassGUID` from a streamed SOC to a uniquely identified physical
@@ -93,7 +93,7 @@ invalid transform can still carry a class and its configuration links.
 
 Use `source.room` to join the physical owner and array slot in
 `declarations.roomAssociations`. The sourced `source.position` identifies the
-actual outer SOCpak, descriptor and SOC Entry, the descriptor's original OC
+actual containing SOCpak, descriptor and SOC Entry, the descriptor's original OC
 node, the CrCh chunk-table index and the Entity's original direct element slot.
 Repeated OC declarations keep separate positions even when they use one SOC Entry.
 
@@ -104,12 +104,25 @@ decoded SOC Entry. `localTransform` is a row-major 3x4 transform in the containi
 room's coordinates, with a distinct invalid state for malformed or ambiguous inputs.
 The original attributes are available in either case.
 
-`placements.facilityInteriorCoverage` records findings by inspected direct room
-slot. Missing, ambiguous or unreadable source paths have separate codes. A
-declared Child container outside the direct inspection is reported as
-`unexaminedChild`. The direct observation uses authored `StreamingOCs` paths.
-A descriptor with repaired string-table bytes is unreadable for stream
-selection. A repaired SOC entity chunk records `lossyEntityChunk`. Its usable
-slots retain their original coordinates and incomplete source sets.
-Attached-item rooms and ship-frame transforms require separate Loadout,
-Child and bone evidence.
+`placements.facilityInteriorCoverage` records opened `containers` and findings
+for each inspected room slot. A facility joins its containing occurrence using
+the `source.room` key and `source.position.value.containerOccurrenceOrdinal`.
+The root occurrence has a null `parentOrdinal` and `child`. Each nested occurrence
+references its parent and retains the original Child descriptor node, raw
+attributes, selected container Entry and local matrix. The lookup searches the
+current container, enclosing containers and then the main Archive. Repeated
+sibling declarations remain separate. A cycle reports the original Child
+occurrence while leaving sibling routes available.
+
+`rootRoomTransform` expresses a nested entity in the root room's coordinates
+using the ordered Child matrices and the entity-local matrix. It is null for a
+direct entity. An invalid Child matrix leaves the local entity and its original
+attributes available and marks the composed matrix invalid. Attached-item
+roots and ship-frame coordinates require separate Loadout and bone evidence.
+
+Findings identify the affected `containerOrdinal`, the original stream name
+when applicable and the Child source for an unresolved edge. Missing,
+ambiguous or unreadable source paths have separate codes. A descriptor with
+repaired string-table bytes is unreadable for selection. A repaired SOC
+entity chunk records `lossyEntityChunk`. Its usable slots retain their original
+coordinates and incomplete source sets.

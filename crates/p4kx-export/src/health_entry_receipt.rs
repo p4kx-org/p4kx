@@ -45,7 +45,7 @@ pub(crate) struct PhysicalEntryIdentity {
 }
 
 /// Structural navigation to one actual physical Archive Entry.
-#[derive(Debug, Clone, serde::Serialize, schemars::JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::schema_fields::every_field_required)]
 pub(crate) struct PhysicalEntryRef {

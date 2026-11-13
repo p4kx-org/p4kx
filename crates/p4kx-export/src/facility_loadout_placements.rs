@@ -27,12 +27,16 @@ use crate::loadout::alignment::AttachmentIdentity;
 use crate::record_header_field::RecordHeaderField;
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "facility_interior_child.rs"]
+mod child;
 #[path = "facility_interior_placements.rs"]
 mod interior;
 #[path = "facility_interior_routes.rs"]
 mod routes;
 #[path = "facility_interior_types.rs"]
 mod types;
+#[path = "facility_interior_walk.rs"]
+mod walk;
 
 pub(super) use types::{InteriorFacilityPlacement, InteriorRoomCoverage};
 

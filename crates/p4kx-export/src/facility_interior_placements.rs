@@ -4,30 +4,30 @@
 use std::collections::{HashMap, HashSet};
 
 use p4kx_extraction::{
-    Archive, CancelToken, DataForge, Guid, PathIndex, SourceUse, SourceUseRole, SourceValue,
+    Archive, DataForge, Guid, PathIndex, SourceUse, SourceUseRole, SourceUses, SourceValue,
     SourcedValue,
 };
 
 use super::super::catalog_entity_configurations::EntityConfigurationRows;
 use super::super::facility_instance::{FacilityPlacementSource, ShipContext};
-use super::super::room_associations::RoomAssociation;
+use p4kx_extraction::model::Transform;
+
 use super::Projection;
-use super::routes::{self, OpenedRoom, StreamDeclaration};
+use super::routes::{self, StreamDeclaration};
 use super::types::{
-    InteriorFacilityPlacement, InteriorFinding, InteriorFindingKind, InteriorRoomCoverage,
-    InteriorRoomRef, InteriorSocPosition, SocAttribute,
+    InteriorFacilityPlacement, InteriorFindingKind, InteriorRoomCoverage, InteriorRoomRef,
+    InteriorSocPosition, SocAttribute,
 };
+use super::walk::{RoomReader, RootRoomTransform, StreamContext};
 use crate::catalog_read::original::{
-    EntryCapture, EntrySoc, EntrySocEntity, EntryXml, OriginalDatum, PhysicalEntryRef,
-    SocSourceFields,
+    EntryCapture, EntrySocEntity, OriginalDatum, PhysicalEntryRef, SocSourceFields,
 };
 use crate::contract_entities::Ship;
 use crate::record_header_field::RecordHeaderField;
-use crate::starmap_xml::Node;
 use crate::{CatalogError, ExportAccountingError};
 
 #[derive(Clone, Copy)]
-enum ClassTarget {
+pub(super) enum ClassTarget {
     One(u32),
     Ambiguous,
 }
@@ -79,7 +79,11 @@ pub(super) fn project(
                 owner: declaration.owner().clone(),
                 object_container_ordinal: room.container_ordinal.clone(),
             };
-            coverage.push(reader.room(project, &ship, identity, room, path)?);
+            let selector = room
+                .file_use
+                .as_ref()
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            coverage.push(reader.room(project, &ship, identity, selector, path)?);
         }
     }
     Ok(coverage)
@@ -113,127 +117,13 @@ fn class_targets(
     Ok(targets)
 }
 
-struct RoomReader<'input> {
-    archive: &'input Archive,
-    index: &'input PathIndex<'input>,
-    capture: &'input EntryCapture<'input>,
-    targets: &'input HashMap<Guid, ClassTarget>,
-    cancel: Option<&'input CancelToken>,
-}
-
 impl RoomReader<'_> {
-    fn room(
-        &self,
-        project: &mut Projection<'_, '_>,
-        ship: &ShipContext,
-        identity: InteriorRoomRef,
-        room: &RoomAssociation<'_>,
-        path: &str,
-    ) -> Result<InteriorRoomCoverage, CatalogError> {
-        let mut coverage = InteriorRoomCoverage {
-            room: identity,
-            findings: Vec::new(),
-        };
-        let opened =
-            match routes::open_room(self.archive, self.index, self.capture, path, self.cancel)? {
-                Ok(opened) => opened,
-                Err(kind) => return Ok(coverage.with_finding(kind, None)),
-            };
-        let index = PathIndex::new(&opened.archive);
-        let read = match opened.descriptor(self.archive, &index, self.capture, self.cancel)? {
-            Ok(read) => read,
-            Err(kind) => return Ok(coverage.with_finding(kind, None)),
-        };
-        let Ok(xml) = EntryXml::parse(&read, self.capture)? else {
-            return Ok(coverage.with_finding(InteriorFindingKind::UnreadableDescriptor, None));
-        };
-        if xml.is_lossy() || !xml.root().name().eq_ignore_ascii_case("ObjectContainer") {
-            return Ok(coverage.with_finding(InteriorFindingKind::UnreadableDescriptor, None));
-        }
-        let descriptor = read.receipt().payload_reference(self.capture)?;
-        let (streams, findings) = routes::declared_streams(&xml, self.cancel)?;
-        for kind in findings {
-            coverage.note(kind, None);
-        }
-        let room_selector = room
-            .file_use
-            .as_ref()
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        for stream in streams {
-            let context = StreamContext {
-                ship,
-                opened: &opened,
-                index: &index,
-                descriptor: &descriptor,
-                room_selector,
-            };
-            self.stream(project, &mut coverage, &context, &stream)?;
-        }
-        Ok(coverage)
-    }
-
-    fn stream(
-        &self,
-        project: &mut Projection<'_, '_>,
-        coverage: &mut InteriorRoomCoverage,
-        context: &StreamContext<'_>,
-        declaration: &StreamDeclaration,
-    ) -> Result<(), CatalogError> {
-        routes::check_cancel(self.cancel)?;
-        let source_name = declaration
-            .name
-            .retain_in(self.capture)?
-            .map(|text| text.as_str().to_owned())?
-            .into_cell(&project.origins.uses);
-        let read = match context.opened.stream(
-            self.archive,
-            context.index,
-            self.capture,
-            declaration.name.as_str(),
-            self.cancel,
-        )? {
-            Ok(read) => read,
-            Err(kind) => {
-                coverage.note(kind, Some(source_name));
-                return Ok(());
-            }
-        };
-        let Ok(soc) = EntrySoc::parse(&read, self.capture)? else {
-            coverage.note(InteriorFindingKind::UnreadableStream, Some(source_name));
-            return Ok(());
-        };
-        let stream = read.receipt().payload_reference(self.capture)?;
-        let route = StreamRoute::new(context, declaration, &stream, source_name)?;
-        for chunk in soc.chunks() {
-            routes::check_cancel(self.cancel)?;
-            match chunk {
-                Ok(chunk) => {
-                    if chunk.is_lossy() {
-                        coverage.note(
-                            InteriorFindingKind::LossyEntityChunk,
-                            Some(route.name.clone()),
-                        );
-                    }
-                    for entity in chunk.entities() {
-                        routes::check_cancel(self.cancel)?;
-                        self.entity(project, coverage, context.ship, &route, &entity)?;
-                    }
-                }
-                Err(_) => coverage.note(
-                    InteriorFindingKind::UnreadableEntityChunk,
-                    Some(route.name.clone()),
-                ),
-            }
-        }
-        Ok(())
-    }
-
-    fn entity(
+    pub(super) fn entity(
         &self,
         project: &mut Projection<'_, '_>,
         coverage: &mut InteriorRoomCoverage,
         ship: &ShipContext,
-        route: &StreamRoute,
+        route: &StreamRoute<'_>,
         entity: &EntrySocEntity<'_>,
     ) -> Result<(), CatalogError> {
         let mut classes = entity.class_guids();
@@ -241,24 +131,18 @@ impl RoomReader<'_> {
             return Ok(());
         };
         if classes.next().is_some() {
-            coverage.note(
-                InteriorFindingKind::AmbiguousClass,
-                Some(route.name.clone()),
-            );
+            route.note(coverage, InteriorFindingKind::AmbiguousClass);
             return Ok(());
         }
         let Ok(guid) = class.trim().parse::<Guid>() else {
-            coverage.note(InteriorFindingKind::InvalidClass, Some(route.name.clone()));
+            route.note(coverage, InteriorFindingKind::InvalidClass);
             return Ok(());
         };
         let Some(target) = self.targets.get(&guid) else {
             return Ok(());
         };
         let ClassTarget::One(index) = *target else {
-            coverage.note(
-                InteriorFindingKind::AmbiguousClass,
-                Some(route.name.clone()),
-            );
+            route.note(coverage, InteriorFindingKind::AmbiguousClass);
             return Ok(());
         };
         let Some(configurations) = project.configuration_links(index)? else {
@@ -274,16 +158,10 @@ impl RoomReader<'_> {
     }
 }
 
-struct StreamContext<'input> {
-    ship: &'input ShipContext,
-    opened: &'input OpenedRoom<'input>,
-    index: &'input PathIndex<'input>,
-    descriptor: &'input OriginalDatum<PhysicalEntryRef>,
-    room_selector: &'input SourceUse,
-}
-
-struct StreamRoute {
+pub(super) struct StreamRoute<'room> {
     name: SourcedValue<String>,
+    ordinal: u32,
+    root_transform: Option<&'room RootRoomTransform>,
     container: PhysicalEntryRef,
     descriptor: PhysicalEntryRef,
     descriptor_node_index: u32,
@@ -292,29 +170,37 @@ struct StreamRoute {
     complete: bool,
 }
 
-impl StreamRoute {
-    fn new(
-        context: &StreamContext<'_>,
+impl<'room> StreamRoute<'room> {
+    pub(super) fn new(
+        context: &'room StreamContext<'_>,
         declaration: &StreamDeclaration,
         stream: &OriginalDatum<PhysicalEntryRef>,
         name: SourcedValue<String>,
     ) -> Result<Self, CatalogError> {
         let (mut uses, mut complete) = declaration.name.selector_inputs()?;
-        uses.extend([context.room_selector.clone(), declaration.selection.clone()]);
-        for datum in [&context.opened.container, context.descriptor, stream] {
+        uses.push(declaration.selection.clone());
+        uses.extend_from_slice(&context.route.selectors);
+        complete &= context.route.complete;
+        for datum in [context.descriptor, stream] {
             let (contributors, known) = datum.contributions();
             uses.extend_from_slice(contributors);
             complete &= known;
         }
         Ok(Self {
             name,
-            container: physical_ref(&context.opened.container)?,
-            descriptor: physical_ref(context.descriptor)?,
+            ordinal: context.route.ordinal,
+            root_transform: context.route.root_transform.as_ref(),
+            container: routes::physical_ref(&context.opened.container)?.clone(),
+            descriptor: routes::physical_ref(context.descriptor)?.clone(),
             descriptor_node_index: declaration.node_index,
-            stream: physical_ref(stream)?,
+            stream: routes::physical_ref(stream)?.clone(),
             uses,
             complete,
         })
+    }
+
+    pub(super) fn note(&self, coverage: &mut InteriorRoomCoverage, kind: InteriorFindingKind) {
+        coverage.note(kind, Some(self.ordinal), Some(self.name.clone()), None);
     }
 
     fn placement(
@@ -334,6 +220,7 @@ impl StreamRoute {
             target.observe_header(RecordHeaderField::RecordIndex, SourceUseRole::Selector)?,
         ];
         let position = InteriorSocPosition {
+            container_occurrence_ordinal: self.ordinal,
             container: self.container.clone(),
             descriptor: self.descriptor.clone(),
             descriptor_node_index: self.descriptor_node_index,
@@ -350,6 +237,9 @@ impl StreamRoute {
             ),
             stream_name: self.name.clone(),
             class_record_index: sources.value(SourceValue::Present(index), &uses, fields.complete),
+            root_room_transform: self
+                .root_transform
+                .map(|root| root.for_entity(sources, &fields.local_transform)),
             local_transform: fields.local_transform.into_cell(sources),
             entity_attributes: fields
                 .attributes
@@ -363,24 +253,24 @@ impl StreamRoute {
     }
 }
 
-fn physical_ref(datum: &OriginalDatum<PhysicalEntryRef>) -> Result<PhysicalEntryRef, CatalogError> {
-    match datum.value() {
-        SourceValue::Present(entry) => Ok(entry.clone()),
-        _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),
-    }
-}
-
-impl InteriorRoomCoverage {
-    fn with_finding(
-        mut self,
-        kind: InteriorFindingKind,
-        stream: Option<SourcedValue<String>>,
-    ) -> Self {
-        self.note(kind, stream);
-        self
-    }
-
-    fn note(&mut self, kind: InteriorFindingKind, stream: Option<SourcedValue<String>>) {
-        self.findings.push(InteriorFinding { kind, stream });
+impl RootRoomTransform {
+    fn for_entity(
+        &self,
+        sources: &SourceUses,
+        local: &OriginalDatum<[[f32; 4]; 3]>,
+    ) -> SourcedValue<[[f32; 4]; 3]> {
+        let (entity_inputs, complete) = local.contributions();
+        let mut uses = self.uses.clone();
+        uses.extend_from_slice(entity_inputs);
+        let value = match (self.value, local.value()) {
+            (Some(root), SourceValue::Present(rows)) => root
+                .then(&Transform { rows: *rows })
+                .finite()
+                .map_or(SourceValue::Invalid, |transform| {
+                    SourceValue::Present(transform.rows)
+                }),
+            _ => SourceValue::Invalid,
+        };
+        sources.value(value, &uses, complete)
     }
 }

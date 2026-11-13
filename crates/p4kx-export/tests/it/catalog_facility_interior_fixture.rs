@@ -15,11 +15,15 @@ pub(super) const SEAT: u128 = 0x1063_0521;
 pub(super) const ROOM: &str = r"ObjectContainers\Ships\Fixture\interior.socpak";
 pub(super) const DESCRIPTOR: &str = "interior.xml";
 pub(super) const STREAM: &str = "interior_room.soc";
+pub(super) const CHILD: &str = "fixture_child";
+pub(super) const CHILD_STREAM: &str = "child_room.soc";
 
 #[derive(Clone, Copy)]
 pub(super) enum Case {
     Direct,
     RepeatedStream,
+    NestedChildren,
+    ChildFaults,
     MissingStreamAndChild,
     AmbiguousStream,
     AmbiguousClass,
@@ -31,6 +35,54 @@ pub(super) enum Case {
 pub(super) fn archive(case: Case) -> TestResult<(tempfile::TempDir, Archive)> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("fixture_soc_facilities.p4k");
+    let descriptor = descriptor(case)?;
+    let mut room = TestContainer::new()
+        .entry(TestEntry::stored(DESCRIPTOR, descriptor))
+        .entry(TestEntry::stored(STREAM, soc(case)?))
+        .entry(TestEntry::stored("unselected.soc", b"not a named stream"));
+    if matches!(case, Case::AmbiguousStream) {
+        room = room.entry(TestEntry::stored(STREAM.to_ascii_uppercase(), soc(case)?));
+    }
+    if matches!(case, Case::NestedChildren | Case::ChildFaults) {
+        let child = TestObjectContainer::new(CHILD).stream(CHILD_STREAM);
+        let child = if matches!(case, Case::NestedChildren) {
+            child.child(ROOM, [0.0; 3], [1.0, 0.0, 0.0, 0.0])
+        } else {
+            child
+        }
+        .cryxml();
+        let pak = TestContainer::new()
+            .entry(TestEntry::stored(format!("{CHILD}.xml"), child))
+            .entry(TestEntry::stored(CHILD_STREAM, soc(case)?))
+            .build();
+        room = room.entry(TestEntry::stored(format!("{CHILD}.socpak"), pak));
+    }
+    if matches!(case, Case::ChildFaults) {
+        room = room
+            .entry(TestEntry::stored("ambiguous.socpak", b"first entry"))
+            .entry(TestEntry::stored("AMBIGUOUS.SOCPAK", b"second entry"));
+    }
+    let archive = ArchiveBuilder::new()
+        .entry(TestEntry::stored(r"Data\Game2.dcb", database(case).build()))
+        .entry(TestEntry::stored(format!(r"Data\{ROOM}"), room.build()).encrypted())
+        .entry(TestEntry::stored(
+            "Data/Libs/CosmoTools/LayerRecovery/LayerBackups.xml",
+            b"<LayerBackups/>",
+        ));
+    let archive = if matches!(case, Case::NestedChildren) {
+        archive.entry(TestEntry::stored(
+            format!("{CHILD}.socpak"),
+            b"unselected outer decoy",
+        ))
+    } else {
+        archive
+    };
+    archive.write_to(&path)?;
+    let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
+    Ok((folder, archive))
+}
+
+fn descriptor(case: Case) -> TestResult<Vec<u8>> {
     let mut descriptor = if matches!(case, Case::UnexpectedDescriptorRoot) {
         format!("<Unrelated><StreamingOCs><OC name='{STREAM}'/></StreamingOCs></Unrelated>")
             .into_bytes()
@@ -38,9 +90,17 @@ pub(super) fn archive(case: Case) -> TestResult<(tempfile::TempDir, Archive)> {
         let room = TestObjectContainer::new("interior").stream(STREAM);
         match case {
             Case::RepeatedStream => room.stream(STREAM),
+            Case::NestedChildren => room
+                .child(CHILD, [2.0, 3.0, 4.0], [0.0, 0.0, 0.0, 1.0])
+                .child(CHILD, [10.0, 3.0, 4.0], [0.0, 0.0, 0.0, 1.0]),
+            Case::ChildFaults => room
+                .raw_child(&[("name", CHILD), ("pos", "bad,3,4"), ("rot", "0,0,0,1")])
+                .raw_child(&[("name", "ambiguous")])
+                .raw_child(&[("name", "../skip")])
+                .raw_child(&[("name", "first"), ("NAME", "second")]),
             Case::MissingStreamAndChild => {
                 room.stream("missing.soc")
-                    .child("unexamined", [0.0; 3], [1.0, 0.0, 0.0, 0.0])
+                    .child("missing_child", [0.0; 3], [1.0, 0.0, 0.0, 0.0])
             }
             _ => room,
         }
@@ -49,23 +109,7 @@ pub(super) fn archive(case: Case) -> TestResult<(tempfile::TempDir, Archive)> {
     if matches!(case, Case::LossyDescriptor) {
         break_string(&mut descriptor, STREAM.as_bytes())?;
     }
-    let mut room = TestContainer::new()
-        .entry(TestEntry::stored(DESCRIPTOR, descriptor))
-        .entry(TestEntry::stored(STREAM, soc(case)?))
-        .entry(TestEntry::stored("unselected.soc", b"not a named stream"));
-    if matches!(case, Case::AmbiguousStream) {
-        room = room.entry(TestEntry::stored(STREAM.to_ascii_uppercase(), soc(case)?));
-    }
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored(r"Data\Game2.dcb", database(case).build()))
-        .entry(TestEntry::stored(format!(r"Data\{ROOM}"), room.build()).encrypted())
-        .entry(TestEntry::stored(
-            "Data/Libs/CosmoTools/LayerRecovery/LayerBackups.xml",
-            b"<LayerBackups/>",
-        ))
-        .write_to(&path)?;
-    let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
-    Ok((folder, archive))
+    Ok(descriptor)
 }
 
 fn database(case: Case) -> DataForgeBuilder {

@@ -15298,6 +15298,49 @@
       ],
       "type": "object"
     },
+    "InteriorChild": {
+      "properties": {
+        "attributes": {
+          "items": {
+            "$ref": "#/$defs/SocAttribute"
+          },
+          "type": "array"
+        },
+        "localTransform": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfInteriorChildPosition"
+        }
+      },
+      "required": [
+        "attributes",
+        "localTransform",
+        "name",
+        "position"
+      ],
+      "type": "object"
+    },
+    "InteriorChildPosition": {
+      "properties": {
+        "descriptor": {
+          "$ref": "#/$defs/PhysicalEntryRef"
+        },
+        "descriptorNodeIndex": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "descriptor",
+        "descriptorNodeIndex"
+      ],
+      "type": "object"
+    },
     "InteriorFacilityPlacement": {
       "properties": {
         "classRecordIndex": {
@@ -15318,6 +15361,16 @@
         "room": {
           "$ref": "#/$defs/InteriorRoomRef"
         },
+        "rootRoomTransform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "streamName": {
           "$ref": "#/$defs/SourcedValueOfstring"
         }
@@ -15328,12 +15381,31 @@
         "localTransform",
         "position",
         "room",
+        "rootRoomTransform",
         "streamName"
       ],
       "type": "object"
     },
     "InteriorFinding": {
       "properties": {
+        "child": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InteriorChild"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "containerOrdinal": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "kind": {
           "$ref": "#/$defs/InteriorFindingKind"
         },
@@ -15349,6 +15421,8 @@
         }
       },
       "required": [
+        "child",
+        "containerOrdinal",
         "kind",
         "stream"
       ],
@@ -15362,7 +15436,10 @@
         "missingDescriptor",
         "ambiguousDescriptor",
         "unreadableDescriptor",
-        "unexaminedChild",
+        "invalidChildPath",
+        "ambiguousChildName",
+        "childCycle",
+        "invalidChildTransform",
         "ambiguousStreamName",
         "missingStream",
         "ambiguousStream",
@@ -15375,9 +15452,46 @@
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
-    "InteriorRoomCoverage": {
-      "description": "Scope and findings for one inspected direct room declaration.",
+    "InteriorRoomContainer": {
       "properties": {
+        "child": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InteriorChild"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "container": {
+          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"
+        },
+        "parentOrdinal": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "child",
+        "container",
+        "parentOrdinal"
+      ],
+      "type": "object"
+    },
+    "InteriorRoomCoverage": {
+      "description": "Scope and findings for one original ship-room declaration.",
+      "properties": {
+        "containers": {
+          "items": {
+            "$ref": "#/$defs/InteriorRoomContainer"
+          },
+          "type": "array"
+        },
         "findings": {
           "items": {
             "$ref": "#/$defs/InteriorFinding"
@@ -15389,6 +15503,7 @@
         }
       },
       "required": [
+        "containers",
         "findings",
         "room"
       ],
@@ -15419,6 +15534,11 @@
         "container": {
           "$ref": "#/$defs/PhysicalEntryRef"
         },
+        "containerOccurrenceOrdinal": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
         "descriptor": {
           "$ref": "#/$defs/PhysicalEntryRef"
         },
@@ -15439,6 +15559,7 @@
       "required": [
         "chunkIndex",
         "container",
+        "containerOccurrenceOrdinal",
         "descriptor",
         "descriptorNodeIndex",
         "entityOrdinal",
@@ -59200,6 +59321,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/InteractionTransition"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfInteriorChildPosition": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/InteriorChildPosition"
               }
             }
           }
