@@ -277,7 +277,8 @@ scope, then the entities written, the Records left out as development leftovers,
 missing and placeholders, the size against the basetool upload limit of 64 MB and the file. A
 catalog close to the upload limit gets a warning, one over it an error note, because the basetool
 rejects it. A read/projection failure or a source warning that makes the export incomplete refuses
-normal publication. The window explains the refusal; no file is created or replaced.
+normal publication. The window explains the refusal and leaves any existing file intact.
+Both outcomes report failed Archive Entry operations by dataset, reason and count.
 
 **Export › Diagnostic Basetool catalog…** explicitly writes a result for investigation, including
 incomplete data. Its save dialog proposes `basetool-catalog.diagnostic.json.zst`. The progress and

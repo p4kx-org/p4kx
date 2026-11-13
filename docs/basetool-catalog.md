@@ -2420,9 +2420,11 @@ authored string values, including malformed identifier text, use `x-gameText`. E
 markers are independent and come from each actual source use.
 
 An unreadable Entry retains its directory identity and an unreadable document state. Invalid
-JSON retains its directory identity and an invalid document state. The archive-entry health
-counters report the failed operation. Price, stock and rental values describe offline design
-settings. The stored values and unit-bearing source fields retain their original form.
+JSON, including a zero-byte file, retains its directory identity and an invalid document state.
+An authored empty `Inventory` array is a present, valid list. Archive-entry health reports
+the failed operation, and diagnostic publication retains the failed row. Price, stock and
+rental values describe offline design settings. Stored values and unit-bearing source fields
+retain their original form.
 
 ### Shop inventory resolution
 

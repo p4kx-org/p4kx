@@ -7,9 +7,11 @@ use std::time::Duration;
 use egui::{Id, Ui};
 use fluent_bundle::FluentValue;
 use p4kx_export::{
-    CatalogPublicationMode, CatalogSummary, DECOMPRESSED_LIMIT, SizeWarning, UPLOAD_LIMIT,
+    CatalogPublicationMode, CatalogSummary, DECOMPRESSED_LIMIT, ExportHealth, SizeWarning,
+    UPLOAD_LIMIT,
 };
 
+use super::catalog_health;
 use super::catalog_lines::{Notice, failure_line, kinds, languages, notices, playability, sizes};
 use super::extraction::{group_label, number};
 use super::extraction_outcome::{decorate, list_row, ratio};
@@ -63,8 +65,8 @@ pub(super) fn show(ui: &Ui, model: &mut Model) {
             let text = texts.format(T::GzipNotSupported, &[("path", run.shown_file().into())]);
             close = failure_window(ui, texts, text);
         }
-        CatalogExportStatus::Incomplete(_) => {
-            close = failure_window(ui, texts, texts.get(T::Incomplete));
+        CatalogExportStatus::Incomplete(health) => {
+            close = incomplete_window(ui, texts, health);
         }
         CatalogExportStatus::Failed(reason) => {
             let path = ("path", run.shown_file().into());
@@ -107,8 +109,21 @@ fn finished_window(
             ui.colored_label(palette::WARNING, texts.get(T::HealthIncomplete));
         }
         ui.add_space(SPACE_3);
+        catalog_health::show_entry_diagnostics(ui, texts, summary.summary().export_health());
         finished(ui, &laid, texts, summary.summary());
     })
+}
+
+fn incomplete_window(ui: &Ui, texts: &Texts, health: &ExportHealth) -> bool {
+    outcome_window(
+        ui,
+        texts,
+        (OUTCOME, T::FailedTitle.into(), Tone::Danger),
+        |ui| {
+            ui.colored_label(palette::DANGER_TEXT, texts.get(T::Incomplete));
+            catalog_health::show_entry_diagnostics(ui, texts, health);
+        },
+    )
 }
 
 /// Shows the danger window of a catalog that wrote nothing, saying why; returns whether it was

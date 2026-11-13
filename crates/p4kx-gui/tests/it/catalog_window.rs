@@ -7,6 +7,9 @@
 #[path = "catalog_category_lists_window.rs"]
 mod category_lists;
 
+#[path = "catalog_entry_health_window.rs"]
+mod entry_health;
+
 use crate::cataloging;
 use crate::waiting::{RunQuiet, wait_for};
 

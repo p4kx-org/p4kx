@@ -108,6 +108,7 @@ fn sample_args() -> Vec<(&'static str, FluentValue<'static>)> {
         ("removed", "2".into()),
         ("changed", "3".into()),
         ("complete", "yes".into()),
+        ("singular", "no".into()),
         ("language", "de".into()),
         ("resolved", "4".into()),
         ("missing", "1".into()),

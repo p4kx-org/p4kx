@@ -154,11 +154,10 @@ These are distinct from another generic Record dump.
 | Ship facilities and topology | [Avenger ship](https://github.com/StarCitizenWiki/scunpacked-data/blob/1340c8303709904165e2da0fa7060bce0624260b/ships/aegs_avenger_titan.json) includes seats/beds, individual inventory/cargo/storage containers and relay links. Prefer declared ports, References and `SInternalHardpointLink` edges to inferred seat roles or fuse counts. |
 | Food/medical/consumable effects | The generator contains [Food](https://github.com/octfx/ScDataDumper/blob/120a728639bdd1b06525a0f8574cb0e91d0fbf8d/src/Formats/ScUnpacked/Food.php) and [Medical](https://github.com/octfx/ScDataDumper/blob/120a728639bdd1b06525a0f8574cb0e91d0fbf8d/src/Formats/ScUnpacked/Medical.php) projections. [P4KX coverage](coverage.md) already discovers consumable components, but [ItemStats](../crates/p4kx-export/src/contract_stats.rs#L23) has no corresponding typed block. This candidate still needs representative current-Build Record sampling before a field contract is fixed. |
 
-Offline shop prices, stock and rental-offering fields are also deliberately omitted by
-[the inventory parser](../crates/p4kx-export/src/shop_inventories.rs#L57).
-A future export could label them as offline designer values with their source file.
-The investigated reference provides no evidence that these are live market prices, actual
-server stock or active rental availability.
+The inspected 0.4.2 baseline omitted offline shop prices, stock and rental offerings.
+[Catalog v3](basetool-catalog.md#physical-offline-shop-inventories) exports these values
+with their physical source file and offline design-time meaning. Live market prices,
+server stock and rental availability are outside that projection.
 
 ## 6. Reference behavior that should not be copied
 

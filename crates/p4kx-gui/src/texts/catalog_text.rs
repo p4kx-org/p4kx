@@ -21,6 +21,8 @@ pub enum CatalogText {
     HealthComplete,
     /// Some selected sources could not be read or projected successfully.
     HealthIncomplete,
+    /// The affected kind, reason and count of a failed original Entry operation.
+    HealthEntryDiagnostic,
     /// The file type of the save dialog.
     FileFilter,
     /// The file type of the save dialog for the zstd-compressed catalog.
@@ -106,7 +108,7 @@ pub enum CatalogText {
 
 impl CatalogText {
     /// Every text, for checks of the Fluent files.
-    pub const ALL: [Self; 46] = [
+    pub const ALL: [Self; 47] = [
         Self::Action,
         Self::DiagnosticAction,
         Self::DiagnosticRunningTitle,
@@ -115,6 +117,7 @@ impl CatalogText {
         Self::Incomplete,
         Self::HealthComplete,
         Self::HealthIncomplete,
+        Self::HealthEntryDiagnostic,
         Self::FileFilter,
         Self::FileFilterCompressed,
         Self::RunningTitle,
@@ -167,6 +170,7 @@ impl CatalogText {
             Self::Incomplete => "catalog-incomplete",
             Self::HealthComplete => "catalog-health-complete",
             Self::HealthIncomplete => "catalog-health-incomplete",
+            Self::HealthEntryDiagnostic => "catalog-health-entry-diagnostic",
             Self::FileFilter => "catalog-file-filter",
             Self::FileFilterCompressed => "catalog-file-filter-compressed",
             Self::RunningTitle => "catalog-running-title",

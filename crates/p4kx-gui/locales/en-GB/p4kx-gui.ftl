@@ -475,6 +475,21 @@ catalog-diagnostic-notice = Diagnostic catalog. Check its reported export health
 catalog-incomplete = Some selected data could not be read or included. No file was created or replaced. Use a diagnostic catalog to inspect the partial result.
 catalog-health-complete = Export health: all selected sources were read and projected successfully.
 catalog-health-incomplete = Export health: incomplete. Some selected sources could not be read or projected successfully.
+catalog-health-entry-diagnostic = { $kind ->
+    [catalog] Catalog
+    [shopInventories] Offline shop inventories
+    [shops] Shops
+   *[other] { $kind }
+}: { $reason ->
+    [malformed] invalid source data
+    [unreadable] source could not be read
+    [missing] source is missing
+    [unsupported] unsupported source data
+   *[failed] source operation failed
+} ({ $number } { $singular ->
+    [yes] Archive Entry operation
+   *[no] Archive Entry operations
+})
 catalog-file-filter = Basetool catalog (JSON)
 catalog-file-filter-compressed = Basetool catalog (JSON, zstd-compressed)
 catalog-running-title = Creating the Basetool catalog

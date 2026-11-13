@@ -475,6 +475,21 @@ catalog-diagnostic-notice = Diagnosekatalog. Prüfe den gemeldeten Exportzustand
 catalog-incomplete = Einige ausgewählte Daten konnten nicht gelesen oder übernommen werden. Es wurde keine Datei erstellt oder ersetzt. Nutze einen Diagnosekatalog, um das Teilergebnis zu untersuchen.
 catalog-health-complete = Exportzustand: Alle ausgewählten Quellen wurden erfolgreich gelesen und übernommen.
 catalog-health-incomplete = Exportzustand: unvollständig. Einige ausgewählte Quellen konnten nicht gelesen oder übernommen werden.
+catalog-health-entry-diagnostic = { $kind ->
+    [catalog] Katalog
+    [shopInventories] Offline-Shop-Inventare
+    [shops] Shops
+   *[other] { $kind }
+}: { $reason ->
+    [malformed] ungültige Quelldaten
+    [unreadable] Quelle konnte nicht gelesen werden
+    [missing] Quelle fehlt
+    [unsupported] nicht unterstützte Quelldaten
+   *[failed] Quellvorgang fehlgeschlagen
+} ({ $number } { $singular ->
+    [yes] Archivvorgang
+   *[no] Archivvorgänge
+})
 catalog-file-filter = Basetool-Katalog (JSON)
 catalog-file-filter-compressed = Basetool-Katalog (JSON, zstd-komprimiert)
 catalog-running-title = Erstelle Basetool-Katalog
