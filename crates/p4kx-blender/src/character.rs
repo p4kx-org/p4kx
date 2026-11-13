@@ -172,7 +172,13 @@ fn manifest(
             .map(assembly_issue)
             .collect(),
     };
-    rig_manifest(scene, info, options, written)
+    let mut manifest = rig_manifest(scene, info, options, written);
+    if written.default_material_ids > 0 {
+        manifest.default_material = armour
+            .default_material(options.lod)
+            .map(p4kx_extraction::ArchiveDefaultMaterial::receipt);
+    }
+    manifest
 }
 
 fn rig(armour: &Armour, written: &GlbSummary) -> Rig {

@@ -19,6 +19,7 @@ pub struct RiggedPartEmission {
     morphs: bool,
     material_slots: BTreeMap<usize, BTreeSet<usize>>,
     diffuse_slots: BTreeSet<usize>,
+    default_layers: Option<BTreeSet<usize>>,
 }
 
 impl RiggedPartEmission {
@@ -60,52 +61,80 @@ impl RiggedPartEmission {
         self.diffuse_slots.contains(&slot)
     }
 
+    /// Returns the contributing layer positions of a physically sourced fallback when emitted.
+    #[must_use]
+    pub const fn archive_default_layers(&self) -> Option<&BTreeSet<usize>> {
+        self.default_layers.as_ref()
+    }
+
     fn observe_slot(
         &mut self,
         part: usize,
-        slot: usize,
+        slot: Slot,
         instance: &Instance<'_>,
         textures: &TextureSet,
     ) {
-        self.material_slots.entry(slot).or_insert_with(|| {
-            let material_slot = Slot::Library(slot);
-            let material = instance.plan.material(material_slot);
-            let images = textures.of(part, material_slot);
-            let tinted = images.base.is_some_and(|base| base.tinted);
-            let layered = images.base.is_some_and(|base| base.layered);
-            let roughness = images
-                .metallic_roughness
-                .is_some_and(|image| image.roughness);
-            let metallic = images
-                .metallic_roughness
-                .is_some_and(|image| image.metallic);
-            let mut layers = BTreeSet::new();
-            if !tinted || !roughness || (layered && !metallic) {
-                layers.extend(
-                    shaded_layers(material)
-                        .into_iter()
-                        .flatten()
-                        .filter(|layer| layer.share > 0.0)
-                        .map(|layer| layer.at),
-                );
-            }
-            if !tinted && layers.is_empty() && uses_plain_diffuse(material) {
-                self.diffuse_slots.insert(slot);
-            }
-            for image in [images.base.map(|image| image.image), images.normal]
-                .into_iter()
-                .flatten()
-            {
-                if let Some(Some(material)) = textures.image_materials.get(image)
-                    && material.part == part
-                    && material.slot == Some(slot)
-                {
-                    layers.extend(&material.layers);
+        match slot {
+            Slot::Library(position) if !self.material_slots.contains_key(&position) => {
+                let (layers, diffuse) = slot_origins(part, slot, instance, textures);
+                self.material_slots.insert(position, layers);
+                if diffuse {
+                    self.diffuse_slots.insert(position);
                 }
             }
-            layers
-        });
+            Slot::Default
+                if instance.plan.has_physical_fallback() && self.default_layers.is_none() =>
+            {
+                self.default_layers = Some(slot_origins(part, slot, instance, textures).0);
+            }
+            _ => {}
+        }
     }
+}
+
+fn slot_origins(
+    part: usize,
+    slot: Slot,
+    instance: &Instance<'_>,
+    textures: &TextureSet,
+) -> (BTreeSet<usize>, bool) {
+    let material = instance.plan.material(slot);
+    let images = textures.of(part, slot);
+    let tinted = images.base.is_some_and(|base| base.tinted);
+    let layered = images.base.is_some_and(|base| base.layered);
+    let roughness = images
+        .metallic_roughness
+        .is_some_and(|image| image.roughness);
+    let metallic = images
+        .metallic_roughness
+        .is_some_and(|image| image.metallic);
+    let mut layers = BTreeSet::new();
+    if !tinted || !roughness || (layered && !metallic) {
+        layers.extend(
+            shaded_layers(material)
+                .into_iter()
+                .flatten()
+                .filter(|layer| layer.share > 0.0)
+                .map(|layer| layer.at),
+        );
+    }
+    let diffuse = !tinted && layers.is_empty() && uses_plain_diffuse(material);
+    let position = match slot {
+        Slot::Library(position) => Some(position),
+        Slot::Default => None,
+    };
+    for image in [images.base.map(|image| image.image), images.normal]
+        .into_iter()
+        .flatten()
+    {
+        if let Some(Some(source)) = textures.image_materials.get(image)
+            && source.part == part
+            && source.slot == position
+        {
+            layers.extend(&source.layers);
+        }
+    }
+    (layers, diffuse)
 }
 
 /// Evidence identifying the actual emitted geometry of each supplied part, in input order.
@@ -134,8 +163,8 @@ impl RiggedGlbEmission {
             part.skinned |= !mesh.joints.is_empty();
             part.morphs |= !mesh.morphs.is_empty();
             for primitive in &mesh.primitives {
-                if let Some(Slot::Library(position)) = instance.plan.slot(primitive.material_id) {
-                    part.observe_slot(mesh.part, position, instance, textures);
+                if let Some(slot) = instance.plan.slot(primitive.material_id) {
+                    part.observe_slot(mesh.part, slot, instance, textures);
                 }
             }
         }

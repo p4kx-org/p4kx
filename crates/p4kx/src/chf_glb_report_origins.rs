@@ -66,6 +66,71 @@ pub(super) fn fields(
     Ok(fields)
 }
 
+pub(super) fn fallback(
+    fields: &mut FieldOrigins,
+    uses: &SourceUses,
+    read: &p4kx_extraction::ArchiveDefaultMaterial,
+) -> Result<()> {
+    use p4kx_extraction::{
+        ArchiveDefaultMaterialState, InputScope, SourceInput, SourceLocation, SourceUseRole,
+    };
+
+    fn metadata(uses: &SourceUses, source: &p4kx_extraction::EntryOrigin) -> Result<Contributors> {
+        let scope = uses.observe(
+            SourceInput::Archive(source),
+            InputScope::ArchiveDirectoryMetadata,
+        )?;
+        let evidence = scope.at(
+            SourceLocation::Metadata {
+                field: "entry".into(),
+            },
+            SourceUseRole::Selector,
+        )?;
+        Ok(Contributors {
+            values: vec![evidence],
+            complete: true,
+        })
+    }
+
+    let mut state = Contributors::default();
+    if let Some(source) = read.original() {
+        let origin = metadata(uses, source)?;
+        field(fields, "/default_material/source", origin.origin(uses))?;
+        state.extend(&origin);
+        if read.decoded_sha256().is_some() {
+            let mut payload = Contributors::default();
+            payload.entry(uses, Some(source), SourceUseRole::Conversion)?;
+            field(
+                fields,
+                "/default_material/decoded_sha256",
+                payload.origin(uses),
+            )?;
+            state.extend(&payload);
+        } else {
+            state.incomplete();
+        }
+    }
+    if let ArchiveDefaultMaterialState::Ambiguous { witnesses } = read.state() {
+        for (index, witness) in witnesses.iter().enumerate() {
+            let origin = metadata(uses, witness)?;
+            field(
+                fields,
+                &format!("/default_material/ambiguous_sources/{index}"),
+                origin.origin(uses),
+            )?;
+            state.extend(&origin);
+        }
+    }
+    if read.original().is_none()
+        && !matches!(read.state(), ArchiveDefaultMaterialState::Ambiguous { .. })
+    {
+        state.incomplete();
+    }
+    field(fields, "/default_material/state", state.origin(uses))?;
+
+    Ok(())
+}
+
 fn part_fields(
     fields: &mut FieldOrigins,
     uses: &SourceUses,

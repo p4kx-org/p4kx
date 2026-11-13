@@ -5,7 +5,7 @@ use std::io::Write;
 
 use gltf_json as json;
 use json::validation::USize64;
-use p4kx_model::{Bone, BoneMatch, Influences, MaterialStatus, Model};
+use p4kx_model::{Bone, BoneMatch, Influences, Material, MaterialStatus, Model};
 
 use crate::GltfError;
 use crate::animations::AnimationPlan;
@@ -39,6 +39,8 @@ pub struct RigPiece<'m> {
     pub model: &'m Model,
     /// The material library of the model, see [`MaterialStatus::library`].
     pub materials: &'m MaterialStatus,
+    /// Physical fallback for missing or empty authored slots, when verified.
+    pub fallback: Option<&'m Material>,
     /// The morph targets of the piece's first mesh, see [`RigPiece::with_morphs`].
     pub morphs: &'m [MorphTarget],
     /// The bone an unskinned piece hangs on, see [`RigPiece::mounted`].
@@ -53,9 +55,17 @@ impl<'m> RigPiece<'m> {
             name,
             model,
             materials,
+            fallback: None,
             morphs: &[],
             mount: None,
         }
+    }
+
+    /// Sets the physical fallback for this piece's missing assignments.
+    #[must_use]
+    pub const fn with_fallback(mut self, material: &'m Material) -> Self {
+        self.fallback = Some(material);
+        self
     }
 
     /// Hangs the piece, whose model has no skinned mesh, below the bone of `mount`, so that it
@@ -212,7 +222,7 @@ fn instances_of<'m>(pieces: &[RigPiece<'m>], options: &GlbOptions) -> (Vec<Insta
                 lod,
                 wrapper: None,
                 plan: lod.map_or_else(MaterialPlan::empty, |lod| {
-                    MaterialPlan::new(piece.materials.library(), lod)
+                    MaterialPlan::with_fallback(piece.materials.library(), lod, piece.fallback)
                 }),
                 twin: None,
             }

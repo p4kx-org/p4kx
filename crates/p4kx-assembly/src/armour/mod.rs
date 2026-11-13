@@ -10,6 +10,7 @@ mod animate_rig;
 mod body;
 mod body_zones;
 mod build;
+mod default_material;
 mod dress;
 mod expressions;
 mod face_build;
@@ -50,7 +51,9 @@ use std::collections::BTreeMap;
 use std::io::Write;
 use std::sync::Arc;
 
-use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource, SourceLocation};
+use p4kx_extraction::{
+    ArchiveDefaultMaterial, EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource, SourceLocation,
+};
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, MorphTarget, RigMount, RigPiece, TextureLoader,
     write_rigged_glb, write_rigged_glb_with,
@@ -164,6 +167,7 @@ pub struct Armour {
     pub(crate) skeleton_file: String,
     pub(crate) skeleton_archive_source: Option<ModelArchiveSource>,
     pub(crate) parts: Vec<ArmourPart>,
+    pub(crate) default_material: Option<Arc<ArchiveDefaultMaterial>>,
     pub(crate) issues: Vec<Issue>,
     pub(crate) lod: u32,
 }
@@ -246,7 +250,7 @@ impl Armour {
         options: &GlbOptions,
         out: &mut impl Write,
     ) -> Result<GlbSummary, GltfError> {
-        let pieces: Vec<RigPiece<'_>> = self.parts.iter().map(ArmourPart::rig_piece).collect();
+        let pieces = self.rig_pieces();
         write_rigged_glb(&self.skeleton.bones, &pieces, options, out)
     }
 
@@ -262,7 +266,7 @@ impl Armour {
         textures: &dyn TextureLoader,
         out: &mut impl Write,
     ) -> Result<GlbSummary, GltfError> {
-        let pieces: Vec<RigPiece<'_>> = self.parts.iter().map(ArmourPart::rig_piece).collect();
+        let pieces = self.rig_pieces();
         write_rigged_glb_with(&self.skeleton.bones, &pieces, options, textures, out)
     }
 }

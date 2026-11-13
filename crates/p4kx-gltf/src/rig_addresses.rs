@@ -85,6 +85,8 @@ pub enum RiggedJsonAddress {
         part: usize,
         /// The originating library slot, or none for the built-in default.
         slot: Option<usize>,
+        /// Whether the originating part used its physical archive fallback.
+        archive_default: bool,
     },
     /// A mesh by its output and part indices.
     Mesh {
@@ -342,6 +344,7 @@ fn scene_addresses(
                     index: index.value(),
                     part,
                     slot,
+                    archive_default: slot.is_none() && instance.plan.has_physical_fallback(),
                 });
             }
         }

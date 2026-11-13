@@ -8,7 +8,7 @@ use std::collections::HashSet;
 use std::io::Write;
 
 use p4kx_gltf::{
-    GlbOptions, GlbSummary, GltfError, RigPiece, SampledAnimation, SampledWeights, TextureLoader,
+    GlbOptions, GlbSummary, GltfError, SampledAnimation, SampledWeights, TextureLoader,
     write_rigged_glb_animated, write_rigged_glb_animated_with,
 };
 use p4kx_model::Animation;
@@ -349,7 +349,7 @@ impl Armour {
         textures: Option<&dyn TextureLoader>,
         out: &mut impl Write,
     ) -> Result<GlbSummary, GltfError> {
-        let pieces: Vec<RigPiece<'_>> = self.parts.iter().map(ArmourPart::rig_piece).collect();
+        let pieces = self.rig_pieces();
         let list = animations.rig_animations();
         let bones = &self.skeleton.bones;
         match textures {

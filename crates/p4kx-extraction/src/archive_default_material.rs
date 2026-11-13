@@ -12,7 +12,8 @@ use sha2::{Digest as _, Sha256};
 use super::{EntryChoice, unique_entry_choice};
 use crate::model_companions::{ArchiveCompanions, MAX_MATERIAL_LEN};
 use crate::sound::read_capped;
-use crate::{PathIndex, TextureVerdicts};
+use crate::source_provenance::model_material_origins::MaterialObservation;
+use crate::{ArchiveMaterialReads, MaterialArchiveOrigins, PathIndex, TextureVerdicts};
 
 const DEFAULT_ENTRY: &str = "Data/Materials/material_default.mtl";
 
@@ -45,6 +46,7 @@ pub struct ArchiveDefaultMaterial {
     original: Option<EntryOrigin>,
     state: ArchiveDefaultMaterialState,
     library: Option<MaterialLibrary>,
+    origins: MaterialArchiveOrigins,
     decoded_sha256: Option<[u8; 32]>,
 }
 
@@ -79,6 +81,12 @@ impl ArchiveDefaultMaterial {
         self.library.as_ref()?.materials.first()
     }
 
+    /// Returns the observed companions of the drawable fallback.
+    #[must_use]
+    pub const fn material_origins(&self) -> &MaterialArchiveOrigins {
+        &self.origins
+    }
+
     pub(crate) fn read(index: &PathIndex<'_>, verdicts: &TextureVerdicts) -> Self {
         let archive = index.archive();
         match unique_entry_choice(index, DEFAULT_ENTRY) {
@@ -105,23 +113,9 @@ impl ArchiveDefaultMaterial {
                 );
             }
         };
-        let mut resolver = ArchiveCompanions {
-            index,
-            folder: "",
-            verdicts,
-            model_sources: None,
-            material_observation: None,
-        };
-        let target = entry.path().to_owned();
         let decoded_sha256 = Some(Sha256::digest(&bytes).into());
-        match MaterialLibrary::parse_with_resolver(
-            DEFAULT_ENTRY,
-            &bytes,
-            Some(target),
-            &mut resolver,
-            MaterialReading::Drawn,
-            &LayerCache::new(),
-        ) {
+        let (parsed, origins) = parse_observed(index, entry, verdicts, &bytes);
+        match parsed {
             Ok(library)
                 if library.single
                     && library
@@ -133,6 +127,7 @@ impl ArchiveDefaultMaterial {
                     original: Some(original),
                     state: ArchiveDefaultMaterialState::Resolved,
                     library: Some(library),
+                    origins,
                     decoded_sha256,
                 }
             }
@@ -170,7 +165,7 @@ impl ArchiveDefaultMaterial {
         )
     }
 
-    const fn read_but_unusable(
+    fn read_but_unusable(
         original: EntryOrigin,
         state: ArchiveDefaultMaterialState,
         decoded_sha256: Option<[u8; 32]>,
@@ -180,20 +175,51 @@ impl ArchiveDefaultMaterial {
             original: Some(original),
             state,
             library: None,
+            origins: MaterialArchiveOrigins::default(),
         }
     }
 
-    const fn unavailable(
-        original: Option<EntryOrigin>,
-        state: ArchiveDefaultMaterialState,
-    ) -> Self {
+    fn unavailable(original: Option<EntryOrigin>, state: ArchiveDefaultMaterialState) -> Self {
         Self {
             original,
             state,
             library: None,
+            origins: MaterialArchiveOrigins::default(),
             decoded_sha256: None,
         }
     }
+}
+
+fn parse_observed(
+    index: &PathIndex<'_>,
+    entry: &Entry,
+    verdicts: &TextureVerdicts,
+    bytes: &[u8],
+) -> (
+    Result<MaterialLibrary, MaterialError>,
+    MaterialArchiveOrigins,
+) {
+    let reads = ArchiveMaterialReads::default();
+    let mut origins = MaterialArchiveOrigins::default();
+    let mut resolver = ArchiveCompanions {
+        index,
+        folder: "",
+        verdicts,
+        model_sources: None,
+        material_observation: Some(MaterialObservation {
+            reads: &reads,
+            used: Some(&mut origins),
+        }),
+    };
+    let parsed = MaterialLibrary::parse_with_resolver(
+        DEFAULT_ENTRY,
+        bytes,
+        Some(entry.path().to_owned()),
+        &mut resolver,
+        MaterialReading::Drawn,
+        &LayerCache::new(),
+    );
+    (parsed, origins)
 }
 
 fn verified_bytes(archive: &Archive, entry: &Entry) -> Result<Vec<u8>, CompanionError> {

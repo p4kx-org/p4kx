@@ -10,8 +10,8 @@ use p4kx_assembly::{
     CharacterAnimations, ForgePalettes, Issue, LoadoutResolver, PartOrigin, character_animations,
 };
 use p4kx_extraction::{
-    AnimationSet, ConversionError, DataForgeEntry, GlbOptions, GlbSummary, GltfError, MaterialMode,
-    is_same_file, write_replacing_protected,
+    AnimationSet, ArchiveDefaultMaterial, ConversionError, DataForgeEntry, DefaultMaterialReceipt,
+    GlbOptions, GlbSummary, GltfError, MaterialMode, is_same_file, write_replacing_protected,
 };
 use serde::Serialize;
 
@@ -56,6 +56,8 @@ struct GlbJson<'a> {
     textured_materials: usize,
     textures: usize,
     texture_pixels: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_material: Option<DefaultMaterialReceipt>,
     vertices: usize,
     triangles: usize,
     bytes: u64,
@@ -187,6 +189,9 @@ fn report<'a>(done: &Done<'a>, args: &ArmourGlbArgs) -> GlbJson<'a> {
         textured_materials: summary.textured_materials,
         textures: summary.textures,
         texture_pixels: summary.texture_pixels,
+        default_material: armour
+            .default_material(args.lod)
+            .map(ArchiveDefaultMaterial::receipt),
         vertices: summary.vertices,
         triangles: summary.triangles,
         bytes: summary.bytes,

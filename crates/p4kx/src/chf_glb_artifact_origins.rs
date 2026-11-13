@@ -95,19 +95,14 @@ impl Inputs<'_> {
             RiggedJsonAddress::Bone(index) => {
                 (format!("/nodes/{index}"), cache(Source::Skeleton, known))
             }
-            RiggedJsonAddress::Material { index, part, slot } => (
+            RiggedJsonAddress::Material {
+                index,
+                part,
+                slot,
+                archive_default,
+            } => (
                 format!("/materials/{index}"),
-                slot.map_or_else(
-                    || self.uses.origin(&[], true),
-                    |slot| {
-                        self.measured(
-                            self.parts
-                                .individual
-                                .get(part)
-                                .and_then(|part| part.material_slots.get(&slot)),
-                        )
-                    },
-                ),
+                self.material(part, slot, archive_default),
             ),
             RiggedJsonAddress::Mesh { index, part } => (
                 format!("/meshes/{index}"),
@@ -130,6 +125,18 @@ impl Inputs<'_> {
             }
             _ => return None,
         })
+    }
+
+    fn material(&self, part: usize, slot: Option<usize>, archive_default: bool) -> FieldOrigin {
+        if slot.is_none() && !archive_default {
+            return self.uses.origin(&[], true);
+        }
+        let origin = self.parts.individual.get(part).and_then(|part| {
+            slot.map_or(part.default_material.as_ref(), |slot| {
+                part.material_slots.get(&slot)
+            })
+        });
+        self.measured(origin)
     }
 
     fn measured(&self, origin: Option<&Contributors>) -> FieldOrigin {

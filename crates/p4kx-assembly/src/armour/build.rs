@@ -55,6 +55,7 @@ impl Armour {
         options: &AssemblyOptions,
     ) -> Result<Self, AssemblyError> {
         Self::build_painted(variant, pieces, models, None, options)
+            .map(|built| built.with_default_material(models))
     }
 
     /// Builds the Armour as [`Self::build`] does, with the materials of each piece drawn with the
@@ -73,6 +74,7 @@ impl Armour {
         options: &AssemblyOptions,
     ) -> Result<Self, AssemblyError> {
         Self::build_painted(variant, pieces, models, Some(palettes), options)
+            .map(|built| built.with_default_material(models))
     }
 
     fn build_painted(
@@ -92,9 +94,7 @@ impl Armour {
         let covering = covering(&jobs, &chosen, variant);
         let (mut reported, mut tints) = (HashSet::new(), Palettes::new(palettes));
         let mut parts = Vec::with_capacity(chosen.len());
-        let mut head: Option<HeadMove> = None;
-        let mut heads = Vec::new();
-        let mut part_jobs = Vec::new();
+        let (mut head, mut heads, mut part_jobs) = (None::<HeadMove>, Vec::new(), Vec::new());
         for (job, found) in jobs.iter().zip(&chosen) {
             let Some(found) = found else { continue };
             let Some(mut dressed) = worn(job, found, models, &mut head, &mut issues) else {
@@ -139,6 +139,7 @@ impl Armour {
             skeleton_file: body.skeleton_file,
             skeleton_archive_source: body.archive_source,
             parts,
+            default_material: None,
             issues,
             lod: options.lod,
         })

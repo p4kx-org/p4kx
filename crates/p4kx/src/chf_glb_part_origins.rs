@@ -7,8 +7,9 @@ use anyhow::Result;
 use p4kx_assembly::{Armour, ArmourPart, PaletteRecords, RigArchiveRead};
 use p4kx_extraction::model::ModelFile;
 use p4kx_extraction::{
-    DataForgeOrigin, InputScope, MaterialArchiveOrigins, ModelArchiveSource, SourceInput,
-    SourceLocation, SourceUseRole, SourceUses, TextureMaterialSource,
+    ArchiveDefaultMaterial, DataForgeOrigin, InputScope, MaterialArchiveOrigins,
+    ModelArchiveSource, SourceInput, SourceLocation, SourceUseRole, SourceUses,
+    TextureMaterialSource,
 };
 use p4kx_extraction::{RiggedGlbEmission, RiggedPartEmission};
 
@@ -37,6 +38,7 @@ pub(super) struct Part {
     pub(super) morphs: Contributors,
     pub(super) materials: Contributors,
     pub(super) material_slots: BTreeMap<usize, Contributors>,
+    pub(super) default_material: Option<Contributors>,
 }
 
 impl Parts {
@@ -57,7 +59,18 @@ impl Parts {
             add_model(uses, &mut found.bones, armour.skeleton_archive_source())?;
         }
         for (part, emitted) in armour.parts().iter().zip(emission.parts()) {
-            let origins = Part::read(uses, part, emitted, forge, &found.shape, input)?;
+            let mut origins = Part::read(uses, part, emitted, forge, &found.shape, input)?;
+            if let Some(layers) = emitted.archive_default_layers() {
+                let mut fallback = Contributors::default();
+                default_material(
+                    uses,
+                    &mut fallback,
+                    armour.resolved_default_material(),
+                    layers,
+                )?;
+                origins.materials.extend(&fallback);
+                origins.default_material = Some(fallback);
+            }
             if !part.model().nodes.is_empty() {
                 found.nodes.extend(&origins.selection);
             }
@@ -233,6 +246,12 @@ pub(super) fn image_material(
         return Ok(());
     };
     let Some(slot) = source.slot else {
+        default_material(
+            uses,
+            found,
+            armour.resolved_default_material(),
+            &source.layers,
+        )?;
         return Ok(());
     };
     let Some(part) = armour.parts().get(source.part) else {
@@ -254,6 +273,24 @@ pub(super) fn image_material(
         } else {
             found.incomplete();
         }
+    }
+    Ok(())
+}
+
+fn default_material<'a>(
+    uses: &SourceUses,
+    found: &mut Contributors,
+    fallback: Option<&ArchiveDefaultMaterial>,
+    layers: impl IntoIterator<Item = &'a usize>,
+) -> Result<()> {
+    let Some(fallback) = fallback else {
+        found.incomplete();
+        return Ok(());
+    };
+    let archive = fallback.material_origins();
+    found.entry(uses, fallback.original(), SourceUseRole::Conversion)?;
+    for &layer in layers {
+        selected_layer(uses, found, archive, 0, layer)?;
     }
     Ok(())
 }

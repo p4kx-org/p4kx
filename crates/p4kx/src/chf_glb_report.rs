@@ -5,7 +5,7 @@ use std::path::Path;
 
 use anyhow::Result;
 use p4kx_assembly::{Armour, CharacterAnimations, Head};
-use p4kx_extraction::GlbSummary;
+use p4kx_extraction::{ArchiveDefaultMaterial, DefaultMaterialReceipt, GlbSummary};
 use serde::Serialize;
 
 use super::origin::GlbPublication;
@@ -53,6 +53,8 @@ struct GlbJson<'a> {
     texture_pixels: u64,
     texture_fallbacks: Vec<FallbackJson<'a>>,
     default_material_ids: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_material: Option<DefaultMaterialReceipt>,
     vertices: usize,
     triangles: usize,
     bytes: u64,
@@ -111,6 +113,9 @@ fn report<'a>(
         texture_pixels: summary.texture_pixels,
         texture_fallbacks: texture_fallbacks(summary),
         default_material_ids: summary.default_material_ids,
+        default_material: armour
+            .default_material(args.lod)
+            .map(ArchiveDefaultMaterial::receipt),
         vertices: summary.vertices,
         triangles: summary.triangles,
         bytes: summary.bytes,

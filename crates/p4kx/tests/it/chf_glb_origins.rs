@@ -12,6 +12,9 @@ use serde_json::Value;
 
 use super::{TestResult, archive, chf, glb, glb_with};
 
+#[path = "chf_glb_default_material.rs"]
+mod default_material;
+
 fn check_receipt(
     out: &Path,
     report: &Value,

@@ -8,7 +8,7 @@ use p4kx_gltf::{
     write_rigged_glb_animated_observed,
 };
 
-use super::{Armour, ArmourPart, CharacterAnimations, RigArchiveRead};
+use super::{Armour, CharacterAnimations, RigArchiveRead};
 
 impl CharacterAnimations<'_> {
     /// Returns the original input positions of animations passed to the GLB writer, in its order.
@@ -47,7 +47,7 @@ impl Armour {
         textures: &dyn TextureLoader,
         out: &mut impl Write,
     ) -> Result<(GlbSummary, RiggedGlbEmission), GltfError> {
-        let pieces: Vec<_> = self.parts.iter().map(ArmourPart::rig_piece).collect();
+        let pieces = self.rig_pieces();
         write_rigged_glb_animated_observed(
             &self.skeleton.bones,
             &pieces,

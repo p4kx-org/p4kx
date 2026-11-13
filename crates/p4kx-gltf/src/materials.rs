@@ -37,11 +37,6 @@ pub(crate) struct MaterialPlan<'m> {
 }
 
 impl<'m> MaterialPlan<'m> {
-    /// Resolves every material ID `lod` uses against `library`, `None` when there is none.
-    pub(crate) fn new(library: Option<&'m MaterialLibrary>, lod: &Lod) -> Self {
-        Self::with_fallback(library, lod, None)
-    }
-
     pub(crate) fn with_fallback(
         library: Option<&'m MaterialLibrary>,
         lod: &Lod,
@@ -168,7 +163,11 @@ impl<'m> MaterialPlan<'m> {
             .collect()
     }
 
-    /// Returns the number of material IDs drawn with the engine's default material.
+    pub(crate) const fn has_physical_fallback(&self) -> bool {
+        matches!(self.default, Cow::Borrowed(_))
+    }
+
+    /// Returns the number of material IDs drawn with a fallback.
     pub(crate) fn defaulted(&self) -> usize {
         self.slots
             .values()

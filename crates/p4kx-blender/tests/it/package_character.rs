@@ -25,6 +25,10 @@ use p4kx_testkit::{
 
 use crate::support::{TestResult, fixture, names_in, never};
 
+#[path = "package_character_default_material.rs"]
+mod default_material;
+use default_material::write;
+
 fn head_path() -> String {
     format!("{MALE_HEAD_FOLDER}/{MALE_RIG}_head.skin")
 }
@@ -84,10 +88,12 @@ struct Written {
     summary: PackageSummary,
 }
 
-fn write(expressions: bool, animated: bool) -> Result<Written, Box<dyn Error>> {
-    let fixture = fixture(head_entries(Some(
-        head_rig(HEAD_VERTICES, MALE_RIG_HASH).build(),
-    )))?;
+fn write_with_entries(
+    expressions: bool,
+    animated: bool,
+    entries: Vec<p4kx_testkit::TestEntry>,
+) -> Result<Written, Box<dyn Error>> {
+    let fixture = fixture(entries)?;
     let archive = Archive::open(&fixture.path)?;
     let models = ArchiveModels::new(&archive);
     let piece = Piece::file("head", head_path(), None).shaped(dna());

@@ -218,3 +218,40 @@ fn one_authored_material_broadcasts_and_empty_multi_slot_uses_physical_fallback(
     }
     Ok(())
 }
+
+#[test]
+fn physical_default_keeps_the_selected_layer_entry_and_slot() -> TestResult {
+    const LAYER: &str = "Data/Materials/Test/fallback_layer.mtl";
+    let folder = tempfile::tempdir()?;
+    let default = br#"<Material Name="physical" Shader="Illum"><MatLayers><Layer Path="Materials/Test/fallback_layer" Submtl="chosen"/></MatLayers></Material>"#;
+    let layer = br#"<Material><SubMaterials><Material Name="unused"/><Material Name="chosen"/></SubMaterials></Material>"#;
+    let archive = fixture(
+        folder.path(),
+        AUTHORED,
+        None,
+        [
+            TestEntry::stored(DEFAULT_ENTRY, default),
+            TestEntry::zstd(LAYER, layer).encrypted(),
+        ],
+    )?;
+    archive.set_key(test_key());
+    let source = ModelSource::from_archive(&archive, MATERIAL_REFERENCE_MODEL)?;
+    let fallback = source.default_material().ok_or("fallback observation")?;
+    assert!(fallback.material().is_some(), "verified root is drawable");
+    let layer = fallback
+        .material_origins()
+        .layer(0, 0)
+        .ok_or("selected layer origin")?;
+    assert_eq!(layer.entry().entry().path(), LAYER, "physical layer Entry");
+    assert_eq!(
+        layer.entry().encryption(),
+        SourceEncryption::Encrypted,
+        "original layer marker"
+    );
+    assert_eq!(
+        layer.source_material(),
+        Some(1),
+        "the chosen authored layer slot"
+    );
+    Ok(())
+}

@@ -153,7 +153,7 @@ pub(super) fn project(
     armour: &Armour,
     (prepared, found): (&CharacterAnimations<'_>, &ArchiveAnimationRead),
     textures: &ArchiveTextureReads<'_, '_>,
-    (summary, emission): (&GlbSummary, &RiggedGlbEmission),
+    (summary, emission, lod): (&GlbSummary, &RiggedGlbEmission, u32),
 ) -> Result<Projection> {
     ensure!(
         emission.parts().len() == armour.parts().len(),
@@ -196,7 +196,10 @@ pub(super) fn project(
         payload.extend(group);
     }
     let artifact = artifact::fields(&uses, emission, &parts, &clips, &images.fields)?;
-    let fields = report::fields(&uses, &character, &parts, &images.all, &clips.all, &payload)?;
+    let mut fields = report::fields(&uses, &character, &parts, &images.all, &clips.all, &payload)?;
+    if let Some(fallback) = armour.default_material(lod) {
+        report::fallback(&mut fields, &uses, fallback)?;
+    }
     Ok(Projection {
         payload: payload.origin(&uses),
         artifact,
@@ -349,7 +352,7 @@ pub(super) fn publish(
                     export.armour,
                     (export.animated, export.found),
                     export.textures,
-                    (&summary, &emission),
+                    (&summary, &emission, export.options.lod),
                 )
                 .map_err(io::Error::other)?;
                 Ok((summary, projection))
