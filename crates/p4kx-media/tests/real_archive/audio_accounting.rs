@@ -71,6 +71,39 @@ fn verify_synthetic_accounting() -> TestResult {
     )
 }
 
+#[test]
+fn embedded_complete_prefetch_and_opaque_source_ranges_reconcile() -> TestResult {
+    use p4kx_testkit::{ArchiveBuilder, TestBank, TestCodec, TestEntry, TestWem};
+
+    const SELECTED: &str = "Data/Sounds/wwise/sample.bnk";
+
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("Data.p4k");
+    let complete = TestWem::pcm(TestCodec::Pcm, 1, 22_050, &[0, 1, 2]).bytes();
+    let prefetch = complete.get(..12).ok_or("synthetic prefetch header")?;
+    let original = TestBank::new(21)
+        .wem(17, complete.as_slice())
+        .wem(17, prefetch)
+        .wem(18, b"PLUG synthetic media".as_slice())
+        .section(*b"UNKN", b"opaque bank data".as_slice())
+        .bytes();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(SELECTED, original.as_slice()))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
+    verify_sample(
+        &archive,
+        Sample {
+            filter: Filter::parse(SELECTED)?,
+            entry_index: 0,
+            original,
+        },
+        &schema,
+        |original, rows| bank::verify(original, rows).map(|_| ()),
+    )
+}
+
 fn verify_archives(verify_archive: impl Fn(&Path) -> TestResult) -> TestResult {
     verify_archive(&p4kx_testkit::real_archive_path()?)?;
     if let Some(second) = p4kx_testkit::real_archive_b_path() {
@@ -94,15 +127,52 @@ fn verify_archive(path: &Path) -> TestResult {
         })?;
         verify_sample(&archive, sample, &schema, |original, rows| {
             if suffix == ".wem" {
-                verify_wem(original, rows)
+                verify_wem(original, rows)?;
+                report_loose_coverage(rows);
             } else {
                 bank::verify(original, rows)?;
-                Ok(())
+                report_bank_coverage(rows);
             }
+            Ok(())
         })?;
         watch.check()?;
     }
     Ok(())
+}
+
+#[expect(
+    clippy::print_stderr,
+    reason = "the opt-in test reports coverage without source values"
+)]
+fn report_loose_coverage(rows: &[MediaRecord]) {
+    let cue = at(rows, "audio-wem-cue").next().is_some();
+    let list = at(rows, "audio-wem-list").next().is_some();
+    eprintln!("WEM source coverage: cue={cue}, list={list}");
+}
+
+#[expect(
+    clippy::print_stderr,
+    reason = "the opt-in test reports coverage without source values"
+)]
+fn report_bank_coverage(rows: &[MediaRecord]) {
+    let complete = at(rows, "audio-bank-wem").next().is_some();
+    let prefetch = at(rows, "audio-bank-media").any(|row| {
+        row.data
+            .pointer("/payload/data/prefetch")
+            .and_then(Value::as_bool)
+            == Some(true)
+    });
+    let opaque = at(rows, "audio-bank-media").any(|row| {
+        matches!(
+            row.data
+                .pointer("/payload/data/class")
+                .and_then(Value::as_str),
+            Some("midi" | "impulse" | "unknown")
+        )
+    });
+    eprintln!(
+        "DIDX source coverage: complete_wem={complete}, prefetch={prefetch}, opaque={opaque}"
+    );
 }
 
 fn verify_archive_containers(path: &Path) -> TestResult {

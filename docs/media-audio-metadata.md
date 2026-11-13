@@ -172,7 +172,8 @@ The marker follows the actual input scopes and container ancestry.
 
 With `P4KX_DATA_P4K` and the stored Archive key configured, the opt-in Media test samples one
 standalone WEM and one bank with HIRC objects and DIDX media from each configured Archive. It
-compares the export with the slice readers and original DIDX bytes, validates the built-in record
+compares the export with the slice readers and original DIDX bytes, including the resolved
+DATA extents and complete banked RIFF directories. It validates the built-in record
 schema and checks the retained bytes and physical identities. Each sampled Entry is at most
 8 MiB. Results report failures without exposing private source paths or values.
 
