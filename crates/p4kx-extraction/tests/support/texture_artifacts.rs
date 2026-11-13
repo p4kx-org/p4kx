@@ -9,8 +9,9 @@ use std::path::{Path, PathBuf};
 
 use exr::prelude::{ReadChannels, ReadLayers, Vec2};
 use p4kx_extraction::{
-    ConversionError, CubemapLayout, DdsHeader, ExtractionError, TextureError, TextureFormat,
-    TextureImage, TextureImageFormat, TextureImagePlan,
+    Checksum, ConversionError, CubemapLayout, DdsHeader, ExtractionError, ExtractionReport,
+    SourceLocation, SourceUseDescription, SourceUseRef, TextureError, TextureFormat, TextureImage,
+    TextureImageArtifact, TextureImageFormat, TextureImagePlan,
 };
 use sha2::{Digest, Sha256};
 
@@ -62,6 +63,93 @@ pub(crate) fn check(root: &Path, expected: &[ExpectedImage]) -> CheckResult {
             format => return Err(io::Error::other(format!("unverified format {format:?}")).into()),
         }
     }
+    Ok(())
+}
+
+pub(crate) fn check_receipts(
+    root: &Path,
+    expected: &[ExpectedImage],
+    report: &ExtractionReport,
+) -> CheckResult {
+    let mut remaining: BTreeMap<_, _> = expected.iter().map(|image| (&image.path, image)).collect();
+    for texture in report.texture_artifacts() {
+        let uses: BTreeMap<_, _> = texture
+            .provenance
+            .uses()
+            .iter()
+            .map(|usage| (usage.id(), usage))
+            .collect();
+        for artifact in &texture.images {
+            let path = root.join(&artifact.path);
+            let planned = &remaining
+                .remove(&path)
+                .ok_or("unexpected or duplicate image receipt")?
+                .image;
+            assert_eq!(artifact.level, planned.level, "the recorded mip");
+            assert_eq!(artifact.layer, planned.layer, "the recorded layer");
+            assert_eq!(artifact.face, planned.face, "the recorded face");
+            assert_eq!(artifact.slice, planned.slice, "the recorded slice");
+
+            let bytes = fs::read(&path)?;
+            assert_eq!(
+                artifact.digest.byte_length(),
+                bytes.len() as u64,
+                "the written byte length"
+            );
+            assert_eq!(
+                artifact.digest.sha256(),
+                Checksum::Sha256(Sha256::digest(&bytes).into()).hex(),
+                "the written bytes match their binding"
+            );
+            check_origin(artifact, &uses)?;
+        }
+    }
+    assert!(remaining.is_empty(), "each published image has a receipt");
+    Ok(())
+}
+
+fn check_origin(
+    artifact: &TextureImageArtifact,
+    uses: &BTreeMap<&SourceUseRef, &SourceUseDescription>,
+) -> CheckResult {
+    assert!(
+        artifact.origin.source_set_complete(),
+        "Archive contributors are bound"
+    );
+    assert!(
+        artifact.origin.contains_encrypted_source().is_some(),
+        "Archive encryption is known"
+    );
+
+    let mut spans = 0;
+    for reference in artifact.origin.source_uses_refs() {
+        let usage = uses.get(reference).ok_or("unresolved image origin use")?;
+        if let SourceLocation::Subresource {
+            namespace, indices, ..
+        } = usage.location()
+            && namespace == "ddsMipPayload"
+        {
+            let [level, _, length, stride, count] = indices.as_slice() else {
+                return Err("invalid DDS mip payload coordinates".into());
+            };
+            assert_eq!(
+                *level,
+                u64::from(artifact.level),
+                "span matches the chosen mip"
+            );
+            assert!(*length > 0, "the span contains source bytes");
+            assert_eq!(
+                (*stride, *count),
+                (0, 1),
+                "a receipt covers one decoded image"
+            );
+            spans += 1;
+        }
+    }
+    assert!(
+        (1..=2).contains(&spans),
+        "one color span and at most one alpha span"
+    );
     Ok(())
 }
 

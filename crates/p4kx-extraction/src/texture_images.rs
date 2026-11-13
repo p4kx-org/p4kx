@@ -5,15 +5,20 @@ use std::ffi::OsString;
 use std::io::Write;
 
 use p4kx_archive::Checksum;
-use p4kx_texture::{Mip, TextureError, read_mip, write_exr, write_png};
+use p4kx_texture::{
+    LocatedMip, MipPayloadLocation, TextureError, read_mip_with_location, write_exr, write_png,
+};
 
 use crate::buffers::Buffers;
 use crate::texture_convert::{Source, Step};
 use crate::texture_outputs::step_of;
+use crate::texture_preview_png::input::{PreviewInputs, TexturePreviewInput};
 use crate::texture_siblings::Replay;
 use crate::write::{Chunk, Destination, EntryWriter, Outcome, write_error};
 use crate::{
-    ConflictPolicy, CubemapLayout, ExtractionError, Texture, TextureImageFormat, TextureImagePlan,
+    ConflictPolicy, CubemapLayout, ExtractionError, OriginArtifactDigest, OriginDigestWriter,
+    SourceUses, Texture, TextureArtifacts, TextureImage, TextureImageArtifact, TextureImageFormat,
+    TextureImagePlan,
 };
 
 /// The extensions of the image files a texture is exported to.
@@ -44,55 +49,105 @@ impl Images {
     }
 }
 
+enum ImageWrite {
+    Written(OriginArtifactDigest),
+    Kept,
+    Cancelled,
+}
+
 impl EntryWriter<'_> {
-    /// Decodes mip `level` of `source`, its part taken from `buffers.data` when the merge kept it
-    /// there, and writes it next to `header` under the Conflict policy: as `<name>.png` with the
-    /// alpha tail in its alpha channel, or for a high-range texture as OpenEXR `<name>.exr`, the
-    /// range kept; a cubemap's six faces as `<name>_posx` â€¦ `<name>_negz`, an array's elements as
-    /// `<name>_layerN` and a volume's slices as `<name>_sliceN`.
+    /// Publishes the selected mip's images and records the inputs of each committed image.
     pub(crate) fn write_images(
         &self,
         source: &Source<'_>,
         header: &Destination,
         level: u32,
         buffers: &mut Buffers,
+        artifacts: &mut Option<TextureArtifacts>,
     ) -> Result<Step, ExtractionError> {
         let dds = source.texture.header();
         let format = TextureImageFormat::for_header(dds);
-        let names: Vec<OsString> = TextureImagePlan::new(dds, level, CubemapLayout::Faces, format)
+        let destinations = TextureImagePlan::new(dds, level, CubemapLayout::Faces, format)
             .map_err(|error| source.texture_error(error))?
-            .map(|image| image_name(header, &image.suffix, image.format.extension()))
-            .collect();
-        let destinations = names
-            .iter()
-            .map(|name| Destination::new(header.folder.clone(), name))
-            .collect::<Result<Vec<_>, _>>()?;
+            .map(|image| {
+                let name = image_name(header, &image.suffix, image.format.extension());
+                let destination = Destination::new(header.folder.clone(), &name)?;
+                Ok((image, destination))
+            })
+            .collect::<Result<Vec<_>, ExtractionError>>()?;
         let skip = self.policy == ConflictPolicy::Skip;
-        if skip && destinations.iter().all(|file| file.existing.is_some()) {
+        if skip && destinations.iter().all(|(_, file)| file.existing.is_some()) {
             return Ok(Step::Kept);
         }
         if self.tracker.should_stop() {
             return Ok(Step::Cancelled);
         }
-        let images = Self::decode_level(source, level, &buffers.data)?;
+        let uses = SourceUses::with_compact_use_refs();
+        let mut written = Vec::new();
+        let step = self.write_image_set(source, level, &destinations, buffers, &uses, &mut written);
+        if !written.is_empty() {
+            *artifacts = Some(TextureArtifacts {
+                images: written,
+                provenance: uses.freeze()?,
+            });
+        }
+        step
+    }
+
+    fn write_image_set(
+        &self,
+        source: &Source<'_>,
+        level: u32,
+        destinations: &[(TextureImage, Destination)],
+        buffers: &mut Buffers,
+        uses: &SourceUses,
+        written: &mut Vec<TextureImageArtifact>,
+    ) -> Result<Step, ExtractionError> {
+        let (images, inputs) = Self::decode_level(source, level, &buffers.data)?;
+        let unsupported = || {
+            source.texture_error(TextureError::UnsupportedImage {
+                images: source.texture.header().images(level),
+            })
+        };
         if images.len() != destinations.len() {
-            return Err(source.texture_error(TextureError::UnsupportedImage {
-                images: dds.images(level),
-            }));
+            return Err(unsupported());
         }
-        let mut written = false;
-        for (index, destination) in destinations.iter().enumerate() {
-            let step = if skip && destination.existing.is_some() {
-                Step::Kept
-            } else {
-                self.write_image_file(source, (&images, index), destination, buffers)?
-            };
-            if step == Step::Cancelled {
-                return Ok(step);
+        for (index, (image, destination)) in destinations.iter().enumerate() {
+            if self.policy == ConflictPolicy::Skip && destination.existing.is_some() {
+                continue;
             }
-            written |= step == Step::Written;
+            let path = destination
+                .file
+                .strip_prefix(self.target)
+                .map_err(|_| ExtractionError::UnsafePath)?
+                .to_str()
+                .ok_or(ExtractionError::UnsafePath)?
+                .replace('\\', "/");
+            let evidence = inputs
+                .register_image(uses, level, index as u64)?
+                .ok_or_else(unsupported)?;
+            let mut contributions = Vec::new();
+            evidence.append_pixel_uses(&mut contributions)?;
+            let origin = uses.origin(&contributions, evidence.is_complete());
+            match self.write_image_file(source, (&images, index), destination, buffers)? {
+                ImageWrite::Written(digest) => written.push(TextureImageArtifact {
+                    path,
+                    digest,
+                    level,
+                    layer: image.layer,
+                    face: image.face,
+                    slice: image.slice,
+                    origin,
+                }),
+                ImageWrite::Kept => {}
+                ImageWrite::Cancelled => return Ok(Step::Cancelled),
+            }
         }
-        Ok(if written { Step::Written } else { Step::Kept })
+        Ok(if written.is_empty() {
+            Step::Kept
+        } else {
+            Step::Written
+        })
     }
 
     fn write_image_file(
@@ -101,7 +156,7 @@ impl EntryWriter<'_> {
         (images, index): (&Images, usize),
         destination: &Destination,
         buffers: &mut Buffers,
-    ) -> Result<Step, ExtractionError> {
+    ) -> Result<ImageWrite, ExtractionError> {
         let encoded = &mut buffers.output;
         encoded.clear();
         images
@@ -114,60 +169,83 @@ impl EntryWriter<'_> {
             )
         };
         if let Some(outcome) = self.decide(destination, expected, &mut buffers.chunk)? {
-            return Ok(step_of(&outcome));
+            return Ok(if matches!(outcome, Outcome::Cancelled) {
+                ImageWrite::Cancelled
+            } else {
+                ImageWrite::Kept
+            });
         }
         if self.tracker.should_stop() {
-            return Ok(Step::Cancelled);
+            return Ok(ImageWrite::Cancelled);
         }
         let (temporary, mut file, ownership) = self.temporary(&destination.folder)?;
-        let copied = file
-            .write_all(encoded)
-            .map(|()| Chunk::End)
-            .map_err(|error| write_error(destination.file.clone(), error));
+        let mut sink = OriginDigestWriter::new(&mut file);
+        let digest = sink.write_all(encoded).and_then(|()| sink.finish());
         drop(file);
+        let digest = match digest {
+            Ok(digest) => digest,
+            Err(error) => {
+                return crate::output_cleanup::extraction(
+                    Err(write_error(destination.file.clone(), error)),
+                    &ownership,
+                    &temporary,
+                    self.cancel,
+                );
+            }
+        };
         let placed = self.put_in_place(
             &temporary,
             &ownership,
             &destination.file,
-            copied,
+            Ok(Chunk::End),
             Outcome::Converted,
         )?;
-        Ok(step_of(&placed))
+        Ok(match step_of(&placed) {
+            Step::Written => ImageWrite::Written(digest),
+            Step::Kept => ImageWrite::Kept,
+            Step::Cancelled => ImageWrite::Cancelled,
+        })
     }
 
     /// Decodes every image of mip `level`, replaying the part in `captured` when it holds exactly
     /// that mip: a high-range texture to floating-point RGB, any other to RGBA with the alpha
     /// tail merged in.
-    fn decode_level(
-        source: &Source<'_>,
+    fn decode_level<'a>(
+        source: &Source<'a>,
         level: u32,
         captured: &[u8],
-    ) -> Result<Images, ExtractionError> {
+    ) -> Result<(Images, PreviewInputs<'a, MipPayloadLocation>), ExtractionError> {
         let texture = &source.texture;
-        if texture.header().format().is_high_range() {
-            let mip = Self::read_level(source, level, captured)?;
-            return mip
+        let hdr = texture.header().format().is_high_range();
+        let alpha = if hdr {
+            None
+        } else {
+            texture
+                .checked_alpha_tail(level)
+                .map_err(ExtractionError::Texture)?
+        };
+        let read = Self::read_level(source, level, captured)?;
+        let color = TexturePreviewInput::of_read(texture.parts(), read.raw_header, read.payload);
+        if hdr {
+            let images = read
+                .mip
                 .decode_surfaces_hdr()
-                .map(Images::Exr)
-                .map_err(|error| source.texture_error(error));
+                .map_err(|error| source.texture_error(error))?;
+            return Ok((Images::Exr(images), PreviewInputs { color, alpha: None }));
         }
-        let alpha = texture
-            .checked_alpha_tail(level)
+        let mut images = texture
+            .decode_mip_data(&read.mip)
             .map_err(ExtractionError::Texture)?;
-        let mip = Self::read_level(source, level, captured)?;
-        let images = texture
-            .decode_mip_data(&mip)
+        let alpha = Texture::merge_alpha_input(alpha, level, &mut images)
             .map_err(ExtractionError::Texture)?;
-        Texture::with_alpha_tail(alpha, level, images)
-            .map(Images::Png)
-            .map_err(ExtractionError::Texture)
+        Ok((Images::Png(images), PreviewInputs { color, alpha }))
     }
 
     fn read_level(
         source: &Source<'_>,
         level: u32,
         captured: &[u8],
-    ) -> Result<Mip, ExtractionError> {
+    ) -> Result<LocatedMip, ExtractionError> {
         let texture = &source.texture;
         let replayed = (level < source.part_count
             && !captured.is_empty()
@@ -178,7 +256,7 @@ impl EntryWriter<'_> {
             captured: replayed,
         };
         let header = texture.open_header().map_err(ExtractionError::Texture)?;
-        read_mip(header, texture.header_size(), &siblings, level)
+        read_mip_with_location(header, texture.header_size(), &siblings, level)
             .map_err(|error| source.texture_error(error))
     }
 }

@@ -2435,6 +2435,13 @@ fields are absent. When `--convert` converted the DataForge Entry, the report al
 Record's file does not follow its name or record path, `renamed` as there
 (`{"guid", "path", "reason"}`); `skipped` lists
 the Record files relative to the folder of the DataForge Entry. Otherwise that field is absent.
+`texture_artifacts` contains the images published by this run when texture image conversion
+is enabled. Each texture groups its `images` with a shared `provenance` inventory. Every image
+has a target-relative `path` with forward slashes, the measured `digest` of the written file,
+the selected `level`, `layer`, `face` and `slice`, and its own `containsEncryptedSource`,
+`sourceUsesRefs` and `sourceSetComplete`. Existing images retained by the conflict policy do
+not gain a receipt from this run. The field is omitted when no image was written.
+
 An Entry whose path has a part that is no valid file name on Linux and Windows, a path that is too
 long for Windows or that differs only in case from an earlier written Entry is listed in `failed`
 with the part and the rule it breaks

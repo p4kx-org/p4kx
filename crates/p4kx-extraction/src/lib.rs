@@ -150,6 +150,7 @@ mod source_value_schema;
 mod target;
 pub mod text_line;
 mod text_window;
+mod texture_artifacts;
 mod texture_conversion_error;
 mod texture_convert;
 mod texture_exr;
@@ -373,6 +374,7 @@ pub use source_provenance::*;
 pub use target::{
     create_default_target, create_default_target_protected, default_target_name, utc_rfc3339,
 };
+pub use texture_artifacts::{TextureArtifacts, TextureImageArtifact};
 pub use texture_exr::ExrReport;
 pub use texture_grey::{TextureVerdicts, probe_saturation};
 pub use texture_groups::{TextureGroup, TextureGroups};

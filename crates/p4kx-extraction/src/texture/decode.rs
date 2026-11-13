@@ -134,17 +134,7 @@ impl<'a> Texture<'a> {
         Ok(alpha)
     }
 
-    /// Merges mip `level` of the alpha tail `alpha` into the alpha channel of `images`.
-    pub(crate) fn with_alpha_tail(
-        alpha: Option<Self>,
-        level: u32,
-        mut images: Vec<RgbaImage>,
-    ) -> Result<Vec<RgbaImage>, ConversionError> {
-        Self::merge_alpha_input(alpha, level, &mut images)?;
-        Ok(images)
-    }
-
-    fn merge_alpha_input(
+    pub(crate) fn merge_alpha_input(
         alpha: Option<Self>,
         level: u32,
         images: &mut [RgbaImage],

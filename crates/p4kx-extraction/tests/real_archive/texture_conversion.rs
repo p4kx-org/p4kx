@@ -120,6 +120,7 @@ fn verify_sample(
     let expected = expected_images(target, &converted)?;
     assert_supported_image_coverage(headers, &expected);
     artifacts::check(target, &expected)?;
+    artifacts::check_receipts(target, &expected, &report)?;
     writeln!(
         std::io::stderr(),
         "{} sampled headers; {} converted; {} explicitly unsupported; {} validated images",
@@ -145,6 +146,10 @@ fn verify_sample(
             .map(|header| header.entry.path())
             .eq(converted.iter().map(|header| header.entry.path())),
         "the same headers convert or remain explicitly unsupported"
+    );
+    assert!(
+        again.texture_artifacts().is_empty(),
+        "no image was rewritten"
     );
     assert_eq!(
         again.skipped().len(),

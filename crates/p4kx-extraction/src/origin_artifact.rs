@@ -131,6 +131,12 @@ impl OriginArtifactDigest {
     pub const fn byte_length(&self) -> u64 {
         self.byte_length.get()
     }
+
+    /// Returns the SHA-256 as lowercase hexadecimal.
+    #[must_use]
+    pub fn sha256(&self) -> &str {
+        &self.sha256
+    }
 }
 
 /// A stream that measures only bytes accepted by its actual sink.

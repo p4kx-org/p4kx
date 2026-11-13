@@ -84,6 +84,15 @@ fn verify_conversion(dds: &SplitDds, mip: u32) -> TestResult {
     let level = mip.min(header.mip_count().saturating_sub(1));
     let expected = artifacts::expected(&fixture.target, HEADER, &header, level)?;
     artifacts::check(&fixture.target, &expected)?;
+    artifacts::check_receipts(&fixture.target, &expected, &report)?;
+    assert!(
+        report
+            .texture_artifacts()
+            .iter()
+            .flat_map(|texture| &texture.images)
+            .all(|image| image.origin.contains_encrypted_source() == Some(false)),
+        "every contributor of this synthetic Archive is unencrypted"
+    );
     check_alpha_array(dds, &expected, level)?;
     for entry in fixture
         .archive
@@ -103,6 +112,10 @@ fn verify_conversion(dds: &SplitDds, mip: u32) -> TestResult {
     let before = artifacts::snapshot(&fixture.target)?;
     let again = run_with(&fixture, ConflictPolicy::IfChanged, textures);
     assert!(again.is_complete(), "the repeat completes: {again:?}");
+    assert!(
+        again.texture_artifacts().is_empty(),
+        "no image was rewritten"
+    );
     assert_eq!(
         again.skipped().len(),
         fixture.archive.entries().len(),

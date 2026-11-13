@@ -125,6 +125,30 @@ impl<'a> TexturePreviewInput<'a, MipPayloadLocation> {
 }
 
 impl<'a> PreviewInputs<'a, MipPayloadLocation> {
+    pub(crate) fn register_image(
+        &self,
+        uses: &SourceUses,
+        level: u32,
+        image: u64,
+    ) -> Result<Option<PreviewPngEvidence>, SourceEvidenceError> {
+        let Some(color) = self.color.spans.spans(Some(image)) else {
+            return Ok(None);
+        };
+        let alpha = match &self.alpha {
+            Some(input) => {
+                let Some(spans) = input.spans.spans(Some(image)) else {
+                    return Ok(None);
+                };
+                Some(input.register_spans(uses, level, spans)?)
+            }
+            None => None,
+        };
+        Ok(Some(PreviewPngEvidence {
+            color: self.color.register_spans(uses, level, color)?,
+            alpha,
+        }))
+    }
+
     pub(crate) fn selected(self, image: Option<u64>) -> Option<PreviewInputs<'a, MipByteSpans>> {
         Some(PreviewInputs {
             color: self.color.selected(image)?,
@@ -204,13 +228,23 @@ impl TexturePreviewInput<'_, MipByteSpans> {
         uses: &SourceUses,
         level: u32,
     ) -> Result<PreviewTextureEvidence, SourceEvidenceError> {
+        self.register_spans(uses, level, self.spans)
+    }
+}
+
+impl<Spans> TexturePreviewInput<'_, Spans> {
+    fn register_spans(
+        &self,
+        uses: &SourceUses,
+        level: u32,
+        spans: MipByteSpans,
+    ) -> Result<PreviewTextureEvidence, SourceEvidenceError> {
         let header = PreviewHeaderEvidence::of_read(uses, self.header.input(), self.raw)?;
         let sibling = match &self.payload {
             PayloadEntry::Header => None,
             PayloadEntry::Split(entry) => Some(uses.observe(entry.input(), InputScope::Payload)?),
         };
         let payload = sibling.as_ref().unwrap_or(&header.scope);
-        let spans = self.spans;
         let mip = payload.at(
             SourceLocation::Subresource {
                 namespace: "ddsMipPayload".into(),

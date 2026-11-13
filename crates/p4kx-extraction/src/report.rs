@@ -9,7 +9,9 @@ use p4kx_cryxml::CryXmlError;
 use p4kx_dataforge::DataForgeError;
 use thiserror::Error;
 
-use crate::{ConversionError, NameRule, PathLimit, RecordExportReport};
+use crate::{
+    ConversionError, NameRule, PathLimit, RecordExportReport, SourceEvidenceError, TextureArtifacts,
+};
 
 /// Why one Entry of an Extraction was not written.
 #[derive(Debug, Error)]
@@ -81,6 +83,9 @@ pub enum ExtractionError {
     /// The texture could not be converted.
     #[error("cannot convert the texture")]
     Texture(#[source] ConversionError),
+    /// The converted image's contributor inventory could not be built.
+    #[error("cannot record texture contributors")]
+    TextureEvidence(#[from] SourceEvidenceError),
     /// The sound, or a WEM the soundbank embeds, could not be converted, naming its codec when no
     /// decoder exists, or the soundbank could not be read.
     #[error("cannot convert the sound")]
@@ -193,9 +198,16 @@ pub struct ExtractionReport {
     pub(crate) records: Option<RecordExportReport>,
     pub(crate) records_entry: Option<String>,
     pub(crate) dataforge_left_out: Vec<String>,
+    pub(crate) texture_artifacts: Vec<TextureArtifacts>,
 }
 
 impl ExtractionReport {
+    /// Returns receipts of the converted images this extraction committed.
+    #[must_use]
+    pub fn texture_artifacts(&self) -> &[TextureArtifacts] {
+        &self.texture_artifacts
+    }
+
     /// Returns the number of Entries written.
     #[must_use]
     pub const fn extracted(&self) -> usize {

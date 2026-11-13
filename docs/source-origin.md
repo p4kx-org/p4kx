@@ -250,3 +250,17 @@ Original P4K lineage for the standalone CHF remains unknown. Report values
 whose contributing reads cannot be proved carry an incomplete origin. A
 successfully written partial model has a companion for its actual bytes and
 retains its existing issue and exit-code behavior.
+
+## Bulk texture conversion
+
+The `texture_artifacts` field in `p4kx extract --convert --json` and
+`p4kx convert --json` binds each written PNG or OpenEXR image to its
+target-relative path, byte length and SHA-256. Its direct encryption marker
+and source-use references describe the decoded bytes for that particular
+mip, array layer, cubemap face or volume slice. References resolve in the
+texture's shared inventory. A `ddsMipPayload` use records the original
+decoded Entry's mip level, byte offset, span length, stride and span count.
+PNG uses the observed alpha tail when merged. OpenEXR uses the colour mip.
+Unused sibling parts are outside the image's contributor set. For a folder
+without proof of original P4K lineage, the marker is unknown. A conflict
+policy that retains a file leaves its origin outside the current report.

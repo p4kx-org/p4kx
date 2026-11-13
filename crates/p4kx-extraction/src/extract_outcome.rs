@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::write::Outcome;
-use crate::{EntryFailure, ExtractionReport};
+use crate::{EntryFailure, ExtractionReport, TextureArtifacts};
 
 /// The outcome of one Entry of an Extraction: its position, its path and how it ended.
 pub(crate) type EntryEnded = (usize, String, Outcome);
@@ -15,6 +15,7 @@ pub(crate) enum Ended {
     Texture {
         entries: Vec<EntryEnded>,
         unconverted: Option<(usize, EntryFailure)>,
+        artifacts: Option<(usize, TextureArtifacts)>,
     },
     /// A sound or soundbank Entry, the failures of what could not be converted and the names of
     /// the sounds of a soundbank the cancelled run left unwritten.
@@ -29,15 +30,18 @@ pub(crate) fn summarise(ended: Vec<Ended>, convert: bool) -> ExtractionReport {
     let mut outcomes = Vec::with_capacity(ended.len());
     let mut unconverted = Vec::new();
     let mut unwritten = Vec::new();
+    let mut texture_artifacts = Vec::new();
     for item in ended {
         match item {
             Ended::Entry(outcome) => outcomes.push(outcome),
             Ended::Texture {
                 entries,
                 unconverted: failure,
+                artifacts,
             } => {
                 outcomes.extend(entries);
                 unconverted.extend(failure);
+                texture_artifacts.extend(artifacts);
             }
             Ended::Sound {
                 entry,
@@ -54,7 +58,12 @@ pub(crate) fn summarise(ended: Vec<Ended>, convert: bool) -> ExtractionReport {
     outcomes.sort_unstable_by_key(|(index, _, _)| *index);
     unwritten.sort_by_key(|(index, _)| *index);
     unconverted.sort_by_key(|(index, _)| *index);
+    texture_artifacts.sort_unstable_by_key(|(index, _)| *index);
     let mut report = ExtractionReport {
+        texture_artifacts: texture_artifacts
+            .into_iter()
+            .map(|(_, artifacts)| artifacts)
+            .collect(),
         converted: convert.then_some(0),
         unconverted: unconverted
             .into_iter()
@@ -62,6 +71,14 @@ pub(crate) fn summarise(ended: Vec<Ended>, convert: bool) -> ExtractionReport {
             .collect(),
         ..ExtractionReport::default()
     };
+    record_outcomes(&mut report, outcomes);
+    report
+        .cancelled
+        .extend(unwritten.into_iter().map(|(_, sound)| sound));
+    report
+}
+
+fn record_outcomes(report: &mut ExtractionReport, outcomes: Vec<EntryEnded>) {
     for (_, path, outcome) in outcomes {
         match outcome {
             Outcome::Written => report.extracted += 1,
@@ -78,8 +95,4 @@ pub(crate) fn summarise(ended: Vec<Ended>, convert: bool) -> ExtractionReport {
             Outcome::Failed(error) => report.failures.push(EntryFailure { path, error }),
         }
     }
-    report
-        .cancelled
-        .extend(unwritten.into_iter().map(|(_, sound)| sound));
-    report
 }
