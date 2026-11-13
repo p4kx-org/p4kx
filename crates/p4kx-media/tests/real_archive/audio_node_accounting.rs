@@ -14,6 +14,20 @@ mod source;
 use self::node_groups::{Coverage, Visitor};
 
 pub(super) fn verify_archive(path: &std::path::Path) -> TestResult {
+    verify_selection(path, Selection::Broad)
+}
+
+pub(super) fn verify_inline_state(path: &std::path::Path) -> TestResult {
+    verify_selection(path, Selection::InlineState)
+}
+
+#[derive(Clone, Copy)]
+enum Selection {
+    Broad,
+    InlineState,
+}
+
+fn verify_selection(path: &std::path::Path, selection: Selection) -> TestResult {
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::real_archive_key()?))?;
     let watch = ArchiveWatch::new(&archive);
     let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
@@ -24,20 +38,30 @@ pub(super) fn verify_archive(path: &std::path::Path) -> TestResult {
         let mut observed = Visitor::scan();
         source::scan(&sample.original, &mut observed)?;
         seen.include(&observed);
+        if matches!(selection, Selection::InlineState) && !observed.has(Coverage::InlineState) {
+            continue;
+        }
         if best
             .as_ref()
             .is_none_or(|(_, current)| observed.score() > current.score())
         {
             best = Some((sample, observed));
         }
-        if best
-            .as_ref()
-            .is_some_and(|(_, observed)| observed.has_complete_node_groups())
-        {
+        if best.as_ref().is_some_and(|(_, observed)| {
+            matches!(selection, Selection::InlineState) || observed.has_complete_node_groups()
+        }) {
             break;
         }
     }
-    let (sample, selected) = best.ok_or("bounded root bank with original nodes")?;
+    let Some((sample, selected)) = best else {
+        return match selection {
+            Selection::Broad => Err("bounded root bank with original nodes".into()),
+            Selection::InlineState => {
+                report(&seen, &Visitor::scan());
+                Ok(())
+            }
+        };
+    };
     require(
         selected.score() > 0,
         "selected bank has source node evidence",
