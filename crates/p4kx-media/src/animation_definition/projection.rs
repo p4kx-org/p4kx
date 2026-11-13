@@ -169,7 +169,7 @@ impl DefinitionProjection<'_, '_> {
         Ok(Frame {
             parent: Some(index),
             parent_name: element.namespace().is_none().then(|| element.name()),
-            filepath: Filepath::for_list(self.family, element, parent.parent_name),
+            filepath: Filepath::for_list(self, element, parent.parent_name, writer)?,
             timeline,
             graph,
             siblings: syntax.content()?,

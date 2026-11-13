@@ -7,6 +7,7 @@ use p4kx_extraction::cryxml::{
 };
 
 use super::links::{self, ReferenceSelection};
+use super::named_dba::{Databases, NamedSelection};
 use super::origins;
 use super::payload::{self as wire, DefinitionFamily, DefinitionPayload, NamedCaf};
 use super::projection::{DefinitionProjection, Failure};
@@ -19,6 +20,7 @@ use crate::{MediaKind, MediaWriter, Status, Subresource};
 #[derive(Default)]
 pub(super) struct Filepath<'document> {
     directive: Option<Directive<'document>>,
+    databases: Databases,
 }
 
 struct Directive<'document> {
@@ -28,15 +30,22 @@ struct Directive<'document> {
 
 impl<'document> Filepath<'document> {
     pub(super) fn for_list(
-        family: DefinitionFamily,
+        projection: &DefinitionProjection<'_, '_>,
         element: SourceElement<'document>,
         parent_name: Option<&str>,
-    ) -> Option<Self> {
-        (matches!(family, DefinitionFamily::Chrparams)
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<Option<Self>, Failure> {
+        let ordered_list = matches!(projection.family, DefinitionFamily::Chrparams)
             && element.namespace().is_none()
             && element.name().eq_ignore_ascii_case("AnimationList")
-            && parent_name.is_some_and(|name| name.eq_ignore_ascii_case("Params")))
-        .then(Self::default)
+            && parent_name.is_some_and(|name| name.eq_ignore_ascii_case("Params"));
+        if !ordered_list {
+            return Ok(None);
+        }
+        Ok(Some(Self {
+            directive: None,
+            databases: Databases::read(element, projection, writer)?,
+        }))
     }
 
     pub(super) fn observe(
@@ -82,7 +91,7 @@ impl<'document> Filepath<'document> {
                 path_position: position,
                 directive: self.directive.as_ref(),
             };
-            link.write(projection, indices, writer)?;
+            link.write(projection, &self.databases, indices, writer)?;
         }
         Ok(())
     }
@@ -187,6 +196,7 @@ impl Link<'_, '_> {
     fn write(
         &self,
         projection: &DefinitionProjection<'_, '_>,
+        databases: &Databases,
         indices: [u64; 2],
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), Failure> {
@@ -222,6 +232,19 @@ impl Link<'_, '_> {
             selector: &full,
         }
         .resolve(projection, &mut prepared, writer)?;
+        if let Some(archive_path) = &archive_path {
+            databases.write(
+                &NamedSelection {
+                    authored_path: self.path,
+                    archive_path,
+                    original: &path,
+                    selector: &full,
+                },
+                projection,
+                indices,
+                writer,
+            )?;
+        }
         prepared.write(
             writer,
             &Subresource::new(wire::NAMED_CAF, indices.to_vec()),

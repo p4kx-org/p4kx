@@ -583,6 +583,19 @@ rules remain in the ordered source declarations. A named CAF link looks up
 physical loose CAF entries without reading their payload. It does not
 identify matches inside a tracks database or establish the clip used at runtime.
 
+Selecting both `animation-definition` and `animation` also writes
+`named-dba-binding` rows for concrete CAF paths in lists with a
+`$TracksDatabase` declaration. The new row has the same original indices as
+its `named-caf` row. It reports each authored database in order and matches
+its declared CAF path to full DBA metadata names. The physical Entry, clip
+ordinal, name interval and metadata interval identify each candidate.
+Matching ignores case and slash direction. Duplicate names and declarations
+retain each observed candidate in order. A completed all-bank miss allows
+the separate loose lookup. Missing database Entries, filtered inputs and
+unavailable metadata have distinct states. Incomplete bank coverage cannot
+prove a loose fallback. Definition-only export keeps the file links and does
+not open DBA payloads.
+
 Animation-event rows give each direct `animation` timeline and `event`
 its own source element identity. Event attributes have separate ordered rows
 with the authored name, value and location. Known timing, attachment and

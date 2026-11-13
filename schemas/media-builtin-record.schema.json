@@ -1035,6 +1035,23 @@
           "additionalProperties": false,
           "properties": {
             "payload": {
+              "$ref": "#/$defs/Binding"
+            },
+            "record_type": {
+              "const": "named-dba-binding",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/EventTimeline"
             },
             "record_type": {
@@ -4451,6 +4468,25 @@
         }
       ]
     },
+    "BankDisposition": {
+      "additionalProperties": false,
+      "properties": {
+        "authored_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/DatabaseState"
+        }
+      },
+      "required": [
+        "authored_path",
+        "state"
+      ],
+      "type": "object"
+    },
     "BankEntryRange": {
       "additionalProperties": false,
       "properties": {
@@ -5227,6 +5263,57 @@
       ],
       "type": "object"
     },
+    "Binding": {
+      "additionalProperties": false,
+      "properties": {
+        "archive_path": {
+          "type": "string"
+        },
+        "authored_path": {
+          "type": "string"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/ClipCandidate"
+          },
+          "type": "array"
+        },
+        "candidates_complete": {
+          "type": "boolean"
+        },
+        "databases": {
+          "items": {
+            "$ref": "#/$defs/BankDisposition"
+          },
+          "type": "array"
+        },
+        "observed_candidates": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "state": {
+          "$ref": "#/$defs/BindingState"
+        }
+      },
+      "required": [
+        "authored_path",
+        "archive_path",
+        "state",
+        "candidates_complete",
+        "observed_candidates",
+        "databases",
+        "candidates"
+      ],
+      "type": "object"
+    },
+    "BindingState": {
+      "enum": [
+        "bank-match",
+        "ambiguous-bank-match",
+        "loose-lookup",
+        "incomplete"
+      ],
+      "type": "string"
+    },
     "BlendAssociationRecord": {
       "oneOf": [
         {
@@ -5968,6 +6055,38 @@
       ],
       "type": "object"
     },
+    "ClipCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "authored_name": {
+          "type": "string"
+        },
+        "clip_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "declaration_ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "entry": {
+          "$ref": "#/$defs/Identity"
+        },
+        "metadata_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "name_range": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "declaration_ordinal",
+        "entry",
+        "clip_ordinal",
+        "authored_name",
+        "name_range",
+        "metadata_range"
+      ],
+      "type": "object"
+    },
     "CompanionPayload": {
       "additionalProperties": false,
       "properties": {
@@ -6675,6 +6794,18 @@
           "type": "string"
         }
       ]
+    },
+    "DatabaseState": {
+      "enum": [
+        "enumerated",
+        "incomplete",
+        "invalid-identifier",
+        "missing",
+        "ambiguous",
+        "not-selected",
+        "unavailable"
+      ],
+      "type": "string"
     },
     "DdsAlphaAssociation": {
       "description": "Association of the stored colour channels with alpha declared by the DDS header.",
@@ -37941,6 +38072,61 @@
                 "properties": {
                   "record_type": {
                     "const": "named-caf"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-named-dba-binding"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "named-dba-binding"
                   }
                 },
                 "required": [

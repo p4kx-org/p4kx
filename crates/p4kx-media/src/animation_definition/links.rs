@@ -239,7 +239,7 @@ impl LinkKind {
     }
 }
 
-fn target_path(kind: LinkKind, path: &str) -> Option<String> {
+pub(super) fn target_path(kind: LinkKind, path: &str) -> Option<String> {
     let (_, extension) = path.rsplit_once('.')?;
     let supported = match kind {
         LinkKind::TracksDatabase => extension.eq_ignore_ascii_case("dba"),
