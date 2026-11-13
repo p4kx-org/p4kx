@@ -38,6 +38,7 @@ mod real_archive_crafting;
 mod real_archive_crafting_catalog;
 mod real_archive_crafting_details;
 mod real_archive_explosive_components;
+mod real_archive_facility_placements;
 mod real_archive_facility_seats;
 mod real_archive_faction_identity_definitions;
 mod real_archive_faction_reputation_source;

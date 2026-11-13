@@ -164,3 +164,19 @@ ambiguous or unreadable source paths have separate codes. A descriptor with
 repaired string-table bytes is unreadable for selection. A repaired SOC
 entity chunk records `lossyEntityChunk`. Its usable slots retain their original
 coordinates and incomplete source sets.
+
+## Installed placement checks
+
+Set `P4KX_DATA_P4K` to the installed Archive and run the two ignored tests.
+
+```text
+cargo test --locked -p p4kx-export --test real_archive ship_facilities_match_original_placements -- --ignored --nocapture --test-threads=1
+```
+
+The tests select a small ship and a ship with multiple physical rooms from
+original room and facility declarations. They report the selection scope and
+trace exported placement and configuration rows back to original Entries,
+Entity slots, transforms and component ordinals. Nested facility evidence is
+checked when the bounded sample contains it. A publication refusal caused only
+by malformed ShopInventory inputs is reported separately. In that case the
+tests verify placement rows in the diagnostic export.

@@ -205,7 +205,8 @@ room key. Its parent and original Child descriptor node preserve the logical
 route even when multiple nodes select the same physical Entry. Facility rows
 join the occurrence by its local ordinal. Composed root-room coordinates use
 the original Child transforms in route order and the original entity-local
-matrix. The direct local matrix also serves as the root-room matrix.
+matrix. A direct Entity has a null rootRoomTransform field and uses its
+localTransform as its root-room matrix.
 
 Item room declarations retain the original scalar component and its physical
 owner once. Placement references identify each selected attachment by its
@@ -213,9 +214,11 @@ resolved Loadout position, including the evidence for the selected Record and
 port path. An occurrence with a parent room shares the same traversal and
 coordinate rules as the ship-room form.
 
-A direct ship room derives its ship-frame matrix from the original complete
-Offset and the absence of a named helper. A scalar room on the root Entity
-uses that Entity's origin. Assembly and Catalog share the Euler conversion.
-The Catalog retains incomplete transform states for dependencies whose
-actual placement cannot be proved. These states leave the existing room-local
-transforms available.
+A vehicle room without a named helper uses its original complete Offset.
+A named helper uses its direct model node and parent matrices, with the
+authored Offset applied within Assembly's origin tolerance. Assembly and
+Catalog share the Euler conversion and model helper resolution. A scalar
+room on the root Entity uses that Entity's origin. Character-definition
+indirection and attached item ship-frame placement have an unsupported
+state. Unavailable ship-frame inputs leave the room-local transforms and
+resolved attachment context available.
