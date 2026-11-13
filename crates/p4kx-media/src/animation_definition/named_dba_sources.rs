@@ -4,19 +4,16 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-#[path = "named_dba_inventory.rs"]
-mod inventory;
-
 use p4kx_extraction::cryxml::{SourceAttribute, SourceElement};
 use p4kx_extraction::{Entry, InputScope, SourceUseRole};
 
-use self::inventory::Inventory;
-pub(super) use self::inventory::ObservedMatch;
 use super::super::links;
 use super::super::origins;
 use super::super::payload::LinkKind;
 use super::super::projection::{DefinitionProjection, Failure};
 use super::DatabaseState;
+pub(super) use crate::animation::dba_metadata_lookup::ObservedMatch;
+use crate::animation::dba_metadata_lookup::{self as inventory, Inventory};
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
 use crate::xml_source_projection::{declaration_position, element_position};
@@ -237,7 +234,7 @@ fn read_bank(
         .ok_or_else(|| MediaError::Contract("observed animation bank Entry is absent".into()))?;
     let use_at = Subresource::new(super::super::payload::NAMED_DBA_BINDING, Vec::new());
     required_input::with_reference_input(directory, entry, &use_at, writer, |input, writer| {
-        inventory::read(input, projection, writer)
+        inventory::read(input, projection.context, writer)
     })
 }
 

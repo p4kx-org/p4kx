@@ -24,7 +24,7 @@ impl Provider for AnimationDefinitionProvider {
         let mut capability = Capability::new(
             MediaKind::AnimationDefinition,
             "p4kx.animation-definition",
-            "1.3.0",
+            "1.4.0",
             "Original character parameters, animation event definitions and Mannequin XML source.",
         );
         capability.field_groups = vec![
@@ -51,6 +51,10 @@ impl Provider for AnimationDefinitionProvider {
             FieldGroup::new(
                 "sub-database-cycles",
                 "Positive cycles in the observed, directory-local Mannequin source graph.",
+            ),
+            FieldGroup::new(
+                "blend-space-local-references",
+                "Document-local face and pseudo example candidates from separate ordinal and alias evidence.",
             ),
         ];
         capability

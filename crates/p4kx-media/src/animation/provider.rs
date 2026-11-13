@@ -23,7 +23,7 @@ impl Provider for AnimationProvider {
         let mut capability = Capability::new(
             MediaKind::Animation,
             "p4kx.animation.source",
-            "1.5.0",
+            "1.6.0",
             "Exact animation and image Entry bytes with positioned source data and separate decoded sample chunks.",
         );
         capability.field_groups = vec![

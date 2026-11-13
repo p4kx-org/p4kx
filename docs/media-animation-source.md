@@ -74,9 +74,17 @@ A chunk with unreconciled path coverage keeps the `directional-opaque` dispositi
 
 CAF and AIM path lookups describe a physical loose Entry in the owning Archive.
 They distinguish missing, ambiguous and filtered identities. A successful lookup
-needs no target payload read. DBA ownership and pose semantics require further
-evidence. The path depends on the image payload. A resolved target identity also
-depends on the target's directory metadata.
+needs no target payload read. The path depends on the image payload. A resolved
+target identity also depends on the target's directory metadata.
+
+A nonzero DBA selector matches the IEEE CRC32 of the normalized DBA path below
+`Data/`. The lookup retains physical duplicate candidates and selection status.
+Only a unique selected bank supplies a clip inventory. The `dba_clip` result then
+matches the complete CAF path against the actual database names and lists their
+physical clip ordinals, name ranges and metadata ranges. The clip data carries
+separate payload origins, including encryption. A filtered, ambiguous or unreadable
+bank cannot establish a clip match. A bounded or incomplete metadata inventory
+reports that its observed candidate list is incomplete.
 
 ## Installed Archive verification
 

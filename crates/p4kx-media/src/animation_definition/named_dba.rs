@@ -196,7 +196,7 @@ impl<'a> BindingProjection<'a> {
         ] {
             records::field(prepared, &format!("{base}/{field}"), origin.clone(), writer)?;
         }
-        self.candidates.push(matched.candidate(index as u64));
+        self.candidates.push(clip_candidate(matched, index as u64));
         Ok(())
     }
 }
@@ -266,4 +266,17 @@ struct ClipCandidate<'a> {
 
 fn identity_definition(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
     schemars::json_schema!({"$ref": "#/$defs/Identity"})
+}
+
+fn clip_candidate<'a>(matched: &ObservedMatch<'a>, declaration: u64) -> ClipCandidate<'a> {
+    ClipCandidate {
+        declaration_ordinal: DecimalU64::new(declaration),
+        entry: &matched.bank.identity,
+        clip_ordinal: DecimalU64::new(matched.record.ordinal as u64),
+        authored_name: &matched.record.authored_name,
+        name_range: crate::animation::dba_metadata_lookup::entry_range(matched.record.name.clone()),
+        metadata_range: crate::animation::dba_metadata_lookup::entry_range(
+            matched.record.metadata.clone(),
+        ),
+    }
 }

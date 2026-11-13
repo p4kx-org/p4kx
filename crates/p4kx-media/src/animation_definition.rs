@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+mod blend_reference_index;
+mod blend_reference_payload;
+mod blend_references;
 mod graph_field;
 mod graph_source;
 mod links;

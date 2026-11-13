@@ -5,6 +5,7 @@ use p4kx_extraction::cryxml::{SourceDeclaration, SourceDeclarationKind, SourceEl
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::graph_field::GraphField;
 use super::payload::{self as wire, DefinitionFamily, DefinitionPayload};
 use super::projection::DefinitionProjection;
 use crate::audio_control_payload::{AtlDeclaration, AtlLocation, AtlPosition};
@@ -129,8 +130,8 @@ impl GraphRole {
     }
 
     pub(super) fn write_attribute(
-        self,
         projection: &DefinitionProjection<'_, '_>,
+        field: GraphField,
         attribute: &SourceDeclaration<'_>,
         indices: [u64; 2],
         position: AtlPosition,
@@ -139,7 +140,7 @@ impl GraphRole {
         if !matches!(attribute.kind(), SourceDeclarationKind::Attribute { .. }) {
             return Ok(());
         }
-        let field = super::graph_field::GraphField::of(self, attribute);
+
         projection.write(
             position,
             wire::GRAPH_ATTRIBUTE,
@@ -172,6 +173,6 @@ pub(super) struct GraphNode<'source> {
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(super) struct GraphAttribute<'source> {
-    field: super::graph_field::GraphField,
+    field: GraphField,
     declaration: AtlDeclaration<'source>,
 }

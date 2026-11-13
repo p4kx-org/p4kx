@@ -5,6 +5,7 @@ use p4kx_extraction::DecimalU64;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::blend_reference_payload::{BlendCandidate, BlendReference};
 use super::graph_source::{GraphAttribute, GraphNode};
 use super::named_dba::Binding;
 use super::sub_database_cycles::{SubDatabaseCycle, SubDatabaseEdge};
@@ -33,6 +34,8 @@ pub(super) const SUB_DATABASE_ATTRIBUTE_FRONTIER: &str =
     "animation-definition-sub-database-attribute-frontier";
 pub(super) const SUB_DATABASE_TARGET_FRONTIER: &str =
     "animation-definition-sub-database-target-frontier";
+pub(super) const BLEND_REFERENCE: &str = "animation-definition-blend-space-reference";
+pub(super) const BLEND_CANDIDATE: &str = "animation-definition-blend-space-candidate";
 pub(super) const GRAPH_ATTRIBUTE: &str = "animation-definition-graph-attribute";
 
 #[derive(Clone, Copy, Serialize, JsonSchema)]
@@ -88,6 +91,8 @@ pub(super) enum DefinitionPayload<'source> {
     SubDatabaseEdge(SubDatabaseEdge),
     SubDatabaseCycle(SubDatabaseCycle),
     SubDatabaseFrontier(Frontier),
+    BlendSpaceReference(BlendReference<'source>),
+    BlendSpaceCandidate(BlendCandidate),
 }
 
 #[derive(Serialize, JsonSchema)]

@@ -3,6 +3,8 @@
 
 use std::cell::Cell;
 
+#[path = "directory_animation_banks.rs"]
+pub(crate) mod animation_banks;
 #[path = "directory_path_candidates.rs"]
 mod path_candidates;
 

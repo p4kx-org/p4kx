@@ -3,24 +3,32 @@
 
 use std::ops::Range;
 
+#[path = "caf_image_bank.rs"]
+mod caf_image_bank;
+#[path = "caf_image_clip.rs"]
+mod caf_image_clip;
 #[path = "caf_image_hashes.rs"]
 mod caf_image_hashes;
+#[path = "caf_image_record.rs"]
+mod caf_image_record;
 #[path = "directional_projection.rs"]
 mod directional_projection;
 
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::chunks::{ChunkFile, Container};
-use p4kx_extraction::model::{CafImage, CafImageError, CafImagePath, CafImageRecord};
+use p4kx_extraction::model::{CafImage, CafImageError, CafImagePath};
 
 use super::directional_paths::DirectionalPaths;
-use super::image_payload::{ImageIndex, ImageLayout, ImagePath, ImageRecord};
+use super::image_payload::{ImageIndex, ImageLayout, ImagePath};
 use super::origin::{self as proof, AnimationOrigins};
 use super::payload::{self as wire, AnimationPayload, Family};
 use crate::animation::selection_path::{ReferenceSelection, archive_animation_path};
+use crate::directory_lookup::animation_banks::AnimationBanks;
 use crate::origin_contributions::OriginContributions;
 use crate::{
     MediaError, MediaIssue, MediaKind, MediaWriter, Severity, SourceContext, Status, Subresource,
 };
+use std::cell::OnceCell;
 
 const CAF_IMAGE_TYPE: u32 = 0x3702_75B7;
 const DIRECTIONAL_IMAGE_TYPE: u32 = 0x6B8D_F259;
@@ -43,6 +51,7 @@ pub(super) fn write(
         Family::DirectionalBlendImage => DIRECTIONAL_IMAGE_TYPE,
         Family::Caf | Family::Dba | Family::Aim => return Ok(()),
     };
+    let banks = OnceCell::new();
     for (index, chunk) in file.chunks().iter().enumerate() {
         writer.checkpoint()?;
         if chunk.chunk_type().id() != expected_type {
@@ -52,13 +61,23 @@ pub(super) fn write(
         let bytes = file.chunk_data(index).ok_or_else(|| {
             MediaError::Contract("validated image chunk has no retained bytes".into())
         })?;
-        let source = ImageSource { context, origins };
+        let source = ImageSource {
+            context,
+            origins,
+            banks: &banks,
+        };
         let layout = source.classify(expected_type, chunk.version(), range.start, bytes, writer)?;
         source.write_index(file, index, range.clone(), &layout, writer)?;
         match layout {
             Layout::Caf(image) => {
+                let mut metadata = caf_image_clip::DbaMetadataCache::default();
                 for (ordinal, record) in image.records().enumerate() {
-                    source.write_record([index as u64, ordinal as u64], record, writer)?;
+                    source.write_record(
+                        [index as u64, ordinal as u64],
+                        record,
+                        &mut metadata,
+                        writer,
+                    )?;
                 }
             }
             Layout::DirectionalPaths { paths, .. } => {
@@ -130,6 +149,7 @@ impl Layout<'_> {
 
 pub(super) struct ImageSource<'a, 'source> {
     context: &'a SourceContext<'source>,
+    banks: &'a OnceCell<AnimationBanks>,
     pub(super) origins: &'a AnimationOrigins<'a>,
 }
 
@@ -271,67 +291,6 @@ impl ImageSource<'_, '_> {
             )?)?;
         }
         Ok(layout_proof.finish())
-    }
-
-    fn write_record(
-        &self,
-        indices: [u64; 2],
-        record: CafImageRecord<'_>,
-        writer: &mut MediaWriter<'_>,
-    ) -> Result<(), MediaError> {
-        self.context.directory.input_state()?.budget.metadata(
-            0,
-            1,
-            writer.limits(),
-            writer.checkpoint,
-        )?;
-        let mut prepared = self.origins.prepared()?;
-        let record_range = record.range();
-        let field_range = record.path_field_range();
-        let body = self.origins.payload(
-            record_range.clone(),
-            "cafImageRecord",
-            SourceUseRole::Payload,
-            writer,
-        )?;
-        let path = self.origins.payload(
-            field_range.clone(),
-            "cafImagePathField",
-            SourceUseRole::Payload,
-            writer,
-        )?;
-        proof::control(&mut prepared, body.clone(), writer)?;
-        proof::at(&mut prepared, "/data/payload/range", body, writer)?;
-        proof::at(
-            &mut prepared,
-            "/data/payload/path_field",
-            path.clone(),
-            writer,
-        )?;
-        proof::at(&mut prepared, "/data/payload/path", path.clone(), writer)?;
-        for field in ["range/basis", "path_field/basis"] {
-            proof::at(
-                &mut prepared,
-                &format!("{FIELD}{field}"),
-                self.origins.independent(),
-                writer,
-            )?;
-        }
-        let hashes = self.hashes(record, &mut prepared, writer)?;
-        let path = self.path(record.path(), "caf", &path, &mut prepared, writer)?;
-        prepared.write(
-            writer,
-            &Subresource::new(wire::IMAGE_RECORD, indices.to_vec()),
-            Status::Complete,
-            &AnimationPayload::ImageRecord(ImageRecord {
-                range: wire::entry_range(record_range),
-                path_field: wire::entry_range(field_range),
-                caf_path_crc32: hashes.caf.value,
-                dba_path_crc32: (hashes.dba.value != 0).then_some(hashes.dba.value),
-                path,
-            }),
-            &[],
-        )
     }
 
     pub(super) fn path<'a>(

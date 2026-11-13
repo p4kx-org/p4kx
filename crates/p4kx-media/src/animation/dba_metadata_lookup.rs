@@ -6,27 +6,25 @@ use std::ops::Range;
 
 use p4kx_extraction::chunks::{ChunkFile, ivo};
 use p4kx_extraction::model::DbaMetadataRecords;
-use p4kx_extraction::{DecimalU64, InputScope, SourceUseRole};
+use p4kx_extraction::{InputScope, SourceUseRole};
 
-use super::super::super::links;
-use super::super::super::projection::DefinitionProjection;
-use super::super::ClipCandidate;
-use super::allocation;
+use super::selection_path::archive_animation_path;
+use crate::SourceContext;
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
 use crate::{Identity, MediaError, MediaWriter, OffsetBasis, RequiredInput, SourceRange};
 
-pub(in super::super) struct Inventory {
-    pub(super) complete: bool,
-    pub(super) coverage: OriginContributions,
+pub(crate) struct Inventory {
+    pub(crate) complete: bool,
+    pub(crate) coverage: OriginContributions,
     input: MediaOriginInput,
-    identity: Identity,
+    pub(crate) identity: Identity,
     records: HashMap<String, Vec<Record>>,
 }
 
 impl Inventory {
-    pub(super) fn matches(&self, path: &str) -> impl Iterator<Item = ObservedMatch<'_>> {
+    pub(crate) fn matches(&self, path: &str) -> impl Iterator<Item = ObservedMatch<'_>> {
         self.records
             .get(path)
             .into_iter()
@@ -34,40 +32,26 @@ impl Inventory {
             .map(move |record| ObservedMatch { bank: self, record })
     }
 }
-struct Record {
-    ordinal: usize,
-    authored_name: String,
-    name: Range<u64>,
-    metadata: Range<u64>,
+pub(crate) struct Record {
+    pub(crate) ordinal: usize,
+    pub(crate) authored_name: String,
+    pub(crate) name: Range<u64>,
+    pub(crate) metadata: Range<u64>,
 }
 
-pub(in super::super) struct ObservedMatch<'a> {
-    bank: &'a Inventory,
-    record: &'a Record,
+pub(crate) struct ObservedMatch<'a> {
+    pub(crate) bank: &'a Inventory,
+    pub(crate) record: &'a Record,
 }
 
-pub(in super::super) struct MatchProof {
-    pub(in super::super) entry: OriginContributions,
-    pub(in super::super) name: OriginContributions,
-    pub(in super::super) metadata: OriginContributions,
+pub(crate) struct MatchProof {
+    pub(crate) entry: OriginContributions,
+    pub(crate) name: OriginContributions,
+    pub(crate) metadata: OriginContributions,
 }
 
-impl<'a> ObservedMatch<'a> {
-    pub(in super::super) fn candidate(&self, declaration: u64) -> ClipCandidate<'a> {
-        ClipCandidate {
-            declaration_ordinal: DecimalU64::new(declaration),
-            entry: &self.bank.identity,
-            clip_ordinal: DecimalU64::new(self.record.ordinal as u64),
-            authored_name: &self.record.authored_name,
-            name_range: entry_range(self.record.name.clone()),
-            metadata_range: entry_range(self.record.metadata.clone()),
-        }
-    }
-
-    pub(in super::super) fn proof(
-        &self,
-        writer: &MediaWriter<'_>,
-    ) -> Result<MatchProof, MediaError> {
+impl ObservedMatch<'_> {
+    pub(crate) fn proof(&self, writer: &MediaWriter<'_>) -> Result<MatchProof, MediaError> {
         let mut entry = writer.capture_origins();
         let input = &self.bank.input;
         entry.add(
@@ -96,7 +80,7 @@ impl<'a> ObservedMatch<'a> {
     }
 }
 
-const fn entry_range(range: Range<u64>) -> SourceRange {
+pub(crate) const fn entry_range(range: Range<u64>) -> SourceRange {
     SourceRange {
         basis: OffsetBasis::Entry,
         start: range.start,
@@ -104,9 +88,9 @@ const fn entry_range(range: Range<u64>) -> SourceRange {
     }
 }
 
-pub(super) fn read(
+pub(crate) fn read(
     input: &mut RequiredInput<'_>,
-    projection: &DefinitionProjection<'_, '_>,
+    context: &SourceContext<'_>,
     writer: &MediaWriter<'_>,
 ) -> Result<Inventory, MediaError> {
     let bytes = input.read_payload()?;
@@ -118,7 +102,7 @@ pub(super) fn read(
                 || file.table_range(),
                 |(_, chunk)| chunk.offset()..chunk.offset() + chunk.size(),
             );
-            let (records, complete) = metadata(&file, projection, writer)?;
+            let (records, complete) = metadata(&file, context, writer)?;
             (records, complete, evidence_range)
         }
         Err(_) => (HashMap::new(), false, 0..input.receipt().source.size),
@@ -147,11 +131,11 @@ type Records = HashMap<String, Vec<Record>>;
 
 fn metadata(
     file: &ChunkFile<&[u8]>,
-    projection: &DefinitionProjection<'_, '_>,
+    context: &SourceContext<'_>,
     writer: &MediaWriter<'_>,
 ) -> Result<(Records, bool), MediaError> {
-    let budget = &projection.context.directory.input_state()?.budget;
-    let names = DbaMetadataRecords::read(projection.context.entry.path(), file);
+    let budget = &context.directory.input_state()?.budget;
+    let names = DbaMetadataRecords::read(context.entry.path(), file);
     let mut complete = names.is_ok();
     let mut records = Records::new();
     for name in names.into_iter().flatten() {
@@ -163,7 +147,7 @@ fn metadata(
         let Some((authored, key)) = std::str::from_utf8(name.name.bytes())
             .ok()
             .and_then(|name| {
-                links::archive_animation_path(name).map(|path| (name, path.to_ascii_lowercase()))
+                archive_animation_path(name).map(|path| (name, path.to_ascii_lowercase()))
             })
         else {
             complete = false;
@@ -171,11 +155,11 @@ fn metadata(
         };
         records
             .try_reserve(1)
-            .map_err(|error| allocation(projection, error))?;
+            .map_err(|error| allocation(context, error))?;
         let matches = records.entry(key).or_default();
         matches
             .try_reserve(1)
-            .map_err(|error| allocation(projection, error))?;
+            .map_err(|error| allocation(context, error))?;
         matches.push(Record {
             ordinal: name.ordinal,
             authored_name: authored.to_owned(),
@@ -184,4 +168,11 @@ fn metadata(
         });
     }
     Ok((records, complete))
+}
+
+fn allocation(context: &SourceContext<'_>, cause: std::collections::TryReserveError) -> MediaError {
+    MediaError::Io {
+        path: context.entry.path().into(),
+        source: std::io::Error::new(std::io::ErrorKind::OutOfMemory, cause),
+    }
 }

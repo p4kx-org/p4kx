@@ -12,6 +12,7 @@ publish.workspace = true
 layer = "service"
 
 [dependencies]
+crc32fast.workspace = true
 p4kx-extraction.workspace = true
 p4kx-shader.workspace = true
 schemars.workspace = true

@@ -4,6 +4,7 @@
 mod binding_payload;
 mod binding_projection;
 mod controller_projection;
+pub(crate) mod dba_metadata_lookup;
 mod dba_projection;
 mod directional_paths;
 mod image_payload;

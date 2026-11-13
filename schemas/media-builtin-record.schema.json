@@ -536,6 +536,16 @@
         }
       ]
     },
+    "AliasDisposition": {
+      "enum": [
+        "missing",
+        "exact",
+        "repeated-exact",
+        "case-variant",
+        "repeated-case-variant"
+      ],
+      "type": "string"
+    },
     "AnimationBindingDisposition": {
       "enum": [
         "bound",
@@ -1183,6 +1193,40 @@
             "payload"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BlendReference"
+            },
+            "record_type": {
+              "const": "blend-space-reference",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BlendCandidate"
+            },
+            "record_type": {
+              "const": "blend-space-candidate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
         }
       ],
       "title": "DefinitionPayload"
@@ -1246,6 +1290,118 @@
         "directional-blend-image"
       ],
       "type": "string"
+    },
+    "AnimationImageDbaClipCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "authored_name": {
+          "type": "string"
+        },
+        "clip_ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "metadata_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "name_range": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "clip_ordinal",
+        "authored_name",
+        "name_range",
+        "metadata_range"
+      ],
+      "type": "object"
+    },
+    "AnimationImageDbaClipLookup": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "no-bank-declared",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "bank-unresolved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "bank-unreadable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "invalid-caf-path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "candidates": {
+              "items": {
+                "$ref": "#/$defs/AnimationImageDbaClipCandidate"
+              },
+              "type": "array"
+            },
+            "candidates_complete": {
+              "type": "boolean"
+            },
+            "observed_candidates": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "const": "observed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "candidates_complete",
+            "observed_candidates",
+            "candidates"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "AnimationImageIndex": {
       "additionalProperties": false,
@@ -1431,6 +1587,19 @@
           "minimum": 0,
           "type": "integer"
         },
+        "dba_clip": {
+          "$ref": "#/$defs/AnimationImageDbaClipLookup"
+        },
+        "dba_entry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Reference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "dba_path_crc32": {
           "format": "uint32",
           "minimum": 0,
@@ -1454,6 +1623,8 @@
         "path_field",
         "caf_path_crc32",
         "dba_path_crc32",
+        "dba_entry",
+        "dba_clip",
         "path"
       ],
       "type": "object"
@@ -5706,6 +5877,52 @@
         }
       ]
     },
+    "BlendCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "alias_declaration_ordinal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "alias_position": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AtlPosition"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "basis": {
+          "$ref": "#/$defs/CandidateBasis"
+        },
+        "target_element_index": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target_kind": {
+          "$ref": "#/$defs/ExampleKind"
+        },
+        "target_position": {
+          "$ref": "#/$defs/AtlPosition"
+        }
+      },
+      "required": [
+        "basis",
+        "target_element_index",
+        "target_kind",
+        "target_position",
+        "alias_declaration_ordinal",
+        "alias_position"
+      ],
+      "type": "object"
+    },
     "BlendFloatWord": {
       "additionalProperties": false,
       "properties": {
@@ -6016,6 +6233,49 @@
         }
       ]
     },
+    "BlendReference": {
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "$ref": "#/$defs/AliasDisposition"
+        },
+        "attribute": {
+          "type": "string"
+        },
+        "interpretations": {
+          "$ref": "#/$defs/Interpretation"
+        },
+        "kind": {
+          "$ref": "#/$defs/PointKind"
+        },
+        "lexeme": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ordinal": {
+          "$ref": "#/$defs/OrdinalDisposition"
+        },
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "attribute",
+        "value",
+        "lexeme",
+        "position",
+        "ordinal",
+        "alias",
+        "interpretations"
+      ],
+      "type": "object"
+    },
     "BlendTable": {
       "additionalProperties": false,
       "properties": {
@@ -6209,6 +6469,14 @@
         "payload_access"
       ],
       "type": "object"
+    },
+    "CandidateBasis": {
+      "enum": [
+        "local-ordinal",
+        "exact-alias",
+        "case-variant-alias"
+      ],
+      "type": "string"
     },
     "CandidateRecord": {
       "additionalProperties": false,
@@ -8816,6 +9084,13 @@
       ],
       "type": "object"
     },
+    "ExampleKind": {
+      "enum": [
+        "real",
+        "pseudo"
+      ],
+      "type": "string"
+    },
     "Float32": {
       "description": "A source float whose raw word survives non-finite values and signed zero.",
       "properties": {
@@ -9808,6 +10083,18 @@
           "type": "string"
         }
       ]
+    },
+    "Interpretation": {
+      "enum": [
+        "unresolved",
+        "ordinal-only",
+        "exact-alias-only",
+        "agreement",
+        "conflict",
+        "tentative-case-variant",
+        "ordinal-with-case-variant"
+      ],
+      "type": "string"
     },
     "InvalidHeader": {
       "additionalProperties": false,
@@ -14583,6 +14870,15 @@
       ],
       "type": "object"
     },
+    "OrdinalDisposition": {
+      "enum": [
+        "non-integer",
+        "unavailable-layout",
+        "out-of-range",
+        "candidate"
+      ],
+      "type": "string"
+    },
     "OriginalIdentifier": {
       "$ref": "#/$defs/IdentifierValue",
       "description": "An unmodified source identifier with a distinct domain and integer width."
@@ -15724,6 +16020,13 @@
         "item_count"
       ],
       "type": "object"
+    },
+    "PointKind": {
+      "enum": [
+        "face",
+        "pseudo"
+      ],
+      "type": "string"
     },
     "Pose": {
       "additionalProperties": false,
@@ -39402,6 +39705,116 @@
               "indices": {
                 "maxItems": 2,
                 "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-blend-space-reference"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "blend-space-reference"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-blend-space-candidate"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "blend-space-candidate"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
               }
             }
           }

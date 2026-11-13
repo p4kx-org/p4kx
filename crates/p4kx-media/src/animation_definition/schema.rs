@@ -32,6 +32,8 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         (wire::EVENT_ATTRIBUTE, "event-attribute", 2),
         (wire::GRAPH_NODE, "graph-node", 1),
         (wire::GRAPH_ATTRIBUTE, "graph-attribute", 2),
+        (wire::BLEND_REFERENCE, "blend-space-reference", 2),
+        (wire::BLEND_CANDIDATE, "blend-space-candidate", 3),
         (wire::SUB_DATABASE_EDGE, "sub-database-edge", 3),
         (wire::SUB_DATABASE_CYCLE, "sub-database-cycle", 1),
         (

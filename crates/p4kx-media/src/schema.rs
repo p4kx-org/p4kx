@@ -66,6 +66,10 @@ pub fn source_schema() -> Value {
     schemars::schema_for!(crate::Source).to_value()
 }
 
+pub(crate) fn optional_reference_definition(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({"anyOf": [{"$ref": "#/$defs/Reference"}, {"type": "null"}]})
+}
+
 pub(crate) fn reference_definition(_: &mut SchemaGenerator) -> Schema {
     schemars::json_schema!({"$ref": "#/$defs/Reference"})
 }

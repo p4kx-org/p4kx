@@ -40,6 +40,9 @@ pub(super) struct ImageRecord<'a> {
     pub(super) path_field: SourceRange,
     pub(super) caf_path_crc32: u32,
     pub(super) dba_path_crc32: Option<u32>,
+    #[schemars(schema_with = "crate::schema::optional_reference_definition")]
+    pub(super) dba_entry: Option<Box<Reference>>,
+    pub(super) dba_clip: DbaClipLookup<'a>,
     pub(super) path: ImagePath<'a>,
 }
 
@@ -63,4 +66,32 @@ pub(super) enum ImagePath<'a> {
 pub(super) struct ImageDirectionalPath<'a> {
     pub(super) path_field: SourceRange,
     pub(super) path: ImagePath<'a>,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(tag = "status", rename_all = "kebab-case", deny_unknown_fields)]
+#[schemars(rename = "AnimationImageDbaClipLookup")]
+pub(super) enum DbaClipLookup<'a> {
+    NoBankDeclared,
+    BankUnresolved,
+    BankUnreadable,
+    InvalidCafPath,
+    Observed {
+        candidates_complete: bool,
+        observed_candidates: usize,
+        candidates: Vec<DbaClipCandidate<'a>>,
+    },
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "AnimationImageDbaClipCandidate")]
+pub(super) struct DbaClipCandidate<'a> {
+    pub(super) clip_ordinal: usize,
+    pub(super) authored_name: &'a str,
+    pub(super) name_range: SourceRange,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(super) proof: super::dba_metadata_lookup::MatchProof,
+    pub(super) metadata_range: SourceRange,
 }

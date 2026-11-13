@@ -9,6 +9,9 @@ use p4kx_extraction::cryxml::{
 };
 use p4kx_extraction::{DecimalU64, SourceUseRole};
 
+use super::blend_reference_index::BlendIndex;
+use super::blend_references;
+use super::graph_field::GraphField;
 use super::graph_source::GraphRole;
 use super::links::{self, SubDatabaseSelector};
 use super::named_clip::Filepath;
@@ -82,6 +85,11 @@ impl DefinitionProjection<'_, '_> {
             next_sibling: 0,
         }];
         let mut index = 0_u64;
+        let mut blend = if matches!(self.family, DefinitionFamily::Bspace) && !source.is_lossy() {
+            Some(BlendIndex::default())
+        } else {
+            None
+        };
         while let Some(frame) = stack.last_mut() {
             let Some(item) = frame.siblings.next() else {
                 stack.pop();
@@ -95,7 +103,8 @@ impl DefinitionProjection<'_, '_> {
             frame.next_sibling = advance(frame.next_sibling)?;
             match item? {
                 SourceContent::Element(element) => {
-                    let child = self.element(element, frame, index, location, writer)?;
+                    let child =
+                        self.element(element, frame, index, location, blend.as_mut(), writer)?;
                     stack.try_reserve(1).map_err(|cause| MediaError::Io {
                         path: writer.root.clone(),
                         source: io::Error::new(io::ErrorKind::OutOfMemory, cause),
@@ -119,6 +128,9 @@ impl DefinitionProjection<'_, '_> {
             }
             index = advance(index)?;
         }
+        if let Some(blend) = blend {
+            blend_references::write(self, &blend, writer)?;
+        }
         Ok(index)
     }
 
@@ -128,12 +140,18 @@ impl DefinitionProjection<'_, '_> {
         parent: &mut Frame<'document>,
         index: u64,
         location: AtlLocation,
+        mut blend: Option<&mut BlendIndex<'document>>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<Frame<'document>, Failure> {
         let syntax = element.syntax()?;
         let position = element_position(&element.position())?;
-        let (graph, sub_database) =
-            self.graph_element(element, parent, (index, position), writer)?;
+        let (graph, sub_database) = self.graph_element(
+            element,
+            parent,
+            (index, position),
+            blend.as_deref_mut(),
+            writer,
+        )?;
         let timeline = TimelineNode::at(
             parent.timeline,
             self.family,
@@ -172,6 +190,7 @@ impl DefinitionProjection<'_, '_> {
                 sub_database: sub_database.as_ref(),
             },
             parent,
+            blend,
             writer,
         )?;
         self.binary_text(syntax.binary_text(), index, writer)?;
@@ -191,14 +210,15 @@ impl DefinitionProjection<'_, '_> {
         element: SourceElement<'_>,
         parent: &Frame<'_>,
         site: (u64, AtlPosition),
+        blend: Option<&mut BlendIndex<'_>>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(Option<GraphRole>, Option<SubDatabaseSelector>), Failure> {
-        let graph = GraphRole::of(
-            self.family,
-            parent.graph.map(|(role, _)| role),
-            parent.parent.is_none(),
-            element,
-        );
+        let parent_role = parent.graph.map(|(role, _)| role);
+        let graph = GraphRole::of(self.family, parent_role, parent.parent.is_none(), element);
+        if let Some(blend) = blend {
+            let (index, position) = site;
+            blend.element(graph, parent_role, index, position, writer)?;
+        }
         let sub_database =
             SubDatabaseSelector::of(graph, parent.graph, element, self, site, writer)?;
         Ok((graph, sub_database))
@@ -223,6 +243,7 @@ impl DefinitionProjection<'_, '_> {
         &self,
         element: &ElementDeclarations<'_, 'document>,
         parent: &mut Frame<'document>,
+        mut blend: Option<&mut BlendIndex<'document>>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), Failure> {
         let budget = self.context.directory.input_state()?.budget;
@@ -242,7 +263,11 @@ impl DefinitionProjection<'_, '_> {
                 .timeline
                 .write_attribute(self, &declaration, indices, position, writer)?;
             if let Some(graph) = element.graph {
-                graph.write_attribute(self, &declaration, indices, position, writer)?;
+                let field = GraphField::of(graph, &declaration);
+                if let Some(blend) = blend.as_deref_mut() {
+                    blend.declaration(&field, graph, &declaration, indices, position, writer)?;
+                }
+                GraphRole::write_attribute(self, field, &declaration, indices, position, writer)?;
             }
         }
         Ok(())

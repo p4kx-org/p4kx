@@ -35,6 +35,7 @@ pub(crate) struct PropertySite {
 pub(crate) enum ReferenceIdentifier {
     Path,
     Text,
+    Unsigned,
 }
 
 #[derive(Clone, Copy)]
@@ -69,8 +70,14 @@ impl<E: CandidateInput> ReferenceOriginInputs<'_, E> {
         let original = child(prefix, "original")?;
         prepared.insert_subtree(&original, self.original.clone(), writer)?;
         independent(prepared, &child(&original, "type")?, writer)?;
-        if matches!(self.identifier, ReferenceIdentifier::Text) {
+        if matches!(
+            self.identifier,
+            ReferenceIdentifier::Text | ReferenceIdentifier::Unsigned
+        ) {
             independent(prepared, &child(&original, "namespace")?, writer)?;
+        }
+        if matches!(self.identifier, ReferenceIdentifier::Unsigned) {
+            independent(prepared, &child(&original, "width")?, writer)?;
         }
         for field in ["resolution", "observed_candidates", "candidates_complete"] {
             prepared.insert_subtree(&child(prefix, field)?, full.clone(), writer)?;

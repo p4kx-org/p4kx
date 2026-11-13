@@ -17,7 +17,6 @@ use thiserror::Error;
 
 #[path = "provider_file.rs"]
 mod file;
-
 use crate::cdf_model_sources::CdfModelSources;
 use crate::path_match::starts_with_path;
 use crate::skeleton::SkeletonProblem;

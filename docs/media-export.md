@@ -653,3 +653,18 @@ remain visible in the corresponding original `link` rows. A reported cycle
 proves the edges that close it, including when other branches are unresolved.
 The absence of a cycle row carries no claim about edges outside the observed
 graph.
+
+Each `p*` attribute on a blend-space face or pseudo example has a
+`blend-space-reference` row. Its declaration and position remain intact.
+For the documented table layout, face ordinals index the real examples
+followed by the pseudo examples. Pseudo input ordinals index only real
+examples. Exact local `Alias` matches and case variants have distinct states.
+Their candidate rows cite the original example and alias positions.
+A numeric alias and an ordinal can identify different nodes. In that case
+both candidates remain available with `conflict` as their interpretation.
+Candidate rows use the source element and attribute ordinals plus a
+zero-based candidate sequence, with ordinal evidence before authored alias
+occurrences. Missing, unsupported and case-variant data remain explicit.
+These local references make no assertion about the runtime's choice of a
+candidate or about animation file resolution.
+See [Crytek's numeric blend-space example](https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756816/pages/26873847).

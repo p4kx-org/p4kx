@@ -3885,6 +3885,7 @@ dependencies = [
 name = "p4kx-media"
 version = "0.4.2"
 dependencies = [
+ "crc32fast",
  "jsonschema",
  "p4kx-extraction",
  "p4kx-shader",
