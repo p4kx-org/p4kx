@@ -3,21 +3,29 @@
 
 use std::collections::BTreeSet;
 use std::error::Error;
-use std::time::SystemTime;
+use std::time::UNIX_EPOCH;
 
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, Kind, build_catalog_from};
+use p4kx_export::{
+    CatalogOptions, CatalogPublicationMode, ExportDiagnosticSeverity, Kind, build_catalog_from,
+};
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForge, DataForgeEntry, RecordTree, StructValue, TreeBuilder,
+    Archive, ArchiveWatch, DataForge, DataForgeEntry, Filter, StructValue, TreeBuilder,
     Value as Original,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-use crate::authored_definition_witness::{field, verify_array, verify_link, verify_state};
+use crate::authored_definition_witness::{field, verify_state};
 use crate::catalog_v3_consumer as consumer;
+use crate::real_archive_auto_spawns::provenance::Origins;
+use crate::real_archive_canonical_texts::TextIndex;
 use crate::real_archive_verification::print_line;
 
+#[path = "real_archive_law_fields.rs"]
+mod law;
+
+const LAW_SYSTEM: &str = "libs/foundry/records/lawsystem/*";
 const FAMILIES: [(Kind, &str); 3] = [
     (Kind::Infractions, "InfractionDefinition"),
     (Kind::InfractionSets, "InfractionSet"),
@@ -34,23 +42,54 @@ fn original_law_definitions_match_canonical_owned_rules_and_links() -> TestResul
     let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
     let watch = ArchiveWatch::new(&archive);
     let entry = DataForgeEntry::read(&archive).map_err(|_| "read original DataForge")?;
+    let forge = entry.open().map_err(|_| "open original DataForge")?;
+    let filter = Filter::new(LAW_SYSTEM);
     let options = CatalogOptions {
+        filter: Some(&filter),
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..CatalogOptions::new(SystemTime::now())
+        ..CatalogOptions::new(UNIX_EPOCH)
     };
     let built = build_catalog_from(&archive, &entry, &options)
-        .map_err(|_| "build law definition catalog")?;
+        .map_err(|_| "build scoped law definition catalog")?;
+    for diagnostic in built.summary().export_health().diagnostics() {
+        if diagnostic.severity != ExportDiagnosticSeverity::Information {
+            assert!(
+                diagnostic
+                    .kind
+                    .is_some_and(|kind| !FAMILIES.iter().any(|(law, _)| *law == kind)),
+                "law extraction has a blocking {:?} diagnostic",
+                diagnostic.code
+            );
+            print_line(&format!(
+                "scoped diagnostic catalog also reports {:?} {:?}: {}",
+                diagnostic.kind, diagnostic.code, diagnostic.count
+            ));
+        }
+    }
     let catalog: Value = serde_json::from_slice(built.json())?;
     crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
-    let forge = entry.open().map_err(|_| "open original DataForge")?;
+    let origins = Origins::read(&catalog, entry.origin())?;
+    let texts = TextIndex::new(&catalog)?;
+    let mut total = 0;
     for (kind, source_type) in FAMILIES {
-        let count = verify_family(&forge, &catalog, kind, source_type)?;
-        print_line(&format!("{kind}: {count} physical definitions checked"));
+        let counts = verify_family(&forge, &catalog, kind, source_type, &origins, &texts)?;
+        print_line(&format!(
+            "{kind}: {} physical definitions, {} typed field and array-element checks",
+            counts.records, counts.checks
+        ));
+        total += counts.records;
     }
+    assert!(total > 0, "a positive original law source selection");
     watch
         .check()
         .map_err(|_| "Archive changed during law verification")?;
     Ok(())
+}
+
+#[derive(Default)]
+struct Counts {
+    records: usize,
+    checks: usize,
 }
 
 fn verify_family(
@@ -58,144 +97,63 @@ fn verify_family(
     catalog: &Value,
     kind: Kind,
     source_type: &str,
-) -> TestResult<usize> {
-    let expected: BTreeSet<_> = forge
-        .records()
-        .filter(|record| record.type_name().is_ok_and(|name| name == source_type))
-        .map(|record| record.index())
-        .collect();
-    let mut seen = BTreeSet::new();
+    origins: &Origins<'_>,
+    texts: &TextIndex<'_>,
+) -> TestResult<Counts> {
+    let mut expected = BTreeSet::new();
+    let filter = Filter::new(LAW_SYSTEM);
+    for record in forge.records() {
+        if record.type_name()? == source_type {
+            let path = record
+                .record_path()
+                .map_err(|_| "original law Record path")?;
+            assert!(filter.matches(path), "all law Record paths are in scope");
+            expected.insert(record.index());
+        }
+    }
     let mut order = Vec::new();
     let mut builder = TreeBuilder::new();
     let rows = consumer::rows(catalog, kind)?;
+    let mut counts = Counts::default();
     for row in rows {
         let index = u32::try_from(
             consumer::field(row, kind, "recordIndex")?
                 .as_u64()
                 .ok_or("physical definition index")?,
         )?;
-        assert!(seen.insert(index), "one row per physical definition");
-        let record = forge.record(index).ok_or("original law Record")?;
-        assert_eq!(
-            record.type_name().ok(),
-            Some(source_type),
-            "exact original definition type"
+        assert!(
+            expected.remove(&index),
+            "one row per original physical definition"
         );
+        let record = forge.record(index).ok_or("original law Record")?;
         let guid = consumer::identity(row, kind)?;
-        assert_eq!(guid, record.guid().to_string(), "exact original GUID");
+        assert!(guid == record.guid().to_string(), "exact original law GUID");
+        let path = consumer::present(field(row, "recordPath")?)?;
+        assert!(
+            path.as_str() == Some(record.record_path()?),
+            "exact original law path"
+        );
         order.push((guid, index));
         let tree = builder
             .build(&record)
             .map_err(|_| "read original law Record body")?;
-        verify_body(forge, kind, &tree, row)?;
+        let witness = law::Witness::new(forge, &tree, origins, texts);
+        witness.verify(kind, tree.root(), row)?;
+        counts.records += 1;
+        counts.checks += witness.checks();
     }
-    assert_eq!(seen, expected, "every physical definition of {kind}");
+    assert!(expected.is_empty(), "every physical definition of {kind}");
     assert!(
         order.is_sorted(),
         "GUID and physical ordinal order of {kind}"
     );
-    Ok(rows.len())
+    Ok(counts)
 }
 
-fn verify_body(
-    forge: &DataForge<'_>,
-    kind: Kind,
-    tree: &RecordTree<'_>,
+pub(super) fn verify_class<'source>(
+    source: Option<&Original<'source>>,
     row: &Value,
-) -> TestResult {
-    match kind {
-        Kind::Infractions => {
-            verify_array(
-                tree.field("triggers"),
-                field(row, "triggers")?,
-                verify_scalar,
-            )?;
-            verify_class(
-                tree.field("defaultParameters"),
-                field(row, "defaultParameters")?,
-                verify_parameters,
-            )
-        }
-        Kind::InfractionSets => verify_array(
-            tree.field("infractions"),
-            field(row, "infractions")?,
-            |slot, row| verify_use(forge, slot, row),
-        ),
-        Kind::Jurisdictions => {
-            for name in [
-                "baseFine",
-                "earlyPaymentPeriod",
-                "isPrison",
-                "respectsParentJurisdictionLaws",
-            ] {
-                verify_scalar(tree.field(name), field(row, name)?)?;
-            }
-            verify_scalar(
-                tree.field("maxStolenGoodsPossessionSCU"),
-                field(row, "maxStolenGoodsPossessionScu")?,
-            )?;
-            for (name, target) in [
-                ("parentJurisdiction", "Jurisdiction"),
-                ("journalEntry", "JournalEntry"),
-            ] {
-                verify_link(forge, target, tree.field(name), field(row, name)?)?;
-            }
-            for (name, target) in [
-                ("infractionSets", "InfractionSet"),
-                ("prohibitedGoods", "EntityClassDefinition"),
-                ("prohibitedResources", "ResourceType"),
-            ] {
-                verify_array(tree.field(name), field(row, name)?, |slot, row| {
-                    verify_link(forge, target, slot, row)
-                })?;
-            }
-            verify_array(
-                tree.field("infractions"),
-                field(row, "infractions")?,
-                |slot, row| verify_use(forge, slot, row),
-            )
-        }
-        _ => Err("kind has no law definition witness".into()),
-    }
-}
-
-fn verify_use(forge: &DataForge<'_>, source: Option<&Original<'_>>, row: &Value) -> TestResult {
-    verify_class(source, row, |original, row| {
-        verify_link(
-            forge,
-            "InfractionDefinition",
-            original.field("definition"),
-            field(row, "definition")?,
-        )?;
-        verify_class(
-            original.field("parameterOverrides"),
-            field(row, "parameterOverrides")?,
-            verify_parameters,
-        )
-    })
-}
-
-fn verify_parameters(source: &StructValue<'_>, row: &Value) -> TestResult {
-    for name in [
-        "isFelony",
-        "graceAllowance",
-        "gracePeriod",
-        "displayGraceTime",
-        "earlyPaymentPeriod",
-        "pressChargesNotificationTime",
-        "removeTimeSeconds",
-        "ignoreIfAgainstPartyMember",
-        "hideCrimeInJournal",
-    ] {
-        verify_scalar(source.field(name), field(row, name)?)?;
-    }
-    Ok(())
-}
-
-pub(super) fn verify_class(
-    source: Option<&Original<'_>>,
-    row: &Value,
-    verify: impl FnOnce(&StructValue<'_>, &Value) -> TestResult,
+    verify: impl FnOnce(&StructValue<'source>, &Value) -> TestResult,
 ) -> TestResult {
     let Some(Original::Struct(source)) = source else {
         return verify_state(source, row);
@@ -214,13 +172,12 @@ pub(super) fn verify_scalar(source: Option<&Original<'_>>, row: &Value) -> TestR
     let expected = match source {
         Some(Original::Int32(value)) => json!(value),
         Some(Original::Bool(value)) => json!(value),
-        Some(Original::Enum(value)) => json!(value),
+        Some(Original::Enum(value) | Original::String(value)) => json!(value),
         Some(Original::Single(value)) => return verify_single(*value, row),
         _ => return verify_state(source, row),
     };
-    assert_eq!(
-        consumer::source_value(row)?,
-        Some(&expected),
+    assert!(
+        consumer::source_value(row)? == Some(&expected),
         "actual source scalar"
     );
     Ok(())
