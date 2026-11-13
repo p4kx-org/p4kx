@@ -192,6 +192,7 @@ mod tests {
             materials: Vec::new(),
             material_libraries: Vec::new(),
             palettes: Vec::new(),
+            authored_soc: None,
             issues: Vec::new(),
         }
     }
