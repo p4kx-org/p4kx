@@ -73,7 +73,7 @@ fn media_export_runs_the_permanent_provider_and_emits_the_1_0_contract() -> Test
 }
 
 #[test]
-fn explicit_unavailable_kind_is_non_success_and_writes_no_root_index() -> TestResult {
+fn explicit_animation_definition_kind_can_publish_empty_selection() -> TestResult {
     let folder = tempfile::tempdir()?;
     let source = folder.path().join("Data.p4k");
     ArchiveBuilder::new().write_to(&source)?;
@@ -85,14 +85,8 @@ fn explicit_unavailable_kind_is_non_success_and_writes_no_root_index() -> TestRe
         .arg(&output)
         .args(["--kind", "animation-definition"])
         .assert()
-        .code(1)
-        .stderr(predicate::str::contains(
-            "media capability animation-definition is unavailable",
-        ));
-    assert!(
-        !output.join("media-index.json").exists(),
-        "an unavailable requested provider publishes no complete root"
-    );
+        .success();
+    assert!(output.join("media-index.json").is_file());
     Ok(())
 }
 

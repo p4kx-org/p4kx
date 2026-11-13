@@ -4,9 +4,8 @@
 use std::io;
 
 use p4kx_extraction::cryxml::{
-    SourceAttributePosition, SourceContent, SourceContentPosition, SourceContents,
-    SourceDeclaration, SourceDocument, SourceElement, SourceElementPosition, SourceSpanError,
-    SourceSyntax, SourceText,
+    SourceContent, SourceContents, SourceDeclaration, SourceDocument, SourceElement,
+    SourceSpanError, SourceSyntax,
 };
 use p4kx_extraction::{DecimalU64, SourceUseRole};
 
@@ -17,6 +16,9 @@ use crate::audio_control_payload::{self as wire, AtlPayload, AtlPosition};
 use crate::audio_control_reference as references;
 use crate::input_budget::InputBudget;
 use crate::origin_input::MediaOriginInput;
+use crate::xml_source_projection::{
+    content_position, declaration_position, element_position, source_content,
+};
 use crate::{DirectoryLookup, MediaError, MediaWriter, Status, Subresource, origin_error};
 
 pub(crate) struct Projection<'source, 'directory> {
@@ -263,37 +265,7 @@ impl Projection<'_, '_> {
         index: u64,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), Failure> {
-        use wire::AtlContentValue;
-
-        let (position, content) = match content {
-            SourceContent::Text(text) => (
-                content_position(text.position())?,
-                AtlContentValue::Text {
-                    value: text.value(),
-                    lexeme: lexeme(text)?,
-                },
-            ),
-            SourceContent::Comment(text) => (
-                content_position(text.position())?,
-                AtlContentValue::Comment {
-                    value: text.value(),
-                    lexeme: lexeme(text)?,
-                },
-            ),
-            SourceContent::ProcessingInstruction {
-                target,
-                value,
-                position,
-                ..
-            } => (
-                AtlPosition::text(position),
-                AtlContentValue::ProcessingInstruction {
-                    target,
-                    value: *value,
-                },
-            ),
-            _ => return Err(Failure::Span),
-        };
+        let (position, content) = source_content(content)?;
         self.write(
             position,
             "content",
@@ -349,43 +321,4 @@ fn reserve<T>(stack: &mut Vec<T>, writer: &MediaWriter<'_>) -> Result<(), MediaE
 
 fn advance(value: u64) -> Result<u64, MediaError> {
     value.checked_add(1).ok_or_else(origin_error::counter)
-}
-
-fn lexeme<'document>(text: &SourceText<'document>) -> Result<&'document str, Failure> {
-    text.lexeme().ok_or(Failure::Span)
-}
-
-const fn element_position(position: &SourceElementPosition) -> Result<AtlPosition, Failure> {
-    Ok(match position {
-        SourceElementPosition::Text(range) => AtlPosition::text(range),
-        SourceElementPosition::CryXml(node_index) => AtlPosition::CryXmlNode {
-            node_index: *node_index,
-        },
-        _ => return Err(Failure::Span),
-    })
-}
-
-const fn declaration_position(position: &SourceAttributePosition) -> Result<AtlPosition, Failure> {
-    Ok(match position {
-        SourceAttributePosition::Text(range) => AtlPosition::text(range),
-        SourceAttributePosition::CryXml {
-            node_index,
-            attribute_index,
-            ..
-        } => AtlPosition::CryXmlAttribute {
-            node_index: *node_index,
-            attribute_index: *attribute_index,
-        },
-        _ => return Err(Failure::Span),
-    })
-}
-
-const fn content_position(position: &SourceContentPosition) -> Result<AtlPosition, Failure> {
-    Ok(match position {
-        SourceContentPosition::Text(range) => AtlPosition::text(range),
-        SourceContentPosition::CryXml(node_index) => AtlPosition::CryXmlContent {
-            node_index: *node_index,
-        },
-        _ => return Err(Failure::Span),
-    })
 }

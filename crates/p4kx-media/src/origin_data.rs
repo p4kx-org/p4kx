@@ -44,6 +44,7 @@ pub(crate) fn scope(profile: OriginProfile, pointer: &str) -> ScopeMapping {
         | OriginProfile::AudioBank
         | OriginProfile::AudioControl
         | OriginProfile::Animation
+        | OriginProfile::AnimationDefinition
         | OriginProfile::Model
         | OriginProfile::TextureHeader
         | OriginProfile::TextureFamily
@@ -128,6 +129,7 @@ pub(crate) fn independent(profile: OriginProfile, pointer: &str) -> bool {
         OriginProfile::AudioWem | OriginProfile::AudioBank => audio_independent(pointer),
         OriginProfile::AudioControl
         | OriginProfile::Animation
+        | OriginProfile::AnimationDefinition
         | OriginProfile::Model
         | OriginProfile::TextureHeader
         | OriginProfile::TextureFamily

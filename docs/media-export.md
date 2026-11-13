@@ -28,7 +28,7 @@ p4kx media schema --source
 Repeat `--kind` for an explicit selection. The known names are `archive`, `model`, `material`,
 `texture`, `shader`, `animation`, `animation-definition`, `audio` and `audio-control`. Omission
 selects every registered provider. The built-in providers are `archive`, `shader`, `material`, `texture`, `model`,
-`animation`, `audio` and `audio-control`. An explicitly requested kind without an available provider returns a typed
+`animation`, `animation-definition`, `audio` and `audio-control`. An explicitly requested kind without an available provider returns a typed
 capability failure and a non-zero exit status, even when the selection is empty.
 
 `--kind shader` exports nested `.ext` declarations and ordered Property fields, with exact raw
@@ -489,3 +489,20 @@ This extends the unreleased `p4kx.field-origins/1` contract. Media stays at
 The projection uses the existing Index/record bound: its compact nullable Build
 bytes are part of the Index base payload. It introduces no additional manifest
 input limit or payload-output allowance.
+
+### Animation definition source
+
+`--kind animation-definition` retains selected `.chrparams`, `.animevents`,
+`.adb`, `.bspace` and `.comb` entries in their original bytes. Their JSONL rows
+give ordered XML elements, declarations, text, comments and processing instructions.
+Parent and sibling positions reconstruct the source tree. Text XML positions are
+half-open byte ranges. CryXml positions address the original node, attribute or
+content slot. Unknown XML remains available with the same coordinates.
+
+File-link rows interpret authored track and event database paths, Mannequin
+sub-database paths and combined blend-space references. Directory matching is
+case-insensitive within the owning Archive and can report every physical match.
+The link keeps the original path and the separately normalized lookup path.
+Missing, unselected, ambiguous and unsupported paths retain explicit outcomes.
+A reference is an edge. Its target contents remain independently selected sources.
+Malformed documents are diagnosed with retained original bytes in diagnostic exports.

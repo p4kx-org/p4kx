@@ -54,9 +54,9 @@ fn insert_definition(
     }
     if let Some(existing) = target.get(name) {
         if existing != &value {
-            return Err(contract(
-                "schema definition collides with a different definition",
-            ));
+            return Err(MediaError::Contract(format!(
+                "schema definition {name} collides with a different definition"
+            )));
         }
         return Ok(());
     }

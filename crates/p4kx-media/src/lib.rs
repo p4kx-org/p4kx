@@ -4,6 +4,7 @@
 //! Bounded media export with physical identities and atomic generation publication.
 
 mod animation;
+mod animation_definition;
 mod archive_extras_read;
 mod archive_layout_consistency_schema;
 mod archive_layout_projection;
@@ -324,6 +325,7 @@ mod writer_build_origins;
 mod writer_manifest;
 mod writer_origins;
 mod writer_record;
+mod xml_source_projection;
 
 pub use archive_metadata_diagnostic::{ArchiveMetadataDiagnostic, ArchiveMetadataFailure};
 pub use archive_provider::ArchiveProvider;

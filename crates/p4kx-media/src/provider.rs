@@ -10,6 +10,7 @@ pub(crate) mod model_source;
 use model_source::ModelSourceProvider;
 
 use crate::animation::AnimationProvider;
+use crate::animation_definition::AnimationDefinitionProvider;
 use crate::audio_control_provider::AudioControlProvider;
 use crate::audio_provider::AudioProvider;
 use crate::texture_provider::TextureProvider;
@@ -179,6 +180,7 @@ impl Default for ProviderRegistry {
                 Box::new(TextureProvider),
                 Box::new(ModelSourceProvider),
                 Box::new(AnimationProvider),
+                Box::new(AnimationDefinitionProvider),
                 Box::new(AudioProvider),
                 Box::new(AudioControlProvider),
             ],

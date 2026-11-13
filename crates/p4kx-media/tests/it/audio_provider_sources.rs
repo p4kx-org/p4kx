@@ -5,9 +5,7 @@ use std::fs;
 use std::path::Path;
 
 use p4kx_extraction::{Archive, Checksum, Exclusion, Filter, OpenOptions, SourceEncryption, Wem};
-use p4kx_media::{
-    Artifact, ByteScope, ExportOptions, Index, MediaError, MediaKind, Source, Status,
-};
+use p4kx_media::{Artifact, ByteScope, ExportOptions, Index, MediaKind, Source, Status};
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry, test_key};
 use serde_json::json;
 use sha2::{Digest as _, Sha256};
@@ -59,7 +57,7 @@ fn default_audio_provider_projects_selected_loose_wems_with_original_raw_receipt
 }
 
 #[test]
-fn an_unregistered_kind_refuses_before_publication() -> TestResult {
+fn an_empty_animation_definition_selection_is_complete() -> TestResult {
     let folder = tempfile::tempdir()?;
     let archive = archive(folder.path(), &wem_bytes())?;
     let destination = folder.path().join("audio-control");
@@ -67,20 +65,8 @@ fn an_unregistered_kind_refuses_before_publication() -> TestResult {
         kinds: vec![MediaKind::AnimationDefinition],
         ..ExportOptions::default()
     };
-    assert!(
-        matches!(
-            p4kx_media::export(&archive, &destination, &options),
-            Err(MediaError::Unsupported {
-                kind: MediaKind::AnimationDefinition,
-                ..
-            })
-        ),
-        "explicit missing AnimationDefinition is a typed capability failure"
-    );
-    assert!(
-        !destination.exists(),
-        "unavailable kinds publish no destination"
-    );
+    let index = support::published(p4kx_media::export(&archive, &destination, &options)?)?;
+    assert!(support::records(&destination, &index, "animation-definition.jsonl")?.is_empty());
     Ok(())
 }
 

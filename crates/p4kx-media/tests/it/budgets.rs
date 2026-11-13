@@ -4,7 +4,7 @@
 use std::fs;
 
 use p4kx_extraction::{Archive, CancelToken, ConflictPolicy};
-use p4kx_media::{ExportOptions, Limits, MediaError, MediaKind};
+use p4kx_media::{ExportOptions, Limits, MediaError, MediaKind, ProviderRegistry};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use super::support::{self, TestResult};
@@ -22,7 +22,12 @@ fn unavailable_explicit_kind_is_not_an_empty_success_even_with_no_entries() -> T
     };
     assert!(
         matches!(
-            p4kx_media::export(&archive, &output, &options),
+            p4kx_media::export_with(
+                &archive,
+                &output,
+                &options,
+                &ProviderRegistry::try_new(Vec::new())?
+            ),
             Err(MediaError::Unsupported {
                 kind: MediaKind::AnimationDefinition,
                 ..

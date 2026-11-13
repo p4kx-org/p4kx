@@ -849,6 +849,113 @@
       ],
       "type": "object"
     },
+    "AnimationDefinitionPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/DefinitionDocument"
+            },
+            "record_type": {
+              "const": "document",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlElement"
+            },
+            "record_type": {
+              "const": "element",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlDeclaration"
+            },
+            "record_type": {
+              "const": "declaration",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlContent"
+            },
+            "record_type": {
+              "const": "content",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AtlBinaryText"
+            },
+            "record_type": {
+              "const": "binary-text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/DefinitionLink"
+            },
+            "record_type": {
+              "const": "link",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "DefinitionPayload"
+    },
     "AnimationEntry": {
       "additionalProperties": false,
       "properties": {
@@ -6907,6 +7014,81 @@
       ],
       "type": "string"
     },
+    "DefinitionDocument": {
+      "additionalProperties": false,
+      "properties": {
+        "family": {
+          "$ref": "#/$defs/DefinitionFamily"
+        },
+        "format": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AtlFormat"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "nodes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "projection": {
+          "$ref": "#/$defs/DocumentProjection"
+        }
+      },
+      "required": [
+        "family",
+        "format",
+        "nodes",
+        "projection"
+      ],
+      "type": "object"
+    },
+    "DefinitionFamily": {
+      "enum": [
+        "chrparams",
+        "animevents",
+        "adb",
+        "bspace",
+        "comb"
+      ],
+      "type": "string"
+    },
+    "DefinitionLink": {
+      "additionalProperties": false,
+      "properties": {
+        "archive_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authored_path": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/LinkKind"
+        },
+        "reference": {
+          "$ref": "#/$defs/Reference"
+        }
+      },
+      "required": [
+        "kind",
+        "authored_path",
+        "archive_path",
+        "reference"
+      ],
+      "type": "object"
+    },
     "DialogueArgumentRecord": {
       "additionalProperties": false,
       "properties": {
@@ -7267,6 +7449,15 @@
         "language_folder"
       ],
       "type": "object"
+    },
+    "DocumentProjection": {
+      "enum": [
+        "readable",
+        "repaired-strings",
+        "invalid-source",
+        "invalid-source-span"
+      ],
+      "type": "string"
     },
     "DosCalendarInfo": {
       "description": "Calendar interpretation of stored DOS words, independent of integrity verification.",
@@ -8554,6 +8745,15 @@
         "candidates_complete"
       ],
       "type": "object"
+    },
+    "LinkKind": {
+      "enum": [
+        "tracks-database",
+        "event-database",
+        "sub-database",
+        "combined-space"
+      ],
+      "type": "string"
     },
     "ListContent": {
       "oneOf": [
@@ -36123,6 +36323,336 @@
                 "properties": {
                   "record_type": {
                     "const": "controller-binding"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-document"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "document"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 0,
+                "minItems": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-element"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "element"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-declaration"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "declaration"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-content"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "content"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-binary-text"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "binary-text"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-link"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "link"
                   }
                 },
                 "required": [
