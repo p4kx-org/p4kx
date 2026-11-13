@@ -92,7 +92,8 @@ fn example(row: &Value, texts: &[Value]) -> OracleResult<Example> {
         cells::text(&path, texts)?;
         Some(index)
     };
-    let family = controls::optional_text(row, "sourceType")?
+    let source_type = cells::field(row, "sourceType")?;
+    let family = cells::text(&source_type, texts)?
         .map_or(MetadataFamily::MetadataAbsent, super::schema_family);
     Ok(Example { index, family })
 }

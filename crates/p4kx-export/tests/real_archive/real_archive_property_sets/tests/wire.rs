@@ -76,13 +76,14 @@ pub(super) fn projection_diagnostic(failed: &Value) -> TestResult<Value> {
         "count": 1, "countUnit": "records",
         "examples": [{
             "recordIndex": field("recordIndex")?, "recordGuid": field("guid")?,
-            "recordPath": field("recordPath")?, "field": null, "sourceType": null, "targetGuid": null,
+            "recordPath": field("recordPath")?, "field": absent(), "sourceType": absent(), "targetGuid": absent(),
         }],
     }))
 }
 
 pub(super) fn diagnostic(document: &mut Value, index: u32, prefix: &str) -> TestResult<Value> {
     let path = atom(document, privacy::SENTINEL)?;
+    let source_type = atom(document, &format!("{prefix}{}", privacy::SENTINEL))?;
     Ok(serde_json::json!({
         "kind": Kind::MissionPropertySets, "stage": ExportDiagnosticStage::DerivedProjection,
         "code": ExportDiagnosticCode::UnsupportedValue, "severity": "error",
@@ -91,8 +92,8 @@ pub(super) fn diagnostic(document: &mut Value, index: u32, prefix: &str) -> Test
         "examples": [{
             "recordIndex": present(serde_json::json!(index)),
             "recordGuid": present(serde_json::json!(privacy::SENTINEL)), "recordPath": present(path),
-            "field": privacy::SENTINEL, "sourceType": format!("{prefix}{}", privacy::SENTINEL),
-            "targetGuid": privacy::SENTINEL,
+            "field": absent(), "sourceType": present(source_type),
+            "targetGuid": absent(),
         }],
     }))
 }

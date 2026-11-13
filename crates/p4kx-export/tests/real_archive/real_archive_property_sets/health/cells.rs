@@ -97,9 +97,12 @@ pub(super) fn string(cell: &Cell<'_>) -> OracleResult {
     Ok(())
 }
 
-pub(super) fn text(cell: &Cell<'_>, texts: &[Value]) -> OracleResult {
+pub(super) fn text<'value>(
+    cell: &Cell<'_>,
+    texts: &'value [Value],
+) -> OracleResult<Option<&'value str>> {
     let Some(value) = cell.value else {
-        return Ok(());
+        return Ok(None);
     };
     let object = value.as_object().ok_or_else(fault)?;
     if object.len() != 1 {
@@ -118,5 +121,9 @@ pub(super) fn text(cell: &Cell<'_>, texts: &[Value]) -> OracleResult {
     let index: u64 = digits.parse().map_err(|_| fault())?;
     let index = usize::try_from(index).map_err(|_| fault())?;
     let stored = read(texts.get(index).ok_or_else(fault)?)?;
-    string(&stored)
+    stored
+        .value
+        .and_then(Value::as_str)
+        .map(Some)
+        .ok_or_else(fault)
 }
