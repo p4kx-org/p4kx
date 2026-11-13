@@ -13,7 +13,7 @@ use p4kx_model::{
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
-type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const REGISTRY: &str = "metadata/entitycomponentroom.xml";
 const SHIP_CONTAINERS: &str = "Data/ObjectContainers/Ships/*.socpak";
@@ -40,14 +40,7 @@ fn original_room_registry_and_three_segment_layouts_match_one_source_container()
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))
         .map_err(|_| "open configured Archive")?;
     let watch = ArchiveWatch::new(&archive);
-    let filter = Filter::new(SHIP_CONTAINERS);
-    let mut candidates: Vec<_> = archive
-        .entries()
-        .iter()
-        .filter(|entry| filter.matches(entry.path()))
-        .collect();
-    candidates.sort_by_key(|entry| entry.uncompressed_size());
-    for candidate in candidates {
+    for candidate in ship_containers(&archive) {
         watch
             .poll()
             .map_err(|_| "Archive changed during container selection")?;
@@ -87,7 +80,18 @@ fn original_room_registry_and_three_segment_layouts_match_one_source_container()
     Err("no readable original room registry with all three segment shapes".into())
 }
 
-fn registry_path(path: &str) -> bool {
+pub(super) fn ship_containers(archive: &Archive) -> Vec<&Entry> {
+    let filter = Filter::new(SHIP_CONTAINERS);
+    let mut candidates: Vec<_> = archive
+        .entries()
+        .iter()
+        .filter(|entry| filter.matches(entry.path()))
+        .collect();
+    candidates.sort_by_key(|entry| entry.uncompressed_size());
+    candidates
+}
+
+pub(super) fn registry_path(path: &str) -> bool {
     let path = path.replace('\\', "/");
     path.eq_ignore_ascii_case(REGISTRY)
         || path.rsplit_once('/').is_some_and(|(folder, leaf)| {
@@ -377,7 +381,7 @@ fn vector<const N: usize>(source: Option<&str>) -> TestResult<[f64; N]> {
         .map_err(|_| "original vector dimension differs".into())
 }
 
-fn bytes(archive: &Archive, entry: &Entry) -> TestResult<Vec<u8>> {
+pub(super) fn bytes(archive: &Archive, entry: &Entry) -> TestResult<Vec<u8>> {
     let mut bytes = Vec::new();
     archive
         .open_entry_verified(entry)

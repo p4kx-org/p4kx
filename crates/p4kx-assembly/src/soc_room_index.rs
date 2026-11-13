@@ -3,8 +3,8 @@
 
 use std::collections::BTreeMap;
 
+use crate::soc_source_guid::SocSourceGuid;
 use p4kx_extraction::Guid;
-use p4kx_extraction::cryxml::SourceAttribute;
 use p4kx_model::{SocAreaLink, SocRoomDeclaration, SocRoomRegistry};
 
 /// An index over the valid GUID declarations of one physical container registry.
@@ -19,7 +19,7 @@ impl<'document> SocRoomIndex<'document> {
     pub fn new(registry: &'document SocRoomRegistry<'_>) -> Self {
         let mut by_guid: BTreeMap<Guid, Vec<_>> = BTreeMap::new();
         for room in registry.rooms() {
-            if let SocRoomGuid::Present(guid) = SocRoomGuid::read(room.guid_attributes()) {
+            if let SocSourceGuid::Present(guid) = SocSourceGuid::read(room.guid_attributes()) {
                 by_guid.entry(guid).or_default().push(room);
             }
         }
@@ -29,46 +29,16 @@ impl<'document> SocRoomIndex<'document> {
     /// Resolves an authored target only within this registry's physical scope.
     #[must_use]
     pub fn target(&self, link: SocAreaLink<'_>) -> SocRoomTarget<'_, 'document> {
-        let guid = match SocRoomGuid::read(link.guid_attributes()) {
-            SocRoomGuid::Absent => return SocRoomTarget::Absent,
-            SocRoomGuid::Invalid => return SocRoomTarget::Invalid,
-            SocRoomGuid::Present(guid) => guid,
+        let guid = match SocSourceGuid::read(link.guid_attributes()) {
+            SocSourceGuid::Absent => return SocRoomTarget::Absent,
+            SocSourceGuid::Invalid => return SocRoomTarget::Invalid,
+            SocSourceGuid::Present(guid) => guid,
         };
         match self.by_guid.get(&guid).map(Vec::as_slice) {
             None => SocRoomTarget::Unmatched { guid },
             Some([room]) => SocRoomTarget::Matched { guid, room: *room },
             Some(rooms) => SocRoomTarget::Ambiguous { guid, rooms },
         }
-    }
-}
-
-/// The stored GUID of an original room declaration or target.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum SocRoomGuid {
-    /// No unqualified GUID attribute is stored.
-    Absent,
-    /// The original attribute is malformed or repeated.
-    Invalid,
-    /// One well-formed GUID is stored.
-    Present(Guid),
-}
-
-impl SocRoomGuid {
-    /// Reads the exact GUID attributes without selecting one from duplicates.
-    pub fn read<'document>(
-        mut attributes: impl Iterator<Item = SourceAttribute<'document>>,
-    ) -> Self {
-        let Some(attribute) = attributes.next() else {
-            return Self::Absent;
-        };
-        if attributes.next().is_some() {
-            return Self::Invalid;
-        }
-        attribute
-            .value()
-            .parse()
-            .map_or(Self::Invalid, Self::Present)
     }
 }
 

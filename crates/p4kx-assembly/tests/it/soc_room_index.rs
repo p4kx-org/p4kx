@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::{SocRoomGuid, SocRoomIndex, SocRoomTarget};
+use p4kx_assembly::{SocRoomIndex, SocRoomTarget, SocSourceGuid};
 use p4kx_model::{SocEntityFile, SocRoomRegistry};
 use p4kx_testkit::TestChunkFile;
 
@@ -26,8 +26,8 @@ fn room_targets_keep_original_candidates_within_each_physical_registry() -> Test
             repeated
                 .rooms()
                 .next()
-                .map(|room| SocRoomGuid::read(room.guid_attributes())),
-            Some(SocRoomGuid::Absent)
+                .map(|room| SocSourceGuid::read(room.guid_attributes())),
+            Some(SocSourceGuid::Absent)
         ),
         "a registry entry without a GUID retains the absent state"
     );

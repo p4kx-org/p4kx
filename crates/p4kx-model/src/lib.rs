@@ -119,8 +119,11 @@ mod skin;
 mod smooth_normals;
 mod soc_area_component;
 mod soc_entities;
+mod soc_entity_component;
+mod soc_entity_links;
 mod soc_entity_source;
 mod soc_geometry;
+mod soc_inline_loadout;
 mod soc_light;
 mod soc_room_registry;
 mod soc_room_segment;
@@ -208,7 +211,12 @@ pub use soc_entities::{
     MAX_SOC_ENTITIES, MAX_SOC_PLACED, SocClassEntity, SocEntities, SocEntitiesError, SocPalette,
     SocProp,
 };
+pub use soc_entity_component::{SocEntityComponent, SocEntityComponentKind};
+pub use soc_entity_links::{SocEntityLink, SocEntityLinks};
 pub use soc_entity_source::{SocEntity, SocEntityChunk, SocEntityFile, SocEntitySourceError};
+pub use soc_inline_loadout::{
+    SocInlineLoadout, SocInlineLoadoutEntries, SocInlineLoadoutEntry, SocInlineLoadoutKind,
+};
 pub use soc_light::{LightState, SocLight};
 pub use soc_room_registry::{SocRoomDeclaration, SocRoomRegistry, SocRoomRegistryError};
 pub use soc_room_segment::{

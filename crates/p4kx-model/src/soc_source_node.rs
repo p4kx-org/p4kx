@@ -10,6 +10,10 @@ pub(crate) struct SocSourceNode<'document> {
 }
 
 impl<'document> SocSourceNode<'document> {
+    pub(crate) const fn new(ordinal: usize, element: SourceElement<'document>) -> Self {
+        Self { ordinal, element }
+    }
+
     pub(crate) const fn ordinal(self) -> usize {
         self.ordinal
     }
@@ -22,12 +26,14 @@ impl<'document> SocSourceNode<'document> {
         parent: SourceElement<'document>,
         name: &'static str,
     ) -> impl Iterator<Item = Self> {
+        Self::direct_children(parent).filter(move |node| named(node.element, name))
+    }
+
+    pub(crate) fn direct_children(parent: SourceElement<'document>) -> impl Iterator<Item = Self> {
         parent
             .elements()
             .enumerate()
-            .filter_map(move |(ordinal, element)| {
-                named(element, name).then_some(Self { ordinal, element })
-            })
+            .map(|(ordinal, element)| Self::new(ordinal, element))
     }
 
     pub(crate) fn attributes(

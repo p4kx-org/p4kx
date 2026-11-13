@@ -2,12 +2,17 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_chunks::{ByteOrder, Chunk, ChunkError, ChunkFile, Container};
-use p4kx_cryxml::{SourceDocument, SourceElement, SourceReadError, SourceReadOptions};
+use p4kx_cryxml::{
+    SourceAttribute, SourceDocument, SourceElement, SourceReadError, SourceReadOptions,
+};
 use thiserror::Error;
 
 use crate::Transform;
 use crate::soc_area_component::SocAreaComponent;
 use crate::soc_entities::{self, ENTITIES};
+use crate::soc_entity_component::SocEntityComponent;
+use crate::soc_entity_links::SocEntityLinks;
+use crate::soc_source_node::SocSourceNode;
 
 /// A failure to open or interpret an authored SOC entity chunk.
 #[derive(Debug, Error)]
@@ -166,6 +171,26 @@ impl<'document> SocEntity<'document> {
     #[must_use]
     pub const fn element(self) -> SourceElement<'document> {
         self.element
+    }
+
+    /// Returns original instance `EntityCryGUID` attributes in order.
+    pub fn guid_attributes(self) -> impl Iterator<Item = SourceAttribute<'document>> {
+        SocSourceNode::new(self.ordinal, self.element).attributes("EntityCryGUID")
+    }
+
+    /// Returns original class `EntityClassGUID` attributes in order.
+    pub fn class_guid_attributes(self) -> impl Iterator<Item = SourceAttribute<'document>> {
+        SocSourceNode::new(self.ordinal, self.element).attributes("EntityClassGUID")
+    }
+
+    /// Visits original `EntityLinks` groups.
+    pub fn entity_links(self) -> impl Iterator<Item = SocEntityLinks<'document>> {
+        SocEntityLinks::read(self.element)
+    }
+
+    /// Visits authored entity components with their original scopes and positions.
+    pub fn authored_components(self) -> impl Iterator<Item = SocEntityComponent<'document>> {
+        SocEntityComponent::read(self.element)
     }
 
     /// Visits `AreaComponent` occurrences in their original Entity slots.
