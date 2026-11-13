@@ -131,7 +131,7 @@ pub(super) const fn structure<'tree, 'source>(
     }
 }
 
-pub(super) struct Locations<'source>(HashMap<*const Value<'source>, usize>);
+pub(crate) struct Locations<'source>(HashMap<*const Value<'source>, usize>);
 
 enum Children<'tree, 'source> {
     Fields(slice::Iter<'tree, Field<'source>>),
@@ -148,7 +148,7 @@ impl<'tree, 'source> Children<'tree, 'source> {
 }
 
 impl<'source> Locations<'source> {
-    pub(super) fn read(root: &StructValue<'source>) -> Self {
+    pub(crate) fn read(root: &StructValue<'source>) -> Self {
         let mut stack = vec![Children::Fields(root.fields().iter())];
         let mut ordinals = HashMap::new();
         while let Some(children) = stack.last_mut() {
@@ -166,7 +166,7 @@ impl<'source> Locations<'source> {
         Self(ordinals)
     }
 
-    pub(super) fn ordinal(&self, value: &Value<'source>) -> TestResult<usize> {
+    pub(crate) fn ordinal(&self, value: &Value<'source>) -> TestResult<usize> {
         self.0
             .get(&std::ptr::from_ref(value))
             .copied()

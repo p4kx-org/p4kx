@@ -62,3 +62,15 @@ targets keep their authored GUID in `originalError`. Null links remain explicit 
 Owned pointers preserve null slots and their original array order. Unrecognized concrete
 variants retain source fields and report their status. Repeated and cyclic Record References
 retain their identities as links.
+
+For installed verification, set the standard `P4KX_DATA_P4K` and Archive key inputs and run
+
+    cargo test --locked --release -p p4kx-export --test real_archive -- real_archive_location_configuration::mission_location_configurations_match_original_selected_owners --exact --ignored
+
+The test reads original location owners, selects populated spawn and limit arrays and checks a
+disabled owner when the source has one. Set `P4KX_LOCATION_CONFIGURATION_FILTER` to scope Record
+paths or `P4KX_EXPECT_DISABLED_LOCATION_CONFIGURATION=1` to require a disabled owner with
+populated configuration. It runs a filtered diagnostic catalog for each selected owner and
+compares original order, exact Single bits, physical Record links and individual source origins.
+It also checks populated module inputs and properties when present. Set
+`P4KX_EXPECT_POPULATED_LOCATION_MODULES=1` to require a populated embedded module owner.

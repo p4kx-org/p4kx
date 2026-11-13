@@ -11,10 +11,10 @@ use crate::catalog_v3_consumer as consumer;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-pub(crate) fn verify_array(
-    source: Option<&Original<'_>>,
+pub(crate) fn verify_array<'source>(
+    source: Option<&Original<'source>>,
     row: &Value,
-    verify: impl Fn(Option<&Original<'_>>, &Value) -> TestResult,
+    verify: impl Fn(Option<&Original<'source>>, &Value) -> TestResult,
 ) -> TestResult {
     let Some(Original::Array(slots)) = source else {
         return verify_state(source, row);

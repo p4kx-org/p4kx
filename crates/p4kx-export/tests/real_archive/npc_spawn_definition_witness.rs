@@ -172,7 +172,7 @@ pub(super) fn verify_encounter(
     )
 }
 
-pub(super) fn verify_single(source: Option<&Original<'_>>, row: &Value) -> TestResult {
+pub(crate) fn verify_single(source: Option<&Original<'_>>, row: &Value) -> TestResult {
     let Some(Original::Single(number)) = source else {
         return verify_state(source, row);
     };

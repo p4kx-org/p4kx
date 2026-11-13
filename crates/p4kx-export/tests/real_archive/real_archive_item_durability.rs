@@ -279,10 +279,14 @@ impl<'read, 'source> Trace<'read, 'source> {
     }
 
     pub(super) fn header(&self, cell: &Value, field: &str, role: &str) -> Result {
+        self.header_for(cell, self.owner, field, role)
+    }
+
+    pub(super) fn header_for(&self, cell: &Value, owner: u32, field: &str, role: &str) -> Result {
         self.location(
             cell,
             "dataforgeRecordHeader",
-            &json!([self.owner.to_string()]),
+            &json!([owner.to_string()]),
             field,
             role,
         )

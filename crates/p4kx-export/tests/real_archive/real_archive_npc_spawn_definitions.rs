@@ -17,7 +17,7 @@ use crate::catalog_v3_consumer as consumer;
 use crate::real_archive_verification::print_line;
 
 #[path = "npc_spawn_definition_witness.rs"]
-mod spawn;
+pub(crate) mod spawn;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 

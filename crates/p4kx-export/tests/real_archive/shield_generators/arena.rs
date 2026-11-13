@@ -27,7 +27,7 @@ pub(super) fn source_type<'source>(
     trace.part(kind, raw, "$type", "selector")
 }
 
-pub(super) struct Coverage {
+pub(crate) struct Coverage {
     pub(super) roots: usize,
     pub(super) nodes: usize,
 }
@@ -46,7 +46,7 @@ pub(super) fn additional<'source>(
     compare(trace, fields, arena)
 }
 
-pub(super) fn compare<'read, 'source: 'read>(
+pub(crate) fn compare<'read, 'source: 'read>(
     trace: &Trace<'_, 'source>,
     fields: impl Iterator<Item = &'read Field<'source>>,
     arena: &Value,

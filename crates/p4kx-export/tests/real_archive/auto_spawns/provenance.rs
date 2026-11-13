@@ -10,14 +10,14 @@ use super::TestResult;
 use crate::catalog_v3_consumer;
 use crate::real_archive_contract_templates::mission_graph as graph;
 
-pub(super) struct Origins<'catalog> {
+pub(crate) struct Origins<'catalog> {
     input: String,
     marker: Value,
     uses: HashMap<&'catalog str, &'catalog Value>,
 }
 
 impl<'catalog> Origins<'catalog> {
-    pub(super) fn read(catalog: &'catalog Value, origin: &DataForgeOrigin) -> TestResult<Self> {
+    pub(crate) fn read(catalog: &'catalog Value, origin: &DataForgeOrigin) -> TestResult<Self> {
         let DataForgeOrigin::Archive(entry) = origin else {
             return Err("original DataForge must be an Archive Entry".into());
         };
@@ -60,7 +60,7 @@ impl<'catalog> Origins<'catalog> {
         Ok(())
     }
 
-    pub(super) fn occurrence(
+    pub(crate) fn occurrence(
         &self,
         cell: &Value,
         owner: u32,
@@ -70,7 +70,7 @@ impl<'catalog> Origins<'catalog> {
         self.locations(cell, &[value_location(owner, ordinal, field)])
     }
 
-    pub(super) fn reference_field(
+    pub(crate) fn reference_field(
         &self,
         cell: &Value,
         owner: u32,

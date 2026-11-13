@@ -14,9 +14,9 @@ use serde_json::Value;
 use crate::real_archive_contract_templates::mission_graph::{self as graph, Family};
 
 #[path = "auto_spawns/original.rs"]
-mod original;
+pub(crate) mod original;
 #[path = "auto_spawns/provenance.rs"]
-mod provenance;
+pub(crate) mod provenance;
 #[path = "auto_spawns/published.rs"]
 mod published;
 
