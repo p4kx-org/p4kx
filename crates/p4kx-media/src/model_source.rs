@@ -12,3 +12,6 @@ mod schema;
 
 pub(crate) use provider::ModelSourceProvider;
 pub(crate) use schema::bind_record_schema;
+
+#[path = "model_source/physics.rs"]
+mod physics;

@@ -98,9 +98,22 @@ do not carry separate digests.
 
 The provider reads the original header and table from retained bytes and charges the validated
 row count to the common metadata work budget before allocating the table. A malformed table
-is diagnosed in diagnostic output with its original Entry bytes. This projection inventories
-opaque chunk sources. Its capability lists model semantics, companion resolution and converted
-geometry as separate coverage.
+is diagnosed in diagnostic output with its original Entry bytes.
+
+IVO StatObjPhysics table version 0x900 additionally emits `model-physics-table` and
+`model-physics-slot` rows. The chunk ordinal locates the table. A second ordinal locates each
+slot, including duplicate packed keys and the whole-object sentinel. Declared and available
+ranges refer to the same retained model Entry. Unsupported versions, damage, signed-distance
+fields and unfamiliar markers or shape selectors keep their bytes with explicit dispositions.
+Malformed or truncated collision data produces partial diagnostic rows and keeps readable
+siblings in that diagnostic generation.
+
+Validated version-2 box, sphere, cylinder and capsule shapes carry original float bits and
+finite values. Source-node geometry uses metres and a Z-up frame. A triangle mesh adds
+`model-physics-vertex` and `model-physics-triangle` rows keyed by chunk, slot and original element
+ordinal. Their fields carry original float words, u16 vertex indices and per-triangle material
+bytes. The shared per-field origin receipts identify the exact source bytes. Model companion
+resolution, entity-frame collision transforms and converted geometry have separate coverage.
 
 `--kind animation` retains CAF, DBA and AIM sources with chunk and clip inventory, original
 metadata and controller words, and typed decoded frame and key chunks.
@@ -252,7 +265,7 @@ real Archives and can be lowered or raised explicitly:
 | `--max-entry-bytes` | 8 GiB | One retained payload or opened container |
 | `--max-records` | 10,000,000 | All metadata and subresource records |
 | `--max-record-bytes` | 1 MiB | One JSONL line or index |
-| `--max-chunk-bytes` | 64 MiB | One typed binary chunk |
+| `--max-chunk-bytes` | 64 MiB | One typed binary chunk or required source chunk read |
 | `--max-output-bytes` | 8 TiB | Generation artifact output work; each independent artifact-verification phase uses the same bound; the index uses its separate record bound |
 | `--max-container-depth` | 8 | Ordered physical container chain |
 | `--max-value-depth` | 128 | JSON value nesting including its envelope; maximum 512 |

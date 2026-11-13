@@ -339,7 +339,7 @@
       "description": "Bounds applied before reading or writing the next unit of work.",
       "properties": {
         "chunk_bytes": {
-          "description": "Bytes in one typed binary chunk.",
+          "description": "Bytes in one typed binary chunk or required source chunk read.",
           "format": "uint64",
           "minimum": 0,
           "type": "integer"

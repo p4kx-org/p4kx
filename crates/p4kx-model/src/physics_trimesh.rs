@@ -15,6 +15,7 @@ const TRIANGLE_BYTES: usize = 3 * HALF_WORD;
 /// Original positioned arrays of one validated collision triangle mesh.
 #[derive(Debug, Clone)]
 pub struct PhysicsTrimesh<'source> {
+    count_offset: u64,
     material_ids: &'source [u8],
     material_offset: u64,
     vertex_words: &'source [u8],
@@ -25,6 +26,7 @@ pub struct PhysicsTrimesh<'source> {
 
 impl<'source> PhysicsTrimesh<'source> {
     pub(crate) fn read(reader: &mut ByteReader<'source>) -> Result<Self, PhysicsBlobError> {
+        let count_offset = reader.offset();
         let vertex_count = count(reader)?;
         let triangle_count = count(reader)?;
         reader.skip(2 * WORD)?;
@@ -58,6 +60,7 @@ impl<'source> PhysicsTrimesh<'source> {
             }
         }
         Ok(Self {
+            count_offset,
             material_ids,
             material_offset,
             vertex_words,
@@ -65,6 +68,18 @@ impl<'source> PhysicsTrimesh<'source> {
             index_words,
             index_offset,
         })
+    }
+
+    /// Returns the original vertex count word's range relative to the blob.
+    #[must_use]
+    pub const fn vertex_count_range(&self) -> Range<u64> {
+        self.count_offset..self.count_offset + WORD as u64
+    }
+
+    /// Returns the original triangle count word's range relative to the blob.
+    #[must_use]
+    pub const fn triangle_count_range(&self) -> Range<u64> {
+        self.count_offset + WORD as u64..self.count_offset + 2 * WORD as u64
     }
 
     /// Returns the original material bytes in triangle order.

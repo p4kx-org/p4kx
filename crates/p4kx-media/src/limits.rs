@@ -31,7 +31,7 @@ pub struct Limits {
     pub records: u64,
     /// Bytes in one serialised record, including its newline.
     pub record_bytes: u64,
-    /// Bytes in one typed binary chunk.
+    /// Bytes in one typed binary chunk or required source chunk read.
     pub chunk_bytes: u64,
     /// Bytes written to payload artifacts, excluding the index and field-origin companion streams.
     pub output_bytes: u64,

@@ -144,6 +144,15 @@ pub struct PhysicsBox {
     pub half_size: [PhysicsFloat; 3],
 }
 
+impl PhysicsBox {
+    /// Returns the original orientation word's byte range within the blob.
+    #[must_use]
+    pub const fn orientation_range(self) -> Range<u64> {
+        let start = self.axes[2][2].range().end;
+        start..start + size_of::<u32>() as u64
+    }
+}
+
 /// Sphere source fields in node coordinates.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -166,6 +175,18 @@ pub struct PhysicsAxial {
     pub radius: PhysicsFloat,
     /// Half axis length for a cylinder or half the centre-to-centre segment of a capsule.
     pub half_height: PhysicsFloat,
+}
+
+/// Returns the original blob marker word's byte range.
+#[must_use]
+pub const fn physics_marker_range() -> Range<u64> {
+    0..size_of::<u32>() as u64
+}
+
+/// Returns the shape selector's byte range within version-2 geometry blobs.
+#[must_use]
+pub const fn physics_shape_range() -> Range<u64> {
+    GEOMETRY_KIND_OFFSET as u64..(GEOMETRY_KIND_OFFSET + size_of::<u32>()) as u64
 }
 
 pub(crate) fn read(bytes: &[u8]) -> PhysicsBlob<'_> {

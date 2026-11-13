@@ -3,7 +3,7 @@
 
 use std::ops::Range;
 
-use p4kx_chunks::{ChunkFile, ivo};
+use p4kx_chunks::{Chunk, ChunkFile, ivo};
 
 use p4kx_foundation::{ByteReader, ParseError};
 
@@ -65,18 +65,42 @@ impl<'source> StatObjPhysics<'source> {
         let chunk = file
             .chunks()
             .get(index)
-            .filter(|chunk| chunk.chunk_type() == ivo::STAT_OBJ_PHYSICS)
             .ok_or(StatObjPhysicsError::NotPhysics { index })?;
+        Self::require_layout(chunk, index)?;
+        let bytes = file
+            .chunk_data(index)
+            .ok_or(StatObjPhysicsError::ChunkRange { index })?;
+        Ok(Self::read(bytes)?)
+    }
+
+    /// Checks the original chunk type and measured table version.
+    ///
+    /// # Errors
+    ///
+    /// Returns a positioned selection or version error for unsupported chunks.
+    pub fn require_layout(chunk: &Chunk, index: usize) -> Result<(), StatObjPhysicsError> {
+        if chunk.chunk_type() != ivo::STAT_OBJ_PHYSICS {
+            return Err(StatObjPhysicsError::NotPhysics { index });
+        }
         if chunk.version() != CHUNK_VERSION {
             return Err(StatObjPhysicsError::UnsupportedVersion {
                 index,
                 version: chunk.version(),
             });
         }
-        let bytes = file
-            .chunk_data(index)
-            .ok_or(StatObjPhysicsError::ChunkRange { index })?;
-        Ok(Self::read(bytes)?)
+        Ok(())
+    }
+
+    /// Returns the original slot count word's byte range within the chunk.
+    #[must_use]
+    pub const fn slot_count_range() -> Range<u64> {
+        BLOB_COUNT_OFFSET as u64..(BLOB_COUNT_OFFSET + WORD_BYTES) as u64
+    }
+
+    /// Returns the original slot table's byte range within the chunk.
+    #[must_use]
+    pub const fn table_range(&self) -> Range<u64> {
+        TABLE_OFFSET as u64..self.payload_start
     }
 
     /// Reads the original table and keeps the complete bounded payload for its slots.

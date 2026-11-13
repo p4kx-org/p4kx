@@ -77,3 +77,44 @@ pub(super) fn at(
     let path = FieldPath::parse(path).map_err(|cause| origin_error::address(&cause))?;
     prepared.insert_subtree(&path, evidence, writer)
 }
+
+pub(super) struct ChunkExtent {
+    pub(super) start: OriginContributions,
+    pub(super) end: OriginContributions,
+}
+pub(super) fn chunk_extent(
+    table: Range<u64>,
+    offset: Range<u64>,
+    size: Option<Range<u64>>,
+    origins: &ModelOrigins<'_>,
+    writer: &MediaWriter<'_>,
+) -> Result<ChunkExtent, MediaError> {
+    let start = origins.payload(offset, "modelChunkOffset", SourceUseRole::Payload, writer)?;
+    let mut end = writer.capture_origins();
+    end.include_original(&start)?;
+    if let Some(size) = size {
+        end.include_original(&origins.payload(
+            size,
+            "modelChunkSize",
+            SourceUseRole::Payload,
+            writer,
+        )?)?;
+    } else {
+        for (range, label) in [
+            (8..16, "modelChunkTableAddress"),
+            (table, "modelChunkExtentTable"),
+        ] {
+            end.include_original(&origins.payload(
+                range,
+                label,
+                SourceUseRole::Selector,
+                writer,
+            )?)?;
+        }
+        end.include_original(&origins.directory("modelDecodedEntryLength", writer)?)?;
+    }
+    Ok(ChunkExtent {
+        start,
+        end: end.finish(),
+    })
+}

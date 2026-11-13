@@ -3,6 +3,7 @@
 
 use std::fs::File;
 use std::io::{self, Read, Seek, SeekFrom};
+use std::ops::Range;
 use std::path::Path;
 
 use crate::checkpoint::{Checkpoint, IO_BLOCK_BYTES};
@@ -100,6 +101,25 @@ impl<'input> RequiredReader<'input> {
         }
         let mut bytes = payload_buffer(self.size, self.budget, self.limits, self.name)?;
         self.read_exact(&mut bytes)
+            .map_err(|cause| error::io(Path::new(self.name), cause))?;
+        Ok(bytes)
+    }
+
+    pub(crate) fn read_chunk(&mut self, range: Range<u64>) -> Result<Vec<u8>, MediaError> {
+        let size = range
+            .end
+            .checked_sub(range.start)
+            .filter(|_| range.end <= self.size)
+            .ok_or_else(|| MediaError::Contract("chunk exceeds its verified Entry range".into()))?;
+        if size > self.limits.chunk_bytes {
+            return Err(MediaError::Limit {
+                budget: "chunk_bytes",
+                limit: self.limits.chunk_bytes,
+            });
+        }
+        let mut bytes = payload_buffer(size, self.budget, self.limits, self.name)?;
+        self.seek(SeekFrom::Start(range.start))
+            .and_then(|_| self.read_exact(&mut bytes))
             .map_err(|cause| error::io(Path::new(self.name), cause))?;
         Ok(bytes)
     }

@@ -12770,6 +12770,566 @@
       ],
       "type": "string"
     },
+    "PhysicsFrame": {
+      "enum": [
+        "source-node-z-up-metres"
+      ],
+      "type": "string"
+    },
+    "PhysicsPayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PhysicsTable"
+            },
+            "record_type": {
+              "const": "table",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PhysicsSlot"
+            },
+            "record_type": {
+              "const": "slot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PhysicsVertex"
+            },
+            "record_type": {
+              "const": "vertex",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PhysicsTriangle"
+            },
+            "record_type": {
+              "const": "triangle",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "PhysicsPayload"
+    },
+    "PhysicsScalar": {
+      "additionalProperties": false,
+      "properties": {
+        "bits": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "value": {
+          "format": "float",
+          "type": "number"
+        }
+      },
+      "required": [
+        "value",
+        "bits"
+      ],
+      "type": "object"
+    },
+    "PhysicsShape": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "axes": {
+              "items": {
+                "items": {
+                  "$ref": "#/$defs/PhysicsScalar"
+                },
+                "maxItems": 3,
+                "minItems": 3,
+                "type": "array"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "centre": {
+              "items": {
+                "$ref": "#/$defs/PhysicsScalar"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "half_size": {
+              "items": {
+                "$ref": "#/$defs/PhysicsScalar"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "orientation_word": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "shape": {
+              "const": "box",
+              "type": "string"
+            }
+          },
+          "required": [
+            "shape",
+            "axes",
+            "orientation_word",
+            "centre",
+            "half_size"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "centre": {
+              "items": {
+                "$ref": "#/$defs/PhysicsScalar"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "radius": {
+              "$ref": "#/$defs/PhysicsScalar"
+            },
+            "shape": {
+              "const": "sphere",
+              "type": "string"
+            }
+          },
+          "required": [
+            "shape",
+            "centre",
+            "radius"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "axis": {
+              "items": {
+                "$ref": "#/$defs/PhysicsScalar"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "centre": {
+              "items": {
+                "$ref": "#/$defs/PhysicsScalar"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "half_height": {
+              "$ref": "#/$defs/PhysicsScalar"
+            },
+            "radius": {
+              "$ref": "#/$defs/PhysicsScalar"
+            },
+            "shape": {
+              "const": "cylinder",
+              "type": "string"
+            }
+          },
+          "required": [
+            "shape",
+            "centre",
+            "axis",
+            "radius",
+            "half_height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "axis": {
+              "items": {
+                "$ref": "#/$defs/PhysicsScalar"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "centre": {
+              "items": {
+                "$ref": "#/$defs/PhysicsScalar"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            },
+            "half_height": {
+              "$ref": "#/$defs/PhysicsScalar"
+            },
+            "radius": {
+              "$ref": "#/$defs/PhysicsScalar"
+            },
+            "shape": {
+              "const": "capsule",
+              "type": "string"
+            }
+          },
+          "required": [
+            "shape",
+            "centre",
+            "axis",
+            "radius",
+            "half_height"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "index_range": {
+              "$ref": "#/$defs/SourceRange"
+            },
+            "material_range": {
+              "$ref": "#/$defs/SourceRange"
+            },
+            "shape": {
+              "const": "trimesh",
+              "type": "string"
+            },
+            "triangle_count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "vertex_count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "vertex_range": {
+              "$ref": "#/$defs/SourceRange"
+            }
+          },
+          "required": [
+            "shape",
+            "vertex_count",
+            "triangle_count",
+            "vertex_range",
+            "index_range",
+            "material_range"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PhysicsSlot": {
+      "additionalProperties": false,
+      "properties": {
+        "blob": {
+          "$ref": "#/$defs/PhysicsSlotBlob"
+        },
+        "declared_length": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "declared_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "node": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "packed_key": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "part": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "retained_range": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "packed_key",
+        "part",
+        "node",
+        "declared_length",
+        "declared_range",
+        "retained_range",
+        "blob"
+      ],
+      "type": "object"
+    },
+    "PhysicsSlotBlob": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "missing-payload",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "damage-mesh",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "signed-distance-field",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "unknown-marker",
+              "type": "string"
+            },
+            "marker": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "disposition",
+            "marker"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "unknown-kind",
+              "type": "string"
+            },
+            "selector": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "disposition",
+            "selector"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "malformed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "geometry",
+              "type": "string"
+            },
+            "frame": {
+              "$ref": "#/$defs/PhysicsFrame"
+            },
+            "geometry": {
+              "$ref": "#/$defs/PhysicsShape"
+            }
+          },
+          "required": [
+            "disposition",
+            "frame",
+            "geometry"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PhysicsTable": {
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "$ref": "#/$defs/PhysicsTableStatus"
+        },
+        "slot_count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "slot_table": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "trailing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "disposition",
+        "slot_count",
+        "slot_table",
+        "trailing"
+      ],
+      "type": "object"
+    },
+    "PhysicsTableStatus": {
+      "enum": [
+        "read",
+        "unsupported-version",
+        "malformed"
+      ],
+      "type": "string"
+    },
+    "PhysicsTriangle": {
+      "additionalProperties": false,
+      "properties": {
+        "indices": {
+          "items": {
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "material_id": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "indices",
+        "material_id"
+      ],
+      "type": "object"
+    },
+    "PhysicsVertex": {
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "items": {
+            "$ref": "#/$defs/PhysicsScalar"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "position"
+      ],
+      "type": "object"
+    },
     "Placement": {
       "oneOf": [
         {
@@ -35909,6 +36469,226 @@
               "indices": {
                 "maxItems": 1,
                 "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-physics-table"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/PhysicsPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "table"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-physics-slot"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/PhysicsPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "slot"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-physics-vertex"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/PhysicsPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "vertex"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-physics-triangle"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/PhysicsPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "triangle"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
               }
             }
           }

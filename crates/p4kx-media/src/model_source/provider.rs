@@ -12,6 +12,7 @@ use super::origins::{self, ModelOrigins};
 use super::payload::{
     self, ModelChunkRecord, ModelEntryRecord, ModelSourceFamily, ModelSourcePayload,
 };
+use super::physics;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::required_reader::RequiredReader;
 use crate::{
@@ -26,7 +27,7 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.0.0",
+            "1.1.0",
             "Selected original model and geometry Entry bytes with positioned chunk table records.",
         );
         capability.field_groups = vec![
@@ -34,9 +35,13 @@ impl Provider for ModelSourceProvider {
                 "chunk-directory",
                 "Original table order, raw byte ranges, IDs, versions and physical source identities.",
             ),
+            FieldGroup::new(
+                "collision-shapes",
+                "Original StatObjPhysics table slots and validated source-frame geometry.",
+            ),
             FieldGroup::new_with_unsupported_projection(
                 "model-semantics",
-                "Model decoding, companion associations and converted geometry are outside this projection.",
+                "Render model decoding, companion associations and entity-frame collision transforms are outside this projection.",
             ),
         ];
         capability
@@ -78,6 +83,7 @@ impl Provider for ModelSourceProvider {
                 for index in 0..file.chunks().len() {
                     writer.checkpoint()?;
                     chunk(&file, index, &origins, writer)?;
+                    physics::emit(&file, index, &mut reader, &origins, writer)?;
                 }
             }
             Err(ChunkDirectoryError::Format(ChunkError::Allocation)) => {
@@ -246,14 +252,11 @@ fn chunk(
     };
     put(&mut prepared, "chunk_id", id, writer)?;
     put(&mut prepared, "extent", signature, writer)?;
-    chunk_range_origins(
-        file.table_range(),
-        row.offset,
-        row.size,
-        origins,
-        &mut prepared,
-        writer,
-    )?;
+    let range = origins::chunk_extent(file.table_range(), row.offset, row.size, origins, writer)?;
+    put(&mut prepared, "range", range.end.clone(), writer)?;
+    put(&mut prepared, "range/start", range.start, writer)?;
+    put(&mut prepared, "range/end_exclusive", range.end, writer)?;
+    put(&mut prepared, "range/basis", origins.independent(), writer)?;
     prepared.write(
         writer,
         &Subresource::new(payload::CHUNK, vec![index as u64]),
@@ -261,45 +264,6 @@ fn chunk(
         &ModelSourcePayload::Chunk(ModelChunkRecord::new(chunk)),
         &[],
     )
-}
-
-fn chunk_range_origins(
-    table: Range<u64>,
-    offset: Range<u64>,
-    size: Option<Range<u64>>,
-    origins: &ModelOrigins<'_>,
-    prepared: &mut PreparedRecordOrigins,
-    writer: &MediaWriter<'_>,
-) -> Result<(), MediaError> {
-    let start = origins.payload(offset, "modelChunkOffset", SourceUseRole::Payload, writer)?;
-    let mut end = writer.capture_origins();
-    end.include_original(&start)?;
-    if let Some(size) = size {
-        end.include_original(&origins.payload(
-            size,
-            "modelChunkSize",
-            SourceUseRole::Payload,
-            writer,
-        )?)?;
-    } else {
-        for (range, label) in [
-            (8..16, "modelChunkTableAddress"),
-            (table, "modelChunkExtentTable"),
-        ] {
-            end.include_original(&origins.payload(
-                range,
-                label,
-                SourceUseRole::Selector,
-                writer,
-            )?)?;
-        }
-        end.include_original(&origins.directory("modelDecodedEntryLength", writer)?)?;
-    }
-    put(prepared, "range/start", start, writer)?;
-    let end = end.finish();
-    put(prepared, "range", end.clone(), writer)?;
-    put(prepared, "range/end_exclusive", end, writer)?;
-    put(prepared, "range/basis", origins.independent(), writer)
 }
 
 fn put(

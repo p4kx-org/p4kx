@@ -38,5 +38,6 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             },"required":["data"]}
         }));
     }
+    super::physics::bind(&mut base)?;
     Ok(base)
 }

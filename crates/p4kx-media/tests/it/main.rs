@@ -91,6 +91,7 @@ mod material_provider_schema;
 mod material_provider_sources;
 mod material_provider_status;
 mod material_support;
+mod model_physics_provider;
 mod model_source_provider;
 mod non_finite;
 mod owned_outputs;

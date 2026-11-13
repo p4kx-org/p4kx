@@ -207,7 +207,7 @@ pub use object_container::{
 pub use palette::{PaletteSlot, TintEntry, TintPalette, srgb8_to_linear};
 pub use physics_blob::{
     PhysicsAxial, PhysicsBlob, PhysicsBlobError, PhysicsBox, PhysicsFloat, PhysicsGeometry,
-    PhysicsSphere,
+    PhysicsSphere, physics_marker_range, physics_shape_range,
 };
 pub use physics_trimesh::PhysicsTrimesh;
 pub use positioned_animation::{PositionedAnimation, PositionedDba};

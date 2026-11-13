@@ -22,7 +22,7 @@ fn model_provider_retains_every_physical_chunk_and_its_immediate_origin() -> Tes
     let temp = tempfile::tempdir()?;
     let file = TestChunkFile::ivo()
         .chunk(
-            ivo::STAT_OBJ_PHYSICS.id(),
+            ivo::PHYSICAL_HIERARCHY.id(),
             0x900,
             b"synthetic opaque physics",
         )

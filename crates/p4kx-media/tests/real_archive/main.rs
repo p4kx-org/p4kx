@@ -17,6 +17,7 @@ mod layout_footer;
 mod layout_inventory;
 mod layout_records;
 mod manifests;
+mod model_collision_replay;
 mod preservation_provider;
 mod privacy;
 mod shader_accounting;
