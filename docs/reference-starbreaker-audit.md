@@ -185,3 +185,33 @@ The GLB check exercised the preflight function in Blender 5.3's bundled Python
 with a synthetic stream. It did not import the invalid model. The remaining
 StarBreaker findings identify implementation seams and source tests for their
 owning tickets. They are not claims of installed-PTU parity.
+
+### Follow-up against the integration branch
+
+The same StarBreaker head was checked against P4KX integration commit
+`1b0ea6a29`. [GLB/package preflight](https://github.com/p4kx-org/p4kx/issues/1134)
+and [DDS transfer encoding](https://github.com/p4kx-org/p4kx/issues/1132) are now
+implemented in the integration branch. The remaining source and package work
+uses the existing tickets above, with two additional implementation units.
+
+- [#1136](https://github.com/p4kx-org/p4kx/issues/1136) tracks the physical default
+  material, its provenance and its selection by fallback slots. The virtual-root
+  repair in #1091 resolves a model's authored request. The physical default is a
+  separate input for slots that still need a fallback. Keep the source mesh ID,
+  source library position and dense GLB/package material index distinct.
+- [#1137](https://github.com/p4kx-org/p4kx/issues/1137) tracks DDS alpha association
+  and selected-mip transparency. P4KX normalizes DXT2/3 to BC2 and DXT4/5 to BC3.
+  The shared block layouts still carry different alpha association declarations.
+  The model texture loader's alpha-format list omits BC1 and BC2. An in-bounds
+  BC1 transparent selector or a BC2 alpha sample can therefore survive decode
+  while the loader reports no alpha channel. Keep the source declaration, observed
+  coverage and consumer interpretation separate, including data packed in alpha.
+  [Microsoft legacy format mapping](https://learn.microsoft.com/en-us/windows/win32/direct3d10/d3d10-graphics-programming-guide-resources-legacy-formats)
+  · [BC1 selectors](https://learn.microsoft.com/en-us/windows/win32/direct3d9/opaque-and-1-bit-alpha-textures)
+  · [DX10 alpha modes](https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-header-dxt10).
+- For SOC doors, StarBreaker assigns a class-derived controller to a shared
+  geometry entry. A shared mesh can represent placements of different classes.
+  Keep class identity, controller references and inline loadouts per placement
+  in [#1129](https://github.com/p4kx-org/p4kx/issues/1129). Sensor volumes and
+  room containment represent different relationships.
+  [StarBreaker interior writer](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/pipeline/interiors.rs).
