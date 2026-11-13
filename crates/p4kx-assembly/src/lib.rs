@@ -168,6 +168,7 @@ mod room_model_helper;
 mod skeleton;
 mod soc_container_capture;
 mod soc_entity_index;
+mod soc_light_class;
 mod soc_room_index;
 mod soc_source_guid;
 mod soc_tile_port_index;
@@ -265,6 +266,7 @@ pub use soc_container_capture::{
     SocContainerOccurrence, SocMemberError, SocMemberSelection, SocMemberSelector, SocStreamInput,
 };
 pub use soc_entity_index::{SocEntityIndex, SocEntitySite, SocEntityTarget};
+pub use soc_light_class::{SocLightClass, SocLightClassSource};
 pub use soc_room_index::{SocRoomIndex, SocRoomTarget};
 pub use soc_source_guid::SocSourceGuid;
 pub use soc_tile_port_index::{SocTilePortIndex, SocTilePortSite, SocTilePortTarget};

@@ -185,6 +185,11 @@ impl<'document> SocEntity<'document> {
         SocSourceNode::new(self.ordinal, self.element).attributes("EntityClassGUID")
     }
 
+    /// Returns original class `EntityClass` attributes in order.
+    pub fn class_name_attributes(self) -> impl Iterator<Item = SourceAttribute<'document>> {
+        SocSourceNode::new(self.ordinal, self.element).attributes("EntityClass")
+    }
+
     /// Visits original `EntityLinks` groups.
     pub fn entity_links(self) -> impl Iterator<Item = SocEntityLinks<'document>> {
         SocEntityLinks::read(self.element)
