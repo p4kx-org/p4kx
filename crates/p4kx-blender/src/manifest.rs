@@ -15,7 +15,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 ///
 /// A new minor version only adds fields and values readers may ignore; a new major version changes
 /// the meaning of existing ones.
-pub const FORMAT_VERSION: &str = "1.12";
+pub const FORMAT_VERSION: &str = "1.13";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
@@ -143,6 +143,9 @@ pub struct Manifest {
     /// The tint palettes of the meshes, each written once; absent in version 1.0.
     #[serde(default)]
     pub palettes: Vec<Palette>,
+    /// The optional authored SOC scene companion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authored_soc: Option<crate::ManifestSocScene>,
     /// What could not be resolved or written, with the node or texture it concerns.
     pub issues: Vec<Issue>,
 }

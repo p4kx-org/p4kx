@@ -600,3 +600,9 @@ from the glTF materials of the meshes and the `diffuse`, `normal` and `specular`
 channel transform in same-read source metadata. Older manifests use their authored
 compatibility colour-space field. Missing or conflicting declarations retain their
 role's compatibility sampling, with unknown actual transfer and an untagged PNG.
+## Authored SOC scene
+
+An interior package written with `--authored-soc` has an `authored_soc` reference in
+`scene.json` (package format 1.13). It names the fixed file `authored/soc-scene.json` and its
+independent schema version. The add-on loads its non-rendering hierarchy alongside the visible
+scene. See [Authored SOC scene](soc-scene.md) for the sidecar contract.

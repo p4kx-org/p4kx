@@ -8,7 +8,8 @@ use p4kx_assembly::{
     SocMemberSelector, SocStreamInput,
 };
 use p4kx_extraction::{
-    CancelToken, EntryOrigin, InputScope, PhysicalSourceRef, SourceInput, SourceUses,
+    CancelToken, EntryOrigin, InputScope, PhysicalSourceRef, SourceInput, SourceUses, SourceValue,
+    SourcedValue,
 };
 use p4kx_model::{SocEntityFile, SocRoomRegistry};
 use schemars::JsonSchema;
@@ -39,9 +40,22 @@ impl Occurrence {
         cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
         let container = physical(&original.origin, sources)?;
+        let mut children = Vec::new();
         let descriptor = Member::read(&original.descriptor, sources, |bytes, origin| {
             let descriptor = p4kx_model::SocContainerDescriptor::parse(bytes)
                 .map_err(|_| InputState::Invalid)?;
+            for (child, declaration) in original.children.iter().zip(descriptor.children()) {
+                if child.selector.position != declaration.element().position() {
+                    return Err(InputState::Capture(SocSceneError::Position));
+                }
+                children.push(
+                    Child::read(child, declaration.element(), origin)
+                        .map_err(InputState::Capture)?,
+                );
+            }
+            if children.len() != original.children.len() {
+                return Err(InputState::Capture(SocSceneError::Position));
+            }
             documents
                 .bind(descriptor.document(), origin)
                 .map_err(InputState::Capture)
@@ -51,11 +65,6 @@ impl Occurrence {
             let (room, origin) = room_input.as_ref().ok_or(InputState::Invalid)?;
             RoomRegistry::read(room, origin, documents).map_err(InputState::Capture)
         })?;
-        let children = original
-            .children
-            .iter()
-            .map(|child| Child::read(child, sources))
-            .collect::<Result<_, _>>()?;
         let streams = streams(original, room_input.as_ref(), sources, documents, cancel)?;
         Ok(Self {
             placement: original.placement,
@@ -229,6 +238,7 @@ impl<T> Member<T> {
 struct Child {
     selector: Selector,
     target: ChildTarget,
+    local_transform: SourcedValue<[[f32; 4]; 3]>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -247,7 +257,12 @@ enum ChildTarget {
 }
 
 impl Child {
-    fn read(original: &SocChildInput, sources: &SourceUses) -> Result<Self, SocSceneError> {
+    fn read(
+        original: &SocChildInput,
+        element: p4kx_extraction::cryxml::SourceElement<'_>,
+        origin: &XmlOrigin<'_>,
+    ) -> Result<Self, SocSceneError> {
+        let sources = origin.sources;
         let target = match &original.state {
             SocChildState::InvalidSelector => ChildTarget::InvalidSelector,
             SocChildState::Missing => ChildTarget::Missing,
@@ -268,8 +283,60 @@ impl Child {
         Ok(Self {
             selector: Selector::read(&original.selector)?,
             target,
+            local_transform: child_transform(element, origin)?,
         })
     }
+}
+
+fn child_transform(
+    element: p4kx_extraction::cryxml::SourceElement<'_>,
+    origin: &XmlOrigin<'_>,
+) -> Result<SourcedValue<[[f32; 4]; 3]>, SocSceneError> {
+    use p4kx_model::Transform;
+    let names = ["pos", "rot"];
+    let used = || {
+        element.attributes().filter(|attr| {
+            attr.namespace().is_none()
+                && names
+                    .iter()
+                    .any(|name| attr.name().eq_ignore_ascii_case(name))
+        })
+    };
+    let position = vector::<3>(element, "pos", [0.0; 3]);
+    let rotation = vector::<4>(element, "rot", [1.0, 0.0, 0.0, 0.0]);
+    let value = if used().next().is_none() {
+        SourceValue::Absent
+    } else {
+        rotation
+            .zip(position)
+            .and_then(|(rotation, position)| Transform::from_quaternion(rotation, position))
+            .map_or(SourceValue::Invalid, |transform| {
+                SourceValue::Present(transform.rows)
+            })
+    };
+    origin.field(element, used(), value)
+}
+
+fn vector<const N: usize>(
+    element: p4kx_extraction::cryxml::SourceElement<'_>,
+    name: &str,
+    default: [f64; N],
+) -> Option<[f64; N]> {
+    let mut attributes = element
+        .attributes()
+        .filter(|attr| attr.namespace().is_none() && attr.name().eq_ignore_ascii_case(name));
+    let Some(attribute) = attributes.next() else {
+        return Some(default);
+    };
+    if attributes.next().is_some() {
+        return None;
+    }
+    let mut parts = attribute.value().split(',');
+    let mut values = [0.0; N];
+    for value in &mut values {
+        *value = parts.next()?.trim().parse().ok()?;
+    }
+    parts.next().is_none().then_some(values)
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

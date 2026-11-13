@@ -4,9 +4,9 @@
 use std::io::{self, BufWriter, Write};
 
 use anyhow::{Result, anyhow};
-use p4kx_assembly::{ArchiveModels, Interior, InteriorOptions};
+use p4kx_assembly::{ArchiveModels, Interior, InteriorOptions, SocContainerCapture};
 use p4kx_blender::{
-    InteriorScene, Issue, PackageInfo, PackageSummary, PackageWriteContext,
+    InteriorScene, Issue, PackageInfo, PackageSummary, PackageWriteContext, SocScene,
     check_output_with_context, write_interior_package_with_context,
 };
 use p4kx_channels::channel_name;
@@ -76,7 +76,17 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
     }
     let info = PackageInfo::new(channel_name(outer.path()), build_info(outer)?);
     let name = name_of(entry);
-    let scene = InteriorScene::new(&name, &interior);
+    let authored = if args.authored_soc {
+        let refs: Vec<_> = layers.iter().collect();
+        let capture = SocContainerCapture::read(&refs, &cancel)?;
+        Some(SocScene::from_capture_with_cancel(&capture, &cancel)?)
+    } else {
+        None
+    };
+    let mut scene = InteriorScene::new(&name, &interior);
+    if let Some(authored) = &authored {
+        scene = scene.with_authored_soc(authored);
+    }
     let loader = models.textures();
     let summary = write_interior_package_with_context(
         &scene, &models, &loader, &glb, &info, &args.out, &context,

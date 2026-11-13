@@ -30,6 +30,10 @@ from .package import (
 )
 
 
+from . import soc_scene
+from .soc_importer import import_soc_nodes
+
+
 @dataclass(slots=True)
 class ImportResult:
     """What an import created, for the report to the user."""
@@ -60,6 +64,7 @@ def import_package(
     """
     if not hasattr(bpy.ops.import_scene, "gltf"):
         raise PackageError("Enable Blender's 'glTF 2.0 format' add-on first.")
+    authored = soc_scene.load(package.root, package.authored_soc) if package.authored_soc else []
     preflight = preflight_meshes(package)
     root = bpy.data.collections.new(blender_name(package.entity_name))
     context.scene.collection.children.link(root)
@@ -79,6 +84,7 @@ def import_package(
                 _import_rigged(context, mesh, preflight.paths[mesh.id], created[node.index], root, result)
         result.objects += 1
         result.instances += template is not None
+    import_soc_nodes(root, authored)
     result.warnings.extend(package.warnings)
     return result
 

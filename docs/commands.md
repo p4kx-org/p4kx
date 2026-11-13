@@ -321,6 +321,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   and lights as `entity package --interior`, without an Entity around them. `--lod`,
   `--texture-mip` and `--no-vertex-colours` work as for `entity package`; the folder is written
   beside the target and moved into place when complete. The Blender add-on imports it.
+  Add `--authored-soc` for the optional [SOC scene companion](soc-scene.md).
 - `p4kx prefab list <archive> [<library>]` lists the prefab libraries below `Data\Prefabs` or the
   prefabs of one; `p4kx prefab dump <archive> <library> <prefab>` prints a prefab with its nested
   prefabs expanded: every object with type, class, geometry file and its transform to the prefab's

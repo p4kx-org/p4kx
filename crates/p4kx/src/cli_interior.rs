@@ -111,6 +111,9 @@ pub(crate) struct InteriorPackageArgs {
     /// Leaves the vertex colours out of the models.
     #[arg(long)]
     pub(crate) no_vertex_colours: bool,
+    /// Includes the versioned authored SOC room and door document.
+    #[arg(long)]
+    pub(crate) authored_soc: bool,
 }
 
 /// Arguments of `p4kx interior source`.

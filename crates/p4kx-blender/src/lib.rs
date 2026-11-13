@@ -40,6 +40,7 @@ mod owned_output_tests;
 mod package_destination;
 mod package_paths;
 mod package_replacement;
+mod package_soc_scene;
 mod package_write_context;
 mod plan;
 mod rename;
@@ -78,6 +79,7 @@ pub use manifest_materials::{
     MaterialStencil, MaterialTexture, Palette, PaletteColours, PaletteEntry, Parameter, TextureUse,
 };
 pub use manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
+pub use package_soc_scene::ManifestSocScene;
 pub use package_write_context::PackageWriteContext;
 pub use schema::manifest_schema;
 pub use soc_scene::{SOC_SCENE_VERSION, SocScene, SocSceneError, SocXmlPosition, soc_scene_schema};

@@ -111,6 +111,10 @@ impl<'a> Staging<'a> {
         ] {
             sync_folder(&path).map_err(|source| PackageError::write(&path, source))?;
         }
+        let authored = self.folder.join(crate::package_soc_scene::DIRECTORY);
+        if authored.is_dir() {
+            sync_folder(&authored).map_err(|source| PackageError::write(&authored, source))?;
+        }
         let previous = Replacement::move_aside(&self.out, self.context)?;
         if let Err(primary) = self.place() {
             return Err(match previous {

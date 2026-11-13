@@ -29,6 +29,7 @@ sys.path.insert(0, str(HERE))
 if not INSTALLED_ROOT:
     sys.path.insert(1, str(HERE.parent))
 
+import blender_soc_scene_smoke  # noqa: E402
 import synthetic  # noqa: E402
 import synthetic_character  # noqa: E402
 import synthetic_materials  # noqa: E402
@@ -274,6 +275,7 @@ def main() -> None:
 
         check_interior(Path(folder) / "lit")
         check_interior_alone(Path(folder) / "interior_alone")
+        blender_soc_scene_smoke.run()
         check_character(Path(folder) / "character", synthetic_character.RIG_BASE_COLOUR)
         check_character(Path(folder) / "character_white", (1.0, 1.0, 1.0, 1.0))
 

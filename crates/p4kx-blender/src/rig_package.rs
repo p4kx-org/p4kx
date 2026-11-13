@@ -82,6 +82,7 @@ pub(crate) fn rig_manifest(
         materials: Vec::new(),
         material_libraries: Vec::new(),
         palettes: Vec::new(),
+        authored_soc: None,
         issues,
     }
 }

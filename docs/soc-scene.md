@@ -36,3 +36,12 @@ exact source use is the XML document's mandatory physical source and chunk ident
 with each row's original local coordinate. The document carries their common
 `sourceSetComplete`. The declaration state stays separate from the encryption
 state.
+
+## Blender package
+
+`p4kx interior package <archive> <container>... --out <folder> --authored-soc` includes the
+same source document at `authored/soc-scene.json`. The package manifest 1.13 references this
+file with `authored_soc`. Blender 5.3 imports the companion as a separate **Authored SOC**
+collection of non-rendering empties for containers, rooms, doors, sensors and area segments.
+Authored local transforms use the source Z-up basis and metres. A missing or invalid
+transform is marked unavailable. Visible meshes and lights use the package scene as usual.

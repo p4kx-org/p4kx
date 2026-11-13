@@ -20,6 +20,7 @@ pub(crate) struct Entity {
     position: SocXmlPosition,
     guid: SourcedValue<String>,
     class_guid: SourcedValue<String>,
+    local_transform: SourcedValue<[[f32; 4]; 3]>,
     areas: Vec<Area>,
     components: Vec<Component>,
     links: Vec<Link>,
@@ -45,6 +46,7 @@ impl Entity {
                 entity.class_guid_attributes(),
                 guid_value(entity.class_guid_attributes()),
             )?,
+            local_transform: entity_transform(entity, origin)?,
             areas: entity
                 .area_components()
                 .map(|area| Area::read(area, index.room, origin))
@@ -60,6 +62,29 @@ impl Entity {
                 .collect::<Result<_, _>>()?,
         })
     }
+}
+
+fn entity_transform(
+    entity: SocEntity<'_>,
+    origin: &XmlOrigin<'_>,
+) -> Result<SourcedValue<[[f32; 4]; 3]>, SocSceneError> {
+    let element = entity.element();
+    let is_transform = |attribute: &p4kx_extraction::cryxml::SourceAttribute<'_>| {
+        attribute.namespace().is_none() && matches!(attribute.name(), "Pos" | "Rotate" | "Scale")
+    };
+    let value = if element
+        .attributes()
+        .any(|attribute| is_transform(&attribute))
+    {
+        entity
+            .local_transform()
+            .map_or(SourceValue::Invalid, |transform| {
+                SourceValue::Present(transform.rows)
+            })
+    } else {
+        SourceValue::Absent
+    };
+    origin.field(element, element.attributes().filter(is_transform), value)
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

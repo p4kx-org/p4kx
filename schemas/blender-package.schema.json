@@ -1133,6 +1133,29 @@
         }
       ]
     },
+    "ManifestSocScene": {
+      "description": "An optional versioned authored SOC scene file in a package.",
+      "properties": {
+        "file": {
+          "const": "authored/soc-scene.json",
+          "description": "The fixed package-relative JSON file.",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "description": "The authored SOC scene schema version.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "file",
+        "schema_version"
+      ],
+      "type": "object"
+    },
     "MaterialAttributeInfo": {
       "description": "One original attribute and its independent semantic/lexical values.",
       "properties": {
@@ -4260,6 +4283,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "The scene description of a package: `scene.json`.",
   "properties": {
+    "authored_soc": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ManifestSocScene"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The optional authored SOC scene companion."
+    },
     "coordinates": {
       "$ref": "#/$defs/Coordinates",
       "description": "The axes and unit of every transform and of the GLB meshes."

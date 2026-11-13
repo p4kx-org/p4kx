@@ -62,6 +62,7 @@ pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
             .cloned()
             .collect(),
         palettes: palettes(inputs),
+        authored_soc: None,
         issues: issues(inputs),
     }
 }

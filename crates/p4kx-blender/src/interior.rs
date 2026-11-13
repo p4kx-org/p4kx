@@ -17,6 +17,7 @@ use crate::{PackageInfo, PackageResult, PackageSummary};
 pub struct InteriorScene<'a> {
     name: &'a str,
     interior: &'a Interior,
+    authored_soc: Option<&'a crate::SocScene>,
 }
 
 impl<'a> InteriorScene<'a> {
@@ -24,7 +25,18 @@ impl<'a> InteriorScene<'a> {
     /// puts `interior` in the scene.
     #[must_use]
     pub const fn new(name: &'a str, interior: &'a Interior) -> Self {
-        Self { name, interior }
+        Self {
+            name,
+            interior,
+            authored_soc: None,
+        }
+    }
+
+    /// Adds an authored SOC source document to the package.
+    #[must_use]
+    pub const fn with_authored_soc(mut self, scene: &'a crate::SocScene) -> Self {
+        self.authored_soc = Some(scene);
+        self
     }
 }
 
@@ -93,6 +105,7 @@ pub fn write_interior_package_with_context(
         },
         items: interior_items(scene.interior),
         issues: scene.interior.issues(),
+        authored_soc: scene.authored_soc,
     };
     write_scene(&scene, models, textures, options, info, out, context)
 }

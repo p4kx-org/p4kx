@@ -196,6 +196,7 @@ pub fn write_package_with_context(
         entity: entity_ref(assembly.root()),
         items: items(assembly),
         issues: assembly.issues(),
+        authored_soc: None,
     };
     write_scene(&scene, models, textures, options, info, out, context)
 }
@@ -205,6 +206,7 @@ pub(crate) struct Scene<'a> {
     pub(crate) entity: EntityRef,
     pub(crate) items: Vec<Item<'a>>,
     pub(crate) issues: &'a [AssemblyIssue],
+    pub(crate) authored_soc: Option<&'a crate::SocScene>,
 }
 
 pub(crate) fn write_scene(
@@ -266,9 +268,20 @@ fn write_scene_files(
         outcomes: &outcomes,
         meshes: &written,
     });
+    let authored_soc_bytes = scene
+        .authored_soc
+        .map(|authored| crate::package_soc_scene::write(staging, authored, context))
+        .transpose()?;
+    if authored_soc_bytes.is_some() {
+        manifest.authored_soc = Some(crate::package_soc_scene::ManifestSocScene::new());
+    }
     sanitise(&mut manifest);
     let manifest_len = write_manifest(&staging.join(MANIFEST_FILE), &manifest, context)?;
-    let summary = summarise(&manifest, &outcomes, &written, manifest_len);
+    let mut summary = summarise(&manifest, &outcomes, &written, manifest_len);
+    if let Some(bytes) = authored_soc_bytes {
+        summary.files += 1;
+        summary.bytes += bytes;
+    }
     context.check()?;
     Ok(summary)
 }
@@ -278,10 +291,23 @@ pub(crate) fn write_manifest(
     manifest: &crate::Manifest,
     context: &PackageWriteContext<'_>,
 ) -> PackageResult<u64> {
+    write_json(path, manifest, context, true)
+}
+
+pub(crate) fn write_json(
+    path: &Path,
+    data: &impl serde::Serialize,
+    context: &PackageWriteContext<'_>,
+    pretty: bool,
+) -> PackageResult<u64> {
     let (file, ownership) = context.create_file(path)?.into_parts();
     let mut writer = BufWriter::new(file);
-    serde_json::to_writer_pretty(&mut writer, manifest)
-        .map_err(|error| PackageError::write(path, error.into()))?;
+    let result = if pretty {
+        serde_json::to_writer_pretty(&mut writer, data)
+    } else {
+        serde_json::to_writer(&mut writer, data)
+    };
+    result.map_err(|error| PackageError::write(path, error.into()))?;
     writer
         .write_all(b"\n")
         .and_then(|()| writer.flush())

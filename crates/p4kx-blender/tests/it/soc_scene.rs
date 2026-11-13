@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::SocContainerCapture;
-use p4kx_blender::{SocScene, soc_scene_schema};
-use p4kx_extraction::{Archive, CancelToken};
+use p4kx_assembly::{ArchiveModels, Interior, InteriorOptions, SocContainerCapture};
+use p4kx_blender::{
+    InteriorScene, PackageError, PackageInfo, SocScene, manifest_schema, soc_scene_schema,
+    write_interior_package,
+};
+use p4kx_extraction::{Archive, CancelToken, GlbOptions};
 use p4kx_testkit::{ArchiveBuilder, TestChunkFile, TestContainer, TestEntry};
 use serde_json::Value;
 
@@ -13,11 +16,11 @@ const GUID: &str = "11111111-1111-1111-1111-111111111111";
 const CLASS: &str = "22222222-2222-2222-2222-222222222222";
 const MANUAL: &str = "SItemPortLoadoutManualParams";
 
-fn scene() -> TestResult<Value> {
+fn fixture() -> TestResult<(tempfile::TempDir, Archive, Archive)> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("soc-scene.p4k");
     let xml = format!(
-        r#"<Entities><Entity EntityCryGUID="{GUID}" EntityClassGUID="{CLASS}">
+        r#"<Entities><Entity EntityCryGUID="{GUID}" EntityClassGUID="{CLASS}" Pos="2,3,4">
         <AreaComponent><Entities><Entity EntityCryGUID="{GUID}"/></Entities>
           <Segment Type="Box" BoxMin="0,0,0" BoxMax="1,2,3" transform_ls="Q:1,0,0,0|T:4,5,6"/>
         </AreaComponent>
@@ -53,6 +56,11 @@ fn scene() -> TestResult<Value> {
         .first()
         .ok_or("original container Entry")?;
     let container = archive.open_container(entry)?;
+    Ok((folder, archive, container))
+}
+
+fn scene() -> TestResult<Value> {
+    let (_folder, archive, container) = fixture()?;
     let capture = SocContainerCapture::read(&[&archive, &container], &CancelToken::new())?;
     Ok(serde_json::to_value(SocScene::from_capture(&capture)?)?)
 }
@@ -195,6 +203,105 @@ fn verify_values(entity: &Value) -> TestResult {
             .and_then(Value::as_array)
             .is_some_and(Vec::is_empty),
         "explicitly empty manual override"
+    );
+    Ok(())
+}
+
+#[test]
+fn authored_soc_package_is_staged_and_replaceable_as_one_package() -> TestResult {
+    let (folder, archive, container) = fixture()?;
+    let layers = [&archive, &container];
+    let capture = SocContainerCapture::read(&layers, &CancelToken::new())?;
+    let soc = SocScene::from_capture(&capture)?;
+    let interior = Interior::build(&layers, "selected.socpak", &InteriorOptions::default())?;
+    let plain = InteriorScene::new("selected", &interior);
+    let with_soc = plain.with_authored_soc(&soc);
+    let model = ArchiveModels::new(&archive);
+    let options = GlbOptions::default();
+    let info = PackageInfo::new(None, None);
+    let target = folder.path().join("package");
+    let write = |scene| {
+        write_interior_package(
+            scene,
+            &model,
+            &model.textures(),
+            &options,
+            &info,
+            &target,
+            &|| false,
+        )
+    };
+    let manifest_path = target.join("scene.json");
+    let baseline = write(&plain)?;
+    let read_manifest =
+        || -> TestResult<Value> { Ok(serde_json::from_slice(&std::fs::read(&manifest_path)?)?) };
+    let baseline_manifest_bytes = std::fs::metadata(&manifest_path)?.len();
+    let before = read_manifest()?;
+    assert!(
+        before.get("authored_soc").is_none(),
+        "only explicit output requests add the sidecar"
+    );
+    let authored = write(&with_soc)?;
+    let manifest = read_manifest()?;
+    assert_eq!(
+        manifest.get("nodes"),
+        before.get("nodes"),
+        "the visible scene is identical"
+    );
+    let relative = manifest
+        .pointer("/authored_soc/file")
+        .and_then(Value::as_str)
+        .ok_or("companion reference")?;
+    let sidecar = target.join(relative);
+    let bytes = std::fs::read(&sidecar)?;
+    let sidecar_len = u64::try_from(bytes.len())?;
+    verify_package_schemas(&bytes, &manifest)?;
+    let authored_manifest_bytes = std::fs::metadata(&manifest_path)?.len();
+    assert_eq!(
+        authored.files,
+        baseline.files + 1,
+        "one companion file is counted"
+    );
+    assert_eq!(
+        authored.bytes + baseline_manifest_bytes,
+        baseline.bytes + authored_manifest_bytes + sidecar_len,
+        "companion bytes are counted"
+    );
+    verify_package_replacement(&target, &sidecar, || write(&plain), || write(&with_soc))
+}
+
+fn verify_package_schemas(bytes: &[u8], manifest: &Value) -> TestResult {
+    let decoded: Value = serde_json::from_slice(bytes)?;
+    let validator = jsonschema::validator_for(&soc_scene_schema())?;
+    validator
+        .validate(&decoded)
+        .map_err(|error| error.to_string())?;
+    let validator = jsonschema::validator_for(&manifest_schema())?;
+    validator
+        .validate(manifest)
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+fn verify_package_replacement(
+    target: &std::path::Path,
+    sidecar: &std::path::Path,
+    plain: impl Fn() -> Result<p4kx_blender::PackageSummary, PackageError>,
+    authored: impl FnOnce() -> Result<p4kx_blender::PackageSummary, PackageError>,
+) -> TestResult {
+    authored()?;
+    let unrelated = target.join("authored/unrelated.txt");
+    std::fs::write(&unrelated, b"unrelated")?;
+    assert!(
+        matches!(plain(), Err(PackageError::NotAPackage { .. })),
+        "foreign sidecar files forbid replacement"
+    );
+    assert!(unrelated.is_file(), "the foreign file is preserved");
+    std::fs::remove_file(unrelated)?;
+    plain()?;
+    assert!(
+        !sidecar.exists(),
+        "replacement retires the old optional companion"
     );
     Ok(())
 }
