@@ -106,10 +106,17 @@ impl ImageSource<'_, '_> {
                     ("name_range", &source.name),
                     ("metadata_range", &source.metadata),
                 ] {
+                    let mut origin = writer.capture_origins();
+                    origin.include(&bank.selection, writer)?;
+                    origin.include(path_proof, writer)?;
+                    origin.include(evidence, writer)?;
+                    if field != "authored_name" {
+                        origin.include(&source.name, writer)?;
+                    }
                     proof::at(
                         prepared,
                         &format!("{FIELD}/candidates/{index}/{field}"),
-                        evidence.clone(),
+                        origin.finish(),
                         writer,
                     )?;
                 }

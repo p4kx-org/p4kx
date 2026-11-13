@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::fs;
+use std::path::Path;
+
 use p4kx_extraction::{Archive, Filter, OpenOptions};
 use p4kx_media::{ExportOptions, MediaRecord};
 use p4kx_testkit::{ArchiveBuilder, TestAnimation, TestChunkFile, TestDba, TestEntry, test_key};
@@ -35,6 +38,12 @@ fn image_candidates_require_original_bank_and_exact_metadata_path() -> TestResul
     let index = support::published(p4kx_media::export(&archive, &output, &options())?)?;
     let rows = support::records(&output, &index, "animation.jsonl")?;
     let row = image_record(&rows)?;
+    check_match(row);
+    check_origins(&output.join(&index.artifact_base), &rows)?;
+    check_filtered(&archive, scratch.path())
+}
+
+fn check_match(row: &MediaRecord) {
     assert_eq!(
         text(row, "/payload/dba_entry/resolution/status"),
         Some("resolved"),
@@ -59,10 +68,9 @@ fn image_candidates_require_original_bank_and_exact_metadata_path() -> TestResul
         Some(1),
         "physical metadata ordinal retained"
     );
-    check_filtered(&archive, scratch.path())
 }
 
-fn check_filtered(archive: &Archive, scratch: &std::path::Path) -> TestResult {
+fn check_filtered(archive: &Archive, scratch: &Path) -> TestResult {
     let filtered = ExportOptions {
         include: Some(Filter::parse(IMAGE)?),
         ..options()
@@ -92,4 +100,35 @@ fn image_record(rows: &[MediaRecord]) -> TestResult<&MediaRecord> {
 
 fn text<'a>(row: &'a MediaRecord, pointer: &str) -> Option<&'a str> {
     row.data.pointer(pointer).and_then(Value::as_str)
+}
+
+fn check_origins(base: &Path, rows: &[MediaRecord]) -> TestResult {
+    let ordinal = rows
+        .iter()
+        .position(|row| row.subresource.namespace == "animation-image-record")
+        .ok_or("CAF image source row")?
+        .to_string();
+    let data = fs::read_to_string(base.join("field-origins.jsonl"))?;
+    let mut verified = 0;
+    for line in data.lines() {
+        let row: Value = serde_json::from_str(line)?;
+        if row.pointer("/scope/ordinal").and_then(Value::as_str) != Some(ordinal.as_str())
+            || row.pointer("/scope/stream/kind").and_then(Value::as_str) != Some("animation")
+        {
+            continue;
+        }
+        let expected = match row.get("field").and_then(Value::as_str) {
+            Some("/data/payload/dba_path_crc32") => false,
+            Some("/data/payload/dba_clip/candidates/0/clip_ordinal") => true,
+            _ => continue,
+        };
+        assert_eq!(
+            row.get("containsEncryptedSource").and_then(Value::as_bool),
+            Some(expected),
+            "plain index word and encrypted DBA metadata retain separate evidence",
+        );
+        verified += 1;
+    }
+    assert_eq!(verified, 2, "both immediate receipts are present");
+    Ok(())
 }
