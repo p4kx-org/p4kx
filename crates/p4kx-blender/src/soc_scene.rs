@@ -2,11 +2,14 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{SocCaptureError, SocContainerCapture};
-use p4kx_extraction::{CancelToken, SourceEvidenceError, SourceInventory, SourceUses};
+use p4kx_extraction::{
+    Archive, ArchiveWatch, CancelToken, SourceEvidenceError, SourceInventory, SourceUses,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 use thiserror::Error;
 
+use crate::soc_scene_classes::{Classes, SocClass};
 pub use crate::soc_scene_origin::SocXmlPosition;
 use crate::soc_scene_xml::{XmlDocument, XmlDocuments};
 
@@ -23,6 +26,7 @@ pub struct SocScene {
     schema_version: u8,
     source_inventory: SourceInventory,
     documents: Vec<XmlDocument>,
+    classes: Vec<SocClass>,
     occurrences: Vec<crate::soc_scene_occurrence::Occurrence>,
 }
 
@@ -43,7 +47,47 @@ impl SocScene {
         capture: &SocContainerCapture,
         cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
+        Self::project(capture, None, cancel)
+    }
+
+    /// Resolves the authored entity class links from the original root Archive.
+    ///
+    /// # Errors
+    /// Returns cancellation, source-evidence or coordinate errors.
+    pub fn from_archive_capture(
+        capture: &SocContainerCapture,
+        archive: &Archive,
+        cancel: &CancelToken,
+    ) -> Result<Self, SocSceneError> {
+        let original = capture
+            .occurrences()
+            .first()
+            .ok_or(SocSceneError::Position)?;
+        if archive.root_directory_entry_count().is_none()
+            || !original
+                .origin
+                .input_origin()
+                .is_same_input(archive.input_origin())
+        {
+            return Err(SocCaptureError::Root.into());
+        }
+        let watch = ArchiveWatch::new(archive);
+        watch.check().map_err(SocCaptureError::Changed)?;
+        let scene = Self::project(capture, Some(archive), cancel)?;
+        watch.check().map_err(SocCaptureError::Changed)?;
+        Ok(scene)
+    }
+
+    fn project(
+        capture: &SocContainerCapture,
+        archive: Option<&Archive>,
+        cancel: &CancelToken,
+    ) -> Result<Self, SocSceneError> {
         let sources = SourceUses::with_compact_use_refs();
+        let classes = archive
+            .map(|archive| Classes::read(capture, archive, &sources, cancel))
+            .transpose()?
+            .unwrap_or_default();
         let mut documents = XmlDocuments::default();
         let occurrences = capture
             .occurrences()
@@ -56,6 +100,7 @@ impl SocScene {
                     original,
                     &sources,
                     &mut documents,
+                    &classes,
                     cancel,
                 )
             })
@@ -65,6 +110,7 @@ impl SocScene {
             schema_version: SOC_SCENE_VERSION,
             source_inventory: sources.freeze()?,
             documents: documents.finish(),
+            classes: classes.finish(),
             occurrences,
         })
     }
@@ -86,6 +132,9 @@ pub enum SocSceneError {
     /// Source projection was interrupted.
     #[error("SOC scene projection cancelled")]
     Cancelled,
+    /// Storage for original source values could not be allocated.
+    #[error(transparent)]
+    Allocation(#[from] std::collections::TryReserveError),
 }
 
 /// Returns the generated schema for the standalone SOC scene document.

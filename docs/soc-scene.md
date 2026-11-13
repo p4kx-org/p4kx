@@ -28,6 +28,24 @@ Inline loadouts keep their declaration, group and item entry order. A nested loa
 its parent entry inside that component. A stored empty entries element is an explicit empty
 group. An omitted declaration has no corresponding row.
 
+For doors, proximity sensors and entities with an inline default loadout, `class` links the
+original `EntityClassGUID` to an entry in `classes`. That table identifies the DataForge record
+by its physical ordinal. A duplicate GUID retains every candidate. The class components
+describe class defaults; the occurrence retains its own inline overrides. An inline geometry
+component's `geometryPaths` gives the original paths, including any empty declaration.
+
+A door class's `fragment` selects named nodes in its controller definition and the ordered
+fragment alternatives in its Mannequin database. Controller and database resources retain
+the exact archive entry, and the selected fragment and animation rows retain XML positions.
+`physicalClip: unresolved` means the authored animation selector has no proven CAF/DBA
+subrecord identity in the scene export. A name can occur in multiple databases. Class
+loadouts preserve original port and item selectors and the hierarchy of XML `Items` groups,
+including explicit empty groups. `classSensor` identifies a placement whose uniquely matched
+class contains the proximity sensor component, including placements without an inline sensor
+declaration. A proximity sensor retains its class's original exit
+delay and, for the declared box shape, the sensor-local extent and offset. Its authored
+links identify the target independently of trigger shape.
+
 Each sourced value includes `containsEncryptedSource`, `sourceSetComplete` and
 `sourceUsesRefs`. References resolve in the same document's `sourceInventory`. The inventory
 distinguishes selector and payload roles. A matched link includes both the selecting source

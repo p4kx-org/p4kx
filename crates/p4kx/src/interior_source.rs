@@ -24,7 +24,7 @@ pub(crate) fn run(args: &InteriorSourceArgs) -> Result<()> {
     let protection = ArchiveWriteProtection::new(outer.path(), cancel.flag())?;
     let layers: Vec<_> = archives.iter().collect();
     let capture = SocContainerCapture::read(&layers, &cancel)?;
-    let scene = SocScene::from_capture_with_cancel(&capture, &cancel)?;
+    let scene = SocScene::from_archive_capture(&capture, outer, &cancel)?;
     write_replacing_io_protected(&args.out, Some(&protection), Some(&cancel), |writer| {
         serde_json::to_writer(&mut *writer, &scene)?;
         writeln!(writer)

@@ -79,7 +79,7 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
     let authored = if args.authored_soc {
         let refs: Vec<_> = layers.iter().collect();
         let capture = SocContainerCapture::read(&refs, &cancel)?;
-        Some(SocScene::from_capture_with_cancel(&capture, &cancel)?)
+        Some(SocScene::from_archive_capture(&capture, outer, &cancel)?)
     } else {
         None
     };

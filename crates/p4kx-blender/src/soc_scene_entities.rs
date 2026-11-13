@@ -8,6 +8,8 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
+use crate::soc_scene_class_mannequin::{children, string_attribute};
+use crate::soc_scene_classes::ClassTarget;
 use crate::soc_scene_loadouts::Loadout;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 use crate::soc_scene_rooms::{Area, guid_value, position};
@@ -20,6 +22,10 @@ pub(crate) struct Entity {
     position: SocXmlPosition,
     guid: SourcedValue<String>,
     class_guid: SourcedValue<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    class: Option<SourcedValue<ClassTarget>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    class_sensor: Option<SourcedValue<bool>>,
     local_transform: SourcedValue<[[f32; 4]; 3]>,
     areas: Vec<Area>,
     components: Vec<Component>,
@@ -46,6 +52,8 @@ impl Entity {
                 entity.class_guid_attributes(),
                 guid_value(entity.class_guid_attributes()),
             )?,
+            class: index.classes.target(entity, origin)?,
+            class_sensor: index.classes.sensor(entity, origin)?,
             local_transform: entity_transform(entity, origin)?,
             areas: entity
                 .area_components()
@@ -94,6 +102,7 @@ struct Component {
     position: SocXmlPosition,
     kind: ComponentKind,
     declared_type: SourcedValue<String>,
+    geometry_paths: Vec<SourcedValue<String>>,
     loadouts: Vec<Loadout>,
 }
 
@@ -134,6 +143,15 @@ impl Component {
             SocEntityComponentKind::DefaultLoadout => ComponentKind::DefaultLoadout,
             _ => ComponentKind::Other,
         };
+        let geometry_paths = if component.kind() == SocEntityComponentKind::GeometryResource {
+            children(element, "Geometry")
+                .flat_map(|outer| children(outer, "Geometry"))
+                .flat_map(|data| children(data, "Geometry"))
+                .map(|geometry| string_attribute(geometry, "path", origin))
+                .collect::<Result<_, _>>()?
+        } else {
+            Vec::new()
+        };
         Ok(Self {
             ordinal: component.ordinal(),
             position: position(element)?,
@@ -141,6 +159,7 @@ impl Component {
             declared_type: origin
                 .named(element, "__type", component.declared_type())?
                 .map(str::to_owned),
+            geometry_paths,
             loadouts: Loadout::read_all(component.loadouts(), origin)?,
         })
     }

@@ -123,7 +123,8 @@ def _add_entity(entity: dict[str, Any], parent: int, nodes: list[SocNode]) -> No
         for value in _array(entity.get("components"), "SOC components")
     ]
     ordinal = _ordinal(entity, "entity")
-    if "door" in kinds or "proximitySensor" in kinds:
+    class_sensor = _present(entity.get("classSensor")) is True
+    if "door" in kinds or "proximitySensor" in kinds or class_sensor:
         role = "Door" if "door" in kinds else "Sensor"
         cell = entity.get("localTransform")
         nodes.append(SocNode(f"{role} {ordinal}", parent, _matrix(cell), _marker(cell), role.lower()))

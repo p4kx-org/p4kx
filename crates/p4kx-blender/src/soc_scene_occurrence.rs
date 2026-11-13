@@ -16,6 +16,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
+use crate::soc_scene_classes::Classes;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 use crate::soc_scene_rooms::{IndexedRoom, RoomRegistry};
 use crate::soc_scene_stream::{IndexedStream, Stream};
@@ -37,6 +38,7 @@ impl Occurrence {
         original: &SocContainerOccurrence,
         sources: &SourceUses,
         documents: &mut XmlDocuments,
+        classes: &Classes,
         cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
         let container = physical(&original.origin, sources)?;
@@ -65,7 +67,14 @@ impl Occurrence {
             let (room, origin) = room_input.as_ref().ok_or(InputState::Invalid)?;
             RoomRegistry::read(room, origin, documents).map_err(InputState::Capture)
         })?;
-        let streams = streams(original, room_input.as_ref(), sources, documents, cancel)?;
+        let streams = streams(
+            original,
+            room_input.as_ref(),
+            sources,
+            documents,
+            classes,
+            cancel,
+        )?;
         Ok(Self {
             placement: original.placement,
             container,
@@ -102,6 +111,7 @@ fn streams(
     room: Option<&(SocRoomRegistry<'_>, XmlOrigin<'_>)>,
     sources: &SourceUses,
     documents: &mut XmlDocuments,
+    classes: &Classes,
     cancel: &CancelToken,
 ) -> Result<Vec<Stream>, SocSceneError> {
     let (index, admitted, complete) = index_streams(&occurrence.streams, cancel)?;
@@ -116,6 +126,7 @@ fn streams(
         index,
         admitted,
         complete,
+        classes,
         room: room_index.as_ref().map(|(index, origin, xml)| IndexedRoom {
             index,
             origin,

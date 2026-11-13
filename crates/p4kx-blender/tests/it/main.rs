@@ -21,6 +21,7 @@ mod package_mesh_extras;
 mod package_safety;
 mod package_vertex_colours;
 mod package_write_context;
+mod soc_door_classes;
 mod soc_scene;
 mod support;
 

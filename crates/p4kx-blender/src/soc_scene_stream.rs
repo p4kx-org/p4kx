@@ -17,6 +17,7 @@ use crate::soc_scene_xml::XmlDocuments;
 
 pub(crate) struct IndexedStream<'a> {
     pub(crate) index: SocEntityIndex,
+    pub(crate) classes: &'a crate::soc_scene_classes::Classes,
     pub(crate) admitted: BTreeMap<usize, &'a EntryOrigin>,
     pub(crate) complete: bool,
     pub(crate) room: Option<crate::soc_scene_rooms::IndexedRoom<'a>>,

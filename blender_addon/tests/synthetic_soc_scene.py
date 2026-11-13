@@ -19,7 +19,7 @@ def scene():
                                                         "translation": [9, 8, 7]}, True)}
     door = {"ordinal": 4, "components": [{"kind": "door"}], "localTransform": translation(4, 2, 3),
             "areas": [{"ordinal": 1, "segments": [segment]}]}
-    sensor = {"ordinal": 5, "components": [{"kind": "proximitySensor"}], "localTransform": translation(1, 2, 3),
+    sensor = {"ordinal": 5, "components": [], "classSensor": cell(True), "localTransform": translation(1, 2, 3),
               "areas": []}
     root = {"placement": None, "children": [{"localTransform": translation(8, 3, 2)}],
             "registry": {"state": "present", "data": {"rooms": [room]}},

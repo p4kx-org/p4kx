@@ -15,7 +15,11 @@ pub struct SocArchiveMember {
 }
 
 impl SocArchiveMember {
-    pub(super) fn read(
+    /// Reads and verifies an admitted SOC source member.
+    ///
+    /// # Errors
+    /// Returns a capture error when reading cannot continue.
+    pub fn read(
         archive: &Archive,
         entry: &Entry,
         check: impl FnMut() -> Result<(), super::SocCaptureError>,
