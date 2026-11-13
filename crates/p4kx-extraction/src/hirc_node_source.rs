@@ -16,6 +16,8 @@ use crate::bank::Bank;
 use crate::source_inventory::SourceInventory;
 use crate::source_value::SourcedValue;
 
+#[path = "hirc_actor_mixer_children_source.rs"]
+mod actor_mixer;
 #[path = "hirc_node_source_positioning.rs"]
 mod positioning;
 #[path = "hirc_node_source_reader.rs"]
@@ -27,6 +29,7 @@ mod rtpc;
 #[path = "hirc_node_source_state.rs"]
 mod state;
 
+use self::actor_mixer::{ActorChildrenSchema, ActorChildrenSource};
 use self::positioning::{Positioning, PositioningRows, PositioningSchema};
 use self::reader::NodeReader;
 use self::routing::{NodeAdvancedSettings, NodeAux, NodeFx};
@@ -36,8 +39,13 @@ use super::Status;
 use super::node_property::{PropertyInterpretation, PropertyList, PropertyWords};
 use super::source_fields::origins::ObjectOrigins;
 
-pub(super) type NodeSourceSchema =
-    NodeDocument<SourceInventory, PositioningSchema, InlineStateSchema, RtpcSchema>;
+pub(super) type NodeSourceSchema = NodeDocument<
+    SourceInventory,
+    PositioningSchema,
+    InlineStateSchema,
+    RtpcSchema,
+    ActorChildrenSchema,
+>;
 
 /// Original shared HIRC node declarations for one selected physical occurrence.
 #[derive(Debug)]
@@ -91,7 +99,7 @@ impl Serialize for NodeSourceFields<'_> {
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "SharedNodeSourceFields")]
-pub(super) struct NodeDocument<Inventory, Positioning, State, Rtpc> {
+pub(super) struct NodeDocument<Inventory, Positioning, State, Rtpc, Children> {
     version: SourcedValue<u32>,
     object_status: SourcedValue<Status>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -123,6 +131,9 @@ pub(super) struct NodeDocument<Inventory, Positioning, State, Rtpc> {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<RtpcSchema>")]
     rtpc: Option<Rtpc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<ActorChildrenSchema>")]
+    actor_mixer_children: Option<Children>,
     #[schemars(with = "SourceInventory")]
     source_inventory: Inventory,
 }
@@ -208,6 +219,7 @@ fn project<R: Read + Seek, S: Serializer>(
             origins,
             node: &node,
         }),
+        actor_mixer_children: ActorChildrenSource::new(origins, &node, &reader),
         source_inventory: origins,
     };
     drop(reader);

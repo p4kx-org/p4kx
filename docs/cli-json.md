@@ -1775,6 +1775,8 @@ prefix, and ordered raw curve and interpolation words. Fields and words are omit
 has no complete source value. Each sourced value can be resolved through
 `node_fields.source_inventory` and includes its encryption marker. The same object
 shape is returned by MCP `list_soundbank_objects`.
+ActorMixer node fields also retain the original child count, checked child
+range and each readable child ID in physical order.
 
 Standalone State objects include sourced version, layout and raw body range in
 source_fields. A checked bundle adds original count, ordered property IDs and

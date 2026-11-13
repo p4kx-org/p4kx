@@ -9,6 +9,7 @@ mod archive_key_cache;
 mod archive_key_note;
 mod archives;
 mod audio;
+mod audio_actor_mixer_children;
 mod audio_blend_source_fields;
 mod audio_candidate_assertions;
 mod audio_candidate_fixture;
