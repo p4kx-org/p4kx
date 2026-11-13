@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Original `NodeMeshCombo` records used by physics projections.
+//! Original `NodeMeshCombo` records independent of render and physics selection.
 
 use std::ops::Range;
 
 use p4kx_chunks::{Chunk, ivo};
 use p4kx_foundation::{ByteReader, ParseError};
 
+use crate::model::is_helper_geometry;
 use crate::nmc::{GEOMETRY_TYPE_AT, LOCAL_TRANSFORM_AT, NODE_LEN, PARENT_AT, SCALE_AT};
+use crate::nmc_layout::HEADER_BYTES;
 
 const COUNT_AT: usize = 4;
-const RECORDS_AT: usize = 32;
+
 const COMPANION_TRANSFORM_AT: usize = 32;
 const STORED_ID_AT: usize = SCALE_AT + 3 * size_of::<u32>();
 
@@ -46,11 +48,17 @@ impl<'source> NmcFrames<'source> {
         let mut reader = ByteReader::new(bytes);
         reader.skip(COUNT_AT)?;
         let count = reader.read_u32()? as usize;
-        reader.skip(RECORDS_AT - 2 * size_of::<u32>())?;
+        reader.skip(HEADER_BYTES - 2 * size_of::<u32>())?;
         let (records, _) = reader
             .read_bytes(count.saturating_mul(NODE_LEN))?
             .as_chunks();
         Ok(Self { records })
+    }
+
+    pub(crate) const fn from_records(records: &'source [u8]) -> Self {
+        Self {
+            records: records.as_chunks::<NODE_LEN>().0,
+        }
     }
 
     /// Returns the number of original records.
@@ -75,7 +83,7 @@ impl<'source> NmcFrames<'source> {
     }
 
     /// Visits the actual rows, including helpers and geometry with no drawable mesh.
-    pub fn frames(&self) -> impl ExactSizeIterator<Item = NmcFrame<'source>> {
+    pub fn frames(&self) -> impl ExactSizeIterator<Item = NmcFrame<'source>> + use<'source> {
         self.records
             .iter()
             .enumerate()
@@ -90,6 +98,12 @@ impl<'source> NmcFrames<'source> {
 }
 
 impl NmcFrame<'_> {
+    /// Returns whether the original geometry type identifies a helper.
+    #[must_use]
+    pub fn is_helper(&self) -> bool {
+        is_helper_geometry(self.geometry_type())
+    }
+
     /// Returns the physical node row index within the source NMC chunk.
     #[must_use]
     pub const fn ordinal(&self) -> usize {
@@ -136,7 +150,7 @@ impl NmcFrame<'_> {
     #[must_use]
     pub const fn range(&self, field: NmcFrameField) -> Range<u64> {
         let (at, width) = field.layout();
-        let start = RECORDS_AT as u64 + self.ordinal as u64 * NODE_LEN as u64 + at;
+        let start = HEADER_BYTES as u64 + self.ordinal as u64 * NODE_LEN as u64 + at;
         start..start + width
     }
 

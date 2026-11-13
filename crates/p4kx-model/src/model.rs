@@ -82,7 +82,7 @@ impl Node {
     /// Returns whether the node is a helper: a point, box or dummy without geometry.
     #[must_use]
     pub const fn is_helper(&self) -> bool {
-        matches!(self.geometry_type, Some(2 | 3))
+        matches!(self.geometry_type, Some(kind) if is_helper_geometry(kind))
     }
 
     /// Returns the value of the property `key`, the first when it is stored more than once.
@@ -394,3 +394,7 @@ impl Model {
 
 /// The chunk types holding a mesh, preferred first.
 pub(crate) const MESH_TYPES: [ChunkType; 2] = [ivo::SKIN_2, ivo::SKIN];
+
+pub(crate) const fn is_helper_geometry(kind: u16) -> bool {
+    matches!(kind, 2 | 3)
+}

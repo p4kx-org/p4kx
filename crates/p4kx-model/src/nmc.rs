@@ -8,8 +8,9 @@ use p4kx_foundation::ByteReader;
 
 use crate::hierarchy::find_cycle;
 use crate::model_node_coordinates::MatrixRead;
+use crate::nmc_layout::{HEADER_BYTES, NmcLayout, name_line};
 use crate::nmc_properties;
-use crate::reader::{ReadValues, to_usize};
+use crate::reader::ReadValues;
 use crate::{
     CorruptChunk, ModelFile, ModelNodePropertySource, ModelNodeSelection, ModelNodeSource,
     ModelNodeSources, Node, Transform,
@@ -20,7 +21,7 @@ pub(crate) const LOCAL_TRANSFORM_AT: usize = 80;
 pub(crate) const SCALE_AT: usize = LOCAL_TRANSFORM_AT + 48;
 pub(crate) const PARENT_AT: usize = 148;
 pub(crate) const GEOMETRY_TYPE_AT: usize = PARENT_AT + size_of::<u16>();
-const FOOTER_LEN: usize = 32;
+
 const ROOT: u16 = 0xFFFF;
 const EPSILON: f32 = 1e-5;
 
@@ -66,39 +67,18 @@ pub(crate) fn read_file_nodes<B: AsRef<[u8]>>(
 /// A node's transform and scale that are zero on every axis (within [`EPSILON`]) are the
 /// identity and 1: records that store none.
 fn read_nodes(data: &[u8], mut sources: Option<NodeMeshSources<'_>>) -> Result<Nmc, CorruptChunk> {
-    let mut reader = ByteReader::new(data);
-    reader.read_u32()?;
-    let count = to_usize(reader.read_u32()?);
-    reader.read_u32()?;
-    let other_indices = to_usize(reader.read_u32()?);
-    let material_indices = to_usize(reader.read_u32()?);
-    let names_len = to_usize(reader.read_u32()?);
-    let properties_len = to_usize(reader.read_u32()?);
-    reader.skip(4)?;
-
-    let records_at = reader.offset();
-    let records = reader.read_bytes(count.saturating_mul(NODE_LEN))?;
-    reader.skip(FOOTER_LEN)?;
-    reader.skip(other_indices.saturating_mul(2))?;
-    let material_bytes = reader.read_bytes(material_indices.saturating_mul(2))?;
-    let material_indices = material_bytes
+    let layout = NmcLayout::read(data)?;
+    let material_indices = layout
+        .material_bytes
         .as_chunks::<2>()
         .0
         .iter()
         .map(|&pair| u16::from_le_bytes(pair))
         .collect();
-    let names_at = reader.offset();
-    let name_bytes = reader.read_bytes(names_len)?;
-    let properties_at = reader.offset();
-    let property_bytes = reader.read_bytes(properties_len.min(reader.remaining()))?;
     if let Some(sources) = sources.as_mut() {
-        sources.start(
-            records_at,
-            names_at..properties_at,
-            properties_at..reader.offset(),
-        );
+        sources.start(layout.names_range(), layout.properties_range());
     }
-    let nodes = read_rows(records, name_bytes, property_bytes, sources)?;
+    let nodes = read_rows(layout.records, layout.names, layout.properties, sources)?;
     let parents: Vec<Option<usize>> = nodes.iter().map(|node| node.parent).collect();
     if let Some(node) = find_cycle(&parents) {
         return Err(CorruptChunk::ParentCycle(node));
@@ -123,7 +103,7 @@ fn read_rows(
     for (index, record) in records.as_chunks::<NODE_LEN>().0.iter().enumerate() {
         let mut record = read_record(index, record, count)?;
         let name = names.next();
-        let line = name.and_then(|bytes| bytes.split(|&byte| byte == b'\n').next());
+        let line = name.map(name_line);
         let entry = properties.next();
         record.node.name = line.map_or_else(String::new, |bytes| {
             String::from_utf8_lossy(bytes).into_owned()
@@ -228,8 +208,8 @@ impl<'a> NodeMeshSources<'a> {
         }
     }
 
-    const fn start(&mut self, records: u64, names: Range<u64>, properties: Range<u64>) {
-        self.records = self.base + records;
+    const fn start(&mut self, names: Range<u64>, properties: Range<u64>) {
+        self.records = self.base + HEADER_BYTES as u64;
         self.names = self.base + names.start..self.base + names.end;
         self.properties = self.base + properties.start..self.base + properties.end;
     }

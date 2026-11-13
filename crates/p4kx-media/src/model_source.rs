@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "model_source/nmc.rs"]
+mod nmc;
+#[path = "model_source/nmc_record.rs"]
+mod nmc_record;
 #[path = "model_source/origins.rs"]
 mod origins;
 #[path = "model_source/payload.rs"]

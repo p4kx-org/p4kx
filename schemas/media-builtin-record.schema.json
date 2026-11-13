@@ -3569,6 +3569,28 @@
       ],
       "type": "object"
     },
+    "Assignment": {
+      "additionalProperties": false,
+      "properties": {
+        "key": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "value": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "key",
+        "value"
+      ],
+      "type": "object"
+    },
     "AtlBinaryText": {
       "additionalProperties": false,
       "properties": {
@@ -11044,6 +11066,21 @@
         }
       ]
     },
+    "MaterialIndex": {
+      "additionalProperties": false,
+      "properties": {
+        "word": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "word"
+      ],
+      "type": "object"
+    },
     "MaterialLayerSourceInfo": {
       "description": "One layer declaration without resolved or inherited surface data.",
       "properties": {
@@ -12194,6 +12231,79 @@
       ],
       "title": "MeshRecord"
     },
+    "ModelNmcRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/Table"
+            },
+            "record_type": {
+              "const": "node-table",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/Node"
+            },
+            "record_type": {
+              "const": "node",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/Property"
+            },
+            "record_type": {
+              "const": "node-property",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MaterialIndex"
+            },
+            "record_type": {
+              "const": "node-material-index",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "NmcRecord"
+    },
     "ModelSkeletonRecord": {
       "oneOf": [
         {
@@ -13054,6 +13164,110 @@
         "config-group"
       ],
       "type": "string"
+    },
+    "Node": {
+      "additionalProperties": false,
+      "properties": {
+        "companion_matrix_bits": {
+          "items": {
+            "items": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "geometry_type": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "helper": {
+          "type": "boolean"
+        },
+        "local_matrix_bits": {
+          "items": {
+            "items": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Text"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "parent_word": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "property_entry": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "property_entry_terminated": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "scale_bits": {
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "stored_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stored_id",
+        "parent_word",
+        "geometry_type",
+        "helper",
+        "local_matrix_bits",
+        "companion_matrix_bits",
+        "scale_bits",
+        "name",
+        "property_entry",
+        "property_entry_terminated"
+      ],
+      "type": "object"
     },
     "NodeBase": {
       "additionalProperties": false,
@@ -16354,6 +16568,36 @@
         "malformed"
       ],
       "type": "string"
+    },
+    "Property": {
+      "additionalProperties": false,
+      "properties": {
+        "assignment": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Assignment"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "raw_utf8": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "raw_utf8",
+        "range",
+        "assignment"
+      ],
+      "type": "object"
     },
     "PropertyInterpretation": {
       "additionalProperties": false,
@@ -20297,6 +20541,103 @@
         "level",
         "target_id",
         "ancestor_nodes"
+      ],
+      "type": "object"
+    },
+    "Table": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "declared_property_bytes": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "disposition": {
+              "const": "measured",
+              "type": "string"
+            },
+            "material_indices": {
+              "$ref": "#/$defs/SourceRange"
+            },
+            "names": {
+              "$ref": "#/$defs/SourceRange"
+            },
+            "nodes": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "properties": {
+              "$ref": "#/$defs/SourceRange"
+            }
+          },
+          "required": [
+            "disposition",
+            "nodes",
+            "names",
+            "properties",
+            "declared_property_bytes",
+            "material_indices"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "unsupported-version",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "malformed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Text": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name_utf8": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "terminated": {
+          "type": "boolean"
+        },
+        "utf8": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "utf8",
+        "display_name_utf8",
+        "range",
+        "terminated"
       ],
       "type": "object"
     },
@@ -41182,6 +41523,226 @@
                 "properties": {
                   "record_type": {
                     "const": "mesh-submesh"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-node-table"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelNmcRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "node-table"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-node"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelNmcRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "node"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-node-property"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelNmcRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "node-property"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-node-material-index"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelNmcRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "node-material-index"
                   }
                 },
                 "required": [

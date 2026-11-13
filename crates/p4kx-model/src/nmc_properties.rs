@@ -35,19 +35,19 @@ pub(crate) fn read_entry(entry: Option<&[u8]>, mut offset: Option<u64>) -> NodeP
     properties
 }
 
-struct Parts<'a> {
-    key: &'a [u8],
-    value: &'a [u8],
+pub(crate) struct Parts<'a> {
+    pub(crate) key: &'a [u8],
+    pub(crate) value: &'a [u8],
 }
 
-fn parts(line: &[u8]) -> Option<Parts<'_>> {
+pub(crate) fn parts(line: &[u8]) -> Option<Parts<'_>> {
     let separator = line.iter().position(|&byte| byte == b'=')?;
     let (key, tail) = line.split_at(separator);
     let value = tail.get(1..)?;
     (!key.trim_ascii().is_empty()).then_some(Parts { key, value })
 }
 
-const fn trimmed(bytes: &[u8], start: u64) -> Range<u64> {
+pub(crate) const fn trimmed(bytes: &[u8], start: u64) -> Range<u64> {
     let text = bytes.trim_ascii_start();
     let start = start + (bytes.len() - text.len()) as u64;
     start..start + text.trim_ascii_end().len() as u64

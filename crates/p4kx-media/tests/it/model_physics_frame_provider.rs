@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::chunks::ivo;
-use p4kx_media::{ExportOptions, MediaKind, MediaRecord};
+use p4kx_media::{ExportOptions, ExportOutcome, MediaKind, MediaRecord, Status};
 use p4kx_testkit::{TestChunkFile, TestEntry};
 use serde_json::{Value, json};
 
@@ -12,12 +12,13 @@ use super::support::{self, TestResult};
 
 const HEADER: usize = 32;
 const STRIDE: usize = 208;
+const FOOTER: usize = 32;
 
 #[test]
 fn collision_frame_preserves_sparse_authored_identity_and_composes_nonuniform_parent() -> TestResult
 {
     let folder = tempfile::tempdir()?;
-    let file = fixture()?;
+    let file = fixture(false)?;
     let archive = support::archive_with(folder.path(), [TestEntry::stored("source.cgf", file)])?;
     let output = folder.path().join("out");
     let options = ExportOptions {
@@ -39,6 +40,38 @@ fn collision_frame_preserves_sparse_authored_identity_and_composes_nonuniform_pa
             .count()
             == 2,
         "both actual parent words determine the composed frame"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_missing_node_footer_keeps_the_observed_physics_frame_in_diagnostics() -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let file = fixture(true)?;
+    let archive = support::archive_with(folder.path(), [TestEntry::stored("source.cgf", file)])?;
+    let output = folder.path().join("out");
+    let options = ExportOptions {
+        kinds: vec![MediaKind::Model],
+        diagnostic: true,
+        ..ExportOptions::default()
+    };
+    let ExportOutcome::Incomplete { diagnostic, .. } =
+        p4kx_media::export(&archive, &output, &options)?
+    else {
+        return Err("missing NMC footer must mark the table partial".into());
+    };
+    let root = diagnostic.parent().ok_or("diagnostic generation")?;
+    let rows = std::fs::read_to_string(root.join("model.jsonl"))?
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<Result<Vec<MediaRecord>, _>>()?;
+    verify_rows(&rows)?;
+    let (_, table) = find(&rows, "model-node-table", &[1])?;
+    assert_eq!(table.status, Status::Partial, "original table remains partial");
+    assert_eq!(
+        table.data.pointer("/payload/disposition"),
+        Some(&json!("malformed")),
+        "explicit disposition of the missing second portion"
     );
     Ok(())
 }
@@ -143,9 +176,9 @@ fn put(bytes: &mut [u8], offset: usize, value: &[u8]) -> TestResult {
     Ok(())
 }
 
-fn fixture() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+fn fixture(truncated: bool) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let shape = collision_shape(4, &[0.0, 0.0, 0.0, 2.0]);
-    let nodes = nmc([
+    let mut nodes = nmc([
         (
             912,
             2,
@@ -170,6 +203,9 @@ fn fixture() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
             ],
         ),
     ])?;
+    if !truncated {
+        nodes.extend([0; FOOTER]);
+    }
     let physical = physics_table(&[
         (0x0001_0000, &shape),
         (0x0002_0001, &shape),

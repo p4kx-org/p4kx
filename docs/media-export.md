@@ -177,6 +177,23 @@ ordinals. Those ordinals identify source vertices before any renderer grouping o
 deduplication. Missing, ambiguous or invalid inputs have their own mapping dispositions.
 All records use the original model's raw artifact and each field carries its source evidence.
 
+Measured IVO NodeMeshCombo v0x900 chunks emit a `model-node-table` row and use the chunk
+and physical node ordinals for `model-node` rows. Nodes retain the stored identifier,
+packed parent and geometry type words, both 3×4 matrix bit patterns, and the three scale
+words. Helper classification uses the same geometry types as the model reader. These
+are the stored words before model defaults, parent resolution or coordinate conversion.
+
+Name rows distinguish an absent name slot, a zero-length slot, and invalid UTF-8. They
+retain the whole slot's range and NUL termination along with a UTF-8 first line for
+display. A `model-node-property` row adds the physical line ordinal, preserving duplicate,
+empty and unparsed lines. It exposes trimmed key and value projections when a line
+has an assignment and keeps the exact original range, including any carriage return.
+`model-node-material-index` rows retain the physical order and unsigned word of each
+material index. All intervals refer to decoded bytes of the retained physical Entry.
+The source evidence addresses individual matrix and scale words and parsed property
+values. Unsupported versions keep the original bytes with an explicit disposition.
+A truncated property table has a partial diagnostic and retains readable rows.
+
 Measured IVO LodDistances chunks emit one `model-lod-distance-words` row per physical
 chunk. The v0x900 layout with a 48-byte inferred range carries twelve ordered original
 little-endian words. Each word has its unsigned bits and, when finite, its binary32

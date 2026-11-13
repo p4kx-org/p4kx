@@ -12,6 +12,7 @@ use super::character;
 use super::companions;
 use super::lod_distances;
 use super::mesh;
+use super::nmc;
 use super::origins::{self, ModelOrigins};
 use super::payload::{
     self, ModelChunkRecord, ModelEntryRecord, ModelSourceFamily, ModelSourcePayload,
@@ -33,7 +34,7 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.8.0",
+            "1.9.0",
             "Selected original models, geometry and character definitions with positioned source declarations.",
         );
         capability.field_groups = vec![
@@ -72,6 +73,10 @@ impl Provider for ModelSourceProvider {
             FieldGroup::new(
                 "physical-mesh-streams",
                 "Original version-qualified IVO mesh bounds, physical stream spans and submesh source-vertex references.",
+            ),
+            FieldGroup::new(
+                "physical-model-nodes",
+                "Original IVO node transforms, helpers, properties and material index words.",
             ),
             FieldGroup::new_with_unsupported_projection(
                 "model-semantics",
@@ -350,6 +355,10 @@ fn chunks(
         lod_distances::emit(file, index, reader, origins, writer)?;
         skeleton::emit(file, index, reader, origins, writer)?;
         mesh::emit(file, index, reader, origins, writer)?;
+        let admitted = frame_input
+            .as_ref()
+            .and_then(|input| input.original_bytes(index));
+        nmc::emit(file, index, admitted, reader, origins, writer)?;
     }
     Ok(())
 }

@@ -84,6 +84,21 @@ impl NodeFrames {
         Ok(loaded)
     }
 
+    pub(in crate::provider::model_source) const fn original_bytes(
+        &self,
+        index: usize,
+    ) -> Option<&[u8]> {
+        match self.owner {
+            Some(owner)
+                if owner == index
+                    && !matches!(self.disposition, FrameDisposition::UnsupportedNodeTable) =>
+            {
+                Some(self.bytes.as_slice())
+            }
+            _ => None,
+        }
+    }
+
     pub(in crate::provider::model_source) fn project<'data>(
         &'data self,
         origins: &ModelOrigins<'_>,
