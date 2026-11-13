@@ -97,30 +97,24 @@ const fn round_byte(value: f32) -> u8 {
 /// image itself when it is not larger than that, else averaged down to the texels one repeat
 /// covers, so that a heavily tiled layer gives its mean colour and not noise.
 fn tile_of(
-    image: &RgbaImage,
+    image: Cow<'_, RgbaImage>,
     repeats: [f32; 2],
     size: (usize, usize),
     colour: Option<DdsTransfer>,
 ) -> Result<Tile<'_>, TextureError> {
     let (width, height) = (image.width() as usize, image.height() as usize);
     if width == 0 || height == 0 {
-        return Ok(Tile {
-            image: Cow::Borrowed(image),
-            colour,
-        });
+        return Ok(Tile { image, colour });
     }
     let wanted = (
         tile_len(size.0, repeats[0], width),
         tile_len(size.1, repeats[1], height),
     );
     if wanted == (width, height) {
-        Ok(Tile {
-            image: Cow::Borrowed(image),
-            colour,
-        })
+        Ok(Tile { image, colour })
     } else {
         Ok(Tile {
-            image: Cow::Owned(minify(image, wanted, colour)?),
+            image: Cow::Owned(minify(&image, wanted, colour)?),
             colour: colour.map(|_| DdsTransfer::Srgb),
         })
     }
@@ -191,7 +185,12 @@ impl<'a> Maps<'a> {
                 match (image, map) {
                     (Some(image), Some((_, repeats))) => {
                         let colour = (!normal).then(|| image.decoded_transfer());
-                        tile_of(&image.image, *repeats, size, colour).map(Some)
+                        let pixels = if normal {
+                            Cow::Borrowed(&image.image)
+                        } else {
+                            image.colour_image()?
+                        };
+                        tile_of(pixels, *repeats, size, colour).map(Some)
                     }
                     _ => Ok(None),
                 }

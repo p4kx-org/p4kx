@@ -2,10 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_archive::ObservedEntry;
-use p4kx_gltf::TextureComponents;
+use p4kx_gltf::{TextureComponents, TextureReadUse};
 use p4kx_texture::{
-    DdsHeader, DdsHeaderField, DdsPngEncoding, DdsRawHeader, DdsTransfer, MipByteSpans,
-    MipPayloadLocation, TextureError,
+    DdsAlphaAssociation, DdsHeader, DdsHeaderField, DdsPngEncoding, DdsRawHeader, DdsTransfer,
+    MipByteSpans, MipPayloadLocation, TextureError,
 };
 
 use crate::source::SourceEntry;
@@ -56,6 +56,10 @@ impl<Spans> PreviewInputs<'_, Spans> {
             PreviewHeaderEvidence::of_read(uses, header.input(), self.color.raw)?,
             header.is_bound(),
         ))
+    }
+
+    pub(crate) const fn source_alpha(&self) -> (DdsAlphaAssociation, bool) {
+        (self.color.raw.alpha_association(), self.alpha.is_some())
     }
 
     pub(crate) fn source_transfer(&self) -> DdsTransfer {
@@ -200,19 +204,26 @@ impl PreviewInputs<'_, MipByteSpans> {
         &self,
         uses: &SourceUses,
         level: u32,
-        components: TextureComponents,
-        transfer: Option<DdsPngEncoding>,
+        observed: TextureReadUse,
         alpha_limits_level: bool,
     ) -> Result<Vec<SourceUse>, SourceEvidenceError> {
         use TextureComponents::{Alpha, Color, ColorAndAlpha};
         let mut fields = Vec::new();
+        let components = observed.components;
         let alpha = matches!(components, Alpha | ColorAndAlpha);
         let color = matches!(components, Color | ColorAndAlpha) || (alpha && self.alpha.is_none());
         self.color
             .append_glb_uses(uses, level, color, &mut fields)?;
-        if let Some(transfer) = transfer {
+        if let Some(transfer) = observed.transfer {
             let (header, _) = self.color_header_evidence(uses)?;
             fields.extend(header.output_transfer_uses(transfer)?);
+        }
+        if observed.alpha_association.is_some() && components != TextureComponents::Dimensions {
+            let (header, _) = self.color_header_evidence(uses)?;
+            fields.extend(header.header_uses(
+                &[DdsHeaderField::Prefix, DdsHeaderField::AlphaAssociation],
+                SourceUseRole::Conversion,
+            )?);
         }
         if let Some(tail) = &self.alpha
             && (alpha || alpha_limits_level)

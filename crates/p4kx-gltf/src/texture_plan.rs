@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use p4kx_model::Material;
-use p4kx_texture::{DdsPngEncoding, DdsTransfer};
+use p4kx_texture::DdsTransfer;
 
 use crate::layer_jobs::{fallback_guards, layer_jobs, layer_normals_last};
 use crate::layer_plan::Layered;
@@ -125,7 +125,7 @@ pub(crate) struct EncodedImage {
     pub(crate) width: u32,
     pub(crate) height: u32,
     pub(crate) transfer: DdsTransfer,
-    pub(crate) source_transfers: Vec<(DdsTransfer, Option<DdsPngEncoding>)>,
+    pub(crate) sources: Vec<TextureReadUse>,
 }
 
 /// A texture that a job could not use.

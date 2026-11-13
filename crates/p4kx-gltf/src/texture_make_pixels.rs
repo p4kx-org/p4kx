@@ -46,7 +46,7 @@ pub(super) fn make_base(
     if specular.is_some() {
         outcome.palette_use = TexturePaletteUse::DiffuseAndSpecular;
     }
-    let components = if keep_alpha && diffuse.has_alpha {
+    let components = if keep_alpha && diffuse.uses_opacity() {
         TextureComponents::ColorAndAlpha
     } else {
         TextureComponents::Color

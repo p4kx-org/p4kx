@@ -4,7 +4,7 @@
 use std::sync::{Mutex, PoisonError};
 
 use p4kx_gltf::{LoadedTexture, TextureLoadError, TextureLoader, TextureReadId, TextureReadUse};
-use p4kx_texture::{DdsHeaderField, MipByteSpans};
+use p4kx_texture::{DdsAlphaTransform, DdsHeaderField, MipByteSpans};
 
 use super::ArchiveTextures;
 use crate::texture_preview_png::input::PreviewInputs;
@@ -40,6 +40,10 @@ pub struct TextureTransferUses {
     pub declared: Vec<SourceUse>,
     /// Source words that establish the decoded colour transfer.
     pub decoded: Vec<SourceUse>,
+    /// Source words declaring alpha association.
+    pub alpha_association: Vec<SourceUse>,
+    /// Source words selecting the RGB unassociation domain.
+    pub alpha_transform: Vec<SourceUse>,
 }
 
 impl ArchiveTextureReads<'_, '_> {
@@ -68,10 +72,23 @@ impl ArchiveTextureReads<'_, '_> {
             Some(encoding) => header.output_transfer_uses(encoding)?,
             None => Vec::new(),
         };
+        let alpha_association = header.header_uses(
+            &[Prefix, DdsHeaderField::AlphaAssociation],
+            SourceUseRole::Conversion,
+        )?;
+        let alpha_transform = if use_of_texture.alpha_transform == DdsAlphaTransform::Preserve {
+            Vec::new()
+        } else {
+            let mut selected = alpha_association.clone();
+            selected.extend(declaration.iter().cloned());
+            selected
+        };
         drop(reads);
         Ok(Some(TextureTransferUses {
             declared: declaration,
             decoded,
+            alpha_association,
+            alpha_transform,
         }))
     }
 
@@ -91,13 +108,8 @@ impl ArchiveTextureReads<'_, '_> {
         reads
             .get(id.index())
             .map(|read| {
-                read.inputs.glb_uses(
-                    uses,
-                    read.level,
-                    use_of_texture.components,
-                    use_of_texture.transfer,
-                    read.alpha_limits_level,
-                )
+                read.inputs
+                    .glb_uses(uses, read.level, use_of_texture, read.alpha_limits_level)
             })
             .transpose()
     }
@@ -107,6 +119,7 @@ impl TextureLoader for ArchiveTextureReads<'_, '_> {
     fn load(&self, path: &str, mip: u32) -> Result<LoadedTexture, TextureLoadError> {
         let opened = self.textures.load_observed(path, mip)?;
         let decoded = opened.decoded;
+        let (association, split) = decoded.inputs.source_alpha();
         let mut reads = self.reads.lock().unwrap_or_else(PoisonError::into_inner);
         let id = TextureReadId::new(reads.len());
         reads.push(Read {
@@ -115,10 +128,15 @@ impl TextureLoader for ArchiveTextureReads<'_, '_> {
             inputs: decoded.inputs,
         });
         drop(reads);
-        let (declared, encoding) = opened.transfer;
-        Ok(LoadedTexture::new(decoded.image, opened.has_alpha)
-            .with_dds_transfer(declared, encoding)
-            .with_read(id))
+        super::loaded_texture(
+            decoded.image,
+            opened.transfer,
+            (association, split),
+            opened.has_alpha,
+            opened.has_packed_alpha,
+            opened.embedded_opacity,
+        )
+        .map(|texture| texture.with_read(id))
     }
 
     fn dimensions(&self, path: &str, mip: u32) -> Result<Option<(u32, u32)>, TextureLoadError> {

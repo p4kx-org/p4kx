@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_testkit::{CheckedGlb, TestMtlMaterial};
-use p4kx_texture::{DdsPngEncoding, DdsTransfer, DxgiFormat, TextureFormat};
+use p4kx_texture::{DdsAlphaAssociation, DdsPngEncoding, DdsTransfer, DxgiFormat, TextureFormat};
 use serde_json::{Value, json};
 
 use super::support::{
@@ -106,6 +106,113 @@ fn a_linear_layer_decodes_before_blending_and_encodes_srgb() -> TestResult {
         layer_textures::base_of(&glb, "hull")?.pixel(0, 0),
         Some([188, 137, 71, 255]),
         "linear layer is encoded as sRGB without altering alpha conventions"
+    );
+    Ok(())
+}
+
+#[test]
+fn premultiplied_colour_is_straight_in_glb_and_packed_alpha_is_preserved() -> TestResult {
+    let rgba = [64, 32, 128, 128];
+    let map = texture(rgba, true)?
+        .with_dds_transfer(
+            DdsTransfer::Linear,
+            DdsPngEncoding::of(TextureFormat::Dxgi(DxgiFormat(28)), DdsTransfer::Linear),
+        )
+        .with_dds_alpha(DdsAlphaAssociation::Premultiplied, true);
+    let stub = Stub::default().with(COLOUR, &map).with(NORMAL, &map);
+    let authored = TestMtlMaterial::new("plate")
+        .diffuse([1.0; 3])
+        .opacity(0.5)
+        .texture("TexSlot1", COLOUR)
+        .texture("TexSlot2", NORMAL);
+    let (glb, _) = export(&[plain("unused"), authored], &stub, &textured())?;
+    let plate = material(&glb, "plate")?;
+    assert_eq!(
+        plate.alpha_mode(),
+        p4kx_testkit::gltf::material::AlphaMode::Blend,
+        "material still determines blending"
+    );
+    assert_eq!(
+        base_image(&glb, &plate)?.pixel(0, 0),
+        Some([188, 137, 255, 128]),
+        "base colour is straight and sRGB"
+    );
+    assert_eq!(
+        packed_image(&glb, &plate)?.pixel(0, 0),
+        Some([255, 127, 255, 255]),
+        "normal smoothness remains packed"
+    );
+    let base = plate
+        .pbr_metallic_roughness()
+        .base_color_texture()
+        .ok_or("colour image")?
+        .texture()
+        .source();
+    let normal = plate
+        .normal_texture()
+        .ok_or("normal map")?
+        .texture()
+        .source();
+    assert_eq!(
+        transfer(&base)?.pointer("/inputs/0/alpha_association"),
+        Some(&json!("premultiplied")),
+        "source declaration"
+    );
+    assert_eq!(
+        transfer(&base)?.pointer("/inputs/0/alpha_transform"),
+        Some(&json!("unassociate_linear")),
+        "base image transformation"
+    );
+    assert_eq!(
+        transfer(&normal)?.pointer("/inputs/0/alpha_transform"),
+        None,
+        "normal is a data role"
+    );
+    Ok(())
+}
+
+#[test]
+fn split_alpha_keeps_its_output_opacity_and_uses_embedded_opacity_for_colour() -> TestResult {
+    let map = texture([64, 32, 128, 64], true)?
+        .with_dds_transfer(
+            DdsTransfer::Linear,
+            DdsPngEncoding::of(TextureFormat::Dxgi(DxgiFormat(28)), DdsTransfer::Linear),
+        )
+        .with_dds_alpha(DdsAlphaAssociation::Premultiplied, true)
+        .with_split_alpha(Some(vec![128; 4]))?;
+    let stub = Stub::default().with(COLOUR, &map);
+    let authored = TestMtlMaterial::new("plate")
+        .diffuse([1.0; 3])
+        .opacity(0.5)
+        .texture("TexSlot1", COLOUR);
+    let (glb, _) = export(&[plain("unused"), authored], &stub, &textured())?;
+    let plate = material(&glb, "plate")?;
+    assert_eq!(
+        base_image(&glb, &plate)?.pixel(0, 0),
+        Some([188, 137, 255, 64]),
+        "unassociation divides by 128, and the output keeps the merged opacity 64"
+    );
+    Ok(())
+}
+
+#[test]
+fn declared_custom_alpha_does_not_become_base_colour_opacity() -> TestResult {
+    let map = texture(TEXEL, true)?.with_dds_alpha(DdsAlphaAssociation::Custom, true);
+    let stub = Stub::default().with(COLOUR, &map);
+    let authored = TestMtlMaterial::new("plate")
+        .opacity(0.5)
+        .texture("TexSlot1", COLOUR);
+    let (glb, _) = export(&[plain("unused"), authored], &stub, &textured())?;
+    let plate = material(&glb, "plate")?;
+    assert_eq!(
+        plate.alpha_mode(),
+        p4kx_testkit::gltf::material::AlphaMode::Blend,
+        "authored blend policy is independent"
+    );
+    assert_eq!(
+        base_image(&glb, &plate)?.pixel(0, 0),
+        Some([128, 64, 16, 255]),
+        "custom data is not opacity"
     );
     Ok(())
 }

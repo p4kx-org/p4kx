@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use anyhow::Result;
+use p4kx_extraction::texture_codec::DdsAlphaTransform;
 use p4kx_extraction::{
     ArchiveTextureReads, FieldOrigin, FieldPath, OriginOutputAddress, SourceUses,
 };
@@ -13,6 +14,8 @@ use super::artifact::Fields;
 pub(super) struct InputOrigins {
     declared: FieldOrigin,
     colour_encoding: Option<FieldOrigin>,
+    alpha_association: Option<FieldOrigin>,
+    alpha_transform: Option<FieldOrigin>,
 }
 
 pub(super) fn capture(
@@ -33,6 +36,11 @@ pub(super) fn capture(
                 colour_encoding: read
                     .transfer
                     .map(|_| uses.origin(&evidence.decoded, complete)),
+                alpha_association: read
+                    .alpha_association
+                    .map(|_| uses.origin(&evidence.alpha_association, complete)),
+                alpha_transform: (read.alpha_transform != DdsAlphaTransform::Preserve)
+                    .then(|| uses.origin(&evidence.alpha_transform, complete)),
             })
         })
         .collect()
@@ -56,6 +64,14 @@ pub(super) fn addresses(fields: &mut Fields, image: &ImageOrigin, uses: &SourceU
             &format!("inputs/{input}/declared"),
             evidence.declared.clone(),
         )?;
+        for (name, origin) in [
+            ("alpha_association", &evidence.alpha_association),
+            ("alpha_transform", &evidence.alpha_transform),
+        ] {
+            if let Some(origin) = origin {
+                add(&format!("inputs/{input}/{name}"), origin.clone())?;
+            }
+        }
         if let Some(encoding) = &evidence.colour_encoding {
             for field in ["transfer", "transform"] {
                 add(

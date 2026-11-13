@@ -172,15 +172,40 @@ impl<'a> ArchiveTextures<'_, 'a> {
 impl TextureLoader for ArchiveTextures<'_, '_> {
     fn load(&self, path: &str, mip: u32) -> Result<LoadedTexture, TextureLoadError> {
         let observed = self.load_observed(path, mip)?;
-        let (declared, encoding) = observed.transfer;
-        Ok(
-            LoadedTexture::new(observed.decoded.into_image(), observed.has_packed_alpha)
-                .with_dds_transfer(declared, encoding),
+        let (association, split) = observed.decoded.inputs.source_alpha();
+        let image = observed.decoded.into_image();
+        loaded_texture(
+            image,
+            observed.transfer,
+            (association, split),
+            observed.has_alpha,
+            observed.has_packed_alpha,
+            observed.embedded_opacity,
         )
     }
 
     fn dimensions(&self, path: &str, mip: u32) -> Result<Option<(u32, u32)>, TextureLoadError> {
         self.open(path, mip).map(|opened| Some(opened.size))
+    }
+}
+
+fn loaded_texture(
+    image: p4kx_texture::RgbaImage,
+    (declared, encoding): (DdsTransfer, DdsPngEncoding),
+    (association, split): (p4kx_texture::DdsAlphaAssociation, bool),
+    opacity: bool,
+    packed: bool,
+    embedded_opacity: Option<Vec<u8>>,
+) -> Result<LoadedTexture, TextureLoadError> {
+    let loaded = LoadedTexture::new(image, packed)
+        .with_dds_transfer(declared, encoding)
+        .with_dds_alpha(association, opacity);
+    if split {
+        loaded
+            .with_split_alpha(embedded_opacity)
+            .map_err(|error| TextureLoadError::Unreadable(describe(&error)))
+    } else {
+        Ok(loaded)
     }
 }
 

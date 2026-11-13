@@ -246,9 +246,35 @@ pub(crate) fn load(
 }
 
 pub(crate) fn image_transfer_extras(image: &EncodedImage) -> gltf_json::extras::Extras {
-    let inputs: Vec<_> = image.source_transfers.iter().map(|(declared, encoding)| {
-        serde_json::json!({ "declared": declared, "colour_encoding": encoding })
-    }).collect();
+    let inputs: Vec<_> = image
+        .sources
+        .iter()
+        .map(|source| {
+            let mut value = serde_json::Map::from_iter([
+                (
+                    "declared".to_owned(),
+                    serde_json::json!(source.declared_transfer),
+                ),
+                (
+                    "colour_encoding".to_owned(),
+                    serde_json::json!(source.transfer),
+                ),
+            ]);
+            if let Some(association) = source.alpha_association {
+                value.insert(
+                    "alpha_association".to_owned(),
+                    serde_json::json!(association),
+                );
+            }
+            if source.alpha_transform != p4kx_texture::DdsAlphaTransform::Preserve {
+                value.insert(
+                    "alpha_transform".to_owned(),
+                    serde_json::json!(source.alpha_transform),
+                );
+            }
+            value
+        })
+        .collect();
     serde_json::value::to_raw_value(&serde_json::json!({
         "p4kx_transfer": { "output": image.transfer, "inputs": inputs },
     }))
@@ -268,7 +294,7 @@ pub(crate) fn encode(image: &RgbaImage, transfer: DdsTransfer) -> Result<Encoded
         width: image.width(),
         height: image.height(),
         transfer,
-        source_transfers: Vec::new(),
+        sources: Vec::new(),
     })
 }
 
@@ -290,11 +316,11 @@ fn make(job: &Job, decoded: &Decoded) -> Outcome {
     };
     match made {
         Some(Ok(mut image)) => {
-            image.source_transfers = outcome
+            image.sources = outcome
                 .texture_sources
                 .iter()
                 .filter(|source| source.components != crate::TextureComponents::Dimensions)
-                .map(|source| (source.declared_transfer, source.transfer))
+                .copied()
                 .collect();
             outcome.image = Some(image);
         }
