@@ -3,16 +3,24 @@
 
 use p4kx_extraction::cryxml::SourceDocument;
 use p4kx_extraction::{
-    SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue,
-    Value,
+    CancelToken, SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceValue, SourcedValue,
+    StructValue, Value,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::player_source::{PlayerSourceError, check};
 use crate::player_source_classes::{self, ClassTarget, Classes};
+use crate::soc_scene::SocSceneError;
 use crate::soc_scene_class_resources::{Resource, ResourceKind, Resources};
+use crate::soc_scene_origin::XmlOrigin;
 use crate::soc_scene_xml::XmlDocuments;
+
+#[path = "player_motion_options.rs"]
+mod motion_options;
+
+use motion_options::controller::Controller;
+use motion_options::{Database, MotionOptions};
 
 const PLAYER_CLASS: &str = "Player";
 const CHARACTER_COMPONENT: &str = "SAnimatedCharacterComponentParams";
@@ -32,6 +40,8 @@ struct MotionComponent {
     third_person_database_path: SourcedValue<String>,
     controller: SourcedValue<Resource<usize>>,
     third_person_database: SourcedValue<Resource<usize>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    authored_options: Option<MotionOptions>,
 }
 
 impl Motion {
@@ -125,16 +135,33 @@ fn components(
             scope,
             resources,
         };
-        let (controller_path, controller) =
-            input.resource("actionController", "ControllerDef", documents)?;
-        let (third_person_database_path, third_person_database) =
-            input.resource("animDatabase3P", "AnimDB", documents)?;
+        let controller = input.resource(
+            "actionController",
+            "ControllerDef",
+            documents,
+            Controller::read,
+        )?;
+        let database = input.resource("animDatabase3P", "AnimDB", documents, Database::read)?;
+        let authored_options = controller
+            .observed
+            .zip(database.observed)
+            .map(|(controller, database)| {
+                MotionOptions::read(
+                    resources,
+                    controller.data,
+                    database.data,
+                    [&controller.selector, &database.selector],
+                    documents,
+                )
+            })
+            .transpose()?;
         rows.push(MotionComponent {
             ordinal,
-            controller_path,
-            third_person_database_path,
-            controller,
-            third_person_database,
+            controller_path: controller.path,
+            third_person_database_path: database.path,
+            controller: controller.value,
+            third_person_database: database.value,
+            authored_options,
         });
     }
     Ok(rows)
@@ -148,13 +175,25 @@ struct MotionInput<'value, 'source, 'archive> {
     resources: &'value Resources<'archive>,
 }
 
+struct Observed<T> {
+    selector: SourceUse,
+    data: T,
+}
+
+struct SelectedResource<T> {
+    path: SourcedValue<String>,
+    value: SourcedValue<Resource<usize>>,
+    observed: Option<Observed<T>>,
+}
+
 impl MotionInput<'_, '_, '_> {
-    fn resource(
+    fn resource<T>(
         &self,
         name: &str,
         expected_root: &'static str,
         documents: &mut XmlDocuments,
-    ) -> Result<(SourcedValue<String>, SourcedValue<Resource<usize>>), PlayerSourceError> {
+        read: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>, &CancelToken) -> Result<T, SocSceneError>,
+    ) -> Result<SelectedResource<T>, PlayerSourceError> {
         let value = crate::soc_scene_classes::string(self.component.field(name));
         let source = |role| {
             self.scope.at(
@@ -172,7 +211,8 @@ impl MotionInput<'_, '_, '_> {
             .resources
             .sources
             .value(value.clone(), &[payload], complete);
-        let file = self.resources.read(
+        let mut observed = None;
+        let value = self.resources.read(
             value,
             &selector,
             ResourceKind::DataRelative,
@@ -181,9 +221,18 @@ impl MotionInput<'_, '_, '_> {
                 if root.namespace().is_some() || root.name() != expected_root {
                     return Ok(None);
                 }
-                documents.bind(xml, origin).map(Some)
+                let index = documents.bind(xml, origin)?;
+                observed = Some(Observed {
+                    selector: selector.clone(),
+                    data: read(xml, origin, self.resources.cancel)?,
+                });
+                Ok(Some(index))
             },
         )?;
-        Ok((path, file))
+        Ok(SelectedResource {
+            path,
+            value,
+            observed,
+        })
     }
 }

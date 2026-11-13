@@ -73,7 +73,17 @@ impl<'a> Resources<'a> {
         kind: ResourceKind,
         project: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
     ) -> Result<SourcedValue<Resource<T>>, SocSceneError> {
-        let mut uses = vec![selector.clone()];
+        self.read_with_selectors(value, std::slice::from_ref(selector), kind, project)
+    }
+
+    pub(crate) fn read_with_selectors<T>(
+        &self,
+        value: SourceValue<String>,
+        selectors: &[SourceUse],
+        kind: ResourceKind,
+        project: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
+    ) -> Result<SourcedValue<Resource<T>>, SocSceneError> {
+        let mut uses = selectors.to_vec();
         let state = match value {
             SourceValue::Present(path) => {
                 SourceValue::Present(self.project(&path, kind, &mut uses, project)?)
@@ -183,7 +193,7 @@ impl<'a> Resources<'a> {
     }
 }
 
-fn resource_path(authored: &str, kind: ResourceKind) -> Option<String> {
+pub(crate) fn resource_path(authored: &str, kind: ResourceKind) -> Option<String> {
     let canonical = authored.trim().replace('\\', "/");
     if canonical.is_empty()
         || canonical.split('/').any(|part| {

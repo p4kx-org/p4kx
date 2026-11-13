@@ -23,9 +23,14 @@ parent selector report that owner state. A duplicate class or port name retains 
 `motion` identifies the DataForge Player actor and its original animated-character component
 slots. `actionController` and `animDatabase3P` select original archive XML documents. The
 document indexes reference controller scopes, fragment alternatives and ADB subdatabase
-declarations in their original order. The export preserves the declared motion inputs.
-Physical clip binding, runtime variant choice and additive composition are outside this
-document's current projection.
+declarations in their original order. When both XML roots are readable, the component includes
+`authoredOptions` for direct root `FragmentList` options in ADB order, with separate original
+`Tags` and `FragTags` values. The controller `Fragments@filename` and ADB `FragDef` must
+identify one physically observed shared definition document before an option links to same-name
+controller fragment candidates. Each unambiguous controller fragment retains its original
+scope tokens and their candidate XML coordinates. An empty candidate list is an observed miss.
+The original documents retain the nested ADB selectors. Physical clips and gameplay variant
+selection require additional source context.
 
 Source-backed values expose `containsEncryptedSource`, `sourceSetComplete` and
 `sourceUsesRefs`. A join preserves both the original selector and observed target source.

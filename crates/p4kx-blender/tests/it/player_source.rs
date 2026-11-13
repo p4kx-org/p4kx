@@ -13,6 +13,9 @@ use serde_json::Value;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+#[path = "player_motion_option_assertions.rs"]
+mod motion_option_assertions;
+
 const BODY: u128 = 0x0101_0101_0101_0101_0101_0101_0101_0101;
 const WEAPON_ONE: u128 = 0x0202_0202_0202_0202_0202_0202_0202_0202;
 const WEAPON_TWO: u128 = 0x0303_0303_0303_0303_0303_0303_0303_0303;
@@ -43,7 +46,7 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
         <Item portName="nested" itemName="SharedWeapon"/>
         <Item portName="unknown" itemName=""/>
     </Items></Item></Items><Inventory><InventoryItem itemName="Other"/></Inventory></Loadout>"#;
-    ArchiveBuilder::new()
+    let archive = ArchiveBuilder::new()
         .entry(
             TestEntry::stored(
                 "Data/Libs/CharacterCustomizer/masculinedefault.chf",
@@ -59,9 +62,10 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
         .entry(TestEntry::stored(
             "Data/Scripts/Loadouts/Player/DefaultLoadouts/sample.xml",
             loadout,
-        ))
-        .entry(TestEntry::stored("Data/Animations/test/controller.xml", br"<ControllerDef><FragmentDefs><Walk/><Walk/></FragmentDefs><ScopeDefs><Body/></ScopeDefs></ControllerDef>"))
-        .entry(TestEntry::stored("Data/Animations/test/player.adb", br#"<AnimDB><FragmentList><Walk><Fragment Tags="one"/><Fragment Tags="two"/></Walk></FragmentList></AnimDB>"#))
+        ));
+    motion_option_assertions::entries()
+        .into_iter()
+        .fold(archive, ArchiveBuilder::entry)
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     Ok((folder, archive))
@@ -153,6 +157,7 @@ fn player_source_preserves_body_variant_port_order_and_exact_loadout_targets() -
     verify_loadout(&male);
     verify_xml_port_definitions(&male);
     verify_motion(&male);
+    motion_option_assertions::verify(&male)?;
     Ok(())
 }
 
