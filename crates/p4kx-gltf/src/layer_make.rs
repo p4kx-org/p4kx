@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use p4kx_texture::{RgbaImage, TextureError};
+use p4kx_texture::{DdsTransfer, RgbaImage, TextureError};
 
 use crate::layer_bake::{Maps, base_colour, normal_colour};
 use crate::layer_plan::Layered;
@@ -80,6 +80,7 @@ fn uses(
     own: Option<&LoadedTexture>,
     layers: &[Option<Arc<LoadedTexture>>],
     sampled_maps: usize,
+    colour: bool,
 ) -> Vec<TextureReadUse> {
     let sampled = layers.iter().enumerate().filter_map(|(index, image)| {
         if sampled_maps & (1 << index) == 0 {
@@ -87,12 +88,17 @@ fn uses(
         }
         image.as_deref()
     });
-    let colors = mask.into_iter().chain(own).chain(sampled);
+    let sources = mask.into_iter().chain(own).map(|image| (image, false));
+    let sources = sources.chain(sampled.map(|image| (image, colour)));
     let mut size_used = false;
-    let mut sources: Vec<_> = colors
-        .map(|image| {
+    let mut sources: Vec<_> = sources
+        .map(|(image, colour)| {
             size_used |= std::ptr::eq(image, sized_by);
-            image.contribution(TextureComponents::Color)
+            if colour {
+                image.colour_contribution(TextureComponents::Color)
+            } else {
+                image.contribution(TextureComponents::Color)
+            }
         })
         .collect();
     if !size_used {
@@ -129,10 +135,7 @@ pub(crate) fn bake_base(
         .as_deref()
         .or_else(|| loaded.iter().flatten().next().map(AsRef::as_ref))?;
     let size = side(&sized_by.image);
-    let images: Vec<Option<&RgbaImage>> = loaded
-        .iter()
-        .map(|map| map.as_ref().map(|map| &map.image))
-        .collect();
+    let images: Vec<_> = loaded.iter().map(Option::as_deref).collect();
     Some(
         Maps::new(layered, &images, (size.0 as usize, size.1 as usize), false)
             .and_then(|maps| {
@@ -147,6 +150,7 @@ pub(crate) fn bake_base(
                     None,
                     &loaded,
                     pixels.sampled_maps,
+                    true,
                 ),
             }),
     )
@@ -166,7 +170,7 @@ pub(crate) fn make_base(
         outcome.texture_sources = baked.sources;
         outcome.material_layers = baked.material_layers;
         outcome.palette_use = TexturePaletteUse::Layers;
-        encode(&baked.image)
+        encode(&baked.image, DdsTransfer::Srgb)
     }))
 }
 
@@ -192,10 +196,7 @@ pub(crate) fn make_normal(
         .or_else(|| loaded.iter().flatten().next().map(AsRef::as_ref))
         .or(own.as_deref())?;
     let size = side(&sized_by.image);
-    let images: Vec<Option<&RgbaImage>> = loaded
-        .iter()
-        .map(|map| map.as_ref().map(|map| &map.image))
-        .collect();
+    let images: Vec<_> = loaded.iter().map(Option::as_deref).collect();
     Some(
         Maps::new(layered, &images, (size.0 as usize, size.1 as usize), true)
             .and_then(|maps| {
@@ -215,9 +216,10 @@ pub(crate) fn make_normal(
                     own.as_deref(),
                     &loaded,
                     pixels.sampled_maps,
+                    false,
                 );
                 outcome.material_layers = used_positions(layered, pixels.used_layers);
-                encode(&pixels.image)
+                encode(&pixels.image, DdsTransfer::Linear)
             }),
     )
 }

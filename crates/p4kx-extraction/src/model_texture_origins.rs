@@ -4,11 +4,11 @@
 use std::sync::{Mutex, PoisonError};
 
 use p4kx_gltf::{LoadedTexture, TextureLoadError, TextureLoader, TextureReadId, TextureReadUse};
-use p4kx_texture::MipByteSpans;
+use p4kx_texture::{DdsHeaderField, MipByteSpans};
 
 use super::ArchiveTextures;
 use crate::texture_preview_png::input::PreviewInputs;
-use crate::{SourceEvidenceError, SourceUse, SourceUses};
+use crate::{SourceEvidenceError, SourceUse, SourceUseRole, SourceUses};
 
 struct Read<'a> {
     level: u32,
@@ -33,7 +33,48 @@ impl<'i, 'a> ArchiveTextures<'i, 'a> {
     }
 }
 
+/// Exact header contributors for a GLB texture's transfer values.
+#[derive(Debug, Default)]
+pub struct TextureTransferUses {
+    /// Source words that establish the effective original declaration.
+    pub declared: Vec<SourceUse>,
+    /// Source words that establish the decoded colour transfer.
+    pub decoded: Vec<SourceUse>,
+}
+
 impl ArchiveTextureReads<'_, '_> {
+    /// Registers the header words for the effective DDS declaration and decoded transfer.
+    ///
+    /// # Errors
+    /// Returns an error if registration was interrupted.
+    pub fn transfer_uses(
+        &self,
+        use_of_texture: TextureReadUse,
+        uses: &SourceUses,
+    ) -> Result<Option<TextureTransferUses>, SourceEvidenceError> {
+        use DdsHeaderField::{CryTransfer, DxgiTransfer, Prefix};
+        let Some(id) = use_of_texture.read else {
+            return Ok(None);
+        };
+        let reads = self.reads.lock().unwrap_or_else(PoisonError::into_inner);
+        let Some(read) = reads.get(id.index()) else {
+            return Ok(None);
+        };
+        let (header, _) = read.inputs.color_header_evidence(uses)?;
+        let mut declaration = header.header_uses(&[Prefix], SourceUseRole::Selector)?;
+        declaration
+            .extend(header.header_uses(&[DxgiTransfer, CryTransfer], SourceUseRole::Conversion)?);
+        let decoded = match use_of_texture.transfer {
+            Some(encoding) => header.output_transfer_uses(encoding)?,
+            None => Vec::new(),
+        };
+        drop(reads);
+        Ok(Some(TextureTransferUses {
+            declared: declaration,
+            decoded,
+        }))
+    }
+
     /// Registers the original components the GLB writer used for one image input.
     ///
     /// # Errors
@@ -54,6 +95,7 @@ impl ArchiveTextureReads<'_, '_> {
                     uses,
                     read.level,
                     use_of_texture.components,
+                    use_of_texture.transfer,
                     read.alpha_limits_level,
                 )
             })
@@ -73,7 +115,10 @@ impl TextureLoader for ArchiveTextureReads<'_, '_> {
             inputs: decoded.inputs,
         });
         drop(reads);
-        Ok(LoadedTexture::new(decoded.image, opened.has_alpha).with_read(id))
+        let (declared, encoding) = opened.transfer;
+        Ok(LoadedTexture::new(decoded.image, opened.has_alpha)
+            .with_dds_transfer(declared, encoding)
+            .with_read(id))
     }
 
     fn dimensions(&self, path: &str, mip: u32) -> Result<Option<(u32, u32)>, TextureLoadError> {

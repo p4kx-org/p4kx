@@ -5,15 +5,19 @@ use std::borrow::Cow;
 
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use p4kx_texture::{RgbaImage, TextureError};
+use p4kx_texture::{DdsTransfer, RgbaImage, TextureError};
 
 use crate::layer_plan::{LayerPlan, Layered, MAX_BAKED_LAYERS};
-use crate::texture_pixels::{OPAQUE, RGBA, encode, fill, linear, sampled, texel};
+use crate::texture_loader::LoadedTexture;
+use crate::texture_pixels::{OPAQUE, RGBA, colour_decoder, encode, fill, sampled, texel};
 
 const BYTE_UNIT: f32 = 1.0 / 255.0;
 const HALF_BYTE: f32 = 127.5;
 
-type Tile<'a> = Cow<'a, RgbaImage>;
+struct Tile<'a> {
+    image: Cow<'a, RgbaImage>,
+    colour: Option<DdsTransfer>,
+}
 
 /// What a layer is blended from: the map of one layer in the form it is sampled from.
 pub(crate) struct Maps<'a> {
@@ -40,8 +44,9 @@ fn tile_len(output: usize, repeats: f32, source: usize) -> usize {
 fn minify(
     image: &RgbaImage,
     (width, height): (usize, usize),
-    colour: bool,
+    colour: Option<DdsTransfer>,
 ) -> Result<RgbaImage, TextureError> {
+    let decode = colour.map_or(f32::from as fn(u8) -> f32, colour_decoder);
     let (source_width, source_height) = (image.width() as usize, image.height() as usize);
     fill(
         u32::try_from(width).unwrap_or(u32::MAX),
@@ -57,11 +62,7 @@ fn minify(
                     for column in left..right {
                         let [red, green, blue, _] = texel(image, column, row);
                         for (total, value) in sum.iter_mut().zip([red, green, blue]) {
-                            *total += if colour {
-                                linear(value)
-                            } else {
-                                f32::from(value)
-                            };
+                            *total += decode(value);
                         }
                     }
                 }
@@ -71,8 +72,8 @@ fn minify(
                 )]
                 let count = ((bottom - top) * (right - left)) as f32;
                 let [red, green, blue] = sum.map(|total| total / count);
-                let [red, green, blue] = if colour {
-                    [encode(red), encode(green), encode(blue)]
+                let [red, green, blue] = if colour.is_some() {
+                    [red, green, blue].map(encode)
                 } else {
                     [red, green, blue].map(round_byte)
                 };
@@ -99,20 +100,29 @@ fn tile_of(
     image: &RgbaImage,
     repeats: [f32; 2],
     size: (usize, usize),
-    colour: bool,
+    colour: Option<DdsTransfer>,
 ) -> Result<Tile<'_>, TextureError> {
     let (width, height) = (image.width() as usize, image.height() as usize);
     if width == 0 || height == 0 {
-        return Ok(Cow::Borrowed(image));
+        return Ok(Tile {
+            image: Cow::Borrowed(image),
+            colour,
+        });
     }
     let wanted = (
         tile_len(size.0, repeats[0], width),
         tile_len(size.1, repeats[1], height),
     );
     if wanted == (width, height) {
-        Ok(Cow::Borrowed(image))
+        Ok(Tile {
+            image: Cow::Borrowed(image),
+            colour,
+        })
     } else {
-        minify(image, wanted, colour).map(Cow::Owned)
+        Ok(Tile {
+            image: Cow::Owned(minify(image, wanted, colour)?),
+            colour: colour.map(|_| DdsTransfer::Srgb),
+        })
     }
 }
 
@@ -164,7 +174,7 @@ impl<'a> Maps<'a> {
     /// of each layer, in the order of the layers, and `normal` says whether they are normal maps.
     pub(crate) fn new(
         layered: &Layered,
-        images: &[Option<&'a RgbaImage>],
+        images: &[Option<&'a LoadedTexture>],
         size: (usize, usize),
         normal: bool,
     ) -> Result<Self, TextureError> {
@@ -180,7 +190,8 @@ impl<'a> Maps<'a> {
                 };
                 match (image, map) {
                     (Some(image), Some((_, repeats))) => {
-                        tile_of(image, *repeats, size, !normal).map(Some)
+                        let colour = (!normal).then(|| image.decoded_transfer());
+                        tile_of(&image.image, *repeats, size, colour).map(Some)
                     }
                     _ => Ok(None),
                 }
@@ -204,7 +215,8 @@ fn centre(position: usize, length: usize) -> f32 {
 fn layer_colour(layer: &LayerPlan, tile: Option<&Tile<'_>>, uv: (f32, f32)) -> [f32; 3] {
     let own = match (tile, &layer.diffuse) {
         (Some(tile), Some((_, repeats))) => {
-            let [red, green, blue] = sample(tile, *repeats, uv, linear);
+            let transfer = tile.colour.unwrap_or(DdsTransfer::Unknown);
+            let [red, green, blue] = sample(&tile.image, *repeats, uv, colour_decoder(transfer));
             let [tint_red, tint_green, tint_blue] = layer.colour;
             [red * tint_red, green * tint_green, blue * tint_blue]
         }
@@ -326,7 +338,7 @@ pub(crate) fn normal_colour(
                     continue;
                 }
                 sampled_row |= 1 << index;
-                let [across, down, _] = sample(tile, *repeats, uv, decode_slope);
+                let [across, down, _] = sample(&tile.image, *repeats, uv, decode_slope);
                 slopes[0] = across.mul_add(share, slopes[0]);
                 slopes[1] = down.mul_add(share, slopes[1]);
             }
@@ -355,35 +367,4 @@ pub(crate) fn normal_colour(
 }
 
 #[cfg(test)]
-mod tests {
-    use p4kx_texture::RgbaImage;
-
-    use super::{axis, minify, tile_len};
-
-    #[test]
-    fn a_tile_is_as_large_as_one_repeat_covers_but_never_larger_than_the_source() {
-        assert_eq!(tile_len(1024, 80.0, 1024), 13);
-        assert_eq!(tile_len(1024, 1.0, 512), 512);
-        assert_eq!(tile_len(4, 100.0, 64), 1);
-    }
-
-    #[test]
-    fn the_coordinates_wrap_around_the_tile() {
-        let (first, second, share) = axis(0.0, 1.0, 4);
-        assert_eq!((first, second), (3, 0));
-        assert!((share - 0.5).abs() < 1e-6);
-        let (first, ..) = axis(2.0, 1.0, 4);
-        assert_eq!(first, 3);
-    }
-
-    #[test]
-    fn a_box_averages_the_normal_bytes() -> Result<(), Box<dyn std::error::Error>> {
-        let pixels = [
-            0_u8, 0, 0, 255, 100, 200, 0, 255, 0, 0, 0, 255, 100, 200, 0, 255,
-        ];
-        let image = RgbaImage::new(2, 2, pixels.to_vec())?;
-        let small = minify(&image, (1, 1), false)?;
-        assert_eq!(small.pixels(), [50, 100, 0, 255]);
-        Ok(())
-    }
-}
+mod tests;

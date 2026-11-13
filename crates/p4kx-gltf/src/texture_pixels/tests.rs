@@ -16,8 +16,9 @@ fn base(specular: [f32; 3]) -> [u8; 3] {
         specular,
         decal: None,
     };
-    let image = base_colour(&pixel(DARK_DIFFUSE), Some(&pixel(LIGHT_MAP)), tints, false)
-        .expect("a base colour image");
+    let diffuse = LoadedTexture::new(pixel(DARK_DIFFUSE), false);
+    let specular = LoadedTexture::new(pixel(LIGHT_MAP), false);
+    let image = base_colour(&diffuse, Some(&specular), tints, false).expect("a base colour image");
     let [red, green, blue, _] = texel(&image, 0, 0);
     [red, green, blue]
 }
@@ -74,7 +75,8 @@ fn a_bright_specular_colour_keeps_the_light_map_as_the_colour() {
 
 #[test]
 fn a_dark_specular_colour_makes_the_metalness_of_the_map_small() {
-    let image = metallic_roughness(None, Some(&pixel(LIGHT_MAP)), [0.061; 3])
+    let specular = LoadedTexture::new(pixel(LIGHT_MAP), false);
+    let image = metallic_roughness(None, Some(&specular), [0.061; 3])
         .expect("a metallic-roughness image")
         .expect("a specular map gives an image")
         .image;

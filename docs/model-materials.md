@@ -235,3 +235,16 @@ mip 2.
 
 Not examined: emissive and occlusion maps (`TexSlot9` `_diff` of `Illum` with `%BLENDLAYER` is the
 second layer, not emission), the PBR extensions for glass (#127) and `KHR_texture_transform`.
+
+## Texture transfer in GLB
+
+The glTF material slot determines how a consumer reads the texture. Base colour RGB is
+sRGB and its opacity remains linear. Normal and packed roughness or metalness channels
+carry linear shader data. Proven linear DDS colour is converted to sRGB for base colour,
+including layer and specular mixing in linear light. Unknown colour declarations retain
+the existing sRGB interpretation and remain unknown in the source metadata.
+
+Embedded image extras record the output transfer and each original declaration. A
+decoded colour encoding is present only when the corresponding image conversion
+consults it. Rigged GLB receipts address these individual values and their original
+DDS header words. See the [glTF material specification](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html#materials).

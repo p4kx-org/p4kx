@@ -245,7 +245,8 @@ fn document(
             extras: json::extras::Extras::default(),
         })
     });
-    let image_textures = buffer.map_or_default(|buffer| push_images(&mut root, buffer, layout));
+    let image_textures =
+        buffer.map_or_default(|buffer| push_images(&mut root, buffer, layout, images));
     let ids = materials(&mut root, layout, instances, images, &image_textures);
     let (node_meshes, skinned): (NodeMeshes, Vec<Vec<bool>>) = buffer.map_or_else(
         || {

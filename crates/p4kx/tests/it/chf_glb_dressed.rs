@@ -215,6 +215,7 @@ fn image_receipt(
         .ok_or("binary chunk start")?;
     let mut ranges = BTreeMap::new();
     let mut images = 0;
+    let mut transfer_values = 0;
     let mut rows = data.lines().map(serde_json::from_str::<Value>);
     check_binding(&rows.next().ok_or("receipt header")??, bytes)?;
     for row in rows {
@@ -224,14 +225,9 @@ fn image_receipt(
         };
         match kind {
             "glbJsonField" => {
-                let path = address_path(&row)?;
-                assert!(
-                    document.pointer(path).is_some(),
-                    "actual GLB JSON field {path}"
-                );
-                if path.starts_with("/images/") {
-                    images += 1;
-                }
+                let (whole_image, output_transfer) = check_json_address(&document, &row)?;
+                images += usize::from(whole_image);
+                transfer_values += usize::from(output_transfer);
             }
             "glbBinaryBytes" => {
                 let path = address_path(&row)?.to_owned();
@@ -254,7 +250,31 @@ fn image_receipt(
         array_len(&document, "images")?,
         "all written images have JSON addresses"
     );
+    assert_eq!(
+        transfer_values, images,
+        "every image has an exact output transfer origin"
+    );
     Ok(ranges)
+}
+
+fn check_json_address(document: &Value, row: &Value) -> Result<(bool, bool), Box<dyn Error>> {
+    let path = address_path(row)?;
+    assert!(
+        document.pointer(path).is_some(),
+        "actual GLB JSON field {path}"
+    );
+    let whole_image = path
+        .strip_prefix("/images/")
+        .is_some_and(|image| !image.contains('/'));
+    let output_transfer = path.ends_with("/extras/p4kx_transfer/output");
+    if output_transfer {
+        assert_eq!(
+            row.get("containsEncryptedSource").and_then(Value::as_bool),
+            Some(false),
+            "the output transfer is required by the glTF material role"
+        );
+    }
+    Ok((whole_image, output_transfer))
 }
 
 fn array_len(document: &Value, name: &str) -> Result<usize, Box<dyn Error>> {

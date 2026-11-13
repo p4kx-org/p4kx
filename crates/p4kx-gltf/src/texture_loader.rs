@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_texture::RgbaImage;
+use p4kx_texture::{DdsPngEncoding, DdsTransfer, RgbaImage};
 use thiserror::Error;
 
 use crate::texture_origins::{TextureComponents, TextureReadId, TextureReadUse};
@@ -27,6 +27,8 @@ pub struct LoadedTexture {
     /// Whether the alpha channel holds data, from an alpha tail or from the texture's own format,
     /// rather than the opaque value a format without alpha decodes to.
     pub has_alpha: bool,
+    declared_transfer: DdsTransfer,
+    encoding: Option<DdsPngEncoding>,
     read: Option<TextureReadId>,
     fallback: bool,
 }
@@ -38,8 +40,31 @@ impl LoadedTexture {
         Self {
             image,
             has_alpha,
+            declared_transfer: DdsTransfer::Unknown,
+            encoding: None,
             read: None,
             fallback: false,
+        }
+    }
+
+    /// Records the source declaration and the transfer of the decoded RGB samples.
+    #[must_use]
+    pub const fn with_dds_transfer(
+        mut self,
+        declared: DdsTransfer,
+        encoding: DdsPngEncoding,
+    ) -> Self {
+        self.declared_transfer = declared;
+        self.encoding = Some(encoding);
+        self
+    }
+
+    /// Returns the encoding of the decoded RGB samples.
+    #[must_use]
+    pub const fn decoded_transfer(&self) -> DdsTransfer {
+        match self.encoding {
+            Some(encoding) => encoding.transfer,
+            None => DdsTransfer::Unknown,
         }
     }
 
@@ -60,13 +85,27 @@ impl LoadedTexture {
             read: self.read,
             components,
             fallback: self.fallback,
+            declared_transfer: self.declared_transfer,
+            transfer: None,
         }
+    }
+
+    pub(crate) const fn colour_contribution(
+        &self,
+        components: TextureComponents,
+    ) -> TextureReadUse {
+        let mut contribution = self.contribution(components);
+        contribution.transfer = self.encoding;
+        contribution
     }
 }
 
 impl PartialEq for LoadedTexture {
     fn eq(&self, other: &Self) -> bool {
-        self.image == other.image && self.has_alpha == other.has_alpha
+        self.image == other.image
+            && self.has_alpha == other.has_alpha
+            && self.declared_transfer == other.declared_transfer
+            && self.encoding == other.encoding
     }
 }
 

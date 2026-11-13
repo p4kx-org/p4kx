@@ -4,6 +4,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use p4kx_model::Material;
+use p4kx_texture::{DdsPngEncoding, DdsTransfer};
 
 use crate::layer_jobs::{fallback_guards, layer_jobs, layer_normals_last};
 use crate::layer_plan::Layered;
@@ -39,6 +40,7 @@ pub(crate) enum Key {
         tint: [u8; 3],
         decal: Option<[[u8; 3]; 3]>,
         keep_alpha: bool,
+        opacity_source: bool,
     },
     Normal {
         normal: String,
@@ -122,6 +124,8 @@ pub(crate) struct EncodedImage {
     pub(crate) png: Vec<u8>,
     pub(crate) width: u32,
     pub(crate) height: u32,
+    pub(crate) transfer: DdsTransfer,
+    pub(crate) source_transfers: Vec<(DdsTransfer, Option<DdsPngEncoding>)>,
 }
 
 /// A texture that a job could not use.
@@ -303,6 +307,7 @@ fn base_job(
                 .filter(|_| diffuse.opacity)
                 .map(|colours| colours.map(quantise)),
             keep_alpha: diffuse.opacity || uses_alpha(material),
+            opacity_source: diffuse.opacity,
         },
         diffuse: Some(diffuse.clone()),
         normal: None,

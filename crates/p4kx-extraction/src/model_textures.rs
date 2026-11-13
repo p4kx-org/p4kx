@@ -4,7 +4,7 @@
 use std::error::Error;
 
 use p4kx_gltf::{LoadedTexture, TextureLoadError, TextureLoader};
-use p4kx_texture::TextureFormat;
+use p4kx_texture::{DdsPngEncoding, DdsTransfer, TextureFormat};
 
 use crate::path_index::PathIndex;
 use crate::texture_preview::ObservedPreviewImage;
@@ -13,7 +13,7 @@ use crate::{ConversionError, DdsSourceInfo, Texture};
 #[path = "model_texture_origins.rs"]
 mod origin;
 
-pub use origin::ArchiveTextureReads;
+pub use origin::{ArchiveTextureReads, TextureTransferUses};
 
 /// The most pixels one texture of a model may hold: 8192 × 8192.
 pub const MAX_MODEL_TEXTURE_PIXELS: u64 = 1 << 26;
@@ -50,6 +50,8 @@ pub struct ObservedModelTexture<'a> {
     pub alpha_limits_level: bool,
     /// Whether the decoded alpha channel carries data.
     pub has_alpha: bool,
+    /// Original effective transfer and the encoding of the decoded RGB samples.
+    pub transfer: (DdsTransfer, DdsPngEncoding),
 }
 
 struct OpenTexture<'a> {
@@ -75,12 +77,20 @@ impl<'a> ArchiveTextures<'_, 'a> {
         let decoded = texture
             .decode_mip_observed(opened.level)
             .map_err(|error| TextureLoadError::Unreadable(describe(&error)))?;
+        let transfer = (
+            decoded.inputs.source_transfer(),
+            decoded
+                .inputs
+                .png_encoding()
+                .map_err(|error| TextureLoadError::Unreadable(describe(&error)))?,
+        );
         Ok(ObservedModelTexture {
             decoded,
             metadata: texture.source_metadata(),
             level: opened.level,
             alpha_limits_level: opened.alpha_limits_level,
             has_alpha,
+            transfer,
         })
     }
 
@@ -141,12 +151,12 @@ impl<'a> ArchiveTextures<'_, 'a> {
 
 impl TextureLoader for ArchiveTextures<'_, '_> {
     fn load(&self, path: &str, mip: u32) -> Result<LoadedTexture, TextureLoadError> {
-        let OpenTexture { texture, level, .. } = self.open(path, mip)?;
-        let has_alpha = texture.has_alpha_tail() || format_has_alpha(texture.header().format());
-        let image = texture
-            .decode_mip(level)
-            .map_err(|error| TextureLoadError::Unreadable(describe(&error)))?;
-        Ok(LoadedTexture::new(image, has_alpha))
+        let observed = self.load_observed(path, mip)?;
+        let (declared, encoding) = observed.transfer;
+        Ok(
+            LoadedTexture::new(observed.decoded.into_image(), observed.has_alpha)
+                .with_dds_transfer(declared, encoding),
+        )
     }
 
     fn dimensions(&self, path: &str, mip: u32) -> Result<Option<(u32, u32)>, TextureLoadError> {

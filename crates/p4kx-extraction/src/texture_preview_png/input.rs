@@ -196,6 +196,7 @@ impl PreviewInputs<'_, MipByteSpans> {
         uses: &SourceUses,
         level: u32,
         components: TextureComponents,
+        transfer: Option<DdsPngEncoding>,
         alpha_limits_level: bool,
     ) -> Result<Vec<SourceUse>, SourceEvidenceError> {
         use TextureComponents::{Alpha, Color, ColorAndAlpha};
@@ -204,6 +205,10 @@ impl PreviewInputs<'_, MipByteSpans> {
         let color = matches!(components, Color | ColorAndAlpha) || (alpha && self.alpha.is_none());
         self.color
             .append_glb_uses(uses, level, color, &mut fields)?;
+        if let Some(transfer) = transfer {
+            let (header, _) = self.color_header_evidence(uses)?;
+            fields.extend(header.output_transfer_uses(transfer)?);
+        }
         if let Some(tail) = &self.alpha
             && (alpha || alpha_limits_level)
         {

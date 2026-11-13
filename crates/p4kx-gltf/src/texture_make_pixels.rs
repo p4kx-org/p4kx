@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_texture::DdsTransfer;
+
 use super::{Made, Outcome, encode, load};
 use crate::texture_cache::Decoded;
 use crate::texture_origins::{TextureComponents, TexturePaletteUse};
@@ -38,7 +40,7 @@ pub(super) fn make_base(
         return Some(
             opacity_colour(&diffuse.image, job.tints.decal)
                 .map_err(|error| error.to_string())
-                .and_then(|image| encode(&image)),
+                .and_then(|image| encode(&image, DdsTransfer::Srgb)),
         );
     }
     if specular.is_some() {
@@ -51,21 +53,16 @@ pub(super) fn make_base(
     };
     outcome
         .texture_sources
-        .push(diffuse.contribution(components));
+        .push(diffuse.colour_contribution(components));
     outcome.texture_sources.extend(
         specular
             .iter()
-            .map(|texture| texture.contribution(TextureComponents::Color)),
+            .map(|texture| texture.colour_contribution(TextureComponents::Color)),
     );
     Some(
-        base_colour(
-            &diffuse.image,
-            specular.as_ref().map(|specular| &specular.image),
-            job.tints,
-            keep_alpha,
-        )
-        .map_err(|error| error.to_string())
-        .and_then(|image| encode(&image)),
+        base_colour(&diffuse, specular.as_deref(), job.tints, keep_alpha)
+            .map_err(|error| error.to_string())
+            .and_then(|image| encode(&image, DdsTransfer::Srgb)),
     )
 }
 
@@ -82,7 +79,7 @@ pub(super) fn make_normal(
     Some(
         normal_map(&normal.image)
             .map_err(|error| error.to_string())
-            .and_then(|image| encode(&image)),
+            .and_then(|image| encode(&image, DdsTransfer::Linear)),
     )
 }
 
@@ -102,7 +99,7 @@ pub(super) fn make_packed(
     );
     match metallic_roughness(
         gloss.as_ref().map(|gloss| &gloss.image),
-        specular.as_ref().map(|specular| &specular.image),
+        specular.as_deref(),
         job.tints.specular,
     ) {
         Ok(Some(packed)) => {
@@ -117,11 +114,11 @@ pub(super) fn make_packed(
             outcome.texture_sources.extend(
                 specular
                     .iter()
-                    .map(|texture| texture.contribution(TextureComponents::Color)),
+                    .map(|texture| texture.colour_contribution(TextureComponents::Color)),
             );
             outcome.roughness = packed.roughness;
             outcome.metallic = packed.metallic;
-            Some(encode(&packed.image))
+            Some(encode(&packed.image, DdsTransfer::Linear))
         }
         Ok(None) => None,
         Err(error) => Some(Err(error.to_string())),

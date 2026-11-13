@@ -19,6 +19,7 @@ use crate::morphs::{mesh_extras, primitive_targets, push_targets};
 use crate::nodes::{Skeleton, push_nodes};
 use crate::scene_nodes::{SceneSkin, push_scene_nodes};
 use crate::scene_rig::SceneRig;
+use crate::texture_make::image_transfer_extras;
 use crate::texture_plan::TextureSet;
 
 pub(crate) const GENERATOR: &str = concat!("P4KX ", env!("CARGO_PKG_VERSION"));
@@ -59,7 +60,8 @@ pub(crate) fn document(
             extras: json::extras::Extras::default(),
         })
     });
-    let image_textures = buffer.map_or_default(|buffer| push_images(&mut root, buffer, layout));
+    let image_textures =
+        buffer.map_or_default(|buffer| push_images(&mut root, buffer, layout, textures));
     let materials = materials(&mut root, layout, instances, textures, &image_textures);
     let (node_meshes, skinned) = buffer.map_or_else(
         || empty_nodes(instances),
@@ -221,6 +223,7 @@ pub(crate) fn push_images(
     root: &mut Root,
     buffer: Index<json::Buffer>,
     layout: &Layout<'_>,
+    textures: &TextureSet,
 ) -> Vec<Index<json::Texture>> {
     if layout.images.is_empty() {
         return Vec::new();
@@ -237,7 +240,8 @@ pub(crate) fn push_images(
     layout
         .images
         .iter()
-        .map(|block| {
+        .zip(&textures.images)
+        .map(|(block, image)| {
             let view = root.push(json::buffer::View {
                 buffer,
                 byte_length: USize64(block.len),
@@ -254,7 +258,7 @@ pub(crate) fn push_images(
                 name: None,
                 uri: None,
                 extensions: None,
-                extras: json::extras::Extras::default(),
+                extras: image_transfer_extras(image),
             });
             root.push(json::Texture {
                 name: None,

@@ -23,6 +23,9 @@ use crate::file_receipt::FileReceipt;
 #[path = "chf_glb_artifact_origins.rs"]
 mod artifact;
 
+#[path = "chf_glb_texture_transfer.rs"]
+mod transfer;
+
 #[path = "chf_glb_character_origins.rs"]
 mod character;
 
@@ -57,6 +60,8 @@ struct ImageOrigin {
     index: usize,
     #[serde(flatten)]
     origin: FieldOrigin,
+    #[serde(skip)]
+    transfer: Vec<transfer::InputOrigins>,
 }
 
 impl Projection {
@@ -241,6 +246,7 @@ fn images(
         fields.push(ImageOrigin {
             index,
             origin: found.origin(uses),
+            transfer: transfer::capture(image, textures, uses)?,
         });
         all.extend(&found);
     }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_texture::{DdsPngEncoding, DdsTransfer};
+
 /// A physical texture read identifier supplied by the loader for this export.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TextureReadId(usize);
@@ -42,6 +44,10 @@ pub struct TextureReadUse {
     pub components: TextureComponents,
     /// Whether the loaded bytes came through a secondary texture-name fallback.
     pub fallback: bool,
+    /// The effective original DDS declaration, when established.
+    pub declared_transfer: DdsTransfer,
+    /// The transfer and decoder transform consulted when the input supplied colour.
+    pub transfer: Option<DdsPngEncoding>,
 }
 
 /// The material values a texture conversion used.

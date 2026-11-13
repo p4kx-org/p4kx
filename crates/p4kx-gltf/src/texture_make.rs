@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use p4kx_texture::{RgbaImage, write_png};
+use p4kx_texture::{DdsTransfer, RgbaImage, write_png_with_transfer};
 use rayon::prelude::*;
 
 use crate::layer_make::{make_base as make_base_layers, make_normal as make_normal_layers};
@@ -245,13 +245,30 @@ pub(crate) fn load(
     }
 }
 
-pub(crate) fn encode(image: &RgbaImage) -> Result<EncodedImage, String> {
+pub(crate) fn image_transfer_extras(image: &EncodedImage) -> gltf_json::extras::Extras {
+    let inputs: Vec<_> = image.source_transfers.iter().map(|(declared, encoding)| {
+        serde_json::json!({ "declared": declared, "colour_encoding": encoding })
+    }).collect();
+    serde_json::value::to_raw_value(&serde_json::json!({
+        "p4kx_transfer": { "output": image.transfer, "inputs": inputs },
+    }))
+    .ok()
+}
+
+pub(crate) fn encode(image: &RgbaImage, transfer: DdsTransfer) -> Result<EncodedImage, String> {
     let mut png = Vec::new();
-    write_png(image, &mut png).map_err(|error| error.to_string())?;
+    let tag = if transfer == DdsTransfer::Srgb {
+        transfer
+    } else {
+        DdsTransfer::Unknown
+    };
+    write_png_with_transfer(image, tag, &mut png).map_err(|error| error.to_string())?;
     Ok(EncodedImage {
         png,
         width: image.width(),
         height: image.height(),
+        transfer,
+        source_transfers: Vec::new(),
     })
 }
 
@@ -272,7 +289,15 @@ fn make(job: &Job, decoded: &Decoded) -> Outcome {
         Key::LayerNormal { .. } => make_normal_layers(job, decoded, &mut outcome, &mut failures),
     };
     match made {
-        Some(Ok(image)) => outcome.image = Some(image),
+        Some(Ok(mut image)) => {
+            image.source_transfers = outcome
+                .texture_sources
+                .iter()
+                .filter(|source| source.components != crate::TextureComponents::Dimensions)
+                .map(|source| (source.declared_transfer, source.transfer))
+                .collect();
+            outcome.image = Some(image);
+        }
         Some(Err(reason)) => {
             if let Some((role, source)) = job.primary() {
                 failures.push(Failure {

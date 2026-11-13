@@ -53,6 +53,9 @@ pub(super) fn fields(
             origin,
         ));
     }
+    for image in images {
+        super::transfer::addresses(&mut found, image, uses)?;
+    }
     Ok(found)
 }
 
