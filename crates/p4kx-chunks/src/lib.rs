@@ -9,6 +9,7 @@
 //! the chunks is left to the model crate.
 
 mod chunk;
+mod chunk_directory;
 mod container;
 mod error;
 mod file;
@@ -16,6 +17,7 @@ mod known;
 mod types;
 
 pub use chunk::{Chunk, ChunkType};
+pub use chunk_directory::{ChunkDirectory, ChunkDirectoryError};
 pub use container::{ByteOrder, Container};
 pub use error::ChunkError;
 pub use file::{ChunkFile, ChunkTableRow};

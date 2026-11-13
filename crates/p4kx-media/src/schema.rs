@@ -49,7 +49,8 @@ pub fn builtin_record_schema() -> Result<Value, MediaError> {
     let audio = crate::audio_schema::bind_record_schema(material)?;
     let control = crate::audio_control_schema::bind_record_schema(audio)?;
     let animation = crate::animation::bind_record_schema(control)?;
-    crate::texture_provider::schema::bind_record_schema(animation)
+    let texture = crate::texture_provider::schema::bind_record_schema(animation)?;
+    crate::provider::model_source::bind_record_schema(texture)
 }
 
 /// Returns the JSON Schema of the common typed reference envelope.

@@ -10036,6 +10036,174 @@
         }
       ]
     },
+    "ModelChunkContainer": {
+      "enum": [
+        "#ivo",
+        "crch"
+      ],
+      "type": "string"
+    },
+    "ModelChunkExtent": {
+      "enum": [
+        "declared-crch-size",
+        "ivo-next-boundary-including-padding"
+      ],
+      "type": "string"
+    },
+    "ModelChunkProjection": {
+      "enum": [
+        "known-opaque",
+        "unknown-type"
+      ],
+      "type": "string"
+    },
+    "ModelChunkRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "byte_order": {
+          "$ref": "#/$defs/ByteOrder"
+        },
+        "chunk_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "extent": {
+          "$ref": "#/$defs/ModelChunkExtent"
+        },
+        "projection": {
+          "$ref": "#/$defs/ModelChunkProjection"
+        },
+        "range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "type_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type_name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "type_id",
+        "type_name",
+        "version",
+        "chunk_id",
+        "byte_order",
+        "extent",
+        "range",
+        "projection"
+      ],
+      "type": "object"
+    },
+    "ModelEntryRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "container": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelChunkContainer"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "family": {
+          "$ref": "#/$defs/ModelSourceFamily"
+        },
+        "table": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "family",
+        "container",
+        "chunk_count",
+        "table"
+      ],
+      "type": "object"
+    },
+    "ModelSourceFamily": {
+      "enum": [
+        "cgf",
+        "cga",
+        "chr",
+        "skin",
+        "cgfm",
+        "cgam",
+        "chrm",
+        "skinm"
+      ],
+      "type": "string"
+    },
+    "ModelSourcePayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ModelEntryRecord"
+            },
+            "record_type": {
+              "const": "entry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/ModelChunkRecord"
+            },
+            "record_type": {
+              "const": "chunk",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ModelSourcePayload"
+    },
     "MusicChildRecord": {
       "additionalProperties": false,
       "properties": {
@@ -35624,6 +35792,116 @@
             "enum": [
               "complete",
               "partial"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-entry"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelSourcePayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "entry"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 0,
+                "minItems": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-chunk"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelSourcePayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "chunk"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
             ]
           },
           "subresource": {

@@ -358,7 +358,7 @@
         },
         "metadata_work": {
           "default": 100000000,
-          "description": "Metadata cursor/read and cached path-index work across all providers and owning sources.",
+          "description": "Metadata cursor/read, chunk table rows and cached path-index work across owning sources.",
           "format": "uint64",
           "maximum": 18446744073709551615,
           "minimum": 1,

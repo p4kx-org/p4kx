@@ -18,7 +18,7 @@ pub struct Limits {
     pub sources: u64,
     /// Decoded retention/container bytes and actual metadata-read bytes across owning sources.
     pub source_bytes: u64,
-    /// Metadata cursor/read and cached path-index work across all providers and owning sources.
+    /// Metadata cursor/read, chunk table rows and cached path-index work across owning sources.
     #[serde(
         default = "default_metadata_work",
         skip_serializing_if = "is_default_metadata_work"

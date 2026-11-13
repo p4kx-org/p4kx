@@ -83,11 +83,11 @@ fn explicit_unavailable_kind_is_non_success_and_writes_no_root_index() -> TestRe
         .arg(&source)
         .arg("--out")
         .arg(&output)
-        .args(["--kind", "model"])
+        .args(["--kind", "animation-definition"])
         .assert()
         .code(1)
         .stderr(predicate::str::contains(
-            "media capability model is unavailable",
+            "media capability animation-definition is unavailable",
         ));
     assert!(
         !output.join("media-index.json").exists(),

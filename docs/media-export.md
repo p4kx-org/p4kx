@@ -27,7 +27,7 @@ p4kx media schema --source
 
 Repeat `--kind` for an explicit selection. The known names are `archive`, `model`, `material`,
 `texture`, `shader`, `animation`, `animation-definition`, `audio` and `audio-control`. Omission
-selects every registered provider. The built-in providers are `archive`, `shader`, `material`, `texture`,
+selects every registered provider. The built-in providers are `archive`, `shader`, `material`, `texture`, `model`,
 `animation`, `audio` and `audio-control`. An explicitly requested kind without an available provider returns a typed
 capability failure and a non-zero exit status, even when the selection is empty.
 
@@ -87,6 +87,20 @@ verifies the selected families against their original stored payload checks, and
 private replay’s Media images byte for byte with ordinary conversion from the installed source.
 Set `P4KX_TEXTURE_ORIGINAL_ROOT=1` to also compare one selection directly through the original
 root Media export. That option reads and hashes the complete installed Archive.
+
+`--kind model` inventories selected CGF, CGA, CHR and SKIN files and their geometry companion
+formats. Each `model-entry` row describes the original container and chunk table. Each
+`model-chunk` row preserves the original physical slot, chunk type, version, byte order,
+declared ID when present and range within the retained decoded Entry. The IVO range reaches the
+next physical boundary and can include padding. Unknown chunk types retain their exact words
+and payloads. The chunk rows reference the same hashed raw file as the Entry. Their ranges
+do not carry separate digests.
+
+The provider reads the original header and table from retained bytes and charges the validated
+row count to the common metadata work budget before allocating the table. A malformed table
+is diagnosed in diagnostic output with its original Entry bytes. This projection inventories
+opaque chunk sources. Its capability lists model semantics, companion resolution and converted
+geometry as separate coverage.
 
 `--kind animation` retains CAF, DBA and AIM sources with chunk and clip inventory, original
 metadata and controller words, and typed decoded frame and key chunks.

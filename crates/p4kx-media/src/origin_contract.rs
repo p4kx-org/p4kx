@@ -76,6 +76,8 @@ pub enum OriginProfile {
     AudioControl,
     /// Original CAF, DBA and AIM inventory and decoded channels.
     Animation,
+    /// Original model and geometry chunk table observations.
+    Model,
     /// Original DDS header words and their normalized topology.
     TextureHeader,
     /// Physical DDS family members and expected split relationships.

@@ -4,6 +4,11 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+#[path = "model_source.rs"]
+pub(crate) mod model_source;
+
+use model_source::ModelSourceProvider;
+
 use crate::animation::AnimationProvider;
 use crate::audio_control_provider::AudioControlProvider;
 use crate::audio_provider::AudioProvider;
@@ -172,6 +177,7 @@ impl Default for ProviderRegistry {
                 Box::new(ShaderProvider::default()),
                 Box::new(MaterialProvider::default()),
                 Box::new(TextureProvider),
+                Box::new(ModelSourceProvider),
                 Box::new(AnimationProvider),
                 Box::new(AudioProvider),
                 Box::new(AudioControlProvider),

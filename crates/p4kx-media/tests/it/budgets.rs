@@ -17,14 +17,14 @@ fn unavailable_explicit_kind_is_not_an_empty_success_even_with_no_entries() -> T
     let archive = Archive::open(path)?;
     let output = folder.path().join("media");
     let options = ExportOptions {
-        kinds: vec![MediaKind::Model],
+        kinds: vec![MediaKind::AnimationDefinition],
         ..ExportOptions::default()
     };
     assert!(
         matches!(
             p4kx_media::export(&archive, &output, &options),
             Err(MediaError::Unsupported {
-                kind: MediaKind::Model,
+                kind: MediaKind::AnimationDefinition,
                 ..
             })
         ),
