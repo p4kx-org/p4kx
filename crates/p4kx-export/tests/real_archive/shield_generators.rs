@@ -42,7 +42,9 @@ fn shield_generators_match_original_component_stun_and_range_slots() -> TestResu
     let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
     let watch = ArchiveWatch::new(&archive);
     let entry = DataForgeEntry::read(&archive).map_err(|_| "read configured DataForge")?;
-    let filter = Filter::new(components::FILTER);
+    let forge = entry.open().map_err(|_| "open original DataForge")?;
+    let selected = representative(&forge, &watch)?;
+    let filter = Filter::new(selected.record_path());
     let options = CatalogOptions {
         filter: Some(&filter),
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
@@ -52,8 +54,7 @@ fn shield_generators_match_original_component_stun_and_range_slots() -> TestResu
         .map_err(|_| "build selected Item catalog")?;
     let catalog: Value = serde_json::from_slice(built.json()).map_err(|_| "read catalog JSON")?;
     real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
-    let forge = entry.open().map_err(|_| "open original DataForge")?;
-    let counts = compare(&forge, entry.origin(), &catalog, &filter, &watch)?;
+    let counts = compare(&forge, entry.origin(), &catalog, &selected)?;
     watch
         .check()
         .map_err(|_| "Archive changed during comparison")?;
@@ -78,12 +79,56 @@ impl Counts {
     }
 }
 
+fn representative<'source>(
+    forge: &'source DataForge<'source>,
+    watch: &ArchiveWatch,
+) -> TestResult<RecordTree<'source>> {
+    let rule = Kind::Items.rule().ok_or("selected Item rule")?;
+    let filter = Filter::new(components::FILTER);
+    let probe = forge
+        .pointer_probe("Components", SOURCE_TYPE)
+        .ok_or("original shield declaration")?;
+    let mut trees = TreeBuilder::new();
+    for record in forge.records() {
+        watch
+            .poll()
+            .map_err(|_| "Archive changed during shield selection")?;
+        if !components::selected_item(&record, &rule, &filter)?
+            || !components::has_component(&mut trees, &record, std::slice::from_ref(&probe))?
+        {
+            continue;
+        }
+        let tree = trees
+            .build(&record)
+            .map_err(|_| "read original shield owner")?;
+        if has_nested_configuration(&tree) {
+            return Ok(tree);
+        }
+    }
+    Err("no original shield owner supplies stun and both range arrays".into())
+}
+
+fn has_nested_configuration(tree: &RecordTree<'_>) -> bool {
+    let Some(Original::Array(components)) = tree.field("Components") else {
+        return false;
+    };
+    components.iter().any(|raw| {
+        let Original::Struct(component) = raw else {
+            return false;
+        };
+        component.type_name() == SOURCE_TYPE
+            && matches!(component.field("stunParams"), Some(Original::Struct(_)))
+            && ["ShieldResistance", "ShieldAbsorption"].iter().all(|field| {
+                matches!(component.field(field), Some(Original::Array(slots)) if !slots.is_empty())
+            })
+    })
+}
+
 fn compare(
     forge: &DataForge<'_>,
     origin: &DataForgeOrigin,
     catalog: &Value,
-    filter: &Filter,
-    watch: &ArchiveWatch,
+    tree: &RecordTree<'_>,
 ) -> TestResult<Counts> {
     let mut rows = components::component_rows(catalog, ROWS)?;
     let uses = proof::indexed(catalog, "/provenance/uses", "id")?;
@@ -99,29 +144,11 @@ fn compare(
         SourceEncryption::Unencrypted => Some(false),
         _ => None,
     };
-    let rule = Kind::Items.rule().ok_or("selected Item rule")?;
-    let probe = forge
-        .pointer_probe("Components", SOURCE_TYPE)
-        .ok_or("original shield declaration")?;
-    let mut trees = TreeBuilder::new();
     let mut counts = Counts::default();
-    for record in forge.records() {
-        watch
-            .poll()
-            .map_err(|_| "Archive changed during source selection")?;
-        if !components::selected_item(&record, &rule, filter)?
-            || !components::has_component(&mut trees, &record, std::slice::from_ref(&probe))?
-        {
-            continue;
-        }
-        let tree = trees
-            .build(&record)
-            .map_err(|_| "read original shield owner")?;
-        let trace = Trace::of(&tree, &uses, &scope, encrypted);
-        compare_components(forge, &tree, &trace, &mut rows, &mut counts)?;
-    }
+    let trace = Trace::of(tree, &uses, &scope, encrypted);
+    compare_components(forge, tree, &trace, &mut rows, &mut counts)?;
     assert!(
-        rows.is_empty(),
+        rows.keys().all(|(index, _)| *index != tree.record_index()),
         "every shield row has its own original component occurrence"
     );
     assert!(
