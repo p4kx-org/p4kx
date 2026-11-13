@@ -198,7 +198,7 @@ impl<'a> TextureHeaderOrigins<'a> {
         Ok(())
     }
 
-    fn fields(
+    pub(super) fn fields(
         &self,
         raw: &DdsRawHeader,
         fields: &[DdsHeaderField],

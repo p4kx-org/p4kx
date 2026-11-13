@@ -80,6 +80,9 @@ pub(crate) struct MediaExportArgs {
     /// Keep raw metadata or add WAV from PCM, ADPCM, Vorbis and Opus, or Ogg from Vorbis and Opus.
     #[arg(long = "audio-format", value_enum, default_value_t = MediaAudioFormat::Raw)]
     pub(crate) audio_format: MediaAudioFormat,
+    /// Converts this zero-based DDS mip to PNG or OpenEXR, according to the source encoding.
+    #[arg(long, value_name = "MIP")]
+    pub(crate) texture_mip: Option<u32>,
     /// Exact skeleton Entry path within each selected CAF or DBA's owning Archive.
     #[arg(long = "animation-skeleton", value_name = "ENTRY")]
     pub(crate) animation_skeleton: Option<String>,

@@ -80,6 +80,8 @@ pub enum OriginProfile {
     TextureHeader,
     /// Physical DDS family members and expected split relationships.
     TextureFamily,
+    /// Emitted DDS images and their exact per-surface source spans.
+    TextureConversion,
     /// Successfully parsed material library and its actually used companions.
     MaterialLibrary,
     /// Material parser failure after actual source-content inspection.

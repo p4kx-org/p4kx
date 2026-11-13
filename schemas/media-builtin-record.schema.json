@@ -16686,6 +16686,299 @@
       ],
       "type": "string"
     },
+    "TextureConversionPayload": {
+      "oneOf": [
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TextureDdsImage"
+            },
+            "record_type": {
+              "const": "image",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/TextureDdsConversion"
+            },
+            "record_type": {
+              "const": "conversion",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "ConversionPayload"
+    },
+    "TextureDdsBranch": {
+      "enum": [
+        "color",
+        "alpha"
+      ],
+      "type": "string"
+    },
+    "TextureDdsChannelTransform": {
+      "enum": [
+        "rgba8-decode",
+        "reconstructed-bc5-normal",
+        "linear-float"
+      ],
+      "type": "string"
+    },
+    "TextureDdsConversion": {
+      "additionalProperties": false,
+      "properties": {
+        "outcome": {
+          "$ref": "#/$defs/TextureDdsConversionOutcome"
+        },
+        "requested_level": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requested_level",
+        "outcome"
+      ],
+      "type": "object"
+    },
+    "TextureDdsConversionFailure": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "invalid-header",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "unsupported-decoder",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "inconsistent-layout",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "unavailable-mip",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "decode",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "branch": {
+              "$ref": "#/$defs/TextureDdsBranch"
+            },
+            "disposition": {
+              "$ref": "#/$defs/TextureDdsConversionMember"
+            },
+            "part": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "member",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "branch",
+            "part",
+            "disposition"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TextureDdsConversionMember": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "missing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/ReferenceUnavailable"
+            },
+            "status": {
+              "const": "unproved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "key-required",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "wrong-key",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "unreadable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "TextureDdsConversionOutcome": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "images": {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            "status": {
+              "const": "written",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "images"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "failure": {
+              "$ref": "#/$defs/TextureDdsConversionFailure"
+            },
+            "status": {
+              "const": "failed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "failure"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "TextureDdsDirectory": {
       "oneOf": [
         {
@@ -16771,6 +17064,119 @@
         "member_paths"
       ],
       "type": "object"
+    },
+    "TextureDdsImage": {
+      "additionalProperties": false,
+      "properties": {
+        "alpha": {
+          "$ref": "#/$defs/TextureDdsImageAlpha"
+        },
+        "artifact": {
+          "$ref": "#/$defs/Artifact"
+        },
+        "bit_depth": {
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "channel_transform": {
+          "$ref": "#/$defs/TextureDdsChannelTransform"
+        },
+        "face": {
+          "$ref": "#/$defs/TextureImageFace"
+        },
+        "format": {
+          "$ref": "#/$defs/TextureDdsImageFormat"
+        },
+        "height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "layer": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "level": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "placement": {
+          "$ref": "#/$defs/TextureDdsImagePlacement"
+        },
+        "slice": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_depth": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_height": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "suffix": {
+          "type": "string"
+        },
+        "width": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "level",
+        "layer",
+        "face",
+        "slice",
+        "source_width",
+        "source_height",
+        "source_depth",
+        "width",
+        "height",
+        "format",
+        "bit_depth",
+        "suffix",
+        "alpha",
+        "channel_transform",
+        "artifact",
+        "placement"
+      ],
+      "type": "object"
+    },
+    "TextureDdsImageAlpha": {
+      "enum": [
+        "decoded-channels",
+        "decoded-split-channel",
+        "no-alpha-channel"
+      ],
+      "type": "string"
+    },
+    "TextureDdsImageFormat": {
+      "enum": [
+        "png",
+        "open-exr"
+      ],
+      "type": "string"
+    },
+    "TextureDdsImagePlacement": {
+      "enum": [
+        "written",
+        "kept-identical"
+      ],
+      "type": "string"
     },
     "TextureDdsMember": {
       "additionalProperties": false,
@@ -17023,6 +17429,144 @@
         }
       ],
       "title": "TextureHeaderPayload"
+    },
+    "TextureImageFace": {
+      "description": "The source face represented by one image, or the existing combined cross layout.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "A texture with no independently named face.",
+          "properties": {
+            "type": {
+              "const": "plane",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "DDS positive X.",
+          "properties": {
+            "type": {
+              "const": "positive-x",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "DDS negative X.",
+          "properties": {
+            "type": {
+              "const": "negative-x",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "DDS positive Y.",
+          "properties": {
+            "type": {
+              "const": "positive-y",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "DDS negative Y.",
+          "properties": {
+            "type": {
+              "const": "negative-y",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "DDS positive Z.",
+          "properties": {
+            "type": {
+              "const": "positive-z",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "DDS negative Z.",
+          "properties": {
+            "type": {
+              "const": "negative-z",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "A face ordinal whose orientation the normalized header does not establish.",
+          "properties": {
+            "index": {
+              "format": "uint32",
+              "maximum": 4294967295,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "indexed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "index"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One horizontal cross containing all six source faces.",
+          "properties": {
+            "type": {
+              "const": "cross",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "TextureMemberPayloadAccess": {
       "enum": [
@@ -34333,6 +34877,192 @@
               "indices": {
                 "maxItems": 0,
                 "minItems": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "texture"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "texture.dds-image"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "properties": {
+              "status": {
+                "const": "complete"
+              }
+            }
+          }
+        ],
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/TextureConversionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "image"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "const": "complete"
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "texture"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "texture.dds-conversion"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "outcome": {
+                          "properties": {
+                            "status": {
+                              "const": "written"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "complete"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "data": {
+                  "properties": {
+                    "payload": {
+                      "properties": {
+                        "outcome": {
+                          "properties": {
+                            "status": {
+                              "const": "failed"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "status": {
+                  "const": "partial"
+                }
+              }
+            }
+          }
+        ],
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/TextureConversionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "conversion"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "status": {
+            "enum": [
+              "complete",
+              "partial"
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
               }
             }
           }

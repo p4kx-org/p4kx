@@ -3,6 +3,8 @@
 
 use serde_json::{Value, json};
 
+use super::conversion_payload::ConversionPayload;
+use super::conversion_schema;
 use super::family_payload::{EXPECTED, FAMILY, FamilyPayload, MEMBER};
 use super::header::{NAMESPACE, TextureHeaderPayload};
 use crate::{MediaError, schema_merge};
@@ -10,6 +12,7 @@ use crate::{MediaError, schema_merge};
 pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
     const PAYLOAD: &str = "TextureHeaderPayload";
     const FAMILY_PAYLOAD: &str = "TextureFamilyPayload";
+    const CONVERSION_PAYLOAD: &str = "TextureConversionPayload";
     schema_merge::insert_payload(
         &mut base,
         PAYLOAD,
@@ -19,6 +22,11 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         &mut base,
         FAMILY_PAYLOAD,
         schema_merge::serialized_payload::<FamilyPayload>(),
+    )?;
+    schema_merge::insert_payload(
+        &mut base,
+        CONVERSION_PAYLOAD,
+        schema_merge::serialized_payload::<ConversionPayload>(),
     )?;
     let branches = base
         .get_mut("allOf")
@@ -50,6 +58,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         }
     }));
     family_branches(branches, FAMILY_PAYLOAD)?;
+    conversion_schema::bind(branches, CONVERSION_PAYLOAD);
     Ok(base)
 }
 

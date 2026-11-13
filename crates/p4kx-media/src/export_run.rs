@@ -42,6 +42,7 @@ pub(crate) fn build(
         options.diagnostic,
     )?;
     writer.audio_output = options.audio_output;
+    writer.texture_mip = options.texture_mip;
     writer
         .animation_skeleton
         .clone_from(&options.animation_skeleton);

@@ -385,7 +385,7 @@ pub use texture_png::{CUBE_FACE_NAMES, CubemapLayout, PngReport};
 pub use textures::{
     ObservedPreviewPng, PreviewPng, PreviewPngEvidence, PreviewTextureEvidence, Texture,
     TextureArtifacts, TextureImage, TextureImageArtifact, TextureImageFace, TextureImageFormat,
-    TextureImagePlan,
+    TextureImagePlan, codec as texture_codec,
 };
 use ui_service::{ui_jobs, ui_movie};
 

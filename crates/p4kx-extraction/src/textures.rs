@@ -12,6 +12,7 @@ pub(crate) mod preview_header;
 #[path = "texture/texture.rs"]
 mod texture;
 
+pub use p4kx_texture as codec;
 pub use texture::Texture;
 
 pub use crate::texture_artifacts::{TextureArtifacts, TextureImageArtifact};

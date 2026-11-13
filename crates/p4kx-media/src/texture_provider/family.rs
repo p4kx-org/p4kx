@@ -4,6 +4,7 @@
 use p4kx_extraction::{DdsHeader, DdsRawHeader, DecimalU64, SourceUseRole, TextureMemberCandidate};
 
 use super::family_expected::Expected;
+use super::family_inputs::{FamilyInputs, ObservedMembers};
 use super::family_origin;
 use super::family_payload::{
     Directory, FAMILY, Family, FamilyPayload, MemberFilter, MemberPaths, Relation,
@@ -28,13 +29,14 @@ pub(super) fn project(
     header: HeaderRole<'_>,
     origin: &TextureHeaderOrigins<'_>,
     plan: Option<(&DdsRawHeader, &DdsHeader, u32)>,
-) -> Result<(), MediaError> {
+) -> Result<Option<FamilyInputs>, MediaError> {
     let owner = context.origin_input(writer)?;
     let archive = context.directory.index.archive;
     let owner_lossless = archive.raw_path(context.entry.index()).is_none();
     let mut scan = Scan {
         expected: Expected::all(plan.map(|(_, header, count)| (header, count)), writer)?,
         observed: 0,
+        inputs: writer.texture_mip.map(|_| ObservedMembers::default()),
         member_paths: writer.capture_origins(),
         lossless: owner_lossless,
         owner_lossless,
@@ -73,11 +75,22 @@ pub(super) fn project(
             part.write(&owner, &layout, lookup, complete, writer)?;
         }
     }
-    Ok(())
+    Ok(scan.inputs.map(|inputs| {
+        inputs.finish(
+            inventory,
+            scan.lossless,
+            if complete {
+                inventory_origin
+            } else {
+                membership
+            },
+        )
+    }))
 }
 
 struct Scan<'a, 'archive> {
     expected: Vec<Expected>,
+    inputs: Option<ObservedMembers>,
     observed: u64,
     member_paths: OriginCapture,
     lossless: bool,
@@ -101,6 +114,9 @@ impl Scan<'_, '_> {
         let archive = self.context.directory.index.archive;
         let relation = Relation::of(candidate.relation, self.owner_lossless);
         self.lossless &= !matches!(relation, Relation::UnprovedPath);
+        if let Some(inputs) = &mut self.inputs {
+            inputs.observe(relation, candidate.entry);
+        }
         let physical = writer.origins.input(archive, candidate.entry)?;
         let paths = member::relationship(
             self.owner,

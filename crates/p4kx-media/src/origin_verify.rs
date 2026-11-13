@@ -164,7 +164,9 @@ fn record_profile(kind: MediaKind, profile: OriginProfile) -> bool {
         MediaKind::Animation => profile == OriginProfile::Animation,
         MediaKind::Texture => matches!(
             profile,
-            OriginProfile::TextureHeader | OriginProfile::TextureFamily
+            OriginProfile::TextureHeader
+                | OriginProfile::TextureFamily
+                | OriginProfile::TextureConversion
         ),
         MediaKind::Material => matches!(
             profile,

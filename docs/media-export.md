@@ -57,7 +57,19 @@ and key availability. Duplicate paths and unproved raw paths remain separate occ
 for each split number established by that header's topology. Missing or mismatched parts
 remain explicit. A matching size describes the directory declaration. `texture.dds-family`
 records directory completeness and whether all matched path spellings were lossless.
-The graph reads the owning Archive directory. Image conversion has a separate output contract.
+The graph reads the owning Archive directory.
+
+`--texture-mip <MIP>` requests zero-based mip conversion. The default exports texture metadata
+and retains selected originals. With a mip requested, `texture.dds-conversion` reports the
+outcome for the selected physical header. Each `texture.dds-image` row identifies the exact
+layer, face and slice, source and output dimensions, shared image suffix, channel treatment,
+and verified PNG or OpenEXR digest. The placement distinguishes a newly written artifact
+from an identical artifact already placed in this generation. PNG merges the selected DDS
+alpha or smoothness tail into the alpha channel when present. High-range sources use linear
+floating-point OpenEXR and retain any authored channels of the high-range mip. Per-image
+field origins record the exact original surface byte spans. Required siblings are read only
+when the immediate owning directory proves a unique lossless Entry. An excluded required
+sibling remains private while still contributing its source evidence.
 
 `--kind animation` retains CAF, DBA and AIM sources with chunk and clip inventory, original
 metadata and controller words, and typed decoded frame and key chunks.

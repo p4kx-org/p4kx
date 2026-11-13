@@ -117,6 +117,7 @@ mod media_animation_binding;
 mod media_archive_layout;
 mod media_material;
 mod media_shader;
+mod media_texture;
 mod model;
 mod model_animation;
 mod model_animation_sources;

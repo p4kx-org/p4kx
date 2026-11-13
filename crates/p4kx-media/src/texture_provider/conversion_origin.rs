@@ -1,0 +1,199 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use p4kx_extraction::{DdsHeaderField, InputScope, SourceUseRole};
+
+use super::conversion_mip::Loaded;
+use super::origin::{self, TextureHeaderOrigins};
+use crate::origin_capture::OriginSite;
+use crate::origin_contract::OriginProfile;
+use crate::origin_contributions::OriginContributions;
+use crate::origin_input::MediaOriginInput;
+use crate::origin_prepared::PreparedRecordOrigins;
+use crate::origin_resolver::BuiltinOrigins;
+use crate::{MediaError, MediaWriter};
+
+pub(super) struct ImageOrigins {
+    width: OriginContributions,
+    height: OriginContributions,
+    depth: OriginContributions,
+    pub(super) shape: OriginContributions,
+    format: OriginContributions,
+    channels: OriginContributions,
+    bytes: OriginContributions,
+}
+
+impl ImageOrigins {
+    pub(super) fn of(
+        color: &Loaded,
+        alpha: Option<&Loaded>,
+        directory: Option<&OriginContributions>,
+        index: u64,
+        writer: &MediaWriter<'_>,
+    ) -> Result<Self, MediaError> {
+        use DdsHeaderField::{ArraySize, Depth, Faces, Format, Height, MipCount, Width};
+
+        let header = color.origins();
+        let raw = &color.mip.raw_header;
+        let width = header.fields(raw, &[Width], writer)?.finish();
+        let height = header.fields(raw, &[Height], writer)?.finish();
+        let depth = header.fields(raw, &[Depth], writer)?.finish();
+        let shape = header
+            .fields(
+                raw,
+                &[Width, Height, Depth, MipCount, Faces, ArraySize],
+                writer,
+            )?
+            .finish();
+        let format = header.fields(raw, &[Format], writer)?.finish();
+        let mut channels = writer.capture_origins();
+        channels.include(&format, writer)?;
+        if let Some(directory) = directory {
+            channels.include(directory, writer)?;
+        }
+        if let Some(alpha) = alpha {
+            channels.include(
+                &alpha
+                    .origins()
+                    .fields(&alpha.mip.raw_header, &[Format], writer)?
+                    .finish(),
+                writer,
+            )?;
+        }
+        let channels = channels.finish();
+        let mut bytes = writer.capture_origins();
+        bytes.include(&channels, writer)?;
+        bytes.include(&color.pixels(index, writer)?, writer)?;
+        if let Some(alpha) = alpha {
+            bytes.include(&alpha.pixels(index, writer)?, writer)?;
+        }
+        Ok(Self {
+            width,
+            height,
+            depth,
+            shape,
+            format,
+            channels,
+            bytes: bytes.finish(),
+        })
+    }
+
+    pub(super) fn manifest(
+        &self,
+        writer: &MediaWriter<'_>,
+    ) -> Result<PreparedRecordOrigins, MediaError> {
+        let mut origins = writer.record_origins();
+        self.artifact_fields(&mut origins, "", writer)?;
+        Ok(origins)
+    }
+
+    pub(super) fn record(
+        &self,
+        input: &MediaOriginInput,
+        writer: &MediaWriter<'_>,
+    ) -> Result<PreparedRecordOrigins, MediaError> {
+        let mut origins = prepared(input)?;
+        let independent = OriginContributions::independent(&self.bytes.owner);
+        for (field, source) in [
+            ("level", &independent),
+            ("placement", &self.bytes),
+            ("layer", &self.shape),
+            ("face", &self.shape),
+            ("slice", &self.shape),
+            ("source_width", &self.width),
+            ("source_height", &self.height),
+            ("source_depth", &self.depth),
+            ("width", &self.width),
+            ("height", &self.height),
+            ("format", &self.format),
+            ("bit_depth", &self.format),
+            ("suffix", &self.shape),
+            ("alpha", &self.channels),
+            ("channel_transform", &self.format),
+        ] {
+            origin::put(
+                &mut origins,
+                &format!("/data/payload/{field}"),
+                source.clone(),
+                writer,
+            )?;
+        }
+        origin::put(
+            &mut origins,
+            "/subresource/indices",
+            self.shape.clone(),
+            writer,
+        )?;
+        self.artifact_fields(&mut origins, "/data/payload/artifact", writer)?;
+        Ok(origins)
+    }
+
+    fn artifact_fields(
+        &self,
+        origins: &mut PreparedRecordOrigins,
+        base: &str,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        let independent = OriginContributions::independent(&self.bytes.owner);
+        for (field, source) in [
+            ("path", &self.bytes),
+            ("size", &self.bytes),
+            ("digest/hex", &self.bytes),
+            ("digest/algorithm", &independent),
+            ("digest/scope", &independent),
+        ] {
+            origin::put(origins, &format!("{base}/{field}"), source.clone(), writer)?;
+        }
+        Ok(())
+    }
+}
+
+impl Loaded {
+    const fn origins(&self) -> TextureHeaderOrigins<'_> {
+        TextureHeaderOrigins::new(
+            &self.header_input,
+            self.header_index,
+            self.mip.raw_header.header_len() as u64,
+        )
+    }
+
+    fn pixels(
+        &self,
+        index: u64,
+        writer: &MediaWriter<'_>,
+    ) -> Result<OriginContributions, MediaError> {
+        let spans =
+            self.mip.payload.spans(Some(index)).ok_or_else(|| {
+                MediaError::Contract("decoded DDS image has no original span".into())
+            })?;
+        let level = self.mip.mip.level();
+        let raw = &self.mip.raw_header;
+        let mut capture = writer.capture_origins();
+        capture.include(&self.origins().split_layout(raw, writer)?, writer)?;
+        let indices = [
+            u64::from(level),
+            spans.offset,
+            spans.length,
+            spans.stride,
+            spans.count,
+        ];
+        capture.add(
+            self.payload_input.as_ref().unwrap_or(&self.header_input),
+            InputScope::Payload,
+            OriginSite::new("ddsMipPayload", &indices, "bytes"),
+            SourceUseRole::Conversion,
+            writer,
+        )?;
+        Ok(capture.finish())
+    }
+}
+
+pub(super) fn prepared(input: &MediaOriginInput) -> Result<PreparedRecordOrigins, MediaError> {
+    let mut origins = PreparedRecordOrigins::new(&input.owner);
+    origins.set_builtin(BuiltinOrigins {
+        profile: OriginProfile::TextureConversion,
+        input: input.clone(),
+        scope: InputScope::Payload,
+    })?;
+    Ok(origins)
+}

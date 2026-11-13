@@ -42,6 +42,8 @@ pub struct ExportOptions {
     pub diagnostic: bool,
     /// Additional audio artifact format.
     pub audio_output: AudioOutput,
+    /// Mip to convert to native PNG or OpenEXR; omission requests metadata only.
+    pub texture_mip: Option<u32>,
     /// Exact skeleton Entry path within each selected CAF or DBA's owning Archive.
     pub animation_skeleton: Option<String>,
 }

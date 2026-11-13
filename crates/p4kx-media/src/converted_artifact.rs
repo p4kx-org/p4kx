@@ -10,6 +10,11 @@ use crate::output_operation;
 use crate::temporary_file::TemporaryFile;
 use crate::{Artifact, ArtifactExtension, MediaError, MediaWriter};
 
+pub(crate) struct ConvertedOccurrence {
+    pub(crate) artifact: Artifact,
+    pub(crate) created: bool,
+}
+
 impl MediaWriter<'_> {
     /// Writes one unknown-length encoding through a bounded protected sink.
     /// The callback receives no path or file handle; returned evidence describes placed bytes.
@@ -22,6 +27,7 @@ impl MediaWriter<'_> {
         encode: impl FnOnce(&mut dyn Write) -> Result<(), MediaError>,
     ) -> Result<Artifact, MediaError> {
         self.encode_conversion(extension, None, encode)
+            .map(|result| result.artifact)
     }
 
     pub(crate) fn converted_artifact_with_origins(
@@ -30,6 +36,16 @@ impl MediaWriter<'_> {
         origins: &PreparedRecordOrigins,
         encode: impl FnOnce(&mut dyn Write) -> Result<(), MediaError>,
     ) -> Result<Artifact, MediaError> {
+        self.converted_occurrence_with_origins(extension, origins, encode)
+            .map(|result| result.artifact)
+    }
+
+    pub(crate) fn converted_occurrence_with_origins(
+        &mut self,
+        extension: ArtifactExtension<'_>,
+        origins: &PreparedRecordOrigins,
+        encode: impl FnOnce(&mut dyn Write) -> Result<(), MediaError>,
+    ) -> Result<ConvertedOccurrence, MediaError> {
         origins.require_writer(self)?;
         self.encode_conversion(extension, Some(origins), encode)
     }
@@ -39,7 +55,7 @@ impl MediaWriter<'_> {
         extension: ArtifactExtension<'_>,
         origins: Option<&PreparedRecordOrigins>,
         encode: impl FnOnce(&mut dyn Write) -> Result<(), MediaError>,
-    ) -> Result<Artifact, MediaError> {
+    ) -> Result<ConvertedOccurrence, MediaError> {
         self.require_output_callback()?;
         let directory = self.root.join("chunks");
         let mut temporary = artifact_placement::temporary(
@@ -66,7 +82,7 @@ impl MediaWriter<'_> {
         encoded: Encoded,
         temporary: &mut TemporaryFile<'_>,
         origins: Option<&PreparedRecordOrigins>,
-    ) -> Result<Artifact, MediaError> {
+    ) -> Result<ConvertedOccurrence, MediaError> {
         let artifact = Artifact {
             path: format!("chunks/{}.{}", encoded.digest.hex, extension.as_str()),
             size: encoded.size,
@@ -85,7 +101,7 @@ impl MediaWriter<'_> {
         }
         self.converted_output(created)?;
         self.checkpoint()?;
-        Ok(artifact)
+        Ok(ConvertedOccurrence { artifact, created })
     }
 }
 

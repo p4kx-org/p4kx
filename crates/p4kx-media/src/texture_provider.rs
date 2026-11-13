@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+mod conversion;
+mod conversion_mip;
+mod conversion_origin;
+mod conversion_payload;
+mod conversion_schema;
 mod family;
 mod family_expected;
+mod family_inputs;
 mod family_origin;
 mod family_payload;
 mod header;
@@ -22,7 +28,7 @@ impl Provider for TextureProvider {
         let mut capability = Capability::new(
             MediaKind::Texture,
             "p4kx.texture.dds",
-            "1.1.0",
+            "1.2.0",
             "Exact decoded DDS source Entries remain in the common RawReference. Header metadata retains authored words and separates reader-derived topology from codec support.",
         );
         capability.field_groups = vec![
@@ -34,9 +40,9 @@ impl Provider for TextureProvider {
                 "sibling-graph",
                 "Physical duplicate-aware DDS family members, selection and declared sizes, and the observed disposition of each expected split part.",
             ),
-            FieldGroup::new_with_unsupported_projection(
+            FieldGroup::new(
                 "texture-conversion",
-                "Metadata export does not decode surfaces or write PNG or OpenEXR artifacts.",
+                "Optional conversion emits the requested mip as PNG or OpenEXR with exact original surface spans.",
             ),
         ];
         capability

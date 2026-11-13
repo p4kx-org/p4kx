@@ -11,8 +11,8 @@ use p4kx_extraction::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::family;
 use super::origin::TextureHeaderOrigins;
+use super::{conversion, family};
 use crate::required_reader::RequiredReader;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, SourceContext, Status, Subresource};
 
@@ -93,12 +93,12 @@ pub(super) fn project(
                         &TextureHeaderPayload::Header(header),
                         &[],
                     )?;
-                return family::project(
+                return project_family(
                     context,
                     writer,
                     role,
                     &origins,
-                    expected.map(|count| (&raw, &normalized, count)),
+                    Some((&raw, &normalized, expected)),
                 );
             }
             Err(error) => (Some(raw), error.to_string()),
@@ -121,9 +121,28 @@ pub(super) fn project(
             detail,
         )],
     )?;
-    family::project(context, writer, role, &origins, None)
+    project_family(context, writer, role, &origins, None)
 }
 
+fn project_family(
+    context: &SourceContext<'_>,
+    writer: &mut MediaWriter<'_>,
+    role: HeaderRole<'_>,
+    origins: &TextureHeaderOrigins<'_>,
+    parsed: Option<(&DdsRawHeader, &DdsHeader, Option<u32>)>,
+) -> Result<(), MediaError> {
+    let plan = parsed.and_then(|(raw, header, count)| count.map(|count| (raw, header, count)));
+    let family = family::project(context, writer, role, origins, plan)?;
+    if let (Some(level), Some(family)) = (writer.texture_mip, family) {
+        conversion::Request {
+            level,
+            role,
+            family,
+        }
+        .run(context, parsed, writer)?;
+    }
+    Ok(())
+}
 impl SplitParts {
     const fn expected_count(&self) -> Option<u32> {
         match self {
