@@ -22,9 +22,8 @@ pub(super) struct Filepath<'document> {
 }
 
 struct Directive<'document> {
-    path: &'document str,
-    name_position: AtlPosition,
-    path_position: AtlPosition,
+    element: SourceElement<'document>,
+    attributes: Option<AnimationAttributes<'document>>,
 }
 
 impl<'document> Filepath<'document> {
@@ -51,7 +50,6 @@ impl<'document> Filepath<'document> {
     ) -> Result<(), Failure> {
         if element.namespace().is_some()
             || !element.name().eq_ignore_ascii_case("Animation")
-            || !declaration.qualified_name().eq_ignore_ascii_case("path")
             || !matches!(
                 declaration.kind(),
                 SourceDeclarationKind::Attribute { namespace: None }
@@ -59,17 +57,24 @@ impl<'document> Filepath<'document> {
         {
             return Ok(());
         }
-        let Some(name) = unique_animation_name(element) else {
+        if declaration.qualified_name().eq_ignore_ascii_case("name")
+            && declaration.value().eq_ignore_ascii_case("#filepath")
+        {
+            self.directive = Some(Directive {
+                element,
+                attributes: AnimationAttributes::read(element),
+            });
+            return Ok(());
+        }
+        if !declaration.qualified_name().eq_ignore_ascii_case("path") {
+            return Ok(());
+        }
+        let Some(attributes) = AnimationAttributes::read(element) else {
             return Ok(());
         };
         let path = declaration.value();
-        if name.value().eq_ignore_ascii_case("#filepath") {
-            self.directive = Some(Directive {
-                path,
-                name_position: declaration_position(name.position())?,
-                path_position: position,
-            });
-        } else if is_concrete_caf(name.value(), path) {
+        let name = &attributes.name;
+        if is_concrete_caf(name.value(), path) {
             let link = Link {
                 name: name.value(),
                 name_position: declaration_position(name.position())?,
@@ -83,25 +88,81 @@ impl<'document> Filepath<'document> {
     }
 }
 
-fn unique_animation_name(element: SourceElement<'_>) -> Option<SourceAttribute<'_>> {
-    let mut name = None;
-    let mut seen_path = false;
-    for attribute in element
-        .attributes()
-        .filter(|attribute| attribute.namespace().is_none())
-    {
-        if attribute.name().eq_ignore_ascii_case("name") {
-            if name.replace(attribute).is_some() {
+struct AnimationAttributes<'document> {
+    name: SourceAttribute<'document>,
+    path: SourceAttribute<'document>,
+}
+
+impl<'document> AnimationAttributes<'document> {
+    fn read(element: SourceElement<'document>) -> Option<Self> {
+        let mut name = None;
+        let mut path = None;
+        for attribute in element
+            .attributes()
+            .filter(|attribute| attribute.namespace().is_none())
+        {
+            let slot = if attribute.name().eq_ignore_ascii_case("name") {
+                &mut name
+            } else if attribute.name().eq_ignore_ascii_case("path") {
+                &mut path
+            } else {
+                continue;
+            };
+            if slot.replace(attribute).is_some() {
                 return None;
             }
-        } else if attribute.name().eq_ignore_ascii_case("path") {
-            if seen_path {
-                return None;
-            }
-            seen_path = true;
         }
+        Some(Self {
+            name: name?,
+            path: path?,
+        })
     }
-    name
+}
+
+impl<'document> Directive<'document> {
+    fn path(&self) -> Option<&'document str> {
+        self.attributes
+            .as_ref()
+            .map(|attributes| attributes.path.value())
+    }
+
+    fn evidence(
+        &self,
+        projection: &DefinitionProjection<'_, '_>,
+        writer: &MediaWriter<'_>,
+    ) -> Result<Scope, Failure> {
+        let mut whole = writer.capture_origins();
+        let position = |attribute: &SourceAttribute<'_>| {
+            origins::position(
+                projection.input,
+                declaration_position(attribute.position())?,
+                SourceUseRole::Selector,
+                writer,
+            )
+            .map_err(Failure::from)
+        };
+        if let Some(attributes) = &self.attributes {
+            let path = position(&attributes.path)?;
+            whole.include(&position(&attributes.name)?, writer)?;
+            whole.include(&path, writer)?;
+            return Ok(Scope {
+                original: path,
+                selection: whole.finish(),
+            });
+        }
+        for attribute in self.element.attributes().filter(|attribute| {
+            attribute.namespace().is_none()
+                && (attribute.name().eq_ignore_ascii_case("name")
+                    || attribute.name().eq_ignore_ascii_case("path"))
+        }) {
+            whole.include(&position(&attribute)?, writer)?;
+        }
+        let selection = whole.finish();
+        Ok(Scope {
+            original: selection.clone(),
+            selection,
+        })
+    }
 }
 
 fn is_concrete_caf(name: &str, path: &str) -> bool {
@@ -168,7 +229,7 @@ impl Link<'_, '_> {
             &DefinitionPayload::NamedCaf(NamedCaf {
                 name: self.name,
                 authored_path: self.path,
-                filepath_scope: self.directive.map(|directive| directive.path),
+                filepath_scope: self.directive.and_then(Directive::path),
                 archive_path,
                 reference,
             }),
@@ -181,7 +242,7 @@ impl Link<'_, '_> {
         if is_rooted(self.path) {
             return links::archive_animation_path(self.path);
         }
-        let directory = self.directive?.path.trim_end_matches(['/', '\\']);
+        let directory = self.directive?.path()?.trim_end_matches(['/', '\\']);
         if directory.is_empty() {
             return None;
         }
@@ -206,31 +267,18 @@ impl Scope {
         projection: &DefinitionProjection<'_, '_>,
         writer: &MediaWriter<'_>,
     ) -> Result<Self, Failure> {
-        let mut scope = writer.capture_origins();
-        let mut original = writer.capture_origins();
-        if let Some(directive) = link.directive {
-            let path = origins::position(
-                projection.input,
-                directive.path_position,
-                SourceUseRole::Selector,
-                writer,
-            )?;
-            original.include(&path, writer)?;
-            if !is_rooted(link.path) {
-                let name = origins::position(
-                    projection.input,
-                    directive.name_position,
-                    SourceUseRole::Selector,
-                    writer,
-                )?;
-                scope.include(&name, writer)?;
-                scope.include(&path, writer)?;
-            }
+        let empty = || writer.capture_origins().finish();
+        let Some(directive) = link.directive else {
+            return Ok(Self {
+                original: empty(),
+                selection: empty(),
+            });
+        };
+        let mut evidence = directive.evidence(projection, writer)?;
+        if is_rooted(link.path) {
+            evidence.selection = empty();
         }
-        Ok(Self {
-            original: original.finish(),
-            selection: scope.finish(),
-        })
+        Ok(evidence)
     }
 }
 

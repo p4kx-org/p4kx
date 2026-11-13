@@ -230,3 +230,142 @@ fn verify_named_caf_origins(base: &Path, relative: usize, absolute: usize) -> Te
     );
     Ok(())
 }
+
+#[test]
+fn malformed_filepath_declarations_suspend_relative_lookup_with_exact_evidence() -> TestResult {
+    let temporary = tempfile::tempdir()?;
+    let archive_path = temporary.path().join("Data.p4k");
+    let params = br##"<Params><AnimationList>
+      <Animation name="#filepath" path="Animations/Before"/>
+      <Animation name="before" path="open.caf"/>
+      <Animation Path="Animations/DuplicateA" name="#filepath" path="Animations/DuplicateB"/>
+      <Animation name="duplicate" path="open.caf"/>
+      <Animation name="rooted" path="Animations/Before/open.caf"/>
+      <Animation name="#filepath" path="Animations/Between"/>
+      <Animation name="#filepath"/>
+      <Animation name="absent" path="open.caf"/>
+      <Animation name="#filepath" path="Animations/After"/>
+      <Animation name="after" path="open.caf"/>
+      </AnimationList></Params>"##;
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/Objects/fixture.chrparams", params).encrypted())
+        .entry(TestEntry::stored(
+            "Data/Animations/Before/open.caf",
+            b"before",
+        ))
+        .entry(TestEntry::stored(
+            "Data/Animations/After/open.caf",
+            b"after",
+        ))
+        .write_to(&archive_path)?;
+    let archive = Archive::open_with(archive_path, OpenOptions::new().key(Some(test_key())))?;
+    let output = temporary.path().join("out");
+    let options = ExportOptions {
+        kinds: vec![MediaKind::AnimationDefinition],
+        ..ExportOptions::default()
+    };
+    let index = support::published(p4kx_media::export(&archive, &output, &options)?)?;
+    let rows = support::records(&output, &index, STREAM)?;
+    let links: Vec<_> = rows
+        .iter()
+        .enumerate()
+        .filter(|(_, row)| row.subresource.namespace == "animation-definition-named-caf")
+        .collect();
+    verify_malformed_scope_rows(&links);
+    verify_malformed_scope_evidence(&output.join(index.artifact_base), &links)
+}
+
+fn verify_malformed_scope_rows(links: &[(usize, &MediaRecord)]) {
+    let expected = [
+        (
+            "before",
+            Some("Data/Animations/Before/open.caf"),
+            "not-selected",
+        ),
+        ("duplicate", None, "unavailable"),
+        (
+            "rooted",
+            Some("Data/Animations/Before/open.caf"),
+            "not-selected",
+        ),
+        ("absent", None, "unavailable"),
+        (
+            "after",
+            Some("Data/Animations/After/open.caf"),
+            "not-selected",
+        ),
+    ];
+    assert_eq!(
+        links.len(),
+        expected.len(),
+        "only concrete animation paths are linked"
+    );
+    for ((_, row), (name, path, status)) in links.iter().zip(expected) {
+        let string = |field| row.data.pointer(field).and_then(Value::as_str);
+        assert_eq!(
+            string("/payload/name"),
+            Some(name),
+            "original selector order"
+        );
+        assert_eq!(
+            string("/payload/archive_path"),
+            path,
+            "normalized path for {name}"
+        );
+        assert_eq!(
+            string("/payload/reference/resolution/status"),
+            Some(status),
+            "lookup state for {name}"
+        );
+        if path.is_none() {
+            assert_eq!(
+                row.data.pointer("/payload/filepath_scope"),
+                Some(&Value::Null),
+                "no usable scope for {name}"
+            );
+        }
+    }
+}
+
+fn verify_malformed_scope_evidence(base: &Path, links: &[(usize, &MediaRecord)]) -> TestResult {
+    let [_, (duplicate, _), (rooted, _), (absent, _), _] = links else {
+        return Err("expected bounded fixture rows".into());
+    };
+    let duplicate = duplicate.to_string();
+    let rooted = rooted.to_string();
+    let absent = absent.to_string();
+    let file = fs::read_to_string(base.join("field-origins.jsonl"))?;
+    let mut checked = 0;
+    for row in file.lines().map(serde_json::from_str::<Value>) {
+        let row = row?;
+        if row.pointer("/scope/stream/kind").and_then(Value::as_str) != Some("animation-definition")
+            || row.get("field").and_then(Value::as_str) != Some("/data/payload/archive_path")
+        {
+            continue;
+        }
+        let expected = match row.pointer("/scope/ordinal").and_then(Value::as_str) {
+            Some(value) if value == duplicate => 4,
+            Some(value) if value == rooted => 1,
+            Some(value) if value == absent => 2,
+            _ => continue,
+        };
+        assert_eq!(
+            row.get("sourceUsesRefs")
+                .and_then(Value::as_array)
+                .map(Vec::len),
+            Some(expected),
+            "only read relevant current source attributes contribute"
+        );
+        assert_eq!(
+            row.get("containsEncryptedSource").and_then(Value::as_bool),
+            Some(true),
+            "malformed directive evidence remains encrypted"
+        );
+        checked += 1;
+    }
+    assert_eq!(
+        checked, 3,
+        "both malformed directives and rooted lookup proved"
+    );
+    Ok(())
+}

@@ -563,7 +563,9 @@ Within a character parameter `AnimationList`, `named-caf` link rows keep each
 concrete animation declaration at the original path attribute's coordinates,
 including repetitions. For relative paths the latest preceding `#filepath`
 in the same list supplies the directory. An empty directive resets that
-scope. Explicit `Animations/` or `Data/` paths address the Archive root.
+scope. A directive with an absent or ambiguous name or path suspends relative
+lookup until a usable directive follows and retains its original XML evidence.
+Explicit `Animations/` or `Data/` paths address the Archive root.
 The row keeps the original name, path and directory text, separately from the
 normalized lookup path and candidate identities. The origin of a relative
 lookup includes the active directive and its directory attribute. Wildcard
