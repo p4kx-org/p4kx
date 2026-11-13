@@ -2,70 +2,32 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::error::Error;
-use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
-use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForge, DataForgeEntry, RecordTree, SourceEncryption, StructValue,
-    TreeBuilder, Value as Original,
-};
-use p4kx_testkit::{real_archive_key, real_archive_path};
+use p4kx_extraction::{DataForge, RecordTree, StructValue, Value as Original};
 use serde_json::Value;
+
+use crate::real_archive_auto_spawns::{original::Locations, provenance::Origins};
+
+#[path = "item_alignment_sample.rs"]
+mod sample;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const AXIS_ENUM: &str = "EItemPortAttachRotationLimitAxis";
+const PORTS: &str = "/configurations/itemPorts/rows";
+const ITEMS: &str = "/configurations/itemAttachmentConstraints/rows";
+const CONTAINER: &str = "SItemPortContainerComponentParams";
+const ATTACHABLE: &str = "SAttachableComponentParams";
 
-#[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn item_port_alignment_matches_original_physical_declarations() -> TestResult {
-    let path = real_archive_path().map_err(|_| "configured Archive path")?;
-    let key = real_archive_key().map_err(|_| "configured Archive key")?;
-    let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
-    let watch = ArchiveWatch::new(&archive);
-    let entry = DataForgeEntry::read(&archive).map_err(|_| "read original DataForge")?;
-    let options = CatalogOptions {
-        publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..CatalogOptions::new(SystemTime::now())
-    };
-    let built =
-        build_catalog_from(&archive, &entry, &options).map_err(|_| "build alignment catalog")?;
-    let catalog: Value = serde_json::from_slice(built.json()).map_err(|_| "decode catalog")?;
-    crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
-    let forge = entry.open().map_err(|_| "open original DataForge")?;
-    let encryption = match entry.origin().encryption() {
-        SourceEncryption::Encrypted => Some(true),
-        SourceEncryption::Unencrypted => Some(false),
-        _ => None,
-    };
-    let ports = rows(&catalog, "/configurations/itemPorts/rows")?;
-    let items = rows(&catalog, "/configurations/itemAttachmentConstraints/rows")?;
-    let mut trees = TreeBuilder::new();
-    let port_count = check_ports(&forge, &mut trees, ports, encryption)?;
-    check_items(&forge, &mut trees, items, encryption)?;
-    watch
-        .check()
-        .map_err(|_| "Archive changed during alignment trace")?;
-    if port_count == 0 || items.is_empty() {
-        return Err("Archive must contain both alignment definition families".into());
-    }
-    crate::real_archive_verification::print_line(&format!(
-        "item-port alignment: {port_count} physical ports and {} item definitions verified",
-        items.len()
-    ));
-    Ok(())
-}
-
-fn check_ports<'source>(
-    forge: &'source DataForge<'source>,
-    trees: &mut TreeBuilder<'source>,
-    ports: &[Value],
-    encryption: Option<bool>,
+fn check_ports(
+    forge: &DataForge<'_>,
+    tree: &RecordTree<'_>,
+    catalog: &Value,
+    origins: &Origins<'_>,
 ) -> TestResult<usize> {
+    let locations = Locations::read(tree.root());
     let mut port_count = 0;
-    for row in ports {
-        let tree = original_tree(forge, trees, row)?;
-        let source = component(&tree, row, "SItemPortContainerComponentParams")?;
+    for (source, row) in component_rows(tree, catalog, PORTS, CONTAINER)? {
         let Some(Original::Array(original)) = source.field("Ports") else {
             return Err("original port array".into());
         };
@@ -83,12 +45,16 @@ fn check_ports<'source>(
                 return Err("physical port identity differs".into());
             }
             check_axis(
-                forge,
                 source,
                 slot,
                 "/value",
                 "attachAxesToAlign",
-                encryption,
+                &AxisProof {
+                    forge,
+                    origins,
+                    locations: &locations,
+                    owner: tree.record_index(),
+                },
             )?;
             port_count += 1;
         }
@@ -96,15 +62,20 @@ fn check_ports<'source>(
     Ok(port_count)
 }
 
-fn check_items<'source>(
-    forge: &'source DataForge<'source>,
-    trees: &mut TreeBuilder<'source>,
-    items: &[Value],
-    encryption: Option<bool>,
+fn check_items(
+    forge: &DataForge<'_>,
+    tree: &RecordTree<'_>,
+    catalog: &Value,
+    origins: &Origins<'_>,
 ) -> TestResult {
-    for row in items {
-        let tree = original_tree(forge, trees, row)?;
-        let component = component(&tree, row, "SAttachableComponentParams")?;
+    let locations = Locations::read(tree.root());
+    let proof = AxisProof {
+        forge,
+        origins,
+        locations: &locations,
+        owner: tree.record_index(),
+    };
+    for (component, row) in component_rows(tree, catalog, ITEMS, ATTACHABLE)? {
         let Some(Original::Struct(source)) = component.field("AttachDef") else {
             return Err("original attachable definition".into());
         };
@@ -112,12 +83,14 @@ fn check_items<'source>(
             return Err("original attached item type".into());
         }
         for field in ["attachAxesToAlign", "ignoredAttachAxis"] {
-            check_axis(forge, source, row, "/definition/value", field, encryption)?;
+            check_axis(source, row, "/definition/value", field, &proof)?;
         }
         let cell = at(row, "/definition/value/attachCheckCenterOfMass")?;
         match source.field("attachCheckCenterOfMass") {
-            Some(Original::Bool(expected)) if boolean(cell, "/value")? == *expected => {
-                check_present(cell, encryption)?;
+            Some(raw @ Original::Bool(expected))
+                if at(cell, "/value")?.as_bool() == Some(*expected) =>
+            {
+                origins.occurrence(cell, tree.record_index(), locations.ordinal(raw)?, "$value")?;
             }
             None if at(cell, "/state")? == "absent" => {}
             _ => return Err("stored center-of-mass declaration differs".into()),
@@ -126,42 +99,68 @@ fn check_items<'source>(
     Ok(())
 }
 
-fn original_tree<'source>(
-    forge: &'source DataForge<'source>,
-    trees: &mut TreeBuilder<'source>,
-    row: &Value,
-) -> TestResult<RecordTree<'source>> {
-    let index = u32::try_from(position(row, "/ownerRecordIndex/value")?)?;
-    let record = forge.record(index).ok_or("physical owner Record")?;
-    trees
-        .build(&record)
-        .map_err(|_| "read physical owner Record".into())
-}
-
-fn component<'read, 'source>(
+fn component_rows<'read, 'source>(
     tree: &'read RecordTree<'source>,
-    row: &Value,
-    expected_type: &str,
-) -> TestResult<&'read StructValue<'source>> {
-    let index = position(row, "/componentOrdinal/value")?;
-    let Some(Original::Array(components)) = tree.field("Components") else {
-        return Err("owner Components array".into());
-    };
-    match components.get(index) {
-        Some(Original::Struct(component)) if component.type_name() == expected_type => {
-            Ok(component)
+    catalog: &'read Value,
+    path: &str,
+    kind: &str,
+) -> TestResult<Vec<(&'read StructValue<'source>, &'read Value)>> {
+    let mut rows = crate::real_archive_item_components::component_rows(catalog, path)?;
+    let owner = tree.record_index();
+    let guid = tree.guid().to_string();
+    let mut matched = Vec::new();
+    for (slot, component) in original_components(tree).filter(|(_, slot)| slot.type_name() == kind)
+    {
+        let row = rows
+            .remove(&(owner, slot))
+            .ok_or("missing original alignment component")?;
+        if at(row, "/ownerGuid/value")?.as_str() != Some(guid.as_str()) {
+            return Err("alignment component source identity differs".into());
         }
-        _ => Err("original physical component differs".into()),
+        matched.push((component, row));
     }
+    if rows.keys().any(|(index, _)| *index == owner) {
+        return Err("export has an extra alignment component for the original owner".into());
+    }
+    Ok(matched)
 }
 
-fn check_axis(
-    forge: &DataForge<'_>,
-    source: &StructValue<'_>,
+fn original_components<'read, 'source>(
+    tree: &'read RecordTree<'source>,
+) -> impl Iterator<Item = (usize, &'read StructValue<'source>)> {
+    structures(tree.root(), "Components")
+}
+
+fn structures<'read, 'source>(
+    source: &'read StructValue<'source>,
+    name: &str,
+) -> impl Iterator<Item = (usize, &'read StructValue<'source>)> {
+    let array: &[_] = match source.field(name) {
+        Some(Original::Array(values)) => values,
+        _ => &[],
+    };
+    array
+        .iter()
+        .enumerate()
+        .filter_map(|(slot, raw)| match raw {
+            Original::Struct(value) => Some((slot, value)),
+            _ => None,
+        })
+}
+
+struct AxisProof<'read, 'catalog, 'source> {
+    forge: &'read DataForge<'source>,
+    origins: &'read Origins<'catalog>,
+    locations: &'read Locations<'source>,
+    owner: u32,
+}
+
+fn check_axis<'source>(
+    source: &StructValue<'source>,
     row: &Value,
     parent: &str,
     field: &str,
-    encryption: Option<bool>,
+    proof: &AxisProof<'_, '_, 'source>,
 ) -> TestResult {
     let axis = at(row, &format!("{parent}/{field}"))?;
     let label = at(axis, "/label")?;
@@ -182,8 +181,12 @@ fn check_axis(
     if at(label, "/value")?.as_str() != Some(*value) {
         return Err("original axis label differs".into());
     }
-    check_present(label, encryption)?;
-    let declaration = forge
+    let ordinal = proof.locations.ordinal(original.value())?;
+    proof
+        .origins
+        .occurrence(label, proof.owner, ordinal, "$value")?;
+    let declaration = proof
+        .forge
         .enums()
         .nth(usize::from(original.storage().target()))
         .ok_or("original axis declaration")?;
@@ -202,24 +205,15 @@ fn check_axis(
     if at(status, "/value")?.as_str() != Some(expected) {
         return Err("axis option membership differs".into());
     }
-    check_present(status, encryption)
-}
-
-fn check_present(cell: &Value, encryption: Option<bool>) -> TestResult {
-    if at(cell, "/state")? != "present"
-        || at(cell, "/sourceSetComplete")? != true
-        || at(cell, "/containsEncryptedSource")?.as_bool() != encryption
-        || rows(cell, "/sourceUsesRefs")?.is_empty()
-    {
-        return Err("alignment source marker or reference set differs".into());
-    }
-    Ok(())
+    proof
+        .origins
+        .occurrence(status, proof.owner, ordinal, "$value")
 }
 
 fn at<'a>(value: &'a Value, path: &str) -> TestResult<&'a Value> {
     value
         .pointer(path)
-        .ok_or_else(|| "required alignment catalog field".into())
+        .ok_or_else(|| format!("required alignment catalog field {path}").into())
 }
 
 fn rows<'a>(value: &'a Value, path: &str) -> TestResult<&'a [Value]> {
@@ -234,10 +228,4 @@ fn position(value: &Value, path: &str) -> TestResult<usize> {
         .as_u64()
         .ok_or("alignment physical ordinal")?;
     Ok(usize::try_from(number)?)
-}
-
-fn boolean(value: &Value, path: &str) -> TestResult<bool> {
-    at(value, path)?
-        .as_bool()
-        .ok_or_else(|| "alignment Bool".into())
 }
