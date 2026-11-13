@@ -36,21 +36,21 @@ fn model_with(mtl: Option<Vec<u8>>) -> Result<Model, Box<dyn Error>> {
     )?)
 }
 
-fn export(mtl: Option<Vec<u8>>) -> Result<(CheckedGlb, GlbSummary), Box<dyn Error>> {
+pub(super) fn export(mtl: Option<Vec<u8>>) -> Result<(CheckedGlb, GlbSummary), Box<dyn Error>> {
     let mut bytes = Vec::new();
     let options = GlbOptions::default().with_materials(MaterialMode::Colours);
     let summary = write_glb(&model_with(mtl)?, &options, &mut bytes)?;
     Ok((check_glb(&bytes)?, summary))
 }
 
-fn matte(name: &str) -> TestMtlMaterial {
+pub(super) fn matte(name: &str) -> TestMtlMaterial {
     TestMtlMaterial::new(name)
         .diffuse([0.2, 0.4, 0.6])
         .specular([0.04; 3])
         .shininess(204.0)
 }
 
-fn material_of(glb: &CheckedGlb, name: &str) -> Result<usize, Box<dyn Error>> {
+pub(super) fn material_of(glb: &CheckedGlb, name: &str) -> Result<usize, Box<dyn Error>> {
     glb.document
         .materials()
         .find(|material| material.name() == Some(name))
@@ -58,7 +58,7 @@ fn material_of(glb: &CheckedGlb, name: &str) -> Result<usize, Box<dyn Error>> {
         .ok_or_else(|| format!("no material {name}").into())
 }
 
-fn close(actual: &[f32], expected: &[f32]) -> bool {
+pub(super) fn close(actual: &[f32], expected: &[f32]) -> bool {
     actual.len() == expected.len()
         && actual
             .iter()
@@ -256,95 +256,6 @@ fn alpha_test_masks_decals_and_glass_blend_and_two_sided_flags_carry_over() -> T
     assert!(
         glass.pbr_metallic_roughness().base_color_factor()[3] < 1.0,
         "and is see-through"
-    );
-    Ok(())
-}
-
-#[test]
-fn emissive_is_scaled_by_glow_and_kept_in_range() -> TestResult {
-    let lit = matte("lit").emissive([0.5, 0.25, 0.0]).glow(1.0);
-    let bright = matte("bright").emissive([1.0, 0.5, 0.0]).glow(4.0);
-    let file = TestMtl::multi(&[matte("unused"), lit, bright]).cryxml();
-
-    let (glb, _) = export(Some(file))?;
-    let extension = "KHR_materials_emissive_strength";
-    let root = glb.document.as_json();
-    assert_eq!(
-        root.extensions_used,
-        [extension],
-        "declare the extension once"
-    );
-    assert!(
-        root.extensions_required.is_empty(),
-        "core fallback remains usable"
-    );
-    assert_eq!(emissive_strength(&glb, "lit")?, None);
-    assert_eq!(emissive_strength(&glb, "bright")?, Some(4.0));
-
-    let lit = glb
-        .document
-        .materials()
-        .nth(material_of(&glb, "lit")?)
-        .ok_or("lit")?;
-    assert!(
-        close(&lit.emissive_factor(), &[0.5, 0.25, 0.0]),
-        "emissive times glow"
-    );
-    let bright = glb
-        .document
-        .materials()
-        .nth(material_of(&glb, "bright")?)
-        .ok_or("bright")?;
-    assert!(
-        close(&bright.emissive_factor(), &[1.0, 0.5, 0.0]),
-        "above 1 it is normalised: {:?}",
-        bright.emissive_factor()
-    );
-    Ok(())
-}
-
-fn emissive_strength(glb: &CheckedGlb, name: &str) -> Result<Option<f32>, Box<dyn Error>> {
-    Ok(glb
-        .document
-        .as_json()
-        .materials
-        .get(material_of(glb, name)?)
-        .and_then(|material| material.extensions.as_ref())
-        .and_then(|extensions| extensions.emissive_strength.as_ref())
-        .map(|strength| strength.emissive_strength.0))
-}
-
-#[test]
-fn emissive_magnitude_remains_distinct_and_ignores_nonfinite_input() -> TestResult {
-    let (glb, _) = export(Some(
-        TestMtl::multi(&[
-            matte("unused"),
-            matte("stronger").emissive([1.0, 0.5, 0.0]).glow(8.0),
-            matte("invalid")
-                .emissive([f32::NAN, f32::INFINITY, -1.0])
-                .glow(4.0),
-        ])
-        .cryxml(),
-    ))?;
-    assert_eq!(emissive_strength(&glb, "stronger")?, Some(8.0));
-    assert_eq!(emissive_strength(&glb, "invalid")?, None);
-    let (glb, _) = export(Some(
-        TestMtl::multi(&[
-            matte("unused"),
-            matte("dark").emissive([1.0; 3]),
-            matte("x"),
-        ])
-        .cryxml(),
-    ))?;
-    assert_eq!(glb.document.as_json().extensions_used, [] as [String; 0]);
-    let dark = glb
-        .document
-        .materials()
-        .nth(material_of(&glb, "dark")?)
-        .ok_or("dark")?;
-    assert!(
-        close(&dark.emissive_factor(), &[0.0; 3]),
-        "no glow, no emission"
     );
     Ok(())
 }

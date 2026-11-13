@@ -9,6 +9,7 @@ mod cube_glb;
 mod layer_limits;
 mod layer_textures;
 mod lods_attributes;
+mod material_emission;
 mod materials;
 mod morphs;
 mod relief_decals;
