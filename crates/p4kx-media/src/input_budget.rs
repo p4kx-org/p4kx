@@ -31,6 +31,10 @@ impl InputBudget {
         limits.source_bytes.saturating_sub(self.bytes.get())
     }
 
+    pub(crate) const fn remaining_metadata_work(&self, limits: Limits) -> u64 {
+        limits.metadata_work.saturating_sub(self.work.get())
+    }
+
     pub(crate) fn metadata(
         &self,
         bytes: u64,

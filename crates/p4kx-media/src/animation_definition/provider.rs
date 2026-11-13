@@ -33,6 +33,10 @@ impl Provider for AnimationDefinitionProvider {
                 "file-links",
                 "Observed animation database and graph file references.",
             ),
+            FieldGroup::new(
+                "event-timelines",
+                "Ordered authored timelines, event attributes and exact CAF references.",
+            ),
         ];
         capability
     }

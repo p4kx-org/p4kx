@@ -3,7 +3,9 @@
 
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::chunks::{ByteOrder as ChunkByteOrder, Chunk, ChunkFile, Container};
-use p4kx_extraction::model::{AnimationMetadata, AnimationSource, AnimationTiming};
+use p4kx_extraction::model::{
+    AnimationMetadata, AnimationSource, AnimationTiming, DbaAnimationName,
+};
 
 use super::binding_projection::ClipBinding;
 use super::origin::{self as proof, AnimationOrigins};
@@ -91,32 +93,10 @@ pub(crate) fn clip(
 ) -> Result<(), MediaError> {
     writer.checkpoint()?;
     let mut prepared = origins.prepared()?;
-    clip_metadata(file, &clip, origins, &mut prepared, writer)?;
-    let timing = clip.metadata().timing();
-    let name = clip.database_name();
-    let mut issues = Vec::new();
-    let timing = match timing {
-        Ok(timing) => Some(timing_value(timing, &clip, origins, &mut prepared, writer)?),
-        Err(error) => {
-            let start = clip.metadata().range().start;
-            let evidence = origins.payload(
-                start + 4..start + 6,
-                "frameRate",
-                SourceUseRole::Selector,
-                writer,
-            )?;
-            put(&mut prepared, "timing", evidence.clone(), writer)?;
-            proof::at(&mut prepared, "/issues", evidence, writer)?;
-            issues.push(MediaIssue::new(
-                "animation.timing",
-                "clip.timing",
-                Severity::Warning,
-                error.to_string(),
-            ));
-            None
-        }
-    };
+    controller_block(file, &clip, origins, &mut prepared, writer)?;
     let metadata = clip.metadata();
+    let name = clip.database_name();
+    let (timing, issues) = clip_metadata(file, metadata, name, origins, &mut prepared, writer)?;
     let status = if issues.is_empty() {
         Status::Complete
     } else {
@@ -134,10 +114,7 @@ pub(crate) fn clip(
             controller_block_range: wire::entry_range(clip.controller_block_range()),
             flags: metadata.flags(),
             timing,
-            database_name: name.map(|name| DatabaseName {
-                utf8: std::str::from_utf8(name.bytes()).ok(),
-                range: wire::entry_range(name.range()),
-            }),
+            database_name: name.map(database_name),
         }),
         &issues,
     )?;
@@ -164,29 +141,53 @@ fn controllers(
     Ok(())
 }
 
-fn clip_metadata(
+pub(super) fn database_name(name: DbaAnimationName<'_>) -> DatabaseName<'_> {
+    DatabaseName {
+        utf8: std::str::from_utf8(name.bytes()).ok(),
+        range: wire::entry_range(name.range()),
+    }
+}
+
+fn controller_block(
     file: &ParsedFile,
     clip: &AnimationSource<'_>,
     origins: &AnimationOrigins<'_>,
     prepared: &mut PreparedRecordOrigins,
     writer: &MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let metadata = clip.metadata();
-    let header = metadata.range();
-    let metadata_row = file
-        .table_row(metadata.chunk_index())
-        .ok_or_else(missing_row)?;
     let data_row = file
         .table_row(clip.data_chunk_index())
         .ok_or_else(missing_row)?;
-    metadata_bytes(metadata, origins, prepared, writer)?;
     put(
         prepared,
         "controller_block_range/basis",
         origins.independent(),
         writer,
     )?;
-    if clip.database_name().is_some() {
+    for (field, range) in [
+        ("data_chunk_version", data_row.version),
+        ("controller_block_range", clip.controller_block_range()),
+    ] {
+        let evidence = origins.payload(range, field, SourceUseRole::Payload, writer)?;
+        put(prepared, field, evidence, writer)?;
+    }
+    Ok(())
+}
+
+pub(super) fn clip_metadata(
+    file: &ParsedFile,
+    metadata: AnimationMetadata<'_>,
+    name: Option<DbaAnimationName<'_>>,
+    origins: &AnimationOrigins<'_>,
+    prepared: &mut PreparedRecordOrigins,
+    writer: &MediaWriter<'_>,
+) -> Result<(Option<Timing>, Vec<MediaIssue>), MediaError> {
+    let header = metadata.range();
+    let metadata_row = file
+        .table_row(metadata.chunk_index())
+        .ok_or_else(missing_row)?;
+    metadata_bytes(metadata, origins, prepared, writer)?;
+    if name.is_some() {
         put(
             prepared,
             "database_name/range/basis",
@@ -194,23 +195,49 @@ fn clip_metadata(
             writer,
         )?;
     }
-    let block = clip.controller_block_range();
     for (field, range) in [
         ("metadata_chunk_version", metadata_row.version),
-        ("data_chunk_version", data_row.version),
         ("flags", header.start..header.start + 4),
-        ("controller_block_range", block),
     ] {
         let evidence = origins.payload(range, field, SourceUseRole::Payload, writer)?;
         put(prepared, field, evidence, writer)?;
     }
-    let name = match clip.database_name() {
+    let name = match name {
         Some(name) => {
             origins.payload(name.range(), "databaseName", SourceUseRole::Payload, writer)?
         }
         None => origins.extension(writer)?,
     };
-    put(prepared, "database_name", name, writer)
+    put(prepared, "database_name", name, writer)?;
+    match metadata.timing() {
+        Ok(timing) => Ok((
+            Some(timing_value(
+                timing,
+                header.start,
+                origins,
+                prepared,
+                writer,
+            )?),
+            Vec::new(),
+        )),
+        Err(error) => {
+            let evidence = origins.payload(
+                header.start + 4..header.start + 6,
+                "frameRate",
+                SourceUseRole::Selector,
+                writer,
+            )?;
+            put(prepared, "timing", evidence.clone(), writer)?;
+            proof::at(prepared, "/issues/0", evidence, writer)?;
+            let issue = MediaIssue::new(
+                "animation.timing",
+                "clip.timing",
+                Severity::Warning,
+                error.to_string(),
+            );
+            Ok((None, vec![issue]))
+        }
+    }
 }
 
 fn metadata_bytes(
@@ -256,12 +283,11 @@ fn metadata_bytes(
 
 fn timing_value(
     timing: AnimationTiming,
-    clip: &AnimationSource<'_>,
+    start: u64,
     origins: &AnimationOrigins<'_>,
     prepared: &mut PreparedRecordOrigins,
     writer: &MediaWriter<'_>,
 ) -> Result<Timing, MediaError> {
-    let start = clip.metadata().range().start;
     for (field, start_offset, end_offset) in [
         ("timing/additive", 0, 4),
         ("timing/frames_per_second", 4, 6),

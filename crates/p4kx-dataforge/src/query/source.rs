@@ -52,6 +52,13 @@ pub enum QuerySource {
         /// Original Record table index.
         index: u32,
     },
+    /// One selected element of an original instance array.
+    ArrayElement {
+        /// Original field header start in the decoded DCB.
+        header_start: u64,
+        /// Zero-based position inside the original array.
+        index: u32,
+    },
     /// The physical instance admitted by a pointer or array.
     Instance {
         /// Original Struct index.

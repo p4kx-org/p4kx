@@ -141,6 +141,19 @@ bone-relative declarations. They do not assert that a named bone exists, or appl
 bind pose to the collider. Each field retains its original text attribute span or CryXml node
 and attribute table coordinates, including its source encryption state.
 
+The model provider reads vehicle physics-grid declarations when the physical DataForge Entry
+is selected. It uses the Archive's preferred DataForge Entry and the authored
+`Components[VehicleComponentParams].physicsGrid.physicsProxy.path` field. The vehicle-grid
+record indices identify the original Record and the original slot in its complete Components
+array. Repeated declarations remain separate even when they use the same target.
+
+The record keeps the physical DataForge owner, original Record GUID and filename when readable,
+and each exact authored path with the owning Archive's target-resolution state. Empty paths,
+missing targets, ambiguous matches and unselected physical targets remain distinct. Paths link
+to collision facts by physical Entry identity and do not read or duplicate the target payload.
+Original DCB byte and selector coordinates carry the source encryption marker. A record can
+remain diagnostic while readable sibling declarations are retained.
+
 Measured IVO LodDistances chunks emit one `model-lod-distance-words` row per physical
 chunk. The v0x900 layout with a 48-byte inferred range carries twelve ordered original
 little-endian words. Each word has its unsigned bits and, when finite, its binary32
@@ -541,3 +554,13 @@ lookup includes the active directive and its directory attribute. Wildcard
 rules remain in the ordered source declarations. A named CAF link looks up
 physical loose CAF entries without reading their payload. It does not
 identify matches inside a tracks database or establish the clip used at runtime.
+
+Animation-event rows give each direct `animation` timeline and `event`
+its own source element identity. Event attributes have separate ordered rows
+with the authored name, value and location. Known timing, attachment and
+flag fields receive a field name. Values remain source strings, including
+empty fields, repeated attribute slots and unrecognised declarations.
+Timeline targets keep the source selector and its attribute position.
+Conventional rooted CAF paths resolve against the archive directory. Missing
+and repeated timeline names and unsupported paths have explicit states.
+The source strings carry no inferred timing units or coordinate conversions.

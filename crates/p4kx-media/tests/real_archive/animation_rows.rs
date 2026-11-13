@@ -6,8 +6,9 @@ use std::path::Path;
 
 use p4kx_extraction::chunks::ChunkFile;
 use p4kx_extraction::model::{
-    AnimationController, AnimationError, AnimationHeader, AnimationSource, CorruptAnimation,
-    DbaAnimationSources, DbaHeaders, DecodedAnimationChannel,
+    AnimationController, AnimationError, AnimationHeader, AnimationMetadata, AnimationSource,
+    CorruptAnimation, DbaAnimationName, DbaAnimationSources, DbaHeaders, DbaMetadataRecords,
+    DecodedAnimationChannel,
 };
 use p4kx_media::{MediaRecord, Source, Status};
 use serde_json::{Value, json};
@@ -22,6 +23,7 @@ pub(super) struct Totals {
     pub(super) entries: u64,
     pub(super) chunks: u64,
     pub(super) clips: u64,
+    pub(super) metadata_only_clips: u64,
     pub(super) controllers: u64,
     pub(super) declared: u64,
     pub(super) decoded: u64,
@@ -81,18 +83,49 @@ impl AnimationRows<'_> {
                 Ok(clip) => self.clip(&clip)?,
                 Err(_) => return Ok(false),
             },
-            Family::Dba => {
-                let Ok(sources) = DbaAnimationSources::read(name, file) else {
-                    return Ok(false);
-                };
-                for clip in sources {
-                    let Ok(clip) = clip else { return Ok(false) };
-                    self.clip(&clip)?;
-                }
-            }
+            Family::Dba => return self.dba(name, file),
             Family::Aim => return Err("AIM does not produce clip rows".into()),
         }
         Ok(true)
+    }
+
+    fn dba(&mut self, name: &str, file: &ChunkFile<&[u8]>) -> TestResult<bool> {
+        let mut covered = 0;
+        if let Ok(sources) = DbaAnimationSources::read(name, file) {
+            let mut complete = true;
+            for clip in sources {
+                let Ok(clip) = clip else {
+                    complete = false;
+                    break;
+                };
+                self.clip(&clip)?;
+                covered += 1;
+            }
+            if complete {
+                return Ok(true);
+            }
+        }
+        if let Ok(records) = DbaMetadataRecords::read(name, file) {
+            for record in records {
+                let Ok(record) = record else { break };
+                if record.ordinal >= covered {
+                    let row = self.next(
+                        "animation-dba-metadata",
+                        &[record.ordinal as u64],
+                        Status::Partial,
+                    )?;
+                    check_metadata(&row, record.metadata, Some(record.name))?;
+                    check(
+                        &row.data,
+                        "/payload/controller_disposition",
+                        &json!("unavailable"),
+                    )?;
+                    self.totals.clips += 1;
+                    self.totals.metadata_only_clips += 1;
+                }
+            }
+        }
+        Ok(false)
     }
 
     fn headers(
@@ -151,17 +184,7 @@ impl AnimationRows<'_> {
             Status::Partial
         };
         let row = self.next("animation-clip", &[ordinal], status)?;
-        check(
-            &row.data,
-            "/payload/metadata_bytes",
-            &json!(metadata.bytes().as_slice()),
-        )?;
-        check(&row.data, "/payload/flags", &json!(metadata.flags()))?;
-        check(
-            &row.data,
-            "/payload/metadata_chunk_version",
-            &json!(metadata.version()),
-        )?;
+        check_metadata(&row, metadata, clip.database_name())?;
         check(
             &row.data,
             "/payload/data_chunk_version",
@@ -169,29 +192,9 @@ impl AnimationRows<'_> {
         )?;
         check(
             &row.data,
-            "/payload/metadata_range",
-            &range(&metadata.range()),
-        )?;
-        check(
-            &row.data,
             "/payload/controller_block_range",
             &range(&clip.controller_block_range()),
         )?;
-        let database_name = clip.database_name().map(|name| {
-            json!({
-                "utf8": std::str::from_utf8(name.bytes()).ok(),
-                "range": range(&name.range())
-            })
-        });
-        check(&row.data, "/payload/database_name", &json!(database_name))?;
-        let expected = timing.ok().map(|timing| {
-            json!({
-                "frames_per_second": timing.frames_per_second,
-                "end_frame": timing.end_frame,
-                "additive": timing.additive
-            })
-        });
-        check(&row.data, "/payload/timing", &json!(expected))?;
         self.totals.clips += 1;
         for controller in clip.controllers()? {
             self.controller(ordinal, &controller)?;
@@ -339,6 +342,40 @@ impl AnimationRows<'_> {
         self.totals.partial += u64::from(status != Status::Complete);
         Ok(row)
     }
+}
+
+fn check_metadata(
+    row: &MediaRecord,
+    metadata: AnimationMetadata<'_>,
+    name: Option<DbaAnimationName<'_>>,
+) -> TestResult {
+    let database_name = name.map(|name| {
+        json!({
+            "utf8": std::str::from_utf8(name.bytes()).ok(),
+            "range": range(&name.range())
+        })
+    });
+    let timing = metadata.timing().ok().map(|timing| {
+        json!({
+            "frames_per_second": timing.frames_per_second,
+            "end_frame": timing.end_frame,
+            "additive": timing.additive
+        })
+    });
+    for (field, expected) in [
+        (
+            "/payload/metadata_bytes",
+            json!(metadata.bytes().as_slice()),
+        ),
+        ("/payload/flags", json!(metadata.flags())),
+        ("/payload/metadata_chunk_version", json!(metadata.version())),
+        ("/payload/metadata_range", range(&metadata.range())),
+        ("/payload/database_name", json!(database_name)),
+        ("/payload/timing", json!(timing)),
+    ] {
+        check(&row.data, field, &expected)?;
+    }
+    Ok(())
 }
 
 fn check(actual: &Value, field: &str, expected: &Value) -> TestResult {

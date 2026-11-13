@@ -8,6 +8,8 @@ mod payload;
 mod projection;
 mod provider;
 mod schema;
+mod timeline;
+mod timeline_payload;
 
 pub(crate) use provider::AnimationDefinitionProvider;
 pub(crate) use schema::bind_record_schema;

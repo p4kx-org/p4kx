@@ -22,6 +22,11 @@ impl Walk {
         let (next, end) = (steps.start, steps.end);
         let index = next.saturating_sub(1);
         let header = place.field(forge, at, HEADER_LEN);
+        let selected_header = sink
+            .source_depth()
+            .and_then(|_| header.as_ref().ok())
+            .and_then(|bytes| forge.byte_span(bytes))
+            .map(|span| span.start);
         let [count, first] = match header {
             Ok(bytes) => {
                 sink.route_bytes(forge, bytes, QueryByteUse::Array);
@@ -44,6 +49,12 @@ impl Walk {
                 return Ok(ControlFlow::Break(()));
             }
             let depth = sink.source_depth();
+            if let Some(header_start) = selected_header {
+                sink.route(QuerySource::ArrayElement {
+                    header_start,
+                    index: element,
+                });
+            }
             let reached = element_of(forge, elements, select, first.saturating_add(element), sink);
             sink.follow_decision(index);
             let flow = match reached {

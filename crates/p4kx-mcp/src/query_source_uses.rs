@@ -61,6 +61,17 @@ fn bind_source(
         QuerySource::Record { index } => {
             record_site(origins, index, "instance", SourceUseRole::Selector)
         }
+        QuerySource::ArrayElement {
+            header_start,
+            index,
+        } => site(
+            &origins.scope,
+            "dataforgeArrayElement",
+            "selection",
+            vec![header_start, u64::from(index)],
+            SourceUseRole::Selector,
+        )
+        .map_err(Into::into),
         QuerySource::Instance {
             structure,
             instance,

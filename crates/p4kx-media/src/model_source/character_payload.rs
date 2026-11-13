@@ -112,7 +112,7 @@ pub(super) enum CharacterRecord {
     Attachment(Attachment),
 }
 
-fn optional_reference(_: &mut SchemaGenerator) -> Schema {
+pub(super) fn optional_reference(_: &mut SchemaGenerator) -> Schema {
     json_schema!({"anyOf": [{"$ref": "#/$defs/Reference"}, {"type": "null"}]})
 }
 

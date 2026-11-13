@@ -148,9 +148,18 @@ impl ReferenceSelection<'_> {
         prepared: &mut PreparedRecordOrigins,
         writer: &mut MediaWriter<'_>,
     ) -> Result<Reference, MediaError> {
+        self.resolve_at(projection, "/data/payload/reference", prepared, writer)
+    }
+
+    pub(super) fn resolve_at(
+        &self,
+        projection: &DefinitionProjection<'_, '_>,
+        address: &str,
+        prepared: &mut PreparedRecordOrigins,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<Reference, MediaError> {
         let original = OriginalIdentifier::new_with_path(self.authored_path);
-        let address = FieldPath::parse("/data/payload/reference")
-            .map_err(|cause| origin_error::address(&cause))?;
+        let address = FieldPath::parse(address).map_err(|cause| origin_error::address(&cause))?;
         let Some(path) = self.archive_path else {
             prepared.insert_subtree(&address, self.selector.clone(), writer)?;
             let original_address = crate::origin_reference::child(&address, "original")?;

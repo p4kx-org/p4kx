@@ -8,12 +8,12 @@ use std::slice::Chunks;
 use rayon::prelude::*;
 
 use crate::dataforge::out_of_range;
-use crate::query::CompiledQuery;
 use crate::query::compile::Plan;
 use crate::query::shared::Recordings;
 use crate::query::source::{CellTrace, QueryCellSources};
 use crate::query::state::WalkState;
 use crate::query::walk::Place;
+use crate::query::{CompiledQuery, MAX_PATH_VALUES};
 use crate::{DataForgeError, Record, Value};
 
 /// The Records a compiled Query selects, ordered by record path and then by definition order;
@@ -128,6 +128,7 @@ pub struct Row<'f> {
     record_path: &'f str,
     cells: Result<Vec<Option<Value<'f>>>, DataForgeError>,
     unresolved: usize,
+    visited_elements: usize,
     sources: Option<Vec<QueryCellSources>>,
 }
 
@@ -161,6 +162,12 @@ impl<'f> Row<'f> {
         self.sources.as_deref()
     }
 
+    /// Returns how many array elements the selected columns admitted during this row read.
+    #[must_use]
+    pub const fn visited_elements(&self) -> usize {
+        self.visited_elements
+    }
+
     /// Returns how many distinct links the columns followed with `->` to no Record or instance:
     /// null or dangling References and null weak pointers, each counted once however many
     /// columns reach it.
@@ -178,9 +185,9 @@ struct Scratch<'f> {
 }
 
 impl Scratch<'_> {
-    const fn new() -> Self {
+    const fn new(limit: usize) -> Self {
         Self {
-            state: WalkState::new(),
+            state: WalkState::new(limit),
             recordings: Vec::new(),
         }
     }
@@ -190,16 +197,39 @@ impl<'f> CompiledQuery<'f> {
     fn rows_of(&self, records: &[u32], observe: bool) -> Vec<Row<'f>> {
         records
             .par_iter()
-            .map_init(Scratch::new, |scratch, &record| {
-                self.row(record, scratch, observe)
-            })
+            .map_init(
+                || Scratch::new(MAX_PATH_VALUES),
+                |scratch, &record| {
+                    let record_path = self.forge.path_of(record)?;
+                    self.row(record, record_path, scratch, observe)
+                },
+            )
             .flatten()
             .collect()
     }
 
-    fn row(&self, index: u32, scratch: &mut Scratch<'f>, observe: bool) -> Option<Row<'f>> {
+    /// Reads one explicitly selected physical Record with source coordinates.
+    ///
+    /// The caller supplies the row traversal budget. Missing filename metadata does not
+    /// select away an otherwise readable physical Record.
+    #[must_use]
+    pub fn physical_row_observed(&self, index: u32, path_values: usize) -> Option<Row<'f>> {
+        self.row(
+            index,
+            self.forge.path_of(index).unwrap_or_default(),
+            &mut Scratch::new(path_values),
+            true,
+        )
+    }
+
+    fn row(
+        &self,
+        index: u32,
+        record_path: &'f str,
+        scratch: &mut Scratch<'f>,
+        observe: bool,
+    ) -> Option<Row<'f>> {
         let record = self.forge.record(index)?;
-        let record_path = self.forge.path_of(index)?;
         let Scratch { state, recordings } = scratch;
         state.reset();
         let mut sources = observe.then(Vec::new);
@@ -237,6 +267,7 @@ impl<'f> CompiledQuery<'f> {
             record_path,
             cells,
             unresolved: state.unresolved(),
+            visited_elements: state.visited(),
             sources,
         })
     }

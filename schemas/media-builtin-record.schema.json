@@ -830,6 +830,12 @@
       ],
       "type": "object"
     },
+    "AnimationControllerDisposition": {
+      "enum": [
+        "unavailable"
+      ],
+      "type": "string"
+    },
     "AnimationDatabaseName": {
       "additionalProperties": false,
       "properties": {
@@ -846,6 +852,61 @@
       "required": [
         "utf8",
         "range"
+      ],
+      "type": "object"
+    },
+    "AnimationDbaMetadata": {
+      "additionalProperties": false,
+      "properties": {
+        "controller_disposition": {
+          "$ref": "#/$defs/AnimationControllerDisposition"
+        },
+        "database_name": {
+          "$ref": "#/$defs/AnimationDatabaseName"
+        },
+        "flags": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "metadata_bytes": {
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 48,
+          "minItems": 48,
+          "type": "array"
+        },
+        "metadata_chunk_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "metadata_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "timing": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnimationTiming"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "metadata_chunk_version",
+        "metadata_range",
+        "metadata_bytes",
+        "flags",
+        "timing",
+        "database_name",
+        "controller_disposition"
       ],
       "type": "object"
     },
@@ -969,6 +1030,57 @@
             "payload"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/EventTimeline"
+            },
+            "record_type": {
+              "const": "event-timeline",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/Event"
+            },
+            "record_type": {
+              "const": "event",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/EventAttribute"
+            },
+            "record_type": {
+              "const": "event-attribute",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
         }
       ],
       "title": "DefinitionPayload"
@@ -1058,6 +1170,23 @@
             },
             "record_type": {
               "const": "clip",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationDbaMetadata"
+            },
+            "record_type": {
+              "const": "dba-metadata",
               "type": "string"
             }
           },
@@ -7886,6 +8015,22 @@
         }
       ]
     },
+    "Event": {
+      "additionalProperties": false,
+      "properties": {
+        "animation_element": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        }
+      },
+      "required": [
+        "animation_element",
+        "position"
+      ],
+      "type": "object"
+    },
     "EventActionRecord": {
       "additionalProperties": false,
       "properties": {
@@ -7907,6 +8052,61 @@
         "id_range"
       ],
       "type": "object"
+    },
+    "EventAttribute": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "$ref": "#/$defs/EventField"
+        },
+        "lexeme": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "qualified_name": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "field",
+        "qualified_name",
+        "namespace",
+        "value",
+        "lexeme",
+        "position"
+      ],
+      "type": "object"
+    },
+    "EventField": {
+      "enum": [
+        "name",
+        "time",
+        "end_time",
+        "seek_time",
+        "bone",
+        "offset",
+        "direction",
+        "parameter",
+        "model",
+        "drop_in_zone",
+        "stop_on_interrupt",
+        "unknown"
+      ],
+      "type": "string"
     },
     "EventPayload": {
       "oneOf": [
@@ -8093,6 +8293,22 @@
       },
       "required": [
         "trailing_range"
+      ],
+      "type": "object"
+    },
+    "EventTimeline": {
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "target": {
+          "$ref": "#/$defs/TimelineTarget"
+        }
+      },
+      "required": [
+        "position",
+        "target"
       ],
       "type": "object"
     },
@@ -8525,6 +8741,23 @@
           "type": "object"
         }
       ]
+    },
+    "GridDatabaseState": {
+      "enum": [
+        "ready",
+        "absent-schema",
+        "unsupported-schema",
+        "invalid-database"
+      ],
+      "type": "string"
+    },
+    "GridPathDisposition": {
+      "enum": [
+        "present",
+        "null",
+        "unreadable"
+      ],
+      "type": "string"
     },
     "Header": {
       "additionalProperties": false,
@@ -10894,6 +11127,62 @@
         }
       ],
       "title": "ModelSourcePayload"
+    },
+    "ModelVehicleGridRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/GridDatabaseState"
+            },
+            "record_type": {
+              "const": "vehicle-grid-database",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/VehicleGrid"
+            },
+            "record_type": {
+              "const": "vehicle-grid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/VehicleGridRecordFailure"
+            },
+            "record_type": {
+              "const": "vehicle-grid-record-failure",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "GridRecord"
     },
     "MusicChildRecord": {
       "additionalProperties": false,
@@ -19331,6 +19620,68 @@
       ],
       "type": "string"
     },
+    "TimelineTarget": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "missing-name",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "state": {
+              "const": "ambiguous-name",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "archive_path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "authored_path": {
+              "type": "string"
+            },
+            "position": {
+              "$ref": "#/$defs/AtlPosition"
+            },
+            "reference": {
+              "$ref": "#/$defs/Reference"
+            },
+            "state": {
+              "const": "path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "authored_path",
+            "archive_path",
+            "position",
+            "reference"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "TrackAutomationCoverage": {
       "enum": [
         "complete",
@@ -20445,6 +20796,56 @@
       },
       "required": [
         "bits"
+      ],
+      "type": "object"
+    },
+    "VehicleGrid": {
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string"
+        },
+        "guid": {
+          "type": "string"
+        },
+        "path": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Reference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "record_file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/GridPathDisposition"
+        }
+      },
+      "required": [
+        "guid",
+        "record_file",
+        "field",
+        "state",
+        "path"
+      ],
+      "type": "object"
+    },
+    "VehicleGridRecordFailure": {
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "reason"
       ],
       "type": "object"
     },
@@ -36480,6 +36881,61 @@
           "subresource": {
             "properties": {
               "namespace": {
+                "const": "animation-dba-metadata"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "dba-metadata"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
                 "const": "animation-controller"
               }
             },
@@ -36999,6 +37455,171 @@
                 "properties": {
                   "record_type": {
                     "const": "named-caf"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-event-timeline"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "event-timeline"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-event"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "event"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-event-attribute"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "event-attribute"
                   }
                 },
                 "required": [
@@ -37897,6 +38518,171 @@
               "indices": {
                 "maxItems": 2,
                 "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-vehicle-grid-database"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelVehicleGridRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "vehicle-grid-database"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 0,
+                "minItems": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-vehicle-grid"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelVehicleGridRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "vehicle-grid"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-vehicle-grid-record-failure"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelVehicleGridRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "vehicle-grid-record-failure"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
               }
             }
           }

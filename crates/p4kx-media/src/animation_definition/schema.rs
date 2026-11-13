@@ -26,6 +26,9 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         (wire::BINARY_TEXT, "binary-text", 1),
         (wire::LINK, "link", 2),
         (wire::NAMED_CAF, "named-caf", 2),
+        (wire::EVENT_TIMELINE, "event-timeline", 1),
+        (wire::EVENT, "event", 1),
+        (wire::EVENT_ATTRIBUTE, "event-attribute", 2),
     ] {
         branches.push(json!({
             "if": {"properties": {

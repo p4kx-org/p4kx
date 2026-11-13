@@ -7,6 +7,7 @@ use super::character_payload;
 use super::companions::{self, CompanionRecord};
 use super::lod_distances;
 use super::payload::{self, ModelSourcePayload};
+use super::vehicle_grid_record;
 use crate::{MediaError, schema_merge};
 
 const PAYLOAD: &str = "ModelSourcePayload";
@@ -24,6 +25,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         schema_merge::serialized_payload::<CompanionRecord>(),
     )?;
     character_payload::insert_schema(&mut base)?;
+    vehicle_grid_record::insert_schema(&mut base)?;
     let branches = base
         .get_mut("allOf")
         .and_then(Value::as_array_mut)
@@ -36,6 +38,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
     ]
     .into_iter()
     .chain(character_payload::SCHEMA_ROWS)
+    .chain(vehicle_grid_record::SCHEMA_ROWS)
     {
         branches.push(json!({
             "if": {

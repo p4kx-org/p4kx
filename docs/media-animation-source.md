@@ -11,12 +11,21 @@ nested Archive traversal and atomic publication follow the [media export contrac
 | `animation-chunk` | original chunk table ordinal | Numeric type, known type name, layout version, byte order, nullable chunk ID and Entry-relative extent |
 | `animation-clip` | original clip ordinal, zero for CAF | Original 48 metadata bytes, full flag word, interpreted timing, physical ranges and DBA name |
 | `animation-controller` | clip ordinal, controller ordinal | Original ID and both 12-byte channel declarations, with independent sample outcomes |
+| `animation-dba-metadata` | original clip ordinal | Uncovered DBA metadata and name with explicitly unavailable controller data |
 
 All ranges are half-open and relative to the original retained Entry. IVO chunk extents come
 from the validated directory and may include padding. DBA controller keys can refer to a
 shared pool beyond the data chunk's computed extent. The name interval includes the original
 NUL byte. Invalid UTF-8 leaves its text view null while the raw name remains recoverable.
 Duplicate or empty controller rows retain their own physical ordinals.
+
+When the DBA controller-block cursor cannot continue, a diagnostic generation can
+still include each structurally readable metadata/name pair after the last covered
+clip. These partial rows keep the original physical ordinal and contain no inferred
+controller interval or key count. A metadata row and a clip row never count the same
+ordinal twice. Count `animation-clip` and `animation-dba-metadata` together to count
+all recorded clip declarations in a diagnostic generation. A malformed name stops
+metadata recovery at the last provable record.
 
 Each decoded channel has one `u16` little-endian chunk of original frame indices and one
 `f32` little-endian chunk of decoded values. Values are grouped by key. Quaternion components

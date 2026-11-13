@@ -16,6 +16,7 @@ use super::payload::{
     self, ModelChunkRecord, ModelEntryRecord, ModelSourceFamily, ModelSourcePayload,
 };
 use super::physics;
+use super::vehicle_grid;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::required_reader::RequiredReader;
 use crate::{
@@ -30,7 +31,7 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.4.0",
+            "1.5.0",
             "Selected original models, geometry and character definitions with positioned source declarations.",
         );
         capability.field_groups = vec![
@@ -54,6 +55,10 @@ impl Provider for ModelSourceProvider {
                 "character-definitions",
                 "Original CDF skeleton and attachment declarations, physical path references and bone-relative offsets.",
             ),
+            FieldGroup::new(
+                "vehicle-physics-grids",
+                "Original vehicle physics-grid paths from the selected DataForge Entry and exact archive targets.",
+            ),
             FieldGroup::new_with_unsupported_projection(
                 "model-semantics",
                 "Render model decoding, material dependencies and entity-frame collision transforms are outside this projection.",
@@ -70,66 +75,76 @@ impl Provider for ModelSourceProvider {
         if p4kx_extraction::model::character_definition::is_definition_path(context.entry.path()) {
             return character::emit(context, writer);
         }
+        if vehicle_grid::is_candidate(context) {
+            return vehicle_grid::emit(context, writer);
+        }
         let Some(family) = ModelSourceFamily::of(context.entry.path()) else {
             return Ok(Projection::Skipped);
         };
-        let input = context.origin_input(writer)?;
-        let origins = ModelOrigins {
-            input: &input,
-            entry: context.entry.index(),
-        };
-        let length = context.source.size;
-        let budget = &context.directory.input_state()?.budget;
-        let limits = writer.limits();
-        let checkpoint = writer.checkpoint;
-        let name = context.entry.path();
-        let mut reader =
-            RequiredReader::open(context.payload, name, length, budget, checkpoint, limits)?;
-        let parsed = ChunkDirectory::read(
-            &mut reader,
-            length,
-            |rows| {
-                budget
-                    .metadata(0, rows, limits, checkpoint)
-                    .map_err(io::Error::other)
-            },
-            || checkpoint.check().map_err(io::Error::other),
-        );
-        match parsed {
-            Ok(file) => {
-                entry(family, &file, &origins, writer)?;
-                companions::emit(context, &file, &origins, writer)?;
-                for index in 0..file.chunks().len() {
-                    writer.checkpoint()?;
-                    chunk(&file, index, &origins, writer)?;
-                    physics::emit(&file, index, &mut reader, &origins, writer)?;
-                    lod_distances::emit(&file, index, &mut reader, &origins, writer)?;
-                }
-            }
-            Err(ChunkDirectoryError::Format(ChunkError::Allocation)) => {
-                return Err(MediaError::Contract(
-                    "cannot allocate admitted model chunk directory".into(),
-                ));
-            }
-            Err(ChunkDirectoryError::Format(error)) => {
-                failed(family, length.min(16), &error, None, &origins, writer)?;
-            }
-            Err(ChunkDirectoryError::InvalidRow { source, range }) => {
-                failed(family, 16, &source, Some(range), &origins, writer)?;
-            }
-            Err(ChunkDirectoryError::Input(cause)) => {
-                return Err(error::io(Path::new(name), cause));
-            }
-            Err(_) => {
-                return Err(MediaError::Contract(
-                    "unsupported model chunk directory failure".into(),
-                ));
-            }
-        }
-        Ok(Projection::Written)
+        chunk_source(family, context, writer)
     }
 }
 
+fn chunk_source(
+    family: ModelSourceFamily,
+    context: &SourceContext<'_>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<Projection, MediaError> {
+    let input = context.origin_input(writer)?;
+    let origins = ModelOrigins {
+        input: &input,
+        entry: context.entry.index(),
+    };
+    let length = context.source.size;
+    let budget = &context.directory.input_state()?.budget;
+    let limits = writer.limits();
+    let checkpoint = writer.checkpoint;
+    let name = context.entry.path();
+    let mut reader =
+        RequiredReader::open(context.payload, name, length, budget, checkpoint, limits)?;
+    let parsed = ChunkDirectory::read(
+        &mut reader,
+        length,
+        |rows| {
+            budget
+                .metadata(0, rows, limits, checkpoint)
+                .map_err(io::Error::other)
+        },
+        || checkpoint.check().map_err(io::Error::other),
+    );
+    match parsed {
+        Ok(file) => {
+            entry(family, &file, &origins, writer)?;
+            companions::emit(context, &file, &origins, writer)?;
+            for index in 0..file.chunks().len() {
+                writer.checkpoint()?;
+                chunk(&file, index, &origins, writer)?;
+                physics::emit(&file, index, &mut reader, &origins, writer)?;
+                lod_distances::emit(&file, index, &mut reader, &origins, writer)?;
+            }
+        }
+        Err(ChunkDirectoryError::Format(ChunkError::Allocation)) => {
+            return Err(MediaError::Contract(
+                "cannot allocate admitted model chunk directory".into(),
+            ));
+        }
+        Err(ChunkDirectoryError::Format(error)) => {
+            failed(family, length.min(16), &error, None, &origins, writer)?;
+        }
+        Err(ChunkDirectoryError::InvalidRow { source, range }) => {
+            failed(family, 16, &source, Some(range), &origins, writer)?;
+        }
+        Err(ChunkDirectoryError::Input(cause)) => {
+            return Err(error::io(Path::new(name), cause));
+        }
+        Err(_) => {
+            return Err(MediaError::Contract(
+                "unsupported model chunk directory failure".into(),
+            ));
+        }
+    }
+    Ok(Projection::Written)
+}
 fn entry(
     family: ModelSourceFamily,
     file: &ChunkDirectory,

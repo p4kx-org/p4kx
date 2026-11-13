@@ -12,6 +12,7 @@ use crate::{ByteOrder, ChunkReference, OffsetBasis, SourceRange};
 pub(crate) const ENTRY: &str = "animation-entry";
 pub(crate) const CHUNK: &str = "animation-chunk";
 pub(crate) const CLIP: &str = "animation-clip";
+pub(crate) const DBA_METADATA: &str = "animation-dba-metadata";
 pub(crate) const CONTROLLER: &str = "animation-controller";
 pub(crate) const SKELETON: &str = "animation-skeleton";
 pub(crate) const BINDING: &str = "animation-controller-binding";
@@ -60,6 +61,7 @@ pub(crate) enum AnimationPayload<'a> {
     Entry(Entry),
     Chunk(AnimationChunk),
     Clip(Clip<'a>),
+    DbaMetadata(DbaMetadata<'a>),
     Controller(Controller),
     Skeleton(Skeleton<'a>),
     ControllerBinding(Binding),
@@ -98,6 +100,27 @@ pub(crate) struct Clip<'a> {
     pub(crate) flags: u32,
     pub(crate) timing: Option<Timing>,
     pub(crate) database_name: Option<DatabaseName<'a>>,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "AnimationDbaMetadata")]
+pub(crate) struct DbaMetadata<'a> {
+    pub(crate) metadata_chunk_version: u32,
+    pub(crate) metadata_range: SourceRange,
+    #[schemars(length(min = 48, max = 48))]
+    pub(crate) metadata_bytes: &'a [u8],
+    pub(crate) flags: u32,
+    pub(crate) timing: Option<Timing>,
+    pub(crate) database_name: DatabaseName<'a>,
+    pub(crate) controller_disposition: ControllerDisposition,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+#[schemars(rename = "AnimationControllerDisposition")]
+pub(crate) enum ControllerDisposition {
+    Unavailable,
 }
 
 #[derive(Serialize, JsonSchema)]

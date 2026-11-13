@@ -30,3 +30,12 @@ mod character_origin;
 mod character_payload;
 #[path = "model_source/character_reference.rs"]
 mod character_reference;
+
+#[path = "model_source/path_reference.rs"]
+mod path_reference;
+#[path = "model_source/vehicle_grid.rs"]
+mod vehicle_grid;
+#[path = "model_source/vehicle_grid_origins.rs"]
+mod vehicle_grid_origins;
+#[path = "model_source/vehicle_grid_record.rs"]
+mod vehicle_grid_record;

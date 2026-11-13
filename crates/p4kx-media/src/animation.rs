@@ -4,6 +4,7 @@
 mod binding_payload;
 mod binding_projection;
 mod controller_projection;
+mod dba_projection;
 mod origin;
 mod payload;
 mod projection;

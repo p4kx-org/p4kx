@@ -33,17 +33,14 @@ pub(super) fn emit(
     let parsed = CharacterDefinition::read(&bytes);
     write_definition(&parsed, bytes.len(), &origins, writer)?;
     if let Ok(source) = parsed {
-        let references = CharacterReferences {
-            context,
-            origins: &origins,
-        };
+        let references = CharacterReferences { context };
         for (index, model) in source.models() {
             writer.checkpoint()?;
-            write_skeleton(index, model, &references, writer)?;
+            write_skeleton(index, model, &origins, &references, writer)?;
         }
         for (indices, attachment) in source.attachments() {
             writer.checkpoint()?;
-            write_attachment(indices, attachment, &references, writer)?;
+            write_attachment(indices, attachment, &origins, &references, writer)?;
         }
     }
     Ok(Projection::Written)
@@ -103,10 +100,11 @@ fn write_definition(
 fn write_skeleton(
     ordinal: usize,
     element: SourceElement<'_>,
+    origins: &ModelOrigins<'_>,
     references: &CharacterReferences<'_, '_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let model = CharacterElement::new(element, references.origins);
+    let model = CharacterElement::new(element, origins);
     let mut prepared = model.prepare(writer)?;
     let file = references.field(&model, "File", "/data/payload/file", &mut prepared, writer)?;
     prepared.write(
@@ -121,10 +119,11 @@ fn write_skeleton(
 fn write_attachment(
     indices: [usize; 2],
     element: SourceElement<'_>,
+    origins: &ModelOrigins<'_>,
     references: &CharacterReferences<'_, '_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let attachment = CharacterElement::new(element, references.origins);
+    let attachment = CharacterElement::new(element, origins);
     let mut prepared = attachment.prepare(writer)?;
     let mut original = |name, pointer| attachment.field(name, pointer, &mut prepared, writer);
     let name = original("AName", "/data/payload/name")?;

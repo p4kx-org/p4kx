@@ -12,6 +12,7 @@ use p4kx_extraction::{DecimalU64, SourceUseRole};
 use super::links;
 use super::named_clip::Filepath;
 use super::payload::{self as wire, DefinitionFamily, DefinitionPayload};
+use super::timeline::{TimelineIdentity, TimelineNode};
 use crate::audio_control_payload::{
     AtlBinaryText, AtlContent, AtlDeclaration, AtlElement, AtlLocation, AtlPosition,
 };
@@ -48,6 +49,7 @@ struct Frame<'document> {
     parent: Option<u64>,
     parent_name: Option<&'document str>,
     filepath: Option<Filepath<'document>>,
+    timeline: TimelineNode,
     siblings: SourceContents<'document>,
     next_sibling: u64,
 }
@@ -63,6 +65,7 @@ impl DefinitionProjection<'_, '_> {
             parent: None,
             parent_name: None,
             filepath: None,
+            timeline: TimelineNode::Other,
             siblings: source.content(),
             next_sibling: 0,
         }];
@@ -117,6 +120,13 @@ impl DefinitionProjection<'_, '_> {
     ) -> Result<Frame<'document>, Failure> {
         let syntax = element.syntax()?;
         let position = element_position(&element.position())?;
+        let timeline = TimelineNode::at(
+            parent.timeline,
+            self.family,
+            element,
+            parent.parent,
+            TimelineIdentity { index, position },
+        );
         self.write(
             position,
             wire::ELEMENT,
@@ -130,15 +140,13 @@ impl DefinitionProjection<'_, '_> {
             writer,
         )?;
         let budget = &self.context.directory.input_state()?.budget;
+        timeline.write(self, element, index, position, writer)?;
         for (ordinal, declaration) in syntax.declarations().enumerate() {
             budget.metadata(0, 1, writer.limits(), writer.checkpoint)?;
-            self.declaration(
-                element,
-                parent,
-                &declaration?,
-                [index, ordinal as u64],
-                writer,
-            )?;
+            let declaration = declaration?;
+            let indices = [index, ordinal as u64];
+            let position = self.declaration(element, parent, &declaration, indices, writer)?;
+            timeline.write_attribute(self, &declaration, indices, position, writer)?;
         }
         if let Some(text) = syntax.binary_text() {
             let position = content_position(text.position())?;
@@ -157,6 +165,7 @@ impl DefinitionProjection<'_, '_> {
             parent: Some(index),
             parent_name: element.namespace().is_none().then(|| element.name()),
             filepath: Filepath::for_list(self.family, element, parent.parent_name),
+            timeline,
             siblings: syntax.content()?,
             next_sibling: 0,
         })
@@ -169,7 +178,7 @@ impl DefinitionProjection<'_, '_> {
         declaration: &SourceDeclaration<'document>,
         indices: [u64; 2],
         writer: &mut MediaWriter<'_>,
-    ) -> Result<(), Failure> {
+    ) -> Result<AtlPosition, Failure> {
         let position = declaration_position(declaration.position())?;
         self.write(
             position,
@@ -190,10 +199,10 @@ impl DefinitionProjection<'_, '_> {
         if let Some(filepath) = &mut parent.filepath {
             filepath.observe(self, element, declaration, position, indices, writer)?;
         }
-        Ok(())
+        Ok(position)
     }
 
-    fn write(
+    pub(super) fn write(
         &self,
         position: AtlPosition,
         namespace: &str,

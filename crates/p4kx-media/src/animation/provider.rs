@@ -5,7 +5,7 @@ use std::error::Error;
 
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::chunks::ChunkFile;
-use p4kx_extraction::model::{AnimationError, AnimationSource, DbaAnimationSources};
+use p4kx_extraction::model::{AnimationError, AnimationSource};
 
 use super::origin::{self as proof, AnimationOrigins};
 use super::payload::{self as wire, AnimationPayload, Entry, EntryLayout, Family};
@@ -22,7 +22,7 @@ impl Provider for AnimationProvider {
         let mut capability = Capability::new(
             MediaKind::Animation,
             "p4kx.animation.source",
-            "1.1.0",
+            "1.2.0",
             "Exact CAF, DBA and AIM Entry bytes with authored chunk, clip and controller positions. Decoded samples are separate typed chunks.",
         );
         capability.field_groups = vec![
@@ -33,6 +33,10 @@ impl Provider for AnimationProvider {
             FieldGroup::new(
                 "caf-and-dba-clips",
                 "Metadata records, complete flags, original DBA name positions, controller encoding words, frames and decoded keys in authored order.",
+            ),
+            FieldGroup::new(
+                "recoverable-dba-metadata",
+                "Physical DBA records and names that do not have a readable controller block.",
             ),
             FieldGroup::new_with_unsupported_projection(
                 "aim-pose-semantics",
@@ -105,18 +109,7 @@ fn clips(
             Ok(clip) => super::projection::clip(file, clip, origins, skeleton, writer)?,
             Err(error) => return Ok(Some(error)),
         },
-        Family::Dba => {
-            let clips = match DbaAnimationSources::read(name, file) {
-                Ok(clips) => clips,
-                Err(error) => return Ok(Some(error)),
-            };
-            for result in clips {
-                match result {
-                    Ok(clip) => super::projection::clip(file, clip, origins, skeleton, writer)?,
-                    Err(error) => return Ok(Some(error)),
-                }
-            }
-        }
+        Family::Dba => return super::dba_projection::clips(name, file, origins, skeleton, writer),
     }
     Ok(None)
 }

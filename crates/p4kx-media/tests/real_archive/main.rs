@@ -11,6 +11,7 @@ use p4kx_media::{Algorithm, ByteScope, ExportOptions, ExportOutcome, Index, Medi
 use sha2::Sha256;
 
 mod animation_accounting;
+mod animation_event_accounting;
 mod animation_samples;
 mod audio_accounting;
 mod layout_footer;

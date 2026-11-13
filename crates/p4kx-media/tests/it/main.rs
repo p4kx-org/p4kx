@@ -3,7 +3,9 @@
 
 //! Synthetic media contract, source preservation and provider integration tests.
 
+mod animation_dba_metadata;
 mod animation_definition_provider;
+mod animation_event_timeline;
 mod animation_named_caf_provider;
 mod animation_provider;
 mod archive;
@@ -98,6 +100,7 @@ mod model_companion_provider;
 mod model_lod_distance_provider;
 mod model_physics_provider;
 mod model_source_provider;
+mod model_vehicle_grid_provider;
 mod non_finite;
 mod owned_outputs;
 mod process_lock;

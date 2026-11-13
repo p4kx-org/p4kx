@@ -5,6 +5,7 @@ use p4kx_extraction::DecimalU64;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::timeline_payload::{Event, EventAttribute, EventTimeline};
 use crate::Reference;
 use crate::audio_control_payload::{
     AtlBinaryText, AtlContent, AtlDeclaration, AtlElement, AtlFormat,
@@ -17,6 +18,9 @@ pub(super) const CONTENT: &str = "animation-definition-content";
 pub(super) const BINARY_TEXT: &str = "animation-definition-binary-text";
 pub(super) const LINK: &str = "animation-definition-link";
 pub(super) const NAMED_CAF: &str = "animation-definition-named-caf";
+pub(super) const EVENT_TIMELINE: &str = "animation-definition-event-timeline";
+pub(super) const EVENT: &str = "animation-definition-event";
+pub(super) const EVENT_ATTRIBUTE: &str = "animation-definition-event-attribute";
 
 #[derive(Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -62,6 +66,9 @@ pub(super) enum DefinitionPayload<'source> {
     BinaryText(AtlBinaryText<'source>),
     Link(DefinitionLink<'source>),
     NamedCaf(NamedCaf<'source>),
+    EventTimeline(EventTimeline<'source>),
+    Event(Event),
+    EventAttribute(EventAttribute<'source>),
 }
 
 #[derive(Serialize, JsonSchema)]

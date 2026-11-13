@@ -270,11 +270,12 @@ impl Lines {
 )]
 fn report(family: Family, totals: &Totals) {
     eprintln!(
-        "animation {} entries={} chunks={} clips={} controllers={} declared_keys={} decoded_keys={} partial_rows={} header_budget_refusals={}",
+        "animation {} entries={} chunks={} clips={} metadata_only={} controllers={} declared_keys={} decoded_keys={} partial_rows={} header_budget_refusals={}",
         family.suffix(),
         totals.entries,
         totals.chunks,
         totals.clips,
+        totals.metadata_only_clips,
         totals.controllers,
         totals.declared,
         totals.decoded,
@@ -338,7 +339,9 @@ fn animation_accounting_checks_every_selected_entry_including_nested_duplicates(
 
 #[test]
 fn animation_accounting_distinguishes_diagnostic_rows_and_usable_channels() -> TestResult {
-    use p4kx_testkit::{ArchiveBuilder, TestAnimation, TestDba, TestEntry, TestTrack};
+    use p4kx_testkit::{
+        ArchiveBuilder, TestAnimation, TestChunkFile, TestDba, TestEntry, TestTrack,
+    };
 
     let temporary = tempfile::tempdir()?;
     let path = temporary.path().join("Data.p4k");
@@ -352,9 +355,20 @@ fn animation_accounting_distinguishes_diagnostic_rows_and_usable_channels() -> T
         .animation(damaged)
         .animation(TestAnimation::new("later.caf", 30))
         .bytes();
+    let file = p4kx_extraction::chunks::ChunkFile::parse(dba.as_slice())?;
+    let kind = p4kx_extraction::chunks::ivo::DBA_METADATA;
+    let (index, metadata) = file.chunks_of(kind).next().ok_or("DBA metadata chunk")?;
+    let metadata_only = TestChunkFile::ivo()
+        .chunk(
+            kind.id(),
+            metadata.version(),
+            file.chunk_data(index).ok_or("DBA metadata bytes")?,
+        )
+        .bytes();
     ArchiveBuilder::new()
         .entry(TestEntry::stored("unreadable.caf", b"unreadable container"))
         .entry(TestEntry::stored("damage.dba", dba))
+        .entry(TestEntry::stored("metadata-only.dba", metadata_only))
         .write_to(&path)?;
     let archive = Archive::open(path)?;
     let invalid = verify_family(&archive, Family::Caf)?;
@@ -372,12 +386,13 @@ fn animation_accounting_distinguishes_diagnostic_rows_and_usable_channels() -> T
         (
             partial.entries,
             partial.clips,
+            partial.metadata_only_clips,
             partial.declared,
             partial.decoded,
             partial.partial
         ),
-        (1, 2, 3, 2, 2),
-        "both clips and the usable translation are verified"
+        (2, 4, 2, 3, 2, 5),
+        "complete clip, recovered metadata and usable translation inventories are verified"
     );
     Ok(())
 }
