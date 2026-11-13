@@ -6,6 +6,7 @@
 mod material_reference;
 mod material_reference_identity;
 mod material_source_metadata;
+mod package_alpha_association;
 mod package_bone_attachment;
 mod package_character;
 mod package_creature;

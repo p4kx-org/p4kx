@@ -275,6 +275,56 @@
         }
       ]
     },
+    "DdsAlphaCoverage": {
+      "additionalProperties": false,
+      "description": "Exact alpha-value counts for one selected BC1, BC2 or BC3 image.",
+      "properties": {
+        "full": {
+          "description": "In-bounds texels whose decoded alpha is full scale.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "partial": {
+          "description": "In-bounds texels whose decoded alpha is greater than zero and below full scale.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "zero": {
+          "description": "In-bounds texels whose decoded alpha is zero.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "zero",
+        "partial",
+        "full"
+      ],
+      "type": "object"
+    },
+    "DdsAlphaTransform": {
+      "description": "Alpha-associated colour processing for an output image.",
+      "oneOf": [
+        {
+          "const": "preserve",
+          "description": "Retain the decoded colour and alpha samples.",
+          "type": "string"
+        },
+        {
+          "const": "unassociate_linear",
+          "description": "Divide linear-light colour by alpha and retain the established transfer.",
+          "type": "string"
+        },
+        {
+          "const": "unassociate_stored",
+          "description": "Divide the stored sample values by alpha when the source transfer is unknown.",
+          "type": "string"
+        }
+      ]
+    },
     "DdsBlockLayoutInfo": {
       "description": "Encoded byte layout known to the current reader, independent of codec availability.",
       "properties": {
@@ -758,6 +808,17 @@
       "additionalProperties": false,
       "description": "A normalized one-surface DDS asset and its original selected mip evidence.",
       "properties": {
+        "alpha_coverage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsAlphaCoverage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Measured alpha samples of the original selected BC1, BC2 or BC3 image."
+        },
         "artifact": {
           "$ref": "#/$defs/OriginArtifactDigest",
           "description": "Byte length and SHA-256 of the DDS file, including its normalized header."
@@ -847,6 +908,16 @@
         {
           "const": "signed_bc5",
           "description": "Blender does not decode the signed BC5 format.",
+          "type": "string"
+        },
+        {
+          "const": "premultiplied_alpha",
+          "description": "The consumer would interpret associated RGB as straight opacity.",
+          "type": "string"
+        },
+        {
+          "const": "reserved_alpha_mode",
+          "description": "The header has undefined alpha-mode bits.",
           "type": "string"
         },
         {
@@ -4401,6 +4472,17 @@
       "additionalProperties": false,
       "description": "Same-read DDS source metadata and provenance for one written texture.",
       "properties": {
+        "alpha_transform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsAlphaTransform"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "RGB unassociation applied for straight opacity output."
+        },
         "channel_transform": {
           "anyOf": [
             {

@@ -126,6 +126,21 @@ impl<'a> Texture<'a> {
         self.decode_preview_selected(level, None)
     }
 
+    pub(crate) fn decode_model_mip_observed(
+        &self,
+        level: u32,
+    ) -> Result<(ObservedPreviewImage<'a>, Option<Vec<u8>>), ConversionError> {
+        let (image, inputs, opacity) = self.decode_mip_and_opacity(level, true)?;
+        Ok((
+            ObservedPreviewImage {
+                level,
+                image,
+                inputs,
+            },
+            opacity,
+        ))
+    }
+
     pub(crate) fn decode_mip_observed(
         &self,
         level: u32,

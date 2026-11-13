@@ -9,7 +9,7 @@ use p4kx_extraction::{
 use crate::PackageResult;
 use crate::texture_source_metadata::metadata_error;
 use p4kx_extraction::texture_preview;
-use p4kx_texture::DdsPngEncoding;
+use p4kx_texture::{DdsAlphaTransform, DdsPngEncoding};
 
 pub(super) fn capture(
     dds: &DdsSourceInfo,
@@ -43,6 +43,7 @@ pub(super) fn capture(
 pub(super) fn image_origin(
     evidence: &PreviewPngEvidence,
     encoding: DdsPngEncoding,
+    alpha_transform: DdsAlphaTransform,
     uses: &SourceUses,
 ) -> PackageResult<FieldOrigin> {
     let mut contributors = Vec::new();
@@ -56,6 +57,9 @@ pub(super) fn image_origin(
             .output_transfer_uses(encoding)
             .map_err(metadata_error)?,
     );
+    if alpha_transform != DdsAlphaTransform::Preserve {
+        contributors.extend(alpha_uses(evidence)?);
+    }
     Ok(uses.origin(&contributors, evidence.is_complete()))
 }
 
@@ -78,6 +82,40 @@ pub(super) fn output_fields(
     let complete = evidence.color.is_complete();
     insert(fields, "/output_transfer", uses.origin(&transfer, complete))?;
     insert(fields, "/png_transform", uses.origin(&transform, complete))
+}
+
+pub(super) fn alpha_transform(
+    fields: &mut FieldOrigins,
+    evidence: &PreviewPngEvidence,
+    uses: &SourceUses,
+) -> PackageResult<()> {
+    let mut contributors = alpha_uses(evidence)?;
+    contributors.extend(
+        evidence
+            .color
+            .header()
+            .header_uses(
+                &[DdsHeaderField::DxgiTransfer, DdsHeaderField::CryTransfer],
+                SourceUseRole::Conversion,
+            )
+            .map_err(metadata_error)?,
+    );
+    insert(
+        fields,
+        "/alpha_transform",
+        uses.origin(&contributors, evidence.color.is_complete()),
+    )
+}
+
+fn alpha_uses(evidence: &PreviewPngEvidence) -> PackageResult<Vec<p4kx_extraction::SourceUse>> {
+    evidence
+        .color
+        .header()
+        .header_uses(
+            &[DdsHeaderField::Prefix, DdsHeaderField::AlphaAssociation],
+            SourceUseRole::Conversion,
+        )
+        .map_err(metadata_error)
 }
 
 pub(super) fn insert(

@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_gltf::TextureFile;
-use p4kx_texture::{DdsPngEncoding, DdsPngTransform, DdsTransfer};
+use p4kx_texture::{
+    DdsAlphaAssociation, DdsAlphaTransform, DdsPngEncoding, DdsPngTransform, DdsTransfer,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -85,6 +87,37 @@ impl TextureMode {
         } else {
             TextureChannelTransform::Preserve
         }
+    }
+
+    pub(crate) const fn uses_colour_samples(self) -> bool {
+        matches!(self, Self::Colour | Self::Specular)
+    }
+
+    pub(crate) const fn opacity_transform(
+        self,
+        association: DdsAlphaAssociation,
+        transfer: DdsTransfer,
+    ) -> DdsAlphaTransform {
+        if self.uses_colour_samples() {
+            DdsAlphaTransform::for_opacity(association, transfer)
+        } else {
+            DdsAlphaTransform::Preserve
+        }
+    }
+
+    pub(crate) const fn uses_alpha(
+        self,
+        has_alpha: bool,
+        association: DdsAlphaAssociation,
+        split_alpha: bool,
+    ) -> bool {
+        has_alpha
+            && (split_alpha
+                || !self.uses_colour_samples()
+                || !matches!(
+                    association,
+                    DdsAlphaAssociation::Opaque | DdsAlphaAssociation::Custom
+                ))
     }
 
     pub(crate) const fn legacy_space(self) -> ColourSpace {

@@ -19,7 +19,7 @@ from p4kx_importer.package import load_package  # noqa: E402
 
 def verify(location: Path) -> None:
     package = load_package(location)
-    assert package.version == (1, 14)
+    assert package.version >= (1, 14)
     cache = ImageCache(package)
     dds = next(texture for texture in package.textures.values() if texture.format == "dds")
     image = cache.get(dds.id)

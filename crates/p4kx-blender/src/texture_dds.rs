@@ -3,10 +3,12 @@
 
 use p4kx_extraction::texture_preview::{ModelDdsRefusal, ObservedModelDds};
 use p4kx_extraction::{
-    Checksum, DdsSourceInfo, FieldOrigins, OriginArtifactDigest, SourceInventory, SourceUseRole,
-    SourceUses,
+    Checksum, DdsSourceInfo, FieldOrigins, OriginArtifactDigest, PreviewPngEvidence,
+    SourceInventory, SourceUseRole, SourceUses,
 };
-use p4kx_texture::{DxgiFormat, LocatedMip, TextureError, TextureFormat};
+use p4kx_texture::{
+    DdsAlphaAssociation, DdsAlphaCoverage, DxgiFormat, LocatedMip, TextureError, TextureFormat,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -48,6 +50,10 @@ pub enum DdsTextureFallback {
     UnsupportedFormat,
     /// Blender does not decode the signed BC5 format.
     SignedBc5,
+    /// The consumer would interpret associated RGB as straight opacity.
+    PremultipliedAlpha,
+    /// The header has undefined alpha-mode bits.
+    ReservedAlphaMode,
     /// The material role requires a flipped normal Y channel.
     NormalCoordinateTransform,
     /// An input could not be read, parsed or verified completely.
@@ -65,6 +71,8 @@ impl DdsTextureFallback {
             Self::UnsupportedTopology => "dds_unsupported_topology",
             Self::UnsupportedFormat => "dds_unsupported_format",
             Self::SignedBc5 => "dds_signed_bc5",
+            Self::PremultipliedAlpha => "dds_premultiplied_alpha",
+            Self::ReservedAlphaMode => "dds_reserved_alpha_mode",
             Self::NormalCoordinateTransform => "dds_normal_coordinate_transform",
             Self::InvalidInput => "dds_invalid_input",
         }
@@ -129,6 +137,9 @@ pub struct DdsTextureAsset {
     pub dds: DdsSourceInfo,
     /// Original zero-based mip copied into this two-dimensional asset.
     pub mip_level: u32,
+    /// Measured alpha samples of the original selected BC1, BC2 or BC3 image.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alpha_coverage: Option<DdsAlphaCoverage>,
     /// Original archive checksum of the header Entry.
     pub header_checksum: DdsTextureSourceChecksum,
     /// Original archive checksum of the split mip Entry when separate.
@@ -146,6 +157,7 @@ impl DdsTextureAsset {
     pub(crate) fn bind(
         observed: ObservedModelDds<'_>,
         artifact: OriginArtifactDigest,
+        alpha_coverage: Option<DdsAlphaCoverage>,
     ) -> PackageResult<Self> {
         let uses = SourceUses::with_compact_use_refs();
         let evidence = observed.evidence(&uses).map_err(metadata_error)?;
@@ -153,6 +165,7 @@ impl DdsTextureAsset {
             observed.checksum_uses(&uses).map_err(metadata_error)?;
         let mut fields =
             texture_field_origins::capture(&observed.metadata, &evidence, false, &uses)?;
+        coverage_origins(&mut fields, &evidence, &uses, alpha_coverage)?;
         let mut artifact_uses = Vec::new();
         evidence
             .append_pixel_uses(&mut artifact_uses)
@@ -192,6 +205,7 @@ impl DdsTextureAsset {
         Ok(Self {
             artifact,
             mip_level: observed.read.mip.level(),
+            alpha_coverage,
             header_checksum: DdsTextureSourceChecksum::of(observed.header_checksum)?,
             part_checksum: observed
                 .part_checksum
@@ -204,6 +218,30 @@ impl DdsTextureAsset {
     }
 }
 
+fn coverage_origins(
+    fields: &mut FieldOrigins,
+    evidence: &PreviewPngEvidence,
+    uses: &SourceUses,
+    coverage: Option<DdsAlphaCoverage>,
+) -> PackageResult<()> {
+    if coverage.is_some() {
+        let mut contributors = Vec::new();
+        evidence
+            .append_pixel_uses(&mut contributors)
+            .map_err(metadata_error)?;
+        let origin = uses.origin(&contributors, evidence.is_complete());
+        for path in [
+            "/alpha_coverage",
+            "/alpha_coverage/zero",
+            "/alpha_coverage/partial",
+            "/alpha_coverage/full",
+        ] {
+            texture_field_origins::insert(fields, path, origin.clone())?;
+        }
+    }
+    Ok(())
+}
+
 pub(crate) fn unsupported(read: &LocatedMip, mode: TextureMode) -> Option<DdsTextureFallback> {
     use DdsTextureFallback::{NormalCoordinateTransform, SignedBc5, UnsupportedFormat};
 
@@ -211,6 +249,13 @@ pub(crate) fn unsupported(read: &LocatedMip, mode: TextureMode) -> Option<DdsTex
     let TextureFormat::Dxgi(format) = read.mip.header().format() else {
         return Some(UnsupportedFormat);
     };
+    match read.raw_header.alpha_association() {
+        DdsAlphaAssociation::Premultiplied if mode.uses_colour_samples() => {
+            return Some(DdsTextureFallback::PremultipliedAlpha);
+        }
+        DdsAlphaAssociation::Reserved => return Some(DdsTextureFallback::ReservedAlphaMode),
+        _ => {}
+    }
     if format == DxgiFormat::BC5_SNORM {
         return Some(SignedBc5);
     }
@@ -233,38 +278,18 @@ pub(crate) fn unsupported(read: &LocatedMip, mode: TextureMode) -> Option<DdsTex
     (!supported || !data_sample_compatible).then_some(UnsupportedFormat)
 }
 
-pub(crate) fn alpha_has_samples(observed: &ObservedModelDds<'_>) -> bool {
+pub(crate) fn alpha_has_samples(
+    observed: &ObservedModelDds<'_>,
+    coverage: Option<DdsAlphaCoverage>,
+) -> bool {
     let mip = &observed.read.mip;
     if matches!(
         mip.header().format(),
-        TextureFormat::Dxgi(DxgiFormat(71 | 72))
+        TextureFormat::Dxgi(DxgiFormat(70..=72))
     ) {
-        return bc1_has_transparency(mip.width() as usize, mip.height() as usize, mip.data());
+        return coverage.is_some_and(DdsAlphaCoverage::has_non_full_alpha);
     }
     observed.has_alpha
-}
-
-fn bc1_has_transparency(width: usize, height: usize, data: &[u8]) -> bool {
-    const BLOCK_EDGE: usize = 4;
-
-    let columns = width.div_ceil(BLOCK_EDGE);
-    for (index, block) in data.as_chunks::<8>().0.iter().enumerate() {
-        let [low0, high0, low1, high1, first, second, third, fourth] = *block;
-        if u16::from_le_bytes([low0, high0]) > u16::from_le_bytes([low1, high1]) {
-            continue;
-        }
-        let selectors = u32::from_le_bytes([first, second, third, fourth]);
-        let left = (index % columns) * BLOCK_EDGE;
-        let top = (index / columns) * BLOCK_EDGE;
-        for row in 0..(height - top).min(BLOCK_EDGE) {
-            for column in 0..(width - left).min(BLOCK_EDGE) {
-                if (selectors >> (2 * (row * BLOCK_EDGE + column))) & 3 == 3 {
-                    return true;
-                }
-            }
-        }
-    }
-    false
 }
 
 #[cfg(test)]
@@ -274,25 +299,8 @@ mod tests {
     use p4kx_extraction::{Archive, ArchiveTextures, PathIndex};
     use p4kx_testkit::{ArchiveBuilder, SplitDds, TestTextureFormat};
 
-    use super::{DdsTextureFallback, bc1_has_transparency, unsupported};
+    use super::{DdsTextureFallback, unsupported};
     use crate::texture_encoding::TextureMode;
-
-    #[test]
-    fn bc1_padding_does_not_create_opacity_for_a_sub_block_mip() {
-        let one_transparent = 3_u32;
-        let padded_transparent = one_transparent << 6;
-        let endpoint_bytes = [0, 0, 1, 0];
-        let first = [endpoint_bytes, one_transparent.to_le_bytes()].concat();
-        let padding = [endpoint_bytes, padded_transparent.to_le_bytes()].concat();
-        assert!(
-            bc1_has_transparency(3, 2, &first),
-            "the first pixel is transparent"
-        );
-        assert!(
-            !bc1_has_transparency(3, 2, &padding),
-            "the fourth column is padding"
-        );
-    }
 
     #[test]
     fn blender_dds_capability_distinguishes_unsigned_data_from_signed_and_normals()

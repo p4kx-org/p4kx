@@ -373,7 +373,13 @@ from edge padding. When a normal requires a Y flip, or the original uses a separ
 smoothness member, the writer uses the usual PNG conversion. Topology and unsupported encodings
 use that same fallback when a PNG can be produced. The row's `dds_fallback` records the reason.
 The direct DDS path requires unique, fully verified header and selected mip members. A failure
-to establish those inputs produces a texture issue and leaves the slot unbound. PNG fallback
+to establish those inputs produces a texture issue and leaves the slot unbound.
+DDS alpha declarations remain distinct from selected alpha samples. Premultiplied opacity
+uses a straight PNG. The exporter divides RGB by alpha in linear light when the source
+transfer is known and in stored sample values when it is unknown. A zero-alpha colour
+becomes black. For split alpha, RGB uses the original embedded alpha and the output alpha
+comes from the separate texture. Normal and packed data retain their original channel
+processing. PNG fallback
 uses the regular PNG decoder, with its normal texture selection and source receipts. The
 [DDS alpha semantics investigation](https://github.com/p4kx-org/p4kx/issues/1137) covers legacy
 premultiplied formats and alpha projection across consumers.
@@ -636,7 +642,8 @@ channel transform in same-read source metadata. Older manifests use their author
 compatibility colour-space field. Missing or conflicting declarations retain their
 role's compatibility sampling, with unknown actual transfer and an untagged PNG.
 **1.13** adds the optional authored SOC reference. **1.14** adds the optional selected-mip DDS
-asset and explicit PNG fallback reason.
+asset and explicit PNG fallback reason. **1.15** adds selected BC1, BC2 and BC3 alpha
+counts to supported DDS rows and records alpha unassociation when applied to PNG.
 
 ## Authored SOC scene
 

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::texture_preview::ObservedModelTexture;
 use p4kx_extraction::{
     DdsSourceInfo, FieldOrigins, FieldOriginsSeed, OriginReaderLimits, SourceInventory, SourceUses,
 };
 use p4kx_gltf::{LoadedTexture, TextureLoadError, TextureLoader};
-use p4kx_texture::{DdsPngTransform, DdsTransfer};
+use p4kx_texture::{DdsAlphaAssociation, DdsAlphaTransform, DdsPngTransform, DdsTransfer};
 use schemars::JsonSchema;
 use serde::de::DeserializeSeed as _;
 use serde::{Deserialize, Serialize};
@@ -33,6 +34,9 @@ pub struct TextureSourceMetadata {
     /// Additional channel handling selected by the material role.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub channel_transform: Option<TextureChannelTransform>,
+    /// RGB unassociation applied for straight opacity output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alpha_transform: Option<DdsAlphaTransform>,
     /// Source origins relative to this metadata object; /image refers to the encoded PNG.
     #[serde(deserialize_with = "read_field_origins")]
     pub field_origins: FieldOrigins,
@@ -65,10 +69,27 @@ pub(crate) fn load(
         Err(error) => return Ok(Err(error)),
     };
     context.check()?;
+    loaded_with_metadata(observed, mode).map(Ok)
+}
+
+fn loaded_with_metadata(
+    observed: ObservedModelTexture<'_>,
+    mode: TextureMode,
+) -> PackageResult<Loaded> {
     let uses = SourceUses::with_compact_use_refs();
     let evidence = observed.decoded.evidence(&uses).map_err(metadata_error)?;
     let dds = observed.metadata;
     let decoded = observed.decoded.png_encoding().map_err(metadata_error)?;
+    let association = dds
+        .alpha_association
+        .unwrap_or(DdsAlphaAssociation::Unknown);
+    let available_alpha = if mode.uses_colour_samples() {
+        observed.has_alpha
+    } else {
+        observed.has_packed_alpha
+    };
+    let has_alpha = mode.uses_alpha(available_alpha, association, evidence.alpha.is_some());
+    let alpha_transform = mode.opacity_transform(association, decoded.transfer);
     let transfer = mode.tag(decoded.transfer);
     let encoding = mode.origin_encoding(decoded);
     let mut field_origins =
@@ -76,9 +97,12 @@ pub(crate) fn load(
     texture_field_origins::insert(
         &mut field_origins,
         "/image",
-        texture_field_origins::image_origin(&evidence, encoding, &uses)?,
+        texture_field_origins::image_origin(&evidence, encoding, alpha_transform, &uses)?,
     )?;
     texture_field_origins::output_fields(&mut field_origins, &evidence, encoding, &uses)?;
+    if alpha_transform != DdsAlphaTransform::Preserve {
+        texture_field_origins::alpha_transform(&mut field_origins, &evidence, &uses)?;
+    }
     let provenance =
         serde_json::to_value(uses.freeze().map_err(metadata_error)?).map_err(metadata_error)?;
     let metadata = TextureSourceMetadata {
@@ -87,11 +111,21 @@ pub(crate) fn load(
         output_transfer: Some(transfer),
         png_transform: Some(encoding.transform),
         channel_transform: Some(mode.channel_transform()),
+        alpha_transform: (alpha_transform != DdsAlphaTransform::Preserve)
+            .then_some(alpha_transform),
         field_origins,
         provenance,
     };
-    let image = LoadedTexture::new(observed.decoded.into_image(), observed.has_alpha);
-    Ok(Ok((image, Some(Box::new(metadata)), decoded.transfer)))
+    let mut image = observed.decoded.into_image();
+    if let Some(opacity) = observed.embedded_opacity {
+        alpha_transform
+            .image_with_opacity(decoded.transfer, &mut image, &opacity)
+            .map_err(metadata_error)?;
+    } else {
+        alpha_transform.image(decoded.transfer, &mut image);
+    }
+    let image = LoadedTexture::new(image, has_alpha);
+    Ok((image, Some(Box::new(metadata)), decoded.transfer))
 }
 
 pub(super) fn metadata_error<E: std::error::Error + Send + Sync + 'static>(

@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_texture::{
-    LocatedMip, Mip, MipByteSpans, MipPayloadLocation, RgbaImage, TextureError, merge_alpha,
-    read_mip_with_location,
+    DdsAlphaAssociation, LocatedMip, Mip, MipByteSpans, MipPayloadLocation, RgbaImage,
+    TextureError, merge_alpha, read_mip_with_location,
 };
 
 use super::disk_mip;
@@ -11,6 +11,8 @@ use super::texture::Texture;
 use crate::ConversionError;
 use crate::texture_parts::Parts;
 use crate::texture_preview_png::input::{DiskSelection, PreviewInputs, TexturePreviewInput};
+
+type ObservedMip<'a> = (RgbaImage, PreviewInputs<'a, MipByteSpans>, Option<Vec<u8>>);
 
 impl<'a> Texture<'a> {
     /// Reads mip `level`, 0 being the largest, from its part or from the header.
@@ -44,6 +46,15 @@ impl<'a> Texture<'a> {
         &self,
         level: u32,
     ) -> Result<(RgbaImage, PreviewInputs<'a, MipByteSpans>), ConversionError> {
+        self.decode_mip_and_opacity(level, false)
+            .map(|(image, inputs, _)| (image, inputs))
+    }
+
+    pub(crate) fn decode_mip_and_opacity(
+        &self,
+        level: u32,
+        retain_opacity: bool,
+    ) -> Result<ObservedMip<'a>, ConversionError> {
         let several = || {
             ConversionError::of_texture(
                 self.name(),
@@ -55,9 +66,19 @@ impl<'a> Texture<'a> {
         if self.header().images(level) > 1 {
             return Err(several());
         }
-        let (mut images, inputs) = self.decode_surfaces_with_inputs(level)?;
+        let (mut images, inputs, opacity) =
+            self.decode_surfaces_observing(level, |images, association, has_tail| {
+                (retain_opacity && has_tail && association == DdsAlphaAssociation::Premultiplied)
+                    .then(|| {
+                        images
+                            .iter()
+                            .flat_map(|image| image.pixels().as_chunks::<4>().0)
+                            .map(|pixel| pixel[3])
+                            .collect()
+                    })
+            })?;
         match (images.pop(), images.is_empty()) {
-            (Some(image), true) => Ok((image, inputs.selected(None).ok_or_else(several)?)),
+            (Some(image), true) => Ok((image, inputs.selected(None).ok_or_else(several)?, opacity)),
             _ => Err(several()),
         }
     }
@@ -83,6 +104,22 @@ impl<'a> Texture<'a> {
         &self,
         level: u32,
     ) -> Result<(Vec<RgbaImage>, PreviewInputs<'a, MipPayloadLocation>), ConversionError> {
+        self.decode_surfaces_observing(level, |_, _, _| ())
+            .map(|(images, inputs, ())| (images, inputs))
+    }
+
+    fn decode_surfaces_observing<Observation>(
+        &self,
+        level: u32,
+        observe: impl FnOnce(&[RgbaImage], DdsAlphaAssociation, bool) -> Observation,
+    ) -> Result<
+        (
+            Vec<RgbaImage>,
+            PreviewInputs<'a, MipPayloadLocation>,
+            Observation,
+        ),
+        ConversionError,
+    > {
         let alpha = self.checked_alpha_tail(level)?;
         let (read, color) = if let Parts::Files(parts) = self.parts() {
             let disk = disk_mip::read(parts, self.header_size(), level, self.name())?;
@@ -103,8 +140,13 @@ impl<'a> Texture<'a> {
             (read, color)
         };
         let mut images = self.decode_mip_data(&read.mip)?;
+        let observation = observe(
+            &images,
+            read.raw_header.alpha_association(),
+            alpha.is_some(),
+        );
         let alpha = Self::merge_alpha_input(alpha, level, &mut images)?;
-        Ok((images, PreviewInputs { color, alpha }))
+        Ok((images, PreviewInputs { color, alpha }, observation))
     }
 
     /// Decodes every image of `mip`, read from this texture, to 8-bit RGBA without the alpha

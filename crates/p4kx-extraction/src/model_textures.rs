@@ -4,7 +4,7 @@
 use std::error::Error;
 
 use p4kx_gltf::{LoadedTexture, TextureLoadError, TextureLoader};
-use p4kx_texture::{DdsPngEncoding, DdsTransfer, TextureFormat};
+use p4kx_texture::{DdsPngEncoding, DdsTransfer, DxgiFormat, TextureFormat};
 
 use crate::path_index::PathIndex;
 use crate::texture_preview::ObservedPreviewImage;
@@ -53,6 +53,10 @@ pub struct ObservedModelTexture<'a> {
     pub alpha_limits_level: bool,
     /// Whether the decoded alpha channel carries data.
     pub has_alpha: bool,
+    /// Whether the selected alpha channel is available for packed shader data.
+    pub has_packed_alpha: bool,
+    /// Embedded opacity of a premultiplied colour surface before a separate alpha merge.
+    pub embedded_opacity: Option<Vec<u8>>,
     /// Original effective transfer and the encoding of the decoded RGB samples.
     pub transfer: (DdsTransfer, DdsPngEncoding),
 }
@@ -76,10 +80,21 @@ impl<'a> ArchiveTextures<'_, 'a> {
     ) -> Result<ObservedModelTexture<'a>, TextureLoadError> {
         let opened = self.open(path, mip)?;
         let texture = &opened.texture;
-        let has_alpha = texture.has_alpha_tail() || format_has_alpha(texture.header().format());
-        let decoded = texture
-            .decode_mip_observed(opened.level)
+
+        let (decoded, embedded_opacity) = texture
+            .decode_model_mip_observed(opened.level)
             .map_err(|error| TextureLoadError::Unreadable(describe(&error)))?;
+        let format = texture.header().format();
+        let bc1_uses_alpha = matches!(format, TextureFormat::Dxgi(DxgiFormat(70..=72)))
+            && decoded
+                .image()
+                .pixels()
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .any(|pixel| pixel[3] != u8::MAX);
+        let has_packed_alpha = texture.has_alpha_tail() || format_has_alpha(format);
+        let has_alpha = has_packed_alpha || bc1_uses_alpha;
         let transfer = (
             decoded.inputs.source_transfer(),
             decoded
@@ -93,6 +108,8 @@ impl<'a> ArchiveTextures<'_, 'a> {
             level: opened.level,
             alpha_limits_level: opened.alpha_limits_level,
             has_alpha,
+            has_packed_alpha,
+            embedded_opacity,
             transfer,
         })
     }
@@ -157,7 +174,7 @@ impl TextureLoader for ArchiveTextures<'_, '_> {
         let observed = self.load_observed(path, mip)?;
         let (declared, encoding) = observed.transfer;
         Ok(
-            LoadedTexture::new(observed.decoded.into_image(), observed.has_alpha)
+            LoadedTexture::new(observed.decoded.into_image(), observed.has_packed_alpha)
                 .with_dds_transfer(declared, encoding),
         )
     }

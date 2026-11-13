@@ -8,6 +8,7 @@ use crate::texture_dds::{self, SourceFallback};
 use crate::texture_encoding::TextureMode;
 use crate::texture_source_metadata;
 use p4kx_extraction::OriginDigestWriter;
+use p4kx_extraction::texture_preview::ObservedModelDds;
 use p4kx_gltf::TextureLoader;
 use p4kx_texture::{DdsTransfer, RgbaImage, TextureError, write_png_with_transfer};
 use rayon::prelude::*;
@@ -141,13 +142,31 @@ impl TextureOutput<'_, '_> {
         if let Some(reason) = texture_dds::unsupported(&observed.read, mode) {
             return Ok(Err(reason));
         }
+        self.write_dds(observed).map(Ok)
+    }
+
+    fn write_dds(&self, observed: ObservedModelDds<'_>) -> PackageResult<Outcome> {
+        let mode = self.texture.mode;
         let width = observed.read.mip.width();
         let height = observed.read.mip.height();
         let transfer = observed
             .metadata
             .transfer
             .map_or(DdsTransfer::Unknown, |source| source.effective);
-        let alpha = Self::alpha(texture_dds::alpha_has_samples(&observed), mode);
+        let coverage = observed.read.mip.alpha_coverage(0);
+        let has_alpha = if mode.uses_colour_samples() {
+            texture_dds::alpha_has_samples(&observed, coverage)
+        } else {
+            observed.has_alpha
+        };
+        let alpha = Self::alpha(
+            mode.uses_alpha(
+                has_alpha,
+                observed.read.raw_header.alpha_association(),
+                false,
+            ),
+            mode,
+        );
         let written = self.write(TextureFormat::Dds, |writer| {
             let mut measured = OriginDigestWriter::new(writer);
             observed.read.write_dds(&mut measured)?;
@@ -156,14 +175,14 @@ impl TextureOutput<'_, '_> {
         let (artifact, bytes) = match written {
             Ok(written) => written,
             Err(error) => {
-                return Ok(Ok(Self::failed(
+                return Ok(Self::failed(
                     error.to_string(),
                     Some(DdsTextureFallback::InvalidInput),
-                )));
+                ));
             }
         };
-        let dds_asset = DdsTextureAsset::bind(observed, artifact)?;
-        Ok(Ok(Outcome::Written {
+        let dds_asset = DdsTextureAsset::bind(observed, artifact, coverage)?;
+        Ok(Outcome::Written {
             width,
             height,
             bytes,
@@ -174,7 +193,7 @@ impl TextureOutput<'_, '_> {
             format: TextureFormat::Dds,
             dds_asset: Some(Box::new(dds_asset)),
             dds_fallback: None,
-        }))
+        })
     }
 
     fn png(
