@@ -47,6 +47,8 @@ mod rig_package;
 mod roles;
 mod schema;
 mod stage;
+mod texture_field_origins;
+mod texture_source_metadata;
 mod textures;
 mod write;
 
@@ -70,6 +72,7 @@ pub use manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
 pub use package_write_context::PackageWriteContext;
 pub use schema::manifest_schema;
 pub use stage::{check_output, check_output_with_context};
+pub use texture_source_metadata::TextureSourceMetadata;
 pub use write::{PackageInfo, PackageSummary, write_package, write_package_with_context};
 
 pub(crate) type PackageResult<T> = Result<T, PackageError>;

@@ -4,6 +4,7 @@
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+use crate::texture_source_metadata;
 use p4kx_gltf::TextureLoader;
 use p4kx_texture::{RgbaImage, TextureError, write_png};
 use rayon::prelude::*;
@@ -34,6 +35,7 @@ pub(crate) enum Outcome {
         bytes: u64,
         colour_space: ColourSpace,
         alpha: AlphaMeaning,
+        source_metadata: Option<Box<crate::TextureSourceMetadata>>,
     },
     Failed(String),
 }
@@ -84,10 +86,11 @@ fn write_one(
     folder: &Path,
     context: &PackageWriteContext<'_>,
 ) -> PackageResult<Outcome> {
-    let decoded = match loader.load(&texture.path, mip) {
-        Ok(decoded) => decoded,
-        Err(error) => return Ok(Outcome::Failed(error.to_string())),
-    };
+    let (decoded, source_metadata) =
+        match texture_source_metadata::load(loader, &texture.path, mip, context)? {
+            Ok(decoded) => decoded,
+            Err(error) => return Ok(Outcome::Failed(error.to_string())),
+        };
     let alpha = match (decoded.has_alpha, texture.role, texture.gloss) {
         (false, _, _) => AlphaMeaning::None,
         (true, TextureUse::Normal, true) => AlphaMeaning::Smoothness,
@@ -137,6 +140,7 @@ fn write_one(
             ColourSpace::Linear
         },
         alpha,
+        source_metadata,
     })
 }
 

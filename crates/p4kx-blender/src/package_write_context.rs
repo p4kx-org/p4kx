@@ -4,6 +4,7 @@
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use p4kx_extraction::ArchiveTextures;
 use p4kx_guard::{ArchiveWriteProtection, CreatedOutputFile, OwnedDirectoryPermit, OwnedFileToken};
 
 use crate::{PackageError, PackageResult};
@@ -12,6 +13,7 @@ use crate::{PackageError, PackageResult};
 #[derive(Clone, Copy)]
 pub struct PackageWriteContext<'a> {
     scope: Scope<'a>,
+    pub(crate) texture_source: Option<&'a ArchiveTextures<'a, 'a>>,
 }
 
 #[derive(Clone, Copy)]
@@ -32,7 +34,18 @@ impl<'a> PackageWriteContext<'a> {
     pub const fn new(protection: &'a ArchiveWriteProtection, cancel: &'a AtomicBool) -> Self {
         Self {
             scope: Scope::Archive { protection, cancel },
+            texture_source: None,
         }
+    }
+
+    /// Uses this Archive loader for the package's one observed decode of each texture.
+    #[must_use]
+    pub const fn with_archive_texture_source(
+        mut self,
+        source: &'a ArchiveTextures<'a, 'a>,
+    ) -> Self {
+        self.texture_source = Some(source);
+        self
     }
 
     pub(crate) const fn standalone(
@@ -40,6 +53,7 @@ impl<'a> PackageWriteContext<'a> {
         observed: &'a AtomicBool,
     ) -> Self {
         Self {
+            texture_source: None,
             scope: Scope::Standalone {
                 cancelled,
                 observed,

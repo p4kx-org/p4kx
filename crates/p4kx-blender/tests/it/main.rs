@@ -21,3 +21,5 @@ mod package_safety;
 mod package_vertex_colours;
 mod package_write_context;
 mod support;
+
+mod texture_source_metadata;

@@ -35,7 +35,8 @@ pub(super) fn write(
         Err(error) if error.is_cancelled() => return Ended::Cancelled,
         Err(error) => return Ended::Failed(ModelExportFailure::Refused(error)),
     };
-    let context = PackageWriteContext::new(&protection, cancel.flag());
+    let context =
+        PackageWriteContext::new(&protection, cancel.flag()).with_archive_texture_source(&loader);
     let written = write_package_with_context(
         assembly,
         &provider,
@@ -74,7 +75,8 @@ pub(super) fn write_interior(
         Err(error) if error.is_cancelled() => return Ended::Cancelled,
         Err(error) => return Ended::Failed(ModelExportFailure::Refused(error)),
     };
-    let context = PackageWriteContext::new(&protection, cancel.flag());
+    let context =
+        PackageWriteContext::new(&protection, cancel.flag()).with_archive_texture_source(&loader);
     let written = write_interior_package_with_context(
         &InteriorScene::new(&request.name, interior),
         &provider,

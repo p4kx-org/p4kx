@@ -123,6 +123,9 @@ pub enum PackageError {
         #[source]
         source: GltfError,
     },
+    /// Original DDS metadata or package field evidence could not be recorded.
+    #[error("cannot record package texture metadata")]
+    TextureEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
     /// The caller asked to stop.
     #[error("cancelled")]
     Cancelled,

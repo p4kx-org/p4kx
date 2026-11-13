@@ -2,8 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_texture::{DdsHeader, DdsRawHeader, TextureError};
+
+#[path = "dds_source_words.rs"]
+mod words;
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+pub use words::{DdsSourceWord, raw_dds_source_words};
 
 use crate::DecimalU64;
 use crate::dds_raw_info::{DdsDx10Info, DdsLegacyInfo};
@@ -12,13 +16,14 @@ use crate::dds_raw_info::{DdsDx10Info, DdsLegacyInfo};
 pub const DDS_SOURCE_INFO_VERSION: u8 = 1;
 
 /// Complete authored header words and separate reader-normalized topology.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
 pub struct DdsSourceInfo {
     /// Metadata contract version, independent of any game or DDS version.
     #[schemars(extend("const" = DDS_SOURCE_INFO_VERSION))]
     pub schema_version: u8,
     /// Header Entry declared decoded length or disk file length, excluding separate siblings.
+    #[serde(deserialize_with = "deserialize_header_source_bytes")]
     pub header_source_bytes: DecimalU64,
     /// Every declared source header word without defaults.
     pub raw: DdsRawHeaderInfo,
@@ -27,7 +32,7 @@ pub struct DdsSourceInfo {
 }
 
 /// Authored source header, including an explicitly absent DX10 extension.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[schemars(transform = crate::projection_schema::require_properties)]
 #[non_exhaustive]
 pub struct DdsRawHeaderInfo {
@@ -43,7 +48,7 @@ pub struct DdsRawHeaderInfo {
 }
 
 /// Topology after applying the existing reader's defaults and validation.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[schemars(transform = crate::projection_schema::require_properties)]
 #[non_exhaustive]
 pub struct DdsNormalizedInfo {
@@ -76,7 +81,7 @@ pub struct DdsNormalizedInfo {
 }
 
 /// Encoded byte layout known to the current reader, independent of codec availability.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
 pub struct DdsBlockLayoutInfo {
     /// Block width in pixels.
@@ -164,4 +169,21 @@ impl DdsNormalizedInfo {
             }),
         }
     }
+}
+
+fn deserialize_header_source_bytes<'de, D: serde::Deserializer<'de>>(
+    source: D,
+) -> Result<DecimalU64, D::Error> {
+    use serde::de::Error as _;
+    let text = String::deserialize(source)?;
+    if text.is_empty()
+        || text.len() > 20
+        || text.len() > 1 && text.starts_with('0')
+        || !text.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return Err(D::Error::custom(
+            "invalid canonical unsigned DDS header length",
+        ));
+    }
+    text.parse().map(DecimalU64::new).map_err(D::Error::custom)
 }

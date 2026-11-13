@@ -6,7 +6,7 @@ use std::sync::{Mutex, PoisonError};
 use p4kx_gltf::{LoadedTexture, TextureLoadError, TextureLoader, TextureReadId, TextureReadUse};
 use p4kx_texture::MipByteSpans;
 
-use super::{ArchiveTextures, describe, format_has_alpha};
+use super::ArchiveTextures;
 use crate::texture_preview_png::input::PreviewInputs;
 use crate::{SourceEvidenceError, SourceUse, SourceUses};
 
@@ -63,12 +63,8 @@ impl ArchiveTextureReads<'_, '_> {
 
 impl TextureLoader for ArchiveTextureReads<'_, '_> {
     fn load(&self, path: &str, mip: u32) -> Result<LoadedTexture, TextureLoadError> {
-        let opened = self.textures.open(path, mip)?;
-        let texture = &opened.texture;
-        let has_alpha = texture.has_alpha_tail() || format_has_alpha(texture.header().format());
-        let decoded = texture
-            .decode_preview_observed(opened.level)
-            .map_err(|error| TextureLoadError::Unreadable(describe(&error)))?;
+        let opened = self.textures.load_observed(path, mip)?;
+        let decoded = opened.decoded;
         let mut reads = self.reads.lock().unwrap_or_else(PoisonError::into_inner);
         let id = TextureReadId::new(reads.len());
         reads.push(Read {
@@ -77,7 +73,7 @@ impl TextureLoader for ArchiveTextureReads<'_, '_> {
             inputs: decoded.inputs,
         });
         drop(reads);
-        Ok(LoadedTexture::new(decoded.image, has_alpha).with_read(id))
+        Ok(LoadedTexture::new(decoded.image, opened.has_alpha).with_read(id))
     }
 
     fn dimensions(&self, path: &str, mip: u32) -> Result<Option<(u32, u32)>, TextureLoadError> {

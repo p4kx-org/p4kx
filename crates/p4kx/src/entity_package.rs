@@ -109,6 +109,7 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
     }
     let info = info_of(&archive, &changes)?;
     let loader = models.textures();
+    let context = context.with_archive_texture_source(&loader);
     let summary = write_package_with_context(
         &assembly, &models, &loader, &glb, &info, &args.out, &context,
     )?;

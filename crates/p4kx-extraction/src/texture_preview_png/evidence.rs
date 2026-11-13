@@ -38,7 +38,9 @@ impl PreviewPngEvidence {
         Ok(())
     }
 
-    pub(crate) fn is_complete(&self) -> bool {
+    /// Returns whether both decoded inputs have their original source bindings.
+    #[must_use]
+    pub fn is_complete(&self) -> bool {
         self.color.complete && self.alpha.as_ref().is_none_or(|alpha| alpha.complete)
     }
 

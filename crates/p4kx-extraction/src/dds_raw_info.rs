@@ -3,10 +3,10 @@
 
 use p4kx_texture::{DdsDx10Fields, DdsLegacyFields, DdsPixelFormatFields};
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 /// The complete authored legacy DDS words.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
 pub struct DdsLegacyInfo {
     /// Header structure size word.
@@ -53,7 +53,7 @@ pub struct DdsLegacyInfo {
 }
 
 /// The eight authored legacy pixel-format words.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
 pub struct DdsPixelFormatInfo {
     /// Authored pixel-format structure size.
@@ -82,7 +82,7 @@ pub struct DdsPixelFormatInfo {
 }
 
 /// The five authored DX10 extension words.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
 pub struct DdsDx10Info {
     /// Unmodified DXGI format number.

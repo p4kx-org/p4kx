@@ -75,6 +75,27 @@ impl PreviewHeaderEvidence {
             .collect()
     }
 
+    /// Registers an exact retained byte range inside the observed DDS header.
+    ///
+    /// # Errors
+    /// Returns an error if the evidence inventory was interrupted.
+    pub fn byte_use(
+        &self,
+        offset: u64,
+        length: u64,
+        field: &str,
+        role: SourceUseRole,
+    ) -> Result<SourceUse, SourceEvidenceError> {
+        self.scope.at(
+            SourceLocation::Subresource {
+                namespace: "ddsHeader".into(),
+                indices: vec![offset, length],
+                field: field.into(),
+            },
+            role,
+        )
+    }
+
     /// Registers only the opened Entry's stored name.
     ///
     /// # Errors

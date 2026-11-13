@@ -7,7 +7,8 @@ use p4kx_gltf::{LoadedTexture, TextureLoadError, TextureLoader};
 use p4kx_texture::TextureFormat;
 
 use crate::path_index::PathIndex;
-use crate::{ConversionError, Texture};
+use crate::texture_preview::ObservedPreviewImage;
+use crate::{ConversionError, DdsSourceInfo, Texture};
 
 #[path = "model_texture_origins.rs"]
 mod origin;
@@ -35,6 +36,22 @@ impl<'i, 'a> ArchiveTextures<'i, 'a> {
     }
 }
 
+/// One decoded model image with its actual DDS metadata and source inputs.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ObservedModelTexture<'a> {
+    /// Decoded image and its actual header and pixel spans.
+    pub decoded: ObservedPreviewImage<'a>,
+    /// Complete raw and normalized source header metadata.
+    pub metadata: DdsSourceInfo,
+    /// Actual zero-based mip after the model loader's size negotiation.
+    pub level: u32,
+    /// Whether the alpha header reduced the requested mip index.
+    pub alpha_limits_level: bool,
+    /// Whether the decoded alpha channel carries data.
+    pub has_alpha: bool,
+}
+
 struct OpenTexture<'a> {
     texture: Texture<'a>,
     level: u32,
@@ -43,6 +60,30 @@ struct OpenTexture<'a> {
 }
 
 impl<'a> ArchiveTextures<'_, 'a> {
+    /// Loads a model texture and captures the header and mip used by that same decode.
+    ///
+    /// # Errors
+    /// Returns the normal model texture lookup, geometry or decode error.
+    pub fn load_observed(
+        &self,
+        path: &str,
+        mip: u32,
+    ) -> Result<ObservedModelTexture<'a>, TextureLoadError> {
+        let opened = self.open(path, mip)?;
+        let texture = &opened.texture;
+        let has_alpha = texture.has_alpha_tail() || format_has_alpha(texture.header().format());
+        let decoded = texture
+            .decode_mip_observed(opened.level)
+            .map_err(|error| TextureLoadError::Unreadable(describe(&error)))?;
+        Ok(ObservedModelTexture {
+            decoded,
+            metadata: texture.source_metadata(),
+            level: opened.level,
+            alpha_limits_level: opened.alpha_limits_level,
+            has_alpha,
+        })
+    }
+
     /// Opens the texture at `path` and returns it with the mip `mip` selects and that mip's
     /// size, after checking it is one image within the pixel limit.
     fn open(&self, path: &str, mip: u32) -> Result<OpenTexture<'a>, TextureLoadError> {

@@ -242,6 +242,7 @@ fn textures(inputs: &Inputs<'_>) -> Vec<Texture> {
                 height,
                 colour_space,
                 alpha,
+                source_metadata,
                 ..
             } => {
                 let id = id_of(position);
@@ -253,6 +254,7 @@ fn textures(inputs: &Inputs<'_>) -> Vec<Texture> {
                     bit_depth: 8,
                     colour_space: *colour_space,
                     alpha: *alpha,
+                    source_metadata: source_metadata.clone(),
                     width: *width,
                     height: *height,
                 })

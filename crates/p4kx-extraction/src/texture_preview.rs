@@ -9,6 +9,8 @@ use crate::texture_job::{Member, Role, role};
 use crate::texture_preview_png::input::PreviewInputs;
 use crate::{ConversionError, PreviewPngEvidence, SourceEvidenceError, SourceUses, Texture};
 
+pub use crate::dds_source_info::{DdsSourceWord, raw_dds_source_words};
+pub use crate::model_textures::ObservedModelTexture;
 pub use crate::texture_preview_png::input::PreviewHeaderEvidence;
 
 /// A decoded preview and its exact original DDS inputs.

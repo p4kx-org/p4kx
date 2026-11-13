@@ -88,7 +88,7 @@ written (there are no `null`s).
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.9` today. |
+| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.10` today. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
@@ -307,6 +307,7 @@ materials from them; the `textures` of a material description say which slot use
 | `colour_space` | `srgb` for a diffuse map, `linear` for normal and specular maps (and any data texture): the importer sets Blender's colour space of the image accordingly. The role is that of the first material that names the texture. |
 | `alpha` | What the alpha channel holds: `none` (opaque, ignore it), `opacity`, or `smoothness` (the alpha channel of a `_ddna` normal map). |
 | `width`, `height` | Pixels of the mip level that was written (`options.texture_mip`, or the smallest the texture has). |
+| `source_metadata` | Optional same-read DDS header, actual `mip_level`, `field_origins` and source-use inventory. Origin paths are relative to this object. `/image` addresses the encoded PNG. |
 
 **Normal maps** are written for glTF and OpenGL, Y up (the green channel points up the image):
 the writer inverts the green channel of the engine's maps, exactly as the GLB writer does. The
@@ -527,6 +528,11 @@ version.
 Original submaterial indices and existing rendering fields keep their meanings. The new
 source descriptions preserve authored roots without inheriting root values into children;
 they do not prove physical Archive identity. Media records provide that provenance.
+
+**1.10** adds optional texture `source_metadata`. Its `dds` object uses the same raw and normalized
+header contract as the CLI texture info and Media export. The loader binds the metadata to the
+actual texture read. The package keeps separate origin receipts for authored header fields,
+normalized topology, the selected mip and the PNG bytes.
 
 The schema file is the schema of the version in `FORMAT_VERSION`: a change of the Rust types that
 changes the schema is a change of the format, and the checked-in schema changes with it. A schema

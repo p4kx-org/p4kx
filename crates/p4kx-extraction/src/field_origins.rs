@@ -10,7 +10,7 @@ use thiserror::Error;
 use crate::{FieldOrigin, FieldPath};
 
 /// Immediate per-value origins addressed inside one complete unchanged output record.
-#[derive(Debug, Clone, Default, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(transparent)]
 pub struct FieldOrigins {
     entries: BTreeMap<FieldPath, FieldOrigin>,
