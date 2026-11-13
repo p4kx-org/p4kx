@@ -4,8 +4,8 @@
 use p4kx_archive::ObservedEntry;
 use p4kx_gltf::TextureComponents;
 use p4kx_texture::{
-    DdsHeader, DdsHeaderField, DdsPngEncoding, DdsRawHeader, MipByteSpans, MipPayloadLocation,
-    TextureError,
+    DdsHeader, DdsHeaderField, DdsPngEncoding, DdsRawHeader, DdsTransfer, MipByteSpans,
+    MipPayloadLocation, TextureError,
 };
 
 use crate::source::SourceEntry;
@@ -58,11 +58,15 @@ impl<Spans> PreviewInputs<'_, Spans> {
         ))
     }
 
+    pub(crate) fn source_transfer(&self) -> DdsTransfer {
+        self.color.raw.transfer().effective
+    }
+
     pub(crate) fn png_encoding(&self) -> Result<DdsPngEncoding, TextureError> {
         let raw = &self.color.raw;
         Ok(DdsPngEncoding::of(
             DdsHeader::from_raw(raw)?.format(),
-            raw.transfer().effective,
+            self.source_transfer(),
         ))
     }
 }

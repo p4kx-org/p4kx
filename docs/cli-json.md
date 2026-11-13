@@ -2493,7 +2493,8 @@ Record's file does not follow its name or record path, `renamed` as there
 (`{"guid", "path", "reason"}`); `skipped` lists
 the Record files relative to the folder of the DataForge Entry. Otherwise that field is absent.
 `texture_artifacts` contains the images published by this run when texture image conversion
-is enabled. Each texture groups its `images` with a shared `provenance` inventory. Every image
+is enabled. Each texture groups its `images` with a shared `provenance` inventory. The group contains its declared `source_transfer`, encoded `output_transfer` and
+any `png_transform`, with their precise `field_origins`. Every image
 has a target-relative `path` with forward slashes, the measured `digest` of the written file,
 the selected `level`, `layer`, `face` and `slice`, and its own `containsEncryptedSource`,
 `sourceUsesRefs` and `sourceSetComplete`. Existing images retained by the conflict policy do

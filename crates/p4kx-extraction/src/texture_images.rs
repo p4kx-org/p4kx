@@ -6,10 +6,12 @@ use std::io::Write;
 
 use p4kx_archive::Checksum;
 use p4kx_texture::{
-    LocatedMip, MipPayloadLocation, TextureError, read_mip_with_location, write_exr, write_png,
+    DdsPngEncoding, LocatedMip, MipPayloadLocation, TextureError, read_mip_with_location,
+    write_exr, write_png_with_transfer,
 };
 
 use crate::buffers::Buffers;
+use crate::texture_artifacts::TextureImageTransfer;
 use crate::texture_convert::{Source, Step};
 use crate::texture_outputs::step_of;
 use crate::texture_preview_png::input::{PreviewInputs, TexturePreviewInput};
@@ -27,7 +29,7 @@ pub(crate) const IMAGE_EXTENSIONS: [&str; 2] = ["png", "exr"];
 /// The decoded images of one mip, ready to encode.
 enum Images {
     /// 8-bit RGBA with the alpha tail merged in, written as PNG.
-    Png(Vec<p4kx_texture::RgbaImage>),
+    Png(Vec<p4kx_texture::RgbaImage>, DdsPngEncoding),
     /// Linear floating-point RGB of a high-range texture, written as OpenEXR.
     Exr(Vec<p4kx_texture::HdrImage>),
 }
@@ -35,15 +37,26 @@ enum Images {
 impl Images {
     const fn len(&self) -> usize {
         match self {
-            Self::Png(images) => images.len(),
+            Self::Png(images, _) => images.len(),
             Self::Exr(images) => images.len(),
+        }
+    }
+
+    const fn png_encoding(&self) -> Option<DdsPngEncoding> {
+        match self {
+            Self::Png(_, encoding) => Some(*encoding),
+            Self::Exr(_) => None,
         }
     }
 
     fn encode(&self, index: usize, out: &mut Vec<u8>) -> Result<(), TextureError> {
         let missing = || TextureError::UnsupportedImage { images: 0 };
         match self {
-            Self::Png(images) => write_png(images.get(index).ok_or_else(missing)?, out),
+            Self::Png(images, encoding) => write_png_with_transfer(
+                images.get(index).ok_or_else(missing)?,
+                encoding.transfer,
+                out,
+            ),
             Self::Exr(images) => write_exr(images.get(index).ok_or_else(missing)?, out),
         }
     }
@@ -84,12 +97,24 @@ impl EntryWriter<'_> {
         }
         let uses = SourceUses::with_compact_use_refs();
         let mut written = Vec::new();
-        let step = self.write_image_set(source, level, &destinations, buffers, &uses, &mut written);
+        let (images, inputs) = Self::decode_level(source, level, &buffers.data)?;
+        let transfer = TextureImageTransfer::capture(
+            &inputs,
+            inputs.source_transfer(),
+            images.png_encoding(),
+            &uses,
+        )
+        .map_err(|error| write_error(header.file.clone(), std::io::Error::other(error)))?;
+        let step = self.write_image_set(
+            source,
+            level,
+            &destinations,
+            (&images, &inputs),
+            buffers,
+            (&uses, &mut written),
+        );
         if !written.is_empty() {
-            *artifacts = Some(TextureArtifacts {
-                images: written,
-                provenance: uses.freeze()?,
-            });
+            *artifacts = Some(transfer.finish(written, uses.freeze()?));
         }
         step
     }
@@ -99,11 +124,10 @@ impl EntryWriter<'_> {
         source: &Source<'_>,
         level: u32,
         destinations: &[(TextureImage, Destination)],
+        (images, inputs): (&Images, &PreviewInputs<'_, MipPayloadLocation>),
         buffers: &mut Buffers,
-        uses: &SourceUses,
-        written: &mut Vec<TextureImageArtifact>,
+        (uses, written): (&SourceUses, &mut Vec<TextureImageArtifact>),
     ) -> Result<Step, ExtractionError> {
-        let (images, inputs) = Self::decode_level(source, level, &buffers.data)?;
         let unsupported = || {
             source.texture_error(TextureError::UnsupportedImage {
                 images: source.texture.header().images(level),
@@ -128,8 +152,11 @@ impl EntryWriter<'_> {
                 .ok_or_else(unsupported)?;
             let mut contributions = Vec::new();
             evidence.append_pixel_uses(&mut contributions)?;
+            if let Some(encoding) = images.png_encoding() {
+                evidence.append_output_transfer_uses(&mut contributions, encoding)?;
+            }
             let origin = uses.origin(&contributions, evidence.is_complete());
-            match self.write_image_file(source, (&images, index), destination, buffers)? {
+            match self.write_image_file(source, (images, index), destination, buffers)? {
                 ImageWrite::Written(digest) => written.push(TextureImageArtifact {
                     path,
                     digest,
@@ -238,7 +265,11 @@ impl EntryWriter<'_> {
             .map_err(ExtractionError::Texture)?;
         let alpha = Texture::merge_alpha_input(alpha, level, &mut images)
             .map_err(ExtractionError::Texture)?;
-        Ok((Images::Png(images), PreviewInputs { color, alpha }))
+        let inputs = PreviewInputs { color, alpha };
+        let encoding = inputs
+            .png_encoding()
+            .map_err(|error| source.texture_error(error))?;
+        Ok((Images::Png(images, encoding), inputs))
     }
 
     fn read_level(
