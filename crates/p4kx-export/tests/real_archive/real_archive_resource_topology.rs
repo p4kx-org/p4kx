@@ -14,6 +14,9 @@ use serde_json::Value;
 use crate::real_archive_item_components as components;
 use crate::real_archive_item_durability as proof;
 
+#[path = "real_archive_resource_topology_sample.rs"]
+mod sample;
+
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 #[test]
