@@ -4,6 +4,7 @@
 use super::observation::Observation;
 use super::sink::{self, Out};
 use super::source::RecordJsonObserver;
+use super::subtree::{RecordJsonStep, selected_value};
 use super::tasks::{Fields, Items, Selected, Task};
 use crate::positioned_record::ValueSlot;
 use crate::{Annotations, PositionedRecord, RecordTree, StructValue, Value};
@@ -95,19 +96,57 @@ impl RecordJson {
         )
     }
 
+    /// Writes one owned value by original field and array ordinals with original input evidence.
+    ///
+    /// Observer pointers are relative to the selected value, with the original route in each use set.
+    ///
+    /// # Errors
+    /// Returns an invalid path, source layout, output or observation error.
+    pub fn write_observed_value<W: Write>(
+        &mut self,
+        input: &PositionedRecord<'_>,
+        steps: &[RecordJsonStep],
+        out: &mut W,
+        observer: &mut dyn RecordJsonObserver,
+    ) -> io::Result<()> {
+        let mut observation = Observation::new(input, observer);
+        observation.track_routes();
+        let (value, slot) = selected_value(input, steps, &mut observation)?;
+        self.write_tasks(
+            Out {
+                sink: out,
+                pretty: self.layout == JsonLayout::Pretty,
+                annotations: Annotations::none(),
+                observation: Some(observation),
+            },
+            Task::Value(value, 0, Some(slot)),
+        )
+    }
+
     fn write_inner<'source, W: Write>(
         &mut self,
         tree: &RecordTree<'source>,
+        out: Out<'_, 'source, W>,
+    ) -> io::Result<()> {
+        self.write_tasks(
+            out,
+            Task::Structure {
+                record: Some(tree),
+                structure: tree.root(),
+                slot: None,
+                depth: 0,
+            },
+        )
+    }
+
+    fn write_tasks<'source, W: Write>(
+        &mut self,
         mut out: Out<'_, 'source, W>,
+        root: Task<'_, 'source>,
     ) -> io::Result<()> {
         self.attribute.clear();
         self.escaped.clear();
-        let mut pending = vec![Task::Structure {
-            record: Some(tree),
-            structure: tree.root(),
-            slot: None,
-            depth: 0,
-        }];
+        let mut pending = vec![root];
         while let Some(task) = pending.pop() {
             self.step(&mut out, task, &mut pending)?;
         }

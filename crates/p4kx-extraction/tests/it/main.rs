@@ -16,6 +16,7 @@ mod dataforge_conversion;
 mod dataforge_file;
 mod dataforge_origin;
 mod dds_source_info;
+mod entity_material_effects;
 mod entry_metadata_info;
 mod entry_payload;
 mod entry_payload_control;

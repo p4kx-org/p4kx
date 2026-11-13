@@ -7,15 +7,23 @@ pub(crate) mod archive_layout_origins;
 mod chunk_table_evidence;
 #[path = "default_material_receipt.rs"]
 mod default_material_receipt;
+#[path = "entity_material_effects.rs"]
+mod entity_material_effects;
 #[path = "entry_directory_origins.rs"]
 mod entry_directory_origins;
 #[path = "model_archive_source.rs"]
 mod model_archive_source;
 #[path = "model_material_origins.rs"]
 pub(crate) mod model_material_origins;
+#[path = "record_json_location.rs"]
+mod record_json_location;
 #[path = "sourced_value_seed.rs"]
 mod sourced_value_seed;
 
+pub use self::entity_material_effects::{
+    EntityMaterialEffects, EntityMaterialEffectsComponent, EntityMaterialEffectsError,
+};
+pub use self::record_json_location::RecordJsonLocation;
 pub use self::sourced_value_seed::SourcedValueSeed;
 pub use crate::animation_sources::{
     AnimationFlagRun, ArchiveAnimationAdmission, ArchiveAnimationRead, ArchiveModelAnimations,

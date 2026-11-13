@@ -4,8 +4,8 @@
 use std::io;
 
 use p4kx_extraction::{
-    DataForge, DataForgeOrigin, RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField,
-    RecordJsonSource, SourceLocation, SourceUse, SourceUseRole,
+    DataForge, DataForgeOrigin, RecordJsonLocation, RecordJsonObserver, RecordJsonSource,
+    SourceUse, SourceUseRole,
 };
 use serde_json::value::RawValue;
 
@@ -28,13 +28,8 @@ pub(crate) struct Capture {
 
 struct CapturedField {
     pointer: String,
-    sources: Vec<Locator>,
+    sources: Vec<RecordJsonLocation>,
     complete: bool,
-}
-
-struct Locator {
-    location: SourceLocation,
-    role: SourceUseRole,
 }
 
 impl Capture {
@@ -69,7 +64,7 @@ impl RecordJsonObserver for Capture {
         self.minimum_wire_len += minimum;
         let locations: Vec<_> = sources
             .iter()
-            .filter_map(|source| Locator::of(*source))
+            .filter_map(|source| RecordJsonLocation::of(*source))
             .collect();
         self.fields.push(CapturedField {
             pointer: pointer.to_owned(),
@@ -202,91 +197,4 @@ fn project_record(
             .origin(std::slice::from_ref(&record_input), complete),
     )?;
     Ok((record_input, complete))
-}
-
-impl Locator {
-    fn of(source: RecordJsonSource<'_>) -> Option<Self> {
-        match source {
-            RecordJsonSource::Record { index, field } => Self::record(index, field),
-            RecordJsonSource::StructName { index } => Some(Self::subresource(
-                "dataforgeStructDefinition",
-                "name",
-                vec![u64::from(index)],
-                SourceUseRole::Payload,
-            )),
-            RecordJsonSource::PropertyName { index } => Some(Self::subresource(
-                "dataforgePropertyDefinition",
-                "name",
-                vec![index as u64],
-                SourceUseRole::Selector,
-            )),
-            RecordJsonSource::PropertyStorage { index, target_used } => Some(Self::subresource(
-                "dataforgePropertyDefinition",
-                if target_used {
-                    "targetedInstanceLayout"
-                } else {
-                    "instanceLayout"
-                },
-                vec![index as u64],
-                SourceUseRole::Conversion,
-            )),
-            RecordJsonSource::InstancePath { record, ordinals } => {
-                let mut indices = vec![u64::from(record)];
-                indices.extend_from_slice(ordinals);
-                Some(Self::subresource(
-                    "dataforgeOwnedInstance",
-                    "path",
-                    indices,
-                    SourceUseRole::Selector,
-                ))
-            }
-            RecordJsonSource::Bytes { start, end, kind } => Self::bytes(start, end, kind),
-            _ => None,
-        }
-    }
-
-    fn record(index: u32, field: RecordJsonRecordField) -> Option<Self> {
-        let (field, role) = match field {
-            RecordJsonRecordField::Guid => ("guid", SourceUseRole::Payload),
-            RecordJsonRecordField::FileName => ("fileName", SourceUseRole::Conversion),
-            RecordJsonRecordField::Name => ("recordName", SourceUseRole::Conversion),
-            RecordJsonRecordField::Tag => ("tag", SourceUseRole::Conversion),
-            RecordJsonRecordField::Struct => ("sourceType", SourceUseRole::Selector),
-            _ => return None,
-        };
-        Some(Self {
-            location: SourceLocation::DataForge {
-                record_index: index,
-                field: field.into(),
-            },
-            role,
-        })
-    }
-
-    fn bytes(start: u64, end: u64, kind: RecordJsonBytes) -> Option<Self> {
-        let (label, role) = match kind {
-            RecordJsonBytes::Slot => ("slot", SourceUseRole::Payload),
-            RecordJsonBytes::ArrayHeader => ("arrayHeader", SourceUseRole::Selector),
-            RecordJsonBytes::ArrayElement => ("arrayElement", SourceUseRole::Payload),
-            RecordJsonBytes::Text => ("text", SourceUseRole::Payload),
-            _ => return None,
-        };
-        Some(Self::subresource(
-            "dataforgeDecodedBytes",
-            label,
-            vec![start, end],
-            role,
-        ))
-    }
-
-    fn subresource(namespace: &str, field: &str, indices: Vec<u64>, role: SourceUseRole) -> Self {
-        Self {
-            location: SourceLocation::Subresource {
-                namespace: namespace.to_owned(),
-                indices,
-                field: field.to_owned(),
-            },
-            role,
-        }
-    }
 }

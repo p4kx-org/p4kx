@@ -15,6 +15,7 @@ pub(super) struct Observation<'observer, 'source> {
     pointer: String,
     lengths: Vec<usize>,
     structures: Vec<Vec<ValueSlot<'source>>>,
+    context: Option<Routes>,
 }
 
 impl<'observer, 'source> Observation<'observer, 'source> {
@@ -28,6 +29,26 @@ impl<'observer, 'source> Observation<'observer, 'source> {
             pointer: String::new(),
             lengths: Vec::new(),
             structures: Vec::new(),
+            context: None,
+        }
+    }
+
+    pub(super) fn track_routes(&mut self) {
+        self.context = Some(Routes {
+            selection: Route {
+                depth: 0,
+                uses: Vec::new(),
+                complete: true,
+            },
+            nested: Vec::new(),
+        });
+    }
+
+    pub(super) fn select(&mut self, slot: ValueSlot<'source>) {
+        let (sources, complete) = self.slot(Some(slot), None);
+        if let Some(context) = &mut self.context {
+            context.selection.uses.extend(sources);
+            context.selection.complete &= complete;
         }
     }
 
@@ -82,6 +103,9 @@ impl<'observer, 'source> Observation<'observer, 'source> {
                 .unwrap_or_default(),
         );
         self.lengths.truncate(parent);
+        if let Some(context) = &mut self.context {
+            context.nested.retain(|route| route.depth < depth);
+        }
         self.pointer.push('/');
     }
 
@@ -135,7 +159,17 @@ impl<'observer, 'source> Observation<'observer, 'source> {
         value: Option<&Value<'_>>,
     ) -> io::Result<()> {
         let (sources, complete) = self.slot(slot, value);
-        self.emit(&sources, complete)
+        self.emit(&sources, complete)?;
+        if matches!(value, Some(Value::Struct(_) | Value::Array(_)))
+            && let Some(context) = &mut self.context
+        {
+            context.nested.push(Route {
+                depth: self.lengths.len(),
+                uses: sources,
+                complete,
+            });
+        }
+        Ok(())
     }
 
     pub(super) fn reference(
@@ -234,8 +268,29 @@ impl<'observer, 'source> Observation<'observer, 'source> {
     }
 
     fn emit(&mut self, sources: &[RecordJsonSource<'_>], complete: bool) -> io::Result<()> {
-        self.observer.value(&self.pointer, sources, complete)
+        let Some(context) = &self.context else {
+            return self.observer.value(&self.pointer, sources, complete);
+        };
+        let mut inputs = context.selection.uses.clone();
+        let mut complete = complete && context.selection.complete;
+        for route in &context.nested {
+            inputs.extend_from_slice(&route.uses);
+            complete &= route.complete;
+        }
+        inputs.extend_from_slice(sources);
+        self.observer.value(&self.pointer, &inputs, complete)
     }
+}
+
+struct Routes {
+    selection: Route,
+    nested: Vec<Route>,
+}
+
+struct Route {
+    depth: usize,
+    uses: Vec<RecordJsonSource<'static>>,
+    complete: bool,
 }
 
 #[derive(Clone, Copy)]

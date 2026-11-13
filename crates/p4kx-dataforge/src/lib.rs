@@ -97,7 +97,7 @@ pub use header::{SNIFF_LEN, SUPPORTED_VERSIONS, looks_like_dataforge};
 pub use issues::{DataForgeIssue, MAX_DATAFORGE_ISSUES};
 pub use json::{
     JsonLayout, RecordJson, RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField,
-    RecordJsonSource,
+    RecordJsonSource, RecordJsonStep,
 };
 pub use kinds::{DataType, ValueKind};
 pub use location::{Location, Step};
