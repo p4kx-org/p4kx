@@ -282,3 +282,26 @@ fn set_word(bytes: &mut [u8], offset: usize, value: u32) -> TestResult {
         .copy_from_slice(&value.to_le_bytes());
     Ok(())
 }
+
+#[test]
+fn historical_metadata_without_transfer_remains_readable() -> TestResult {
+    let bytes = SplitDds::new(TestTextureFormat::LegacyDxt1, 8, 8)
+        .mips(1)
+        .header_bytes();
+    let mut json = serde_json::to_value(DdsSourceInfo::parse(&bytes, 128)?)?;
+    json.as_object_mut()
+        .ok_or("source metadata")?
+        .remove("transfer")
+        .ok_or("current transfer")?;
+    let validator = jsonschema::validator_for(&schemars::schema_for!(DdsSourceInfo).to_value())?;
+    assert!(
+        validator.is_valid(&json),
+        "historical additive metadata remains valid"
+    );
+    let historical: DdsSourceInfo = serde_json::from_value(json)?;
+    assert!(
+        historical.transfer.is_none(),
+        "absence carries no original declaration proof"
+    );
+    Ok(())
+}

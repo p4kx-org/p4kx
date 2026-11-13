@@ -147,6 +147,10 @@ fn verify_rows(color: &MediaRecord, alpha: &MediaRecord) -> TestResult {
             json!(0xdead_beef_u32),
         ),
         ("/payload/source_metadata/normalized/array_size", json!(2)),
+        (
+            "/payload/source_metadata/transfer/effective",
+            json!("linear"),
+        ),
     ] {
         assert_eq!(
             color.data.pointer(path),
@@ -205,6 +209,21 @@ fn verify_origins(base: &Path, [color, alpha]: [usize; 2]) -> TestResult {
             .and_then(Value::as_array)
             .ok_or("source refs")?;
         check_uses(references, &uses, &sources, entry)?;
+        let transfer = fields
+            .iter()
+            .find(|row| {
+                row.get("field").and_then(Value::as_str)
+                    == Some("/data/payload/source_metadata/transfer/effective")
+                    && row.pointer("/scope/ordinal").and_then(Value::as_str)
+                        == Some(ordinal.as_str())
+                    && row.pointer("/scope/stream/kind").and_then(Value::as_str) == Some("texture")
+            })
+            .ok_or("transfer field origin")?;
+        assert_eq!(
+            transfer.get("containsEncryptedSource"),
+            Some(&json!(encrypted)),
+            "transfer comes from the corresponding texture header"
+        );
     }
     Ok(())
 }

@@ -28,13 +28,13 @@ impl Provider for TextureProvider {
         let mut capability = Capability::new(
             MediaKind::Texture,
             "p4kx.texture.dds",
-            "1.2.0",
+            "1.3.0",
             "Exact decoded DDS source Entries remain in the common RawReference. Header metadata retains authored words and separates reader-derived topology from codec support.",
         );
         capability.field_groups = vec![
             FieldGroup::new(
                 "header-metadata",
-                "Selected DDS and alpha headers, original legacy and DX10 words, normalized topology, codec capability and expected split-part count.",
+                "Selected DDS and alpha headers, original legacy and DX10 words, transfer declarations, normalized topology, codec capability and expected split-part count.",
             ),
             FieldGroup::new(
                 "sibling-graph",

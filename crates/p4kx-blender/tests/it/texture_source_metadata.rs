@@ -36,6 +36,21 @@ fn package_texture_keeps_plain_dds_words_separate_from_used_encrypted_alpha() ->
         Some(false),
         "plain color header supplies width"
     );
+    let transfer = receipt.dds.transfer.ok_or("transfer declarations")?;
+    assert_eq!(
+        transfer.effective,
+        p4kx_extraction::texture_preview::DdsTransfer::Unknown,
+        "unmarked legacy source"
+    );
+    let origin = receipt
+        .field_origins
+        .get(&FieldPath::parse("/dds/transfer/effective")?)
+        .ok_or("transfer origin")?;
+    assert_eq!(
+        origin.contains_encrypted_source(),
+        Some(false),
+        "alpha does not affect colour transfer"
+    );
     let image = receipt
         .field_origins
         .get(&FieldPath::parse("/image")?)

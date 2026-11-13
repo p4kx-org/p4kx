@@ -41,6 +41,18 @@ pub fn dds_info_origins(
     let base = base.as_str();
     words::capture(fields, dds, header, uses, base)?;
     normalized(fields, dds, header, uses, base)?;
+    if dds.transfer.is_some() {
+        for (field, words) in crate::dds_source_info::DDS_TRANSFER_ORIGIN_FIELDS {
+            let mut contributors =
+                header.header_uses(&[DdsHeaderField::Prefix], SourceUseRole::Selector)?;
+            contributors.extend(header.header_uses(words, SourceUseRole::Conversion)?);
+            insert(
+                fields,
+                &format!("{base}/transfer/{field}"),
+                uses.origin(&contributors, true),
+            )?;
+        }
+    }
     insert(
         fields,
         &format!("{base}/header_source_bytes"),

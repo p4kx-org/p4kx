@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::texture_preview::DDS_TRANSFER_ORIGIN_FIELDS;
 use p4kx_extraction::{DdsHeaderField, DdsRawHeader, FieldPath, InputScope, SourceUseRole};
 
 use crate::origin_capture::{OriginCapture, OriginSite};
@@ -53,6 +54,15 @@ impl<'a> TextureHeaderOrigins<'a> {
         )?;
         self.raw(raw, &format!("{base}/raw"), &mut prepared, writer)?;
         self.normalized(raw, base, &mut prepared, writer)?;
+        for (field, words) in DDS_TRANSFER_ORIGIN_FIELDS {
+            let proof = self.fields(raw, words, writer)?.finish();
+            put(
+                &mut prepared,
+                &format!("{base}/transfer/{field}"),
+                proof,
+                writer,
+            )?;
+        }
         let format = self.fields(raw, &[Format], writer)?.finish();
         put(
             &mut prepared,

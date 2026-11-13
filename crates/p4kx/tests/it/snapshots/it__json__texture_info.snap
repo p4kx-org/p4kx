@@ -83,7 +83,15 @@ expression: "serde_json::to_string_pretty(&value)?"
       },
       "magic_present": true
     },
-    "schema_version": 1
+    "schema_version": 1,
+    "transfer": {
+      "conflict": false,
+      "cry": "unknown",
+      "cry_image_flags": 0,
+      "cry_marker": 0,
+      "dxgi": "srgb",
+      "effective": "srgb"
+    }
   },
   "texture": "Data\\Textures\\hull_ddna.dds",
   "width": 64

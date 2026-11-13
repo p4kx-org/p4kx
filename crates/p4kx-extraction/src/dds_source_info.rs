@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_texture::{DdsHeader, DdsRawHeader, TextureError};
+use p4kx_texture::{DdsHeader, DdsRawHeader, DdsTransferEvidence, TextureError};
 
 #[path = "dds_source_words.rs"]
 mod words;
@@ -11,6 +11,20 @@ pub use words::{DdsSourceWord, raw_dds_source_words};
 
 use crate::DecimalU64;
 use crate::dds_raw_info::{DdsDx10Info, DdsLegacyInfo};
+
+use p4kx_texture::DdsHeaderField::{
+    self, CryImageFlags, CryImageMarker, CryTransfer, DxgiTransfer,
+};
+
+/// Paths of DDS transfer facts and the exact authored words that determine them.
+pub const DDS_TRANSFER_ORIGIN_FIELDS: &[(&str, &[DdsHeaderField])] = &[
+    ("dxgi", &[DxgiTransfer]),
+    ("cry_marker", &[CryImageMarker]),
+    ("cry_image_flags", &[CryImageFlags]),
+    ("cry", &[CryTransfer]),
+    ("effective", &[DxgiTransfer, CryTransfer]),
+    ("conflict", &[DxgiTransfer, CryTransfer]),
+];
 
 /// Version of the additive DDS source-header metadata projection.
 pub const DDS_SOURCE_INFO_VERSION: u8 = 1;
@@ -29,6 +43,9 @@ pub struct DdsSourceInfo {
     pub raw: DdsRawHeaderInfo,
     /// Reader-derived topology and layout, without an image-decoding claim.
     pub normalized: DdsNormalizedInfo,
+    /// Original transfer declarations and their agreement, absent in older reports.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub transfer: Option<DdsTransferEvidence>,
 }
 
 /// Authored source header, including an explicitly absent DX10 extension.
@@ -133,6 +150,7 @@ impl DdsSourceInfo {
             header_source_bytes: DecimalU64::new(size),
             raw: DdsRawHeaderInfo::of(raw),
             normalized: DdsNormalizedInfo::of(normalized),
+            transfer: Some(raw.transfer()),
         }
     }
 }

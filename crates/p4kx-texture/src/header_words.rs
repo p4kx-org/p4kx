@@ -27,6 +27,14 @@ pub enum DdsHeaderField {
     ArraySize,
     /// The volume depth of mip zero.
     Depth,
+    /// The original format selector and any authored DXGI transfer code.
+    DxgiTransfer,
+    /// The original Cry marker word.
+    CryImageMarker,
+    /// The original Cry image flags word.
+    CryImageFlags,
+    /// The marker and, when recognised, the relevant Cry image flags.
+    CryTransfer,
 }
 
 /// One authored DDS header word in the uncompressed source file.
@@ -60,6 +68,8 @@ enum Word {
     ResourceDimension,
     MiscFlag,
     ArraySize,
+    CryMarker,
+    CryFlags,
 }
 
 impl Word {
@@ -83,6 +93,8 @@ impl Word {
             Self::ResourceDimension => ("dx10.resourceDimension", 128),
             Self::MiscFlag => ("dx10.miscFlag", 132),
             Self::ArraySize => ("dx10.arraySize", 136),
+            Self::CryMarker => ("reserved2", 120),
+            Self::CryFlags => ("reserved1", 32),
         };
         DdsHeaderWord {
             name,
@@ -95,7 +107,10 @@ impl Word {
 impl DdsRawHeader {
     /// Returns the authored byte words used to obtain one normalized header field.
     pub fn words_for(&self, field: DdsHeaderField) -> impl Iterator<Item = DdsHeaderWord> + use<> {
-        use DdsHeaderField::{ArraySize, Depth, Faces, Format, Height, MipCount, Prefix, Width};
+        use DdsHeaderField::{
+            ArraySize, CryImageFlags, CryImageMarker, CryTransfer, Depth, DxgiTransfer, Faces,
+            Format, Height, MipCount, Prefix, Width,
+        };
         let legacy = self.legacy();
         let dx10 = self.dx10();
         let (words, extra): (&[Word], Option<Word>) = match field {
@@ -103,7 +118,7 @@ impl DdsRawHeader {
             Width => (&[Word::Width], None),
             Height => (&[Word::Height], None),
             MipCount => (&[Word::MipMapCount], None),
-            Format if dx10.is_some() => (&[Word::FourCc, Word::DxgiFormat], None),
+            Format | DxgiTransfer if dx10.is_some() => (&[Word::FourCc, Word::DxgiFormat], None),
             Format if legacy_uses_four_cc(legacy.pixel_format.flags) => {
                 (&[Word::PixelFlags, Word::FourCc], None)
             }
@@ -121,8 +136,11 @@ impl DdsRawHeader {
             Faces if dx10.is_some() => (&[Word::FourCc, Word::MiscFlag], None),
             Faces => (&[Word::FourCc, Word::Caps2], None),
             ArraySize if dx10.is_some() => (&[Word::FourCc, Word::ArraySize], None),
-            ArraySize => (&[Word::FourCc], None),
             Depth => depth_words(legacy, dx10),
+            ArraySize | DxgiTransfer => (&[Word::FourCc], None),
+            CryImageFlags => (&[Word::CryFlags], None),
+            CryTransfer if self.has_cry_image_flags() => (&[Word::CryMarker, Word::CryFlags], None),
+            CryImageMarker | CryTransfer => (&[Word::CryMarker], None),
         };
         let magic = u64::from(self.magic_present()) * WORD_BYTES;
         let prefix = (field == Prefix).then_some(DdsHeaderWord {

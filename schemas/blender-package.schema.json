@@ -662,6 +662,17 @@
           "maximum": 255,
           "minimum": 0,
           "type": "integer"
+        },
+        "transfer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTransferEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original transfer declarations and their agreement, absent in older reports."
         }
       },
       "required": [
@@ -669,6 +680,71 @@
         "header_source_bytes",
         "raw",
         "normalized"
+      ],
+      "type": "object"
+    },
+    "DdsTransfer": {
+      "description": "Transfer function declared for DDS colour samples.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "A linear transfer function.",
+          "type": "string"
+        },
+        {
+          "const": "srgb",
+          "description": "The sRGB transfer function.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "The source does not establish a transfer function.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdsTransferEvidence": {
+      "additionalProperties": false,
+      "description": "Independent transfer declarations and their agreement in one authored DDS header.",
+      "properties": {
+        "conflict": {
+          "description": "Two recognised declarations disagree.",
+          "type": "boolean"
+        },
+        "cry": {
+          "$ref": "#/$defs/DdsTransfer",
+          "description": "Transfer indicated by the sRGB-read bit when the marker is valid."
+        },
+        "cry_image_flags": {
+          "description": "The original image flags word, including unrecognised bits.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cry_marker": {
+          "description": "The original Cry marker word, including unrecognised values.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dxgi": {
+          "$ref": "#/$defs/DdsTransfer",
+          "description": "Transfer declared by the original typed DXGI format, when known."
+        },
+        "effective": {
+          "$ref": "#/$defs/DdsTransfer",
+          "description": "The transfer established by the compatible declarations."
+        }
+      },
+      "required": [
+        "dxgi",
+        "cry_marker",
+        "cry_image_flags",
+        "cry",
+        "effective",
+        "conflict"
       ],
       "type": "object"
     },

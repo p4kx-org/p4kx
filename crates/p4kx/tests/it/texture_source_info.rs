@@ -51,6 +51,7 @@ fn cli_preserves_source_words_and_legacy_fields_for_archive_and_disk() -> TestRe
             Some(&json!(0xface_0007_u32)),
             "authored DX10 extra flags are preserved"
         );
+        verify_transfer_origin(&value, entry)?;
         values.push(
             value
                 .get("source_metadata")
@@ -62,6 +63,23 @@ fn cli_preserves_source_words_and_legacy_fields_for_archive_and_disk() -> TestRe
         values.first(),
         values.get(1),
         "the same shared DTO serves disk and Archive"
+    );
+    Ok(())
+}
+
+fn verify_transfer_origin(value: &Value, entry: bool) -> TestResult {
+    assert_eq!(
+        value.pointer("/source_metadata/transfer/effective"),
+        Some(&json!("srgb")),
+        "explicit DXGI colour transfer"
+    );
+    let field = value
+        .pointer("/field_origins/~1source_metadata~1transfer~1effective")
+        .ok_or("transfer origin")?;
+    assert_eq!(
+        field.get("containsEncryptedSource"),
+        Some(&if entry { json!(false) } else { Value::Null }),
+        "actual Archive proof is distinct from external file input"
     );
     Ok(())
 }

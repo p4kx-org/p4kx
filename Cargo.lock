@@ -4020,6 +4020,8 @@ dependencies = [
  "p4kx-testkit",
  "png",
  "rayon",
+ "schemars",
+ "serde",
  "thiserror 2.0.21",
 ]
 

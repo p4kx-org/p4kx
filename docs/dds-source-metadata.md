@@ -1,7 +1,7 @@
 # DDS source-header metadata
 
 `p4kx texture info --json` adds `source_metadata` without changing its existing fields or human output.
-The projection has `schema_version:1`, `header_source_bytes`, `raw`, and `normalized`.
+The projection has `schema_version:1`, `header_source_bytes`, `raw`,, `normalized` and `transfer`.
 `Texture::source_metadata` returns the same Extraction DTO without another source read.
 
 `header_source_bytes` is the header Entry's declared decoded length or disk file length, excluding
@@ -37,3 +37,24 @@ The word names and layouts follow Microsoft's [DDS_HEADER](https://learn.microso
 [DDS_PIXELFORMAT](https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-pixelformat) and
 [DDS_HEADER_DXT10](https://learn.microsoft.com/en-us/windows/win32/direct3ddds/dds-header-dxt10) declarations.
 The implementation reads bytes through the existing portable reader and adds no Windows API dependency.
+
+## DDS transfer declarations and their evidence
+
+The `transfer` object retains the exact Cry image flags and marker words, the
+DXGI and Cry interpretations, the effective transfer, and whether the known
+declarations conflict. Older metadata without this object remains readable
+and provides no transfer proof.
+
+An explicit typed sRGB or linear DXGI format is independent of the legacy
+Cry declaration. The Cry marker is the final legacy word at body byte 120.
+The image flags word is at body byte 32. Both offsets shift by four when
+DDS magic is present. Only the recognised Cry marker makes bit `0x800`
+meaningful. An absent marker and a legacy pixel format leave the transfer
+unknown. Two opposing known declarations retain their individual values,
+set the conflict field, and leave the effective transfer unknown.
+
+The DDS source transfer is independent of the texture's material role and
+the output file's transfer.
+
+See the [DXGI format definitions](https://learn.microsoft.com/en-us/windows/win32/api/dxgiformat/ne-dxgiformat-dxgi_format)
+and [Cry image extension header](https://github.com/aws/lumberyard/blob/master/dev/Code/CryEngine/CryCommon/ImageExtensionHelper.h).

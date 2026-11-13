@@ -13,9 +13,10 @@ use crate::{ConversionError, PreviewPngEvidence, SourceEvidenceError, SourceUses
 mod info_origins;
 
 pub use self::info_origins::{DdsInfoOriginError, dds_info_origins};
-pub use crate::dds_source_info::{DdsSourceWord, raw_dds_source_words};
+pub use crate::dds_source_info::{DDS_TRANSFER_ORIGIN_FIELDS, DdsSourceWord, raw_dds_source_words};
 pub use crate::model_textures::ObservedModelTexture;
 pub use crate::texture_preview_png::input::PreviewHeaderEvidence;
+pub use p4kx_texture::{DdsTransfer, DdsTransferEvidence};
 
 /// A decoded preview and its exact original DDS inputs.
 #[derive(Debug)]
