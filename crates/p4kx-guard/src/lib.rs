@@ -58,7 +58,7 @@ pub use installation::{Installation, without_verbatim_prefix};
 pub use owned_directory_permit::{
     OwnedDirectoryPermit, create_output_directory, validated_output_directory,
 };
-pub use owned_file_token::OwnedFileToken;
+pub use owned_file_token::{OwnedFileToken, is_redirected_metadata};
 pub use owned_output_cleanup::{
     OwnedOutputCleanupError, remove_owned_output, remove_owned_output_target_only,
 };

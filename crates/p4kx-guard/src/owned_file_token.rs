@@ -116,7 +116,7 @@ impl OwnedFileToken {
 
     fn matches(&self, path: &Path) -> Result<(), WriteProtectionError> {
         let metadata = fs::symlink_metadata(path).map_err(|error| identity_error(path, error))?;
-        if !metadata.is_file() || redirected_file(&metadata) {
+        if !metadata.is_file() || is_redirected_metadata(&metadata) {
             return Err(changed(path));
         }
         let current = Handle::from_path(path).map_err(|error| identity_error(path, error))?;
@@ -127,15 +127,19 @@ impl OwnedFileToken {
     }
 }
 
+/// Returns whether unfollowed metadata identifies a symlink or Windows reparse point.
 #[cfg(windows)]
-fn redirected_file(metadata: &fs::Metadata) -> bool {
+#[must_use]
+pub fn is_redirected_metadata(metadata: &fs::Metadata) -> bool {
     use std::os::windows::fs::MetadataExt as _;
 
     metadata.file_type().is_symlink() || content_reparse_point(metadata.file_attributes())
 }
 
+/// Returns whether unfollowed metadata identifies a symlink.
 #[cfg(not(windows))]
-fn redirected_file(metadata: &fs::Metadata) -> bool {
+#[must_use]
+pub fn is_redirected_metadata(metadata: &fs::Metadata) -> bool {
     metadata.file_type().is_symlink()
 }
 

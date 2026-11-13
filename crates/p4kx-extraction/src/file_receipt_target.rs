@@ -5,9 +5,9 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::{ArchiveWriteProtection, CancelToken, OriginArtifactName};
+use crate::{ArchiveWriteProtection, CancelToken, OriginArtifactName, is_redirected_metadata};
 
-use super::lock::{LOCK_NAME, invalid, redirected};
+use super::lock::{LOCK_NAME, invalid};
 use super::{COMPANION_SUFFIX, check};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -57,7 +57,7 @@ pub(super) fn bind_target(
                 leaf: TargetLeaf::SymbolicLink,
             }
         }
-        Ok(metadata) if metadata.is_file() && !redirected(&metadata) => BoundTarget {
+        Ok(metadata) if metadata.is_file() && !is_redirected_metadata(&metadata) => BoundTarget {
             path: fs::canonicalize(lexical)?,
             leaf: TargetLeaf::File,
         },
@@ -109,7 +109,7 @@ pub(super) fn lexical_receipt(path: &Path) -> io::Result<Option<OriginArtifactNa
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(error),
     };
-    if !metadata.is_file() || redirected(&metadata) {
+    if !metadata.is_file() || is_redirected_metadata(&metadata) {
         return Ok(None);
     }
     let actual = fs::canonicalize(path)?;

@@ -9,7 +9,7 @@ use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::Duration;
 
-use p4kx_guard::AliasUncertainty;
+use p4kx_guard::{AliasUncertainty, is_redirected_metadata};
 use same_file::Handle;
 
 use crate::{
@@ -325,29 +325,14 @@ fn same_lock(file: &Handle, path: &Path) -> io::Result<bool> {
 
 pub(super) fn regular_file(path: &Path) -> io::Result<Option<Metadata>> {
     match fs::symlink_metadata(path) {
-        Ok(metadata) if metadata.is_file() && !redirected(&metadata) => Ok(Some(metadata)),
+        Ok(metadata) if metadata.is_file() && !is_redirected_metadata(&metadata) => {
+            Ok(Some(metadata))
+        }
         Ok(_) => Err(invalid(
             "the origin target must be a regular, non-redirected file",
         )),
         Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(None),
         Err(error) => Err(error),
-    }
-}
-
-pub(super) fn redirected(metadata: &Metadata) -> bool {
-    if metadata.file_type().is_symlink() {
-        return true;
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt as _;
-
-        const REPARSE_POINT: u32 = 0x400;
-        metadata.file_attributes() & REPARSE_POINT != 0
-    }
-    #[cfg(not(windows))]
-    {
-        false
     }
 }
 

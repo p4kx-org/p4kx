@@ -4,6 +4,8 @@
 use std::fs::{self, Metadata};
 use std::path::{Component, Path, PathBuf};
 
+use p4kx_extraction::is_redirected_metadata;
+
 use crate::MediaError;
 use crate::checkpoint::Checkpoint;
 use crate::error;
@@ -76,7 +78,7 @@ fn existing(path: &Path) -> Result<Option<Metadata>, MediaError> {
 
 fn inspect(path: &Path) -> Result<Option<Metadata>, MediaError> {
     match fs::symlink_metadata(path) {
-        Ok(metadata) if redirected(&metadata) => inspect_redirected(path),
+        Ok(metadata) if is_redirected_metadata(&metadata) => inspect_redirected(path),
         Ok(metadata) => Ok(Some(metadata)),
         Err(source) if source.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(source) => Err(error::io(path, source)),
@@ -104,20 +106,4 @@ fn inspect_redirected(path: &Path) -> Result<Option<Metadata>, MediaError> {
 
 fn not_plain(path: &Path) -> MediaError {
     MediaError::Destination(format!("{} is not a plain output path", path.display()))
-}
-
-fn redirected(metadata: &Metadata) -> bool {
-    if metadata.file_type().is_symlink() {
-        return true;
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt as _;
-        const FILE_ATTRIBUTE_REPARSE_POINT: u32 = 0x400;
-        metadata.file_attributes() & FILE_ATTRIBUTE_REPARSE_POINT != 0
-    }
-    #[cfg(not(windows))]
-    {
-        false
-    }
 }
