@@ -11,6 +11,11 @@ use assert_cmd::Command;
 use p4kx_testkit::{ArchiveBuilder, GlobalIniBuilder, TestEntry};
 use predicates::prelude::predicate;
 
+#[path = "loc_json_origin.rs"]
+mod json_origin;
+
+use json_origin::payload_snapshot;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn english() -> TestEntry {
@@ -149,7 +154,7 @@ fn get_falls_back_when_the_language_has_no_text() -> TestResult {
         ]),
         0,
     )?;
-    insta::assert_snapshot!("loc_get_fallback_json", json);
+    insta::assert_snapshot!("loc_get_fallback_json", payload_snapshot(&json)?);
     let own = stdout_of(
         p4kx()?.args(["--json", "loc", "get"]).arg(&archive).args([
             "item_NameRifle",
@@ -160,7 +165,7 @@ fn get_falls_back_when_the_language_has_no_text() -> TestResult {
         ]),
         0,
     )?;
-    insta::assert_snapshot!("loc_get_found_json", own);
+    insta::assert_snapshot!("loc_get_found_json", payload_snapshot(&own)?);
     Ok(())
 }
 
@@ -188,7 +193,7 @@ fn get_of_a_missing_key_exits_with_2() -> TestResult {
         ]),
         2,
     )?;
-    insta::assert_snapshot!("loc_get_missing_json", json);
+    insta::assert_snapshot!("loc_get_missing_json", payload_snapshot(&json)?);
     Ok(())
 }
 
@@ -203,7 +208,7 @@ fn get_of_a_placeholder_key_has_no_text_but_succeeds() -> TestResult {
             .arg("@LOC_EMPTY"),
         0,
     )?;
-    insta::assert_snapshot!("loc_get_placeholder_json", json);
+    insta::assert_snapshot!("loc_get_placeholder_json", payload_snapshot(&json)?);
     Ok(())
 }
 

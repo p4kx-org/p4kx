@@ -1417,6 +1417,10 @@ GUID, record path and reason, ordered by record path; the exit code is 1 when it
 `languages` lists the languages the Archive holds a `global.ini` for, in the order `en`, `de`,
 `fr`, `it`, `es-ES`, `es-419`, `pt-BR`, `ja`, `ko`, `zh-Hans`, `zh-Hant`.
 
+The `fieldOrigins` map addresses the original directory information for each
+language's `code`, `folder` and `entry`. Listing a language reads its Entry path,
+and its translation payload may have a different encryption state.
+
 ## `p4kx loc get <archive> <key> [--lang <language>] [--fallback <language>] --json`
 
 ```json
@@ -1429,6 +1433,15 @@ GUID, record path and reason, ordered by record path; the exit code is 1 when it
 `@LOC_UNINITIALIZED` and `@blank_space`, which stand for no text) or `missing`. `text_language`
 and `text` are `null` for the last two; `text` has `\n` decoded to a line feed. A `missing` key is
 printed and then ends the command with exit code 2.
+
+The `fieldOrigins` map and shared `provenance` inventory describe each output
+field. `/text` cites the winning value and its byte range in the decoded
+UTF-8 localization input. It also retains the selectors that chose the result.
+`/status` and `/text_language` cite those selectors. A missing or empty preferred
+value can select a fallback, so a plain translation can carry an encrypted
+selector. A UTF-16 Entry retains its original Archive evidence. A missing
+lookup uses the normalized key in the queried Entry. Placeholder results
+require no lookup.
 
 ## `p4kx loc export <archive> [--lang <language>,…] [--format json|csv] [--out <file>]`
 

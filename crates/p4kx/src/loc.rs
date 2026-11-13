@@ -17,6 +17,9 @@ use crate::cli_loc::{LocAction, LocArgs, LocExportArgs, LocGetArgs, TableOutput}
 use crate::dcb_export::FlatConflict;
 use crate::{exit, json};
 
+#[path = "loc_json_origin.rs"]
+mod origin;
+
 /// A language the Archive holds no `global.ini` for was asked for.
 #[derive(Debug, Error)]
 #[error("the Archive holds no global.ini for the language {language}")]
@@ -67,14 +70,9 @@ struct LanguagesJson<'a> {
 fn languages(path: &std::path::Path, as_json: bool) -> Result<()> {
     let archive = crate::key::open(path)?;
     let present = LocalizationEntry::languages(&archive);
-    let listed: Vec<(Language, &str)> = present
+    let listed: Vec<_> = present
         .iter()
-        .filter_map(|&language| {
-            Some((
-                language,
-                LocalizationEntry::locate(&archive, language)?.path(),
-            ))
-        })
+        .filter_map(|&language| Some((language, LocalizationEntry::locate(&archive, language)?)))
         .collect();
     let mut out = BufWriter::new(io::stdout().lock());
     if as_json {
@@ -85,15 +83,21 @@ fn languages(path: &std::path::Path, as_json: bool) -> Result<()> {
                 .map(|&(language, entry)| LanguageJson {
                     code: language.code(),
                     folder: language.folder(),
-                    entry,
+                    entry: entry.path(),
                 })
                 .collect(),
         };
-        serde_json::to_writer(&mut out, &report)?;
+        serde_json::to_writer(&mut out, &origin::languages(&archive, &listed, report)?)?;
         writeln!(out)?;
     } else {
         for (language, entry) in listed {
-            writeln!(out, "{}\t{}\t{entry}", language.code(), language.folder())?;
+            writeln!(
+                out,
+                "{}\t{}\t{}",
+                language.code(),
+                language.folder(),
+                entry.path()
+            )?;
         }
     }
     out.flush()?;
@@ -139,6 +143,7 @@ fn get(args: &LocGetArgs, as_json: bool) -> Result<ExitCode> {
             text_language: lookup.language().map(Language::code),
             text: decoded.as_deref(),
         };
+        let report = origin::get(&set, &texts, args.lang, args.fallback, lookup, report)?;
         serde_json::to_writer(&mut out, &report)?;
         writeln!(out)?;
     } else if let Some(text) = &decoded {
