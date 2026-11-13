@@ -31,6 +31,10 @@ An absent pointer is null; the fieldless base is an explicit concrete object. Em
 remain empty, and unresolved target identities remain present. This value references the
 independent AutoSpawns definitions without flattening them into legacy NPC-spawn descriptions.
 
+The ignored AutoSpawns source comparison requires a physical Template with a readable target.
+Set P4KX_EXPECT_AUTO_SPAWNS_CLOSET_TAGS=1 to also require authored closet tags. Both modes
+compare every selected occurrence and the exact source state of its search options.
+
 ## Investigation
 
 `MissionPropertyValue_Investigation` has discriminator `investigation` and ordered

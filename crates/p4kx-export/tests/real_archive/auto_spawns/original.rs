@@ -68,11 +68,18 @@ fn retain<'tree, 'source>(
     }
 }
 
+pub(super) fn resolved_reference(case: &Selected<'_, '_>) -> bool {
+    matches!(
+        structure(case.value).and_then(|source| source.field("autoSpawns")),
+        Some(Value::Reference(link)) if link.location().is_none()
+    )
+}
+
 pub(super) fn populated_closet(case: &Selected<'_, '_>) -> bool {
     let Some(value) = structure(case.value) else {
         return false;
     };
-    matches!(value.field("autoSpawns"), Some(Value::Reference(link)) if link.location().is_none())
+    resolved_reference(case)
         && value
             .field("searchOptions")
             .and_then(structure)

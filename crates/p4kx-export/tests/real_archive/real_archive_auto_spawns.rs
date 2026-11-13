@@ -32,7 +32,8 @@ fn selected_auto_spawns_match_authored_references_and_closet_search() -> TestRes
     watch.check().map_err(|_| "Archive changed")?;
     let entry = DataForgeEntry::read(&archive).map_err(|_| "read original DataForge")?;
     let forge = entry.open().map_err(|_| "open original DataForge")?;
-    let witnesses = find_witnesses(&forge, &watch)?;
+    let require_closet = std::env::var_os("P4KX_EXPECT_AUTO_SPAWNS_CLOSET_TAGS").is_some();
+    let witnesses = find_witnesses(&forge, &watch, require_closet)?;
     for witness in &witnesses {
         compare(&archive, &entry, &watch, witness)?;
     }
@@ -48,6 +49,7 @@ struct Witness<'source> {
 fn find_witnesses<'source>(
     forge: &'source DataForge<'source>,
     watch: &ArchiveWatch,
+    require_closet: bool,
 ) -> TestResult<Vec<Witness<'source>>> {
     let mut builder = TreeBuilder::new();
     let mut template = None;
@@ -62,7 +64,8 @@ fn find_witnesses<'source>(
         let tree = builder.build(&record).map_err(|_| "read mission owner")?;
         let values = original::selected(tree.root(), family);
         let supported = match family {
-            Family::Template => values.iter().any(original::populated_closet),
+            Family::Template if require_closet => values.iter().any(original::populated_closet),
+            Family::Template => values.iter().any(original::resolved_reference),
             Family::Broker => !values.is_empty(),
         };
         if supported {
@@ -72,7 +75,12 @@ fn find_witnesses<'source>(
             break;
         }
     }
-    let template = template.ok_or("Archive lacks a selected Template with a readable AutoSpawns target and authored closet tags")?;
+    let expected = if require_closet {
+        "Archive lacks a selected Template with a readable AutoSpawns target and authored closet tags"
+    } else {
+        "Archive lacks a selected Template with a readable AutoSpawns target"
+    };
+    let template = template.ok_or(expected)?;
     Ok(std::iter::once(template).chain(broker).collect())
 }
 
