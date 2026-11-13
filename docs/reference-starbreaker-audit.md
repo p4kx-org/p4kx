@@ -330,3 +330,47 @@ derived comparison of clip endpoints remain independent facts.
 [Upstream merge limitations](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/docs/decomposed-export-contract.md#L767-L803)
 · [Upstream pose sampler](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/pipeline/default_pose.rs)
 · [P4KX header listing](../crates/p4kx-extraction/src/animation_listing.rs)
+
+### Integration recheck on 2026-11-14
+
+GitHub still reported the open upstream PR at `14ae2d99`, with 32 commits
+and 123 changed files. The P4KX comparison used the pushed integration
+checkout at `9ebb9d655`.
+
+- Static Entity and Interior packages can include an optional vertex map
+  linking each GLB POSITION accessor to the physical model and stream,
+  requested and actual LOD, and available original source indices and
+  origins. A second export to the same destinations produced identical map
+  digests. Blender 5.3 imported the replacement package with verified digests
+  and no warnings. Rigged mapping and full model metadata acceptance remain in
+  [#1092](https://github.com/p4kx-org/p4kx/issues/1092).
+- The comparable upstream GLB integration test checks emitted material-slot
+  order against the associated material description. P4KX accepted a
+  structurally valid GLB with two transposed `p4kx_index` tags and applied
+  the two material descriptions to the wrong slots. Static package preflight
+  now checks explicit tags against their actual array indices. Older
+  untagged meshes retain the existing name fallback. Blender 5.3 verified
+  matching same-name indices and skipped the affected mesh when the tags
+  were transposed. [StarBreaker GLB integration test](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/tests/decomposed_glb.rs)
+  · [P4KX validation change](https://github.com/p4kx-org/p4kx/commit/9ebb9d655).
+- The palette comparison exposed another default-value problem. The Blender
+  graph treated an explicit zero layer `GlossMult` as the neutral multiplier
+  of one. The synthetic palette fixture now yields a roughness input of one
+  for that layer, in agreement with the P4KX GLB factor path.
+  [Upstream palette source](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/pipeline/palette.rs)
+  · [P4KX gloss change](https://github.com/p4kx-org/p4kx/commit/6856c157a).
+- The animation provider publishes both global image sources with their raw
+  payloads and verified path spans. A CAF-to-DBA clip edge requires the original
+  bank selector and a matching full path in the physical bank metadata.
+  An encrypted bank can therefore mark a joined clip field as encrypted even
+  when the index path and hash themselves came from an unencrypted source.
+  Full directional record framing remains unverified.
+  [#1141](https://github.com/p4kx-org/p4kx/issues/1141)
+  · [P4KX field provenance change](https://github.com/p4kx-org/p4kx/commit/6ca661ba2).
+
+The upstream room-containment helper tests geometric inclusion for a point
+in a container-local segment. It does not add authored room membership to
+the export. P4KX exports the segment geometry and source GUID links in
+[#1129](https://github.com/p4kx-org/p4kx/issues/1129). A consumer can compute
+inclusion from those inputs when it needs it.
+[Upstream containment helper](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/socpak/room_containment.rs).
