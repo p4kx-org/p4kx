@@ -137,6 +137,7 @@ mod prefab;
 mod prefab_lookup;
 mod prop_on_skin_port;
 mod prop_on_skin_port_edges;
+mod soc_room_index;
 mod stinger_indexed_bank;
 mod vehicle_api;
 mod vehicle_depth;

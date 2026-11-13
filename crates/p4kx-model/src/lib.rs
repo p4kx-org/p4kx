@@ -117,10 +117,14 @@ mod skeleton;
 mod skeleton_source;
 mod skin;
 mod smooth_normals;
+mod soc_area_component;
 mod soc_entities;
 mod soc_entity_source;
 mod soc_geometry;
 mod soc_light;
+mod soc_room_registry;
+mod soc_room_segment;
+mod soc_source_node;
 mod streams;
 mod transform;
 mod vector;
@@ -199,10 +203,16 @@ pub use prefab::{
 };
 pub use rig_logic_bytes::RigLogicBytes;
 pub use skeleton_source::SkeletonSource;
+pub use soc_area_component::{SocAreaComponent, SocAreaLink};
 pub use soc_entities::{
     MAX_SOC_ENTITIES, MAX_SOC_PLACED, SocClassEntity, SocEntities, SocEntitiesError, SocPalette,
     SocProp,
 };
 pub use soc_entity_source::{SocEntity, SocEntityChunk, SocEntityFile, SocEntitySourceError};
 pub use soc_light::{LightState, SocLight};
+pub use soc_room_registry::{SocRoomDeclaration, SocRoomRegistry, SocRoomRegistryError};
+pub use soc_room_segment::{
+    SocRoomSegment, SocSegmentGeometry, SocSegmentPoint, SocSegmentTransform,
+};
+pub use soc_source_node::SocSourceValue;
 pub use transform::Transform;

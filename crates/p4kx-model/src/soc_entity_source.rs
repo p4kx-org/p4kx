@@ -6,6 +6,7 @@ use p4kx_cryxml::{SourceDocument, SourceElement, SourceReadError, SourceReadOpti
 use thiserror::Error;
 
 use crate::Transform;
+use crate::soc_area_component::SocAreaComponent;
 use crate::soc_entities::{self, ENTITIES};
 
 /// A failure to open or interpret an authored SOC entity chunk.
@@ -165,6 +166,11 @@ impl<'document> SocEntity<'document> {
     #[must_use]
     pub const fn element(self) -> SourceElement<'document> {
         self.element
+    }
+
+    /// Visits `AreaComponent` occurrences in their original Entity slots.
+    pub fn area_components(self) -> impl Iterator<Item = SocAreaComponent<'document>> {
+        SocAreaComponent::read(self.element)
     }
 
     /// Derives the container-local transform from unique `Pos`, `Rotate` and `Scale` attributes.

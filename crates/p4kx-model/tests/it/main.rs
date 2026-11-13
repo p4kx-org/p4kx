@@ -42,6 +42,7 @@ mod skeleton;
 mod skin_levels;
 mod soc_entities;
 mod soc_entity_source;
+mod soc_room_source;
 mod structured;
 mod transform;
 mod unresolved_layers;
