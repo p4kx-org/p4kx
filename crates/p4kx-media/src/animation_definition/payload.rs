@@ -16,6 +16,7 @@ pub(super) const DECLARATION: &str = "animation-definition-declaration";
 pub(super) const CONTENT: &str = "animation-definition-content";
 pub(super) const BINARY_TEXT: &str = "animation-definition-binary-text";
 pub(super) const LINK: &str = "animation-definition-link";
+pub(super) const NAMED_CAF: &str = "animation-definition-named-caf";
 
 #[derive(Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -60,6 +61,7 @@ pub(super) enum DefinitionPayload<'source> {
     Content(AtlContent<'source>),
     BinaryText(AtlBinaryText<'source>),
     Link(DefinitionLink<'source>),
+    NamedCaf(NamedCaf<'source>),
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -97,4 +99,15 @@ pub(super) enum LinkKind {
     EventDatabase,
     SubDatabase,
     CombinedSpace,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct NamedCaf<'source> {
+    pub(super) name: &'source str,
+    pub(super) authored_path: &'source str,
+    pub(super) filepath_scope: Option<&'source str>,
+    pub(super) archive_path: Option<String>,
+    #[schemars(schema_with = "crate::schema::reference_definition")]
+    pub(super) reference: Reference,
 }

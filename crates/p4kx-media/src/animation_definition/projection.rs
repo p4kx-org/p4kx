@@ -4,11 +4,13 @@
 use std::io;
 
 use p4kx_extraction::cryxml::{
-    SourceContent, SourceContents, SourceDocument, SourceElement, SourceSpanError,
+    SourceContent, SourceContents, SourceDeclaration, SourceDocument, SourceElement,
+    SourceSpanError,
 };
 use p4kx_extraction::{DecimalU64, SourceUseRole};
 
 use super::links;
+use super::named_clip::Filepath;
 use super::payload::{self as wire, DefinitionFamily, DefinitionPayload};
 use crate::audio_control_payload::{
     AtlBinaryText, AtlContent, AtlDeclaration, AtlElement, AtlLocation, AtlPosition,
@@ -45,6 +47,7 @@ impl From<MediaError> for Failure {
 struct Frame<'document> {
     parent: Option<u64>,
     parent_name: Option<&'document str>,
+    filepath: Option<Filepath<'document>>,
     siblings: SourceContents<'document>,
     next_sibling: u64,
 }
@@ -59,6 +62,7 @@ impl DefinitionProjection<'_, '_> {
         let mut stack = vec![Frame {
             parent: None,
             parent_name: None,
+            filepath: None,
             siblings: source.content(),
             next_sibling: 0,
         }];
@@ -74,10 +78,9 @@ impl DefinitionProjection<'_, '_> {
                 sibling_ordinal: DecimalU64::new(frame.next_sibling),
             };
             frame.next_sibling = advance(frame.next_sibling)?;
-            let parent_name = frame.parent_name;
             match item? {
                 SourceContent::Element(element) => {
-                    let child = self.element(element, parent_name, index, location, writer)?;
+                    let child = self.element(element, frame, index, location, writer)?;
                     stack.try_reserve(1).map_err(|cause| MediaError::Io {
                         path: writer.root.clone(),
                         source: io::Error::new(io::ErrorKind::OutOfMemory, cause),
@@ -107,7 +110,7 @@ impl DefinitionProjection<'_, '_> {
     fn element<'document>(
         &self,
         element: SourceElement<'document>,
-        parent_name: Option<&str>,
+        parent: &mut Frame<'document>,
         index: u64,
         location: AtlLocation,
         writer: &mut MediaWriter<'_>,
@@ -129,25 +132,13 @@ impl DefinitionProjection<'_, '_> {
         let budget = &self.context.directory.input_state()?.budget;
         for (ordinal, declaration) in syntax.declarations().enumerate() {
             budget.metadata(0, 1, writer.limits(), writer.checkpoint)?;
-            let declaration = declaration?;
-            let position = declaration_position(declaration.position())?;
-            let indices = [index, ordinal as u64];
-            self.write(
-                position,
-                wire::DECLARATION,
-                indices.to_vec(),
-                &DefinitionPayload::Declaration(AtlDeclaration {
-                    qualified_name: declaration.qualified_name(),
-                    value: declaration.value(),
-                    lexeme: declaration.lexeme(),
-                    kind: declaration.kind().try_into()?,
-                    position,
-                }),
+            self.declaration(
+                element,
+                parent,
+                &declaration?,
+                [index, ordinal as u64],
                 writer,
             )?;
-            if let Some(kind) = links::kind(self.family, element, parent_name, &declaration) {
-                links::write(self, &kind, declaration.value(), position, indices, writer)?;
-            }
         }
         if let Some(text) = syntax.binary_text() {
             let position = content_position(text.position())?;
@@ -165,9 +156,41 @@ impl DefinitionProjection<'_, '_> {
         Ok(Frame {
             parent: Some(index),
             parent_name: element.namespace().is_none().then(|| element.name()),
+            filepath: Filepath::for_list(self.family, element, parent.parent_name),
             siblings: syntax.content()?,
             next_sibling: 0,
         })
+    }
+
+    fn declaration<'document>(
+        &self,
+        element: SourceElement<'document>,
+        parent: &mut Frame<'document>,
+        declaration: &SourceDeclaration<'document>,
+        indices: [u64; 2],
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), Failure> {
+        let position = declaration_position(declaration.position())?;
+        self.write(
+            position,
+            wire::DECLARATION,
+            indices.to_vec(),
+            &DefinitionPayload::Declaration(AtlDeclaration {
+                qualified_name: declaration.qualified_name(),
+                value: declaration.value(),
+                lexeme: declaration.lexeme(),
+                kind: declaration.kind().try_into()?,
+                position,
+            }),
+            writer,
+        )?;
+        if let Some(kind) = links::kind(self.family, element, parent.parent_name, declaration) {
+            links::write(self, &kind, declaration.value(), position, indices, writer)?;
+        }
+        if let Some(filepath) = &mut parent.filepath {
+            filepath.observe(self, element, declaration, position, indices, writer)?;
+        }
+        Ok(())
     }
 
     fn write(

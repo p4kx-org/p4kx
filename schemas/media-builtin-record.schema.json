@@ -952,6 +952,23 @@
             "payload"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/NamedCaf"
+            },
+            "record_type": {
+              "const": "named-caf",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
         }
       ],
       "title": "DefinitionPayload"
@@ -11532,6 +11549,40 @@
         }
       ],
       "title": "MusicTransitionRulePayload"
+    },
+    "NamedCaf": {
+      "additionalProperties": false,
+      "properties": {
+        "archive_path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "authored_path": {
+          "type": "string"
+        },
+        "filepath_scope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "reference": {
+          "$ref": "#/$defs/Reference"
+        }
+      },
+      "required": [
+        "name",
+        "authored_path",
+        "filepath_scope",
+        "archive_path",
+        "reference"
+      ],
+      "type": "object"
     },
     "NamedKind": {
       "enum": [
@@ -36893,6 +36944,61 @@
                 "properties": {
                   "record_type": {
                     "const": "link"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-named-caf"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "named-caf"
                   }
                 },
                 "required": [

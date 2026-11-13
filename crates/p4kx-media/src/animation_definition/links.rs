@@ -10,17 +10,19 @@ use super::origins;
 use super::payload::{self as wire, DefinitionFamily, DefinitionLink, DefinitionPayload, LinkKind};
 use super::projection::DefinitionProjection;
 use crate::audio_control_payload::AtlPosition;
+use crate::origin_contributions::OriginContributions;
+use crate::origin_prepared::PreparedRecordOrigins;
 use crate::origin_reference::{ReferenceIdentifier, ReferenceOriginInputs, ReferenceSubresource};
 use crate::xml_source_projection::declaration_position;
+use crate::{
+    CandidateInventory, MediaError, MediaKind, MediaWriter, OriginalIdentifier, Reference,
+    ReferenceUnavailable, Status, Subresource, origin_error,
+};
 
 pub(super) struct LinkSelector {
     pub(super) kind: LinkKind,
     name_position: Option<SourceAttributePosition>,
 }
-use crate::{
-    CandidateInventory, MediaError, MediaKind, MediaWriter, OriginalIdentifier,
-    ReferenceUnavailable, Status, Subresource, origin_error,
-};
 
 pub(super) fn kind(
     family: DefinitionFamily,
@@ -108,36 +110,15 @@ pub(super) fn write(
         writer,
     )?;
     let kind = selector.kind;
-    let original = OriginalIdentifier::new_with_path(authored_path);
     let archive_path = target_path(kind, authored_path);
-    let reference = if let Some(path) = &archive_path {
-        let lookup = projection.context.directory.lookup_input_observed(
-            original,
-            path,
-            Some(kind.target_kind()),
-            writer,
-        )?;
-        let origins = ReferenceOriginInputs {
-            original: &proof,
-            selector: &selection,
-            inventory: &lookup.inventory,
-            semantic: &proof,
-            candidates: &lookup.evidence,
-            read_selected: false,
-            identifier: ReferenceIdentifier::Path,
-            subresource: ReferenceSubresource::None,
-        };
-        let address = FieldPath::parse("/data/payload/reference")
-            .map_err(|cause| origin_error::address(&cause))?;
-        origins.write(&mut prepared, &address, &lookup.lookup.reference, writer)?;
-        lookup.lookup.reference
-    } else {
-        writer.resolve_reference(
-            original,
-            [],
-            CandidateInventory::Unavailable(ReferenceUnavailable::InvalidIdentifier),
-        )?
-    };
+    let reference = ReferenceSelection {
+        authored_path,
+        archive_path: archive_path.as_deref(),
+        kind: kind.target_kind(),
+        original: &proof,
+        selector: &selection,
+    }
+    .resolve(projection, &mut prepared, writer)?;
     prepared.write(
         writer,
         &Subresource::new(wire::LINK, indices.to_vec()),
@@ -152,13 +133,67 @@ pub(super) fn write(
     )
 }
 
+pub(super) struct ReferenceSelection<'a> {
+    pub(super) authored_path: &'a str,
+    pub(super) archive_path: Option<&'a str>,
+    pub(super) kind: MediaKind,
+    pub(super) original: &'a OriginContributions,
+    pub(super) selector: &'a OriginContributions,
+}
+
+impl ReferenceSelection<'_> {
+    pub(super) fn resolve(
+        &self,
+        projection: &DefinitionProjection<'_, '_>,
+        prepared: &mut PreparedRecordOrigins,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<Reference, MediaError> {
+        let original = OriginalIdentifier::new_with_path(self.authored_path);
+        let address = FieldPath::parse("/data/payload/reference")
+            .map_err(|cause| origin_error::address(&cause))?;
+        let Some(path) = self.archive_path else {
+            prepared.insert_subtree(&address, self.selector.clone(), writer)?;
+            let original_address = crate::origin_reference::child(&address, "original")?;
+            prepared.insert_subtree(&original_address, self.original.clone(), writer)?;
+            crate::origin_reference::independent(
+                prepared,
+                &crate::origin_reference::child(&original_address, "type")?,
+                writer,
+            )?;
+            return writer.resolve_reference(
+                original,
+                [],
+                CandidateInventory::Unavailable(ReferenceUnavailable::InvalidIdentifier),
+            );
+        };
+        let lookup = projection.context.directory.lookup_input_observed(
+            original,
+            path,
+            Some(self.kind),
+            writer,
+        )?;
+        let origins = ReferenceOriginInputs {
+            original: self.original,
+            selector: self.selector,
+            inventory: &lookup.inventory,
+            semantic: self.original,
+            candidates: &lookup.evidence,
+            read_selected: false,
+            identifier: ReferenceIdentifier::Path,
+            subresource: ReferenceSubresource::None,
+        };
+        origins.write(prepared, &address, &lookup.lookup.reference, writer)?;
+        Ok(lookup.lookup.reference)
+    }
+}
+
 impl LinkSelector {
     fn proof(
         &self,
         input: &crate::origin_input::MediaOriginInput,
-        path: &crate::origin_contributions::OriginContributions,
+        path: &OriginContributions,
         writer: &MediaWriter<'_>,
-    ) -> Result<crate::origin_contributions::OriginContributions, MediaError> {
+    ) -> Result<OriginContributions, MediaError> {
         let mut selection = writer.capture_origins();
         selection.include(path, writer)?;
         if let Some(position) = &self.name_position {
@@ -194,13 +229,18 @@ fn target_path(kind: LinkKind, path: &str) -> Option<String> {
             extension.eq_ignore_ascii_case("bspace") || extension.eq_ignore_ascii_case("comb")
         }
     };
-    if !supported
-        || path.split(['/', '\\']).any(|part| {
-            matches!(part, "" | "." | "..")
-                || part.contains([':', '\0', '!', '*', '?'])
-                || part.ends_with([' ', '.'])
-        })
-    {
+    if !supported {
+        return None;
+    }
+    archive_animation_path(path)
+}
+
+pub(super) fn archive_animation_path(path: &str) -> Option<String> {
+    if path.split(['/', '\\']).any(|part| {
+        matches!(part, "" | "." | "..")
+            || part.contains([':', '\0', '!', '*', '?'])
+            || part.ends_with([' ', '.'])
+    }) {
         return None;
     }
     let mut parts = path.split(['/', '\\']);

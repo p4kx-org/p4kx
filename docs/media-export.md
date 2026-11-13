@@ -529,3 +529,15 @@ The link keeps the original path and the separately normalized lookup path.
 Missing, unselected, ambiguous and unsupported paths retain explicit outcomes.
 A reference is an edge. Its target contents remain independently selected sources.
 Malformed documents are diagnosed with retained original bytes in diagnostic exports.
+
+Within a character parameter `AnimationList`, `named-caf` link rows keep each
+concrete animation declaration at the original path attribute's coordinates,
+including repetitions. For relative paths the latest preceding `#filepath`
+in the same list supplies the directory. An empty directive resets that
+scope. Explicit `Animations/` or `Data/` paths address the Archive root.
+The row keeps the original name, path and directory text, separately from the
+normalized lookup path and candidate identities. The origin of a relative
+lookup includes the active directive and its directory attribute. Wildcard
+rules remain in the ordered source declarations. A named CAF link looks up
+physical loose CAF entries without reading their payload. It does not
+identify matches inside a tracks database or establish the clip used at runtime.

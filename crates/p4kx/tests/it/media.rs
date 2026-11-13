@@ -91,6 +91,59 @@ fn explicit_animation_definition_kind_can_publish_empty_selection() -> TestResul
 }
 
 #[test]
+fn animation_definition_cli_links_a_named_caf_without_selecting_its_payload() -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let source = folder.path().join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(
+            "Data/Objects/fixture.chrparams",
+            br##"<Params><AnimationList>
+            <Animation name="#filepath" path="Animations/Fixture"/>
+            <Animation name="sample" path="sample.caf"/>
+            </AnimationList></Params>"##,
+        ))
+        .entry(TestEntry::stored(
+            "Data/Animations/Fixture/sample.caf",
+            b"opaque",
+        ))
+        .write_to(&source)?;
+    let output = folder.path().join("media");
+    p4kx_testkit::p4kx()?
+        .args(["media", "export"])
+        .arg(&source)
+        .arg("--out")
+        .arg(&output)
+        .args(["--kind", "animation-definition"])
+        .assert()
+        .success();
+    let index: Value = serde_json::from_slice(&fs::read(output.join("media-index.json"))?)?;
+    let base = index
+        .get("artifact_base")
+        .and_then(Value::as_str)
+        .ok_or("media artifact base")?;
+    let rows = jsonl_rows(&output.join(base).join("animation-definition.jsonl"))?;
+    let named = rows
+        .iter()
+        .find(|row| row.pointer("/data/record_type").and_then(Value::as_str) == Some("named-caf"))
+        .ok_or("named CAF row")?;
+    assert_eq!(
+        named
+            .pointer("/data/payload/archive_path")
+            .and_then(Value::as_str),
+        Some("Data/Animations/Fixture/sample.caf"),
+        "the running directive resolves the original CAF",
+    );
+    assert_eq!(
+        named
+            .pointer("/data/payload/reference/resolution/status")
+            .and_then(Value::as_str),
+        Some("not-selected"),
+        "definition-only selection retains the target without reading it",
+    );
+    Ok(())
+}
+
+#[test]
 fn media_output_inside_the_opened_installation_is_refused() -> TestResult {
     let folder = tempfile::tempdir()?;
     let channel = folder.path().join("StarCitizen/PTU");

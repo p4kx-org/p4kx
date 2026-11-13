@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 mod links;
+mod named_clip;
 mod origins;
 mod payload;
 mod projection;

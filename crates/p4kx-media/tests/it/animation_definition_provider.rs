@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fs;
+use std::path::Path;
 
 use p4kx_extraction::{Archive, OpenOptions};
 use p4kx_media::{ExportOptions, MediaKind, MediaRecord, Status};
@@ -89,7 +90,7 @@ fn verify_links(rows: &[MediaRecord]) {
     );
 }
 
-fn verify_link_origins(rows: &[MediaRecord], base: &std::path::Path) -> TestResult {
+fn verify_link_origins(rows: &[MediaRecord], base: &Path) -> TestResult {
     let (ordinal, _) = rows
         .iter()
         .enumerate()
@@ -144,7 +145,7 @@ fn verify_link_origins(rows: &[MediaRecord], base: &std::path::Path) -> TestResu
     Ok(())
 }
 
-fn verify_source(rows: &[MediaRecord], base: &std::path::Path) -> TestResult {
+fn verify_source(rows: &[MediaRecord], base: &Path) -> TestResult {
     let params = rows
         .iter()
         .find(|row| {

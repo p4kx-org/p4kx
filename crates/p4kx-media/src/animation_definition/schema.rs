@@ -25,6 +25,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         (wire::CONTENT, "content", 1),
         (wire::BINARY_TEXT, "binary-text", 1),
         (wire::LINK, "link", 2),
+        (wire::NAMED_CAF, "named-caf", 2),
     ] {
         branches.push(json!({
             "if": {"properties": {

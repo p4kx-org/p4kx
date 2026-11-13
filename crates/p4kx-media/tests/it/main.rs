@@ -4,6 +4,7 @@
 //! Synthetic media contract, source preservation and provider integration tests.
 
 mod animation_definition_provider;
+mod animation_named_caf_provider;
 mod animation_provider;
 mod archive;
 mod archive_layout;
