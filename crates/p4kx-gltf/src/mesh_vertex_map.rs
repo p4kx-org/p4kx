@@ -6,7 +6,7 @@ use std::io::{self, Write};
 use gltf_json::Root;
 use gltf_json::mesh::Semantic;
 use gltf_json::validation::Checked::Valid;
-use p4kx_model::MeshOrigin;
+use p4kx_model::{Mesh, MeshOrigin, MeshVertexOrigin};
 
 use crate::instance::Instance;
 use crate::layout::Layout;
@@ -15,13 +15,15 @@ use crate::texture_loader::{NoTextures, TextureLoader};
 use crate::{GlbOptions, GlbSummary, GltfError};
 
 /// The actual vertex order of one emitted GLB mesh.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub struct MeshVertexMap<'a> {
     /// The GLB mesh index.
     pub mesh: usize,
     /// The GLB POSITION accessor shared by this mesh's primitives.
     pub position_accessor: usize,
+    /// The count of actually written POSITION elements.
+    pub vertices: u64,
     /// The model instance that supplied the geometry, in producer order.
     pub part: usize,
     /// The originating node index in that instance's model.
@@ -34,6 +36,16 @@ pub struct MeshVertexMap<'a> {
     pub origin: Option<MeshOrigin>,
     /// One physical stream vertex ordinal per emitted POSITION element when proven.
     pub source_vertices: Option<&'a [u32]>,
+    mesh_source: &'a Mesh,
+}
+
+impl MeshVertexMap<'_> {
+    /// Returns original first-use index coordinates when the position order is known.
+    pub fn vertex_origins(&self) -> impl Iterator<Item = MeshVertexOrigin> + '_ {
+        self.source_vertices
+            .into_iter()
+            .flat_map(|_| self.mesh_source.vertex_origins())
+    }
 }
 
 /// Writes a scene and visits each emitted GLB mesh and its source vertex map.
@@ -90,11 +102,13 @@ pub(crate) fn observe(
         visitor(MeshVertexMap {
             mesh: index,
             position_accessor: position.value(),
+            vertices: accessor.count.0,
             part: plan.part,
             model_node: source.node,
             requested_lod,
             model_lod: lod.level,
             origin,
+            mesh_source: source,
             source_vertices: origin
                 .filter(|_| source.source.len() as u64 == accessor.count.0)
                 .map(|_| source.source.as_slice()),

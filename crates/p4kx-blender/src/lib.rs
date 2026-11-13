@@ -43,6 +43,8 @@ mod manifest_rig;
 mod material_emission_origins;
 mod material_library_sources;
 mod mesh_options;
+mod mesh_vertex_map;
+mod mesh_vertex_map_wire;
 mod meshes;
 #[cfg(test)]
 mod owned_output_tests;
@@ -117,6 +119,7 @@ pub use manifest_materials::{
     MaterialStencil, MaterialTexture, Palette, PaletteColours, PaletteEntry, Parameter, TextureUse,
 };
 pub use manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
+pub use mesh_vertex_map_wire::mesh_vertex_map_schema;
 pub use package_default_material::{FallbackMaterialCause, FallbackMaterialSlot};
 pub use package_material_emission::{
     AuthoredEmission, EmissionField, EmissionSample, EmissionSlot, EmissionSource,

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::mesh_origin::MeshSubmeshOrigin;
 use crate::reader::to_usize;
 use crate::skin::{RawSubmesh, SkinMesh};
 use crate::smooth_normals::smooth_normals;
@@ -106,6 +107,7 @@ impl<'s, 'a> MeshBuilder<'s, 'a> {
                 positions: Vec::new(),
                 source: Vec::new(),
                 origin: None,
+                index_width: Some(skin.streams.indices.width()),
                 normals: skin.streams.normals.map(|_| Vec::new()),
                 normals_computed: false,
                 tangents: skin.streams.tangents.map(|_| Vec::new()),
@@ -153,6 +155,11 @@ impl<'s, 'a> MeshBuilder<'s, 'a> {
             node_id: submesh.node,
             first_index: first,
             index_count: self.mesh.indices.len() - first,
+            origin: Some(MeshSubmeshOrigin::new(
+                submesh.start,
+                self.skin.streams.indices.word_start(submesh.first_index),
+                submesh.page_base,
+            )),
         });
         Ok(())
     }

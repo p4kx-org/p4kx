@@ -3,7 +3,7 @@
 
 use crate::package_light_placements::PlacedLight;
 use p4kx_assembly::{Assembly, INTERIOR_NODE, Interior, InteriorPart, InteriorPartKind, Part};
-use p4kx_extraction::EntryOrigin;
+use p4kx_extraction::{EntryOrigin, ModelArchiveSource};
 use p4kx_gltf::{NodeTransform, SceneLight, light_node_transform, node_transform};
 use p4kx_model::{MaterialStatus, Model, TintPalette, Transform};
 
@@ -13,6 +13,7 @@ use crate::manifest::{EntityRef, NodeKind};
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Drawn<'a> {
     pub(crate) model: &'a Model,
+    pub(crate) model_sources: &'a [ModelArchiveSource],
     pub(crate) materials: &'a MaterialStatus,
     pub(crate) material_entry: Option<&'a EntryOrigin>,
     pub(crate) palette: Option<&'a TintPalette>,
@@ -147,6 +148,7 @@ fn push_attachments<'a>(items: &mut Vec<Item<'a>>, assembly: &'a Assembly) {
             geometry: Some(attached.geometry()),
             drawn: Some(Drawn {
                 model: attached.model(),
+                model_sources: attached.model_archive_sources(),
                 materials: attached.materials(),
                 material_entry: attached.material_archive_origins().library(),
                 palette: part.and_then(Part::palette),
@@ -178,6 +180,7 @@ fn part_item(part: &Part) -> Item<'_> {
         geometry: part.geometry(),
         drawn: part.model().map(|model| Drawn {
             model,
+            model_sources: part.model_archive_sources(),
             materials: part.materials(),
             material_entry: part.material_archive_origins().library(),
             palette: part.palette(),
@@ -214,6 +217,7 @@ fn interior_item<'a>(
         geometry: part.model_path(),
         drawn: part.model().map(|model| Drawn {
             model,
+            model_sources: part.model_archive_sources(),
             materials: part.materials(),
             material_entry: part.material_archive_origins().library(),
             palette: part.palette(),

@@ -3454,6 +3454,14 @@
           "minimum": 0,
           "type": "integer"
         },
+        "vertex_map": {
+          "description": "The streamed source map accompanying this GLB.",
+          "pattern": "^meshes/m[0-9]{4,}\\.vertex-map\\.jsonl$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "vertices": {
           "description": "The number of vertices of the mesh.",
           "format": "uint",

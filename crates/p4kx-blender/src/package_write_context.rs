@@ -17,6 +17,7 @@ pub struct PackageWriteContext<'a> {
     pub(crate) texture_source: Option<&'a ArchiveTextures<'a, 'a>>,
     pub(crate) glow_source: Option<crate::package_glow::Source<'a>>,
     pub(crate) collision_source: Option<&'a Archive>,
+    pub(crate) vertex_maps: bool,
 }
 
 #[derive(Clone, Copy)]
@@ -41,6 +42,7 @@ impl<'a> PackageWriteContext<'a> {
             texture_source: None,
             glow_source: None,
             collision_source: None,
+            vertex_maps: false,
         }
     }
 
@@ -58,6 +60,13 @@ impl<'a> PackageWriteContext<'a> {
     #[must_use]
     pub const fn with_collision_helpers(mut self, archive: &'a Archive) -> Self {
         self.collision_source = Some(archive);
+        self
+    }
+
+    /// Includes original vertex maps for the package's static scene GLBs.
+    #[must_use]
+    pub const fn with_vertex_maps(mut self) -> Self {
+        self.vertex_maps = true;
         self
     }
 
@@ -88,6 +97,7 @@ impl<'a> PackageWriteContext<'a> {
             texture_source: None,
             glow_source: None,
             collision_source: None,
+            vertex_maps: false,
             scope: Scope::Standalone {
                 cancelled,
                 observed,

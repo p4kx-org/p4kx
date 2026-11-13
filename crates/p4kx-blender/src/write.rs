@@ -196,6 +196,15 @@ pub fn write_package_with_context(
                 "collision helpers require a decomposed Assembly package",
             )));
         }
+        if context.vertex_maps {
+            return Err(crate::PackageError::write(
+                out,
+                std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "vertex maps require a decomposed Assembly package",
+                ),
+            ));
+        }
         return write_creature_package(assembly, textures, options, info, out, context);
     }
     let scene = Scene {
@@ -300,6 +309,9 @@ fn write_scene_files(
         staging,
         context,
     )?);
+    if manifest.meshes.iter().any(|mesh| mesh.vertex_map.is_some()) {
+        crate::mesh_vertex_map_wire::PACKAGE_VERSION.clone_into(&mut manifest.version);
+    }
     let totals = package_receipt::write_metadata(staging, &manifest, files, context)?;
     summary.files = totals.files;
     summary.bytes = totals.bytes;

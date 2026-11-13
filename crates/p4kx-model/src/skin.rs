@@ -16,6 +16,7 @@ pub(crate) struct RawSubmesh {
     pub(crate) first_index: u32,
     pub(crate) index_count: u32,
     pub(crate) page_base: u32,
+    pub(crate) start: u64,
 }
 
 /// A `Skin` or `Skin2` mesh chunk: its counts, submeshes and data streams, borrowed from the chunk.

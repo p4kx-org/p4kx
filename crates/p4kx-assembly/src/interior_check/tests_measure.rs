@@ -118,6 +118,7 @@ fn part(
         world: at,
         model_path: path.map(str::to_owned),
         model,
+        model_archive_sources: Arc::default(),
         materials: Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed)),
         palette: None,
         light: None,

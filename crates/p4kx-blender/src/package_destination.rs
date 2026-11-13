@@ -26,6 +26,14 @@ struct Marker {
     collision_helpers: Option<crate::CollisionHelperReference>,
     #[serde(default)]
     textures: Vec<TextureMarker>,
+    #[serde(default)]
+    meshes: Vec<MeshMarker>,
+}
+
+#[derive(Deserialize)]
+struct MeshMarker {
+    file: Option<String>,
+    vertex_map: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -100,6 +108,10 @@ fn check_replaceable(out: &Path) -> PackageResult<()> {
 }
 
 fn matches_asset_folders(out: &Path, marker: &Marker) -> PackageResult<bool> {
+    let mesh_prefix = format!("{MESHES_FOLDER}/");
+    let Some(vertex_maps) = vertex_map_names(marker, &mesh_prefix) else {
+        return Ok(false);
+    };
     let texture_prefix = format!("{TEXTURES_FOLDER}/");
     let dds_names: BTreeSet<_> = marker
         .textures
@@ -115,7 +127,12 @@ fn matches_asset_folders(out: &Path, marker: &Marker) -> PackageResult<bool> {
         match fs::symlink_metadata(&path) {
             Ok(metadata) if metadata.is_dir() => {}
             Ok(_) => return Ok(false),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                if folder == MESHES_FOLDER && !vertex_maps.is_empty() {
+                    return Ok(false);
+                }
+                continue;
+            }
             Err(source) => return Err(PackageError::write(&path, source)),
         }
         let files = names_in(&path).map_err(|source| PackageError::write(&path, source))?;
@@ -123,12 +140,40 @@ fn matches_asset_folders(out: &Path, marker: &Marker) -> PackageResult<bool> {
             let declared_dds = folder == TEXTURES_FOLDER
                 && is_id_file(name, prefix, TextureFormat::Dds.extension())
                 && name.to_str().is_some_and(|text| dds_names.contains(text));
-            (is_id_file(name, prefix, extension) || declared_dds) && is_plain_file(&path.join(name))
+            let vertex_map = folder == MESHES_FOLDER
+                && name.to_str().is_some_and(|text| vertex_maps.contains(text));
+            (is_id_file(name, prefix, extension) || declared_dds || vertex_map)
+                && is_plain_file(&path.join(name))
         }) {
+            return Ok(false);
+        }
+        if folder == MESHES_FOLDER
+            && vertex_maps
+                .iter()
+                .any(|name| !is_plain_file(&path.join(name)))
+        {
             return Ok(false);
         }
     }
     Ok(true)
+}
+
+fn vertex_map_names<'a>(marker: &'a Marker, prefix: &str) -> Option<BTreeSet<&'a str>> {
+    let mut names = BTreeSet::new();
+    for mesh in &marker.meshes {
+        if let Some(reference) = &mesh.vertex_map {
+            let file = mesh.file.as_deref()?.strip_prefix(prefix)?;
+            let map = reference.strip_prefix(prefix)?;
+            let stem = file.strip_suffix(".glb")?;
+            if !is_id_file(OsStr::new(file), 'm', "glb")
+                || map.strip_suffix(".vertex-map.jsonl") != Some(stem)
+                || !names.insert(map)
+            {
+                return None;
+            }
+        }
+    }
+    Some(names)
 }
 
 fn names_in(folder: &Path) -> io::Result<Vec<OsString>> {

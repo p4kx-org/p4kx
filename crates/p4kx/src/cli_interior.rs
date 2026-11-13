@@ -118,6 +118,9 @@ pub(crate) struct InteriorPackageArgs {
     /// Includes the versioned authored SOC room and door document.
     #[arg(long)]
     pub(crate) authored_soc: bool,
+    /// Writes source vertex maps for the package's static scene meshes.
+    #[arg(long)]
+    pub(crate) vertex_maps: bool,
 }
 
 /// Arguments of `p4kx interior source`.

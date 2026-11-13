@@ -11,18 +11,33 @@ use crate::{OriginCompanionRow, SourceUse};
 use super::{SourceRegistry, SourceUses};
 
 impl SourceUses {
-    pub(crate) fn with_batched_use_refs() -> Self {
+    /// Keeps document-wide source identities and releases use references after each streamed batch.
+    #[must_use]
+    pub fn with_batched_use_refs() -> Self {
         Self::with_registry(SourceRegistry::with_batched_use_refs)
     }
 
-    pub(crate) fn write_use_batch(&self, writer: &mut impl Write) -> io::Result<u64> {
+    /// Releases current batch uses after passing their descriptions to a stream writer.
+    ///
+    /// # Errors
+    /// Returns a batching, evidence registry or visitor error.
+    pub fn drain_use_batch(
+        &self,
+        mut visit: impl FnMut(&crate::SourceUseDescription) -> io::Result<()>,
+    ) -> io::Result<u64> {
         let uses = source_evidence_error::lock(&self.registry)
             .map_err(io::Error::other)?
             .take_use_batch()?;
         for source_use in uses.values() {
-            origin_companion::row(writer, &OriginCompanionRow::SourceUse { source_use })?;
+            visit(source_use)?;
         }
         Ok(uses.len() as u64)
+    }
+
+    pub(crate) fn write_use_batch(&self, writer: &mut impl Write) -> io::Result<u64> {
+        self.drain_use_batch(|source_use| {
+            origin_companion::row(writer, &OriginCompanionRow::SourceUse { source_use })
+        })
     }
 
     pub(crate) fn accepts_use_batch(&self, uses: &[SourceUse]) -> io::Result<bool> {

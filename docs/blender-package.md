@@ -802,3 +802,32 @@ authored tint once, and supplies the Glow value to the shader's emission strengt
 The surface retains its normal alpha coverage rules. A missing image uses the ordinary flat
 material emission. Dynamic Entity links and shader-specific coverage controls such as
 `AlphaGlowCutoff` remain authored data.
+
+### Source vertex maps
+
+Use `entity package --vertex-maps` or `interior package --vertex-maps` to include
+`meshes/mNNNN.vertex-map.jsonl` alongside each emitted static scene GLB. In Rust, enable
+this option with `PackageWriteContext::with_vertex_maps`. The package declares each file
+as `mesh.vertex_map`, and `receipt.json` records its SHA-256. The package uses minor
+version 1.19 when it contains a map. An explicit request for a single rigged creature
+package fails with an unsupported-layout error.
+
+Each JSONL file begins with the format and version. A `mesh` row identifies the actual GLB
+mesh and POSITION accessor, its element count, the requested level, the selected model
+level, and the original geometry level and chunk when observed. A `vertex` row links an
+output POSITION ordinal to its source-stream vertex ordinal. It includes original source
+uses for the first little-endian index word, its page base and the original submesh
+selectors. The GLB writer retains the POSITION order of the decoded mesh even when it
+omits individual material primitives.
+
+A `mapping` of `unknown` records a GLB mesh without a proved IVO mapping. A mapping can be
+present when the source file's physical Archive identity is unavailable. In that case
+the values carry an unknown encryption marker and incomplete source set. Batches of
+`sourceUse` rows resolve their immediately preceding field references. The original
+`source` rows follow, then the measured artifact binding and an `end` count row. The
+[mesh vertex map schema](../schemas/blender-mesh-vertex-map.schema.json) describes each row.
+
+The package validator checks the mesh, accessor and position counts, source-use closure,
+GLB SHA-256 and receipt. Blender imports the same render geometry independently of the
+companion. The source-byte ranges for the selected geometry can be joined to the
+[Media model export](media-export.md) by physical Archive identity and chunk.

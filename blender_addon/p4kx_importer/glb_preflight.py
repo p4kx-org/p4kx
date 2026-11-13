@@ -30,6 +30,7 @@ class GlbInfo:
     bytes: int
     materials: int
     geometry: GeometryCounts | None
+    positions: tuple[tuple[int, int] | None, ...]
 
 
 def check_glb(path: Path) -> GlbInfo:
@@ -68,7 +69,20 @@ def _check_stream(stream: BinaryIO) -> GlbInfo:
         padding = stream.read(bin_length - data_length)
         if padding != bytes(bin_length - data_length):
             raise PackageError("GLB BIN padding is invalid.")
-    return GlbInfo(actual_size, material_count, geometry_counts(document))
+    return GlbInfo(actual_size, material_count, geometry_counts(document), _position_accessors(document))
+
+
+def _position_accessors(document: dict[str, Any]) -> tuple[tuple[int, int] | None, ...]:
+    positions = []
+    accessors = document.get("accessors", [])
+    for mesh in document.get("meshes", []):
+        refs = {primitive["attributes"].get("POSITION") for primitive in mesh["primitives"]}
+        if len(refs) != 1 or None in refs:
+            positions.append(None)
+        else:
+            index = refs.pop()
+            positions.append((index, accessors[index]["count"]))
+    return tuple(positions)
 
 
 def _read_chunk(stream: BinaryIO, total: int) -> tuple[int, bytes]:

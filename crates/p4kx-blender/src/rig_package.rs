@@ -68,6 +68,7 @@ pub(crate) fn rig_manifest(
         nodes: vec![node],
         meshes: vec![Mesh {
             file: format!("{MESHES_FOLDER}/{id}.glb"),
+            vertex_map: None,
             id,
             geometry: scene.geometry,
             palette: None,

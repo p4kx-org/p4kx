@@ -72,6 +72,7 @@ impl Walker<'_> {
             world: world.then(&placed.transform),
             model_path: placed.path.map(str::to_owned),
             model: None,
+            model_archive_sources: Arc::default(),
             materials: Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed)),
             palette: None,
             light: None,

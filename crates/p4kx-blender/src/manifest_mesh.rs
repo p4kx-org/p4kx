@@ -13,6 +13,10 @@ pub struct Mesh {
     pub id: String,
     /// The GLB file relative to the package folder, e.g. `meshes/m0001.glb`.
     pub file: String,
+    /// The streamed source map accompanying this GLB.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(regex(pattern = r"^meshes/m[0-9]{4,}\.vertex-map\.jsonl$"))]
+    pub vertex_map: Option<String>,
     /// The geometry file in the Archive the model was read from, below `Data`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub geometry: Option<String>,

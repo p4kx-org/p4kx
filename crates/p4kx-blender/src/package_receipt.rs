@@ -66,6 +66,12 @@ pub(crate) fn write_metadata(
         .chain(manifest.meshes.iter().map(|mesh| mesh.file.as_str()))
         .chain(
             manifest
+                .meshes
+                .iter()
+                .filter_map(|mesh| mesh.vertex_map.as_deref()),
+        )
+        .chain(
+            manifest
                 .textures
                 .iter()
                 .map(|texture| texture.file.as_str()),
@@ -158,7 +164,7 @@ pub(super) fn scene_files(
 ) -> Vec<PackageFile> {
     meshes
         .into_iter()
-        .map(|mesh| mesh.file)
+        .flat_map(|mesh| std::iter::once(mesh.file).chain(mesh.vertex_map))
         .chain(
             outcomes
                 .iter()

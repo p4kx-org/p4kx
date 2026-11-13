@@ -48,6 +48,7 @@ impl MeshHeader {
 }
 
 pub(crate) fn read_submesh(reader: &mut ByteReader<'_>) -> Result<RawSubmesh, CorruptChunk> {
+    let start = reader.offset();
     let material_id = reader.read_u16()?;
     let node = reader.read_u16()?;
     let first_index = reader.read_u32()?;
@@ -61,6 +62,7 @@ pub(crate) fn read_submesh(reader: &mut ByteReader<'_>) -> Result<RawSubmesh, Co
         first_index,
         index_count,
         page_base,
+        start,
     })
 }
 

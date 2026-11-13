@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use p4kx_extraction::{ArchiveDefaultMaterial, ArchiveMaterialRead};
+use p4kx_extraction::{ArchiveDefaultMaterial, ArchiveMaterialRead, ModelArchiveSource};
 use p4kx_model::{Lod, MaterialStatus, Model};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -19,11 +19,12 @@ use crate::{ArchiveModels, AssemblyError, Issue, IssueKind, ModelFailure, ModelP
 const WAVE: usize = 256;
 
 type Key = (usize, String);
-type Read = Result<(String, Model), ModelFailure>;
+type Read = Result<crate::ProvidedModel, ModelFailure>;
 
 struct Loaded {
     entry: String,
     model: Arc<Model>,
+    archive_sources: Arc<[ModelArchiveSource]>,
 }
 
 enum Outcome {
@@ -126,6 +127,7 @@ impl Fill<'_> {
         let kind = match self.outcomes.get(key) {
             Some(Outcome::Loaded(loaded)) => {
                 part.model = Some(Arc::clone(&loaded.model));
+                part.model_archive_sources = Arc::clone(&loaded.archive_sources);
                 let library = library_key(key.0, loaded, placement.library.as_deref());
                 part.materials = library
                     .as_ref()
@@ -215,8 +217,7 @@ fn read_wave(
                     .ok_or(ModelFailure::Missing)
                     .and_then(|provider| provider.model(path, options.lod)),
             };
-            let result = read.map(|provided| (provided.entry, provided.model));
-            (key.clone(), result)
+            (key.clone(), read)
         })
         .collect()
 }
@@ -242,7 +243,12 @@ fn read_models(
         }
         for (key, result) in read_wave(wave, providers, (options, watch), shared) {
             let outcome = match result {
-                Ok((entry, model)) => {
+                Ok(crate::ProvidedModel {
+                    entry,
+                    model,
+                    archive_sources,
+                    ..
+                }) => {
                     let count = vertices(&model);
                     if total.saturating_add(count) > options.max_vertices {
                         Outcome::NotRead
@@ -251,6 +257,7 @@ fn read_models(
                         Outcome::Loaded(Loaded {
                             entry,
                             model: Arc::new(model),
+                            archive_sources,
                         })
                     }
                 }

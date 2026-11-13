@@ -69,6 +69,7 @@ fn container_part(
         world,
         model_path: None,
         model: None,
+        model_archive_sources: Arc::default(),
         materials: Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed)),
         palette: None,
         light: None,

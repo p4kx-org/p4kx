@@ -91,6 +91,11 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
     let context = context
         .with_texture_container(args.texture_container.container())
         .with_archive_texture_source(&loader);
+    let context = if args.vertex_maps {
+        context.with_vertex_maps()
+    } else {
+        context
+    };
     let summary = write_interior_package_with_context(
         &scene, &models, &loader, &glb, &info, &args.out, &context,
     )?;

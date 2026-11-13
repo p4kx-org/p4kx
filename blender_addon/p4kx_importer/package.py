@@ -38,7 +38,7 @@ from .soc_scene import parse_ref as parse_soc_ref
 
 FORMAT_NAME = "p4kx-blender-package"
 SUPPORTED_MAJOR = 1
-SUPPORTED_MINOR = collisions.MINOR
+SUPPORTED_MINOR = 19
 MANIFEST_NAME = "scene.json"
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
 BLENDER_NAME_BYTES = 63
@@ -75,6 +75,7 @@ class Mesh:
     bytes: int | None = None
     vertices: int | None = None
     triangles: int | None = None
+    vertex_map: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,7 +130,8 @@ def load_package(location: Path) -> Package:
         raise PackageError(f"{MANIFEST_NAME} is not valid JSON: {error}") from error
     package = parse_manifest(data, manifest_path.parent)
     assets = chain(package.meshes.values(), package.textures.values())
-    require_exact_asset_case(package.root, (asset.file for asset in assets))
+    maps = (mesh.vertex_map for mesh in package.meshes.values() if mesh.vertex_map is not None)
+    require_exact_asset_case(package.root, chain((asset.file for asset in assets), maps))
     return package
 
 
@@ -142,7 +144,7 @@ def parse_manifest(data: object, root: Path) -> Package:
     _check_coordinates(read_object(manifest.get("coordinates"), "coordinates"))
     textures = _parse_textures(read_array(manifest.get("textures"), "textures"), version, warnings)
     ddna_pair.validate_pairs(textures)
-    meshes = _parse_meshes(read_array(manifest.get("meshes"), "meshes"), textures)
+    meshes = _parse_meshes(read_array(manifest.get("meshes"), "meshes"), textures, version)
     nodes = parse_nodes(
         manifest.get("nodes"), {mesh_id: mesh.rig is not None for mesh_id, mesh in meshes.items()}, warnings
     )
@@ -328,7 +330,9 @@ def _valid_dds_length(value: object) -> bool:
     )
 
 
-def _parse_meshes(items: list[Any], textures: dict[str, Texture]) -> dict[str, Mesh]:
+def _parse_meshes(
+    items: list[Any], textures: dict[str, Texture], version: tuple[int, int]
+) -> dict[str, Mesh]:
     meshes: dict[str, Mesh] = {}
     for position, item in enumerate(items):
         where = f"meshes[{position}]"
@@ -355,8 +359,17 @@ def _parse_meshes(items: list[Any], textures: dict[str, Texture]) -> dict[str, M
             _mesh_count(entry, "bytes", where),
             _mesh_count(entry, "vertices", where),
             _mesh_count(entry, "triangles", where),
+            _vertex_map(entry.get("vertex_map"), file, version, where),
         )
     return meshes
+
+
+def _vertex_map(value: Any, glb: str, version: tuple[int, int], where: str) -> str | None:
+    if value is None:
+        return None
+    if version < (1, 19) or value != glb.removesuffix(".glb") + ".vertex-map.jsonl":
+        raise PackageError(f"{where}: invalid mesh vertex map path or format version.")
+    return value
 
 
 def _mesh_count(entry: dict[str, Any], key: str, where: str) -> int | None:

@@ -138,6 +138,7 @@ pub struct Mesh {
     /// is how data stored per stream vertex, such as a DNA rig, is matched to the mesh.
     pub source: Vec<u32>,
     pub(crate) origin: Option<MeshOrigin>,
+    pub(crate) index_width: Option<u32>,
     /// The unit vertex normals: the stored ones, or the computed smooth ones when the mesh
     /// stores none, see [`Self::normals_computed`]. `None` only for a mesh without triangles.
     pub normals: Option<Vec<[f32; 3]>>,
@@ -180,6 +181,7 @@ pub struct Submesh {
     pub first_index: usize,
     /// The number of indices, a multiple of three.
     pub index_count: usize,
+    pub(crate) origin: Option<crate::mesh_origin::MeshSubmeshOrigin>,
 }
 
 /// Which file of a model a chunk is in.

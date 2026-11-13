@@ -5,6 +5,7 @@ use p4kx_foundation::ByteReader;
 
 use crate::CorruptChunk;
 use crate::bone_map::BoneMapStream;
+pub(crate) use crate::index_stream::IndexStream;
 use crate::mesh_stream_source::{StreamScan, StreamStep};
 use crate::second_uv::SecondUvStream;
 use crate::vector::{
@@ -159,36 +160,6 @@ impl NormalStream<'_> {
     }
 }
 
-/// The index list of a mesh, 16 or 32 bits per index.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct IndexStream<'a> {
-    data: &'a [u8],
-    wide: bool,
-}
-
-impl IndexStream<'_> {
-    pub(crate) const fn from_bytes(data: &[u8], wide: bool) -> IndexStream<'_> {
-        IndexStream { data, wide }
-    }
-
-    pub(crate) fn source_vertex(&self, at: usize, page_base: u32) -> Result<u64, CorruptChunk> {
-        self.index(at)
-            .map(|word| Self::apply_page_base(word, page_base))
-    }
-    pub(crate) const fn apply_page_base(word: u32, page_base: u32) -> u64 {
-        word as u64 + page_base as u64
-    }
-
-    /// Returns index `position` of the list.
-    pub(crate) fn index(&self, position: usize) -> Result<u32, CorruptChunk> {
-        if self.wide {
-            element(self.data, position, 4, "index").map(|bytes| u32_at(bytes, 0))
-        } else {
-            element(self.data, position, 2, "index").map(|bytes| u32::from(u16_at(bytes, 0)))
-        }
-    }
-}
-
 /// The data streams of a mesh chunk that a model reads.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Streams<'a> {
@@ -224,11 +195,12 @@ pub(crate) fn read_streams<'a>(
     let mut seen = 0_u16;
     let scan = StreamScan::new(reader, counts.vertices, counts.indices);
     for step in scan {
-        let (tag, size, data) = match step? {
+        let (tag, size, data, start) = match step? {
             StreamStep::Complete(stream) => (
                 stream.header().tag(),
                 stream.header().stride(),
                 stream.bytes(),
+                stream.payload_range().start,
             ),
             StreamStep::Incomplete(stream, error) => {
                 if repeat(&mut seen, stream.tag()) {
@@ -243,7 +215,7 @@ pub(crate) fn read_streams<'a>(
         if repeat(&mut seen, tag) {
             return Err(CorruptChunk::RepeatedStream(tag));
         }
-        match classify(tag, size, data, counts)? {
+        match classify(tag, size, data, start, counts)? {
             Some(Found::Indices(stream)) => indices = Some(stream),
             Some(Found::Vertices(stream)) => vertices = Some(stream),
             Some(Found::Normals(stream)) => {
@@ -315,14 +287,16 @@ fn classify(
     tag: u32,
     size: u32,
     data: &[u8],
+    start: u64,
     counts: StreamCounts,
 ) -> Result<Option<Found<'_>>, CorruptChunk> {
     let (min, max) = (counts.min, counts.max);
     Ok(match (tag, size) {
-        (INDICES, 2 | 4) => Some(Found::Indices(IndexStream {
+        (INDICES, 2 | 4) => Some(Found::Indices(IndexStream::positioned(
             data,
-            wide: size == 4,
-        })),
+            size == 4,
+            start,
+        ))),
         (VERTS_UVS | VERTS_UVS_2, 16) => Some(Found::Vertices(VertexStream {
             data,
             layout: VertexLayout::Quantised { min, max },
@@ -386,7 +360,7 @@ fn i16_at(bytes: &[u8], at: usize) -> i16 {
     i16::from_le_bytes(u16_at(bytes, at).to_le_bytes())
 }
 
-fn u32_at(bytes: &[u8], at: usize) -> u32 {
+pub(crate) fn u32_at(bytes: &[u8], at: usize) -> u32 {
     let word = bytes
         .get(at..at + 4)
         .and_then(|word| <[u8; 4]>::try_from(word).ok());

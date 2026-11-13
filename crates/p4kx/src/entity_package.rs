@@ -145,6 +145,11 @@ fn write<'a>(
     } else {
         context
     };
+    let context = if args.vertex_maps {
+        context.with_vertex_maps()
+    } else {
+        context
+    };
     Ok(write_package_with_context(
         assembly, models, &loader, &glb, info, &args.out, &context,
     )?)

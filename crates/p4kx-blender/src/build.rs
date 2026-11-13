@@ -132,6 +132,7 @@ fn meshes(inputs: &Inputs<'_>) -> Vec<Mesh> {
             let id = mesh_id(index);
             Mesh {
                 file: format!("{MESHES_FOLDER}/{id}.glb"),
+                vertex_map: written.vertex_map.as_ref().map(|file| file.path.clone()),
                 id,
                 geometry: first.and_then(|item| item.geometry).map(str::to_owned),
                 palette: first

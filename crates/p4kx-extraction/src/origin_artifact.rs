@@ -161,12 +161,21 @@ impl<W: Write> OriginDigestWriter<W> {
     ///
     /// # Errors
     /// Returns an error when the sink cannot flush.
-    pub fn finish(mut self) -> io::Result<OriginArtifactDigest> {
+    pub fn finish(self) -> io::Result<OriginArtifactDigest> {
+        self.finish_with_sink().map(|(digest, _)| digest)
+    }
+
+    /// Finishes the byte binding and returns the flushed sink for durability checks.
+    ///
+    /// # Errors
+    /// Returns an error when the sink cannot flush.
+    pub fn finish_with_sink(mut self) -> io::Result<(OriginArtifactDigest, W)> {
         self.flush()?;
-        Ok(OriginArtifactDigest {
+        let digest = OriginArtifactDigest {
             byte_length: DecimalU64::new(self.bytes),
             sha256: Checksum::Sha256(self.digest.finalize().into()).hex(),
-        })
+        };
+        Ok((digest, self.writer))
     }
 }
 
