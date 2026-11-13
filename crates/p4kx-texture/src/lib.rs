@@ -32,6 +32,7 @@ mod header_words;
 mod image;
 mod merge;
 mod mip;
+mod mip_dds;
 mod mip_source;
 mod pixels;
 mod png_export;

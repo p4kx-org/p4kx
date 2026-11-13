@@ -15,6 +15,7 @@ mod header;
 mod images;
 mod merge;
 mod mip;
+mod mip_dds;
 mod raw_header;
 mod topology_complete;
 mod transfer;
