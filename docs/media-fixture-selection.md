@@ -162,7 +162,8 @@ Its native Blender 5.2 headless check runs separately in a pinned ARM64 Debian c
 Blender `5.2.2+dfsg-1`. Debian supplies the required newer glibc and runtime libraries. The
 container verifies the host, daemon, image and Python architecture and mounts the exchanged
 packages read-only. It uses a dated, signed APT snapshot for build reproducibility. Docker and
-Blender are CI consumer dependencies. [Debian ARM64 Blender](https://packages.debian.org/sid/arm64/graphics/blender) · [Debian Snapshot](https://snapshot.debian.org/archive/debian/20261104T000000Z/) · [Docker Official Debian image](https://hub.docker.com/_/debian)
+Blender are CI consumer dependencies. The image explicitly installs NumPy for glTF import
+and cattrs for the extension manager. [Debian ARM64 Blender](https://packages.debian.org/sid/arm64/graphics/blender) · [Debian Snapshot](https://snapshot.debian.org/archive/debian/20261104T000000Z/) · [Docker Official Debian image](https://hub.docker.com/_/debian)
 
 The supported upstream wheels and standalone release files do not include Linux ARM64, and the
 Ubuntu 24.04 ARM64 Blender package is 4.0.2. The Flathub package currently targets x86_64.

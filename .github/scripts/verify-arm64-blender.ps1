@@ -36,7 +36,8 @@ if ($LASTEXITCODE -ne 0 -or $imagePlatform.Count -ne 1 -or $imagePlatform[0] -cn
 $dockerOptions = @(
     '--rm', '--platform', 'linux/arm64', '--network', 'none', '--read-only', '--tmpfs', '/tmp',
     '--env', 'GITHUB_SHA', '--env', 'GITHUB_RUN_ID', '--env', 'P4KX_PLATFORM_MATRIX',
-    '--env', 'PYTHONDONTWRITEBYTECODE=1', '--env', 'BLENDER_USER_CONFIG=/tmp/blender-config',
+    '--env', 'HOME=/tmp', '--env', 'PYTHONDONTWRITEBYTECODE=1',
+    '--env', 'BLENDER_USER_CONFIG=/tmp/blender-config',
     '--env', 'BLENDER_USER_SCRIPTS=/tmp/blender-scripts', '--env', 'BLENDER_USER_DATAFILES=/tmp/blender-data',
     '--env', 'XDG_CACHE_HOME=/tmp/blender-cache',
     '--mount', "type=bind,source=$repository,target=/p4kx,readonly",
