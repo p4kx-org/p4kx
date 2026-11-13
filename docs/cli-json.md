@@ -1764,7 +1764,11 @@ bank. The ordinary and ranged property lists preserve authored order, original I
 raw words and each list's checked counts. Effect and metadata slots retain their
 physical order, indices, reference IDs and raw flag bytes. Aux routing retains the
 four authored user send slots and reflections ID. Advanced settings preserve the
-original instance limit, behavior codes and flags. Fields and words are omitted when the reader
+original instance limit, behavior codes and flags. Positioning rows preserve original
+vertex, playlist and automation words and indicate a checked partial final row.
+Inline State includes the original binding, group and member sequence and its raw
+property words. RTPC includes the original curve count, checked complete curve
+prefix, and ordered raw curve and interpolation words. Fields and words are omitted when the reader
 has no complete source value. Each sourced value can be resolved through
 `node_fields.source_inventory` and includes its encryption marker. The same object
 shape is returned by MCP `list_soundbank_objects`.

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cell::RefCell;
 use std::io::{Read, Seek};
 
 use p4kx_audio::{
@@ -15,18 +16,28 @@ use crate::bank::Bank;
 use crate::source_inventory::SourceInventory;
 use crate::source_value::SourcedValue;
 
+#[path = "hirc_node_source_positioning.rs"]
+mod positioning;
 #[path = "hirc_node_source_reader.rs"]
 mod reader;
 #[path = "hirc_node_source_routing.rs"]
 mod routing;
+#[path = "hirc_node_source_rtpc.rs"]
+mod rtpc;
+#[path = "hirc_node_source_state.rs"]
+mod state;
 
+use self::positioning::{Positioning, PositioningRows, PositioningSchema};
 use self::reader::NodeReader;
 use self::routing::{NodeAdvancedSettings, NodeAux, NodeFx};
+use self::rtpc::{RtpcGroup, RtpcSchema};
+use self::state::{InlineStateGroup, InlineStateSchema};
 use super::Status;
 use super::node_property::{PropertyExtent, PropertyWords};
 use super::source_fields::origins::ObjectOrigins;
 
-pub(super) type NodeSourceSchema = NodeDocument<SourceInventory>;
+pub(super) type NodeSourceSchema =
+    NodeDocument<SourceInventory, PositioningSchema, InlineStateSchema, RtpcSchema>;
 
 /// Original shared HIRC node declarations for one selected physical occurrence.
 #[derive(Debug)]
@@ -70,8 +81,7 @@ impl Serialize for NodeSourceFields<'_> {
         self.bank
             .soundbank()
             .with_hirc_source_fields(self.index, |header, mut observed| {
-                let document = read::<_, S::Error>(&origins, &header, &mut observed, self.status)?;
-                document.serialize(serializer)
+                project(serializer, &origins, &header, &mut observed, self.status)
             })
             .map_err(S::Error::custom)?
             .ok_or_else(|| S::Error::custom("the selected original node is absent"))?
@@ -81,7 +91,7 @@ impl Serialize for NodeSourceFields<'_> {
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "SharedNodeSourceFields")]
-pub(super) struct NodeDocument<Inventory> {
+pub(super) struct NodeDocument<Inventory, Positioning, State, Rtpc> {
     version: SourcedValue<u32>,
     object_status: SourcedValue<Status>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -102,6 +112,15 @@ pub(super) struct NodeDocument<Inventory> {
     aux: Option<NodeAux>,
     #[serde(skip_serializing_if = "Option::is_none")]
     advanced: Option<NodeAdvancedSettings>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<PositioningSchema>")]
+    positioning: Option<Positioning>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<InlineStateSchema>")]
+    inline_state: Option<State>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<RtpcSchema>")]
+    rtpc: Option<Rtpc>,
     #[schemars(with = "SourceInventory")]
     source_inventory: Inventory,
 }
@@ -114,48 +133,83 @@ struct PropertyList {
     rows: Vec<PropertyWords>,
 }
 
-fn read<'source, R: Read + Seek, E: serde::ser::Error>(
-    origins: &'source ObjectOrigins,
+fn project<R: Read + Seek, S: Serializer>(
+    serializer: S,
+    origins: &ObjectOrigins,
     header: &BankObservedHeader,
     observed: &mut BankHircSemantic<'_, R>,
     status: Status,
-) -> Result<NodeDocument<&'source ObjectOrigins>, E> {
+) -> Result<S::Ok, S::Error> {
     let object_status = origins
         .coverage(status, header, observed.object())
-        .map_err(E::custom)?;
-    let mut node =
-        NodeReader::new(observed).ok_or_else(|| E::custom("unexpected original node layout"))?;
-    let parent = node.parent();
+        .map_err(S::Error::custom)?;
+    let node = NodeReader::new(observed)
+        .ok_or_else(|| S::Error::custom("unexpected original node layout"))?;
+    let node = RefCell::new(node);
+    let mut reader = node.try_borrow_mut().map_err(S::Error::custom)?;
+    let parent = reader.parent();
     let parent_id = parent.and_then(|parent| parent.parent_id.as_ref());
     let override_bus_id = parent.and_then(|parent| parent.override_bus_id());
     let priority_flags = parent.and_then(|parent| parent.priority_flags.as_ref());
-    Ok(NodeDocument {
-        version: origins.version(header).map_err(E::custom)?,
+    let document = NodeDocument {
+        version: origins.version(header).map_err(S::Error::custom)?,
         object_status,
         parent_id: origins
             .optional(parent_id, "nodeParentId")
-            .map_err(E::custom)?,
+            .map_err(S::Error::custom)?,
         override_bus_id: origins
             .optional(override_bus_id, "nodeOverrideBusId")
-            .map_err(E::custom)?,
+            .map_err(S::Error::custom)?,
         priority_flags: origins
             .optional(priority_flags, "nodePriorityFlags")
-            .map_err(E::custom)?,
-        properties: property_list(origins, node.properties(BankNodePropertyKind::Properties))?,
-        ranged_modifiers: property_list(
+            .map_err(S::Error::custom)?,
+        properties: property_list::<_, S::Error>(
             origins,
-            node.properties(BankNodePropertyKind::RangedModifiers),
+            reader.properties(BankNodePropertyKind::Properties),
         )?,
-        effects: NodeFx::read(origins, &mut node, BankNodeFxKind::Effects)?,
-        metadata_effects: NodeFx::read(origins, &mut node, BankNodeFxKind::Metadata)?,
-        aux: NodeAux::read(origins, &mut node)?,
+        ranged_modifiers: property_list::<_, S::Error>(
+            origins,
+            reader.properties(BankNodePropertyKind::RangedModifiers),
+        )?,
+        effects: NodeFx::read::<_, S::Error>(origins, &mut reader, BankNodeFxKind::Effects)?,
+        metadata_effects: NodeFx::read::<_, S::Error>(
+            origins,
+            &mut reader,
+            BankNodeFxKind::Metadata,
+        )?,
+        aux: NodeAux::read::<_, S::Error>(origins, &mut reader)?,
         advanced: NodeAdvancedSettings::read(
             origins,
-            node.playback().map(|fields| &fields.advanced),
+            reader.playback().map(|fields| &fields.advanced),
         )
-        .map_err(E::custom)?,
+        .map_err(S::Error::custom)?,
+        positioning: positioning::<_, S::Error>(origins, &node, &reader)?,
+        inline_state: reader.states().is_some().then_some(InlineStateGroup {
+            origins,
+            node: &node,
+        }),
+        rtpc: reader.rtpc().is_some().then_some(RtpcGroup {
+            origins,
+            node: &node,
+        }),
         source_inventory: origins,
-    })
+    };
+    drop(reader);
+    document.serialize(serializer)
+}
+
+fn positioning<'view, 'source, 'input, R, E: serde::ser::Error>(
+    origins: &'view ObjectOrigins,
+    node: &'view RefCell<NodeReader<'source, 'input, R>>,
+    reader: &NodeReader<'_, '_, R>,
+) -> Result<Option<Positioning<PositioningRows<'view, 'source, 'input, R>>>, E> {
+    reader
+        .playback()
+        .map(|fields| &fields.positioning)
+        .filter(|fields| fields.start.is_some())
+        .map(|fields| Positioning::read(origins, fields, PositioningRows { origins, node }))
+        .transpose()
+        .map_err(E::custom)
 }
 
 fn property_list<R: Read + Seek, E: serde::ser::Error>(

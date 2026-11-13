@@ -5,9 +5,10 @@ use std::io::{Read, Seek};
 
 use p4kx_audio::{
     BankHircActorMixer, BankHircContainerNode, BankHircSemantic, BankHircSoundNode,
-    BankNodeAuxFields, BankNodeFxKind, BankNodeFxSlots, BankNodeParentFields,
+    BankInlineStateRows, BankNodeAuxFields, BankNodeFxKind, BankNodeFxSlots, BankNodeParentFields,
     BankNodePlaybackFields, BankNodePropertyKind, BankNodePropertyRows, BankNodeUserAuxBuses,
-    BankReadError, BankSharedNode,
+    BankPositioningRows, BankPositioningTableKind, BankReadError, BankRtpcRead, BankRtpcRows,
+    BankSharedNode, BankSoundStateRead,
 };
 
 pub(super) enum NodeReader<'source, 'input, R> {
@@ -76,6 +77,42 @@ impl<'source, 'input, R> NodeReader<'source, 'input, R> {
             Self::Actor(node) => node.user_aux_buses(),
             Self::Container(node) => node.user_aux_buses(),
             Self::Music(node) => node.user_aux_buses(),
+        }
+    }
+
+    pub(super) fn positioning_rows(
+        &mut self,
+        kind: BankPositioningTableKind,
+    ) -> Option<BankPositioningRows<'_, R>> {
+        match self {
+            Self::Sound(node) => node.positioning_rows(kind),
+            Self::Actor(node) => node.positioning_rows(kind),
+            Self::Container(node) => node.positioning_rows(kind),
+            Self::Music(node) => node.positioning_rows(kind),
+        }
+    }
+
+    pub(super) fn states(&mut self) -> Option<BankInlineStateRows<'_, R>> {
+        match self {
+            Self::Sound(node) => match node.states() {
+                BankSoundStateRead::Readable(rows) => Some(rows),
+                _ => None,
+            },
+            Self::Actor(node) => node.states(),
+            Self::Container(node) => node.states(),
+            Self::Music(node) => node.states(),
+        }
+    }
+
+    pub(super) fn rtpc(&mut self) -> Option<BankRtpcRows<'_, R>> {
+        match self {
+            Self::Sound(node) => match node.rtpc() {
+                BankRtpcRead::Readable(rows) | BankRtpcRead::Malformed { rows, .. } => Some(rows),
+                _ => None,
+            },
+            Self::Actor(node) => node.rtpc(),
+            Self::Container(node) => node.rtpc(),
+            Self::Music(node) => node.rtpc(),
         }
     }
 

@@ -27,19 +27,29 @@ pub(in crate::hirc_view) struct ObjectOrigins {
 
 impl ObjectOrigins {
     pub(super) fn new(bank: &Bank, family: SourceFamily) -> Result<Self, SourceEvidenceError> {
-        Self::with_site(bank, family.namespace(), family.extent_label())
+        Self::with_site(
+            bank,
+            family.namespace(),
+            family.extent_label(),
+            SourceUses::new(),
+        )
     }
 
     pub(in crate::hirc_view) fn shared_node(bank: &Bank) -> Result<Self, SourceEvidenceError> {
-        Self::with_site(bank, "bnkHircSharedNode", "nodeObjectExtent")
+        Self::with_site(
+            bank,
+            "bnkHircSharedNode",
+            "nodeObjectExtent",
+            SourceUses::with_compact_use_refs(),
+        )
     }
 
     fn with_site(
         bank: &Bank,
         namespace: &'static str,
         extent_label: &'static str,
+        uses: SourceUses,
     ) -> Result<Self, SourceEvidenceError> {
-        let uses = SourceUses::new();
         let input = bank.observed_input();
         let complete = !matches!(input, SourceInput::Unknown);
         let scope = uses.observe(input, InputScope::Payload)?;
