@@ -31,7 +31,22 @@ pub(crate) enum CharacterAction {
     /// GLB file, there are no texture files. Pieces that cannot be fitted and animations that fit
     /// nothing are listed in the manifest and the report.
     #[command(after_help = EXIT_CODES_HELP)]
-    Package(CharacterPackageArgs),
+    Package(Box<CharacterPackageArgs>),
+    /// Writes original body, item-port and player default loadout declarations as JSON.
+    #[command(after_help = EXIT_CODES_HELP)]
+    Source(CharacterSourceArgs),
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct CharacterSourceArgs {
+    /// Path of the Data.p4k Archive.
+    pub(crate) archive: PathBuf,
+    /// Body variant whose default CHF is selected.
+    #[arg(long, value_enum, value_name = "VARIANT")]
+    pub(crate) body: BodyArg,
+    /// JSON file to write.
+    #[arg(long, value_name = "FILE")]
+    pub(crate) out: PathBuf,
 }
 
 /// Arguments of `p4kx character package`.

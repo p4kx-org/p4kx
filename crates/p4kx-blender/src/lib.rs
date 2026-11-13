@@ -43,6 +43,11 @@ mod package_replacement;
 mod package_soc_scene;
 mod package_write_context;
 mod plan;
+mod player_source;
+mod player_source_body;
+mod player_source_classes;
+mod player_source_loadout;
+mod player_source_motion;
 mod rename;
 mod rig_package;
 mod roles;
@@ -104,3 +109,5 @@ pub use texture_source_metadata::TextureSourceMetadata;
 pub use write::{PackageInfo, PackageSummary, write_package, write_package_with_context};
 
 pub(crate) type PackageResult<T> = Result<T, PackageError>;
+
+pub use player_source::{PlayerSource, PlayerSourceError, player_source_schema};

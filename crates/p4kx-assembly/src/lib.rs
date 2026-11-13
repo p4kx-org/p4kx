@@ -155,6 +155,7 @@ mod placement;
 mod plan;
 mod port;
 mod port_placement_origin;
+mod positioned_loadout;
 mod prefab;
 mod provider;
 mod read;
@@ -252,6 +253,7 @@ pub use pick::LoadoutPicks;
 pub use placement::offset_transform;
 pub use port::{PortDefinition, PortDefinitionPosition, PortTransform, PortType};
 pub use port_placement_origin::{PortPlacementField, PortPlacementSource};
+pub use positioned_loadout::{PositionedLoadout, PositionedLoadoutNode};
 pub use prefab::{
     MAX_PREFAB_DEPTH, MAX_PREFAB_ISSUES, MAX_PREFAB_LIBRARY_LEN, MAX_PREFAB_OBJECTS,
     MAX_PREFAB_VISITS, PrefabError, PrefabFile, PrefabIssue, PrefabIssueKind, PrefabSet,

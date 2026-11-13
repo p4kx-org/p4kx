@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_assembly::PositionedLoadout;
 use p4kx_extraction::cryxml::SourceDocument;
 use p4kx_extraction::{SourceUseRole, SourceValue, SourcedValue, Value, ValueError};
 use schemars::JsonSchema;
@@ -8,7 +9,7 @@ use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_class_components::{ComponentInput, struct_type};
-use crate::soc_scene_class_mannequin::{children, string_attribute};
+use crate::soc_scene_class_mannequin::string_attribute;
 use crate::soc_scene_class_resources::{Resource, ResourceKind};
 use crate::soc_scene_classes::string;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
@@ -67,9 +68,12 @@ impl DefaultLoadout {
         };
         let xml_path = input.cell(&loadout_prefix, "loadoutPath", path.clone())?;
         let selector = input.use_at(&loadout_prefix, "loadoutPath", SourceUseRole::Selector)?;
-        let xml = input
-            .resources
-            .read(path, &selector, ResourceKind::Loadout, XmlLoadout::read)?;
+        let xml = input.resources.read(
+            path,
+            &selector,
+            ResourceKind::DataRelative,
+            XmlLoadout::read,
+        )?;
         let manual = match loadout {
             Some(Value::Struct(value)) if value.type_name() == "SItemPortLoadoutManualParams" => {
                 match value.field("entries") {
@@ -98,39 +102,41 @@ impl XmlLoadout {
         document: &SourceDocument<'_>,
         origin: &XmlOrigin<'_>,
     ) -> Result<Option<Self>, SocSceneError> {
-        let root = document.root();
-        if root.name() != "Loadout" || root.namespace().is_some() {
+        let Some(loadout) = PositionedLoadout::read(document) else {
             return Ok(None);
-        }
-        let root_groups = children(root, "Items")
-            .map(position)
-            .collect::<Result<_, _>>()?;
-        let mut items = Vec::new();
-        let mut pending: Vec<_> = children(root, "Items")
-            .flat_map(|group| children(group, "Item"))
-            .map(|node| (None, node))
-            .collect();
-        pending.reverse();
-        while let Some((parent, node)) = pending.pop() {
-            let index = items.len();
-            let start = pending.len();
-            pending.extend(
-                children(node, "Items")
-                    .flat_map(|group| children(group, "Item"))
-                    .map(|node| (Some(index), node)),
-            );
-            if let Some(nested) = pending.get_mut(start..) {
-                nested.reverse();
-            }
-            items.push(XmlItem {
-                parent,
-                position: position(node)?,
-                item_groups: children(node, "Items")
-                    .map(position)
-                    .collect::<Result<_, _>>()?,
-                port: string_attribute(node, "portName", origin)?,
-                item: string_attribute(node, "itemName", origin)?,
-            });
+        };
+        let mut root_groups = Vec::new();
+        let mut items: Vec<XmlItem> = Vec::new();
+        let mut owner_by_node: Vec<Option<usize>> = Vec::new();
+        for node in loadout.nodes() {
+            let element = node.element();
+            let parent = node
+                .parent()
+                .and_then(|index| owner_by_node.get(index).copied().flatten());
+            let position = position(element)?;
+            let owner = if node.is_group() {
+                if let Some(item) = parent {
+                    items
+                        .get_mut(item)
+                        .ok_or(SocSceneError::Position)?
+                        .item_groups
+                        .push(position);
+                } else {
+                    root_groups.push(position);
+                }
+                parent
+            } else {
+                let index = items.len();
+                items.push(XmlItem {
+                    parent,
+                    position,
+                    item_groups: Vec::new(),
+                    port: string_attribute(element, "portName", origin)?,
+                    item: string_attribute(element, "itemName", origin)?,
+                });
+                Some(index)
+            };
+            owner_by_node.push(owner);
         }
         Ok(Some(Self { root_groups, items }))
     }

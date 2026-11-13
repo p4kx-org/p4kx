@@ -94,7 +94,9 @@ impl<'f> Entities<'f> {
         self.class_candidates(name).first().copied()
     }
 
-    pub(crate) fn named_class_candidates(&self, text: &str) -> &[Record<'f>] {
+    /// Returns all original Entity Records for an exact class name in definition order.
+    #[must_use]
+    pub fn named_class_candidates(&self, text: &str) -> &[Record<'f>] {
         self.class_candidates(strip_prefix_ignoring_case(text).unwrap_or(text))
     }
 

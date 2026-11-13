@@ -28,7 +28,7 @@ pub(crate) struct Resources<'a> {
 #[derive(Clone, Copy)]
 pub(crate) enum ResourceKind {
     Mannequin,
-    Loadout,
+    DataRelative,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

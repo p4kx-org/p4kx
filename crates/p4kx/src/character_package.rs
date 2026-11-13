@@ -29,10 +29,14 @@ use crate::extract::cancel_on_interrupt;
 
 mod report;
 
+#[path = "character_source.rs"]
+mod source;
+
 /// Runs a `p4kx character` subcommand.
 pub(crate) fn run(args: &CharacterArgs, as_json: bool) -> Result<()> {
     match &args.action {
         CharacterAction::Package(args) => package(args, as_json),
+        CharacterAction::Source(args) => source::run(args),
     }
 }
 
