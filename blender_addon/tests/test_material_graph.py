@@ -128,6 +128,14 @@ def test_the_second_layer_takes_the_palette_gloss_and_gloss_mult() -> None:
     assert graph.linked(blend.key, "Roughness B") is not None
 
 
+def test_authored_zero_layer_gloss_multiplier_is_applied() -> None:
+    raw = manifest_11()
+    raw["materials"][0]["layers"][1]["gloss_mult"] = 0.0
+    graph = graph_of(package.parse_manifest(raw, Path(".")), "x0001", "p0001")
+    blend = next(n for n in graph.nodes if n.group == LAYER_BLEND)
+    assert blend.inputs["Roughness A"] == 1.0
+
+
 def test_layer_normal_and_smoothness_come_from_the_layer_texture() -> None:
     graph = graph_of(load(), "x0001", "p0001")
     kinds = graph.kinds()

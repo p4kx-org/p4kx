@@ -305,7 +305,7 @@ class _Maker(LayerBlending, GlassSurface):
             factor,
             smooth,
             specular,
-            layer.gloss_mult or 1.0,
+            1.0 if layer.gloss_mult is None else layer.gloss_mult,
             layer.uv_tiling or 1.0,
             entry is not None,
         )
