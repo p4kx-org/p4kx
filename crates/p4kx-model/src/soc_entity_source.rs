@@ -14,6 +14,7 @@ use crate::soc_entity_component::SocEntityComponent;
 use crate::soc_entity_links::SocEntityLinks;
 use crate::soc_light_source::{SocLightGroupSource, SocLightSource};
 use crate::soc_source_node::SocSourceNode;
+use crate::soc_tile_port::SocTileAttachment;
 
 /// A failure to open or interpret an authored SOC entity chunk.
 #[derive(Debug, Error)]
@@ -202,6 +203,11 @@ impl<'document> SocEntity<'document> {
     /// Visits original light groups in either authored Entity scope.
     pub fn authored_light_groups(self) -> impl Iterator<Item = SocLightGroupSource<'document>> {
         SocLightGroupSource::read(self.element)
+    }
+
+    /// Visits original tile attachment declarations in Entity order.
+    pub fn tile_attachments(self) -> impl Iterator<Item = SocTileAttachment<'document>> {
+        SocTileAttachment::read(self.element)
     }
 
     /// Visits `AreaComponent` occurrences in their original Entity slots.

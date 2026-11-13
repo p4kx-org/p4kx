@@ -170,6 +170,7 @@ mod soc_container_capture;
 mod soc_entity_index;
 mod soc_room_index;
 mod soc_source_guid;
+mod soc_tile_port_index;
 mod spec;
 mod spec_loadout;
 mod tree;
@@ -266,6 +267,7 @@ pub use soc_container_capture::{
 pub use soc_entity_index::{SocEntityIndex, SocEntitySite, SocEntityTarget};
 pub use soc_room_index::{SocRoomIndex, SocRoomTarget};
 pub use soc_source_guid::SocSourceGuid;
+pub use soc_tile_port_index::{SocTilePortIndex, SocTilePortSite, SocTilePortTarget};
 pub use spec::LoadoutOrigin;
 pub use spec::read_geometry;
 pub use tree::{Attachment, EntityNode, PortNode, PortSource, Target, Unresolved};

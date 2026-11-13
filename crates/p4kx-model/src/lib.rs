@@ -132,6 +132,7 @@ mod soc_light_source;
 mod soc_room_registry;
 mod soc_room_segment;
 mod soc_source_node;
+mod soc_tile_port;
 mod stat_obj_physics;
 mod streams;
 mod transform;
@@ -240,5 +241,6 @@ pub use soc_room_segment::{
     SocRoomSegment, SocSegmentGeometry, SocSegmentPoint, SocSegmentTransform,
 };
 pub use soc_source_node::SocSourceValue;
+pub use soc_tile_port::{SocTileAttachment, SocTileItemPort};
 pub use stat_obj_physics::{StatObjPhysics, StatObjPhysicsError, StatObjPhysicsSlot};
 pub use transform::Transform;

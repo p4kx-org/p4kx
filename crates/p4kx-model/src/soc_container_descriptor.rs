@@ -6,6 +6,7 @@ use p4kx_cryxml::{SourceReadError, SourceReadOptions};
 use thiserror::Error;
 
 use crate::soc_source_node::{SocSourceNode, SocSourceValue};
+use crate::soc_tile_port::SocTileItemPort;
 
 /// A positioned source descriptor of an object container.
 #[derive(Debug)]
@@ -50,6 +51,11 @@ impl<'input> SocContainerDescriptor<'input> {
             sections(section.element(), "Child")
                 .map(move |node| SocContainerDeclaration { section, node })
         })
+    }
+
+    /// Visits original tile item ports in descriptor order.
+    pub fn tile_item_ports(&self) -> impl Iterator<Item = SocTileItemPort<'_>> {
+        SocTileItemPort::read(self.document.root())
     }
 
     /// Visits physical stream declarations in descriptor order, parents before nested streams.
