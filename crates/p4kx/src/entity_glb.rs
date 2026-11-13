@@ -38,7 +38,9 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = ArchiveFiles::new(&archive);
-    let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
+    let mut resolver = LoadoutResolver::new(&forge)
+        .with_forge_entry(&entry)
+        .with_files(&files);
     if !args.expand_docked_vehicles {
         resolver = resolver.stopping_at_docked_vehicles();
     }

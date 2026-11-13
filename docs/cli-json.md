@@ -360,7 +360,15 @@ creature whose skins are bound to its skeleton gets, with `--animations`, the cl
 (`animDatabase3P` of `SAnimatedCharacterComponentParams`, a Mannequin `.adb` with the databases
 nested in it), looked for by file name without extension in the animation folders (`#filepath`) and
 the track databases of its skeleton's parameter file ([ADR-0307](adr/0307-the-clips-of-a-creature-are-those-its-animation-database-names-and-are-written-on-the-bones-of-its-skeleton.md));
-`--animations` asks for them, without it the GLB is static. Names no clip has, such as blend spaces, are skipped, additive
+`--animations` asks for them, without it the GLB is static. The optional `animation_sources` object
+reports the selected Entity's database and geometry, the skeleton selection and parameter file,
+and the physical clip path and original ordinal. Each `graph_selectors` item identifies an
+original ADB name occurrence that contributed to that clip's selection, including the traversed
+SubADB path. The report includes the source inventory and per-value encryption evidence.
+`selection_complete` is false when a preview limit or unread source leaves part of the scan
+unavailable. Observed clip contributors are retained in a partial scan. These
+are the clips selected before checking whether they fit the exported skeleton. Names no clip
+has, such as blend spaces, are skipped, additive
 clips and clips that move no bone are left out as `animation_not_used` (one Issue per reason,
 `skipped` false), and a database, parameter file or folder the Archive lacks is
 `animations_unavailable` (`skipped` false), as is a limit that dropped databases, names or folders. A docked vehicle is

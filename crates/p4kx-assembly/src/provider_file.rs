@@ -21,12 +21,20 @@ impl ArchiveModels<'_> {
         choice: &AnimationChoice,
         extra: &[String],
     ) -> Result<ArchiveAnimationRead, ConversionError> {
-        let folders: Vec<String> = folders
-            .iter()
-            .map(|folder| format!("Data/{}", folder.trim_start_matches(['/', '\\'])))
-            .collect();
-        let folders: Vec<&str> = folders.iter().map(String::as_str).collect();
+        let paths = archive_folders(folders);
+        let folders: Vec<&str> = paths.iter().map(String::as_str).collect();
         AnimationSet::from_folders_with_archive_sources(&self.index, &folders, choice, extra)
+    }
+
+    pub(crate) fn animations_with_clip_evidence(
+        &self,
+        folders: &[&str],
+        choice: &AnimationChoice,
+        extra: &[String],
+    ) -> Result<ArchiveAnimationRead, ConversionError> {
+        let paths = archive_folders(folders);
+        let folders: Vec<&str> = paths.iter().map(String::as_str).collect();
+        AnimationSet::from_folders_with_clip_evidence(&self.index, &folders, choice, extra)
     }
 
     pub(crate) fn animations_of(
@@ -100,6 +108,13 @@ impl ArchiveModels<'_> {
             .map_err(read_failure)?;
         Ok(bytes)
     }
+}
+
+fn archive_folders(folders: &[&str]) -> Vec<String> {
+    folders
+        .iter()
+        .map(|folder| format!("Data/{}", folder.trim_start_matches(['/', '\\'])))
+        .collect()
 }
 
 impl super::ProvidedModel {

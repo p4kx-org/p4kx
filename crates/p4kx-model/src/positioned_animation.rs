@@ -33,6 +33,12 @@ impl PositionedAnimation {
         &self.animation
     }
 
+    /// Returns the decoded clip without its positions.
+    #[must_use]
+    pub fn into_animation(self) -> Animation {
+        self.animation
+    }
+
     /// Returns the original zero-based clip ordinal in its file.
     #[must_use]
     pub const fn clip_ordinal(&self) -> usize {

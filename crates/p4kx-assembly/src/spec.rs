@@ -140,7 +140,7 @@ pub(crate) struct EntitySpec {
     pub(crate) container: Option<Guid>,
     pub(crate) object_containers: Arc<[ObjectContainerRef]>,
     pub(crate) zones: ZoneList,
-    pub(crate) animation_database: Option<Arc<str>>,
+    pub(crate) animation_database: Option<crate::creature_animation::AnimationDatabase>,
 }
 
 impl EntitySpec {
@@ -181,7 +181,10 @@ impl EntitySpec {
             container: inventory_container(&components),
             object_containers: crate::object_containers::read(tree, component_slots(tree)).into(),
             zones: read_zones(&components),
-            animation_database: crate::creature_animation::database_of(&components),
+            animation_database: crate::creature_animation::database_of(
+                tree.record_index(),
+                component_slots(tree),
+            ),
             record_index: Some(tree.record_index()),
             guid: tree.guid(),
             record_path: tree.record_path().to_owned(),

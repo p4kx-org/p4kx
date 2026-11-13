@@ -205,7 +205,10 @@ pub use changes::{ChangeError, ChangedLoadout, LoadoutChanges, PortChange, Repla
 pub use chf_name_sources::{ChfNameContributions, ObservedChfNames};
 pub use chf_names::{archive_names, archive_names_observed};
 pub use compat::{AcceptedType, Incompatibility, ItemFacts, PortConstraints};
-pub use creature_animation::{CreatureAnimations, CreatureClips, creature_animations};
+pub use creature_animation::{
+    CreatureAnimationClipSource, CreatureAnimationOwner, CreatureAnimationSourceReport,
+    CreatureAnimations, CreatureClips, creature_animations,
+};
 pub use entities::{ENTITY_TYPE, Entities};
 pub use entity_glow::{
     EntityGlow, EntityGlowBindingError, EntityGlowLink, GlowEffectKind, GlowSelection, GlowSubset,

@@ -19,6 +19,11 @@ use crate::json;
 use crate::layers_json::LayersJson;
 use crate::model_animations::WrittenJson;
 
+#[path = "entity_glb_animation_sources.rs"]
+mod animation_sources;
+
+use animation_sources::AnimationSourcesJson;
+
 /// What the JSON report of one `entity glb` run is built from.
 pub(crate) struct GlbReport<'a> {
     pub(crate) archive: &'a Path,
@@ -87,6 +92,12 @@ impl GlbReport<'_> {
                 .collect(),
             placements: placements_json(assembly),
             animations: summary.animations.iter().map(WrittenJson::of).collect(),
+            animation_sources: self
+                .animations
+                .0
+                .sources
+                .as_ref()
+                .map(AnimationSourcesJson::from),
             issues: issues_json(assembly, self.animations),
         })?)
     }
@@ -142,6 +153,8 @@ struct GlbJson<'a> {
     placements: Vec<PlacementJson<'a>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     animations: Vec<WrittenJson>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    animation_sources: Option<AnimationSourcesJson<'a>>,
     issues: Vec<IssueJson<'a>>,
 }
 

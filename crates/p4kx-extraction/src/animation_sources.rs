@@ -11,36 +11,14 @@ use p4kx_model::{
 };
 
 use crate::animation_load::{Loaded, kind, load_with_positions};
-use crate::animation_select::{self, Gathered};
+use crate::animation_select::{self, Gathered, MatchEvidence};
 use crate::animation_set::{MAX_ANIMATION_FILE_LEN, Source, folder_entries, source_of};
 use crate::{AnimationChoice, AnimationSet, CancelToken, ChunkSource, ConversionError, PathIndex};
 
-/// The selected animations and their bound Archive reads.
-#[derive(Debug, Clone, Default)]
-pub struct ArchiveAnimationRead {
-    set: AnimationSet,
-    archive_sources: Vec<Option<EntryOrigin>>,
-}
+#[path = "archive_animation_read.rs"]
+mod read;
 
-impl ArchiveAnimationRead {
-    /// Returns the selected animations in source order.
-    #[must_use]
-    pub const fn set(&self) -> &AnimationSet {
-        &self.set
-    }
-
-    /// Returns the Archive Entry that supplied the selected animation at `index`.
-    #[must_use]
-    pub fn archive_source(&self, index: usize) -> Option<&EntryOrigin> {
-        self.archive_sources.get(index)?.as_ref()
-    }
-
-    /// Returns the selected animations without the Archive evidence.
-    #[must_use]
-    pub fn into_set(self) -> AnimationSet {
-        self.set
-    }
-}
+pub use read::{ArchiveAnimationRead, ArchiveClipEvidence};
 
 /// The selected decoded clip and the physical Archive Entry that supplied it.
 #[derive(Debug)]
@@ -126,6 +104,7 @@ impl ArchiveModelAnimations {
             &AnimationChoice::All,
             |label| open_entry(index, label, None),
             |source, label, kind, _| load_with_positions(source, label, kind),
+            MatchEvidence::Off,
             |origin, loaded| {
                 let authored_empty = loaded.database.is_some()
                     && loaded.animations.is_empty()
@@ -248,16 +227,6 @@ impl AnimationFlagRun {
         }
         self.count += 1;
         true
-    }
-}
-
-impl From<Gathered<Animation>> for ArchiveAnimationRead {
-    fn from(mut gathered: Gathered<Animation>) -> Self {
-        let archive_sources = std::mem::take(&mut gathered.archive_sources);
-        Self {
-            set: gathered.into(),
-            archive_sources,
-        }
     }
 }
 

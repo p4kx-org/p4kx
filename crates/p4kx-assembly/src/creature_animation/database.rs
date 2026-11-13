@@ -4,17 +4,18 @@
 //! The animation names of a Mannequin animation database (`.adb`) and of the databases it nests.
 
 use std::collections::HashSet;
+use std::sync::Arc;
 
+use p4kx_extraction::{EntryOrigin, SourceLocation};
+
+use crate::loadout_xml::{AttributeNamespaces, Node, Scope};
 use crate::markup::{self, Budget, Element};
 use crate::{ModelFailure, ModelProvider};
 
-/// The most bytes of one database that are read.
 const MAX_DATABASE_BYTES: u64 = 16 << 20;
 
-/// The most databases read for one Entity: the one it names and those nested in it.
 const MAX_DATABASES: usize = 64;
 
-/// The most animation names kept.
 const MAX_NAMES: usize = 1 << 16;
 
 /// The animation names of a database and what could not be read of it or of its nested databases.
@@ -22,11 +23,64 @@ const MAX_NAMES: usize = 1 << 16;
 pub(super) struct Clips {
     /// The names in the order of their first use, each once, ignoring ASCII case.
     pub(super) names: Vec<String>,
+    pub(super) selectors: Vec<NameSelector>,
+    pub(super) unpositioned_selectors: bool,
     /// The nested databases that could not be read, each with why.
     pub(super) unread: Vec<(String, String)>,
     /// What was dropped because a limit was reached, each as a sentence for a report.
     pub(super) truncated: Vec<String>,
 }
+
+#[derive(Debug)]
+pub(super) struct NameSelector {
+    pub(super) name: String,
+    pub(super) input: EntryOrigin,
+    pub(super) position: SourceLocation,
+    pub(super) route: Route,
+}
+
+impl PartialEq for NameSelector {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+            && self.input.binding() == other.input.binding()
+            && self.position == other.position
+            && self.route == other.route
+    }
+}
+
+impl Eq for NameSelector {}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub(super) enum Route {
+    #[default]
+    Root,
+    Nested(Arc<NestedRoute>),
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct NestedRoute {
+    pub(super) parent: Route,
+    pub(super) selector: Option<SelectorOrigin>,
+}
+
+#[derive(Debug)]
+pub(super) struct SelectorOrigin {
+    pub(super) input: EntryOrigin,
+    pub(super) position: SourceLocation,
+}
+
+impl PartialEq for SelectorOrigin {
+    fn eq(&self, other: &Self) -> bool {
+        self.input.binding() == other.input.binding() && self.position == other.position
+    }
+}
+
+impl Eq for SelectorOrigin {}
+
+const NAMESPACES: AttributeNamespaces = AttributeNamespaces {
+    text_bytes: "mannequinAnimationTextBytes",
+    cryxml_attribute: "mannequinAnimationCryXmlAttribute",
+};
 
 /// Why the database an Entity names gives no clips.
 #[derive(Debug, PartialEq, Eq)]
@@ -46,14 +100,13 @@ pub(super) enum DatabaseProblem {
 /// is listed in [`Clips::unread`], and what a limit dropped in [`Clips::truncated`].
 pub(super) fn clips(models: &dyn ModelProvider, path: &str) -> Result<Clips, DatabaseProblem> {
     let mut clips = Clips::default();
-    let mut seen_names: HashSet<String> = HashSet::new();
+    let mut seen_names = HashSet::new();
     let mut seen_files: HashSet<String> = HashSet::from([key(path)]);
-    let mut queue = vec![path.to_owned()];
+    let mut queue = vec![(path.to_owned(), Route::Root)];
     let (mut next, mut databases_dropped, mut names_dropped) = (0, false, false);
-    while let Some(file) = queue.get(next).cloned() {
-        let nested = match read(models, &file) {
-            Ok(element) => {
-                let found = collect(&element, &mut clips.names, &mut seen_names);
+    while let Some((file, route)) = queue.get(next).cloned() {
+        let nested = match read(models, &file, &route, &mut clips, &mut seen_names) {
+            Ok(found) => {
                 names_dropped |= found.names_dropped;
                 found.databases
             }
@@ -63,12 +116,18 @@ pub(super) fn clips(models: &dyn ModelProvider, path: &str) -> Result<Clips, Dat
                 Vec::new()
             }
         };
-        for file in nested {
+        for (file, selector) in nested {
             if !seen_files.insert(key(&file)) {
                 continue;
             }
             if queue.len() < MAX_DATABASES {
-                queue.push(file);
+                queue.push((
+                    file,
+                    Route::Nested(Arc::new(NestedRoute {
+                        parent: route.clone(),
+                        selector,
+                    })),
+                ));
             } else {
                 databases_dropped = true;
             }
@@ -99,38 +158,69 @@ fn describe(problem: &DatabaseProblem) -> String {
     }
 }
 
-fn read(models: &dyn ModelProvider, path: &str) -> Result<Element, DatabaseProblem> {
-    let bytes = models
-        .file(path, MAX_DATABASE_BYTES)
-        .map_err(|failure| match failure {
-            ModelFailure::Missing => DatabaseProblem::Missing,
-            other => DatabaseProblem::Unreadable(other.to_string()),
-        })?;
-    markup::parse(&bytes, &mut Budget::new(bytes.len())).map_err(DatabaseProblem::Unreadable)
+fn read(
+    models: &dyn ModelProvider,
+    path: &str,
+    route: &Route,
+    output: &mut Clips,
+    seen: &mut HashSet<String>,
+) -> Result<Found, DatabaseProblem> {
+    let (origin, bytes) = models.file_observed(path, MAX_DATABASE_BYTES);
+    let bytes = bytes.map_err(|failure| match failure {
+        ModelFailure::Missing => DatabaseProblem::Missing,
+        other => DatabaseProblem::Unreadable(other.to_string()),
+    })?;
+    let mut budget = Budget::new(bytes.len());
+    markup::parse_with_source(&bytes, &mut budget, |root, original, scope| {
+        Ok(collect(
+            &root,
+            original,
+            scope,
+            origin.as_ref(),
+            route,
+            output,
+            seen,
+        ))
+    })
+    .map_err(DatabaseProblem::Unreadable)
 }
 
-/// What one database holds besides the names added to the list.
 struct Found {
-    /// The files of its `SubADB` elements.
-    databases: Vec<String>,
-    /// Whether a name was dropped because the list is full.
+    databases: Vec<(String, Option<SelectorOrigin>)>,
     names_dropped: bool,
 }
 
-/// Adds the names of the `Animation` elements below `root` to `names`.
-fn collect(root: &Element, names: &mut Vec<String>, seen: &mut HashSet<String>) -> Found {
+fn collect(
+    root: &Element,
+    original: Node<'_, '_>,
+    scope: &Scope<'_, '_>,
+    origin: Option<&EntryOrigin>,
+    route: &Route,
+    output: &mut Clips,
+    seen: &mut HashSet<String>,
+) -> Found {
     let mut found = Found {
         databases: Vec::new(),
         names_dropped: false,
     };
-    let mut stack = vec![root];
-    while let Some(element) = stack.pop() {
+    let mut stack = vec![(root, original)];
+    while let Some((element, source)) = stack.pop() {
         if element.name.eq_ignore_ascii_case("Animation")
             && let Some(name) = element.attribute("name").filter(|name| !name.is_empty())
-            && seen.insert(name.to_ascii_lowercase())
         {
-            if names.len() < MAX_NAMES {
-                names.push(name.to_owned());
+            if admit_name(name, output, seen) {
+                if let Some(SelectorOrigin { input, position }) =
+                    selector_origin(origin, scope, source, "name")
+                {
+                    output.selectors.push(NameSelector {
+                        name: name.to_owned(),
+                        input,
+                        position,
+                        route: route.clone(),
+                    });
+                } else if origin.is_some() {
+                    output.unpositioned_selectors = true;
+                }
             } else {
                 found.names_dropped = true;
             }
@@ -138,11 +228,37 @@ fn collect(root: &Element, names: &mut Vec<String>, seen: &mut HashSet<String>) 
         if element.name.eq_ignore_ascii_case("SubADB")
             && let Some(file) = element.attribute("File").filter(|file| !file.is_empty())
         {
-            found.databases.push(file.to_owned());
+            found.databases.push((
+                file.to_owned(),
+                selector_origin(origin, scope, source, "File"),
+            ));
         }
-        stack.extend(element.children.iter().rev());
+        stack.extend(element.children.iter().zip(source.children()).rev());
     }
     found
+}
+
+fn admit_name(name: &str, output: &mut Clips, seen: &mut HashSet<String>) -> bool {
+    let key = name.to_ascii_lowercase();
+    if output.names.len() == MAX_NAMES {
+        return seen.contains(&key);
+    }
+    if seen.insert(key) {
+        output.names.push(name.to_owned());
+    }
+    true
+}
+
+fn selector_origin(
+    origin: Option<&EntryOrigin>,
+    scope: &Scope<'_, '_>,
+    source: Node<'_, '_>,
+    field: &str,
+) -> Option<SelectorOrigin> {
+    Some(SelectorOrigin {
+        input: origin?.clone(),
+        position: NAMESPACES.location(&scope.attribute_ascii_position(source, field)?, field)?,
+    })
 }
 
 #[cfg(test)]

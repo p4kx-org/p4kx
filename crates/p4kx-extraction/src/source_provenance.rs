@@ -26,8 +26,8 @@ pub use self::entity_material_effects::{
 pub use self::record_json_location::RecordJsonLocation;
 pub use self::sourced_value_seed::SourcedValueSeed;
 pub use crate::animation_sources::{
-    AnimationFlagRun, ArchiveAnimationAdmission, ArchiveAnimationRead, ArchiveModelAnimations,
-    ArchivePositionedAnimation,
+    AnimationFlagRun, ArchiveAnimationAdmission, ArchiveAnimationRead, ArchiveClipEvidence,
+    ArchiveModelAnimations, ArchivePositionedAnimation,
 };
 pub use crate::chunk_source::{ChunkDumpMode, ChunkDumpPayload, PreparedChunk};
 pub use crate::field_origin::{FieldOrigin, SharedFieldOrigin};

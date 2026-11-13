@@ -14,11 +14,14 @@ use p4kx_model::{AnimationError, ModelError};
 use p4kx_texture::TextureError;
 use thiserror::Error;
 
-use crate::UnknownEntries;
+use crate::{SourceEvidenceError, UnknownEntries};
 
 /// A failure to convert a texture, a sound or a UI movie.
 #[derive(Debug, Error)]
 pub enum ConversionError {
+    /// Original source evidence could not be represented.
+    #[error(transparent)]
+    SourceEvidence(#[from] SourceEvidenceError),
     /// The Archive holds no Entry with the requested path.
     #[error(transparent)]
     UnknownEntry(#[from] UnknownEntries),
