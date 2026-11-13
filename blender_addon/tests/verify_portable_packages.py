@@ -6,11 +6,9 @@
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import platform
-import re
 import sys
 from pathlib import Path
 
@@ -19,7 +17,8 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 
 from p4kx_importer import package  # noqa: E402
-from p4kx_importer.mesh_preflight import preflight_meshes  # noqa: E402
+from p4kx_importer.mesh_preflight import preflight_all_meshes  # noqa: E402
+from p4kx_importer.package_digests import file_sha256, is_sha256, read_expected  # noqa: E402
 
 ARTIFACT_PREFIX = "p4kx-blender-package-"
 CASES = ("assembly", "livery")
@@ -33,12 +32,6 @@ def require(condition: bool, message: str) -> None:
         raise ValueError(message)
 
 
-def digest(path: Path) -> str:
-    """Returns the SHA-256 of the complete regular file."""
-    with path.open("rb") as source:
-        return hashlib.file_digest(source, "sha256").hexdigest()
-
-
 def file_hashes(root: Path) -> dict[str, str]:
     """Inventories each exact portable path and refuses linked entries."""
     require(root.is_dir(), f"Missing package directory: {root.name}")
@@ -47,7 +40,7 @@ def file_hashes(root: Path) -> dict[str, str]:
         path = entry.relative_to(root).as_posix()
         require(not entry.is_symlink() and not entry.is_junction(), f"Linked package entry: {path}")
         if entry.is_file():
-            files[path] = digest(entry)
+            files[path] = file_sha256(entry)
         else:
             require(entry.is_dir(), f"Unexpected package entry: {path}")
     return files
@@ -80,12 +73,11 @@ def read_receipt(folder: Path, row: dict, revision: str, run_id: str) -> dict[st
         require(receipt.get(key) == value, f"{target}: receipt {key} differs")
     executable = receipt.get("exporter_sha256")
     require(
-        isinstance(executable, str) and re.fullmatch(r"[0-9a-f]{64}", executable) is not None,
+        is_sha256(executable),
         f"{target}: invalid native exporter digest",
     )
-    items = receipt["files"]
-    hashes = {item["path"]: item["sha256"] for item in items}
-    require(bool(hashes) and len(hashes) == len(items), f"{target}: missing or duplicate receipt paths")
+    hashes = read_expected(receipt)
+    require(bool(hashes), f"{target}: receipt has no files")
     require(hashes == file_hashes(packages), f"{target}: received package paths or bytes differ from receipt")
     return hashes
 
@@ -99,7 +91,7 @@ def manifests(folder: Path, hashes: dict[str, str]) -> dict[str, dict]:
     for case in CASES:
         directory = root / case
         loaded = package.load_package(directory)
-        preflight = preflight_meshes(loaded)
+        preflight = preflight_all_meshes(loaded)
         require(
             not preflight.problems,
             f"{case}: package mesh preflight failed: " + " | ".join(

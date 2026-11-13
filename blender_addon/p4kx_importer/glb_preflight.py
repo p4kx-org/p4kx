@@ -11,6 +11,7 @@ from pathlib import Path
 from struct import Struct
 from typing import Any, BinaryIO
 
+from .glb_geometry import GeometryCounts, geometry_counts
 from .glb_references import validate_references
 from .manifest_fields import PackageError, read_object
 
@@ -28,6 +29,7 @@ class GlbInfo:
 
     bytes: int
     materials: int
+    geometry: GeometryCounts | None
 
 
 def check_glb(path: Path) -> GlbInfo:
@@ -66,7 +68,7 @@ def _check_stream(stream: BinaryIO) -> GlbInfo:
         padding = stream.read(bin_length - data_length)
         if padding != bytes(bin_length - data_length):
             raise PackageError("GLB BIN padding is invalid.")
-    return GlbInfo(actual_size, material_count)
+    return GlbInfo(actual_size, material_count, geometry_counts(document))
 
 
 def _read_chunk(stream: BinaryIO, total: int) -> tuple[int, bytes]:

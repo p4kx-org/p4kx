@@ -68,6 +68,8 @@ class Mesh:
     palette_id: str | None = None
     rig: Rig | None = None
     bytes: int | None = None
+    vertices: int | None = None
+    triangles: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -268,18 +270,24 @@ def _parse_meshes(items: list[Any], textures: dict[str, Texture]) -> dict[str, M
             for slot, material in enumerate(read_array(entry.get("materials"), f"{where}.materials"))
         )
         palette_id = entry.get("palette_id")
-        size = entry.get("bytes")
-        if size is not None and (type(size) is not int or size < 0):
-            raise PackageError(f"{where}: bytes is not a non-negative integer.")
         meshes[mesh_id] = Mesh(
             mesh_id,
             file,
             materials,
             palette_id if isinstance(palette_id, str) else None,
             _rig(entry.get("rig"), f"{where}.rig"),
-            size,
+            _mesh_count(entry, "bytes", where),
+            _mesh_count(entry, "vertices", where),
+            _mesh_count(entry, "triangles", where),
         )
     return meshes
+
+
+def _mesh_count(entry: dict[str, Any], key: str, where: str) -> int | None:
+    value = entry.get(key)
+    if value is not None and (type(value) is not int or value < 0):
+        raise PackageError(f"{where}: {key} is not a non-negative integer.")
+    return value
 
 
 def _parse_material(item: Any, where: str, textures: dict[str, Texture]) -> MeshMaterial:

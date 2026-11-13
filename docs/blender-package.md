@@ -90,11 +90,30 @@ buffer or image is refused.
 If a mesh is missing or fails validation, Blender reports the mesh ID and the reason. The
 remaining valid meshes and scene nodes still import. The add-on checks any recorded nonzero
 file size and requires manifest material indices to be unique and within the GLB material
-array. Older packages may omit the file size. Blender's glTF importer still verifies that it
-can read the valid assets.
+array. It also compares reported geometry counts for triangle meshes. Shared position
+accessors count once per emitted mesh, and each primitive contributes its triangle count.
+Older packages may omit these counts. Blender's glTF importer still checks that it can read
+the assets.
 
-For native release fixtures, the package exchange checks the receipt's SHA-256 inventory and
-the structure of referenced GLBs. Ordinary Blender imports work without a receipt.
+### Validate a package without Blender
+
+From the repository's `blender_addon` directory, run the validator with Python 3.13.
+
+```powershell
+python -B -m p4kx_importer.validate_package 'D:/exports/ship-package'
+```
+
+The command checks all declared mesh files and the presence of manifest textures. It prints
+JSON to standard output and leaves the package folder untouched. `structure.status` is
+`valid`, `partial` when the package has warnings or geometry counts could not be compared,
+or `failed`. The command exits with status 1 for a structural or digest failure.
+
+Pass `--receipt 'D:/exports/package-receipt.json'` to check an existing SHA-256 inventory.
+The schema-1 receipt has a `files` array of `path` and `sha256` pairs. Paths are relative to
+the package folder, such as `scene.json` or `meshes/m0001.glb`. A receipt may list a subset
+of declared files. `digests.status` reports `absent`, `partial`, `verified` or `failed`
+independently of structural validation. Native release fixtures use the same receipt entries
+with paths relative to their two-package exchange root.
 
 ## `scene.json`
 
