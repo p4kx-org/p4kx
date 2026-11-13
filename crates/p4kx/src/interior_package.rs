@@ -10,7 +10,7 @@ use p4kx_blender::{
     check_output_with_context, write_interior_package_with_context,
 };
 use p4kx_channels::channel_name;
-use p4kx_extraction::{GlbOptions, is_same_file};
+use p4kx_extraction::is_same_file;
 use serde::Serialize;
 
 use crate::cli_interior::InteriorPackageArgs;
@@ -58,7 +58,7 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
     }
     let (layers, chain) = open(&args.archive, &args.containers)?;
     let entry = chain.last().map_or("", String::as_str);
-    let options = InteriorOptions::default().with_lod(args.lod);
+    let options = InteriorOptions::default().with_lod(args.mesh.lod);
     let interior = crate::interior_forge::build(&layers, entry, &options)?;
     let outer = layers
         .first()
@@ -68,12 +68,7 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
     let context = PackageWriteContext::new(&protection, cancel.flag());
     check_output_with_context(&args.out, &context)?;
     let models = ArchiveModels::new(outer);
-    let mut glb = GlbOptions::default()
-        .with_lod(args.lod)
-        .with_texture_mip(args.texture_mip);
-    if args.no_vertex_colours {
-        glb = glb.without_vertex_colours();
-    }
+    let glb = args.mesh.glb_options();
     let info = PackageInfo::new(channel_name(outer.path()), build_info(outer)?);
     let name = name_of(entry);
     let authored = if args.authored_soc {
@@ -89,9 +84,9 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
     }
     let loader = models.textures();
     let context = context
-        .with_texture_container(args.texture_container.container())
+        .with_texture_container(args.mesh.texture_container())
         .with_archive_texture_source(&loader);
-    let context = if args.vertex_maps {
+    let context = if args.mesh.vertex_maps {
         context.with_vertex_maps()
     } else {
         context
@@ -134,8 +129,8 @@ impl<'a> PackageJson<'a> {
             archive: archive.to_owned(),
             containers: chain,
             out: json::path(&args.out),
-            lod: args.lod,
-            texture_mip: args.texture_mip,
+            lod: args.mesh.lod,
+            texture_mip: args.mesh.texture_mip,
             containers_opened: interior.containers(),
             model_parts: interior.model_parts(),
             modelled_parts: interior.modelled_parts(),

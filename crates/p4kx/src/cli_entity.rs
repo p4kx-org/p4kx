@@ -7,6 +7,7 @@ use clap::{Args, Subcommand, ValueEnum};
 use p4kx_assembly::{ChangeError, LoadoutChanges, LoadoutPicks};
 
 use crate::cli_model::lod_range;
+use crate::cli_package_mesh::PackageMeshArgs;
 use crate::cli_wwise::{AudioLanguageArgs, SoundExportArgs};
 use crate::exit::EXIT_CODES_HELP;
 
@@ -132,26 +133,11 @@ pub(crate) struct EntityPackageArgs {
     /// earlier run wrote, which is replaced.
     #[arg(long, value_name = "FOLDER")]
     pub(crate) out: PathBuf,
-    /// The level of detail of every model: 0 is the most detailed. A model that lacks the level
-    /// is written at the nearest lower level it has.
-    #[arg(long, value_name = "N", default_value_t = 0, value_parser = lod_range())]
-    pub(crate) lod: u32,
-    /// The mip level of the textures: 0 is the largest, each level halves the width and height;
-    /// a texture with fewer mips gives its smallest.
-    #[arg(long, value_name = "N", default_value_t = 0)]
-    pub(crate) texture_mip: u32,
-    /// Writes supported DDS mips unchanged, with PNG fallback for other textures.
-    #[arg(long, value_enum, value_name = "CONTAINER", default_value_t)]
-    pub(crate) texture_container: PackageTextureContainerArg,
-    /// Leaves the vertex colours out of the parts.
-    #[arg(long)]
-    pub(crate) no_vertex_colours: bool,
+    #[command(flatten)]
+    pub(crate) mesh: PackageMeshArgs,
     /// Writes opt-in collision helpers alongside the package's render meshes.
     #[arg(long)]
     pub(crate) collision_helpers: bool,
-    /// Writes source vertex maps for the package's static scene meshes.
-    #[arg(long)]
-    pub(crate) vertex_maps: bool,
     /// Includes the Interior as for `entity glb --interior`: the socpak containers the Records of
     /// the Entity and of its attached Entities name, each placed at its bone of the Entity that
     /// names it, as nodes below an `Interior` node of that Entity, with their models and props
@@ -162,25 +148,6 @@ pub(crate) struct EntityPackageArgs {
     pub(crate) interior: bool,
     #[command(flatten)]
     pub(crate) changes: LoadoutChangeArgs,
-}
-
-/// An external texture container supported by the Blender package importer.
-#[derive(Debug, Default, Clone, Copy, ValueEnum)]
-pub(crate) enum PackageTextureContainerArg {
-    /// Converts textures to PNG.
-    #[default]
-    Png,
-    /// Uses verified DDS blocks for compatible material textures.
-    Dds,
-}
-
-impl PackageTextureContainerArg {
-    pub(crate) const fn container(self) -> p4kx_blender::PackageTextureContainer {
-        match self {
-            Self::Png => p4kx_blender::PackageTextureContainer::Png,
-            Self::Dds => p4kx_blender::PackageTextureContainer::BlenderDds,
-        }
-    }
 }
 
 /// Arguments of `p4kx entity glb`.

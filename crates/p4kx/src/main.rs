@@ -59,6 +59,7 @@ mod cli_loc;
 mod cli_media;
 mod cli_model;
 mod cli_output;
+mod cli_package_mesh;
 mod cli_prefab;
 mod cli_ships;
 mod cli_socpak;

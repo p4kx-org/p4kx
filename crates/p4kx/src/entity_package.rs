@@ -13,7 +13,7 @@ use p4kx_blender::{
     check_output_with_context, write_package_with_context,
 };
 use p4kx_channels::channel_name;
-use p4kx_extraction::{Archive, DataForgeEntry, GlbOptions, is_same_file};
+use p4kx_extraction::{Archive, DataForgeEntry, is_same_file};
 use serde::Serialize;
 
 use crate::cli_entity::EntityPackageArgs;
@@ -94,11 +94,11 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
     let tree = applied.node();
     let models = ArchiveModels::new(&archive).with_model_node_sources();
     let palettes = ForgePalettes::new(&forge);
-    let options = AssemblyOptions::default().with_lod(args.lod);
+    let options = AssemblyOptions::default().with_lod(args.mesh.lod);
     let assembly = Assembly::build_with_palettes(tree, &models, &palettes, &options)?;
     crate::entity_root::check(&assembly)?;
     let assembly = if args.interior {
-        crate::interior_forge::with_interior(assembly, (&archive, &forge), tree, args.lod)?
+        crate::interior_forge::with_interior(assembly, (&archive, &forge), tree, args.mesh.lod)?
     } else {
         assembly
     };
@@ -129,23 +129,18 @@ fn write<'a>(
     assembly: &Assembly,
     context: PackageWriteContext<'a>,
 ) -> Result<PackageSummary> {
-    let mut glb = GlbOptions::default()
-        .with_lod(args.lod)
-        .with_texture_mip(args.texture_mip);
-    if args.no_vertex_colours {
-        glb = glb.without_vertex_colours();
-    }
+    let glb = args.mesh.glb_options();
 
     let loader = models.textures();
     let context = context
-        .with_texture_container(args.texture_container.container())
+        .with_texture_container(args.mesh.texture_container())
         .with_archive_texture_source(&loader);
     let context = if args.collision_helpers {
         context.with_collision_helpers(archive)
     } else {
         context
     };
-    let context = if args.vertex_maps {
+    let context = if args.mesh.vertex_maps {
         context.with_vertex_maps()
     } else {
         context
@@ -168,8 +163,8 @@ impl<'a> PackageJson<'a> {
             entity: tree.class_name(),
             guid: tree.guid().to_string(),
             out: json::path(&args.out),
-            lod: args.lod,
-            texture_mip: args.texture_mip,
+            lod: args.mesh.lod,
+            texture_mip: args.mesh.texture_mip,
             nodes: summary.nodes,
             drawn_nodes: summary.drawn_nodes,
             containers: summary.containers,
@@ -299,7 +294,7 @@ fn print_report(
         writeln!(
             out,
             "{} models lack LOD{} and are written at the nearest lower level",
-            summary.lod_fallbacks, args.lod
+            summary.lod_fallbacks, args.mesh.lod
         )?;
     }
     if summary.texture_failures > 0 {
