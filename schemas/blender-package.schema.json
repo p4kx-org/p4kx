@@ -1235,12 +1235,42 @@
       ],
       "type": "object"
     },
+    "EntityClassification": {
+      "additionalProperties": false,
+      "description": "The authored classification of an Entity node and its immediate origins.",
+      "properties": {
+        "item_type": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original `AttachDef` Type."
+        },
+        "subtype": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original `AttachDef` `SubType`."
+        }
+      },
+      "required": [
+        "item_type",
+        "subtype"
+      ],
+      "type": "object"
+    },
     "EntityRef": {
       "description": "An Entity of the Archive. In `source.entity` of a Character package, which is made from no\nEntity, `class_name` is the Character's name and `guid` is empty.",
       "properties": {
         "class_name": {
           "description": "The Entity's class name, e.g. `AEGS_Avenger_Titan`.",
           "type": "string"
+        },
+        "classification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntityClassification"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Authored classification of an Entity node when selected by the Assembly."
         },
         "guid": {
           "description": "The Entity's GUID.",
@@ -4879,6 +4909,17 @@
         }
       ],
       "description": "Physical fallback lookup for drawn mesh assignments that require one."
+    },
+    "entity_provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourceInventory"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Physical inputs and references used by sourced Entity classifications."
     },
     "format": {
       "$ref": "#/$defs/Format",

@@ -74,10 +74,12 @@ pub(crate) fn entity_ref(root: Option<&Part>) -> EntityRef {
         || EntityRef {
             class_name: String::new(),
             guid: String::new(),
+            classification: None,
         },
         |part| EntityRef {
             class_name: part.class_name().to_owned(),
             guid: part.guid().to_string(),
+            classification: None,
         },
     )
 }
@@ -152,6 +154,7 @@ fn part_item(part: &Part) -> Item<'_> {
         entity: (!gear).then(|| EntityRef {
             class_name: part.class_name().to_owned(),
             guid: part.guid().to_string(),
+            classification: None,
         }),
         geometry: part.geometry(),
         drawn: part.model().map(|model| Drawn {

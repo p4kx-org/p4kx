@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::field_origin::FieldOrigin;
 use crate::source_value_schema;
@@ -26,7 +26,9 @@ pub enum SourceValue<T> {
 }
 
 /// The interpretation state of one typed source value.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Deserialize, Serialize, JsonSchema,
+)]
 #[non_exhaustive]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
@@ -58,6 +60,20 @@ pub struct SourcedValue<T> {
 }
 
 impl<T> SourcedValue<T> {
+    /// Reconstructs a typed value and its validated origin from a reader.
+    #[must_use]
+    pub(crate) fn from_wire(
+        state: SourceValueState,
+        value: Option<T>,
+        origin: FieldOrigin,
+    ) -> Option<Self> {
+        ((state == SourceValueState::Present) == value.is_some()).then_some(Self {
+            state,
+            value,
+            origin,
+        })
+    }
+
     pub(crate) fn new(value: SourceValue<T>, origin: FieldOrigin) -> Self {
         let (state, value) = match value {
             SourceValue::Present(value) => (SourceValueState::Present, Some(value)),

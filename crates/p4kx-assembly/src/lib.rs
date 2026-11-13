@@ -300,6 +300,8 @@ mod loadout_reference;
 mod target_spec;
 pub use loadout_reference::{LoadoutReference, LoadoutReferenceSelection};
 
+mod item_classification;
+pub use item_classification::ItemClassification;
 mod loadout_class;
 mod loadout_target_guid;
 mod loadout_xml_attribute;

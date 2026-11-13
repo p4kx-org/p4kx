@@ -9,6 +9,7 @@ use p4kx_assembly::{Assembly, Part};
 use p4kx_gltf::{GlbOptions, GlbSummary, MaterialMode, TextureLoader};
 
 use crate::build::assembly_issue;
+use crate::entity_classification::EntityClassifications;
 use crate::items::entity_ref;
 use crate::manifest::{Issue, IssueOrigin, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigPart, RigPartOrigin};
@@ -39,13 +40,18 @@ pub(crate) fn write_creature_package(
     } else {
         assembly
     };
+    let classifications = EntityClassifications::capture(assembly.root(), assembly.forge_origin())?;
     write_rig_package(
         out,
         name,
         &options,
         context,
         |options, writer| assembly.write_glb_with(options, textures, writer),
-        |written| manifest(assembly, interior_left_out, info, &options, written),
+        |written| {
+            let mut manifest = manifest(assembly, interior_left_out, info, &options, written);
+            classifications.apply(&mut manifest);
+            manifest
+        },
     )
 }
 

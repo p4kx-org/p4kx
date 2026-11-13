@@ -175,6 +175,7 @@ pub(super) mod tests {
                 entity: EntityRef {
                     class_name: String::new(),
                     guid: String::new(),
+                    classification: None,
                 },
                 character: None,
             },
@@ -194,6 +195,7 @@ pub(super) mod tests {
             palettes: Vec::new(),
             authored_soc: None,
             default_material: None,
+            entity_provenance: None,
             issues: Vec::new(),
         }
     }

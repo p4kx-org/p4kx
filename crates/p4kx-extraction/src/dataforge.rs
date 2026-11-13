@@ -144,6 +144,12 @@ impl DataForgeEntry {
     pub fn open(&self) -> Result<DataForge<'_>, DataForgeError> {
         DataForge::open(&self.bytes)
     }
+
+    /// Returns the physical origin when the DataForge uses this exact opened input.
+    #[must_use]
+    pub fn origin_of(&self, forge: &DataForge<'_>) -> Option<&DataForgeOrigin> {
+        forge.is_opened_over(&self.bytes).then_some(&self.origin)
+    }
 }
 
 /// The DataForge Entry of an Archive cannot be found or read.

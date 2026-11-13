@@ -13,7 +13,10 @@ mod entry_directory_origins;
 mod model_archive_source;
 #[path = "model_material_origins.rs"]
 pub(crate) mod model_material_origins;
+#[path = "sourced_value_seed.rs"]
+mod sourced_value_seed;
 
+pub use self::sourced_value_seed::SourcedValueSeed;
 pub use crate::animation_sources::{
     AnimationFlagRun, ArchiveAnimationAdmission, ArchiveAnimationRead, ArchiveModelAnimations,
     ArchivePositionedAnimation,

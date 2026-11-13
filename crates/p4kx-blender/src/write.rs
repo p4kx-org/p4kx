@@ -11,6 +11,7 @@ use p4kx_gltf::{AnimationSummary, GlbOptions, TextureLoader};
 use crate::build::{Inputs, manifest};
 use crate::collect::Collected;
 use crate::creature::write_creature_package;
+use crate::entity_classification::EntityClassifications;
 use crate::finite::sanitise;
 use crate::items::{Item, entity_ref, items};
 use crate::manifest::{
@@ -197,6 +198,7 @@ pub fn write_package_with_context(
         items: items(assembly),
         issues: assembly.issues(),
         authored_soc: None,
+        classification: Some(assembly),
     };
     write_scene(&scene, models, textures, options, info, out, context)
 }
@@ -207,6 +209,7 @@ pub(crate) struct Scene<'a> {
     pub(crate) items: Vec<Item<'a>>,
     pub(crate) issues: &'a [AssemblyIssue],
     pub(crate) authored_soc: Option<&'a crate::SocScene>,
+    pub(crate) classification: Option<&'a Assembly>,
 }
 
 pub(crate) fn write_scene(
@@ -281,15 +284,8 @@ fn write_scene_files(
         outcomes: &outcomes,
         meshes: &written,
     });
-    let authored_soc_file = scene
-        .authored_soc
-        .map(|authored| crate::package_soc_scene::write(staging, authored, context))
-        .transpose()?;
-    if authored_soc_file.is_some() {
-        manifest.authored_soc = Some(crate::package_soc_scene::ManifestSocScene::new());
-    }
-    manifest.default_material = fallback.as_deref().map(ArchiveDefaultMaterial::receipt);
-    sanitise(&mut manifest);
+    let authored_soc_file =
+        complete_manifest(&mut manifest, scene, fallback.as_deref(), staging, context)?;
     let mut summary = summarise(&manifest, &outcomes, &written);
     let files = package_files(written, &outcomes, authored_soc_file);
     let totals = package_receipt::write_metadata(staging, &manifest, files, context)?;
@@ -297,6 +293,28 @@ fn write_scene_files(
     summary.bytes = totals.bytes;
     context.check()?;
     Ok(summary)
+}
+
+fn complete_manifest(
+    manifest: &mut crate::Manifest,
+    scene: &Scene<'_>,
+    fallback: Option<&ArchiveDefaultMaterial>,
+    staging: &Path,
+    context: &PackageWriteContext<'_>,
+) -> PackageResult<Option<PackageFile>> {
+    let authored_soc = scene
+        .authored_soc
+        .map(|authored| crate::package_soc_scene::write(staging, authored, context))
+        .transpose()?;
+    if authored_soc.is_some() {
+        manifest.authored_soc = Some(crate::package_soc_scene::ManifestSocScene::new());
+    }
+    manifest.default_material = fallback.map(ArchiveDefaultMaterial::receipt);
+    if let Some(assembly) = scene.classification {
+        EntityClassifications::capture(assembly.parts(), assembly.forge_origin())?.apply(manifest);
+    }
+    sanitise(manifest);
+    Ok(authored_soc)
 }
 
 fn package_files(

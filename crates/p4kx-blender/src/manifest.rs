@@ -17,7 +17,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 ///
 /// A new minor version only adds fields and values readers may ignore; a new major version changes
 /// the meaning of existing ones.
-pub const FORMAT_VERSION: &str = "1.15";
+pub const FORMAT_VERSION: &str = "1.16";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
@@ -123,6 +123,10 @@ pub struct Manifest {
     pub options: Options,
     /// The scene hierarchy; a node comes after its parent.
     pub nodes: Vec<Node>,
+    /// Physical inputs and references used by sourced Entity classifications.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<p4kx_extraction::SourceInventory>")]
+    pub entity_provenance: Option<serde_json::Value>,
     /// The GLB meshes, one per distinct mesh set; nodes reference them.
     pub meshes: Vec<Mesh>,
     /// The PNG textures, each written once.
@@ -213,6 +217,9 @@ pub struct EntityRef {
     pub class_name: String,
     /// The Entity's GUID.
     pub guid: String,
+    /// Authored classification of an Entity node when selected by the Assembly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub classification: Option<crate::EntityClassification>,
 }
 
 /// The coordinate system of a package.

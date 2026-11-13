@@ -147,7 +147,7 @@ impl<'f> LoadoutResolver<'f> {
         self.entries(Some(&loadout))?;
         let spec = EntitySpec {
             record_index: None,
-            attachable_component: None,
+            classification: crate::ItemClassification::unresolved(),
             guid: Guid::default(),
             record_path: path.to_owned(),
             origin: crate::spec::LoadoutOrigin::File(path.into()),
@@ -161,8 +161,7 @@ impl<'f> LoadoutResolver<'f> {
             variants: Vec::new(),
             vehicle: None,
             docked_vehicle: false,
-            attach_type: String::new(),
-            attach_sub_type: String::new(),
+
             attach_tags: Vec::new(),
             material_variants: Vec::new(),
             size: None,

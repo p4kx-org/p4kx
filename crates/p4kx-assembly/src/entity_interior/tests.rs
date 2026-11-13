@@ -28,6 +28,7 @@ fn a_non_finite_offset_is_the_identity_and_an_issue() {
 #[test]
 fn an_assembly_without_parts_still_writes_the_interior_at_the_top() {
     let empty = Assembly {
+        forge_origin: None,
         parts: Vec::new(),
         issues: Vec::new(),
         lod: 0,

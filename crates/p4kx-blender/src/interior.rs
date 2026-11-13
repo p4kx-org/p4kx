@@ -102,9 +102,11 @@ pub fn write_interior_package_with_context(
         entity: EntityRef {
             class_name: scene.name.to_owned(),
             guid: String::new(),
+            classification: None,
         },
         items: interior_items(scene.interior),
         issues: scene.interior.issues(),
+        classification: None,
         authored_soc: scene.authored_soc,
     };
     write_scene(&scene, models, textures, options, info, out, context)

@@ -115,6 +115,7 @@ pub struct Part {
     pub(crate) path: String,
     pub(crate) guid: Guid,
     pub(crate) class_name: String,
+    pub(crate) classification: Option<crate::ItemClassification>,
     pub(crate) landing_gear: Option<GearPlacementSource>,
     pub(crate) parent: Option<usize>,
     pub(crate) local: Transform,
@@ -245,6 +246,7 @@ impl Part {
 #[derive(Debug, Clone)]
 pub struct Assembly {
     pub(crate) parts: Vec<Part>,
+    pub(crate) forge_origin: Option<Arc<p4kx_extraction::DataForgeOrigin>>,
     pub(crate) issues: Vec<Issue>,
     pub(crate) lod: u32,
     pub(crate) interior: Option<crate::EntityInterior>,

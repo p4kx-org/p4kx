@@ -129,6 +129,7 @@ fn source(character: &CharacterScene<'_>, info: &PackageInfo) -> Source {
         entity: EntityRef {
             class_name: character.name.to_owned(),
             guid: String::new(),
+            classification: None,
         },
         character: Some(CharacterSource {
             name: character.name.to_owned(),

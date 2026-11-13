@@ -15,6 +15,26 @@ when the two differ (`P4KX_BLESS=1 cargo test -p p4kx-blender --test schema` reg
 A note on words: a **node** of the package is a placed Entity (a **Part** of the Assembly in the
 glossary); a **mesh** of the package is a GLB file with the geometry of one model.
 
+## Authored item classification
+
+Assembly Entity nodes can include `entity.classification` with typed
+`item_type` and `subtype` values from the original selected Entity Record's
+`AttachDef.Type` and `AttachDef.SubType`. Text keeps its original spelling.
+An authored empty string has state `present`; an absent declaration, null,
+unreadable value or incompatible source shape has its own state.
+
+Each field carries `sourceUsesRefs`, `sourceSetComplete` and
+`containsEncryptedSource`. References resolve in the manifest's
+`entity_provenance` inventory. The owning DataForge Record and selected
+component field are tracked independently for every Entity, including nodes
+without meshes. For unreadable strings, an invalid offset contributes only
+when the DataForge decoder used the stored offset to produce the failure.
+The unread target adds no contribution. Synthetic gear, bone attachments and
+Interior groups do not carry an Entity classification. Shared mesh identities are unaffected.
+
+Package version 1.16 adds these optional fields. Older manifests remain
+readable, and Blender can import the scene independently of the metadata.
+
 ## Layout
 
 ```text

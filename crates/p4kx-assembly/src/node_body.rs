@@ -95,7 +95,7 @@ impl EntityNode {
             });
         }
         let body = find_item(self.ports(), is_body_type)?;
-        let variant = BodyVariant::from_code(&body.attach_sub_type)
+        let variant = BodyVariant::from_code(body.classification.subtype_text())
             .or_else(|| BodyVariant::of_model_path(body.geometry()?.path()))?;
         Some(Naming {
             variant,
@@ -222,5 +222,5 @@ pub(crate) const fn is_body_type(item_type: &str) -> bool {
 
 /// Returns the body the sub-type of the head Entity `head` names.
 pub(crate) fn variant_of(head: &EntityNode) -> Option<BodyVariant> {
-    BodyVariant::from_code(&head.attach_sub_type)
+    BodyVariant::from_code(head.classification.subtype_text())
 }

@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, OnceLock};
 
 use p4kx_dataforge::{DataForge, Guid, Record, RecordTree, TagTree, TreeBuilder};
+use p4kx_extraction::{DataForgeEntry, DataForgeOrigin};
 
 use crate::assortment::Assorted;
 use crate::entities::is_entity;
@@ -58,6 +59,7 @@ impl Entries {
 /// tree with the reason.
 pub struct LoadoutResolver<'f> {
     pub(crate) entities: Arc<Entities<'f>>,
+    forge_origin: Option<Arc<DataForgeOrigin>>,
     pub(crate) files: Option<&'f dyn LoadoutFiles>,
     pub(crate) specs: HashMap<u32, SpecResult>,
     pub(crate) xml: HashMap<String, CachedDocument<EntriesResult>>,
@@ -101,6 +103,7 @@ impl<'f> LoadoutResolver<'f> {
     pub fn with_entities(entities: Arc<Entities<'f>>) -> Self {
         Self {
             entities,
+            forge_origin: None,
             files: None,
             specs: HashMap::new(),
             xml: HashMap::new(),
@@ -118,6 +121,16 @@ impl<'f> LoadoutResolver<'f> {
             serial_reads: 0,
             tag_tree: OnceLock::new(),
         }
+    }
+
+    /// Retains provenance only when the Entry is the resolver's original DataForge input.
+    #[must_use]
+    pub fn with_forge_entry(mut self, entry: &DataForgeEntry) -> Self {
+        self.forge_origin = entry
+            .origin_of(self.entities.forge())
+            .cloned()
+            .map(Arc::new);
+        self
     }
 
     /// Stops at docked vehicles: an Entity whose `AttachDef.Type` starts with `NOITEM_Vehicle`
@@ -181,6 +194,9 @@ impl<'f> LoadoutResolver<'f> {
             return Err(LoadoutError::ObservationStopped);
         }
         self.dress_body(&mut node);
+        if entity.is_from(self.entities.forge()) {
+            node.forge_origin = self.forge_origin.clone();
+        }
         if self.observation_stopped() {
             return Err(LoadoutError::ObservationStopped);
         }
@@ -286,6 +302,9 @@ impl<'f> LoadoutResolver<'f> {
             return Err(LoadoutError::ObservationStopped.into());
         }
         self.dress_body(&mut node);
+        if entity.is_from(self.entities.forge()) {
+            node.forge_origin = self.forge_origin.clone();
+        }
         node.issues.extend(self.unknown_picks());
         let (ignored, mismatches) = match walk.plan.take() {
             Some(plan) => plan.finish()?,

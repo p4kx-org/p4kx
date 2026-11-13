@@ -119,6 +119,12 @@ impl<'a> DataForge<'a> {
         self.bytes.len()
     }
 
+    /// Returns whether this database was opened over the supplied exact input slice.
+    #[must_use]
+    pub fn is_opened_over(&self, bytes: &[u8]) -> bool {
+        std::ptr::eq(self.bytes, bytes)
+    }
+
     pub(crate) fn byte_span(&self, bytes: &[u8]) -> Option<Range<u64>> {
         if bytes.is_empty() {
             return None;

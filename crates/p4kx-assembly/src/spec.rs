@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use p4kx_dataforge::{Guid, RecordTree, StructValue};
 
+use crate::ItemClassification;
 use crate::LoadoutXmlClassUse;
 use crate::armour::{ZoneList, read_zones};
 use crate::geometry::GeometryComponent;
@@ -132,9 +133,7 @@ pub(crate) struct EntitySpec {
     pub(crate) variants: Vec<GeometryVariant>,
     pub(crate) vehicle: Option<VehicleSpec>,
     pub(crate) docked_vehicle: bool,
-    pub(crate) attach_type: String,
-    pub(crate) attach_sub_type: String,
-    pub(crate) attachable_component: Option<usize>,
+    pub(crate) classification: ItemClassification,
     pub(crate) attach_tags: Vec<String>,
     pub(crate) material_variants: Vec<MaterialVariant>,
     pub(crate) size: Option<u32>,
@@ -170,19 +169,15 @@ impl EntitySpec {
             .map(|(ordinal, component)| read_vehicle(component, ordinal, tree, paths));
         let attachable = attachable_component(tree);
         let definition = attachable.and_then(|(_, component)| struct_field(component, "AttachDef"));
-        let attach_type = definition.map_or("", |definition| text(definition, "Type"));
+        let classification = ItemClassification::read(tree, attachable);
         Self {
-            attach_sub_type: definition
-                .map_or("", |definition| text(definition, "SubType"))
-                .to_owned(),
             attach_tags: definition
                 .map_or_default(|definition| tag_words(text(definition, "Tags"))),
             material_variants: geometry_component
                 .map_or_default(|(_, component)| MaterialVariant::read(component)),
             size: definition.and_then(|definition| unsigned(definition, "Size")),
-            docked_vehicle: is_docked_vehicle_type(attach_type),
-            attach_type: attach_type.to_owned(),
-            attachable_component: attachable.map(|(ordinal, _)| ordinal),
+            docked_vehicle: is_docked_vehicle_type(classification.item_type_text()),
+            classification,
             container: inventory_container(&components),
             object_containers: crate::object_containers::read(&components).into(),
             zones: read_zones(&components),
@@ -216,8 +211,8 @@ impl EntitySpec {
             class_name: crate::entities::class_name_of(&self.name)
                 .unwrap_or(&self.name)
                 .to_owned(),
-            item_type: self.attach_type.clone(),
-            sub_type: self.attach_sub_type.clone(),
+            item_type: self.classification.item_type_text().to_owned(),
+            sub_type: self.classification.subtype_text().to_owned(),
             size: self.size,
         }
     }
@@ -327,19 +322,16 @@ pub fn read_geometry(tree: &RecordTree<'_>) -> Option<Geometry> {
 
 /// Reads what an Entity Record offers a port, with its class name taken from `name`.
 pub(crate) fn read_item_facts(tree: &RecordTree<'_>) -> ItemFacts {
-    let definition =
-        attachable_component(tree).and_then(|(_, component)| struct_field(component, "AttachDef"));
+    let attachable = attachable_component(tree);
+    let definition = attachable.and_then(|(_, component)| struct_field(component, "AttachDef"));
+    let classification = ItemClassification::read(tree, attachable);
     let name = tree.name();
     ItemFacts {
         class_name: crate::entities::class_name_of(name)
             .unwrap_or(name)
             .to_owned(),
-        item_type: definition
-            .map_or("", |definition| text(definition, "Type"))
-            .to_owned(),
-        sub_type: definition
-            .map_or("", |definition| text(definition, "SubType"))
-            .to_owned(),
+        item_type: classification.item_type_text().to_owned(),
+        sub_type: classification.subtype_text().to_owned(),
         size: definition.and_then(|definition| unsigned(definition, "Size")),
     }
 }

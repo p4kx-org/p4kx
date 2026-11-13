@@ -17,6 +17,19 @@ pub enum DataForgeOrigin {
     Unknown,
 }
 
+impl PartialEq for DataForgeOrigin {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Archive(left), Self::Archive(right)) => left.binding() == right.binding(),
+            (Self::File(left), Self::File(right)) => left.is_same_input(right),
+            (Self::Unknown, Self::Unknown) => true,
+            _ => false,
+        }
+    }
+}
+
+impl Eq for DataForgeOrigin {}
+
 impl DataForgeOrigin {
     /// Returns whether Archive evidence matches the exact input and containing position.
     /// Files and unbound streams return false and require their own input-kind handling.

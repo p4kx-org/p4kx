@@ -26,6 +26,10 @@ use crate::{
     ObjectContainerRef, PaletteProvider, Part, SkeletonProblem,
 };
 
+#[path = "build_part.rs"]
+mod part;
+use part::build_part;
+
 pub(crate) type Library = Arc<ArchiveMaterialRead>;
 pub(crate) type Libraries = HashMap<String, Library>;
 
@@ -108,34 +112,22 @@ impl Assembly {
             let placement = place(draft, &parts, *model, rig, prop, &mut issues);
             let world = world_of(draft, &parts, &placement.local);
             let geometry = rendered_geometry(cut.as_ref(), index, draft, *model, &mut issues);
-            parts.push(Part {
-                name: draft.name.clone(),
-                path: draft.path.clone(),
-                guid: draft.node.guid(),
-                class_name: draft.class_name().to_owned(),
-                landing_gear: placement.gear,
-                parent: draft.parent,
-                local: placement.local,
+            parts.push(build_part(
+                draft,
+                placement,
                 world,
-                placement: placement.kind,
-                placement_source: placement.port,
-                model_placement: placement.nodes,
-                geometry: draft.geometry_path().map(str::to_owned),
-                model: geometry.model,
-                model_archive_sources: geometry.sources,
-                model_definition: geometry.definition.with_model_material(library.from_model),
-                geometry_selectors: geometry.selectors,
-                materials: library.materials,
+                geometry,
+                (library.materials, library.from_model),
                 palette,
                 attachments,
-                hidden: draft.hidden,
-            });
+            ));
         }
         creature_rig::note_fit(&parts, options.lod, &mut issues);
         creature_rig::note_loadout(tree, &mut issues);
 
         Ok(Self {
             parts,
+            forge_origin: tree.forge_origin.clone(),
             issues,
             lod: options.lod,
             interior: None,

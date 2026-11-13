@@ -127,6 +127,7 @@ fn serve(
         return;
     }
     let mut resolver = LoadoutResolver::with_entities(entities)
+        .with_forge_entry(&source.entry)
         .with_files(&files)
         .with_stop(&stop)
         .stopping_at_docked_vehicles();

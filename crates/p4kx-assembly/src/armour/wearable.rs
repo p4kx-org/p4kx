@@ -47,7 +47,7 @@ impl Wearable {
             class_name: crate::entities::class_name_of(&spec.name)
                 .unwrap_or(&spec.name)
                 .to_owned(),
-            item_type: spec.attach_type.clone(),
+            item_type: spec.classification.item_type_text().to_owned(),
             geometry: spec.geometry.clone(),
             variants: spec.variants.clone(),
             tags: spec.attach_tags.clone(),

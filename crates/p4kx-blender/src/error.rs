@@ -126,6 +126,9 @@ pub enum PackageError {
     /// Original DDS metadata or package field evidence could not be recorded.
     #[error("cannot record package texture metadata")]
     TextureEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original entity classification evidence could not be recorded.
+    #[error("cannot record package entity classification")]
+    EntityEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
     /// The caller asked to stop.
     #[error("cancelled")]
     Cancelled,

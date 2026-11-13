@@ -4,8 +4,8 @@
 use std::sync::Arc;
 
 use p4kx_dataforge::Guid;
+use p4kx_extraction::DataForgeOrigin;
 
-use crate::LoadoutEntry;
 use crate::bespoke::OwnSkin;
 use crate::entities::class_name_of;
 use crate::geometry_choice::GeometryChoice;
@@ -15,6 +15,7 @@ use crate::{
     ObjectContainerRef, PortConstraints, PortDefinition, PortVisibility, VehicleImplementation,
     ZoneChunk,
 };
+use crate::{ItemClassification, LoadoutEntry};
 
 #[path = "loadout_target.rs"]
 mod loadout_target;
@@ -43,9 +44,8 @@ pub struct EntityNode {
     pub(crate) docked_vehicle: bool,
     pub(crate) loadout_file: Option<Arc<str>>,
     pub(crate) expanded: bool,
-    pub(crate) attach_type: String,
-    pub(crate) attach_sub_type: String,
-    pub(crate) attachable_component: Option<usize>,
+    pub(crate) classification: ItemClassification,
+    pub(crate) forge_origin: Option<Arc<DataForgeOrigin>>,
     pub(crate) attachment_target: Option<LoadoutTargetGuid>,
     pub(crate) size: Option<u32>,
     pub(crate) container: Option<Guid>,
@@ -69,8 +69,8 @@ impl EntityNode {
     pub fn item_facts(&self) -> ItemFacts {
         ItemFacts {
             class_name: self.class_name().to_owned(),
-            item_type: self.attach_type.clone(),
-            sub_type: self.attach_sub_type.clone(),
+            item_type: self.classification.item_type_text().to_owned(),
+            sub_type: self.classification.subtype_text().to_owned(),
             size: self.size,
         }
     }
@@ -79,7 +79,13 @@ impl EntityNode {
     /// Record has none.
     #[must_use]
     pub fn attach_type(&self) -> &str {
-        &self.attach_type
+        self.classification.item_type_text()
+    }
+
+    /// Returns the authored item classification selected for this Entity.
+    #[must_use]
+    pub const fn classification(&self) -> &ItemClassification {
+        &self.classification
     }
 
     /// Returns the GUID of the `InventoryContainer` Record the Entity's
@@ -148,7 +154,7 @@ impl EntityNode {
     /// Returns the ordinal of the first attachable component selected in this Record.
     #[must_use]
     pub const fn attachable_component_ordinal(&self) -> Option<usize> {
-        self.attachable_component
+        self.classification.component()
     }
 
     /// Returns the original selection of this Entity when attached through a port.

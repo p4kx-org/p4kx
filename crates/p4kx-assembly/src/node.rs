@@ -27,7 +27,7 @@ use crate::{
 /// Returns the flags `spec`'s port container gives all its ports when they choose a sub-geometry:
 /// those of a head, which name the character the face parts belong to; none for any other Entity.
 fn shared_port_flags(spec: &EntitySpec) -> &[String] {
-    if is_head_type(&spec.attach_type) {
+    if is_head_type(spec.classification.item_type_text()) {
         &spec.port_flags
     } else {
         &[]
@@ -334,7 +334,8 @@ fn visibility_of(port: &PortNode, vehicle: Option<&VehicleImplementation>) -> Po
 fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode {
     EntityNode {
         record_index: spec.record_index,
-        attachable_component: spec.attachable_component,
+        classification: spec.classification.clone(),
+        forge_origin: None,
         attachment_target: None,
         guid: spec.guid,
         record_path: spec.record_path.clone(),
@@ -359,8 +360,7 @@ fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode 
             _ => None,
         },
         expanded,
-        attach_type: spec.attach_type.clone(),
-        attach_sub_type: spec.attach_sub_type.clone(),
+
         size: spec.size,
         container: spec.container,
         object_containers: Arc::clone(&spec.object_containers),
