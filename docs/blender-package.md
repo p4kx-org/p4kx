@@ -438,9 +438,19 @@ The Blender DDS capability accepts legacy DXT1, DXT5, ATI1, ATI2 and BC5U, plus 
 legacy 32-bit RGBA/BGRA masks. It accepts DX10 RGBA8, BC1, BC3 and unsigned BC5 for 2D textures.
 Unsigned BC5 is emitted directly for data inputs. Signed BC5 uses PNG because Blender 5.3
 does not decode it. DDS rows with BC1 use the selected blocks to distinguish transparent samples
-from edge padding. When a normal requires a Y flip, or the original uses a separate alpha or
-smoothness member, the writer uses the usual PNG conversion. Topology and unsupported encodings
-use that same fallback when a PNG can be produced. The row's `dds_fallback` records the reason.
+from edge padding. Package format 1.17 supports a split DDNA normal and smoothness pair
+for 2D linear BC3 normals with a DXT5 or DX10 header and a DX10 BC4_UNORM tail. The files
+retain the same common original mip as the composed PNG. Both payloads are copied without
+re-encoding. A normal row's `ddna_pair` names the separate texture, the source normal's
+`cryengine_y_down` convention and its companion's `red` channel. The importer inverts green
+once and uses the companion's red value for the normal slot's existing smoothness calculation.
+Both inputs use the same texture coordinates and scaling in direct and layered materials.
+
+Each pair member has its own `dds_asset.copied_payload` digest, `normalized_header_bytes`
+and input provenance. The pair's joint origin covers both selected inputs and the common mip. The
+package receipt authenticates both complete files. Other normal conventions, separate alpha
+encodings and unsupported topologies use the usual PNG conversion when available. The
+row's `dds_fallback` records the reason.
 The direct DDS path requires unique, fully verified header and selected mip members. A failure
 to establish those inputs produces a texture issue and leaves the slot unbound.
 DDS alpha declarations remain distinct from selected alpha samples. Premultiplied opacity
@@ -710,6 +720,8 @@ role's compatibility sampling, with unknown actual transfer and an untagged PNG.
 **1.13** adds the optional authored SOC reference. **1.14** adds the optional selected-mip DDS
 asset and explicit PNG fallback reason. **1.15** adds selected BC1, BC2 and BC3 alpha
 counts to supported DDS rows and records alpha unassociation when applied to PNG.
+**1.16** adds optional entity classifications and light-placement evidence. **1.17** adds
+separate DDS normal and smoothness pairs with linked source and per-file evidence.
 
 ## Authored SOC scene
 

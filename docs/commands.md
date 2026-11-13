@@ -288,7 +288,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 - `p4kx entity package <archive> <entity> --out <folder>` writes an Entity as a Blender package,
   a folder that does not depend on Blender's file format: `scene.json` (format version, source
   Channel and Build, the node hierarchy with names and transforms), one GLB per distinct mesh
-  and the textures of the materials as PNG, each written once. `--lod`, `--texture-mip`,
+  and the textures of the materials as PNG, each written once. `--texture-container dds`
+  opts into verified DDS textures, including supported DDNA normal and smoothness pairs.
+  `--lod`, `--texture-mip`,
   `--exclude` and `--replace` work as for `entity glb`. A creature whose skeleton the Archive
   holds is written as one skinned GLB with the skeleton, the skins and the parts on its bones and
   its textures embedded at `--texture-mip` (default 0, about 110 to 120 MB; `--texture-mip 1`
@@ -322,7 +324,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 - `p4kx interior package <archive> <container>... --out <folder>` writes the Interior of a socpak
   container on its own as a Blender package: the same container, object and light nodes, props
   and lights as `entity package --interior`, without an Entity around them. `--lod`,
-  `--texture-mip` and `--no-vertex-colours` work as for `entity package`; the folder is written
+  `--texture-mip`, `--texture-container` and `--no-vertex-colours` work as for `entity package`;
+  the folder is written
   beside the target and moved into place when complete. The Blender add-on imports it.
   Add `--authored-soc` for the optional [SOC scene companion](soc-scene.md).
 - `p4kx prefab list <archive> [<library>]` lists the prefab libraries below `Data\Prefabs` or the

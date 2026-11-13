@@ -6,10 +6,11 @@ use std::path::Path;
 
 use crate::manifest::TEXTURES_FOLDER;
 use crate::package_receipt::PackageFile;
+use crate::texture_ddna::SmoothnessWritten;
 use crate::texture_dds::{self, SourceFallback};
 use crate::texture_encoding::TextureMode;
 use crate::texture_source_metadata;
-use p4kx_extraction::texture_preview::ObservedModelDds;
+use p4kx_extraction::texture_preview::{ModelDdsRefusal, ObservedModelDds};
 use p4kx_extraction::{OriginArtifactDigest, OriginDigestWriter};
 use p4kx_gltf::TextureLoader;
 use p4kx_texture::{DdsTransfer, RgbaImage, TextureError, write_png_with_transfer};
@@ -19,6 +20,18 @@ use crate::{
     AlphaMeaning, ColourSpace, DdsTextureAsset, DdsTextureFallback, PackageError, PackageResult,
     PackageTextureContainer, PackageWriteContext, TextureEncoding, TextureFormat,
 };
+
+#[path = "texture_output_ddna.rs"]
+mod ddna;
+
+fn source_disposition(error: &ModelDdsRefusal) -> Result<Outcome, DdsTextureFallback> {
+    match DdsTextureFallback::source_error(error) {
+        SourceFallback::Png(reason) => Err(reason),
+        SourceFallback::Refused(reason) => {
+            Ok(TextureOutput::failed(error.to_string(), Some(reason)))
+        }
+    }
+}
 
 /// How many textures are decoded and encoded at once; a texture can hold 64 megapixels.
 const BATCH: usize = 4;
@@ -46,6 +59,7 @@ pub(crate) enum Outcome {
         format: TextureFormat,
         dds_asset: Option<Box<DdsTextureAsset>>,
         dds_fallback: Option<DdsTextureFallback>,
+        smoothness: Option<Box<SmoothnessWritten>>,
     },
     Failed {
         reason: String,
@@ -53,18 +67,33 @@ pub(crate) enum Outcome {
     },
 }
 
-pub(crate) fn package_file(position: usize, outcome: &Outcome) -> Option<PackageFile> {
+pub(crate) fn package_files(
+    position: usize,
+    outcome: &Outcome,
+) -> impl Iterator<Item = PackageFile> {
     let Outcome::Written {
-        artifact, format, ..
+        artifact,
+        format,
+        smoothness,
+        ..
     } = outcome
     else {
-        return None;
+        return [None, None].into_iter().flatten();
     };
-    let id = id_of(position);
-    Some(PackageFile::new(
-        format!("{TEXTURES_FOLDER}/{id}.{}", format.extension()),
-        artifact,
-    ))
+    let copy = |id: &str, format: TextureFormat, digest: &OriginArtifactDigest| {
+        PackageFile::new(
+            format!("{TEXTURES_FOLDER}/{id}.{}", format.extension()),
+            digest,
+        )
+    };
+    [
+        Some(copy(&id_of(position), *format, artifact)),
+        smoothness
+            .as_deref()
+            .map(|value| copy(&value.id, TextureFormat::Dds, &value.asset.artifact)),
+    ]
+    .into_iter()
+    .flatten()
 }
 
 /// Returns the file name of the texture at position `index` of the wanted ones.
@@ -92,7 +121,8 @@ pub(crate) fn write_all(
                 cancelled.check()?;
                 write_one(
                     texture,
-                    &id_of(batch * BATCH + offset),
+                    batch * BATCH + offset,
+                    wanted.len(),
                     loader,
                     mip,
                     folder,
@@ -107,7 +137,8 @@ pub(crate) fn write_all(
 
 fn write_one(
     texture: &Wanted,
-    id: &str,
+    position: usize,
+    primary_count: usize,
     loader: &dyn TextureLoader,
     mip: u32,
     folder: &Path,
@@ -115,7 +146,8 @@ fn write_one(
 ) -> PackageResult<Outcome> {
     let output = TextureOutput {
         texture,
-        id,
+        id: &id_of(position),
+        smoothness_id: &id_of(primary_count + position),
         folder,
         context,
     };
@@ -132,6 +164,7 @@ fn write_one(
 struct TextureOutput<'a, 'source> {
     texture: &'a Wanted,
     id: &'a str,
+    smoothness_id: &'a str,
     folder: &'a Path,
     context: &'a PackageWriteContext<'source>,
 }
@@ -144,14 +177,17 @@ impl TextureOutput<'_, '_> {
         self.context.check()?;
         let observed = match source.load_dds(&self.texture.path, mip) {
             Ok(observed) => observed,
-            Err(error) => {
-                return Ok(match DdsTextureFallback::source_error(&error) {
-                    SourceFallback::Png(reason) => Err(reason),
-                    SourceFallback::Refused(reason) => {
-                        Ok(Self::failed(error.to_string(), Some(reason)))
-                    }
-                });
+            Err(ModelDdsRefusal::SplitAlpha)
+                if self.texture.mode == (TextureMode::Normal { gloss: true }) =>
+            {
+                let observed = match source.load_ddna_dds(&self.texture.path, mip) {
+                    Ok(observed) => observed,
+                    Err(error) => return Ok(source_disposition(&error)),
+                };
+                self.context.check()?;
+                return self.write_ddna_pair(observed);
             }
+            Err(error) => return Ok(source_disposition(&error)),
         };
         self.context.check()?;
         let mode = self.texture.mode;
@@ -205,6 +241,7 @@ impl TextureOutput<'_, '_> {
             format: TextureFormat::Dds,
             dds_asset: Some(Box::new(dds_asset)),
             dds_fallback: None,
+            smoothness: None,
         })
     }
 
@@ -252,6 +289,7 @@ impl TextureOutput<'_, '_> {
             format: TextureFormat::Png,
             dds_asset: None,
             dds_fallback: fallback,
+            smoothness: None,
         })
     }
 

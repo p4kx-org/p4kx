@@ -83,6 +83,7 @@ mod soc_scene_stream;
 mod soc_scene_tile_ports;
 mod soc_scene_xml;
 mod stage;
+mod texture_ddna;
 mod texture_dds;
 mod texture_encoding;
 mod texture_field_origins;
@@ -114,6 +115,7 @@ pub use package_write_context::PackageWriteContext;
 pub use schema::manifest_schema;
 pub use soc_scene::{SOC_SCENE_VERSION, SocScene, SocSceneError, SocXmlPosition, soc_scene_schema};
 pub use stage::{check_output, check_output_with_context};
+pub use texture_ddna::{DdnaNormalAxis, DdnaSelection, DdnaSmoothnessChannel, DdnaTexturePair};
 pub use texture_dds::{
     DdsTextureAsset, DdsTextureFallback, DdsTextureSourceChecksum, PackageTextureContainer,
 };

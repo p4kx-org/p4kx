@@ -57,6 +57,25 @@ impl ObservedDdnaDds<'_> {
         &self,
         inventory: &SourceUses,
     ) -> Result<FieldOrigin, SourceEvidenceError> {
+        self.related_origin(inventory, false)
+    }
+
+    /// Registers the selected payloads and source decisions that make the pair publishable.
+    ///
+    /// # Errors
+    /// Returns an evidence registration error.
+    pub fn pairing_origin(
+        &self,
+        inventory: &SourceUses,
+    ) -> Result<FieldOrigin, SourceEvidenceError> {
+        self.related_origin(inventory, true)
+    }
+
+    fn related_origin(
+        &self,
+        inventory: &SourceUses,
+        paired_payloads: bool,
+    ) -> Result<FieldOrigin, SourceEvidenceError> {
         use DdsHeaderField::{
             AlphaAssociation, ArraySize, CryTransfer, Depth, DxgiTransfer, Faces, Format, Height,
             MipCount, Prefix, Width,
@@ -81,6 +100,15 @@ impl ObservedDdnaDds<'_> {
             &[AlphaAssociation, DxgiTransfer, CryTransfer],
             SourceUseRole::Selector,
         )?);
+        if paired_payloads {
+            contributors.extend(
+                normal
+                    .color
+                    .header_uses(&[DxgiTransfer, CryTransfer], SourceUseRole::Selector)?,
+            );
+            normal.append_pixel_uses(&mut contributors)?;
+            smoothness.append_pixel_uses(&mut contributors)?;
+        }
         Ok(inventory.origin(
             &contributors,
             normal.is_complete() && smoothness.is_complete(),

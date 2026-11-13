@@ -215,4 +215,9 @@ def _context(package: Package, images: ImageCache, palette: Palette | None = Non
         palette,
         {texture.id: texture.alpha for texture in package.textures.values()},
         images.loads,
+        {
+            texture.id: texture.ddna.smoothness
+            for texture in package.textures.values()
+            if texture.ddna is not None
+        },
     )

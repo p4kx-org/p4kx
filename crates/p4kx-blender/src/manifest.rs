@@ -17,7 +17,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 ///
 /// A new minor version only adds fields and values readers may ignore; a new major version changes
 /// the meaning of existing ones.
-pub const FORMAT_VERSION: &str = "1.16";
+pub const FORMAT_VERSION: &str = "1.17";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
@@ -311,6 +311,9 @@ pub struct Texture {
     /// The importer input encoding for this specific output role.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub encoding: Option<crate::TextureEncoding>,
+    /// Optional normal and separate DDS smoothness texture association.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ddna_pair: Option<Box<crate::DdnaTexturePair>>,
     /// A lossless selected-mip DDS byte binding and its original entry checksums.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub dds_asset: Option<Box<crate::DdsTextureAsset>>,

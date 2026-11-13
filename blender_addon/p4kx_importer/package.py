@@ -16,6 +16,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any
 
+from . import ddna_pair
 from .glb_preflight import check_glb as check_glb
 from .manifest_fields import (
     PackageError,
@@ -36,7 +37,7 @@ from .soc_scene import parse_ref as parse_soc_ref
 
 FORMAT_NAME = "p4kx-blender-package"
 SUPPORTED_MAJOR = 1
-SUPPORTED_MINOR = 16
+SUPPORTED_MINOR = ddna_pair.MINOR
 MANIFEST_NAME = "scene.json"
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
 BLENDER_NAME_BYTES = 63
@@ -88,6 +89,9 @@ class Texture:
     dimensions: tuple[int, int] | None = None
     byte_length: int | None = None
     sha256: str | None = None
+    ddna: ddna_pair.Pair | None = None
+    dds_pixel_format: str | None = None
+    dds_mip: int | None = None
 
 
 @dataclass(slots=True)
@@ -135,6 +139,7 @@ def parse_manifest(data: object, root: Path) -> Package:
     version, warnings = _check_version(manifest.get("version"))
     _check_coordinates(read_object(manifest.get("coordinates"), "coordinates"))
     textures = _parse_textures(read_array(manifest.get("textures"), "textures"), version, warnings)
+    ddna_pair.validate_pairs(textures)
     meshes = _parse_meshes(read_array(manifest.get("meshes"), "meshes"), textures)
     nodes = parse_nodes(
         manifest.get("nodes"), {mesh_id: mesh.rig is not None for mesh_id, mesh in meshes.items()}, warnings
@@ -268,9 +273,14 @@ def _parse_textures(
         ):
             warnings.append(f"Texture {texture_id} has an unknown input encoding.")
             encoding = None
+        pair = ddna_pair.pairing(entry, where, version)
+        if pair is not None and image_format != "dds":
+            raise PackageError(f"{where}: a DDNA pair must use DDS.")
         if image_format == "dds":
             textures[texture_id] = _parse_dds_texture(
-                entry, where, Texture(texture_id, file, colour_space, alpha, encoding)
+                                entry,
+                where,
+                Texture(texture_id, file, colour_space, alpha, encoding, ddna=pair),
             )
         else:
             textures[texture_id] = Texture(texture_id, file, colour_space, alpha, encoding)
@@ -289,8 +299,18 @@ def _parse_dds_texture(entry: dict[str, Any], where: str, texture: Texture) -> T
         raise PackageError(f"{where}: invalid DDS artifact digest or byte length.")
     if type(width) is not int or type(height) is not int or min(width, height) < 1:
         raise PackageError(f"{where}: invalid DDS texture dimensions.")
+    original = asset.get("dds")
+    normalized = original.get("normalized") if isinstance(original, dict) else None
+    pixel_format = normalized.get("format") if isinstance(normalized, dict) else None
+    mip = asset.get("mip_level")
     return replace(
-        texture, format="dds", dimensions=(width, height), byte_length=int(byte_length), sha256=digest
+        texture,
+        format="dds",
+        dimensions=(width, height),
+        byte_length=int(byte_length),
+        sha256=digest,
+        dds_pixel_format=pixel_format if isinstance(pixel_format, str) else None,
+        dds_mip=mip if type(mip) is int and mip >= 0 else None,
     )
 
 

@@ -10,6 +10,7 @@ mod package_alpha_association;
 mod package_bone_attachment;
 mod package_character;
 mod package_creature;
+mod package_ddna_pair;
 mod package_dds_fallback;
 mod package_default_material;
 mod package_entity_classification;

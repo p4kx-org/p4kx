@@ -312,6 +312,105 @@
       ],
       "type": "object"
     },
+    "DdnaNormalAxis": {
+      "description": "Normal map convention stored by the DDS primary image.",
+      "oneOf": [
+        {
+          "const": "cryengine_y_down",
+          "description": "Original CryEngine green channel, inverted by the importer.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdnaSelection": {
+      "description": "Reason for the common DDNA level.",
+      "oneOf": [
+        {
+          "const": "requested",
+          "description": "Both input files contain the requested mip.",
+          "type": "string"
+        },
+        {
+          "const": "primary_chain",
+          "description": "The normal DDS bounds the selected mip.",
+          "type": "string"
+        },
+        {
+          "const": "smoothness_chain",
+          "description": "The smoothness DDS bounds the selected mip.",
+          "type": "string"
+        },
+        {
+          "const": "both_chains",
+          "description": "Both input chains stop at the selected mip.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdnaSmoothnessChannel": {
+      "description": "Channel that the separate texture stores.",
+      "oneOf": [
+        {
+          "const": "red",
+          "description": "Red samples of the positive-unsigned BC4 block.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdnaTexturePair": {
+      "additionalProperties": false,
+      "description": "Consumer pairing and provenance for a split normal and smoothness DDS.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/DdnaSmoothnessChannel",
+          "description": "Stored sample that drives smoothness."
+        },
+        "normal_axis": {
+          "$ref": "#/$defs/DdnaNormalAxis",
+          "description": "Convention of the normal samples stored in the primary DDS."
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory",
+          "description": "Original entries referenced by the pairing."
+        },
+        "requested_mip": {
+          "description": "Level requested by the package caller.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selected_mip": {
+          "description": "Common original level retained in the two files.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selection": {
+          "$ref": "#/$defs/DdnaSelection",
+          "description": "Which input determined the common level."
+        },
+        "smoothness": {
+          "description": "Texture ID of the independently written linear smoothness DDS.",
+          "pattern": "^t[0-9]{4,}$",
+          "type": "string"
+        },
+        "source_origin": {
+          "$ref": "#/$defs/FieldOrigin",
+          "description": "Source inputs contributing to the common mip and associated assets."
+        }
+      },
+      "required": [
+        "smoothness",
+        "normal_axis",
+        "channel",
+        "requested_mip",
+        "selected_mip",
+        "selection",
+        "source_origin",
+        "provenance"
+      ],
+      "type": "object"
+    },
     "DdsAlphaAssociation": {
       "description": "Association of the stored colour channels with alpha declared by the DDS header.",
       "oneOf": [
@@ -895,6 +994,17 @@
           "$ref": "#/$defs/OriginArtifactDigest",
           "description": "Byte length and SHA-256 of the DDS file, including its normalized header."
         },
+        "copied_payload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OriginArtifactDigest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Byte length and SHA-256 of only the copied selected payload."
+        },
         "dds": {
           "$ref": "#/$defs/DdsSourceInfo",
           "description": "Raw and reader-normalized original header."
@@ -912,6 +1022,15 @@
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
+        },
+        "normalized_header_bytes": {
+          "description": "Number of derived header bytes before the copied DDS payload.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
         },
         "part_checksum": {
           "anyOf": [
@@ -5154,6 +5273,17 @@
         "colour_space": {
           "$ref": "#/$defs/ColourSpace",
           "description": "How the colour channels are encoded."
+        },
+        "ddna_pair": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdnaTexturePair"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional normal and separate DDS smoothness texture association."
         },
         "dds_asset": {
           "anyOf": [

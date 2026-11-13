@@ -4,7 +4,7 @@
 use p4kx_extraction::texture_preview::{ModelDdsRefusal, ObservedModelDds};
 use p4kx_extraction::{
     Checksum, DdsSourceInfo, FieldOrigins, OriginArtifactDigest, PreviewPngEvidence,
-    SourceInventory, SourceUseRole, SourceUses,
+    SourceInventory, SourceUses,
 };
 use p4kx_texture::{
     DdsAlphaAssociation, DdsAlphaCoverage, DxgiFormat, LocatedMip, TextureError, TextureFormat,
@@ -84,7 +84,9 @@ impl DdsTextureFallback {
             ModelDdsRefusal::Missing => Refused(Self::MissingMember),
             ModelDdsRefusal::Ambiguous => Refused(Self::AmbiguousMember),
             ModelDdsRefusal::UnsupportedRawPath => Refused(Self::UnprovedMember),
-            ModelDdsRefusal::SplitAlpha => Png(Self::SplitAlpha),
+            ModelDdsRefusal::SplitAlpha
+            | ModelDdsRefusal::UnsupportedSmoothness
+            | ModelDdsRefusal::AlphaAssociation => Png(Self::SplitAlpha),
             ModelDdsRefusal::Topology => Png(Self::UnsupportedTopology),
             ModelDdsRefusal::Dds(TextureError::UnsupportedFormat(_)) => {
                 Png(Self::UnsupportedFormat)
@@ -140,6 +142,12 @@ pub struct DdsTextureAsset {
     /// Measured alpha samples of the original selected BC1, BC2 or BC3 image.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub alpha_coverage: Option<DdsAlphaCoverage>,
+    /// Byte length and SHA-256 of only the copied selected payload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub copied_payload: Option<OriginArtifactDigest>,
+    /// Number of derived header bytes before the copied DDS payload.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub normalized_header_bytes: Option<u32>,
     /// Original archive checksum of the header Entry.
     pub header_checksum: DdsTextureSourceChecksum,
     /// Original archive checksum of the split mip Entry when separate.
@@ -154,10 +162,38 @@ pub struct DdsTextureAsset {
 }
 
 impl DdsTextureAsset {
+    pub(crate) fn bind_pair_member(
+        observed: ObservedModelDds<'_>,
+        artifact: OriginArtifactDigest,
+        coverage: Option<DdsAlphaCoverage>,
+    ) -> PackageResult<Self> {
+        let copied_payload = crate::texture_ddna::payload_digest(&observed.read)?;
+        let normalized_header_bytes = artifact
+            .byte_length()
+            .checked_sub(copied_payload.byte_length())
+            .and_then(|length| u32::try_from(length).ok())
+            .ok_or_else(|| {
+                metadata_error(std::io::Error::other("invalid DDS output header extent"))
+            })?;
+        let mut bound = Self::bind_with_payload(observed, artifact, coverage, true)?;
+        bound.copied_payload = Some(copied_payload);
+        bound.normalized_header_bytes = Some(normalized_header_bytes);
+        Ok(bound)
+    }
+
     pub(crate) fn bind(
         observed: ObservedModelDds<'_>,
         artifact: OriginArtifactDigest,
         alpha_coverage: Option<DdsAlphaCoverage>,
+    ) -> PackageResult<Self> {
+        Self::bind_with_payload(observed, artifact, alpha_coverage, false)
+    }
+
+    fn bind_with_payload(
+        observed: ObservedModelDds<'_>,
+        artifact: OriginArtifactDigest,
+        alpha_coverage: Option<DdsAlphaCoverage>,
+        paired: bool,
     ) -> PackageResult<Self> {
         let uses = SourceUses::with_compact_use_refs();
         let evidence = observed.evidence(&uses).map_err(metadata_error)?;
@@ -166,28 +202,14 @@ impl DdsTextureAsset {
         let mut fields =
             texture_field_origins::capture(&observed.metadata, &evidence, false, &uses)?;
         coverage_origins(&mut fields, &evidence, &uses, alpha_coverage)?;
-        let mut artifact_uses = Vec::new();
-        evidence
-            .append_pixel_uses(&mut artifact_uses)
-            .map_err(metadata_error)?;
-        artifact_uses.push(
-            evidence
-                .color
-                .header()
-                .byte_use(
-                    0,
-                    observed.metadata.raw.header_length as u64,
-                    "originalHeader",
-                    SourceUseRole::Conversion,
-                )
-                .map_err(metadata_error)?,
-        );
-        let complete = evidence.is_complete();
-        texture_field_origins::insert(
+        texture_field_origins::artifact(
             &mut fields,
-            "/artifact",
-            uses.origin(&artifact_uses, complete),
+            observed.metadata.raw.header_length,
+            &evidence,
+            &uses,
+            paired,
         )?;
+        let complete = evidence.is_complete();
         texture_field_origins::insert(
             &mut fields,
             "/header_checksum",
@@ -204,6 +226,8 @@ impl DdsTextureAsset {
             serde_json::to_value(uses.freeze().map_err(metadata_error)?).map_err(metadata_error)?;
         Ok(Self {
             artifact,
+            copied_payload: None,
+            normalized_header_bytes: None,
             mip_level: observed.read.mip.level(),
             alpha_coverage,
             header_checksum: DdsTextureSourceChecksum::of(observed.header_checksum)?,

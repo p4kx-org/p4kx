@@ -331,7 +331,7 @@ fn package_files(
             outcomes
                 .iter()
                 .enumerate()
-                .filter_map(|(position, outcome)| textures::package_file(position, outcome)),
+                .flat_map(|(position, outcome)| textures::package_files(position, outcome)),
         )
         .chain(authored_soc)
         .collect()
@@ -375,8 +375,14 @@ fn summarise(
     }
     for outcome in outcomes {
         match outcome {
-            Outcome::Written { width, height, .. } => {
-                summary.texture_pixels += u64::from(*width) * u64::from(*height);
+            Outcome::Written {
+                width,
+                height,
+                smoothness,
+                ..
+            } => {
+                let images = if smoothness.is_some() { 2 } else { 1 };
+                summary.texture_pixels += images * u64::from(*width) * u64::from(*height);
             }
             Outcome::Failed { .. } => summary.texture_failures += 1,
         }

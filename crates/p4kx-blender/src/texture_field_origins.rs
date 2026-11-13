@@ -40,6 +40,43 @@ pub(super) fn capture(
     Ok(fields)
 }
 
+pub(super) fn artifact(
+    fields: &mut FieldOrigins,
+    header_length: usize,
+    evidence: &PreviewPngEvidence,
+    uses: &SourceUses,
+    paired: bool,
+) -> PackageResult<()> {
+    let original_header = evidence
+        .color
+        .header()
+        .byte_use(
+            0,
+            header_length as u64,
+            "originalHeader",
+            SourceUseRole::Conversion,
+        )
+        .map_err(metadata_error)?;
+    let complete = evidence.is_complete();
+    if paired {
+        insert(
+            fields,
+            "/copied_payload",
+            uses.origin(std::slice::from_ref(evidence.color.mip()), complete),
+        )?;
+        insert(
+            fields,
+            "/normalized_header_bytes",
+            uses.origin(std::slice::from_ref(&original_header), complete),
+        )?;
+    }
+    let mut sources = vec![original_header];
+    evidence
+        .append_pixel_uses(&mut sources)
+        .map_err(metadata_error)?;
+    insert(fields, "/artifact", uses.origin(&sources, complete))
+}
+
 pub(super) fn image_origin(
     evidence: &PreviewPngEvidence,
     encoding: DdsPngEncoding,

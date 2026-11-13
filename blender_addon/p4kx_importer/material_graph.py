@@ -9,6 +9,8 @@ palette and the alpha meaning of the textures, so all of it is tested without Bl
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from .graph_spec import GraphBuilder, GraphSpec, Ref
 from .material_glass import GlassSurface
 from .material_layers import LayerBlending
@@ -210,10 +212,9 @@ class _Maker(LayerBlending, GlassSurface):
         if slot := desc.slot("normal"):
             image = self._image(slot, tiling)
             map_key = b.add("ShaderNodeNormalMap", props={"space": "TANGENT"})
-            b.link(Ref(image, "Color"), map_key, "Color")
+            samples, smoothness = self._normal_samples(slot, tiling, image)
+            b.link(samples, map_key, "Color")
             normal = Ref(map_key, "Normal")
-            if slot.texture and self.context.texture_alpha.get(slot.texture) == "smoothness":
-                smoothness = Ref(image, "Alpha")
         if smoothness is None and (slot := desc.slot("gloss")):
             gloss = b.add("ShaderNodeRGBToBW")
             b.link(Ref(self._image(slot, tiling), "Color"), gloss, "Color")
@@ -223,6 +224,29 @@ class _Maker(LayerBlending, GlassSurface):
             return Surface(colour, roughness, normal, metallic, level)
         scaled = smoothness if gloss_mult == 1.0 else b.math("MULTIPLY", smoothness, gloss_mult)
         return Surface(colour, b.math("SUBTRACT", 1.0, scaled, clamp=True), normal, metallic, level)
+
+    def _normal_samples(
+        self, slot: TextureSlot, tiling: float, image: str
+    ) -> tuple[Ref, Ref | None]:
+        colour = Ref(image, "Color")
+        companion = self.context.ddna_pairs.get(slot.texture or "")
+        if companion is None:
+            alpha = Ref(image, "Alpha") if self.context.texture_alpha.get(slot.texture or "") == "smoothness" else None
+            return colour, alpha
+        b = self.builder
+        separated = b.add("ShaderNodeSeparateColor")
+        b.link(colour, separated, "Color")
+        flipped = b.math("SUBTRACT", 1.0, Ref(separated, "Green"))
+        combined = b.add("ShaderNodeCombineColor")
+        b.link(Ref(separated, "Red"), combined, "Red")
+        b.link(flipped, combined, "Green")
+        b.link(Ref(separated, "Blue"), combined, "Blue")
+        if self.context.loadable is not None and not self.context.loadable(companion):
+            return Ref(combined, "Color"), None
+        smooth_image = self._image(replace(slot, texture=companion), tiling)
+        smooth_channels = b.add("ShaderNodeSeparateColor")
+        b.link(Ref(smooth_image, "Color"), smooth_channels, "Color")
+        return Ref(combined, "Color"), Ref(smooth_channels, "Red")
 
     def _metal(
         self,
