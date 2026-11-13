@@ -123,14 +123,27 @@ impl<'a> Texture<'a> {
     > {
         self.decode_surfaces_observing(level, |images, raw, _| {
             let encoding = DdsPngEncoding::of(self.header().format(), raw.transfer().effective);
-            let transform = DdsAlphaTransform::for_png(raw.alpha_association(), encoding);
-            if transform != DdsAlphaTransform::Preserve {
-                for image in images {
-                    transform.image(encoding.transfer, image);
-                }
-            }
-            transform
+            self.straighten_png_colour(raw, encoding, images)
         })
+    }
+
+    pub(crate) fn straighten_png_colour(
+        &self,
+        raw: DdsRawHeader,
+        encoding: DdsPngEncoding,
+        images: &mut [RgbaImage],
+    ) -> DdsAlphaTransform {
+        let transform = if crate::texture_parts::split_alpha(self.name()).1 {
+            DdsAlphaTransform::Preserve
+        } else {
+            DdsAlphaTransform::for_png(raw.alpha_association(), encoding)
+        };
+        if transform != DdsAlphaTransform::Preserve {
+            for image in images {
+                transform.image(encoding.transfer, image);
+            }
+        }
+        transform
     }
 
     fn decode_surfaces_observing<Observation>(

@@ -196,7 +196,7 @@ enum Role {
 }
 
 /// Returns `path` without a trailing `.a`, and whether it had one.
-fn split_alpha(path: &str) -> (&str, bool) {
+pub(crate) fn split_alpha(path: &str) -> (&str, bool) {
     match path
         .len()
         .checked_sub(2)

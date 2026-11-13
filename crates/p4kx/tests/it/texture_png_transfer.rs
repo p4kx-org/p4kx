@@ -182,11 +182,57 @@ fn legacy_dxt_pairs_keep_alpha_and_only_straighten_premultiplied_colour() -> Tes
     Ok(())
 }
 
-fn bc2_alpha() -> [u8; 8] {
+#[test]
+fn directly_selected_alpha_tail_preserves_its_data_channels() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let header = dir.path().join("texture.dds.a");
+    let output = dir.path().join("texture.png");
+    let fixture = SplitDds::new(
+        TestTextureFormat::Dx10Pixel {
+            dxgi_format: 28,
+            pixel_bytes: 4,
+        },
+        2,
+        1,
+    )
+    .mips(1)
+    .alpha(TestTextureFormat::Dx10Pixel {
+        dxgi_format: 28,
+        pixel_bytes: 4,
+    })
+    .alpha_tail()
+    .ok_or("alpha tail")?;
+    let mut bytes = fixture.header_bytes();
+    bytes
+        .get_mut(140..144)
+        .ok_or("miscFlags2")?
+        .copy_from_slice(&2_u32.to_le_bytes());
+    bytes.truncate(fixture.header_len());
+    bytes.extend(PIXELS);
+    fs::write(&header, bytes)?;
+    let report = export(&header, &output)?;
+    assert_eq!(
+        report["alpha_association"], "premultiplied",
+        "retain the original contradictory declaration"
+    );
+    assert_eq!(
+        report.get("alpha_transform"),
+        None,
+        "a selected tail supplies data"
+    );
+    assert_eq!(
+        read_rgba(&output)?.2,
+        PIXELS,
+        "keep the original channel bytes"
+    );
+    Ok(())
+}
+
+const fn bc2_alpha() -> [u8; 8] {
     0x0F80_u64.to_le_bytes()
 }
 
-fn bc3_alpha() -> [u8; 8] {
+const fn bc3_alpha() -> [u8; 8] {
     [0, 128, 0xC8, 0x01, 0, 0, 0, 0]
 }
 

@@ -45,6 +45,17 @@ fn converted_array_images_bind_their_own_colour_and_alpha_bytes() -> TestResult 
     let [texture] = textures.as_slice() else {
         return Err("one converted texture".into());
     };
+    check_texture_fields(texture);
+    let images = texture["images"].as_array().ok_or("converted images")?;
+    assert_eq!(images.len(), 2, "a receipt for each array layer");
+    let first = check_image_receipt(&out, texture, &images[0], "Data/glass_layer0.png")?;
+    let second = check_image_receipt(&out, texture, &images[1], "Data/glass_layer1.png")?;
+    assert_eq!(first, [0, 0], "first layer offsets in color and alpha");
+    assert_eq!(second, [256, 64], "second layer offsets in color and alpha");
+    Ok(())
+}
+
+fn check_texture_fields(texture: &Value) {
     assert_eq!(
         texture["source_transfer"], "linear",
         "explicit DXGI transfer"
@@ -72,13 +83,6 @@ fn converted_array_images_bind_their_own_colour_and_alpha_bytes() -> TestResult 
             "the plain colour header owns {field} without the private alpha tail"
         );
     }
-    let images = texture["images"].as_array().ok_or("converted images")?;
-    assert_eq!(images.len(), 2, "a receipt for each array layer");
-    let first = check_image_receipt(&out, texture, &images[0], "Data/glass_layer0.png")?;
-    let second = check_image_receipt(&out, texture, &images[1], "Data/glass_layer1.png")?;
-    assert_eq!(first, [0, 0], "first layer offsets in color and alpha");
-    assert_eq!(second, [256, 64], "second layer offsets in color and alpha");
-    Ok(())
 }
 
 fn check_image_receipt(

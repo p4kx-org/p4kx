@@ -281,12 +281,7 @@ impl EntryWriter<'_> {
             read.mip.header().format(),
             read.raw_header.transfer().effective,
         );
-        let transform = DdsAlphaTransform::for_png(read.raw_header.alpha_association(), encoding);
-        if transform != DdsAlphaTransform::Preserve {
-            for image in &mut images {
-                transform.image(encoding.transfer, image);
-            }
-        }
+        let transform = texture.straighten_png_colour(read.raw_header, encoding, &mut images);
         let alpha = Texture::merge_alpha_input(alpha, level, &mut images)
             .map_err(ExtractionError::Texture)?;
         Ok((
