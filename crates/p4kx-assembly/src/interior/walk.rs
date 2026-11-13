@@ -9,9 +9,9 @@ use p4kx_model::{ChildContainer, MaterialStatus, SocContainerDescriptor, Transfo
 
 use super::child_container_path::ChildContainerPath;
 use super::classes::ClassLookup;
-use super::files::{file_name, find_first, path_key, stem};
+use super::files::{find_first, path_key, stem};
 use super::layers::Layers;
-use super::scan::{Scan, StreamScan, scan_container};
+use super::scan::{Scan, scan_container};
 use super::tile_light::{TileLightOwner, TileLightPlacement};
 use super::{
     InteriorOptions, InteriorPart, InteriorPartKind, InteriorWatch, MAX_INTERIOR_CONTAINERS,
@@ -21,8 +21,7 @@ use crate::{AssemblyError, Geometry, Issue, IssueKind, PaletteRef};
 
 mod classes;
 mod entities;
-
-use entities::Placed;
+mod streams;
 
 /// A model part waiting for its model: where to look for the file, outermost layer first.
 pub(super) struct Placement {
@@ -214,62 +213,6 @@ impl<'a> Walker<'a> {
             };
         };
         scan_container(archive, keys, &todo.stem, capture_tile)
-    }
-
-    fn add_streams(
-        &mut self,
-        todo: &Todo,
-        streams: Vec<StreamScan>,
-        tile: Option<&TileLightPlacement<'_>>,
-    ) {
-        for stream in streams {
-            if !self.room(todo) {
-                return;
-            }
-            let Some(parent) = self.parts.get(todo.part) else {
-                return;
-            };
-            let world = parent.world;
-            let at = self.parts.len();
-            let mut part = container_part(
-                file_name(&stream.name).to_owned(),
-                Some(todo.part),
-                Transform::IDENTITY,
-                world,
-            );
-            part.kind = InteriorPartKind::Stream;
-            self.parts.push(part);
-            let file = file_name(&stream.name);
-            if let Some(objects) = &stream.objects {
-                if objects.invalid > 0 {
-                    let count = objects.invalid;
-                    self.note(&todo.path, file, IssueKind::ObjectsLeftOut { count });
-                }
-                if let Some(kind) = objects.unsupported {
-                    self.note(&todo.path, file, IssueKind::UnsupportedObjects { kind });
-                }
-                for object in &objects.objects {
-                    let Some(path) = objects.models.get(object.model) else {
-                        continue;
-                    };
-                    let name = stem(path).to_owned();
-                    let mut placed =
-                        Placed::new(name, InteriorPartKind::Model, Some(path), object.transform);
-                    placed.palette = object
-                        .palette
-                        .and_then(|index| objects.palettes.get(index))
-                        .and_then(|palette| self.palette_at(todo, file, palette));
-                    if !self.add_placed(todo, at, world, placed) {
-                        return;
-                    }
-                }
-            }
-            if let Some(entities) = &stream.entities
-                && !self.add_entities(todo, (at, world), file, entities, tile)
-            {
-                return;
-            }
-        }
     }
 
     fn add_children(
