@@ -12,6 +12,7 @@ use serde::Serialize;
 
 use crate::player_source::{PlayerSourceError, check, index_error};
 use crate::player_source_classes::{self, ClassTarget, Classes};
+use crate::player_source_port_binding::{self, OwnerPort, PortBinding};
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
@@ -57,6 +58,7 @@ struct Port {
     crc: SourcedValue<u32>,
     item_guid: SourcedValue<String>,
     item: SourcedValue<ClassTarget>,
+    definition: SourcedValue<PortBinding>,
 }
 
 pub(crate) fn read(
@@ -184,6 +186,7 @@ fn read_ports(
 ) -> Result<Vec<Port>, PlayerSourceError> {
     let mut rows = Vec::new();
     let mut pending = vec![(None, 0, root)];
+    let mut owner_selectors: Vec<(Guid, SourceUse)> = Vec::new();
     while let Some((parent, ordinal, port)) = pending.pop() {
         check(cancel)?;
         let index = rows.len();
@@ -191,6 +194,17 @@ fn read_ports(
         let payload = |field| at(scope, &site, field, SourceUseRole::Payload);
         let selector = at(scope, &site, "item", SourceUseRole::Selector)?;
         let guid = Guid::from_stored(port.item.stored());
+        let port_selector = at(scope, &site, "port", SourceUseRole::Selector)?;
+        let owner =
+            parent
+                .and_then(|index| owner_selectors.get(index))
+                .map(|(owner, owner_selector)| OwnerPort {
+                    owner: *owner,
+                    crc: port.port,
+                    owner_selector,
+                    port_selector: &port_selector,
+                });
+        let definition = player_source_port_binding::read(sources, classes, owner, &port_selector)?;
         rows.push(Port {
             parent,
             ordinal,
@@ -201,7 +215,9 @@ fn read_ports(
                 true,
             ),
             item: player_source_classes::by_guid(sources, classes, &selector, guid)?,
+            definition,
         });
+        owner_selectors.push((guid, selector));
         pending.extend(
             port.children
                 .iter()

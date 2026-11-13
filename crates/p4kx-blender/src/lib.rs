@@ -48,6 +48,8 @@ mod player_source_body;
 mod player_source_classes;
 mod player_source_loadout;
 mod player_source_motion;
+mod player_source_port_binding;
+mod player_source_port_helper;
 mod rename;
 mod rig_package;
 mod roles;
