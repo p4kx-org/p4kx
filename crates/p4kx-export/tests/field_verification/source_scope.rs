@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 use p4kx_export::Kind;
-use p4kx_extraction::{DataForge, DataForgeError, Guid, Record};
+use p4kx_extraction::{DataForge, DataForgeError, Filter, Guid, Record};
 
 use super::error::{self, Error, Kind as ErrorKind};
 
@@ -76,6 +76,7 @@ pub(crate) struct ScopedRecord<'f> {
 pub(crate) fn records<'f>(
     forge: &'f DataForge<'f>,
     kinds: &[Kind],
+    filter: Option<&Filter>,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<Vec<ScopedRecord<'f>>> {
     let rules: Vec<_> = kinds
@@ -95,6 +96,9 @@ pub(crate) fn records<'f>(
             continue;
         }
         let path = record.record_path()?;
+        if filter.is_some_and(|filter| !filter.matches(path)) {
+            continue;
+        }
         let Some(&(kind, _)) = rules
             .iter()
             .find(|(_, rule)| rule.type_name == type_name && rule.matches_path(path))

@@ -64,13 +64,14 @@ impl Schema {
                     wanted.insert(parent.to_owned());
                 }
                 for property in structure.properties() {
-                    if let Some(target) = property.target_struct() {
-                        wanted.insert(target.name()?.to_owned());
-                        if matches!(
-                            property.data_type()?,
-                            DataType::StrongPointer | DataType::WeakPointer | DataType::Reference
-                        ) {
-                            polymorphic.insert(target.name()?.to_owned());
+                    let storage = property.data_type()?;
+                    if matches!(storage, DataType::Class | DataType::StrongPointer)
+                        && let Some(target) = property.target_struct()
+                    {
+                        let target = target.name()?;
+                        wanted.insert(target.to_owned());
+                        if storage == DataType::StrongPointer {
+                            polymorphic.insert(target.to_owned());
                         }
                     }
                 }

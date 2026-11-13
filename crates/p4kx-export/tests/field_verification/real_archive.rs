@@ -4,7 +4,7 @@
 use std::collections::BTreeMap;
 use std::time::SystemTime;
 
-use p4kx_extraction::{Archive, DataForge, DataForgeEntry};
+use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry, Filter};
 use serde_json::Value;
 
 use super::accounting;
@@ -15,9 +15,10 @@ use super::published_model::{Build, BuildGate, PUBLICATIONS};
 fn exclusions(
     forge: &DataForge<'_>,
     inventory: &Inventory,
+    filter: Option<&Filter>,
 ) -> super::Result<BTreeMap<p4kx_extraction::Guid, String>> {
     let kinds = super::audit_scope::kinds(inventory)?;
-    let records = super::source_scope::records(forge, &kinds, &|| false)?;
+    let records = super::source_scope::records(forge, &kinds, filter, &|| false)?;
     let mut exclusions = BTreeMap::new();
     for scoped in records {
         let record = scoped.record;
@@ -53,14 +54,31 @@ fn field_inventory_observes_declared_populated_and_exported_source_values() -> s
     let forge = loaded.open()?;
     let inventory = inventory()?;
     let kinds = super::audit_scope::kinds(&inventory)?;
-    let built =
-        p4kx_export::build_catalog(&archive, &super::audit_scope::options(SystemTime::now()))?;
+    let watch = ArchiveWatch::new(&archive);
+    let filter = record_filter()?;
+    let scope = filter.as_ref();
+    if scope.is_some() {
+        let selected = super::source_scope::records(&forge, &kinds, scope, &|| false)?;
+        assert!(
+            !selected.is_empty(),
+            "the field-audit filter must select a source Record"
+        );
+        super::report(&format!(
+            "explicit Record filter: {} source owners",
+            selected.len()
+        ));
+    }
+    let options = p4kx_export::CatalogOptions {
+        filter: scope,
+        ..super::audit_scope::options(SystemTime::now())
+    };
+    let built = p4kx_export::build_catalog_from(&archive, &loaded, &options)?;
     let health = super::audit_scope::verify(built.summary().export_health(), &kinds);
     if let Err(error) = &health {
         super::report(&format!("mapped production health: {error}"));
     }
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let exclusions = exclusions(&forge, &inventory)?;
+    let exclusions = exclusions(&forge, &inventory, scope)?;
     super::report(&format!(
         "source selection exclusions: {}",
         exclusions.len()
@@ -76,9 +94,31 @@ fn field_inventory_observes_declared_populated_and_exported_source_values() -> s
             .map(|failure| failure.guid().parse())
             .collect::<Result<_, _>>()?,
         exclusions,
+        scope,
         &|| false,
     )?;
-    for (field, count) in &counts {
+    report_counts(&counts);
+    watch.check()?;
+    assert_eq!(
+        accounting::regressions(&counts),
+        0,
+        "every declared/populated field requires a reviewed disposition and retained projection"
+    );
+    health?;
+    Ok(())
+}
+
+fn record_filter() -> super::Result<Option<Filter>> {
+    match std::env::var("P4KX_FIELD_RECORD_FILTER") {
+        Ok(value) if !value.trim().is_empty() => Ok(Some(Filter::parse(&value)?)),
+        Ok(_) => Err(Error::new(ErrorKind::Input, "empty field-audit Record filter").into()),
+        Err(std::env::VarError::NotPresent) => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
+fn report_counts(counts: &BTreeMap<super::inventory::FieldKey, accounting::Counts>) {
+    for (field, count) in counts {
         super::report(&format!(
             "{}.{}{}: declared={} present={} populated={} exported={} unhandled={} unreviewed={} rejected={} source-errors={} missing-targets={} missing-export-GUID={} excluded={} target-changed={} newly-populated={}",
             field.owner,
@@ -99,13 +139,6 @@ fn field_inventory_observes_declared_populated_and_exported_source_values() -> s
             count.population == accounting::Population::NewlyPopulated
         ));
     }
-    assert_eq!(
-        accounting::regressions(&counts),
-        0,
-        "every declared/populated field requires a reviewed disposition and retained projection"
-    );
-    health?;
-    Ok(())
 }
 
 fn actual_build(archive: &Archive) -> super::Result<Build> {
@@ -153,7 +186,7 @@ fn report_comparisons(report: &super::published::Report) -> u64 {
 fn check_source_records(archive: &Archive, kinds: &[p4kx_export::Kind]) -> super::Result<()> {
     let loaded = DataForgeEntry::read(archive)?;
     let forge = loaded.open()?;
-    let records = super::source_scope::records(&forge, kinds, &|| false)?;
+    let records = super::source_scope::records(&forge, kinds, None, &|| false)?;
     super::report(&format!(
         "mapped physical Record identities checked: {}",
         records.len()

@@ -35,7 +35,9 @@ raw-array multiplicity, physical duplicates, source states, global Filter scope 
 diagnostics. The ignored Tag oracle compares raw physical definitions and owning Entity arrays
 without treating convenience paths as source identity.
 
-Schema collection includes parents, owned targets and relevant polymorphic descendants. A changed
+Schema collection includes parents, owned targets and relevant strong-pointer descendants.
+Reference and weak-pointer declarations retain their target type. Auditing those targets
+requires their own inventory roots. A changed
 declared base target with supported concrete instances is a schema-contract change, not observed
 data loss. A schema-declared resource override without populated instances remains distinct from
 a populated family.
@@ -58,7 +60,12 @@ cargo test --release -p p4kx-export --test field_verification --locked real_arch
 ~~~
 
 `P4KX_FIELD_INVENTORY` may name a private inventory JSON; otherwise the baseline is used. Mapped
-catalog kinds reuse public `Kind::rule` selection. Development leftovers are separately accounted
+catalog kinds reuse public `Kind::rule` selection. Set `P4KX_FIELD_RECORD_FILTER` to the original
+Record path or a catalog Filter pattern for a scoped survey. The same Filter applies to the
+producer and raw observation walk. Declaration review still covers the inventory's full type
+closure, and the test checks selected GUIDs for aliases outside the Filter. An empty selection
+fails. The offline published comparison uses its independent snapshot selection.
+Development leftovers are separately accounted
 for. The check reads canonical source trees and the actual catalog. Missing mapped
 projections, typed rejection, new population, changed targets and unreviewed declarations fail the
 survey. Missing source targets retain their own source-evidence category.

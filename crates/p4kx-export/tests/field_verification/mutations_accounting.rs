@@ -24,6 +24,7 @@ fn survey(
         &projected(),
         BTreeSet::new(),
         BTreeMap::new(),
+        None,
         &|| false,
     )
 }
@@ -168,6 +169,7 @@ fn a_successful_public_mapper_cannot_hide_a_populated_nested_block() -> super::R
             .map(|failure| failure.guid().parse())
             .collect::<Result<_, _>>()?,
         BTreeMap::new(),
+        None,
         &|| false,
     )?;
     let silent = counts
@@ -251,6 +253,7 @@ fn unreviewed_declarations_exclusions_and_inventory_errors_are_visible() -> supe
         &projected(),
         BTreeSet::new(),
         BTreeMap::new(),
+        None,
         &|| false,
     )?;
     assert!(
@@ -269,6 +272,7 @@ fn unreviewed_declarations_exclusions_and_inventory_errors_are_visible() -> supe
         &projected(),
         BTreeSet::new(),
         excluded,
+        None,
         &|| false,
     )?;
     assert!(

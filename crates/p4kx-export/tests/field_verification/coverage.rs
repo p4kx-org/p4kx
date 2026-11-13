@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use p4kx_extraction::{DataForge, Guid, TreeBuilder};
+use p4kx_extraction::{DataForge, Filter, Guid, TreeBuilder};
 use serde_json::Value;
 
 use crate::catalog_v3_consumer;
@@ -27,6 +27,7 @@ fn observations(
     forge: &DataForge<'_>,
     schema: &Schema,
     inventory: &Inventory,
+    filter: Option<&Filter>,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<Observations> {
     let kinds = audit_scope::kinds(inventory)?;
@@ -37,7 +38,7 @@ fn observations(
         )
         .into());
     }
-    let records = source_scope::records(forge, &kinds, cancelled)?;
+    let records = source_scope::records(forge, &kinds, filter, cancelled)?;
     let mut observations = Observations::new();
     let mut trees = TreeBuilder::new();
     for scoped in records {
@@ -160,10 +161,11 @@ pub(crate) fn run(
     catalog: &Value,
     rejected: BTreeSet<Guid>,
     exclusions: BTreeMap<Guid, String>,
+    filter: Option<&Filter>,
     cancelled: &impl Fn() -> bool,
 ) -> super::Result<BTreeMap<FieldKey, Counts>> {
     let schema = Schema::read(forge, &inventory.roots, cancelled)?;
-    let observations = observations(forge, &schema, inventory, cancelled)?;
+    let observations = observations(forge, &schema, inventory, filter, cancelled)?;
     let groups = projections(catalog, inventory, cancelled)?;
     accounting::count_fields(
         &schema,
