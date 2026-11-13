@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
 use std::path::Path;
 
 use p4kx_extraction::{Archive, ArchiveWatch, Entry, Filter};
 use p4kx_media::{
-    ContainerIdentity, Digest, ExportOptions, ExportOutcome, Identity, Index, MediaKind,
-    MediaRecord, Source,
+    ContainerIdentity, Digest, ExportOptions, Identity, Index, MediaKind, MediaRecord, Source,
 };
-use serde::de::DeserializeOwned;
 
+use super::archive_replay::{Lines, compare_original, generation};
 use super::shader_accounting::require;
 use super::{TestResult, manifests, privacy};
 
@@ -84,25 +81,6 @@ fn verify_family(archive: &Archive, family: Family) -> TestResult<Totals> {
     output.close()?;
     watch.check()?;
     Ok(totals)
-}
-
-fn generation(
-    output: &Path,
-    outcome: ExportOutcome,
-) -> TestResult<(Box<Index>, std::path::PathBuf)> {
-    match outcome {
-        ExportOutcome::Published { index, .. } => {
-            let base = output.join(&index.artifact_base);
-            Ok((index, base))
-        }
-        ExportOutcome::Incomplete { index, diagnostic } => {
-            let base = diagnostic
-                .parent()
-                .ok_or("diagnostic generation directory")?;
-            Ok((index, base.to_path_buf()))
-        }
-        _ => Err("animation verification did not run an export".into()),
-    }
 }
 
 fn reconcile(
@@ -222,45 +200,6 @@ impl Census<'_> {
         self.totals.entries += 1;
         self.watch.poll()?;
         Ok(())
-    }
-}
-
-fn compare_original(archive: &Archive, entry: &Entry, retained: &[u8]) -> TestResult {
-    let mut original = archive.open_entry_verified(entry)?;
-    let mut buffer = [0_u8; 16 << 10];
-    for bytes in retained.chunks(buffer.len()) {
-        let observed = buffer.get_mut(..bytes.len()).ok_or("comparison buffer")?;
-        original.read_exact(observed)?;
-        require(
-            observed == bytes,
-            "retained payload matches original verified source bytes",
-        )?;
-    }
-    require(
-        original.read(&mut buffer)? == 0,
-        "retained payload includes the complete Entry",
-    )
-}
-
-struct Lines {
-    input: BufReader<File>,
-    line: String,
-}
-
-impl Lines {
-    fn open(path: &Path) -> TestResult<Self> {
-        Ok(Self {
-            input: BufReader::new(File::open(path)?),
-            line: String::new(),
-        })
-    }
-
-    fn next<T: DeserializeOwned>(&mut self) -> TestResult<Option<T>> {
-        self.line.clear();
-        if self.input.read_line(&mut self.line)? == 0 {
-            return Ok(None);
-        }
-        Ok(Some(serde_json::from_str(&self.line)?))
     }
 }
 

@@ -34,7 +34,15 @@ Blender package format 1.9 adds `material_libraries`, once per distinct retained
 
 ## Verification boundary
 
-Independent synthetic cases cover roots, unknown submaterial slots, ordered case-distinct/namespaced attributes, mixed text/CDATA/comments/PI including endtag-like data, layers/TexMod/placeholders, strict UTF8 and true CryXml repair, truncation, original ordinals, raw bytes/digests, cancellation/publication and schemas. The ignored aggregate census compares every selected material reader's retained fields with the same shared exported wire shape entirely in memory, preserving original errors behind static console diagnostics. It writes no source dump and does not replace provider/provenance tests.
+Independent synthetic cases cover roots, unknown submaterial slots, ordered case-distinct/namespaced attributes, mixed text/CDATA/comments/PI including endtag-like data, layers/TexMod/placeholders, strict UTF8 and true CryXml repair, truncation, original ordinals, raw bytes/digests, cancellation/publication and schemas. The Extraction census compares retained root-Entry fields with the shared wire shape in memory.
+The opt-in Media replay additionally runs the actual material provider and reconciles its JSONL
+records, verified raw artifacts, original container/Entry identities and coverage counts against
+a separate read of all selected root and nested `.mtl` Entries. It reports only aggregate counts
+and keeps its temporary generation outside the input installation. Set `P4KX_DATA_P4K` and optionally
+`P4KX_DATA_P4K_B`, then run
+`cargo test -p p4kx-media --test real_archive all_selected_material_libraries_and_raw_artifacts_reconcile -- --ignored --nocapture`.
+Diagnosed structured failures or losses remain separately counted. A traversal or accounting
+failure cannot pass as a complete replay.
 
 Blender import/render success alone does not prove source completeness or game semantics. Source-built Blender 5.2 verification must inspect unchanged supported node groups/links/color spaces/inputs and warnings, after exact metadata and raw-digest checks.
 

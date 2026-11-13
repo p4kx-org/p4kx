@@ -103,6 +103,7 @@ counts without recording asset names or payloads.
 ```powershell
 cargo test --locked -p p4kx-media --test real_archive all_selected_animation_entries_clips_and_keys_reconcile -- --ignored
 cargo test --locked -p p4kx-media --test real_archive global_animation_images_match_verified_physical_sources -- --ignored
+cargo test --locked -p p4kx-media --test real_archive global_animation_image_export_matches_original_path_fields -- --ignored
 ```
 
 ## Optional skeleton bindings
