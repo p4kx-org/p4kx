@@ -3,6 +3,9 @@
 
 //! Original objective-property source cells and contextual bindings.
 
+#[path = "catalog_mission_item_definitions.rs"]
+mod mission_item_definitions;
+
 use std::error::Error;
 
 use serde_json::{Value, json};

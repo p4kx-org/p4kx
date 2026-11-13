@@ -75,7 +75,6 @@ mod catalog_loot_filter_assertions;
 mod catalog_loot_followups;
 mod catalog_mining;
 mod catalog_mining_stats;
-mod catalog_mission_items;
 mod catalog_npc_spawns;
 mod catalog_paints;
 mod catalog_playability;
