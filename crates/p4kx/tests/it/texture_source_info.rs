@@ -51,7 +51,8 @@ fn cli_preserves_source_words_and_legacy_fields_for_archive_and_disk() -> TestRe
             Some(&json!(0xface_0007_u32)),
             "authored DX10 extra flags are preserved"
         );
-        verify_transfer_origin(&value, entry)?;
+        verify_header_origin(&value, entry, "transfer~1effective", json!("srgb"))?;
+        verify_header_origin(&value, entry, "alpha_association", json!("reserved"))?;
         values.push(
             value
                 .get("source_metadata")
@@ -67,15 +68,16 @@ fn cli_preserves_source_words_and_legacy_fields_for_archive_and_disk() -> TestRe
     Ok(())
 }
 
-fn verify_transfer_origin(value: &Value, entry: bool) -> TestResult {
+fn verify_header_origin(value: &Value, entry: bool, pointer: &str, expected: Value) -> TestResult {
+    let path = pointer.replace("~1", "/");
     assert_eq!(
-        value.pointer("/source_metadata/transfer/effective"),
-        Some(&json!("srgb")),
-        "explicit DXGI colour transfer"
+        value.pointer(&format!("/source_metadata/{path}")),
+        Some(&expected),
+        "{path}"
     );
     let field = value
-        .pointer("/field_origins/~1source_metadata~1transfer~1effective")
-        .ok_or("transfer origin")?;
+        .pointer(&format!("/field_origins/~1source_metadata~1{pointer}"))
+        .ok_or("derived DDS header field origin")?;
     assert_eq!(
         field.get("containsEncryptedSource"),
         Some(&if entry { json!(false) } else { Value::Null }),

@@ -29,6 +29,8 @@ pub enum DdsHeaderField {
     Depth,
     /// The original format selector and any authored DXGI transfer code.
     DxgiTransfer,
+    /// The original `FourCC` and DX10 alpha-association word.
+    AlphaAssociation,
     /// The original Cry marker word.
     CryImageMarker,
     /// The original Cry image flags word.
@@ -68,6 +70,7 @@ enum Word {
     ResourceDimension,
     MiscFlag,
     ArraySize,
+    MiscFlags2,
     CryMarker,
     CryFlags,
 }
@@ -93,6 +96,7 @@ impl Word {
             Self::ResourceDimension => ("dx10.resourceDimension", 128),
             Self::MiscFlag => ("dx10.miscFlag", 132),
             Self::ArraySize => ("dx10.arraySize", 136),
+            Self::MiscFlags2 => ("dx10.miscFlags2", 140),
             Self::CryMarker => ("reserved2", 120),
             Self::CryFlags => ("reserved1", 32),
         };
@@ -108,8 +112,8 @@ impl DdsRawHeader {
     /// Returns the authored byte words used to obtain one normalized header field.
     pub fn words_for(&self, field: DdsHeaderField) -> impl Iterator<Item = DdsHeaderWord> + use<> {
         use DdsHeaderField::{
-            ArraySize, CryImageFlags, CryImageMarker, CryTransfer, Depth, DxgiTransfer, Faces,
-            Format, Height, MipCount, Prefix, Width,
+            AlphaAssociation, ArraySize, CryImageFlags, CryImageMarker, CryTransfer, Depth,
+            DxgiTransfer, Faces, Format, Height, MipCount, Prefix, Width,
         };
         let legacy = self.legacy();
         let dx10 = self.dx10();
@@ -137,6 +141,8 @@ impl DdsRawHeader {
             Faces => (&[Word::FourCc, Word::Caps2], None),
             ArraySize if dx10.is_some() => (&[Word::FourCc, Word::ArraySize], None),
             Depth => depth_words(legacy, dx10),
+            AlphaAssociation if dx10.is_some() => (&[Word::FourCc, Word::MiscFlags2], None),
+            AlphaAssociation => (&[Word::PixelFlags, Word::FourCc], None),
             ArraySize | DxgiTransfer => (&[Word::FourCc], None),
             CryImageFlags => (&[Word::CryFlags], None),
             CryTransfer if self.has_cry_image_flags() => (&[Word::CryMarker, Word::CryFlags], None),

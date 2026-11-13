@@ -148,6 +148,10 @@ fn verify_rows(color: &MediaRecord, alpha: &MediaRecord) -> TestResult {
         ),
         ("/payload/source_metadata/normalized/array_size", json!(2)),
         (
+            "/payload/source_metadata/alpha_association",
+            json!("reserved"),
+        ),
+        (
             "/payload/source_metadata/transfer/effective",
             json!("linear"),
         ),
@@ -208,27 +212,45 @@ fn verify_origins(base: &Path, [color, alpha]: [usize; 2]) -> TestResult {
             .get("sourceUsesRefs")
             .and_then(Value::as_array)
             .ok_or("source refs")?;
-        check_uses(references, &uses, &sources, entry)?;
-        let transfer = fields
-            .iter()
-            .find(|row| {
-                row.get("field").and_then(Value::as_str)
-                    == Some("/data/payload/source_metadata/transfer/effective")
-                    && row.pointer("/scope/ordinal").and_then(Value::as_str)
-                        == Some(ordinal.as_str())
-                    && row.pointer("/scope/stream/kind").and_then(Value::as_str) == Some("texture")
-            })
-            .ok_or("transfer field origin")?;
-        assert_eq!(
-            transfer.get("containsEncryptedSource"),
-            Some(&json!(encrypted)),
-            "transfer comes from the corresponding texture header"
-        );
+        check_uses(references, &uses, &sources, entry, "payload")?;
+        for path in [
+            "/data/payload/source_metadata/transfer/effective",
+            "/data/payload/source_metadata/alpha_association",
+        ] {
+            let origin = fields
+                .iter()
+                .find(|row| {
+                    row.get("field").and_then(Value::as_str) == Some(path)
+                        && row.pointer("/scope/ordinal").and_then(Value::as_str)
+                            == Some(ordinal.as_str())
+                        && row.pointer("/scope/stream/kind").and_then(Value::as_str)
+                            == Some("texture")
+                })
+                .ok_or("derived header field origin")?;
+            assert_eq!(
+                origin.get("containsEncryptedSource"),
+                Some(&json!(encrypted)),
+                "{path} comes from the corresponding texture header"
+            );
+            if path.ends_with("alpha_association") {
+                let refs = origin
+                    .get("sourceUsesRefs")
+                    .and_then(Value::as_array)
+                    .ok_or("association source refs")?;
+                check_uses(refs, &uses, &sources, entry, "conversion")?;
+            }
+        }
     }
     Ok(())
 }
 
-fn check_uses(references: &[Value], uses: &[Value], sources: &[Value], entry: u32) -> TestResult {
+fn check_uses(
+    references: &[Value],
+    uses: &[Value],
+    sources: &[Value],
+    entry: u32,
+    role: &str,
+) -> TestResult {
     let mut exact_word = false;
     for id in references {
         let usage = uses
@@ -246,7 +268,7 @@ fn check_uses(references: &[Value], uses: &[Value], sources: &[Value], entry: u3
             "no unrelated sibling contributes"
         );
         exact_word |= usage.pointer("/location/indices") == Some(&json!(["144", "4"]))
-            && usage.get("role").and_then(Value::as_str) == Some("payload");
+            && usage.get("role").and_then(Value::as_str) == Some(role);
     }
     assert!(exact_word, "exact miscFlags2 byte range");
     Ok(())

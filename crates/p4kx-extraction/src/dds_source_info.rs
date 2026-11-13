@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_texture::{DdsHeader, DdsRawHeader, DdsTransferEvidence, TextureError};
+use p4kx_texture::{
+    DdsAlphaAssociation, DdsHeader, DdsRawHeader, DdsTransferEvidence, TextureError,
+};
 
 #[path = "dds_source_words.rs"]
 mod words;
@@ -45,6 +47,9 @@ pub struct DdsSourceInfo {
     /// Original transfer declarations and their agreement, absent in older reports.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub transfer: Option<DdsTransferEvidence>,
+    /// Alpha association declared by the original header.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub alpha_association: Option<DdsAlphaAssociation>,
 }
 
 /// Authored source header, including an explicitly absent DX10 extension.
@@ -150,6 +155,7 @@ impl DdsSourceInfo {
             raw: DdsRawHeaderInfo::of(raw),
             normalized: DdsNormalizedInfo::of(normalized),
             transfer: Some(raw.transfer()),
+            alpha_association: Some(raw.alpha_association()),
         }
     }
 }

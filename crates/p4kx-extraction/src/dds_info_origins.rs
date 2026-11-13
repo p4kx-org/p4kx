@@ -53,6 +53,17 @@ pub fn dds_info_origins(
             )?;
         }
     }
+    if dds.alpha_association.is_some() {
+        let contributors = header.header_uses(
+            &[DdsHeaderField::Prefix, DdsHeaderField::AlphaAssociation],
+            SourceUseRole::Conversion,
+        )?;
+        insert(
+            fields,
+            &format!("{base}/alpha_association"),
+            uses.origin(&contributors, true),
+        )?;
+    }
     insert(
         fields,
         &format!("{base}/header_source_bytes"),

@@ -605,6 +605,9 @@ normalized topology, the selected mip and the PNG bytes.
 
 **1.11** adds the optional DDS transfer declarations inside texture source metadata.
 The original header words and existing texture colour-space field retain their meanings.
+The DDS source metadata also records the declared `alpha_association` independently of colour
+transfer, actual channel samples and material alpha mode. Unknown and reserved declarations
+remain visible alongside the exact raw header words.
 
 The schema file is the schema of the version in `FORMAT_VERSION`: a change of the Rust types that
 changes the schema is a change of the format, and the checked-in schema changes with it. A schema

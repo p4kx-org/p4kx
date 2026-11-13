@@ -6261,6 +6261,41 @@
         }
       ]
     },
+    "DdsAlphaAssociation": {
+      "description": "Association of the stored colour channels with alpha declared by the DDS header.",
+      "oneOf": [
+        {
+          "const": "unknown",
+          "description": "The header does not declare an association.",
+          "type": "string"
+        },
+        {
+          "const": "straight",
+          "description": "RGB is independent of the alpha channel.",
+          "type": "string"
+        },
+        {
+          "const": "premultiplied",
+          "description": "RGB has been multiplied by alpha.",
+          "type": "string"
+        },
+        {
+          "const": "opaque",
+          "description": "The consumer should treat the texture as opaque.",
+          "type": "string"
+        },
+        {
+          "const": "custom",
+          "description": "The fourth channel is authored as data.",
+          "type": "string"
+        },
+        {
+          "const": "reserved",
+          "description": "The alpha-mode bits contain an undefined value.",
+          "type": "string"
+        }
+      ]
+    },
     "DdsBlockLayoutInfo": {
       "description": "Encoded byte layout known to the current reader, independent of codec availability.",
       "properties": {
@@ -6689,6 +6724,17 @@
     "DdsSourceInfo": {
       "description": "Complete authored header words and separate reader-normalized topology.",
       "properties": {
+        "alpha_association": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsAlphaAssociation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Alpha association declared by the original header."
+        },
         "header_source_bytes": {
           "$ref": "#/$defs/DecimalU64",
           "description": "Header Entry declared decoded length or disk file length, excluding separate siblings."

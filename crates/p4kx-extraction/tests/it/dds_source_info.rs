@@ -284,7 +284,7 @@ fn set_word(bytes: &mut [u8], offset: usize, value: u32) -> TestResult {
 }
 
 #[test]
-fn historical_metadata_without_transfer_remains_readable() -> TestResult {
+fn historical_metadata_without_derived_header_fields_remains_readable() -> TestResult {
     let bytes = SplitDds::new(TestTextureFormat::LegacyDxt1, 8, 8)
         .mips(1)
         .header_bytes();
@@ -293,6 +293,10 @@ fn historical_metadata_without_transfer_remains_readable() -> TestResult {
         .ok_or("source metadata")?
         .remove("transfer")
         .ok_or("current transfer")?;
+    json.as_object_mut()
+        .ok_or("source metadata")?
+        .remove("alpha_association")
+        .ok_or("current alpha association")?;
     let validator = jsonschema::validator_for(&schemars::schema_for!(DdsSourceInfo).to_value())?;
     assert!(
         validator.is_valid(&json),
@@ -302,6 +306,10 @@ fn historical_metadata_without_transfer_remains_readable() -> TestResult {
     assert!(
         historical.transfer.is_none(),
         "absence carries no original declaration proof"
+    );
+    assert!(
+        historical.alpha_association.is_none(),
+        "absence carries no alpha association proof"
     );
     Ok(())
 }

@@ -63,6 +63,15 @@ impl<'a> TextureHeaderOrigins<'a> {
                 writer,
             )?;
         }
+        let alpha = self
+            .fields(raw, &[DdsHeaderField::AlphaAssociation], writer)?
+            .finish();
+        put(
+            &mut prepared,
+            &format!("{base}/alpha_association"),
+            alpha,
+            writer,
+        )?;
         let format = self.fields(raw, &[Format], writer)?.finish();
         put(
             &mut prepared,

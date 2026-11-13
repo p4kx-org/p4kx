@@ -4,6 +4,7 @@
 //! Integration tests of `p4kx-texture`, built as one test binary.
 
 mod alpha;
+mod alpha_association;
 mod cubemap;
 mod decode;
 mod decode_bc45;
