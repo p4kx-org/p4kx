@@ -57,6 +57,19 @@ fn premultiplied_opacity_uses_straight_png_and_bc1_uses_original_dds() -> TestRe
     verify_png(find("base_diff.dds").ok_or("opacity PNG")?, &output)?;
     verify_dds(find("wear_diff.dds").ok_or("original BC1")?)?;
     verify_split(find("wear_spec.dds").ok_or("split opacity PNG")?, &output)?;
+    let before = fs::read(output.join("receipt.json"))?;
+    write_package_with_context(
+        &assembly,
+        &models,
+        &loader,
+        &glb_options(0),
+        &PackageInfo::default(),
+        &output,
+        &context,
+    )?;
+    assert_eq!(before, fs::read(output.join("receipt.json"))?);
+    let receipt: serde_json::Value = serde_json::from_slice(&before)?;
+    assert!(receipt["archive_build"].is_null());
     Ok(())
 }
 

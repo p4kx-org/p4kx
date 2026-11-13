@@ -17,6 +17,7 @@ pub(crate) struct Measured {
     pub(crate) bytes: u64,
     pub(crate) mesh_bytes: u64,
     pub(crate) meshes: usize,
+    pub(crate) textures: usize,
     pub(crate) instances: u64,
     pub(crate) undeduplicated_mesh_bytes: u64,
 }
@@ -24,9 +25,6 @@ pub(crate) struct Measured {
 impl Measured {
     pub(crate) fn mesh_ratio(&self) -> f64 {
         ratio(self.mesh_bytes, self.undeduplicated_mesh_bytes)
-    }
-    pub(crate) const fn textures(&self) -> usize {
-        self.files.saturating_sub(self.meshes.saturating_add(1))
     }
     pub(crate) fn sharing(&self) -> f64 {
         1.0 - ratio(self.meshes as u64, self.instances)

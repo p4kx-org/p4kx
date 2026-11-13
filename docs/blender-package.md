@@ -20,18 +20,19 @@ glossary); a **mesh** of the package is a GLB file with the geometry of one mode
 ```text
 <package>/
   scene.json            the manifest
+  receipt.json          SHA-256 inventory for the package
   meshes/m0001.glb      one GLB per distinct mesh
   meshes/m0002.glb
   textures/t0001.png    one PNG or DDS file per distinct texture
 ```
 
-- The folder holds nothing but these. Every file name is an id made by the writer (`m` or `t` and
+- The mesh and texture file names are ids made by the writer (`m` or `t` and
   at least four digits); a name from the Archive never becomes a file name, so no name can lead
   out of the package. Mesh ids number the meshes from 1 in the order of their first node. Texture
   ids number the textures in the order of their first use, and a texture that could not be
   written leaves a gap, so ids are not always consecutive.
-- `scene.json` is written last. A folder with a `scene.json` whose `format` is
-  `p4kx-blender-package` is a complete package.
+- The writer records the manifest and receipt in staging before publishing the complete folder.
+  An authored SOC scene, when requested, adds `authored/soc-scene.json`.
 
 ## Writing a package
 
@@ -60,7 +61,8 @@ rules below apply to it as well.
 - The output is checked before the Archive is opened (`p4kx_blender::check_output`). The folder
   must not exist, or be empty, or hold a package an earlier run wrote: `scene.json` with the
   format name, a `meshes` folder holding only `m<digits>.glb` files and a `textures` folder
-  holding only `t<digits>.png` files. The earlier package is then replaced. Any other folder or
+  holding `t<digits>.png` or declared `t<digits>.dds` files. A package may also contain its
+  receipt and authored SOC companion. The earlier package is then replaced. Any other folder or
   file is refused with exit code 2 and left alone.
 - A folder inside a Star Citizen installation is refused with exit code 2.
 - Everything is written into a temporary folder `<name>.p4kx-<process id>.part` next to the
@@ -109,12 +111,24 @@ JSON to standard output and leaves the package folder untouched. `structure.stat
 `valid`, `partial` when the package has warnings or geometry counts could not be compared,
 or `failed`. The command exits with status 1 for a structural or digest failure.
 
-Pass `--receipt 'D:/exports/package-receipt.json'` to check an existing SHA-256 inventory.
-The schema-1 receipt has a `files` array of `path` and `sha256` pairs. Paths are relative to
-the package folder, such as `scene.json` or `meshes/m0001.glb`. A receipt may list a subset
-of declared files. `digests.status` reports `absent`, `partial`, `verified` or `failed`
-independently of structural validation. Native release fixtures use the same receipt entries
-with paths relative to their two-package exchange root.
+The validator discovers `receipt.json` at the package root. Pass
+`--receipt 'D:/exports/package-receipt.json'` to use an external inventory. A schema-1
+receipt has a `files` array of `path` and `sha256` pairs. Paths are relative to the
+package folder. The writer records `scene.json`, every mesh and texture, and any authored
+SOC companion in path order. An external receipt may list a subset of declared files.
+`digests.status` reports `absent`, `partial`, `verified` or `failed` independently of
+structural validation. A declared file that cannot be read is `unavailable`. A receipt
+row that the manifest does not declare is `unknown`. Older packages can be checked with
+an absent receipt.
+
+The built-in receipt records the generator name and version and the archive Build when
+available. A missing Build is `null`. Builds can supply an exact source revision through
+the compile-time `P4KX_SOURCE_REVISION` input, a full lowercase Git object ID. Official
+native builds take it from their checked-out source revision. The hash
+inventory establishes consistency of the package bytes. Its source metadata describes the
+exporting build and archive context. The source revision identifies the exporter code.
+Native release fixtures bind the complete package
+exchange separately to a workflow revision and the exporter binary digest.
 
 ## `scene.json`
 

@@ -127,7 +127,10 @@ fn a_character_with_animations_is_a_package_of_one_skinned_glb() -> TestResult {
     )?;
 
     assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
-    assert_eq!(names(&out)?, ["meshes", "scene.json", "textures"]);
+    assert_eq!(
+        names(&out)?,
+        ["meshes", "receipt.json", "scene.json", "textures"]
+    );
     assert_eq!(names(&out.join("meshes"))?, ["m0001.glb"]);
     assert!(run.stdout.contains("on the male body"), "{}", run.stdout);
     assert!(run.stdout.contains("2 animations"), "{}", run.stdout);

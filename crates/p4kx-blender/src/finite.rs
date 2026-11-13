@@ -142,7 +142,7 @@ fn clean_option_value(value: &mut Option<f32>) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::{clean_all, clean_each, clean_option, sanitise};
     use crate::build::{coordinates, generator};
     use crate::manifest::{
@@ -164,7 +164,7 @@ mod tests {
         }
     }
 
-    fn manifest(nodes: Vec<Node>) -> Manifest {
+    pub(crate) fn manifest(nodes: Vec<Node>) -> Manifest {
         Manifest {
             format: Format::P4kxBlenderPackage,
             version: FORMAT_VERSION.to_owned(),

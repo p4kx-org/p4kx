@@ -4,11 +4,13 @@
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+use crate::manifest::TEXTURES_FOLDER;
+use crate::package_receipt::PackageFile;
 use crate::texture_dds::{self, SourceFallback};
 use crate::texture_encoding::TextureMode;
 use crate::texture_source_metadata;
-use p4kx_extraction::OriginDigestWriter;
 use p4kx_extraction::texture_preview::ObservedModelDds;
+use p4kx_extraction::{OriginArtifactDigest, OriginDigestWriter};
 use p4kx_gltf::TextureLoader;
 use p4kx_texture::{DdsTransfer, RgbaImage, TextureError, write_png_with_transfer};
 use rayon::prelude::*;
@@ -36,7 +38,7 @@ pub(crate) enum Outcome {
     Written {
         width: u32,
         height: u32,
-        bytes: u64,
+        artifact: OriginArtifactDigest,
         colour_space: ColourSpace,
         encoding: TextureEncoding,
         alpha: AlphaMeaning,
@@ -49,6 +51,20 @@ pub(crate) enum Outcome {
         reason: String,
         dds: Option<DdsTextureFallback>,
     },
+}
+
+pub(crate) fn package_file(position: usize, outcome: &Outcome) -> Option<PackageFile> {
+    let Outcome::Written {
+        artifact, format, ..
+    } = outcome
+    else {
+        return None;
+    };
+    let id = id_of(position);
+    Some(PackageFile::new(
+        format!("{TEXTURES_FOLDER}/{id}.{}", format.extension()),
+        artifact,
+    ))
 }
 
 /// Returns the file name of the texture at position `index` of the wanted ones.
@@ -167,12 +183,8 @@ impl TextureOutput<'_, '_> {
             ),
             mode,
         );
-        let written = self.write(TextureFormat::Dds, |writer| {
-            let mut measured = OriginDigestWriter::new(writer);
-            observed.read.write_dds(&mut measured)?;
-            measured.finish().map_err(TextureError::Write)
-        })?;
-        let (artifact, bytes) = match written {
+        let written = self.write(TextureFormat::Dds, |writer| observed.read.write_dds(writer))?;
+        let artifact = match written {
             Ok(written) => written,
             Err(error) => {
                 return Ok(Self::failed(
@@ -181,11 +193,11 @@ impl TextureOutput<'_, '_> {
                 ));
             }
         };
-        let dds_asset = DdsTextureAsset::bind(observed, artifact, coverage)?;
+        let dds_asset = DdsTextureAsset::bind(observed, artifact.clone(), coverage)?;
         Ok(Outcome::Written {
             width,
             height,
-            bytes,
+            artifact,
             colour_space: mode.legacy_space(),
             encoding: mode.encoding(transfer),
             alpha,
@@ -225,14 +237,14 @@ impl TextureOutput<'_, '_> {
         let written = self.write(TextureFormat::Png, |writer| {
             write_png_with_transfer(&image, mode.tag(transfer), writer)
         })?;
-        let bytes = match written {
-            Ok(((), bytes)) => bytes,
+        let artifact = match written {
+            Ok(artifact) => artifact,
             Err(error) => return Ok(Self::failed(error.to_string(), fallback)),
         };
         Ok(Outcome::Written {
             width: image.width(),
             height: image.height(),
-            bytes,
+            artifact,
             colour_space: mode.legacy_space(),
             encoding: mode.encoding(transfer),
             alpha,
@@ -243,37 +255,34 @@ impl TextureOutput<'_, '_> {
         })
     }
 
-    fn write<T>(
+    fn write(
         &self,
         format: TextureFormat,
-        encode: impl FnOnce(&mut dyn Write) -> Result<T, TextureError>,
-    ) -> PackageResult<Result<(T, u64), TextureError>> {
+        encode: impl FnOnce(&mut dyn Write) -> Result<(), TextureError>,
+    ) -> PackageResult<Result<OriginArtifactDigest, TextureError>> {
         let path = self
             .folder
             .join(format!("{}.{}", self.id, format.extension()));
         let (file, ownership) = self.context.create_file(&path)?.into_parts();
-        let mut writer = BufWriter::new(file);
-        let encoded = match encode(&mut writer) {
-            Ok(encoded) => encoded,
+        let mut sink = BufWriter::new(file);
+        let mut writer = OriginDigestWriter::new(&mut sink);
+        match encode(&mut writer) {
+            Ok(()) => {}
             Err(TextureError::Write(source)) => return Err(PackageError::write(&path, source)),
             Err(error) => {
-                drop(writer);
+                drop(sink);
                 self.context.cleanup_file(&ownership, &path)?;
                 return Ok(Err(error));
             }
-        };
-        writer
-            .flush()
+        }
+        let artifact = writer
+            .finish()
             .map_err(|source| PackageError::write(&path, source))?;
         ownership.ensure_writable(&path, self.context.cancel_flag())?;
-        let file = writer.get_ref();
-        file.sync_all()
+        sink.get_ref()
+            .sync_all()
             .map_err(|source| PackageError::write(&path, source))?;
-        let bytes = file
-            .metadata()
-            .map_err(|source| PackageError::write(&path, source))?
-            .len();
-        Ok(Ok((encoded, bytes)))
+        Ok(Ok(artifact))
     }
 
     const fn alpha(has_samples: bool, mode: TextureMode) -> AlphaMeaning {

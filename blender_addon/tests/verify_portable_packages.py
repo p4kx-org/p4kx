@@ -18,7 +18,8 @@ sys.path.insert(0, str(HERE))
 
 from p4kx_importer import package  # noqa: E402
 from p4kx_importer.mesh_preflight import preflight_all_meshes  # noqa: E402
-from p4kx_importer.package_digests import file_sha256, is_sha256, read_expected  # noqa: E402
+from p4kx_importer.package_digests import RECEIPT_NAME, file_sha256, is_sha256, read_expected  # noqa: E402
+from p4kx_importer.validate_package import validate_package  # noqa: E402
 
 ARTIFACT_PREFIX = "p4kx-blender-package-"
 CASES = ("assembly", "livery")
@@ -82,7 +83,7 @@ def read_receipt(folder: Path, row: dict, revision: str, run_id: str) -> dict[st
     return hashes
 
 
-def manifests(folder: Path, hashes: dict[str, str]) -> dict[str, dict]:
+def manifests(folder: Path, hashes: dict[str, str], revision: str) -> dict[str, dict]:
     """Loads the package with the add-on and checks its complete referenced assets."""
     root = folder / "packages"
     require({entry.name for entry in root.iterdir()} == set(CASES), "Wrong fixture cases")
@@ -98,9 +99,12 @@ def manifests(folder: Path, hashes: dict[str, str]) -> dict[str, dict]:
                 problem.message() for problem in preflight.problems
             ),
         )
-        expected.add(f"{case}/scene.json")
-        expected.update(f"{case}/{asset.file}" for asset in loaded.meshes.values())
-        expected.update(f"{case}/{asset.file}" for asset in loaded.textures.values())
+        validation = validate_package(directory)
+        require(validation["digests"]["status"] == "verified", f"{case}: package receipt did not verify")
+        receipt = json.loads((directory / RECEIPT_NAME).read_text(encoding="utf-8"))
+        require(receipt["generator"].get("source_revision") == revision, f"{case}: package revision differs")
+        expected.add(f"{case}/{RECEIPT_NAME}")
+        expected.update(f"{case}/{name}" for name in validation["digests"]["verified"])
         documents[case] = json.loads((directory / "scene.json").read_text(encoding="utf-8"))
     require(expected == hashes.keys(), "Package assets differ from the exact manifest references")
     return documents
@@ -119,7 +123,7 @@ def verify_exchange(root: Path, rows: list[dict], revision: str, run_id: str) ->
         target = row["target"]
         folder = folders[target]
         require(folder.is_dir() and not folder.is_symlink() and not folder.is_junction(), f"{target}: wrong artifact folder")
-        documents = manifests(folder, read_receipt(folder, row, revision, run_id))
+        documents = manifests(folder, read_receipt(folder, row, revision, run_id), revision)
         if reference is None:
             reference = documents
         require(documents == reference, f"{target}: cross-target package manifest differs")

@@ -84,7 +84,10 @@ fn the_package_has_the_documented_layout_and_validates_against_the_schema() -> T
     )?;
 
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert_eq!(names(&out)?, ["meshes", "scene.json", "textures"]);
+    assert_eq!(
+        names(&out)?,
+        ["meshes", "receipt.json", "scene.json", "textures"]
+    );
     assert_eq!(
         names(&out.join("meshes"))?,
         ["m0001.glb", "m0002.glb", "m0003.glb", "m0004.glb"]
@@ -131,7 +134,7 @@ fn shared_meshes_are_written_once_and_the_json_report_says_so() -> TestResult {
     assert_eq!(report["meshes"], 4);
     assert_eq!(report["shared_meshes"], 3);
     assert_eq!(report["textures"], 1);
-    assert_eq!(report["files"], 6);
+    assert_eq!(report["files"], 7);
     assert_eq!(report["lod"], 0);
     let manifest = manifest(&out)?;
     let instances: Vec<u64> = manifest["meshes"]

@@ -6,13 +6,14 @@
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 from struct import pack_into
 
 import pytest
 
+from p4kx_importer.package_digests import RECEIPT_NAME, file_sha256
 from p4kx_importer.soc_scene import SOC_SCENE_FILE, SOC_SCENE_VERSION
-from p4kx_importer.package_digests import file_sha256
 from p4kx_importer.validate_package import main, validate_package
 from synthetic import glb, manifest, write_package
 from synthetic_soc_scene import scene as authored_scene
@@ -158,6 +159,71 @@ def test_rehashed_malformed_glb_remains_structurally_failed(tmp_path: Path) -> N
     assert result["digests"]["status"] == "verified"
 
 
+def test_default_receipt_is_portable_and_explicit_receipt_takes_precedence(tmp_path: Path) -> None:
+    folder = tmp_path / "original"
+    scene = write_package(folder)
+    names = sorted(path.relative_to(folder).as_posix() for path in folder.rglob("*") if path.is_file())
+    default = receipt_for(folder, folder / RECEIPT_NAME, names)
+    explicit = receipt_for(folder, tmp_path / "external.json", names)
+    first = validate_package(scene)
+    assert first["digests"]["status"] == "verified"
+    copied = tmp_path / "copied"
+    shutil.copytree(folder, copied)
+    assert first == validate_package(copied)
+
+    default.write_text("{}", encoding="utf-8")
+    assert validate_package(folder)["digests"]["status"] == "failed"
+    assert first == validate_package(folder, explicit)
+
+
+def test_default_receipt_detects_changed_missing_and_added_declared_files(tmp_path: Path) -> None:
+    data = manifest()
+    scene = write_package(tmp_path, data)
+    names = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*") if path.is_file())
+    receipt_for(tmp_path, tmp_path / RECEIPT_NAME, names)
+
+    texture = tmp_path / "textures/t0001.png"
+    texture.write_bytes(b"changed")
+    changed = validate_package(scene)
+    assert changed["digests"]["mismatches"] == ["textures/t0001.png"]
+    texture.unlink()
+    missing = validate_package(scene)
+    assert missing["structure"]["status"] == "failed"
+    assert missing["digests"]["status"] == "failed"
+    assert missing["digests"]["unavailable"] == ["textures/t0001.png"]
+    assert missing["digests"]["unknown"] == []
+
+    extra = {**data["textures"][0], "id": "t0003", "file": "textures/t0003.png"}
+    data["textures"].append(extra)
+    write_package(tmp_path, data)
+    added = validate_package(scene)
+    assert added["digests"]["status"] == "failed"
+    assert added["digests"]["mismatches"] == ["scene.json"]
+    assert added["digests"]["unrecorded"] == [extra["file"]]
+
+
+def test_default_receipt_refuses_a_directory_and_inexact_name(tmp_path: Path) -> None:
+    scene = write_package(tmp_path)
+    default = tmp_path / RECEIPT_NAME
+    default.mkdir()
+    assert validate_package(scene)["digests"]["status"] == "failed"
+    default.rmdir()
+    receipt_for(tmp_path, tmp_path / RECEIPT_NAME.upper(), ["scene.json"])
+    assert validate_package(scene)["digests"]["status"] == "failed"
+
+
+def test_default_receipt_refuses_a_symlink(tmp_path: Path) -> None:
+    folder = tmp_path / "package"
+    scene = write_package(folder)
+    default = folder / RECEIPT_NAME
+    external = receipt_for(folder, tmp_path / "external.json", ["scene.json"])
+    try:
+        default.symlink_to(external)
+    except OSError:
+        pytest.skip("symlinks are not available")
+    assert validate_package(scene)["digests"]["status"] == "failed"
+
+
 def test_digest_receipt_cannot_select_a_file_outside_package(tmp_path: Path) -> None:
     folder = tmp_path / "package"
     scene = write_package(folder)
@@ -168,6 +234,7 @@ def test_digest_receipt_cannot_select_a_file_outside_package(tmp_path: Path) -> 
     assert report["structure"]["status"] == "valid"
     assert report["digests"]["status"] == "failed"
     assert report["digests"]["unknown"] == ["../outside.bin"]
+    assert report["digests"]["unavailable"] == []
     assert report["digests"]["verified"] == ["scene.json"]
 
 

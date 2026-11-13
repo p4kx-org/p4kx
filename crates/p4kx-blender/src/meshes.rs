@@ -4,14 +4,23 @@
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+use p4kx_extraction::OriginDigestWriter;
+
 use p4kx_gltf::{GlbOptions, GlbSummary, GltfError, Scene, SceneNode, ScenePart, write_scene_glb};
 use p4kx_model::{Material, Transform};
 use rayon::prelude::*;
 
 use crate::items::Item;
+use crate::manifest::MESHES_FOLDER;
 use crate::mesh_options::package_mesh_options;
+use crate::package_receipt::PackageFile;
 use crate::plan::{MeshPlan, mesh_id};
 use crate::{PackageError, PackageResult, PackageWriteContext};
+
+pub(crate) struct WrittenMesh {
+    pub(crate) summary: GlbSummary,
+    pub(crate) file: PackageFile,
+}
 
 /// Writes the GLB file `<folder>/<id>.glb` of every distinct mesh of `plan`, in parallel.
 pub(crate) fn write_all(
@@ -21,7 +30,7 @@ pub(crate) fn write_all(
     folder: &Path,
     cancelled: &PackageWriteContext<'_>,
     fallback: Option<&Material>,
-) -> PackageResult<Vec<GlbSummary>> {
+) -> PackageResult<Vec<WrittenMesh>> {
     (0..plan.len())
         .into_par_iter()
         .map(|index| {
@@ -39,7 +48,7 @@ fn write_one(
     folder: &Path,
     context: &PackageWriteContext<'_>,
     fallback: Option<&Material>,
-) -> PackageResult<GlbSummary> {
+) -> PackageResult<WrittenMesh> {
     let id = mesh_id(index);
     let first = plan
         .first(index)
@@ -58,7 +67,8 @@ fn write_one(
             .push(node)
             .map_err(|source| mesh_error(&id, &name, source))?;
     }
-    let path = folder.join(format!("{id}.glb"));
+    let filename = format!("{id}.glb");
+    let path = folder.join(&filename);
     let mut glb = Vec::new();
     let summary = write_scene_glb(
         &scene,
@@ -67,17 +77,22 @@ fn write_one(
     )
     .map_err(|source| mesh_error(&id, &name, source))?;
     let (file, ownership) = context.create_file(&path)?.into_parts();
-    let mut writer = BufWriter::new(file);
+    let mut sink = BufWriter::new(file);
+    let mut writer = OriginDigestWriter::new(&mut sink);
     writer
         .write_all(&glb)
-        .and_then(|()| writer.flush())
+        .map_err(|source| PackageError::write(&path, source))?;
+    let digest = writer
+        .finish()
         .map_err(|source| PackageError::write(&path, source))?;
     ownership.ensure_writable(&path, context.cancel_flag())?;
-    writer
-        .get_ref()
+    sink.get_ref()
         .sync_all()
         .map_err(|source| PackageError::write(&path, source))?;
-    Ok(summary)
+    Ok(WrittenMesh {
+        summary,
+        file: PackageFile::new(format!("{MESHES_FOLDER}/{filename}"), &digest),
+    })
 }
 
 fn mesh_error(id: &str, name: &str, source: GltfError) -> PackageError {

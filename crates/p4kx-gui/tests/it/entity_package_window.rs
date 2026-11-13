@@ -138,7 +138,7 @@ fn the_export_writes_the_package_folder_reports_it_and_remembers_the_choices() -
     let summary = summary(&harness)?;
     let package = summary.package().ok_or("no package in the summary")?;
     assert_eq!(summary.parts(), 3, "the ship, the gun and the relay");
-    assert_eq!(package.files, package.meshes + package.textures + 1);
+    assert_eq!(package.files, package.meshes + package.textures + 2);
     assert!(package.meshes > 0, "{package:?}");
     assert_eq!(manifest(&folder)?["format"], "p4kx-blender-package");
     assert!(folder.join("meshes").is_dir());

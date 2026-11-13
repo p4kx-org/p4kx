@@ -142,7 +142,7 @@ fn a_character_is_a_folder_of_a_manifest_and_one_skinned_mesh() -> TestResult {
 
     assert_eq!(
         names_in(&written.out)?,
-        ["meshes", "scene.json", "textures"]
+        ["meshes", "receipt.json", "scene.json", "textures"]
     );
     assert_eq!(names_in(&written.out.join("meshes"))?, ["m0001.glb"]);
     assert_eq!(names_in(&written.out.join("textures"))?.len(), 0);
@@ -251,7 +251,7 @@ fn the_rig_lists_the_parts_morph_targets_and_animations_the_glb_holds() -> TestR
     assert_eq!(written.summary.animations(), 2);
     assert_eq!(written.summary.bones, rig.bones);
     assert_eq!(written.summary.morph_targets, rig.morph_targets);
-    assert_eq!(written.summary.files, 2);
+    assert_eq!(written.summary.files, 3);
     Ok(())
 }
 

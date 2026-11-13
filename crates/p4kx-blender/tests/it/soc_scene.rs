@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::path::Path;
+
 use p4kx_assembly::{ArchiveModels, Interior, InteriorOptions, SocContainerCapture};
 use p4kx_blender::{
     InteriorScene, PackageError, PackageInfo, SocScene, manifest_schema, soc_scene_schema,
@@ -235,7 +237,7 @@ fn authored_soc_package_is_staged_and_replaceable_as_one_package() -> TestResult
     let baseline = write(&plain)?;
     let read_manifest =
         || -> TestResult<Value> { Ok(serde_json::from_slice(&std::fs::read(&manifest_path)?)?) };
-    let baseline_manifest_bytes = std::fs::metadata(&manifest_path)?.len();
+    let baseline_metadata_bytes = package_metadata_bytes(&target)?;
     let before = read_manifest()?;
     assert!(
         before.get("authored_soc").is_none(),
@@ -256,18 +258,39 @@ fn authored_soc_package_is_staged_and_replaceable_as_one_package() -> TestResult
     let bytes = std::fs::read(&sidecar)?;
     let sidecar_len = u64::try_from(bytes.len())?;
     verify_package_schemas(&bytes, &manifest)?;
-    let authored_manifest_bytes = std::fs::metadata(&manifest_path)?.len();
+    let authored_metadata_bytes = package_metadata_bytes(&target)?;
+    verify_receipt_member(&target, relative)?;
     assert_eq!(
         authored.files,
         baseline.files + 1,
         "one companion file is counted"
     );
     assert_eq!(
-        authored.bytes + baseline_manifest_bytes,
-        baseline.bytes + authored_manifest_bytes + sidecar_len,
+        authored.bytes + baseline_metadata_bytes,
+        baseline.bytes + authored_metadata_bytes + sidecar_len,
         "companion bytes are counted"
     );
     verify_package_replacement(&target, &sidecar, || write(&plain), || write(&with_soc))
+}
+
+fn package_metadata_bytes(root: &Path) -> TestResult<u64> {
+    Ok(std::fs::metadata(root.join("scene.json"))?.len()
+        + std::fs::metadata(root.join("receipt.json"))?.len())
+}
+
+fn verify_receipt_member(root: &Path, relative: &str) -> TestResult {
+    let receipt: Value = serde_json::from_slice(&std::fs::read(root.join("receipt.json"))?)?;
+    let files = receipt
+        .get("files")
+        .and_then(Value::as_array)
+        .ok_or("receipt files")?;
+    assert!(
+        files
+            .iter()
+            .any(|row| row.get("path").and_then(Value::as_str) == Some(relative)),
+        "the receipt covers the declared companion"
+    );
+    Ok(())
 }
 
 fn verify_package_schemas(bytes: &[u8], manifest: &Value) -> TestResult {
@@ -284,8 +307,8 @@ fn verify_package_schemas(bytes: &[u8], manifest: &Value) -> TestResult {
 }
 
 fn verify_package_replacement(
-    target: &std::path::Path,
-    sidecar: &std::path::Path,
+    target: &Path,
+    sidecar: &Path,
     plain: impl Fn() -> Result<p4kx_blender::PackageSummary, PackageError>,
     authored: impl FnOnce() -> Result<p4kx_blender::PackageSummary, PackageError>,
 ) -> TestResult {

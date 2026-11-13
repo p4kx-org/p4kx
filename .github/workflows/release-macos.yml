@@ -69,6 +69,8 @@ jobs:
           .github/scripts/test-macos-package-evidence.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'evidence-contract')
       - name: Build the three native release applications
         run: |
+          . .github/scripts/package-source-revision.ps1
+          $env:P4KX_SOURCE_REVISION = Get-P4kxPackageSourceRevision
           cargo build --release --locked --target $env:P4KX_TARGET -p p4kx -p p4kx-gui -p p4kx-mcp
           if ($LASTEXITCODE -ne 0) { throw 'Native macOS release build failed.' }
           $fixture = Join-Path $env:P4KX_PACKAGE_TASK 'fixture'

@@ -9,6 +9,7 @@
 //! ```text
 //! <package>/
 //!   scene.json        the manifest: version, source, node hierarchy, meshes, textures, issues
+//!   receipt.json      package-relative SHA-256 checksums and generator identity
 //!   meshes/m0001.glb  one GLB per distinct mesh set (model, material library and palette)
 //!   textures/t0001.png  one PNG per distinct texture of the materials
 //! ```
@@ -41,6 +42,7 @@ mod owned_output_tests;
 mod package_default_material;
 mod package_destination;
 mod package_paths;
+mod package_receipt;
 mod package_replacement;
 mod package_soc_scene;
 mod package_write_context;

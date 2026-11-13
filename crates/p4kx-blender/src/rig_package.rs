@@ -8,18 +8,19 @@ use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
 use crate::mesh_options::package_mesh_options;
+use p4kx_extraction::OriginDigestWriter;
 use p4kx_gltf::{GlbOptions, GlbSummary, GltfError};
 
 use crate::build::{coordinates, generator};
 use crate::finite::sanitise;
 use crate::manifest::{
-    FORMAT_VERSION, Format, Issue, IssueOrigin, MANIFEST_FILE, MESHES_FOLDER, Manifest, Mesh, Node,
-    Options, Source,
+    FORMAT_VERSION, Format, Issue, IssueOrigin, MESHES_FOLDER, Manifest, Mesh, Node, Options,
+    Source,
 };
 use crate::manifest_rig::Rig;
+use crate::package_receipt::{self, PackageFile, PackageTotals};
 use crate::plan::mesh_id;
 use crate::stage::Staging;
-use crate::write::write_manifest;
 use crate::{PackageError, PackageInfo, PackageResult, PackageSummary, PackageWriteContext};
 
 /// What the manifest of a rigged package says besides the file's size: where it comes from, the
@@ -108,7 +109,8 @@ impl<W: Write> Write for Stoppable<'_, W> {
 }
 
 /// The file a rigged mesh is written to.
-pub(crate) type RigWriter<'a> = Stoppable<'a, BufWriter<File>>;
+pub(crate) type RigWriter<'a, 'sink> =
+    Stoppable<'a, OriginDigestWriter<&'sink mut BufWriter<File>>>;
 
 /// Writes a package into the folder `out` whose only mesh, `meshes/m0001.glb`, `write_glb` writes
 /// to the writer it is given with the GLB options of a package mesh (`options` with the vertex
@@ -121,7 +123,7 @@ pub(crate) fn write_rig_package(
     name: &str,
     options: &GlbOptions,
     cancelled: &PackageWriteContext<'_>,
-    write_glb: impl FnOnce(&GlbOptions, &mut RigWriter<'_>) -> Result<GlbSummary, GltfError>,
+    write_glb: impl FnOnce(&GlbOptions, &mut RigWriter<'_, '_>) -> Result<GlbSummary, GltfError>,
     manifest_of: impl FnOnce(&GlbSummary) -> Manifest,
 ) -> PackageResult<PackageSummary> {
     let staging = Staging::create(out, *cancelled)?;
@@ -141,35 +143,36 @@ fn write_rig_files(
     name: &str,
     options: &GlbOptions,
     cancelled: &PackageWriteContext<'_>,
-    write_glb: impl FnOnce(&GlbOptions, &mut RigWriter<'_>) -> Result<GlbSummary, GltfError>,
+    write_glb: impl FnOnce(&GlbOptions, &mut RigWriter<'_, '_>) -> Result<GlbSummary, GltfError>,
     manifest_of: impl FnOnce(&GlbSummary) -> Manifest,
 ) -> PackageResult<PackageSummary> {
     cancelled.check()?;
     let id = mesh_id(0);
-    let path = staging.join(MESHES_FOLDER).join(format!("{id}.glb"));
+    let relative = format!("{MESHES_FOLDER}/{id}.glb");
+    let path = staging.join(&relative);
     let (file, ownership) = cancelled.create_file(&path)?.into_parts();
+    let mut sink = BufWriter::new(file);
     let mut writer = Stoppable {
-        inner: BufWriter::new(file),
+        inner: OriginDigestWriter::new(&mut sink),
         cancelled,
     };
     let written = write_glb(&package_mesh_options(options), &mut writer)
         .map_err(|error| glb_error(error, &path, (&id, name), cancelled))?;
-    writer
-        .flush()
-        .map_err(|source| flush_error(source, &path, cancelled))?;
-    let file = writer
+    let digest = writer
         .inner
-        .into_inner()
-        .map_err(|error| PackageError::write(&path, error.into_error()))?;
+        .finish()
+        .map_err(|source| flush_error(source, &path, cancelled))?;
     ownership.ensure_writable(&path, cancelled.cancel_flag())?;
-    file.sync_all()
+    sink.get_ref()
+        .sync_all()
         .map_err(|source| PackageError::write(&path, source))?;
-    drop(file);
+    drop(sink);
     cancelled.check()?;
     let mut manifest = manifest_of(&written);
     sanitise(&mut manifest);
-    let manifest_len = write_manifest(&staging.join(MANIFEST_FILE), &manifest, cancelled)?;
-    let summary = summarise(&manifest, &written, manifest_len);
+    let files = vec![PackageFile::new(relative, &digest)];
+    let totals = package_receipt::write_metadata(staging, &manifest, files, cancelled)?;
+    let summary = summarise(&manifest, &written, totals);
     cancelled.check()?;
     Ok(summary)
 }
@@ -202,14 +205,14 @@ fn flush_error(
     }
 }
 
-fn summarise(manifest: &Manifest, written: &GlbSummary, manifest_len: u64) -> PackageSummary {
+fn summarise(manifest: &Manifest, written: &GlbSummary, totals: PackageTotals) -> PackageSummary {
     PackageSummary {
         nodes: manifest.nodes.len(),
         drawn_nodes: 1,
         meshes: 1,
         materials: written.materials,
-        files: 2,
-        bytes: manifest_len + written.bytes,
+        files: totals.files,
+        bytes: totals.bytes,
         vertices: written.vertices,
         triangles: written.triangles,
         lod_fallbacks: written.lod_fallbacks,

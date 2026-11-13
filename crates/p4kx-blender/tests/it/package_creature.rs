@@ -117,7 +117,7 @@ fn a_creature_with_its_skeleton_is_one_skinned_rig_mesh() -> TestResult {
     let glb = glb_of(&written.out, &mesh.file)?;
     assert_eq!(glb.document.skins().len(), 1);
     assert_eq!(written.summary.bones, 3);
-    assert_eq!(written.summary.files, 2);
+    assert_eq!(written.summary.files, 3);
     Ok(())
 }
 

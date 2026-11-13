@@ -58,6 +58,8 @@ jobs:
           nextest: "true"
       - name: Build all shipped native release applications
         run: |
+          . .github/scripts/package-source-revision.ps1
+          $env:P4KX_SOURCE_REVISION = Get-P4kxPackageSourceRevision
           cargo build --release --locked --target $env:P4KX_TARGET -p p4kx -p p4kx-gui -p p4kx-mcp
           if ($LASTEXITCODE -ne 0) { throw 'Native release build failed.' }
       - name: Write unencrypted synthetic runtime fixture

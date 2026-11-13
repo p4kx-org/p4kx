@@ -6,10 +6,13 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
+import stat
 from pathlib import Path
 from typing import Any
 
+RECEIPT_NAME = "receipt.json"
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 
 
@@ -24,24 +27,46 @@ def file_sha256(path: Path) -> str:
         return hashlib.file_digest(stream, "sha256").hexdigest()
 
 
-def verify_digests(files: dict[str, Path], expected: dict[str, str] | None) -> dict[str, Any]:
+def default_receipt(root: Path) -> Path | None:
+    """Finds a fixed-name regular package receipt using exact spelling."""
+    try:
+        names = [entry.name for entry in root.iterdir() if entry.name.casefold() == RECEIPT_NAME]
+    except FileNotFoundError:
+        return None
+    if not names:
+        return None
+    if names != [RECEIPT_NAME]:
+        raise ValueError("The package digest receipt must use the exact declared spelling.")
+    path = root / RECEIPT_NAME
+    metadata = path.lstat()
+    redirected = getattr(metadata, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT
+    if not stat.S_ISREG(metadata.st_mode) or redirected:
+        raise ValueError("The package digest receipt is not a regular file.")
+    return path
+
+
+def verify_digests(
+    declared: set[str], files: dict[str, Path], expected: dict[str, str]
+) -> dict[str, Any]:
     """Reports verified, missing, mismatching and unknown digest entries."""
-    if expected is None:
-        return {"status": "absent"}
     verified: list[str] = []
     mismatches: list[str] = []
     unavailable: list[str] = []
     for name, digest in sorted(expected.items()):
-        if name not in files:
+        if name not in declared:
+            continue
+        path = files.get(name)
+        if path is None:
+            unavailable.append(name)
             continue
         try:
-            actual = file_sha256(files[name])
+            actual = file_sha256(path)
         except OSError:
             unavailable.append(name)
             continue
         (verified if actual == digest else mismatches).append(name)
-    absent = sorted(files.keys() - expected.keys())
-    unknown = sorted(expected.keys() - files.keys())
+    absent = sorted(declared - expected.keys())
+    unknown = sorted(expected.keys() - declared)
     status = "verified"
     if mismatches or unknown or unavailable:
         status = "failed"
@@ -55,6 +80,12 @@ def verify_digests(files: dict[str, Path], expected: dict[str, str] | None) -> d
         "unknown": unknown,
         "unavailable": unavailable,
     }
+
+
+def load_expected(receipt: Path) -> dict[str, str]:
+    """Loads digest rows from a receipt selected by the caller or the package."""
+    with receipt.open("rb") as stream:
+        return read_expected(json.load(stream))
 
 
 def read_expected(document: object) -> dict[str, str]:

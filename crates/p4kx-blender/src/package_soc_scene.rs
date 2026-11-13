@@ -6,6 +6,7 @@ use std::path::Path;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::package_receipt::{self, PackageFile};
 use crate::{PackageResult, PackageWriteContext, SOC_SCENE_VERSION, SocScene};
 
 pub(crate) const DIRECTORY: &str = "authored";
@@ -39,7 +40,8 @@ pub(crate) fn write(
     staging: &Path,
     scene: &SocScene,
     context: &PackageWriteContext<'_>,
-) -> PackageResult<u64> {
+) -> PackageResult<PackageFile> {
     let _ = context.create_directory(&staging.join(DIRECTORY))?;
-    crate::write::write_json(&staging.join(SCENE_FILE), scene, context, false)
+    let digest = package_receipt::write_json(&staging.join(SCENE_FILE), scene, context, false)?;
+    Ok(PackageFile::new(SCENE_FILE.to_owned(), &digest))
 }

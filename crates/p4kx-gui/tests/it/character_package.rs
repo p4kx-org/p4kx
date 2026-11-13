@@ -155,7 +155,10 @@ fn the_package_holds_the_skinned_character_and_is_reported() -> TestResult {
     assert_eq!(summary.file(), folder);
     assert_eq!(package.bones, 3, "the male skeleton");
     assert!(package.morph_targets >= 2, "{package:?}");
-    assert_eq!(package.files, 2, "the manifest and the Character");
+    assert_eq!(
+        package.files, 3,
+        "the manifest, the receipt and the Character"
+    );
 
     let manifest = manifest(&folder)?;
     assert_eq!(manifest["format"], "p4kx-blender-package");

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::Issue as AssemblyIssue;
-use p4kx_gltf::{DrawnMaterial, GlbOptions, GlbSummary, TextureFile};
+use p4kx_gltf::{DrawnMaterial, GlbOptions, TextureFile};
 
 use crate::PackageInfo;
 use crate::collect::{Collected, id_of as material_id};
@@ -28,7 +28,7 @@ pub(crate) struct Inputs<'a> {
     pub(crate) plan: &'a MeshPlan,
     pub(crate) collected: &'a Collected,
     pub(crate) outcomes: &'a [Outcome],
-    pub(crate) meshes: &'a [GlbSummary],
+    pub(crate) meshes: &'a [crate::meshes::WrittenMesh],
 }
 
 /// Builds the manifest of a package whose files are written.
@@ -109,7 +109,8 @@ fn meshes(inputs: &Inputs<'_>) -> Vec<Mesh> {
         .meshes
         .iter()
         .enumerate()
-        .map(|(index, summary)| {
+        .map(|(index, written)| {
+            let summary = &written.summary;
             let mesh = index;
             let first = inputs
                 .plan

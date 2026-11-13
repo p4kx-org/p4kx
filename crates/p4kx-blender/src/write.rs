@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{BufWriter, Write};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
@@ -15,13 +14,13 @@ use crate::creature::write_creature_package;
 use crate::finite::sanitise;
 use crate::items::{Item, entity_ref, items};
 use crate::manifest::{
-    BuildInfo, EntityRef, Issue, MANIFEST_FILE, MESHES_FOLDER, NodeKind, Replacement,
-    TEXTURES_FOLDER,
+    BuildInfo, EntityRef, Issue, MESHES_FOLDER, NodeKind, Replacement, TEXTURES_FOLDER,
 };
+use crate::package_receipt::{self, PackageFile};
 use crate::plan::MeshPlan;
 use crate::stage::Staging;
 use crate::textures::{self, Outcome};
-use crate::{PackageError, PackageResult, PackageWriteContext, meshes};
+use crate::{PackageResult, PackageWriteContext, meshes};
 
 /// What the package records about where the Assembly comes from and how it was chosen.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -86,7 +85,7 @@ pub struct PackageSummary {
     pub materials: usize,
     /// The number of tint palettes.
     pub palettes: usize,
-    /// The number of files in the package: the manifest, the meshes and the textures.
+    /// The number of files in the package, including metadata and optional companions.
     pub files: usize,
     /// The size of all files in bytes.
     pub bytes: u64,
@@ -282,62 +281,40 @@ fn write_scene_files(
         outcomes: &outcomes,
         meshes: &written,
     });
-    let authored_soc_bytes = scene
+    let authored_soc_file = scene
         .authored_soc
         .map(|authored| crate::package_soc_scene::write(staging, authored, context))
         .transpose()?;
-    if authored_soc_bytes.is_some() {
+    if authored_soc_file.is_some() {
         manifest.authored_soc = Some(crate::package_soc_scene::ManifestSocScene::new());
     }
     manifest.default_material = fallback.as_deref().map(ArchiveDefaultMaterial::receipt);
     sanitise(&mut manifest);
-    let manifest_len = write_manifest(&staging.join(MANIFEST_FILE), &manifest, context)?;
-    let mut summary = summarise(&manifest, &outcomes, &written, manifest_len);
-    if let Some(bytes) = authored_soc_bytes {
-        summary.files += 1;
-        summary.bytes += bytes;
-    }
+    let mut summary = summarise(&manifest, &outcomes, &written);
+    let files = package_files(written, &outcomes, authored_soc_file);
+    let totals = package_receipt::write_metadata(staging, &manifest, files, context)?;
+    summary.files = totals.files;
+    summary.bytes = totals.bytes;
     context.check()?;
     Ok(summary)
 }
 
-pub(crate) fn write_manifest(
-    path: &Path,
-    manifest: &crate::Manifest,
-    context: &PackageWriteContext<'_>,
-) -> PackageResult<u64> {
-    write_json(path, manifest, context, true)
-}
-
-pub(crate) fn write_json(
-    path: &Path,
-    data: &impl serde::Serialize,
-    context: &PackageWriteContext<'_>,
-    pretty: bool,
-) -> PackageResult<u64> {
-    let (file, ownership) = context.create_file(path)?.into_parts();
-    let mut writer = BufWriter::new(file);
-    let result = if pretty {
-        serde_json::to_writer_pretty(&mut writer, data)
-    } else {
-        serde_json::to_writer(&mut writer, data)
-    };
-    result.map_err(|error| PackageError::write(path, error.into()))?;
-    writer
-        .write_all(b"\n")
-        .and_then(|()| writer.flush())
-        .map_err(|source| PackageError::write(path, source))?;
-    let file = writer
-        .into_inner()
-        .map_err(|error| PackageError::write(path, error.into_error()))?;
-    ownership.ensure_writable(path, context.cancel_flag())?;
-    file.sync_all()
-        .map_err(|source| PackageError::write(path, source))?;
-    let len = file
-        .metadata()
-        .map_err(|source| PackageError::write(path, source))?
-        .len();
-    Ok(len)
+fn package_files(
+    meshes: Vec<meshes::WrittenMesh>,
+    outcomes: &[Outcome],
+    authored_soc: Option<PackageFile>,
+) -> Vec<PackageFile> {
+    meshes
+        .into_iter()
+        .map(|mesh| mesh.file)
+        .chain(
+            outcomes
+                .iter()
+                .enumerate()
+                .filter_map(|(position, outcome)| textures::package_file(position, outcome)),
+        )
+        .chain(authored_soc)
+        .collect()
 }
 
 fn count(manifest: &crate::Manifest, kind: NodeKind) -> usize {
@@ -351,8 +328,7 @@ fn count(manifest: &crate::Manifest, kind: NodeKind) -> usize {
 fn summarise(
     manifest: &crate::Manifest,
     outcomes: &[Outcome],
-    meshes: &[p4kx_gltf::GlbSummary],
-    manifest_len: u64,
+    meshes: &[meshes::WrittenMesh],
 ) -> PackageSummary {
     let mut summary = PackageSummary {
         nodes: manifest.nodes.len(),
@@ -368,27 +344,18 @@ fn summarise(
         textures: manifest.textures.len(),
         materials: manifest.materials.len(),
         palettes: manifest.palettes.len(),
-        files: 1 + manifest.meshes.len() + manifest.textures.len(),
-        bytes: manifest_len,
         issues: manifest.issues.clone(),
         ..PackageSummary::default()
     };
     summary.shared_meshes = summary.drawn_nodes.saturating_sub(summary.meshes);
     for mesh in meshes {
-        summary.bytes += mesh.bytes;
-        summary.vertices += mesh.vertices;
-        summary.triangles += mesh.triangles;
-        summary.lod_fallbacks += mesh.lod_fallbacks;
+        summary.vertices += mesh.summary.vertices;
+        summary.triangles += mesh.summary.triangles;
+        summary.lod_fallbacks += mesh.summary.lod_fallbacks;
     }
     for outcome in outcomes {
         match outcome {
-            Outcome::Written {
-                width,
-                height,
-                bytes,
-                ..
-            } => {
-                summary.bytes += bytes;
+            Outcome::Written { width, height, .. } => {
                 summary.texture_pixels += u64::from(*width) * u64::from(*height);
             }
             Outcome::Failed { .. } => summary.texture_failures += 1,

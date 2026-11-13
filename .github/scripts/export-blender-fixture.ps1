@@ -8,6 +8,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'native-evidence.ps1')
 . (Join-Path $PSScriptRoot 'binary-machine.ps1')
+. (Join-Path $PSScriptRoot 'package-source-revision.ps1')
 
 $platform = Get-P4kxPlatform -Target $Target
 Assert-P4kxNativeHost -Platform $platform
@@ -66,15 +67,12 @@ foreach ($folder in $env:P4KX_LAUNCHER_DIR, $env:TMP) {
 }
 
 Push-Location -LiteralPath $repository
+$previousSourceRevision = $env:P4KX_SOURCE_REVISION
 try {
-    $revision = @(& git rev-parse HEAD)
-    if ($LASTEXITCODE -ne 0 -or $revision.Count -ne 1 -or
-        $revision[0] -cnotmatch '^(?:[0-9a-f]{40}|[0-9a-f]{64})$' -or
-        ($env:GITHUB_SHA -and $env:GITHUB_SHA -cne $revision[0])) {
-        throw 'Blender fixture producer requires the checked-out workflow revision.'
-    }
+    $revision = Get-P4kxPackageSourceRevision
     cargo run --locked --target $Target -p p4kx-testkit --example blender_consumer_fixture -- $fixtures
     if ($LASTEXITCODE -ne 0) { throw 'Synthetic Blender source fixture generation failed.' }
+    $env:P4KX_SOURCE_REVISION = $revision
     cargo build --locked --target $Target -p p4kx --bin p4kx
     if ($LASTEXITCODE -ne 0) { throw 'Native P4KX CLI build failed.' }
     $metadata = & cargo metadata --locked --no-deps --format-version 1
@@ -97,7 +95,7 @@ try {
 
     [ordered]@{
         schema = 1
-        revision = $revision[0]
+        revision = $revision
         run_id = $RunId
         target = $Target
         os = $platform.os
@@ -107,5 +105,6 @@ try {
     } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $artifact 'receipt.json') -Encoding utf8NoBOM
     Write-Output "Produced $($files.Count) deterministic Blender fixture files on $Target."
 } finally {
+    $env:P4KX_SOURCE_REVISION = $previousSourceRevision
     Pop-Location
 }

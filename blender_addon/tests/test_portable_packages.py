@@ -9,13 +9,24 @@ from pathlib import Path
 
 import pytest
 
+from p4kx_importer.package_digests import RECEIPT_NAME
 from synthetic import manifest, write_package
+from test_validate_package import receipt_for
 from verify_portable_packages import ARTIFACT_PREFIX, CASES, verify_exchange
 
 REVISION = "a" * 40
 RUN = "1019"
 WINDOWS = {"target": "x86_64-pc-windows-msvc", "os": "windows", "arch": "amd64"}
 LINUX = {"target": "aarch64-unknown-linux-gnu", "os": "linux", "arch": "arm64"}
+
+
+def write_fixture_package(folder: Path, data=None) -> None:
+    write_package(folder, data)
+    names = [path.relative_to(folder).as_posix() for path in folder.rglob("*") if path.is_file()]
+    receipt = receipt_for(folder, folder / RECEIPT_NAME, sorted(set(names) - {RECEIPT_NAME}))
+    document = json.loads(receipt.read_text(encoding="utf-8"))
+    document["generator"] = {"source_revision": REVISION}
+    receipt.write_text(json.dumps(document), encoding="utf-8")
 
 
 def write_receipt(folder: Path, row: dict, **changes) -> None:
@@ -44,7 +55,7 @@ def exchange(tmp_path: Path) -> Path:
     for row in (WINDOWS, LINUX):
         folder = tmp_path / (ARTIFACT_PREFIX + row["target"])
         for case in CASES:
-            write_package(folder / "packages" / case)
+            write_fixture_package(folder / "packages" / case)
         write_receipt(folder, row)
     return tmp_path
 
@@ -92,7 +103,7 @@ def test_rejects_semantics_that_differ_between_native_targets(exchange: Path) ->
     folder = exchange / (ARTIFACT_PREFIX + LINUX["target"])
     data = manifest()
     data["nodes"][0]["name"] = "Other original name"
-    write_package(folder / "packages/assembly", data)
+    write_fixture_package(folder / "packages/assembly", data)
     write_receipt(folder, LINUX)
     with pytest.raises(ValueError, match="cross-target package manifest differs"):
         verify_exchange(exchange, [WINDOWS, LINUX], REVISION, RUN)

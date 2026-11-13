@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::BTreeSet;
 use std::ffi::{OsStr, OsString};
 use std::fs::{self, File};
 use std::io::{self, BufReader, Read};
@@ -8,7 +9,11 @@ use std::path::Path;
 
 use serde::Deserialize;
 
+use p4kx_guard::is_redirected_metadata;
+
+use crate::TextureFormat;
 use crate::manifest::{FORMAT, MANIFEST_FILE, MESHES_FOLDER, TEXTURES_FOLDER};
+use crate::package_receipt::RECEIPT_FILE;
 use crate::{ManifestSocScene, PackageError, PackageResult, package_soc_scene};
 
 const MAX_MARKER_LEN: u64 = 1 << 30;
@@ -18,6 +23,14 @@ const MIN_ID_DIGITS: usize = 4;
 struct Marker {
     format: String,
     authored_soc: Option<ManifestSocScene>,
+    #[serde(default)]
+    textures: Vec<TextureMarker>,
+}
+
+#[derive(Deserialize)]
+struct TextureMarker {
+    file: String,
+    format: Option<TextureFormat>,
 }
 
 pub(crate) fn check_shape(out: &Path) -> PackageResult<()> {
@@ -49,6 +62,7 @@ fn check_replaceable(out: &Path) -> PackageResult<()> {
     let marker = read_marker(&out.join(MANIFEST_FILE)).ok_or_else(not_a_package)?;
     let known = [
         MANIFEST_FILE,
+        RECEIPT_FILE,
         MESHES_FOLDER,
         TEXTURES_FOLDER,
         package_soc_scene::DIRECTORY,
@@ -59,28 +73,49 @@ fn check_replaceable(out: &Path) -> PackageResult<()> {
     {
         return Err(not_a_package());
     }
-    for (folder, prefix, extension) in [(MESHES_FOLDER, 'm', "glb"), (TEXTURES_FOLDER, 't', "png")]
-    {
-        let path = out.join(folder);
-        match fs::symlink_metadata(&path) {
-            Ok(metadata) if metadata.is_dir() => {}
-            Ok(_) => return Err(not_a_package()),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
-            Err(source) => return Err(io_error(&path, source)),
-        }
-        let files = names_in(&path).map_err(|source| io_error(&path, source))?;
-        if !files
-            .iter()
-            .all(|name| is_id_file(name, prefix, extension) && is_plain_file(&path.join(name)))
-        {
-            return Err(not_a_package());
-        }
+    if names.iter().any(|name| name == RECEIPT_FILE) && !is_plain_file(&out.join(RECEIPT_FILE)) {
+        return Err(not_a_package());
+    }
+    if !matches_asset_folders(out, &marker)? {
+        return Err(not_a_package());
     }
     let authored = out.join(package_soc_scene::DIRECTORY);
     if !matches_soc_companion(out, &authored, marker.authored_soc.as_ref())? {
         return Err(not_a_package());
     }
     Ok(())
+}
+
+fn matches_asset_folders(out: &Path, marker: &Marker) -> PackageResult<bool> {
+    let texture_prefix = format!("{TEXTURES_FOLDER}/");
+    let dds_names: BTreeSet<_> = marker
+        .textures
+        .iter()
+        .filter(|texture| texture.format == Some(TextureFormat::Dds))
+        .filter_map(|texture| texture.file.strip_prefix(&texture_prefix))
+        .collect();
+    for (folder, prefix, extension) in [
+        (MESHES_FOLDER, 'm', "glb"),
+        (TEXTURES_FOLDER, 't', TextureFormat::Png.extension()),
+    ] {
+        let path = out.join(folder);
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) if metadata.is_dir() => {}
+            Ok(_) => return Ok(false),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => continue,
+            Err(source) => return Err(PackageError::write(&path, source)),
+        }
+        let files = names_in(&path).map_err(|source| PackageError::write(&path, source))?;
+        if !files.iter().all(|name| {
+            let declared_dds = folder == TEXTURES_FOLDER
+                && is_id_file(name, prefix, TextureFormat::Dds.extension())
+                && name.to_str().is_some_and(|text| dds_names.contains(text));
+            (is_id_file(name, prefix, extension) || declared_dds) && is_plain_file(&path.join(name))
+        }) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 fn names_in(folder: &Path) -> io::Result<Vec<OsString>> {
@@ -90,7 +125,8 @@ fn names_in(folder: &Path) -> io::Result<Vec<OsString>> {
 }
 
 fn is_plain_file(path: &Path) -> bool {
-    fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_file())
+    fs::symlink_metadata(path)
+        .is_ok_and(|metadata| metadata.is_file() && !is_redirected_metadata(&metadata))
 }
 
 fn is_id_file(name: &OsStr, prefix: char, extension: &str) -> bool {

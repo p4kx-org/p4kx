@@ -31,7 +31,7 @@ fn files_below(folder: &Path) -> package_fault::Result<Vec<(PathBuf, u64)>> {
     Ok(found)
 }
 
-fn textures(built: &Built) -> package_fault::Result<()> {
+fn textures(built: &Built) -> package_fault::Result<usize> {
     let mut sources = HashSet::new();
     for texture in array(&built.manifest, "textures")? {
         let file = texture["file"].as_str().ok_or(Check::ManifestField)?;
@@ -47,7 +47,8 @@ fn textures(built: &Built) -> package_fault::Result<()> {
             .as_str()
             .is_some_and(|reason| reason.contains("budget"))
     });
-    package_fault::require(!spent, Check::LayerBudget)
+    package_fault::require(!spent, Check::LayerBudget)?;
+    Ok(sources.len())
 }
 
 pub(crate) fn verify(built: &Built) -> package_fault::Result<Measured> {
@@ -64,13 +65,13 @@ pub(crate) fn verify(built: &Built) -> package_fault::Result<Measured> {
         bytes,
         mesh_bytes: 0,
         meshes: 0,
+        textures: textures(built)?,
         instances: 0,
         undeduplicated_mesh_bytes: 0,
     };
     for mesh in array(&built.manifest, "meshes")? {
         measure_mesh(built, mesh, &mut measured)?;
     }
-    textures(built)?;
     for (key, counted) in [("files", measured.files as u64), ("bytes", bytes)] {
         package_fault::require(
             built.report.get(key).and_then(Value::as_u64) == Some(counted),
@@ -121,7 +122,7 @@ fn report(built: &Built, measured: &Measured) -> package_fault::Result<()> {
         measured.sharing(),
         measured.mesh_bytes,
         measured.mesh_ratio(),
-        array(&built.manifest, "textures")?.len(),
+        measured.textures,
         array(&built.manifest, "issues")?.len(),
         built.elapsed.as_millis()
     );

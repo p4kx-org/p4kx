@@ -28,7 +28,7 @@ const MIN_SHARING: f64 = 0.3;
 const MIN_SHIP_TEXTURES: usize = 100;
 
 fn shared(built: &Built, measured: &Measured) -> TestResult {
-    package_fault::require(measured.textures() >= MIN_SHIP_TEXTURES, Check::Textures)?;
+    package_fault::require(measured.textures >= MIN_SHIP_TEXTURES, Check::Textures)?;
     package_fault::require(
         built.report.get("drawn_nodes").and_then(Value::as_u64) == Some(measured.instances),
         Check::MeshInstances,
