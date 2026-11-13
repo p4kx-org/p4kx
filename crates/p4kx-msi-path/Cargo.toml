@@ -23,16 +23,18 @@ required-features = ["native-fixtures"]
 name = "p4kx-msi-path"
 path = "src/main.rs"
 
-[dependencies]
-getrandom.workspace = true
-
 [target.'cfg(windows)'.dependencies]
+getrandom.workspace = true
 winreg = { workspace = true, features = ["transactions"] }
 windows-sys = { workspace = true, features = ["Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
 
 [dev-dependencies]
 serde.workspace = true
 serde_json.workspace = true
+
+[target.'cfg(not(windows))'.dev-dependencies]
+getrandom.workspace = true
+
 [lints.rust]
 missing_docs = "deny"
 unsafe_code = "deny"
