@@ -103,6 +103,7 @@ mod material_support;
 mod model_character_provider;
 mod model_companion_provider;
 mod model_lod_distance_provider;
+mod model_mesh_provider;
 mod model_physics_frame_provider;
 mod model_physics_provider;
 mod model_skeleton_provider;

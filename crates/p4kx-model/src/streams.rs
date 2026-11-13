@@ -5,14 +5,14 @@ use p4kx_foundation::ByteReader;
 
 use crate::CorruptChunk;
 use crate::bone_map::BoneMapStream;
-use crate::reader::to_usize;
+use crate::mesh_stream_source::{StreamScan, StreamStep};
 use crate::second_uv::SecondUvStream;
 use crate::vector::{
     dequantise, finite_uv, normal_of_quaternion, normal_of_tangent_frame, normalise,
     tangent_of_quaternion, tangent_of_tangent_frame, unpack_unit_vector,
 };
 
-const INDICES: u32 = 0xEECD_C168;
+pub(crate) const INDICES: u32 = 0xEECD_C168;
 const VERTS_UVS: u32 = 0x9132_9AE9;
 const VERTS_UVS_2: u32 = 0xB3A7_0D5E;
 const NORMALS: u32 = 0x9CF3_F615;
@@ -21,7 +21,7 @@ const TANGENTS: u32 = 0xB95E_9A1B;
 const QTANGENTS: u32 = 0xEE05_7252;
 const BONEMAP: u32 = 0x677C_7B23;
 const BONEMAP32: u32 = 0x6ECA_3708;
-const STREAM_ALIGNMENT: usize = 8;
+
 const COLOUR_FROM_END: usize = 8;
 
 /// The vertex positions and texture coordinates of a mesh.
@@ -167,6 +167,18 @@ pub(crate) struct IndexStream<'a> {
 }
 
 impl IndexStream<'_> {
+    pub(crate) const fn from_bytes(data: &[u8], wide: bool) -> IndexStream<'_> {
+        IndexStream { data, wide }
+    }
+
+    pub(crate) fn source_vertex(&self, at: usize, page_base: u32) -> Result<u64, CorruptChunk> {
+        self.index(at)
+            .map(|word| Self::apply_page_base(word, page_base))
+    }
+    pub(crate) const fn apply_page_base(word: u32, page_base: u32) -> u64 {
+        word as u64 + page_base as u64
+    }
+
     /// Returns index `position` of the list.
     pub(crate) fn index(&self, position: usize) -> Result<u32, CorruptChunk> {
         if self.wide {
@@ -200,7 +212,7 @@ pub(crate) struct StreamCounts {
 /// Reads the streams that follow the submeshes until the end of the chunk; each is a type tag,
 /// an element size and one element per vertex or index, padded to 8 bytes.
 pub(crate) fn read_streams<'a>(
-    reader: &mut ByteReader<'a>,
+    reader: ByteReader<'a>,
     counts: StreamCounts,
 ) -> Result<Streams<'a>, CorruptChunk> {
     let mut vertices = None;
@@ -210,21 +222,27 @@ pub(crate) fn read_streams<'a>(
     let mut bone_map: Option<BoneMapStream<'a>> = None;
     let mut indices = None;
     let mut seen = 0_u16;
-    while reader.remaining() >= 4 {
-        let tag = reader.read_u32()?;
-        if tag == 0 {
-            continue;
-        }
-        let size = reader.read_u32()?;
-        if let Some(bit) = read_tag_bit(tag) {
-            if seen & bit != 0 {
-                return Err(CorruptChunk::RepeatedStream(tag));
+    let scan = StreamScan::new(reader, counts.vertices, counts.indices);
+    for step in scan {
+        let (tag, size, data) = match step? {
+            StreamStep::Complete(stream) => (
+                stream.header().tag(),
+                stream.header().stride(),
+                stream.bytes(),
+            ),
+            StreamStep::Incomplete(stream, error) => {
+                if repeat(&mut seen, stream.tag()) {
+                    return Err(CorruptChunk::RepeatedStream(stream.tag()));
+                }
+                if stream.is_recognized() {
+                    return Err(error.into());
+                }
+                break;
             }
-            seen |= bit;
-        }
-        let Some(data) = stream_data(reader, tag, size, counts)? else {
-            break;
         };
+        if repeat(&mut seen, tag) {
+            return Err(CorruptChunk::RepeatedStream(tag));
+        }
         match classify(tag, size, data, counts)? {
             Some(Found::Indices(stream)) => indices = Some(stream),
             Some(Found::Vertices(stream)) => vertices = Some(stream),
@@ -255,30 +273,19 @@ pub(crate) fn read_streams<'a>(
     })
 }
 
-/// Takes the elements and the padding of the stream `tag` off `reader`, or `None` when an
-/// unknown stream claims more than the chunk has left, which ends the walk.
-fn stream_data<'a>(
-    reader: &mut ByteReader<'a>,
-    tag: u32,
-    size: u32,
-    counts: StreamCounts,
-) -> Result<Option<&'a [u8]>, CorruptChunk> {
-    let count = if tag == INDICES {
-        counts.indices
-    } else {
-        counts.vertices
+const fn repeat(seen: &mut u16, tag: u32) -> bool {
+    let Some(bit) = read_tag_bit(tag) else {
+        return false;
     };
-    let len = to_usize(size).checked_mul(to_usize(count));
-    let known = matches!(tag, INDICES | VERTS_UVS | VERTS_UVS_2 | BONEMAP | BONEMAP32)
-        || (tag, size) == (NORMALS_2, 4)
-        || normal_kind(tag, size).is_some();
-    let Some(len) = len.filter(|&len| known || len <= reader.remaining()) else {
-        return Ok(None);
-    };
-    let data = reader.read_bytes(len)?;
-    let padding = len.next_multiple_of(STREAM_ALIGNMENT) - len;
-    reader.skip(padding.min(reader.remaining()))?;
-    Ok(Some(data))
+    let repeated = *seen & bit != 0;
+    *seen |= bit;
+    repeated
+}
+
+pub(crate) const fn recognized(tag: u32, size: u32) -> bool {
+    matches!(tag, INDICES | VERTS_UVS | VERTS_UVS_2 | BONEMAP | BONEMAP32)
+        || (tag == NORMALS_2 && size == 4)
+        || normal_kind(tag, size).is_some()
 }
 
 const fn read_tag_bit(tag: u32) -> Option<u16> {

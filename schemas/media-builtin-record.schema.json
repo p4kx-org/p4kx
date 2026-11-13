@@ -6787,6 +6787,13 @@
         }
       ]
     },
+    "CountBasis": {
+      "enum": [
+        "vertex-count",
+        "index-count"
+      ],
+      "type": "string"
+    },
     "CountEncoding": {
       "enum": [
         "fixed-u32",
@@ -11484,6 +11491,105 @@
         }
       ]
     },
+    "Mesh": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "measured",
+              "type": "string"
+            },
+            "extra_words": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "indices": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "model_bounds_bits": {
+              "items": {
+                "items": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "maxItems": 3,
+                "minItems": 3,
+                "type": "array"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "scaling_bounds_bits": {
+              "items": {
+                "items": {
+                  "format": "uint32",
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "maxItems": 3,
+                "minItems": 3,
+                "type": "array"
+              },
+              "maxItems": 2,
+              "minItems": 2,
+              "type": "array"
+            },
+            "submeshes": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "vertices": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "disposition",
+            "vertices",
+            "indices",
+            "submeshes",
+            "extra_words",
+            "model_bounds_bits",
+            "scaling_bounds_bits"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "unsupported-version",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "malformed",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "ModelCharacterRecord": {
       "oneOf": [
         {
@@ -11677,6 +11783,62 @@
         "table"
       ],
       "type": "object"
+    },
+    "ModelMeshRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/Mesh"
+            },
+            "record_type": {
+              "const": "mesh",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/Stream"
+            },
+            "record_type": {
+              "const": "mesh-stream",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/Submesh"
+            },
+            "record_type": {
+              "const": "mesh-submesh",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "MeshRecord"
     },
     "ModelSkeletonRecord": {
       "oneOf": [
@@ -18917,6 +19079,98 @@
       ],
       "type": "string"
     },
+    "Stream": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "count_basis": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CountBasis"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "disposition": {
+          "$ref": "#/$defs/StreamDisposition"
+        },
+        "padding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "payload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "retained_tail": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceRange"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "stride_bytes": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tag": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "tag",
+        "stride_bytes",
+        "count",
+        "count_basis",
+        "payload",
+        "padding",
+        "retained_tail",
+        "disposition"
+      ],
+      "type": "object"
+    },
+    "StreamDisposition": {
+      "enum": [
+        "bounded",
+        "opaque-tail",
+        "incomplete",
+        "malformed-header"
+      ],
+      "type": "string"
+    },
     "SubDatabaseCycle": {
       "additionalProperties": false,
       "properties": {
@@ -18958,6 +19212,50 @@
         "target_entry_index",
         "source_element_index",
         "source_declaration_ordinal"
+      ],
+      "type": "object"
+    },
+    "Submesh": {
+      "additionalProperties": false,
+      "properties": {
+        "first_index": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "index_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "material_id": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "node_id": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_vertices": {
+          "$ref": "#/$defs/VertexMapping"
+        },
+        "vertex_page_base": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "material_id",
+        "node_id",
+        "first_index",
+        "index_count",
+        "vertex_page_base",
+        "source_vertices"
       ],
       "type": "object"
     },
@@ -21829,6 +22127,117 @@
           "const": "verified",
           "description": "Available source checks passed while the entire Entry was retained.",
           "type": "string"
+        }
+      ]
+    },
+    "VertexMapping": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "indices": {
+              "$ref": "#/$defs/SourceRange"
+            },
+            "status": {
+              "const": "stored-indices",
+              "type": "string"
+            },
+            "stream": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "stride_bytes": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "status",
+            "stream",
+            "stride_bytes",
+            "indices"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "no-indices",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "missing-index-stream",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "ambiguous-index-streams",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "invalid-index-stream",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "invalid-index-range",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "invalid-source-vertex",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
         }
       ]
     },
@@ -40073,6 +40482,171 @@
                 "properties": {
                   "record_type": {
                     "const": "skeleton-bone"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-mesh"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelMeshRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "mesh"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-mesh-stream"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelMeshRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "mesh-stream"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-mesh-submesh"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelMeshRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "mesh-submesh"
                   }
                 },
                 "required": [

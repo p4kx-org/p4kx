@@ -105,6 +105,10 @@ impl<'input> RequiredReader<'input> {
         Ok(bytes)
     }
 
+    pub(crate) fn charge_metadata_work(&self, count: u64) -> Result<(), MediaError> {
+        self.budget.metadata(0, count, self.limits, self.checkpoint)
+    }
+
     pub(crate) fn read_chunk(&mut self, range: Range<u64>) -> Result<Vec<u8>, MediaError> {
         let size = range
             .end

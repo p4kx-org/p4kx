@@ -11,6 +11,7 @@ use p4kx_extraction::chunks::{ChunkDirectory, ChunkDirectoryError, ChunkError, C
 use super::character;
 use super::companions;
 use super::lod_distances;
+use super::mesh;
 use super::origins::{self, ModelOrigins};
 use super::payload::{
     self, ModelChunkRecord, ModelEntryRecord, ModelSourceFamily, ModelSourcePayload,
@@ -32,7 +33,7 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.7.0",
+            "1.8.0",
             "Selected original models, geometry and character definitions with positioned source declarations.",
         );
         capability.field_groups = vec![
@@ -67,6 +68,10 @@ impl Provider for ModelSourceProvider {
             FieldGroup::new(
                 "physical-skeletons",
                 "Measured original IVO skeleton chunks, bind poses and exact bone field coordinates.",
+            ),
+            FieldGroup::new(
+                "physical-mesh-streams",
+                "Original version-qualified IVO mesh bounds, physical stream spans and submesh source-vertex references.",
             ),
             FieldGroup::new_with_unsupported_projection(
                 "model-semantics",
@@ -344,6 +349,7 @@ fn chunks(
         physics::emit(file, index, reader, frames.as_ref(), origins, writer)?;
         lod_distances::emit(file, index, reader, origins, writer)?;
         skeleton::emit(file, index, reader, origins, writer)?;
+        mesh::emit(file, index, reader, origins, writer)?;
     }
     Ok(())
 }

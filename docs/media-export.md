@@ -154,6 +154,29 @@ to collision facts by physical Entry identity and do not read or duplicate the t
 Original DCB byte and selector coordinates carry the source encryption marker. A record can
 remain diagnostic while readable sibling declarations are retained.
 
+IVO Skin and Skin2 chunks at version 0x900 emit a positioned model mesh inventory.
+A `model-mesh` row records the authored counts and the two original bounding boxes. Each box
+contains the min and max XYZ triples as unsigned binary32 words. A `model-mesh-stream` row
+uses the chunk and physical stream ordinals. It preserves the tag, stride, count basis,
+and half-open intervals for payload and available alignment padding in the decoded Entry.
+The known index tag takes the mesh index count. Other stream extents use the vertex count
+under the IVO stream walk. Unclassified trailing bytes have an opaque disposition and a
+retained interval. A truncated recognised stream or unreadable header has a partial diagnostic.
+
+Float-position streams store XYZ directly. For quantised positions, the model reader
+decodes signed little-endian 16-bit words per axis as
+``(word / 32767) × max((max - min) / 2, 1) + midpoint(min, max)``.
+The normal standalone read selects the scaling box. SOC placements can specify the model box.
+Both exported boxes are stored facts. See [mesh bounding boxes](mesh-bounding-boxes.md).
+
+A `model-mesh-submesh` row uses the chunk and physical submesh ordinals. It identifies the
+original material and node or skin-zone IDs, first index, count, and vertex page base.
+For a `stored-indices` mapping, read little-endian unsigned index words of the indicated
+stride from the retained interval and add the page base to find source-stream vertex
+ordinals. Those ordinals identify source vertices before any renderer grouping or
+deduplication. Missing, ambiguous or invalid inputs have their own mapping dispositions.
+All records use the original model's raw artifact and each field carries its source evidence.
+
 Measured IVO LodDistances chunks emit one `model-lod-distance-words` row per physical
 chunk. The v0x900 layout with a 48-byte inferred range carries twelve ordered original
 little-endian words. Each word has its unsigned bits and, when finite, its binary32

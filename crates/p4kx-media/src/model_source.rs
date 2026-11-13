@@ -44,3 +44,8 @@ mod vehicle_grid;
 mod vehicle_grid_origins;
 #[path = "model_source/vehicle_grid_record.rs"]
 mod vehicle_grid_record;
+
+#[path = "model_source/mesh.rs"]
+mod mesh;
+#[path = "model_source/mesh_record.rs"]
+mod mesh_record;

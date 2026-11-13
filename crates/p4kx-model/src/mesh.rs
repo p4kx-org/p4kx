@@ -60,7 +60,11 @@ pub(crate) fn split_by_node(
     Ok(meshes)
 }
 
-fn check_range(position: usize, submesh: &RawSubmesh, total: u32) -> Result<(), CorruptChunk> {
+pub(crate) fn check_range(
+    position: usize,
+    submesh: &RawSubmesh,
+    total: u32,
+) -> Result<(), CorruptChunk> {
     let fits = submesh
         .first_index
         .checked_add(submesh.index_count)
@@ -125,8 +129,11 @@ impl<'s, 'a> MeshBuilder<'s, 'a> {
         let first = self.mesh.indices.len();
         let start = to_usize(submesh.first_index);
         for at in start..start + to_usize(submesh.index_count) {
-            let index =
-                u64::from(self.skin.streams.indices.index(at)?) + u64::from(submesh.page_base);
+            let index = self
+                .skin
+                .streams
+                .indices
+                .source_vertex(at, submesh.page_base)?;
             let out_of_range = CorruptChunk::IndexRange {
                 submesh: position,
                 index,

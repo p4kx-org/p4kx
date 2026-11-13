@@ -6,6 +6,7 @@ use serde_json::{Value, json};
 use super::character_payload;
 use super::companions::{self, CompanionRecord};
 use super::lod_distances;
+use super::mesh_record;
 use super::payload::{self, ModelSourcePayload};
 use super::skeleton_record;
 use super::vehicle_grid_record;
@@ -27,6 +28,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
     )?;
     character_payload::insert_schema(&mut base)?;
     skeleton_record::insert_schema(&mut base)?;
+    mesh_record::insert_schema(&mut base)?;
     vehicle_grid_record::insert_schema(&mut base)?;
     let branches = base
         .get_mut("allOf")
@@ -41,6 +43,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
     .into_iter()
     .chain(character_payload::SCHEMA_ROWS)
     .chain(skeleton_record::SCHEMA_ROWS)
+    .chain(mesh_record::SCHEMA_ROWS)
     .chain(vehicle_grid_record::SCHEMA_ROWS)
     {
         branches.push(json!({
