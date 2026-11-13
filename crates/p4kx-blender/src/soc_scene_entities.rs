@@ -78,7 +78,7 @@ impl Entity {
                 .collect::<Result<_, _>>()?,
             lights: entity
                 .authored_lights()
-                .map(|light| Light::read(light, origin))
+                .map(|light| Light::read_with_class(light, entity, &index.classes.lights, origin))
                 .collect::<Result<_, _>>()?,
             light_groups: entity
                 .authored_light_groups()

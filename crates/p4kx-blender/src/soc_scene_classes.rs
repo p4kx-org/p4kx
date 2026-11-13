@@ -17,6 +17,7 @@ use crate::soc_scene::SocSceneError;
 use crate::soc_scene_class_candidates::{candidates, inline_candidate};
 use crate::soc_scene_class_components::{ClassComponent, ComponentInput};
 use crate::soc_scene_class_resources::Resources;
+use crate::soc_scene_light_classes::{DefaultClass, LightClasses};
 use crate::soc_scene_origin::XmlOrigin;
 
 const ENTITY_CLASS: &str = "EntityClassDefinition";
@@ -27,6 +28,7 @@ pub(crate) struct Classes {
     rows: Vec<SocClass>,
     available: bool,
     guid_index: Option<SourceUse>,
+    pub(crate) lights: LightClasses,
 }
 
 struct ClassSite {
@@ -43,7 +45,7 @@ impl Classes {
         cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
         let wanted = candidates(capture, cancel)?;
-        if wanted.is_empty() {
+        if wanted.entities.is_empty() && wanted.lights.is_empty() {
             return Ok(Self {
                 available: true,
                 ..Self::default()
@@ -68,7 +70,8 @@ impl Classes {
             SourceUseRole::Payload,
         )?);
         let resources = Resources::new(archive, sources, cancel);
-        result.add_wanted(&forge, wanted, &scope, &resources)?;
+        result.add_wanted(&forge, wanted.entities, &scope, &resources)?;
+        result.lights = LightClasses::read(wanted.lights, &forge, &scope, sources, cancel)?;
         Ok(result)
     }
 
@@ -199,8 +202,8 @@ impl Classes {
         }
     }
 
-    pub(crate) fn finish(self) -> Vec<SocClass> {
-        self.rows
+    pub(crate) fn finish(self) -> (Vec<SocClass>, Vec<DefaultClass>) {
+        (self.rows, self.lights.finish())
     }
 }
 

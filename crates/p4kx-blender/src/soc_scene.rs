@@ -10,6 +10,7 @@ use serde::Serialize;
 use thiserror::Error;
 
 use crate::soc_scene_classes::{Classes, SocClass};
+use crate::soc_scene_light_classes::DefaultClass;
 pub use crate::soc_scene_origin::SocXmlPosition;
 use crate::soc_scene_xml::{XmlDocument, XmlDocuments};
 
@@ -27,6 +28,8 @@ pub struct SocScene {
     source_inventory: SourceInventory,
     documents: Vec<XmlDocument>,
     classes: Vec<SocClass>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    light_classes: Vec<DefaultClass>,
     occurrences: Vec<crate::soc_scene_occurrence::Occurrence>,
 }
 
@@ -105,12 +108,14 @@ impl SocScene {
                 )
             })
             .collect::<Result<_, _>>()?;
+        let (classes, light_classes) = classes.finish();
         Ok(Self {
             format: "p4kx-soc-scene",
             schema_version: SOC_SCENE_VERSION,
             source_inventory: sources.freeze()?,
             documents: documents.finish(),
-            classes: classes.finish(),
+            classes,
+            light_classes,
             occurrences,
         })
     }

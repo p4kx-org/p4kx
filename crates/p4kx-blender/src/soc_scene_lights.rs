@@ -3,11 +3,14 @@
 
 use p4kx_extraction::SourcedValue;
 use p4kx_extraction::cryxml::SourceElement;
-use p4kx_model::{SocBakedLightSource, SocLightGroupSource, SocLightMode, SocLightSource};
+use p4kx_model::{
+    SocBakedLightSource, SocEntity, SocLightGroupSource, SocLightMode, SocLightSource,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
+use crate::soc_scene_light_classes::{EffectiveLight, LightClasses};
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 use crate::soc_scene_rooms::position;
 
@@ -19,13 +22,23 @@ pub(crate) struct Light {
     kind: SourcedValue<String>,
     use_temperature: SourcedValue<bool>,
     modes: Vec<Mode>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effective: Option<EffectiveLight>,
 }
 
 impl Light {
-    pub(crate) fn read(
+    pub(crate) fn read_with_class(
         light: SocLightSource<'_>,
+        entity: SocEntity<'_>,
+        classes: &LightClasses,
         origin: &XmlOrigin<'_>,
     ) -> Result<Self, SocSceneError> {
+        let mut row = Self::read(light, origin)?;
+        row.effective = Some(classes.effective(entity, light, origin)?);
+        Ok(row)
+    }
+
+    fn read(light: SocLightSource<'_>, origin: &XmlOrigin<'_>) -> Result<Self, SocSceneError> {
         let element = light.element();
         Ok(Self {
             position: position(element)?,
@@ -33,6 +46,7 @@ impl Light {
                 .named(element, "lightType", light.light_type())?
                 .map(str::to_owned),
             use_temperature: origin.named(element, "useTemperature", light.use_temperature())?,
+            effective: None,
             modes: light
                 .modes()
                 .map(|mode| Mode::read(mode, origin))

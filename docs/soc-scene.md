@@ -53,6 +53,19 @@ source uses. Colour elements, empty baked sections and relative-frame declaratio
 point to their original XML coordinates in the same chunk. These fields describe
 authored inputs to light assembly.
 
+For direct lights, `effective.class` reports the selected class or its explicit
+absence, ambiguity or read failure. A nonzero `EntityClassGUID` takes precedence.
+The original `EntityClass` name is used when the GUID is absent or zero.
+`lightClasses` stores the original `LightComponentParams` scalar values once per
+physical Record. Component and preorder ordinals distinguish repeated declarations.
+
+`effective.fields` shows where a unique class field is inherited or overridden by
+a matching XML attribute. Invalid or repeated overrides are retained as invalid,
+including cases where a usable class default exists. The field origin includes
+the XML and DataForge sources used for selection and interpretation. Positioned
+array leaves remain available under the class defaults. Baked light members keep
+their original source declarations.
+
 An entity's `tileAttachments` refer to the port declarations of its own descriptor.
 Each matched or ambiguous candidate retains its original position and interaction
 offset in the container owner's frame. An unavailable descriptor leaves the

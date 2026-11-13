@@ -1,14 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
 
-use p4kx_assembly::{SocContainerCapture, SocMemberSelection, SocSourceGuid};
+use p4kx_assembly::{
+    SocContainerCapture, SocLightClassSelector, SocMemberSelection, SocSourceGuid,
+};
 use p4kx_extraction::{CancelToken, Guid};
 use p4kx_model::{SocEntity, SocEntityComponentKind, SocEntityFile};
 
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_classes::check;
+use crate::soc_scene_light_classes::Selector;
+
+#[derive(Default)]
+pub(crate) struct Candidates {
+    pub(crate) entities: BTreeMap<Guid, bool>,
+    pub(crate) lights: BTreeSet<Selector>,
+}
 
 pub(crate) fn inline_candidate(entity: SocEntity<'_>) -> bool {
     entity.authored_components().any(|component| {
@@ -22,8 +31,8 @@ pub(crate) fn inline_candidate(entity: SocEntity<'_>) -> bool {
 pub(crate) fn candidates(
     capture: &SocContainerCapture,
     cancel: &CancelToken,
-) -> Result<BTreeMap<Guid, bool>, SocSceneError> {
-    let mut wanted = BTreeMap::new();
+) -> Result<Candidates, SocSceneError> {
+    let mut wanted = Candidates::default();
     let mut seen = HashSet::new();
     for stream in capture
         .occurrences()
@@ -54,7 +63,12 @@ pub(crate) fn candidates(
                 if let SocSourceGuid::Present(guid) =
                     SocSourceGuid::read(entity.class_guid_attributes())
                 {
-                    *wanted.entry(guid).or_insert(false) |= inline_candidate(entity);
+                    *wanted.entities.entry(guid).or_insert(false) |= inline_candidate(entity);
+                }
+                if entity.authored_lights().next().is_some() {
+                    wanted
+                        .lights
+                        .extend(Selector::read(SocLightClassSelector::read(entity)));
                 }
             }
         }

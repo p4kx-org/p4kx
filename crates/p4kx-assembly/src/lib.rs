@@ -269,7 +269,7 @@ pub use soc_container_capture::{
     SocContainerOccurrence, SocMemberError, SocMemberSelection, SocMemberSelector, SocStreamInput,
 };
 pub use soc_entity_index::{SocEntityIndex, SocEntitySite, SocEntityTarget};
-pub use soc_light_class::{SocLightClass, SocLightClassSource};
+pub use soc_light_class::{SocLightClass, SocLightClassSelector, SocLightClassSource};
 pub use soc_room_index::{SocRoomIndex, SocRoomTarget};
 pub use soc_source_guid::SocSourceGuid;
 pub use soc_tile_light_anchor::{SocTileLightAnchor, SocTileLightAnchorError};
