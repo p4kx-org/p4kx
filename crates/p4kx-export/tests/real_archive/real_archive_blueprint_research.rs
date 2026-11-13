@@ -5,10 +5,10 @@ use std::collections::BTreeMap;
 use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, Filter, Kind, build_catalog_from};
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForgeEntry, DataType, RecordTree, StructValue, TreeBuilder,
-    Value as Original,
+    Archive, ArchiveWatch, DataForge, DataForgeEntry, DataType, RecordTree, StructValue,
+    TreeBuilder, Value as Original,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
@@ -32,49 +32,134 @@ fn crafting_research_matches_original_slots_and_declared_bases() -> TestResult {
     let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
     let watch = ArchiveWatch::new(&archive);
     let entry = DataForgeEntry::read(&archive).map_err(|_| "read original DataForge")?;
-    let options = CatalogOptions {
-        publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..CatalogOptions::new(SystemTime::now())
-    };
-    let built =
-        build_catalog_from(&archive, &entry, &options).map_err(|_| "build research catalog")?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
-    crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
-    let blueprints = Blueprints::read(&catalog)?;
     let forge = entry.open().map_err(|_| "open original DataForge")?;
-    let mut trees = TreeBuilder::new();
+    let selected = select(&forge, &watch)?;
     let mut states = BTreeMap::new();
-    for blueprint in blueprints.rows() {
-        let index = blueprint
-            .definition
-            .pointer("/recordIndex/value")
-            .and_then(Value::as_u64)
-            .ok_or("physical Blueprint index")?;
-        let record = forge
-            .record(u32::try_from(index)?)
-            .ok_or("original Blueprint Record")?;
-        assert!(
+    for tree in selected.values() {
+        let catalog = build_selected(&archive, &entry, tree)?;
+        let blueprints = Blueprints::read(&catalog)?;
+        let mut rows = blueprints.rows().iter().filter(|blueprint| {
             blueprint
+                .definition
+                .pointer("/recordIndex/value")
+                .and_then(Value::as_u64)
+                == Some(u64::from(tree.record_index()))
+        });
+        let blueprint = rows.next().ok_or("missing original Blueprint definition")?;
+        if rows.next().is_some()
+            || blueprint
                 .definition
                 .pointer("/guid/value")
                 .and_then(Value::as_str)
-                == Some(record.guid().to_string().as_str()),
-            "the source Record has the exported physical identity"
-        );
-        let tree = trees
-            .build(&record)
-            .map_err(|_| "read original Blueprint Record")?;
-        check_blueprint(blueprint, &tree, &mut states)?;
+                != Some(tree.guid().to_string().as_str())
+        {
+            return Err("original Blueprint physical identity differs".into());
+        }
+        check_blueprint(blueprint, tree, &mut states)?;
     }
-    assert!(
-        !states.is_empty(),
-        "the configured Build has observable research tier states"
-    );
+    if states.is_empty() {
+        return Err("the configured Build has no observable research tier states".into());
+    }
     watch
         .check()
         .map_err(|_| "Archive changed during research verification")?;
     print_line(&format!("crafting research envelope states: {states:?}"));
     Ok(())
+}
+
+fn select<'source>(
+    forge: &'source DataForge<'source>,
+    watch: &ArchiveWatch,
+) -> TestResult<BTreeMap<ResearchState, RecordTree<'source>>> {
+    let rule = Kind::Blueprints.rule().ok_or("selected Blueprint rule")?;
+    let mut trees = TreeBuilder::new();
+    let mut selected = BTreeMap::new();
+    for record in forge.records() {
+        watch
+            .poll()
+            .map_err(|_| "Archive changed during research selection")?;
+        if record.type_name()? != rule.type_name || !rule.matches_path(record.record_path()?) {
+            continue;
+        }
+        let tree = trees
+            .build(&record)
+            .map_err(|_| "read original Blueprint Record")?;
+        if let Some(state) = research_state(&tree) {
+            selected.entry(state).or_insert(tree);
+        }
+        if selected.len() == ResearchState::COUNT {
+            break;
+        }
+    }
+    if selected.is_empty() {
+        return Err("no original Blueprint Record contains a tier".into());
+    }
+    Ok(selected)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum ResearchState {
+    Empty,
+    Null,
+    Unavailable,
+    Populated,
+}
+
+impl ResearchState {
+    const COUNT: usize = 4;
+}
+
+fn research_state(tree: &RecordTree<'_>) -> Option<ResearchState> {
+    let Some(Original::Struct(body)) = tree.field("blueprint") else {
+        return None;
+    };
+    let Some(Original::Array(tiers)) = body.field("tiers") else {
+        return None;
+    };
+    tiers
+        .iter()
+        .filter_map(|tier| {
+            let Original::Struct(tier) = tier else {
+                return None;
+            };
+            Some(match tier.field("research") {
+                None | Some(Original::Null) => ResearchState::Null,
+                Some(Original::Struct(body)) if body.type_name() == RESEARCH => {
+                    if MEMBERS
+                        .iter()
+                        .any(|(member, _)| matches!(body.field(member), Some(Original::Error(_))))
+                    {
+                        ResearchState::Unavailable
+                    } else if MEMBERS.iter().any(|(member, _)| {
+                        !matches!(body.field(member), None | Some(Original::Null))
+                    }) {
+                        ResearchState::Populated
+                    } else {
+                        ResearchState::Empty
+                    }
+                }
+                _ => ResearchState::Unavailable,
+            })
+        })
+        .max()
+}
+
+fn build_selected(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    tree: &RecordTree<'_>,
+) -> TestResult<Value> {
+    let filter = Filter::new(tree.record_path());
+    let options = CatalogOptions {
+        filter: Some(&filter),
+        publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        ..CatalogOptions::new(SystemTime::now())
+    };
+    let built =
+        build_catalog_from(archive, entry, &options).map_err(|_| "build research catalog")?;
+    let catalog = serde_json::from_slice(built.json())?;
+    crate::real_archive_shop_inventory_v3::verify_build(archive, &catalog)?;
+    Ok(catalog)
 }
 
 fn check_blueprint(
