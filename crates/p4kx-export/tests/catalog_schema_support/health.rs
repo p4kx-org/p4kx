@@ -86,6 +86,8 @@ fn row_count(kind: Kind, catalog: &Value) -> usize {
         Kind::InfractionSets => catalog.pointer("/definitions/infractionSets/rows"),
         Kind::Jurisdictions => catalog.pointer("/definitions/jurisdictions/rows"),
         Kind::LocationClasses => catalog.pointer("/definitions/locationClasses/rows"),
+        Kind::NpcArchetypes => catalog.pointer("/definitions/npcArchetypes/rows"),
+        Kind::NpcClassPools => catalog.pointer("/definitions/npcClassPools/rows"),
         Kind::LocationFunctions => catalog.pointer("/definitions/locationFunctions/rows"),
         Kind::LocationSizes => catalog.pointer("/definitions/locationSizes/rows"),
         Kind::LocationClassRegistries => {

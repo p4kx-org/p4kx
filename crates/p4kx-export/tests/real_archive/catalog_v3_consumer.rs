@@ -58,6 +58,8 @@ pub(crate) fn named_rows<'catalog>(
         Kind::InfractionSets => "/definitions/infractionSets",
         Kind::Jurisdictions => "/definitions/jurisdictions",
         Kind::LocationClasses => "/definitions/locationClasses",
+        Kind::NpcArchetypes => "/definitions/npcArchetypes",
+        Kind::NpcClassPools => "/definitions/npcClassPools",
         Kind::LocationFunctions => "/definitions/locationFunctions",
         Kind::LocationSizes => "/definitions/locationSizes",
         Kind::LocationClassRegistries => "/definitions/locationRegistries/classes",
@@ -124,6 +126,8 @@ fn checked_table<'catalog>(
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries
+                | Kind::NpcArchetypes
+                | Kind::NpcClassPools
                 | Kind::StarmapObjects
                 | Kind::StarmapTypes
                 | Kind::StarmapPresets
@@ -246,6 +250,8 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::NpcArchetypes
+            | Kind::NpcClassPools
             | Kind::StarmapObjects
             | Kind::StarmapTypes
             | Kind::StarmapPresets

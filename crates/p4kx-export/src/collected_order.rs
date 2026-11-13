@@ -42,6 +42,7 @@ impl Collected<'_> {
         self.mission_kinds.order();
         self.law.order();
         self.location_vocabulary.order();
+        self.npc_spawn_definitions.order();
         self.loot_kinds.order();
         self.tags.order_entities();
     }

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForgeError, Filter, Record};
-
 pub use crate::selection_rules::KindRule;
 pub(crate) use crate::selection_rules::starts_with_folder;
 
+mod blueprint_selection;
 mod record_leftovers;
+
+pub(crate) use blueprint_selection::{BlueprintSelection, selects_blueprint};
 
 pub(crate) use record_leftovers::is_leftover;
 pub use record_leftovers::{EXCLUDED_TOKENS, SHIP_EXCLUDED_TOKENS, is_kind_leftover};
@@ -180,6 +181,10 @@ pub enum Kind {
     LocationFunctionRegistries,
     /// Physical mission location size registries.
     LocationSizeRegistries,
+    /// Physical NPC archetype Records.
+    NpcArchetypes,
+    /// Physical weighted NPC class pool Records.
+    NpcClassPools,
     /// All physical inventory storage Records.
     InventoryContainers,
     /// Physical shared medical tier and consumption configuration Records.
@@ -196,7 +201,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 73] = [
+    pub const ALL: [Self; 75] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -264,6 +269,8 @@ impl Kind {
         Self::LocationClassRegistries,
         Self::LocationFunctionRegistries,
         Self::LocationSizeRegistries,
+        Self::NpcArchetypes,
+        Self::NpcClassPools,
         Self::InventoryContainers,
         Self::MedicalItemTierConfigs,
         Self::StarmapTypes,
@@ -348,6 +355,8 @@ impl Kind {
             Self::LocationClassRegistries => "locationClassRegistries",
             Self::LocationFunctionRegistries => "locationFunctionRegistries",
             Self::LocationSizeRegistries => "locationSizeRegistries",
+            Self::NpcArchetypes => "npcArchetypes",
+            Self::NpcClassPools => "npcClassPools",
             Self::InventoryContainers => "inventoryContainers",
             Self::MedicalItemTierConfigs => "medicalItemTierConfigs",
             Self::StarmapTypes => "starmapTypes",
@@ -355,42 +364,6 @@ impl Kind {
             Self::StarmapAmenities => "starmapAmenities",
         }
     }
-}
-
-/// What the blueprint selection makes of one Record.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum BlueprintSelection {
-    /// Not a blueprint of the catalog, or one the Filter does not match.
-    Outside,
-    /// A blueprint of the catalog.
-    Kept,
-    /// A blueprint left out as a development leftover.
-    Leftover,
-}
-
-/// Returns what the blueprint selection makes of `record`: the one rule behind the `blueprints`
-/// kind of the catalog and the blueprints of [`read_crafting`](crate::read_crafting).
-///
-/// # Errors
-///
-/// Returns the error of the Record's path, type or name when it cannot be read.
-pub(crate) fn selects_blueprint(
-    record: &Record<'_>,
-    filter: Option<&Filter>,
-) -> Result<BlueprintSelection, DataForgeError> {
-    let rule = Kind::Blueprints.records();
-    let path = record.record_path()?;
-    if !rule.matches_path(path)
-        || record.type_name()? != rule.type_name
-        || filter.is_some_and(|filter| !filter.matches(path))
-    {
-        return Ok(BlueprintSelection::Outside);
-    }
-    Ok(if is_leftover(path, record.name()?) {
-        BlueprintSelection::Leftover
-    } else {
-        BlueprintSelection::Kept
-    })
 }
 
 #[cfg(test)]

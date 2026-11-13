@@ -87,6 +87,8 @@ fn expected_completeness() -> Value {
         "locationClassRegistries": {"status": "complete"},
         "locationFunctionRegistries": {"status": "complete"},
         "locationSizeRegistries": {"status": "complete"},
+        "npcArchetypes": {"status": "complete"},
+        "npcClassPools": {"status": "complete"},
         "inventoryContainers": {"status": "complete"},
         "medicalItemTierConfigs": {"status": "complete"},
         "starmapTypes": {"status": "complete"},

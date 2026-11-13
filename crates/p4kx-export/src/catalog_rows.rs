@@ -86,6 +86,7 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
             .law
             .sources()
             .chain(collected.location_vocabulary.sources())
+            .chain(collected.npc_spawn_definitions.sources())
             .chain(crate::catalog_v3::mission_scenario_definition::sources(
                 &collected.mission_kinds.scenario_definitions,
             ))
@@ -349,6 +350,7 @@ fn definition_number_groups<'rows>(
         .chain(collected.mission_kinds.reputation_number_groups())
         .chain(collected.law.number_groups())
         .chain(collected.location_vocabulary.number_groups())
+        .chain(collected.npc_spawn_definitions.number_groups())
         .chain(
             crate::catalog_v3::mission_scenario_definition::sources(
                 &collected.mission_kinds.scenario_definitions,

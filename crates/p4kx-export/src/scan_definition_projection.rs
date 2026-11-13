@@ -8,6 +8,7 @@ use crate::Kind;
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::{self, LocationVocabularyPick};
 use crate::catalog_v3::medical::medical_tier_config;
+use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsPick;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
 use crate::loot_kinds::LootPick;
 use crate::mission_kinds::MissionPick;
@@ -31,6 +32,9 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::Factions => self.faction_definition(admission, tree)?,
             Kind::StarmapTypes | Kind::StarmapPresets | Kind::StarmapAmenities => {
                 self.starmap_definition(kind, admission, tree)?
+            }
+            Kind::NpcArchetypes | Kind::NpcClassPools => {
+                self.npc_spawn_definition(kind, admission, tree)?
             }
             Kind::Infractions | Kind::InfractionSets | Kind::Jurisdictions => {
                 self.law_definition(kind, admission, tree)?
@@ -76,6 +80,22 @@ impl<'f> Scan<'_, '_, 'f> {
             _ => return self.read_mission_definition(kind, admission, tree),
         };
         Ok(Some(projection))
+    }
+
+    fn npc_spawn_definition(
+        &self,
+        kind: Kind,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (value, notes) = NpcSpawnDefinitionsPick::read(
+            kind,
+            tree,
+            self.projection,
+            admission,
+            self.options.cancel,
+        )?;
+        Ok((Picked::NpcSpawnDefinitions(value), notes))
     }
 
     fn loot_pool_filter_definition(

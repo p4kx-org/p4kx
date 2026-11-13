@@ -89,6 +89,8 @@ pub(crate) fn minimal_catalog() -> Value {
             "locationClassRegistries": {"status": "complete"},
             "locationFunctionRegistries": {"status": "complete"},
             "locationSizeRegistries": {"status": "complete"},
+            "npcArchetypes": {"status": "complete"},
+            "npcClassPools": {"status": "complete"},
             "starmapTypes": {"status": "complete"},
             "starmapPresets": {"status": "complete"},
             "starmapAmenities": {"status": "complete"},
@@ -181,6 +183,8 @@ pub(crate) fn minimal_catalog() -> Value {
             "infractionSets": absent_table(),
             "jurisdictions": absent_table(),
             "locationClasses": absent_table(),
+            "npcArchetypes": absent_table(),
+            "npcClassPools": absent_table(),
             "locationFunctions": absent_table(),
             "locationSizes": absent_table(),
             "locationRegistries": {

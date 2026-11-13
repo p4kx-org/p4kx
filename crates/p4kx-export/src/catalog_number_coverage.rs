@@ -32,6 +32,8 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::NpcArchetypes
+            | Kind::NpcClassPools
             | Kind::StarmapObjects
             | Kind::StarmapTypes
             | Kind::StarmapPresets
@@ -57,31 +59,9 @@ pub(super) const fn expected_owned_number(
         (Kind::Blueprints, _) => (BlueprintValue { ordinal }, Number),
         (Kind::Items, ItemComponentRawValue { .. }) => (ItemComponentRawValue { ordinal }, Number),
         (Kind::Items, _) => (ItemComponentValue { ordinal }, Single),
-        (
-            Kind::InventoryContainers
-            | Kind::MedicalItemTierConfigs
-            | Kind::Factions
-            | Kind::FactionReputations
-            | Kind::ReputationScopes
-            | Kind::ReputationStandings
-            | Kind::ReputationContexts
-            | Kind::ReputationPerks
-            | Kind::Infractions
-            | Kind::InfractionSets
-            | Kind::Jurisdictions
-            | Kind::MissionScenarios
-            | Kind::LocationClasses
-            | Kind::LocationFunctions
-            | Kind::LocationSizes
-            | Kind::LocationClassRegistries
-            | Kind::LocationFunctionRegistries
-            | Kind::LocationSizeRegistries
-            | Kind::StarmapObjects
-            | Kind::StarmapTypes
-            | Kind::StarmapPresets
-            | Kind::StarmapAmenities,
-            AuthoredDefinitionRawValue { .. },
-        ) => (AuthoredDefinitionRawValue { ordinal }, Number),
+        (kind, AuthoredDefinitionRawValue { .. }) if uses_authored_raw_number(kind) => {
+            (AuthoredDefinitionRawValue { ordinal }, Number)
+        }
         (Kind::StarmapObjects | Kind::StarmapPresets, AuthoredDefinitionValue { .. })
             if matches!(token, FloatToken::Double(_)) =>
         {
@@ -101,9 +81,40 @@ pub(super) const fn expected_owned_number(
             | Kind::Jurisdictions
             | Kind::StarmapObjects
             | Kind::StarmapTypes
-            | Kind::StarmapPresets,
+            | Kind::StarmapPresets
+            | Kind::NpcClassPools,
             _,
         ) => (AuthoredDefinitionValue { ordinal }, Single),
         _ => return None,
     })
+}
+
+const fn uses_authored_raw_number(kind: Kind) -> bool {
+    matches!(
+        kind,
+        Kind::InventoryContainers
+            | Kind::MedicalItemTierConfigs
+            | Kind::Factions
+            | Kind::FactionReputations
+            | Kind::ReputationScopes
+            | Kind::ReputationStandings
+            | Kind::ReputationContexts
+            | Kind::ReputationPerks
+            | Kind::Infractions
+            | Kind::InfractionSets
+            | Kind::Jurisdictions
+            | Kind::MissionScenarios
+            | Kind::LocationClasses
+            | Kind::LocationFunctions
+            | Kind::LocationSizes
+            | Kind::LocationClassRegistries
+            | Kind::LocationFunctionRegistries
+            | Kind::LocationSizeRegistries
+            | Kind::NpcArchetypes
+            | Kind::NpcClassPools
+            | Kind::StarmapObjects
+            | Kind::StarmapTypes
+            | Kind::StarmapPresets
+            | Kind::StarmapAmenities
+    )
 }

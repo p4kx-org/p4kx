@@ -17,6 +17,7 @@ use crate::catalog_v3::jurisdiction_definition::JurisdictionDefinition;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyTables;
 use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
 use crate::catalog_v3::medical::medical_tier_config::MedicalItemTierConfig;
+use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsTables;
 use crate::catalog_v3::reputation_context_definition::ContextDefinition;
 use crate::catalog_v3::reputation_faction_definition::FactionReputationDefinition;
 use crate::catalog_v3::reputation_perk_list::ReputationPerkList;
@@ -76,6 +77,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) jurisdictions: CatalogTable<JurisdictionDefinition<'source>>,
     #[serde(flatten)]
     pub(crate) location_vocabulary: LocationVocabularyTables<'source>,
+    #[serde(flatten)]
+    pub(crate) npc_spawn_definitions: NpcSpawnDefinitionsTables<'source>,
     #[serde(flatten)]
     pub(crate) starmap: StarmapDefinitionTables<'source>,
 }

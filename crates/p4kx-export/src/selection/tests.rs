@@ -78,6 +78,8 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries
+                | Kind::NpcArchetypes
+                | Kind::NpcClassPools
                 | Kind::InventoryContainers
                 | Kind::MedicalItemTierConfigs
                 | Kind::StarmapTypes

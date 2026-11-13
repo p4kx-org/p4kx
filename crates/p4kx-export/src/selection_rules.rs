@@ -57,6 +57,14 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::location_vocabulary::SIZE_REGISTRY,
             },
+            Self::NpcArchetypes => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::npc_spawn_definitions::ARCHETYPE_TYPE,
+            },
+            Self::NpcClassPools => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::npc_spawn_definitions::POOL_TYPE,
+            },
             Self::ReputationPerks => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::reputation_perk_list::SOURCE_TYPE,

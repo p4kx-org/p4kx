@@ -35,7 +35,6 @@ pub use api::{build_catalog, build_catalog_from, write_catalog, write_catalog_fr
 #[path = "catalog_refusal.rs"]
 pub(crate) mod refusal;
 use refusal::CatalogRefusal;
-
 #[path = "original_catalog_inputs.rs"]
 pub(crate) mod original_input;
 use crate::catalog_read::original::EntryCapture;
@@ -287,6 +286,7 @@ fn assemble<R>(
             infraction_sets: law_tables.infraction_sets,
             jurisdictions: law_tables.jurisdictions,
             location_vocabulary: collected.location_vocabulary.into_tables(&forge),
+            npc_spawn_definitions: collected.npc_spawn_definitions.into_tables(&forge),
             starmap: collected.starmap_definitions.into_tables(&forge),
         },
         projections: CatalogProjections {

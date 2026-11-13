@@ -24,6 +24,7 @@ use crate::catalog_v3::law_kinds::LawKinds;
 use crate::catalog_v3::location_vocabulary::LocationVocabulary;
 use crate::catalog_v3::medical::medical_tier_config::PreparedMedicalTier;
 use crate::catalog_v3::mission_sources::local_contract_generator_configuration::LocalContractGeneratorConfiguration;
+use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitions;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitions;
 use crate::contract::{
     BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
@@ -71,6 +72,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) factions: Vec<PreparedFaction<'f>>,
     pub(crate) law: LawKinds<'f>,
     pub(crate) location_vocabulary: LocationVocabulary<'f>,
+    pub(crate) npc_spawn_definitions: NpcSpawnDefinitions<'f>,
     pub(crate) items: Vec<Item<'f>>,
     pub(crate) item_components: ItemComponentRows<'f>,
     pub(crate) entity_configurations: EntityConfigurationRows<'f>,
@@ -233,6 +235,7 @@ impl<'f> Collected<'f> {
             mission_kinds: MissionKinds::default(),
             law: LawKinds::default(),
             location_vocabulary: LocationVocabulary::default(),
+            npc_spawn_definitions: NpcSpawnDefinitions::default(),
             loot_kinds: LootKinds::default(),
             vehicles: Vec::new(),
             item_classes: ItemClassSummary::default(),
@@ -298,6 +301,7 @@ impl<'f> Collected<'f> {
             Picked::Mission(entity) => self.mission_kinds.push(entity),
             Picked::Law(entity) => self.law.push(entity),
             Picked::LocationVocabulary(entity) => self.location_vocabulary.push(entity),
+            Picked::NpcSpawnDefinitions(entity) => self.npc_spawn_definitions.push(entity),
             Picked::Loot(entity) => self.loot_kinds.push(entity),
             Picked::Crafter(entity) => self.crafters.push(entity),
             Picked::Crafted(pick, entity) => {

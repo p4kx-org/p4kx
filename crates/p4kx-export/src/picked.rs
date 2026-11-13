@@ -14,6 +14,7 @@ use crate::catalog_v3::inventory_container_definition::PreparedInventoryContaine
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyPick;
 use crate::catalog_v3::medical::medical_tier_config::PreparedMedicalTier;
+use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsPick;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
 use crate::catalog_v3::starmap_object_definition::StarmapObjectRead;
 use crate::contract::{
@@ -68,6 +69,7 @@ pub(crate) enum Picked<'f> {
     Faction(Box<PreparedFaction<'f>>),
     Law(LawPick<'f>),
     LocationVocabulary(LocationVocabularyPick<'f>),
+    NpcSpawnDefinitions(NpcSpawnDefinitionsPick<'f>),
     /// A starmap object.
     Starmap(Box<StarmapObjectRead<'f>>),
     StarmapDefinition(StarmapDefinitionPick<'f>),
@@ -162,6 +164,8 @@ impl<'f> Picked<'f> {
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
+            | Kind::NpcArchetypes
+            | Kind::NpcClassPools
             | Kind::StarmapTypes
             | Kind::StarmapPresets
             | Kind::StarmapAmenities

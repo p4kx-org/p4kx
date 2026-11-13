@@ -12,6 +12,8 @@ mod local_generators;
 mod location_vocabulary;
 #[path = "catalog_mission_scenario_definitions.rs"]
 mod mission_scenario_definitions;
+#[path = "catalog_npc_spawn_definitions.rs"]
+mod npc_spawn_definitions;
 
 #[path = "catalog_mission_boards.rs"]
 mod mission_boards;

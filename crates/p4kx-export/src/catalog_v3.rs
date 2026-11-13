@@ -71,6 +71,10 @@ pub(crate) mod location_vocabulary;
 mod location_vocabulary_definition;
 #[path = "mission_scenario_definition.rs"]
 pub(crate) mod mission_scenario_definition;
+#[path = "npc_spawn_definition.rs"]
+mod npc_spawn_definition;
+#[path = "npc_spawn_definitions.rs"]
+pub(crate) mod npc_spawn_definitions;
 #[path = "prepared_definition.rs"]
 mod prepared_definition;
 #[path = "reputation_blackboard.rs"]
@@ -351,25 +355,18 @@ pub(crate) mod catalog_table;
 
 #[path = "commodity.rs"]
 pub(crate) mod commodity;
-
 #[path = "commodity_authoring_contract.rs"]
 pub(crate) mod commodity_authoring_contract;
-
 #[path = "commodity_authoring_inputs.rs"]
 pub(crate) mod commodity_authoring_inputs;
-
 #[path = "commodity_authoring_read.rs"]
 pub(crate) mod commodity_authoring_read;
-
 #[path = "commodity_backfill.rs"]
 pub(crate) mod commodity_backfill;
-
 #[path = "commodity_binding_read.rs"]
 pub(crate) mod commodity_binding_read;
-
 #[path = "commodity_contract.rs"]
 pub(crate) mod commodity_contract;
-
 #[path = "commodity_inputs.rs"]
 pub(crate) mod commodity_inputs;
 

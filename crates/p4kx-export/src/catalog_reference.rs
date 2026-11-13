@@ -119,6 +119,7 @@ pub(crate) fn actual_kind(type_name: &str) -> Option<Kind> {
         crate::catalog_v3::mission_scenario_definition::SOURCE_TYPE => Some(Kind::MissionScenarios),
         _ => crate::catalog_v3::law_kinds::kind_for_type(type_name)
             .or_else(|| crate::catalog_v3::location_vocabulary::kind_for_type(type_name))
+            .or_else(|| crate::catalog_v3::npc_spawn_definitions::kind_for_type(type_name))
             .or_else(|| crate::catalog_v3::starmap_definition_kinds::kind_for_type(type_name)),
     }
 }

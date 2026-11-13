@@ -71,6 +71,8 @@ locationSizes: 0 written, 0 skipped, complete
 locationClassRegistries: 0 written, 0 skipped, complete
 locationFunctionRegistries: 0 written, 0 skipped, complete
 locationSizeRegistries: 0 written, 0 skipped, complete
+npcArchetypes: 0 written, 0 skipped, complete
+npcClassPools: 0 written, 0 skipped, complete
 inventoryContainers: 0 written, 0 skipped, complete
 medicalItemTierConfigs: 0 written, 0 skipped, complete
 starmapTypes: 0 written, 0 skipped, complete
@@ -90,4 +92,4 @@ ships variants: 0 in 0 groups
 quality quantizations: 0 used by no ResourceType, 0 links reach no quantization
 en: 16 texts resolved, 1 unresolved, 0 placeholders
 de: 0 texts resolved, 17 unresolved, 0 placeholders, the Archive holds no global.ini
-wrote [DIR]/english-only.json: 207235 bytes, 1 Records skipped, 0 failed
+wrote [DIR]/english-only.json: 208851 bytes, 1 Records skipped, 0 failed
