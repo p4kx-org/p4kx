@@ -11,6 +11,9 @@ use crate::CatalogError;
 use crate::blueprint::as_struct;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_v3::location_classification::configuration::{
+    self, MissionLocationConfiguration,
+};
 use crate::catalog_v3::location_classification::{self, LocationClassification};
 use crate::contract::{LocalisedText, every_field_required};
 use crate::guid_text::CatalogGuid;
@@ -40,6 +43,7 @@ pub(crate) struct MissionLocationTemplate<'a> {
     pub(crate) disabled: Option<bool>,
     /// The original classification of the location data.
     classification: SourcedValue<LocationClassification<'a>>,
+    configuration: SourcedValue<MissionLocationConfiguration<'a>>,
     /// The `isSecurityNetworkHost` flag, `null` when absent.
     pub(crate) is_security_network_host: Option<bool>,
     /// The `generalTags`: what the queries of `contractLocationQueries` match.
@@ -111,12 +115,14 @@ fn template<'f>(
     let data = one(Some(tree.root()), "locationData");
     let mut notes = Vec::new();
     let classification = location_classification::read(&fields, input, &capture, &mut notes)?;
+    let configuration = configuration::read(&fields, input, &capture, &mut notes)?;
     let value = MissionLocationTemplate {
         guid: CatalogGuid(tree.guid()),
         class_name: class_name(tree),
         record_path: tree.record_path(),
         disabled: boolean(data, "disabled"),
         classification,
+        configuration,
         is_security_network_host: boolean(data, "isSecurityNetworkHost"),
         tags: reader.tag_list(data, "generalTags"),
         produces_tags: term(&reader, data, "producesTags"),

@@ -80,6 +80,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) shop_inventories: KindCompleteness<'a>,
     /// The completeness of `factions`.
     pub(crate) factions: KindCompleteness<'a>,
+    /// The completeness of the physical `FactionIdentity` selection.
+    pub(crate) faction_identities: KindCompleteness<'a>,
     /// The completeness of `reputationPerks`.
     pub(crate) reputation_perks: KindCompleteness<'a>,
     /// The completeness of `reputationTriggerRecords`.
@@ -200,6 +202,7 @@ impl<'a> Completeness<'a> {
             shops: completeness,
             shop_inventories: KindCompleteness::Complete,
             factions: completeness,
+            faction_identities: completeness,
             reputation_perks: completeness,
             reputation_trigger_records: completeness,
             reputation_reward_amounts: completeness,

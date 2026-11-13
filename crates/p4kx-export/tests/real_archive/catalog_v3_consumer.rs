@@ -57,6 +57,7 @@ fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
         Kind::BlueprintCategories => "/definitions/blueprintCategories",
         Kind::Manufacturers => "/definitions/manufacturers",
         Kind::Factions => "/definitions/factions",
+        Kind::FactionIdentities => "/definitions/factionIdentities",
         Kind::FactionReputations => "/definitions/factionReputations",
         Kind::ReputationPerks => "/definitions/reputationPerks",
         Kind::ReputationTriggerRecords => "/definitions/reputationTriggerRecords",
@@ -129,6 +130,7 @@ fn checked_table<'catalog>(
                 | Kind::GameplayProperties
                 | Kind::LootPoolFilters
                 | Kind::Factions
+                | Kind::FactionIdentities
                 | Kind::FactionReputations
                 | Kind::ReputationTriggerRecords
                 | Kind::ReputationRewardAmounts
@@ -256,6 +258,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::GameplayProperties
             | Kind::Manufacturers
             | Kind::Factions
+            | Kind::FactionIdentities
             | Kind::FactionReputations
             | Kind::ReputationTriggerRecords
             | Kind::ReputationRewardAmounts

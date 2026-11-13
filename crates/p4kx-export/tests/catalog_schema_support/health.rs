@@ -73,6 +73,7 @@ fn row_count(kind: Kind, catalog: &Value) -> usize {
         Kind::MedicalItemTierConfigs => catalog.pointer("/definitions/medicalItemTierConfigs/rows"),
         Kind::MissionScenarios => catalog.pointer("/definitions/missionScenarios/rows"),
         Kind::Factions => catalog.pointer("/definitions/factions/rows"),
+        Kind::FactionIdentities => catalog.pointer("/definitions/factionIdentities/rows"),
         Kind::FactionReputations => catalog.pointer("/definitions/factionReputations/rows"),
         Kind::ReputationPerks => catalog.pointer("/definitions/reputationPerks/rows"),
         Kind::ReputationTriggerRecords => {

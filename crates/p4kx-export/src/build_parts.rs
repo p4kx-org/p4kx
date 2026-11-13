@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::DataForge;
+
+use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::faction_identity_definition::{
+    self, FactionIdentityDefinition, PreparedFactionIdentity,
+};
 use crate::starmap_report::StarmapReport;
 use crate::{
     CatalogProvenance, CatalogSummary, CraftingWarning, LoadoutSummary, PaintSummary, ShopSummary,
@@ -51,4 +57,11 @@ impl Parts {
             compressed_size,
         }
     }
+}
+
+pub(super) fn faction_identities<'source>(
+    forge: &DataForge<'_>,
+    rows: Vec<PreparedFactionIdentity<'source>>,
+) -> CatalogTable<FactionIdentityDefinition<'source>> {
+    faction_identity_definition::table(forge, rows)
 }

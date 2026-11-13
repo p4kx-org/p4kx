@@ -157,6 +157,8 @@ pub enum Kind {
     AmmoDefinitions,
     /// All physically typed Faction Records.
     Factions,
+    /// Physical `FactionIdentity` Records.
+    FactionIdentities,
     /// All physically typed reputation perk-list Records.
     ReputationPerks,
     /// All physical sandbox reputation trigger definition Records.
@@ -207,7 +209,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 78] = [
+    pub const ALL: [Self; 79] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -263,6 +265,7 @@ impl Kind {
         Self::ExplosionDefinitions,
         Self::AmmoDefinitions,
         Self::Factions,
+        Self::FactionIdentities,
         Self::ReputationPerks,
         Self::ReputationTriggerRecords,
         Self::ReputationRewardAmounts,
@@ -352,6 +355,7 @@ impl Kind {
             Self::ExplosionDefinitions => "explosionDefinitions",
             Self::AmmoDefinitions => "ammoDefinitions",
             Self::Factions => "factions",
+            Self::FactionIdentities => "factionIdentities",
             Self::ReputationPerks => "reputationPerks",
             Self::ReputationTriggerRecords => "reputationTriggerRecords",
             Self::ReputationRewardAmounts => "reputationRewardAmounts",

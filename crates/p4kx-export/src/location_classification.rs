@@ -18,6 +18,9 @@ use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceRecordReference;
 use crate::template_field_capture::TemplateFieldCapture;
 
+#[path = "location_configuration.rs"]
+pub(crate) mod configuration;
+
 type Reference<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
 
 /// The original dictionary links of one mission location.

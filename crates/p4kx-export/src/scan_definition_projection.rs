@@ -84,6 +84,19 @@ impl<'f> Scan<'_, '_, 'f> {
         Ok(Some(projection))
     }
 
+    fn faction_identity_definition(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (value, notes) = crate::catalog_v3::faction_identity_definition::read(
+            tree,
+            self.projection,
+            admission,
+            self.options.cancel,
+        )?;
+        Ok((Picked::FactionIdentity(Box::new(value)), notes))
+    }
     fn npc_spawn_definition(
         &self,
         kind: Kind,
@@ -132,6 +145,7 @@ impl<'f> Scan<'_, '_, 'f> {
     ) -> Result<Option<(Picked<'f>, Vec<FieldError>)>, ScanError> {
         let projection = match kind {
             Kind::FactionReputations => self.faction_reputation_definition(admission, tree)?,
+            Kind::FactionIdentities => self.faction_identity_definition(admission, tree)?,
             Kind::ReputationContexts => self.context_definition(admission, tree)?,
             Kind::ReputationScopes => self.scope_definition(admission, tree)?,
             Kind::ReputationStandings => self.standing_definition(admission, tree)?,

@@ -1629,6 +1629,8 @@ original location class, function and size References. See [the location vocabul
 Not exported of a location template: the NPC auto spawn settings of its
 `locationData` (not the NPC spawn descriptions of contracts, see "NPC and entity spawns"), the
 mission modules and limits and the security network manifest.
+The sourced location configuration retains authored mission limits and its default security
+manifest Reference. See [mission location configuration](catalog-location-configuration.md).
 
 Not exported: SCMDB's own pools, waves and region lists, which are derived and not stated by the
 Archive.

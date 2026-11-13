@@ -15,6 +15,7 @@ impl Collected<'_> {
             Kind::Tags => self.tags.count(),
             Kind::Manufacturers => self.manufacturers.len(),
             Kind::Factions => self.factions.len(),
+            Kind::FactionIdentities => self.faction_identities.len(),
             Kind::Infractions | Kind::InfractionSets | Kind::Jurisdictions => self.law.count(kind),
             Kind::LocationClasses
             | Kind::LocationFunctions

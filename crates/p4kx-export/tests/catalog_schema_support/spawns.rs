@@ -15,6 +15,10 @@ pub(super) fn location_templates() -> serde_json::Value {
             "state": "absent", "value": null, "sourceUsesRefs": [],
             "sourceSetComplete": true, "containsEncryptedSource": false
         },
+        "configuration": {
+            "state": "absent", "value": null, "sourceUsesRefs": [],
+            "sourceSetComplete": true, "containsEncryptedSource": false
+        },
         "isSecurityNetworkHost": null,
         "tags": ["Missions.LocationType.HijackedShip"],
         "producesTags": {"positiveTags": [], "negativeTags": []},

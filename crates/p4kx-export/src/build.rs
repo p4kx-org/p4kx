@@ -38,17 +38,14 @@ use refusal::CatalogRefusal;
 #[path = "original_catalog_inputs.rs"]
 pub(crate) mod original_input;
 use crate::catalog_read::original::EntryCapture;
-
 #[path = "build_parts.rs"]
 mod parts;
 use parts::Parts;
 #[path = "build_source.rs"]
 mod metadata;
 pub(crate) use metadata::source;
-
 #[path = "build_scan.rs"]
 mod scanning;
-
 /// Builds the catalog and hands it to `emit`, which serialises it.
 #[expect(
     clippy::too_many_lines,
@@ -279,6 +276,7 @@ fn assemble<R>(
             commodities: commodity_tables.definitions,
             manufacturers: crate::manufacturer::table(&forge, collected.manufacturers),
             factions: crate::catalog_v3::faction_definition::table(&forge, collected.factions),
+            faction_identities: parts::faction_identities(&forge, collected.faction_identities),
             reputation_perks: reputation_tables.perks,
             reputation_trigger_records: reputation_tables.trigger_records,
             reputation_reward_amounts: reputation_tables.reward_amounts,

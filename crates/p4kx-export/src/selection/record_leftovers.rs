@@ -43,6 +43,7 @@ pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
     match kind {
         Kind::Tags
         | Kind::Factions
+        | Kind::FactionIdentities
         | Kind::ReputationPerks
         | Kind::ReputationTriggerRecords
         | Kind::ReputationRewardAmounts

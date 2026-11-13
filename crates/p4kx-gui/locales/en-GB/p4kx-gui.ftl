@@ -527,6 +527,7 @@ catalog-summary-kind = { $kind ->
     [blueprintCategories] Blueprint categories
     [blueprintCategoryLists] Blueprint category lists
     [factions] Factions
+    [factionIdentities] Faction identities
     [reputationPerks] Reputation perks
     [reputationTriggerRecords] Reputation trigger records
     [reputationRewardAmounts] Reputation reward amounts

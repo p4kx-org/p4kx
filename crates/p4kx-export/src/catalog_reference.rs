@@ -92,6 +92,9 @@ pub(crate) fn actual_kind(type_name: &str) -> Option<Kind> {
         "Tag" => Some(Kind::Tags),
         "SCItemManufacturer" => Some(Kind::Manufacturers),
         crate::catalog_v3::faction_definition::SOURCE_TYPE => Some(Kind::Factions),
+        crate::catalog_v3::faction_identity_definition::SOURCE_TYPE => {
+            Some(Kind::FactionIdentities)
+        }
         crate::catalog_v3::reputation_faction_definition::SOURCE_TYPE => {
             Some(Kind::FactionReputations)
         }

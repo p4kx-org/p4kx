@@ -10,6 +10,7 @@ use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition::AmmoDefinition;
 use crate::catalog_v3::explosion_definition::ExplosionDefinition;
 use crate::catalog_v3::faction_definition::FactionDefinition;
+use crate::catalog_v3::faction_identity_definition::FactionIdentityDefinition;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::infraction_definition::{InfractionDefinition, InfractionSetDefinition};
 use crate::catalog_v3::inventory_container_definition::InventoryContainerDefinition;
@@ -67,6 +68,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) resource_types: CatalogTable<ResourceType<'source>>,
     pub(crate) commodities: CatalogTable<CommodityDefinition<'source>>,
     pub(crate) manufacturers: CatalogTable<ManufacturerDefinition<'source>>,
+    pub(crate) faction_identities: CatalogTable<FactionIdentityDefinition<'source>>,
     pub(crate) factions: CatalogTable<FactionDefinition<'source>>,
     pub(crate) faction_reputations: CatalogTable<FactionReputationDefinition<'source>>,
     pub(crate) reputation_perks: CatalogTable<ReputationPerkList<'source>>,

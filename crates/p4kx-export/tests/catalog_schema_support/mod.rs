@@ -334,6 +334,21 @@ pub(crate) fn minimal_catalog() -> Value {
         "cargoManifests": contracts::manifests(),
         "shipStoreSlugs": slugs::ship_store_slugs()
     });
+    if let Some(completeness) = catalog
+        .get_mut("completeness")
+        .and_then(Value::as_object_mut)
+    {
+        completeness.insert(
+            "factionIdentities".to_owned(),
+            json!({"status": "complete"}),
+        );
+    }
+    if let Some(definitions) = catalog
+        .get_mut("definitions")
+        .and_then(Value::as_object_mut)
+    {
+        definitions.insert("factionIdentities".to_owned(), absent_table());
+    }
     let export_health = health::fixture(&catalog);
     let Value::Object(fields) = &mut catalog else {
         unreachable!("the authored catalog fixture is a JSON object");

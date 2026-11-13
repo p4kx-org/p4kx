@@ -527,6 +527,7 @@ catalog-summary-kind = { $kind ->
     [blueprintCategories] Blaupausenkategorien
     [blueprintCategoryLists] Blaupausenkategorielisten
     [factions] Fraktionen
+    [factionIdentities] Fraktionsidentitäten
     [reputationPerks] Rufvorteile
     [reputationTriggerRecords] Rufauslöser-Definitionen
     [reputationRewardAmounts] Rufbelohnungswerte

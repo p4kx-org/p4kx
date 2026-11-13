@@ -107,6 +107,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | lootContainers | P.lootContainers | original config/container/system/object relation, contextual identity |
 | shops | D.shops; A.shopInventoryResolution | registry identity/type/brand/place, conservative all-sources-agree resolution |
 | factionReputations | D.factionReputations; C.reputationTriggers | physical reputation owners, distinct from Faction/FactionIdentity, with authored presentation, blackboard, relation markers and perk-list links |
+| factionIdentities | D.factionIdentities | [physical FactionIdentity owners](catalog-faction-identities.md) with protected Locale, security and Tag links, exact ordered encounter weights and original NPC joins |
 | reputationScopes | D.reputationScopes | physical scopes, protected names and descriptions, icon paths, exact standing-map limits and ordered standing links |
 | reputationStandings | D.reputationStandings | authored rank names, descriptions, perk text, icon paths, gating and exact progression values |
 | reputationPerks | D.reputationPerks | physical perk lists, ordered scope/standing bindings, typed item/category rewards, original words and unclassified authored variants |

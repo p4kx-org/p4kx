@@ -66,6 +66,9 @@ pub(crate) enum Picked<'f> {
     AmmoDefinition(Box<PreparedAmmoDefinition<'f>>),
     InventoryContainer(Box<PreparedInventoryContainer<'f>>),
     MedicalItemTierConfig(Box<PreparedMedicalTier<'f>>),
+    FactionIdentity(
+        Box<crate::catalog_v3::faction_identity_definition::PreparedFactionIdentity<'f>>,
+    ),
     Faction(Box<PreparedFaction<'f>>),
     Law(LawPick<'f>),
     LocationVocabulary(LocationVocabularyPick<'f>),
@@ -151,6 +154,7 @@ impl<'f> Picked<'f> {
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
             | Kind::Factions
+            | Kind::FactionIdentities
             | Kind::ReputationPerks
             | Kind::ReputationTriggerRecords
             | Kind::ReputationRewardAmounts

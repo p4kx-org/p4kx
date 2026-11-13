@@ -43,6 +43,7 @@ impl Collected<'_> {
         self.law.order();
         self.location_vocabulary.order();
         self.npc_spawn_definitions.order();
+        crate::catalog_v3::faction_identity_definition::order(&mut self.faction_identities);
         self.loot_kinds.order();
         self.tags.order_entities();
     }

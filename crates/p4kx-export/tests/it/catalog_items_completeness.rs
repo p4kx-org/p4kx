@@ -89,6 +89,7 @@ fn expected_completeness() -> Value {
         "locationSizeRegistries": {"status": "complete"},
         "npcArchetypes": {"status": "complete"},
         "npcClassPools": {"status": "complete"},
+        "factionIdentities": {"status": "complete"},
         "autoSpawns": {"status": "complete"},
         "autoSpawnSets": {"status": "complete"},
         "encounterIndices": {"status": "complete"},

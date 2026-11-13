@@ -17,6 +17,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
             | Kind::Factions
+            | Kind::FactionIdentities
             | Kind::FactionReputations
             | Kind::ReputationScopes
             | Kind::ReputationStandings
@@ -87,7 +88,8 @@ pub(super) const fn expected_owned_number(
             | Kind::StarmapPresets
             | Kind::NpcClassPools
             | Kind::AutoSpawns
-            | Kind::AutoSpawnSets,
+            | Kind::AutoSpawnSets
+            | Kind::FactionIdentities,
             _,
         ) => (AuthoredDefinitionValue { ordinal }, Single),
         _ => return None,
@@ -100,6 +102,7 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
         Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
             | Kind::Factions
+            | Kind::FactionIdentities
             | Kind::FactionReputations
             | Kind::ReputationScopes
             | Kind::ReputationStandings

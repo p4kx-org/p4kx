@@ -93,6 +93,10 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::faction_definition::SOURCE_TYPE,
             },
+            Self::FactionIdentities => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::faction_identity_definition::SOURCE_TYPE,
+            },
             Self::AmmoDefinitions => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::ammo_definition::SOURCE_TYPE,

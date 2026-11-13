@@ -69,6 +69,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) ledger: ExportLedger,
     pub(crate) tags: crate::catalog_v3::tag_catalog::TagRows<'f>,
     pub(crate) manufacturers: Vec<Manufacturer<'f>>,
+    pub(crate) faction_identities: Vec<crate::catalog_v3::faction_identity_definition::PreparedFactionIdentity<'f>>,
     pub(crate) factions: Vec<PreparedFaction<'f>>,
     pub(crate) law: LawKinds<'f>,
     pub(crate) location_vocabulary: LocationVocabulary<'f>,
@@ -177,6 +178,7 @@ impl<'f> Collected<'f> {
             ledger: crafting.ledger,
             tags: crate::catalog_v3::tag_catalog::TagRows::default(),
             manufacturers: Vec::new(),
+            faction_identities: Vec::new(),
             factions: Vec::new(),
             items: Vec::new(),
             item_components: ItemComponentRows::default(),
@@ -253,6 +255,7 @@ impl<'f> Collected<'f> {
     fn take(&mut self, pick: Picked<'f>, missing_categories: &mut HashSet<Guid>) {
         match pick {
             Picked::Manufacturer(entity) => self.manufacturers.push(*entity),
+            Picked::FactionIdentity(entity) => self.faction_identities.push(*entity),
             Picked::Faction(entity) => self.factions.push(*entity),
             Picked::Item {
                 entity,

@@ -172,6 +172,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
         kind,
         Kind::Manufacturers
             | Kind::Factions
+            | Kind::FactionIdentities
             | Kind::FactionReputations
             | Kind::ReputationPerks
             | Kind::ReputationTriggerRecords
