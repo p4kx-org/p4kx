@@ -4,6 +4,7 @@
 use std::io::Write;
 
 use gltf_json as json;
+use p4kx_model::Material;
 use p4kx_model::{Animation, Lod, Model};
 
 use crate::GltfError;
@@ -158,12 +159,28 @@ pub fn write_glb_animated_with(
     textures: &dyn TextureLoader,
     out: &mut impl Write,
 ) -> Result<GlbSummary, GltfError> {
+    write_glb_animated_with_fallback(model, animations, options, Some(textures), None, out)
+}
+
+/// Writes the model using a resolved source fallback for missing material assignments.
+///
+/// # Errors
+///
+/// As [`write_glb`].
+pub fn write_glb_animated_with_fallback(
+    model: &Model,
+    animations: &[Animation],
+    options: &GlbOptions,
+    textures: Option<&dyn TextureLoader>,
+    fallback: Option<&Material>,
+    out: &mut impl Write,
+) -> Result<GlbSummary, GltfError> {
     let lod = find_lod(model, options.lod)?;
     let instance = Instance {
         model,
         lod: Some(lod),
         wrapper: None,
-        plan: MaterialPlan::new(model.materials.library(), lod),
+        plan: MaterialPlan::with_fallback(model.materials.library(), lod, fallback),
         twin: None,
     };
     let animations: Vec<&Animation> = animations.iter().collect();
@@ -173,7 +190,7 @@ pub fn write_glb_animated_with(
         rig: None,
         animations: &animations,
     };
-    write_instances(&content, options, textures, 0, out)
+    write_instances(&content, options, textures.unwrap_or(&NoTextures), 0, out)
 }
 
 /// Returns how many meshes the twin instances reuse instead of writing them again.

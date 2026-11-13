@@ -2350,7 +2350,12 @@ what is wrong for the second and third; `single` is true when one material serve
 `id` of the material is `null`); `default_palette` is the library's default tint palette.
 `materials` lists the materials of a loaded library in ID order, with the colours as the file
 stores them (linear), `flags` the engine's `MtlFlags` and `textures` the slots with their paths as
-the file gives them. `nodes` keeps the order of the file;
+the file gives them. `default_material` reports the separate archive fallback lookup when
+a read model requires it. Its state distinguishes a resolved material from missing,
+ambiguous, unreadable, malformed or unsupported sources. An observed source includes
+its physical Entry and container coordinates and an encryption marker. The decoded
+SHA-256 is present when the candidate's original bytes were verified. An unreadable
+candidate is evidence of the attempted source. `nodes` keeps the order of the file;
 `parent` is the index of the parent node or `null` for a root, and `transform` the 3×4 row-major
 matrix from the node's space to its parent's, translation last, in CryEngine axes (Z up) and
 metres. A model without a `NodeMeshCombo` chunk has one root node named after the file. `scale` is

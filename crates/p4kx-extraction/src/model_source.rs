@@ -10,6 +10,7 @@ use p4kx_model::{
 };
 
 use crate::ConversionError;
+pub use crate::archive_material_reference::{ArchiveDefaultMaterial, ArchiveDefaultMaterialState};
 use crate::chunk_source::ChunkSource;
 use crate::disk_case::CaseIndex;
 use crate::model_companions::{ArchiveCompanions, DiskCompanions};
@@ -34,6 +35,7 @@ pub struct ModelSource {
     inputs: Vec<PathBuf>,
     model: Model,
     archive_sources: Vec<ModelArchiveSource>,
+    default_material: Option<Arc<ArchiveDefaultMaterial>>,
 }
 
 impl ModelSource {
@@ -299,6 +301,7 @@ impl ModelSource {
             inputs: companions.read,
             model,
             archive_sources: Vec::new(),
+            default_material: None,
         })
     }
 
@@ -306,6 +309,21 @@ impl ModelSource {
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Resolves the source fallback from this observed Archive directory and key generation.
+    #[must_use]
+    pub fn archive_default_material(
+        index: &PathIndex<'_>,
+        verdicts: &TextureVerdicts,
+    ) -> Arc<ArchiveDefaultMaterial> {
+        index.default_material.resolve(index, verdicts)
+    }
+
+    /// Returns the original archive fallback lookup when this model required one.
+    #[must_use]
+    pub fn default_material(&self) -> Option<&ArchiveDefaultMaterial> {
+        self.default_material.as_deref()
     }
 
     /// Returns the model.

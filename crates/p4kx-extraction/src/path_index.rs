@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use p4kx_archive::{Archive, Entry};
 use rayon::prelude::*;
 
+use crate::archive_material_reference::default_material::Cache as DefaultMaterialCache;
 use crate::entry_path::same_entry_path;
 use crate::path_key_sort;
 use crate::{PathIndexBuildError, PathIndexError};
@@ -21,6 +22,7 @@ const HASH_BLOCK_BYTES: usize = 4096;
 pub struct PathIndex<'a> {
     archive: &'a Archive,
     keys: Cow<'a, [(u64, u32)]>,
+    pub(crate) default_material: DefaultMaterialCache,
 }
 
 /// The sorted path hashes of an Archive's Entries, kept apart from the Archive so one build serves
@@ -91,6 +93,7 @@ impl PathKeys {
         PathIndex {
             archive,
             keys: Cow::Borrowed(&self.keys),
+            default_material: DefaultMaterialCache::default(),
         }
     }
 }
@@ -102,6 +105,7 @@ impl<'a> PathIndex<'a> {
         Self {
             archive,
             keys: Cow::Owned(PathKeys::new(archive).keys),
+            default_material: DefaultMaterialCache::default(),
         }
     }
 

@@ -9,6 +9,11 @@ use thiserror::Error;
 
 use crate::PathIndex;
 
+#[path = "archive_default_material.rs"]
+pub(crate) mod default_material;
+
+pub use default_material::{ArchiveDefaultMaterial, ArchiveDefaultMaterialState};
+
 #[derive(Debug, Error)]
 enum MaterialReferenceError {
     #[error("the material reference is not an admitted virtual Archive path")]
@@ -80,13 +85,34 @@ pub(crate) fn unique_entry<'a>(
     index: &PathIndex<'a>,
     path: &str,
 ) -> Result<Option<&'a Entry>, CompanionError> {
-    let mut matches = index.matching_entries_with(path, |_| Ok::<(), Infallible>(()))?;
-    let first = matches.next().transpose()?;
-    if matches.next().transpose()?.is_some() {
-        return Err(MaterialReferenceError::AmbiguousTarget {
+    match unique_entry_choice(index, path)? {
+        EntryChoice::Missing => Ok(None),
+        EntryChoice::Unique(entry) => Ok(Some(entry)),
+        EntryChoice::Ambiguous(_, _) => Err(MaterialReferenceError::AmbiguousTarget {
             target: path.to_owned(),
         }
-        .into());
+        .into()),
     }
-    Ok(first)
+}
+
+pub(crate) enum EntryChoice<'archive> {
+    Missing,
+    Unique(&'archive Entry),
+    Ambiguous(&'archive Entry, &'archive Entry),
+}
+
+pub(crate) fn unique_entry_choice<'a>(
+    index: &PathIndex<'a>,
+    path: &str,
+) -> Result<EntryChoice<'a>, CompanionError> {
+    let mut matches = index.matching_entries_with(path, |_| Ok::<(), Infallible>(()))?;
+    let Some(first) = matches.next().transpose()? else {
+        return Ok(EntryChoice::Missing);
+    };
+    Ok(matches
+        .next()
+        .transpose()?
+        .map_or(EntryChoice::Unique(first), |second| {
+            EntryChoice::Ambiguous(first, second)
+        }))
 }

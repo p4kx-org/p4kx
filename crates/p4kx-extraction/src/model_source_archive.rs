@@ -187,28 +187,53 @@ impl ModelSource {
             file: name.clone(),
             source,
         })?;
-        if !matches!(coordinates, Coordinates::Skip) {
-            if let Some(primary) = archive_sources.first_mut() {
-                primary.set_node_sources(observed.nodes);
-                if let Some(selection) = observed.primary_skeleton {
-                    primary.set_primary_skeleton(selection);
-                }
-            }
-            for skeleton in observed.skeletons {
-                if let Some(source) = archive_sources
-                    .iter_mut()
-                    .find(|source| source.file() == skeleton.file())
-                {
-                    source.set_bone_sources(skeleton);
-                }
-            }
-        }
+        bind_sources(coordinates, observed, &mut archive_sources);
         Ok(Self {
             protection: source.into_protection(),
             name,
             inputs: vec![index.archive().path().to_path_buf()],
+            default_material: (reading != MaterialReading::Skipped && requires_default(&model))
+                .then(|| Self::archive_default_material(index, verdicts)),
             model,
             archive_sources,
         })
     }
+}
+
+fn bind_sources(
+    coordinates: Coordinates,
+    observed: ModelReadSources,
+    archive_sources: &mut [ModelArchiveSource],
+) {
+    if !matches!(coordinates, Coordinates::Skip) {
+        if let Some(primary) = archive_sources.first_mut() {
+            primary.set_node_sources(observed.nodes);
+            if let Some(selection) = observed.primary_skeleton {
+                primary.set_primary_skeleton(selection);
+            }
+        }
+        for skeleton in observed.skeletons {
+            if let Some(source) = archive_sources
+                .iter_mut()
+                .find(|source| source.file() == skeleton.file())
+            {
+                source.set_bone_sources(skeleton);
+            }
+        }
+    }
+}
+
+fn requires_default(model: &Model) -> bool {
+    let library = model.materials.library();
+    model
+        .lods
+        .iter()
+        .flat_map(|lod| &lod.meshes)
+        .flat_map(|mesh| &mesh.submeshes)
+        .any(|submesh| {
+            library.is_none_or(|library| {
+                library.material(submesh.material_id).is_none()
+                    || library.is_empty_slot(submesh.material_id)
+            })
+        })
 }

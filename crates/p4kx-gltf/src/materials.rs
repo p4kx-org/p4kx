@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 
 use gltf_json as json;
@@ -31,13 +32,21 @@ pub(crate) enum Slot {
 pub(crate) struct MaterialPlan<'m> {
     library: Option<&'m MaterialLibrary>,
     slots: BTreeMap<u16, Option<Slot>>,
-    default: Material,
+    default: Cow<'m, Material>,
     overrides: BTreeMap<usize, Material>,
 }
 
 impl<'m> MaterialPlan<'m> {
     /// Resolves every material ID `lod` uses against `library`, `None` when there is none.
     pub(crate) fn new(library: Option<&'m MaterialLibrary>, lod: &Lod) -> Self {
+        Self::with_fallback(library, lod, None)
+    }
+
+    pub(crate) fn with_fallback(
+        library: Option<&'m MaterialLibrary>,
+        lod: &Lod,
+        fallback: Option<&'m Material>,
+    ) -> Self {
         let ids: BTreeSet<u16> = lod
             .meshes
             .iter()
@@ -49,7 +58,9 @@ impl<'m> MaterialPlan<'m> {
             .map(|id| {
                 (
                     id,
-                    library.map_or(Some(Slot::Default), |library| resolve(library, id)),
+                    library.map_or(Some(Slot::Default), |library| {
+                        resolve(library, id, fallback.is_some())
+                    }),
                 )
             })
             .collect();
@@ -69,7 +80,7 @@ impl<'m> MaterialPlan<'m> {
         Self {
             library,
             slots,
-            default: Material::engine_default(),
+            default: fallback.map_or_else(|| Cow::Owned(Material::engine_default()), Cow::Borrowed),
             overrides,
         }
     }
@@ -119,7 +130,7 @@ impl<'m> MaterialPlan<'m> {
         Self {
             library: None,
             slots: BTreeMap::new(),
-            default: Material::engine_default(),
+            default: Cow::Owned(Material::engine_default()),
             overrides: BTreeMap::new(),
         }
     }
@@ -176,8 +187,11 @@ impl<'m> MaterialPlan<'m> {
     }
 }
 
-fn resolve(library: &MaterialLibrary, id: u16) -> Option<Slot> {
+fn resolve(library: &MaterialLibrary, id: u16, physical_fallback: bool) -> Option<Slot> {
     let position = if library.single { 0 } else { usize::from(id) };
+    if physical_fallback && library.is_empty_slot(id) {
+        return Some(Slot::Default);
+    }
     match library.materials.get(position) {
         Some(material) if material.hidden() => None,
         Some(_) => Some(Slot::Library(position)),
@@ -312,6 +326,7 @@ fn emissive(material: &Material) -> [f32; 3] {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
     use std::collections::BTreeMap;
 
     use p4kx_model::{MaterialLibrary, TintEntry, TintPalette};
@@ -336,7 +351,7 @@ mod tests {
         let mut plan = MaterialPlan {
             library: Some(&library),
             slots: BTreeMap::from([(0, Some(Slot::Library(0)))]),
-            default: Material::engine_default(),
+            default: Cow::Owned(Material::engine_default()),
             overrides: BTreeMap::new(),
         };
         let corrected = library

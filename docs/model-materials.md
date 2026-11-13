@@ -107,9 +107,12 @@ Synthetic and optional local consumer verification is documented in
 These are heuristics for a file without textures, after the findings of the StarBreaker review
 (#104). A material that draws nothing (the no-draw flag, the `NoDraw` shader or opacity 0) gets no
 glTF material and its submeshes are not written; the summary counts them as hidden. A material ID
-beyond the sub-materials, or any ID when the library is missing, gets one shared default material
-(light grey, matt); the engine draws such IDs with `material_default.mtl`, which the reader does
-not load.
+beyond the sub-materials or any ID when the library is missing gets one shared fallback surface.
+Archive-backed model GLB uses a verified, drawable single material from the unique
+`Data/Materials/material_default.mtl` Entry when that source is available. An explicit
+non-material position in an authored list keeps its slot and can use the same physical
+fallback. A hidden authored material remains suppressed. Disk models and unreadable or
+unsupported archive fallbacks use the synthetic light-grey surface.
 
 `HardSurface` and `LayerBlend_V2` (23,770 and 46,806 materials) take their colour from `MatLayers`
 and the tint palette, so their plain colour is the white `Diffuse`; tints are #127.

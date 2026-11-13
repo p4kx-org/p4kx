@@ -6,15 +6,18 @@
 use std::borrow::Cow;
 
 use p4kx_chunks::Chunk;
-use p4kx_model::{
-    Bone, BoneTransform, ChunkUsage, Mesh, Model, ModelChunk, ModelFile, Node, Submesh,
-};
+use p4kx_model::{Bone, BoneTransform, ChunkUsage, Model, ModelChunk, ModelFile, Node};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::model_info_animations::{AnimationInfo, UnreadInfo};
-use crate::model_info_materials::{LibraryInfo, MaterialInfo};
+use crate::model_info_materials::{DefaultMaterialInfo, LibraryInfo, MaterialInfo};
 use crate::{AnimationListing, AnimationSet, ModelSource};
+
+#[path = "model_mesh_info.rs"]
+mod mesh_info;
+
+pub use mesh_info::MeshInfo;
 
 /// What `p4kx model info --json` says about a model, and what front-ends serialise of it.
 #[derive(Debug, Serialize)]
@@ -29,6 +32,8 @@ pub struct ModelInfo<'a> {
     pub material_ids: Vec<u16>,
     /// What reading the material library came to.
     pub library: LibraryInfo<'a>,
+    /// The separately looked-up physical fallback, when the read model needed one.
+    pub default_material: Option<DefaultMaterialInfo<'a>>,
     /// The materials of the library.
     pub materials: Vec<MaterialInfo<'a>>,
     /// The list of material indices of the node table.
@@ -82,6 +87,7 @@ impl<'a> ModelInfo<'a> {
             material_library: model.material_library.as_deref(),
             material_ids: model.material_ids(),
             library: LibraryInfo::of(model),
+            default_material: source.default_material().map(DefaultMaterialInfo::of),
             materials: MaterialInfo::of_model(model),
             node_material_indices: &model.material_indices,
             issues: model.issues.iter().map(ToString::to_string).collect(),
@@ -177,61 +183,6 @@ impl LodInfo {
                 meshes: lod.meshes.iter().map(MeshInfo::of).collect(),
             })
             .collect()
-    }
-}
-
-/// One mesh of a level of detail.
-#[derive(Debug, Serialize)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "the JSON has one flag per optional vertex stream of a mesh"
-)]
-pub struct MeshInfo {
-    node: usize,
-    vertices: usize,
-    triangles: usize,
-    normals: bool,
-    normals_computed: bool,
-    tangents: bool,
-    colours: bool,
-    second_uvs: bool,
-    non_finite_uvs: usize,
-    skinned: bool,
-    submeshes: Vec<SubmeshInfo>,
-}
-
-impl MeshInfo {
-    fn of(mesh: &Mesh) -> Self {
-        Self {
-            node: mesh.node,
-            vertices: mesh.positions.len(),
-            triangles: mesh.indices.len() / 3,
-            normals: mesh.normals.is_some(),
-            normals_computed: mesh.normals_computed,
-            tangents: mesh.tangents.is_some(),
-            colours: mesh.colours.is_some(),
-            second_uvs: mesh.second_uvs.is_some(),
-            non_finite_uvs: mesh.non_finite_uvs,
-            skinned: mesh.influences.is_some(),
-            submeshes: mesh.submeshes.iter().map(SubmeshInfo::of).collect(),
-        }
-    }
-}
-
-#[derive(Debug, Serialize)]
-struct SubmeshInfo {
-    material_id: u16,
-    first_index: usize,
-    index_count: usize,
-}
-
-impl SubmeshInfo {
-    const fn of(submesh: &Submesh) -> Self {
-        Self {
-            material_id: submesh.material_id,
-            first_index: submesh.first_index,
-            index_count: submesh.index_count,
-        }
     }
 }
 

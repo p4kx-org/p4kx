@@ -23,7 +23,7 @@ use crate::source_provenance::model_material_origins::MaterialObservation;
 use crate::texture_grey::TextureVerdicts;
 
 /// The largest `.mtl` file a model's material library is read from, in bytes.
-const MAX_MATERIAL_LEN: u64 = 16 << 20;
+pub(crate) const MAX_MATERIAL_LEN: u64 = 16 << 20;
 
 /// A companion a resolver refuses to read.
 #[derive(Debug, Error)]

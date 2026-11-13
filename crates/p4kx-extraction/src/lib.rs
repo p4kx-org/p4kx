@@ -254,8 +254,8 @@ pub use model_chunk_source_info::{
 };
 pub use model_info::{BoneInfo, ChunkInfo, ChunkJson, LodInfo, MeshInfo, ModelInfo, NodeInfo};
 pub use model_info_animations::{AnimationInfo, UnreadInfo};
-pub use model_info_materials::{LibraryInfo, MaterialInfo};
-pub use model_source::ModelSource;
+pub use model_info_materials::{DefaultMaterialInfo, LibraryInfo, MaterialInfo};
+pub use model_source::{ArchiveDefaultMaterial, ArchiveDefaultMaterialState, ModelSource};
 pub use model_textures::{ArchiveTextures, MAX_MODEL_TEXTURE_PIXELS};
 pub use observed_file_origin::{ObservedFileOrigin, ObservedFileRead, read_observed_file};
 pub use options::{

@@ -55,15 +55,15 @@ pub(crate) fn load(
             reason: error.to_string(),
             target,
         },
-        Ok(Some(bytes)) => match MaterialLibrary::parse(name, &bytes) {
-            Ok(mut library) => {
-                library.target = target;
-                if reading == MaterialReading::Drawn {
-                    crate::mtl_layers::resolve(&mut library, companions, cache);
-                    crate::mtl_relief::check_diffuse_maps(&mut library, companions);
-                }
-                MaterialStatus::Loaded(library)
-            }
+        Ok(Some(bytes)) => match MaterialLibrary::parse_with_resolver(
+            name,
+            &bytes,
+            target.clone(),
+            companions,
+            reading,
+            cache,
+        ) {
+            Ok(library) => MaterialStatus::Loaded(library),
             Err(error) => MaterialStatus::Unreadable {
                 path,
                 reason: error.to_string(),

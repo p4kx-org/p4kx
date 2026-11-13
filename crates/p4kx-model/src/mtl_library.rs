@@ -3,7 +3,10 @@
 
 use crate::mtl_source::MaterialSourceLimits;
 use crate::mtl_source_error::MaterialReadError;
-use crate::{Material, MaterialError, MaterialLibrary, MaterialReadObservation, mtl_source_read};
+use crate::{
+    CompanionResolver, LayerCache, Material, MaterialError, MaterialLibrary,
+    MaterialReadObservation, MaterialReading, mtl_source_read,
+};
 impl MaterialLibrary {
     /// Reads the `.mtl` file `bytes`, text XML or `CryXml`, of the library `path`.
     ///
@@ -21,6 +24,28 @@ impl MaterialLibrary {
     /// [`MaterialError::TooMany`] when it holds more sub-materials than the limit allows.
     pub fn parse(path: &str, bytes: &[u8]) -> Result<Self, MaterialError> {
         mtl_source_read::parse(path, bytes)
+    }
+
+    /// Parses a material and optionally resolves its drawn surfaces with the supplied resolver.
+    ///
+    /// # Errors
+    ///
+    /// Returns the material parser's original typed error.
+    pub fn parse_with_resolver(
+        path: &str,
+        bytes: &[u8],
+        target: Option<String>,
+        resolver: &mut dyn CompanionResolver,
+        reading: MaterialReading,
+        cache: &LayerCache,
+    ) -> Result<Self, MaterialError> {
+        let mut library = Self::parse(path, bytes)?;
+        library.target = target;
+        if reading == MaterialReading::Drawn {
+            crate::mtl_layers::resolve(&mut library, resolver, cache);
+            crate::mtl_relief::check_diffuse_maps(&mut library, resolver);
+        }
+        Ok(library)
     }
 
     /// Reads bounded authored syntax while preserving the checkpoint's original error.
@@ -51,6 +76,19 @@ impl MaterialLibrary {
         observer: impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
     ) -> Result<Self, MaterialReadError<Interrupted>> {
         mtl_source_read::read_observed(path, bytes, limits, checkpoint, observer)
+    }
+
+    /// Returns whether the source slot contains an explicit non-material entry.
+    #[must_use]
+    pub fn is_empty_slot(&self, id: u16) -> bool {
+        !self.single
+            && self
+                .authored
+                .entries
+                .get(usize::from(id))
+                .is_some_and(|entry| {
+                    entry.disposition == crate::MaterialEntryDisposition::EngineDefault
+                })
     }
 
     /// Returns the material of `id`, or `None` when the library has no sub-material at that

@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_archive::{EntryOrigin, EntryOriginStep, SourceEncryption};
 use p4kx_model::{Material, MaterialStatus, Model};
 use serde::Serialize;
+use std::fmt::Write as _;
 
 use crate::material_source_info::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
+use crate::{ArchiveDefaultMaterial, ArchiveDefaultMaterialState};
 
 /// What reading a model's material library came to.
 #[derive(Debug, Serialize)]
@@ -107,4 +110,89 @@ impl<'a> MaterialInfo<'a> {
                 .collect(),
         }
     }
+}
+
+/// Physical fallback lookup and its original source, separate from the authored library.
+#[derive(Debug, Serialize)]
+pub struct DefaultMaterialInfo<'a> {
+    state: &'static str,
+    source: Option<DefaultMaterialSource<'a>>,
+    ambiguous_sources: Vec<DefaultMaterialSource<'a>>,
+    material: Option<MaterialInfo<'a>>,
+    decoded_sha256: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct DefaultMaterialSource<'a> {
+    entry_index: usize,
+    entry_path: &'a str,
+    containers: Vec<Option<DefaultMaterialContainer<'a>>>,
+    contains_encrypted_source: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+struct DefaultMaterialContainer<'a> {
+    entry_index: usize,
+    entry_path: &'a str,
+}
+
+impl<'a> DefaultMaterialInfo<'a> {
+    pub(crate) fn of(read: &'a ArchiveDefaultMaterial) -> Self {
+        let (state, ambiguous_sources) = match read.state() {
+            ArchiveDefaultMaterialState::Missing => ("missing", Vec::new()),
+            ArchiveDefaultMaterialState::Ambiguous { witnesses } => (
+                "ambiguous",
+                witnesses.iter().map(DefaultMaterialSource::of).collect(),
+            ),
+            ArchiveDefaultMaterialState::LookupFailed(_) => ("lookup-failed", Vec::new()),
+            ArchiveDefaultMaterialState::Unreadable(_) => ("unreadable", Vec::new()),
+            ArchiveDefaultMaterialState::Malformed(_) => ("malformed", Vec::new()),
+            ArchiveDefaultMaterialState::UnsupportedLibrary => ("unsupported-library", Vec::new()),
+            ArchiveDefaultMaterialState::Resolved => ("resolved", Vec::new()),
+        };
+        Self {
+            state,
+            source: read.original().map(DefaultMaterialSource::of),
+            ambiguous_sources,
+            material: read
+                .material()
+                .map(|material| MaterialInfo::of(material, Some(0))),
+            decoded_sha256: read.decoded_sha256().map(sha256_hex),
+        }
+    }
+}
+
+impl<'a> DefaultMaterialSource<'a> {
+    fn of(origin: &'a EntryOrigin) -> Self {
+        Self {
+            entry_index: origin.entry().index(),
+            entry_path: origin.entry().path(),
+            containers: origin
+                .ancestors()
+                .map(|step| step.map(DefaultMaterialContainer::of))
+                .collect(),
+            contains_encrypted_source: match origin.encryption() {
+                SourceEncryption::Encrypted => Some(true),
+                SourceEncryption::Unencrypted => Some(false),
+                _ => None,
+            },
+        }
+    }
+}
+
+impl<'a> DefaultMaterialContainer<'a> {
+    fn of(step: &'a EntryOriginStep) -> Self {
+        Self {
+            entry_index: step.index(),
+            entry_path: step.path(),
+        }
+    }
+}
+
+fn sha256_hex(digest: &[u8; 32]) -> String {
+    let mut hex = String::with_capacity(2 * digest.len());
+    for byte in digest {
+        let _ignored = write!(hex, "{byte:02x}");
+    }
+    hex
 }
