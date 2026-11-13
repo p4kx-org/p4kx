@@ -128,7 +128,8 @@ impl EntryPageSources {
     ) -> Result<Self, SourceEvidenceError> {
         let payload = uses.observe(input, InputScope::Payload)?;
         let directory = payload.for_scope(InputScope::ArchiveDirectoryMetadata);
-        let (path_uses, complete_path) = path_uses(&directory, ancestors, complete)?;
+        let (path_uses, complete_path) =
+            p4kx_extraction::directory_path_uses(&directory, ancestors, complete)?;
         let path = uses.origin(&path_uses, complete_path);
         Ok(Self {
             uses,
@@ -154,14 +155,6 @@ impl EntryPageSources {
         role: SourceUseRole,
     ) -> Result<SourceUse, SourceEvidenceError> {
         self.directory.at(location, role)
-    }
-
-    pub(crate) fn directory_fact(
-        &self,
-        field: &str,
-        role: SourceUseRole,
-    ) -> Result<SourceUse, SourceEvidenceError> {
-        self.directory.at(metadata(field), role)
     }
 
     pub(crate) fn leaf_path(&self) -> Result<SourceUse, SourceEvidenceError> {
@@ -221,23 +214,6 @@ impl EntryPageSources {
     pub(crate) fn local(&self) -> FieldOrigin {
         self.uses.origin(&[], true)
     }
-}
-
-fn path_uses(
-    directory: &SourceScope,
-    ancestors: usize,
-    mut complete: bool,
-) -> Result<(Vec<SourceUse>, bool), SourceEvidenceError> {
-    let mut path = Vec::new();
-    for index in 0..ancestors {
-        if let Some(ancestor) = directory.ancestor(index)? {
-            path.push(ancestor.at(metadata("path"), SourceUseRole::Payload)?);
-        } else {
-            complete = false;
-        }
-    }
-    path.push(directory.at(metadata("path"), SourceUseRole::Payload)?);
-    Ok((path, complete))
 }
 
 fn metadata(field: &str) -> SourceLocation {

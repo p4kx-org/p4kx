@@ -99,6 +99,7 @@ mod entity_outfit;
 mod entity_package;
 mod entity_root;
 mod entity_vehicle;
+mod entry_listing_json;
 mod exit;
 mod extract;
 mod extract_report;

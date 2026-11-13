@@ -56,6 +56,10 @@ pub(crate) struct EntryJson<'a> {
 }
 
 impl<'a> EntryJson<'a> {
+    pub(crate) const fn metadata(&self) -> &EntryMetadataInfo {
+        &self.metadata
+    }
+
     /// Makes the Entry the row of a split texture: the sizes are those of the whole group, and
     /// `parts` are the paths of its other Entries.
     pub(crate) fn grouped(mut self, compressed_size: u64, size: u64, parts: Vec<&'a str>) -> Self {

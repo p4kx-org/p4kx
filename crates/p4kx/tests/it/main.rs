@@ -89,6 +89,7 @@ mod entity_package_parity;
 mod entity_pick;
 mod entity_vehicle;
 mod entry_issues;
+mod entry_listing_origins;
 mod entry_metadata_json;
 mod exclude_commands;
 mod extract;

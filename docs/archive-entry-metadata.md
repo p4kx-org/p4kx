@@ -67,6 +67,16 @@ the record was copied into an export artifact.
 `p4kx-extraction::EntryMetadataInfo::of(entry)` encodes the same directory facts
 for frontends. CLI `list`, `search` and `socpak list` attach this object at
 `metadata`; MCP `list_entries` and `search_entries` use the identical object.
+
+CLI JSON Entry rows also carry `fieldOrigins` and `provenance`. Each row has a local
+source-use inventory. The pointers are relative to that row, such as
+`/metadata/dos_timestamp/raw_date` and `/size`. The grouped sizes carry the actual
+directory contributors for the header and every included part. Individual
+`/parts/0` and subsequent path fields carry their original path uses.
+The physical header still owns `metadata`, `compression` and `encrypted`.
+An encrypted leaf payload alone leaves a plain root directory field unencrypted.
+A plain nested Entry can have encrypted metadata when its owning container was stored encrypted.
+
 The Archive media provider writes that same object at `data.metadata` on each
 `archive-entry` record in `archive.jsonl`:
 

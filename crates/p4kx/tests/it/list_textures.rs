@@ -137,6 +137,7 @@ fn list_json_snapshot() -> TestResult {
 
     let mut value: serde_json::Value = serde_json::from_str(&stdout)?;
     value["archive"] = "[DIR]/Data.p4k".into();
+    crate::entry_listing_origins::remove_checked_origins_for_snapshot(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }

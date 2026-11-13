@@ -3,6 +3,8 @@
 
 #[path = "chunk_table_evidence.rs"]
 mod chunk_table_evidence;
+#[path = "entry_directory_origins.rs"]
+mod entry_directory_origins;
 #[path = "model_archive_source.rs"]
 mod model_archive_source;
 #[path = "model_material_origins.rs"]
@@ -44,6 +46,9 @@ pub use crate::source_use::{
 pub use crate::source_uses::SourceUses;
 pub use crate::source_value::{SourceValue, SourceValueState, SourcedValue};
 pub use chunk_table_evidence::{ChunkEvidenceError, ChunkTableEvidence, ChunkTableRows};
+pub use entry_directory_origins::{
+    EntryDirectoryOrigins, EntryDirectoryOriginsError, directory_path_uses,
+};
 pub use model_archive_source::{ArchiveModelRead, ModelArchiveSource};
 pub use model_material_origins::{
     ArchiveMaterialRead, ArchiveMaterialReads, MaterialArchiveOrigins, MaterialLayerOrigin,

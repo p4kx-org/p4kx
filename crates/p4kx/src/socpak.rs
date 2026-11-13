@@ -10,15 +10,16 @@ use p4kx_extraction::{
 use serde::Serialize;
 
 use crate::cli::{SocpakAction, SocpakArgs, SocpakSource};
+use crate::entry_listing_json::EntryRows;
 use crate::extract::{self, Settings};
-use crate::json::{self, EntryJson};
+use crate::json;
 use crate::{exit, filter_pair, list, verify};
 
 #[derive(Serialize)]
 struct ListJson<'a> {
     archive: String,
     containers: &'a [String],
-    entries: Vec<EntryJson<'a>>,
+    entries: EntryRows<'a>,
 }
 
 /// Runs `p4kx socpak list` or `p4kx socpak extract`.
@@ -31,7 +32,7 @@ pub(crate) fn run(args: &SocpakArgs, as_json: bool) -> Result<ExitCode> {
                 json::print(&ListJson {
                     archive: json::path(container.path()),
                     containers: &containers,
-                    entries: entries.iter().copied().map(EntryJson::from).collect(),
+                    entries: EntryRows::physical(&container, &entries),
                 })?;
             } else {
                 list::print_table(&entries)?;

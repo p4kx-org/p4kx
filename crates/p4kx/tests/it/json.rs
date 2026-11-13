@@ -89,6 +89,12 @@ impl Fixture {
     }
 }
 
+fn checked_entry_snapshot(text: &str) -> Result<String, Box<dyn Error>> {
+    let mut value = serde_json::from_str(text)?;
+    crate::entry_listing_origins::remove_checked_origins_for_snapshot(&mut value)?;
+    Ok(serde_json::to_string_pretty(&value)?)
+}
+
 fn redact(value: &mut Value, dir: &str) {
     match value {
         Value::String(text) => {
@@ -108,6 +114,7 @@ fn list() -> TestResult {
     let archive = fixture.channel("LIVE", false)?;
 
     let json = fixture.json(fixture.p4kx()?.arg("list").arg(&archive), 0)?;
+    let json = checked_entry_snapshot(&json)?;
 
     insta::assert_snapshot!(json);
     Ok(())
@@ -127,6 +134,7 @@ fn search() -> TestResult {
         0,
     )?;
 
+    let json = checked_entry_snapshot(&json)?;
     insta::assert_snapshot!(json);
     Ok(())
 }
