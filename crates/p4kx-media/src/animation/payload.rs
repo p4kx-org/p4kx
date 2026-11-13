@@ -7,7 +7,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::binding_payload::{Binding, Skeleton};
-use super::image_payload::{ImageIndex, ImageRecord};
+use super::image_payload::{ImageDirectionalPath, ImageIndex, ImageRecord};
 use crate::{ByteOrder, ChunkReference, OffsetBasis, SourceRange};
 
 pub(crate) const ENTRY: &str = "animation-entry";
@@ -15,6 +15,7 @@ pub(crate) const CHUNK: &str = "animation-chunk";
 pub(crate) const CLIP: &str = "animation-clip";
 pub(crate) const DBA_METADATA: &str = "animation-dba-metadata";
 pub(crate) const IMAGE_INDEX: &str = "animation-image-index";
+pub(crate) const IMAGE_DIRECTIONAL_PATH: &str = "animation-image-directional-path";
 pub(crate) const IMAGE_RECORD: &str = "animation-image-record";
 pub(crate) const CONTROLLER: &str = "animation-controller";
 pub(crate) const SKELETON: &str = "animation-skeleton";
@@ -92,6 +93,7 @@ pub(crate) enum AnimationPayload<'a> {
     Clip(Clip<'a>),
     DbaMetadata(DbaMetadata<'a>),
     ImageIndex(ImageIndex),
+    ImageDirectionalPath(ImageDirectionalPath<'a>),
     ImageRecord(ImageRecord<'a>),
     Controller(Controller),
     Skeleton(Skeleton<'a>),

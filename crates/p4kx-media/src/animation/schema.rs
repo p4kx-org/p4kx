@@ -25,6 +25,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         (wire::DBA_METADATA, "dba-metadata", 1),
         (wire::IMAGE_INDEX, "image-index", 1),
         (wire::IMAGE_RECORD, "image-record", 2),
+        (wire::IMAGE_DIRECTIONAL_PATH, "image-directional-path", 2),
         (wire::CONTROLLER, "controller", 2),
         (wire::SKELETON, "skeleton", 0),
         (wire::BINDING, "controller-binding", 2),

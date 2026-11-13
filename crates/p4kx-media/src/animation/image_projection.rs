@@ -3,10 +3,14 @@
 
 use std::ops::Range;
 
+#[path = "directional_projection.rs"]
+mod directional_projection;
+
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::chunks::{ChunkFile, Container};
 use p4kx_extraction::model::{CafImage, CafImageError, CafImagePath, CafImageRecord};
 
+use super::directional_paths::DirectionalPaths;
 use super::image_payload::{ImageIndex, ImageLayout, ImagePath, ImageRecord};
 use super::origin::{self as proof, AnimationOrigins};
 use super::payload::{self as wire, AnimationPayload, Family};
@@ -47,12 +51,23 @@ pub(super) fn write(
             MediaError::Contract("validated image chunk has no retained bytes".into())
         })?;
         let source = ImageSource { context, origins };
-        let layout = classify(expected_type, chunk.version(), range.start, bytes);
-        source.write_index(file, index, range, &layout, writer)?;
-        if let Layout::Caf(image) = layout {
-            for (ordinal, record) in image.records().enumerate() {
-                source.write_record([index as u64, ordinal as u64], record, writer)?;
+        let layout = source.classify(expected_type, chunk.version(), range.start, bytes, writer)?;
+        source.write_index(file, index, range.clone(), &layout, writer)?;
+        match layout {
+            Layout::Caf(image) => {
+                for (ordinal, record) in image.records().enumerate() {
+                    source.write_record([index as u64, ordinal as u64], record, writer)?;
+                }
             }
+            Layout::DirectionalPaths { paths, .. } => {
+                let mut ordinal = 0;
+                paths.visit(context, writer, |path, writer| {
+                    source.write_directional([index as u64, ordinal], range.start, path, writer)?;
+                    ordinal += 1;
+                    Ok(())
+                })?;
+            }
+            _ => {}
         }
     }
     Ok(())
@@ -61,6 +76,10 @@ pub(super) fn write(
 enum Layout<'a> {
     Caf(CafImage<'a>),
     Directional,
+    DirectionalPaths {
+        paths: DirectionalPaths<'a>,
+        count: usize,
+    },
     UnsupportedVersion,
     UnsupportedFormat,
     InvalidFraming,
@@ -75,6 +94,9 @@ impl Layout<'_> {
                 trailer: wire::entry_range(image.trailer_range()),
             },
             Self::Directional => ImageLayout::DirectionalOpaque,
+            Self::DirectionalPaths { count, .. } => ImageLayout::DirectionalPaths {
+                declared_paths: *count,
+            },
             Self::UnsupportedVersion => ImageLayout::UnsupportedVersion,
             Self::UnsupportedFormat => ImageLayout::UnsupportedFormat,
             Self::InvalidFraming => ImageLayout::InvalidFraming,
@@ -82,7 +104,7 @@ impl Layout<'_> {
     }
     fn issue(&self) -> Option<MediaIssue> {
         let (code, detail) = match self {
-            Self::Caf(_) | Self::Directional => return None,
+            Self::Caf(_) | Self::Directional | Self::DirectionalPaths { .. } => return None,
             Self::UnsupportedVersion => (
                 "animation.image-version",
                 "Unknown animation image chunk version",
@@ -104,24 +126,60 @@ impl Layout<'_> {
     }
 }
 
-fn classify(kind: u32, version: u32, start: u64, bytes: &[u8]) -> Layout<'_> {
-    match (kind, version) {
-        (CAF_IMAGE_TYPE, CAF_IMAGE_VERSION) => match CafImage::read(bytes, start) {
-            Ok(image) => Layout::Caf(image),
-            Err(CafImageError::UnsupportedFormat(_)) => Layout::UnsupportedFormat,
-            Err(_) => Layout::InvalidFraming,
-        },
-        (DIRECTIONAL_IMAGE_TYPE, DIRECTIONAL_IMAGE_VERSION) => Layout::Directional,
-        _ => Layout::UnsupportedVersion,
-    }
-}
-
-struct ImageSource<'a, 'source> {
+pub(super) struct ImageSource<'a, 'source> {
     context: &'a SourceContext<'source>,
-    origins: &'a AnimationOrigins<'a>,
+    pub(super) origins: &'a AnimationOrigins<'a>,
 }
 
 impl ImageSource<'_, '_> {
+    fn classify<'a>(
+        &self,
+        kind: u32,
+        version: u32,
+        start: u64,
+        bytes: &'a [u8],
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<Layout<'a>, MediaError> {
+        match (kind, version) {
+            (CAF_IMAGE_TYPE, CAF_IMAGE_VERSION) => Ok(match CafImage::read(bytes, start) {
+                Ok(image) => Layout::Caf(image),
+                Err(CafImageError::UnsupportedFormat(_)) => Layout::UnsupportedFormat,
+                Err(_) => Layout::InvalidFraming,
+            }),
+            (DIRECTIONAL_IMAGE_TYPE, DIRECTIONAL_IMAGE_VERSION) => {
+                self.directional(bytes, start, writer)
+            }
+            _ => Ok(Layout::UnsupportedVersion),
+        }
+    }
+
+    fn directional<'a>(
+        &self,
+        bytes: &'a [u8],
+        start: u64,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<Layout<'a>, MediaError> {
+        let Some(paths) = DirectionalPaths::new(bytes, start) else {
+            return Ok(Layout::Directional);
+        };
+        let Some(count) = paths.declared() else {
+            return Ok(Layout::Directional);
+        };
+        if count == 0 || !paths.begins_with_path() {
+            return Ok(Layout::Directional);
+        }
+        let mut observed = 0;
+        paths.visit(self.context, writer, |_, _| {
+            observed += 1;
+            Ok(())
+        })?;
+        if observed == count {
+            Ok(Layout::DirectionalPaths { paths, count })
+        } else {
+            Ok(Layout::Directional)
+        }
+    }
+
     fn write_index(
         &self,
         file: &ChunkFile<Vec<u8>>,
@@ -192,7 +250,17 @@ impl ImageSource<'_, '_> {
     ) -> Result<OriginContributions, MediaError> {
         let mut layout_proof = writer.capture_origins();
         layout_proof.include_original(table)?;
-        if !matches!(layout, Layout::Directional | Layout::UnsupportedVersion) {
+        if matches!(
+            layout,
+            Layout::DirectionalPaths { .. } | Layout::Directional
+        ) {
+            layout_proof.include_original(&self.origins.payload(
+                range.clone(),
+                "directionalPathScan",
+                SourceUseRole::Selector,
+                writer,
+            )?)?;
+        } else if !matches!(layout, Layout::Directional | Layout::UnsupportedVersion) {
             layout_proof.include_original(&self.origins.payload(
                 range.start..range.end.min(range.start.saturating_add(8)),
                 "imagePrefix",
@@ -247,7 +315,7 @@ impl ImageSource<'_, '_> {
                 writer,
             )?;
         }
-        let path = self.path(record.path(), &path, &mut prepared, writer)?;
+        let path = self.path(record.path(), "caf", &path, &mut prepared, writer)?;
         prepared.write(
             writer,
             &Subresource::new(wire::IMAGE_RECORD, indices.to_vec()),
@@ -261,9 +329,10 @@ impl ImageSource<'_, '_> {
         )
     }
 
-    fn path<'a>(
+    pub(super) fn path<'a>(
         &self,
         path: CafImagePath<'a>,
+        expected_extension: &str,
         path_proof: &OriginContributions,
         prepared: &mut crate::origin_prepared::PreparedRecordOrigins,
         writer: &mut MediaWriter<'_>,
@@ -275,7 +344,7 @@ impl ImageSource<'_, '_> {
         };
         let archive_path = authored
             .rsplit_once('.')
-            .filter(|(_, extension)| extension.eq_ignore_ascii_case("caf"))
+            .filter(|(_, extension)| extension.eq_ignore_ascii_case(expected_extension))
             .and_then(|_| archive_animation_path(authored));
         let reference = ReferenceSelection {
             authored_path: authored,

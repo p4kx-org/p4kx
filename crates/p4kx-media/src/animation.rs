@@ -5,6 +5,7 @@ mod binding_payload;
 mod binding_projection;
 mod controller_projection;
 mod dba_projection;
+mod directional_paths;
 mod image_payload;
 mod image_projection;
 mod origin;

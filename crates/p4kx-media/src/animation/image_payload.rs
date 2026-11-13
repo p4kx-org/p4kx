@@ -24,6 +24,9 @@ pub(super) enum ImageLayout {
         trailer: SourceRange,
     },
     DirectionalOpaque,
+    DirectionalPaths {
+        declared_paths: usize,
+    },
     UnsupportedVersion,
     UnsupportedFormat,
     InvalidFraming,
@@ -50,4 +53,12 @@ pub(super) enum ImagePath<'a> {
     },
     InvalidEncoding,
     Unterminated,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "AnimationDirectionalPath")]
+pub(super) struct ImageDirectionalPath<'a> {
+    pub(super) path_field: SourceRange,
+    pub(super) path: ImagePath<'a>,
 }

@@ -14,6 +14,7 @@ nested Archive traversal and atomic publication follow the [media export contrac
 | `animation-dba-metadata` | original clip ordinal | Uncovered DBA metadata and name with explicitly unavailable controller data |
 | `animation-image-index` | original chunk table ordinal | Global image extent and layout disposition with the CAF prefix, record count and trailer when proved |
 | `animation-image-record` | original chunk table ordinal, original record ordinal | Physical CAF record and path field ranges, original path text or lexical error, and the independent loose Entry lookup |
+| `animation-image-directional-path` | original chunk table ordinal, observed path ordinal | Count-reconciled fixed-width AIM path field with the exact source span and independent loose Entry lookup |
 
 All ranges are half-open and relative to the original retained Entry. IVO chunk extents come
 from the validated directory and may include padding. DBA controller keys can refer to a
@@ -62,13 +63,18 @@ ordinals. An invalid UTF-8 or unterminated field keeps its physical interval and
 disposition while later fixed-width records remain readable. Unknown versions and
 malformed framing expose the original chunk and a diagnostic disposition.
 
-The directional chunk `0x6B8DF259` v0x901 remains opaque. Its original bytes
-and extent are available. The CAF path's lookup describes only a physical loose Entry
-in the owning Archive. It distinguishes missing, ambiguous and filtered identities.
-A successful lookup needs no target payload read. DBA ownership, timing interpretation
-and pose semantics require separate evidence. The source path depends on the image payload.
-The resolved target identity carries
-both the authored selector and the target's directory metadata.
+The directional chunk `0x6B8DF259` v0x901 retains its original bytes and extent.
+The path projection checks for a fixed-width, zero-padded AIM path at byte 12 and
+locates matching aligned fields within the chunk. It emits source-ordered path
+observations only when their total agrees with the original count. Each observation
+identifies the exact 256-byte path field. Record boundaries and pose data remain opaque.
+A chunk with unreconciled path coverage keeps the `directional-opaque` disposition.
+
+CAF and AIM path lookups describe a physical loose Entry in the owning Archive.
+They distinguish missing, ambiguous and filtered identities. A successful lookup
+needs no target payload read. DBA ownership and pose semantics require further
+evidence. The path depends on the image payload. A resolved target identity also
+depends on the target's directory metadata.
 
 ## Installed Archive verification
 

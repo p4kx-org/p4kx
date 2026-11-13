@@ -1187,6 +1187,22 @@
       ],
       "title": "DefinitionPayload"
     },
+    "AnimationDirectionalPath": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/AnimationImagePath"
+        },
+        "path_field": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "path_field",
+        "path"
+      ],
+      "type": "object"
+    },
     "AnimationEntry": {
       "additionalProperties": false,
       "properties": {
@@ -1286,6 +1302,25 @@
           },
           "required": [
             "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "declared_paths": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "const": "directional-paths",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "declared_paths"
           ],
           "type": "object"
         },
@@ -1486,6 +1521,23 @@
             },
             "record_type": {
               "const": "image-index",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationDirectionalPath"
+            },
+            "record_type": {
+              "const": "image-directional-path",
               "type": "string"
             }
           },
@@ -38387,6 +38439,61 @@
                 "properties": {
                   "record_type": {
                     "const": "image-record"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-image-directional-path"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "image-directional-path"
                   }
                 },
                 "required": [
