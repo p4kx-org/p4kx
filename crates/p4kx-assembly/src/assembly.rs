@@ -5,7 +5,7 @@ use std::io::Write;
 use std::sync::Arc;
 
 use p4kx_dataforge::Guid;
-use p4kx_extraction::{ArchiveMaterialRead, ModelArchiveSource};
+use p4kx_extraction::{ArchiveDefaultMaterial, ArchiveMaterialRead, ModelArchiveSource};
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, Scene, SceneNode, ScenePart, TextureLoader, write_scene_glb,
     write_scene_glb_with,
@@ -17,6 +17,8 @@ use crate::geometry::GeometrySelectors;
 use crate::model_placement_sources::ModelPlacement;
 use crate::{AttachedModel, GearPlacementSource, Issue, PortPlacementSource, creature_rig};
 
+#[path = "assembly_default_material.rs"]
+mod default_material;
 #[path = "assembly_part_inputs.rs"]
 mod part_inputs;
 
@@ -246,6 +248,7 @@ pub struct Assembly {
     pub(crate) issues: Vec<Issue>,
     pub(crate) lod: u32,
     pub(crate) interior: Option<crate::EntityInterior>,
+    pub(crate) default_material: Option<Arc<ArchiveDefaultMaterial>>,
     pub(crate) containers: Vec<Arc<[crate::ObjectContainerRef]>>,
 }
 
@@ -358,10 +361,15 @@ impl Assembly {
     pub(crate) fn scene(&self) -> Result<Scene<'_>, GltfError> {
         let mut scene = creature_rig::skeleton_of(&self.parts, &self.issues, self.lod)
             .map_or_else(Scene::new, |skeleton| Scene::new().with_skeleton(skeleton));
+        let fallback = self
+            .default_material
+            .as_deref()
+            .and_then(ArchiveDefaultMaterial::material);
         for part in &self.parts {
             let mut node = SceneNode::new(part.name.clone(), part.parent, part.local);
             if let Some(model) = &part.model {
                 let drawn = ScenePart::new(model, part.materials());
+                let drawn = fallback.map_or(drawn, |material| drawn.with_fallback(material));
                 node = node.with_part(
                     part.palette
                         .as_deref()
@@ -372,6 +380,7 @@ impl Assembly {
         }
         for (index, attached) in self.attached_models() {
             let drawn = ScenePart::new(&attached.model, attached.materials());
+            let drawn = fallback.map_or(drawn, |material| drawn.with_fallback(material));
             let palette = self
                 .parts
                 .get(index)

@@ -50,6 +50,7 @@ impl Assembly {
         options: &AssemblyOptions,
     ) -> Result<Self, AssemblyError> {
         Self::build_inner(tree, models, None, options)
+            .map(|built| built.with_default_material(models))
     }
 
     /// Builds the Assembly like [`Self::build`] and resolves the tint palette of each part with
@@ -71,6 +72,7 @@ impl Assembly {
         options: &AssemblyOptions,
     ) -> Result<Self, AssemblyError> {
         Self::build_inner(tree, models, Some(palettes), options)
+            .map(|built| built.with_default_material(models))
     }
 
     fn build_inner(
@@ -131,11 +133,13 @@ impl Assembly {
         }
         creature_rig::note_fit(&parts, options.lod, &mut issues);
         creature_rig::note_loadout(tree, &mut issues);
+
         Ok(Self {
             parts,
             issues,
             lod: options.lod,
             interior: None,
+            default_material: None,
             containers: containers_of(&drafts),
         })
     }

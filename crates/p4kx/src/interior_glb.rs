@@ -7,8 +7,9 @@ use std::path::{Path, PathBuf};
 use anyhow::Result;
 use p4kx_assembly::{Interior, InteriorOptions, Issue};
 use p4kx_extraction::{
-    Archive, ConversionError, GlbOptions, GlbSummary, GltfError, MaterialMode, UnknownEntries,
-    is_same_file, select_entries, write_replacing_protected,
+    Archive, ArchiveDefaultMaterial, ConversionError, DefaultMaterialReceipt, GlbOptions,
+    GlbSummary, GltfError, MaterialMode, UnknownEntries, is_same_file, select_entries,
+    write_replacing_protected,
 };
 use serde::Serialize;
 use thiserror::Error;
@@ -41,6 +42,8 @@ struct GlbJson<'a> {
     primitives: usize,
     materials: usize,
     default_material_ids: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_material: Option<DefaultMaterialReceipt>,
     hidden_primitives: usize,
     lod_fallbacks: usize,
     shared_meshes: usize,
@@ -112,6 +115,9 @@ pub(crate) fn run(args: &InteriorGlbArgs, as_json: bool) -> Result<()> {
             primitives: summary.primitives,
             materials: summary.materials,
             default_material_ids: summary.default_material_ids,
+            default_material: interior
+                .default_material(args.lod)
+                .map(ArchiveDefaultMaterial::receipt),
             hidden_primitives: summary.hidden_primitives,
             lod_fallbacks: summary.lod_fallbacks,
             shared_meshes: summary.shared_meshes,

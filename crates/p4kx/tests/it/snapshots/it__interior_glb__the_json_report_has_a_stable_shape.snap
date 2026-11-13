@@ -9,6 +9,12 @@ expression: "serde_json::to_string_pretty(&shaped)?"
     "Data\\ObjectContainers\\ships\\test\\ship_interior.socpak"
   ],
   "containers_opened": 4,
+  "default_material": {
+    "ambiguous_sources": [],
+    "decoded_sha256": null,
+    "source": null,
+    "state": "missing"
+  },
   "default_material_ids": 4,
   "hidden_primitives": 0,
   "issues": [

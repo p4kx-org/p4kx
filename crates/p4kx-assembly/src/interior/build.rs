@@ -100,12 +100,13 @@ impl Interior {
     ) -> Result<Self, AssemblyError> {
         let classes = forge.map(|forge| forge as &dyn ClassLookup);
         let mut walked = walk(layers, entry, options, watch, classes)?;
-        attach(&mut walked, options, watch, classes, models)?;
+        let default_material = attach(&mut walked, options, watch, classes, models)?;
         Ok(Self {
             parts: walked.parts,
             issues: walked.issues,
             lod: options.lod,
             containers: walked.containers,
+            default_material,
         })
     }
 }

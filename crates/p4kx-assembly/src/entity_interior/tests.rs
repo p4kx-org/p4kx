@@ -32,6 +32,7 @@ fn an_assembly_without_parts_still_writes_the_interior_at_the_top() {
         issues: Vec::new(),
         lod: 0,
         interior: None,
+        default_material: None,
         containers: Vec::new(),
     };
     let mut interior = EntityInterior::default();
@@ -45,6 +46,7 @@ fn an_assembly_without_parts_still_writes_the_interior_at_the_top() {
             issues: Vec::new(),
             lod: 0,
             containers: 0,
+            default_material: None,
         },
     );
 

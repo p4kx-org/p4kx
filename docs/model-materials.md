@@ -108,11 +108,13 @@ These are heuristics for a file without textures, after the findings of the Star
 (#104). A material that draws nothing (the no-draw flag, the `NoDraw` shader or opacity 0) gets no
 glTF material and its submeshes are not written; the summary counts them as hidden. A material ID
 beyond the sub-materials or any ID when the library is missing gets one shared fallback surface.
-Archive-backed model GLB and static Blender packages use a verified, drawable single material from the unique
+Archive-backed model, Entity and Interior GLB exports and Blender packages for these scenes
+use a verified, drawable single material from the unique
 `Data/Materials/material_default.mtl` Entry when that source is available. An explicit
 non-material position in an authored list keeps its slot and can use the same physical
 fallback. A hidden authored material remains suppressed. Disk models and unreadable or
-unsupported archive fallbacks use the synthetic light-grey surface.
+unsupported archive fallbacks use the synthetic light-grey surface. Interior models
+inside SOCPAKs use the same fallback policy as the enclosing game's Archive.
 
 `HardSurface` and `LayerBlend_V2` (23,770 and 46,806 materials) take their colour from `MatLayers`
 and the tint palette, so their plain colour is the white `Diffuse`; tints are #127.

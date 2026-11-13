@@ -348,6 +348,11 @@ which counts as often as its most frequent library lists it. Each library lists 
 `first_unresolved_layer` is the first such path, as the layer names it; it is absent when
 `unresolved_layers` is 0 (the example shows the case without any).
 
+`default_material` describes the physical Archive lookup when a drawable assignment needed a fallback.
+It reports the state, original Entry and effective encryption marker, decoded SHA-256 when read,
+and two original witnesses for an ambiguous lookup. Missing or unusable physical sources leave
+the synthetic fallback in use. Authored library failures remain in `issues`.
+
 `<entity>` is named as for `p4kx entity loadout`, with the same exit codes. `animations` is absent
 without any; for a creature it lists each clip the GLB writes or leaves out, shaped as in `p4kx
 model glb`: `name`, `duration_seconds`, `additive`, `channels`, `keys` and `skipped_tracks`. A
@@ -574,6 +579,8 @@ or wrong exits with code 7.
 
 `unresolved_layers` and `first_unresolved_layer` (absent when there is none) are those of
 `p4kx entity glb`, for the material libraries of the parts.
+
+`default_material` is the same lookup receipt as in `entity glb`. The canonical fallback comes from the outer game Archive.
 
 `containers` are the Entry paths of the chain as for `p4kx socpak list`, with the same exit codes
 (an Entry the Archive lacks is 2, a container that cannot be opened 3). `parts` counts the root

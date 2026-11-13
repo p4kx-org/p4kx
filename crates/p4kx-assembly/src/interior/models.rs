@@ -4,6 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use p4kx_extraction::ArchiveDefaultMaterial;
 use p4kx_model::{Lod, MaterialStatus, Model};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -45,7 +46,7 @@ pub(super) fn attach(
     watch: &InteriorWatch<'_>,
     classes: Option<&dyn ClassLookup>,
     shared: Option<&dyn ModelProvider>,
-) -> Result<(), AssemblyError> {
+) -> Result<Option<Arc<ArchiveDefaultMaterial>>, AssemblyError> {
     let providers: Vec<ArchiveModels<'_>> = (0..walked.layers.len())
         .filter_map(|layer| walked.layers.get(layer))
         .map(ArchiveModels::new)
@@ -79,7 +80,14 @@ pub(super) fn attach(
         }
     }
     walked.issues.extend(fill.issues);
-    Ok(())
+    let root = providers
+        .first()
+        .map(|provider| provider as &dyn ModelProvider);
+    let Some(root) = root else { return Ok(None) };
+    Ok(super::default_material::resolve(
+        &walked.parts,
+        shared.unwrap_or(root),
+    ))
 }
 
 /// The models and libraries that were read, and the issues found while handing them to parts.

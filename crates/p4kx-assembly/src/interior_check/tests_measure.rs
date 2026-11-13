@@ -139,6 +139,7 @@ fn container_of(parts: Vec<InteriorPart>) -> EntityContainer {
             issues: Vec::new(),
             lod: 0,
             containers: 1,
+            default_material: None,
         },
     }
 }

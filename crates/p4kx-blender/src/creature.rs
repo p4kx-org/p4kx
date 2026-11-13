@@ -93,7 +93,13 @@ fn manifest(
         rig: rig(assembly, written),
         issues,
     };
-    rig_manifest(scene, info, options, written)
+    let mut manifest = rig_manifest(scene, info, options, written);
+    if written.default_material_ids > 0 {
+        manifest.default_material = assembly
+            .default_material(options.lod)
+            .map(p4kx_extraction::ArchiveDefaultMaterial::receipt);
+    }
+    manifest
 }
 
 fn rig(assembly: &Assembly, written: &GlbSummary) -> Rig {
