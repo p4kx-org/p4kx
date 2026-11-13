@@ -96,6 +96,11 @@ where that reader covers the selected source. Legacy header-budget refusals are 
 separately. The streaming source reader still checks the complete available declarations.
 Diagnostic rows are verified and an incomplete census fails the check.
 
+The separate global-image export replay selects the two original root image families and
+excludes nested containers. It compares the retained SHA-256 artifacts byte-for-byte against
+verified original Entries, checks the CAF prefix, record and trailer extents, and reconciles
+the directional path spans with the original chunk and count.
+
 Configure the Archive paths and temporary directory as described in [CLAUDE.md](../CLAUDE.md).
 The test uses `P4KX_DATA_P4K` and the optional `P4KX_DATA_P4K_B`, then reports aggregate
 counts without recording asset names or payloads.
