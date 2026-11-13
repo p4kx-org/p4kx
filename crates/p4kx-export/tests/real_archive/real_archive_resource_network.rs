@@ -15,7 +15,7 @@ use crate::real_archive_item_durability as proof;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
-const TABLE: &str = "/configurations/resourceNetworkParameters/rows";
+pub(super) const TABLE: &str = "/configurations/resourceNetworkParameters/rows";
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
@@ -65,7 +65,7 @@ fn game_mode_resource_rules_trace_actual_owner_and_original_fields() -> TestResu
     Ok(())
 }
 
-fn compare_mode(tree: &RecordTree<'_>, row: &Value) -> TestResult<bool> {
+pub(super) fn compare_mode(tree: &RecordTree<'_>, row: &Value) -> TestResult<bool> {
     if tree.type_name() != "GameMode"
         || proof::text(row, "/source/sourceType/value")? != tree.type_name()
         || proof::text(row, "/source/guid/value")? != tree.guid().to_string()
@@ -113,18 +113,7 @@ fn compare_rules(source: &StructValue<'_>, row: &Value) -> TestResult {
     if proof::text(row, "/sourceType/value")? != source.type_name() {
         return Err("original resource rules declaration differs".into());
     }
-    for field in [
-        "enableItemResourceNetwork",
-        "enableSalvageItemRepair",
-        "enableMisfires",
-        "enableCriticalMisfires",
-        "doorsIgnoreRN",
-        "enableExperimentalArmorPenetration",
-        "shipPassDestroyedPartDamageToComponent",
-        "shipPassDestroyedPartDamageToChild",
-        "shipDestructionBufferMultiplier",
-        "shipDestructionHealthThreshold",
-    ] {
+    for field in RULE_FIELDS {
         let cell = components::cell(row, field)?;
         let value = cell.get("value").ok_or("global rule payload")?;
         let same = match source.field(field) {
@@ -139,9 +128,22 @@ fn compare_rules(source: &StructValue<'_>, row: &Value) -> TestResult {
             _ => return Err("unreadable original global rule".into()),
         };
         if !same {
-            return Err(format!("original global resource setting {field} differs").into());
+            return Err(format!("original global rule {field} differs").into());
         }
         require_state(cell, "present")?;
     }
     Ok(())
 }
+
+pub(super) const RULE_FIELDS: [&str; 10] = [
+    "enableItemResourceNetwork",
+    "enableSalvageItemRepair",
+    "enableMisfires",
+    "enableCriticalMisfires",
+    "doorsIgnoreRN",
+    "enableExperimentalArmorPenetration",
+    "shipPassDestroyedPartDamageToComponent",
+    "shipPassDestroyedPartDamageToChild",
+    "shipDestructionBufferMultiplier",
+    "shipDestructionHealthThreshold",
+];

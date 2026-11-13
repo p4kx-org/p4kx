@@ -14,9 +14,20 @@ use serde_json::Value;
 use crate::real_archive_item_components::{self as components, require_state};
 use crate::real_archive_item_durability as proof;
 
+#[path = "real_archive_resource_component_sample.rs"]
+mod sample;
+
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const TABLE: &str = "/configurations/resourceComponents/rows";
+const SCALARS: [&str; 6] = [
+    "isResourceNetworked",
+    "isRelay",
+    "isConnectedToRoom",
+    "wirelessConnection",
+    "defaultPriority",
+    "repairRestoreRatio",
+];
 const EXPECTED: [&str; 5] = ["plant", "cooler", "shield", "controller", "tank"];
 
 #[derive(Default)]
@@ -151,14 +162,7 @@ fn compare_component(
     row: &Value,
     coverage: &mut BTreeMap<&'static str, FieldCoverage>,
 ) -> TestResult {
-    for field in [
-        "isResourceNetworked",
-        "isRelay",
-        "isConnectedToRoom",
-        "wirelessConnection",
-        "defaultPriority",
-        "repairRestoreRatio",
-    ] {
+    for field in SCALARS {
         compare_scalar(source, row, field, coverage)?;
     }
     if let Some(Original::Struct(repair)) = source.field("selfRepair") {
