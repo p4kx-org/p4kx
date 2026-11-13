@@ -235,3 +235,14 @@ the SOC companion. Exporter identity, archive identity and output-byte
 consistency are separate facts. An archive directory fingerprint identifies
 directory evidence only. A receipt from the writer is a consistency check.
 [StarBreaker export stamp](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/export_stamp.rs)
+
+### Attachment classification on scene instances
+
+StarBreaker exports the authored item type on each decomposed scene instance.
+P4KX already reads the same `AttachDef.Type` and `AttachDef.SubType` fields for
+Entity resolution and exposes them through catalog v3. The Assembly parts
+and Blender scene nodes discard the values. A package consumer needs a
+separate catalog lookup to classify installed parts. [Issue #1139](https://github.com/p4kx-org/p4kx/issues/1139)
+carries the exact selected fields and their source evidence through Assembly
+to the corresponding package entity node.
+[StarBreaker scene contract](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/docs/decomposed-export-contract.md)
