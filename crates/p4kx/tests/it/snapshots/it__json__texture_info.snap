@@ -13,6 +13,7 @@ expression: "serde_json::to_string_pretty(&value)?"
   "mip_count": 7,
   "parts": 4,
   "source_metadata": {
+    "alpha_association": "unknown",
     "header_source_bytes": "196",
     "normalized": {
       "array_size": 1,
