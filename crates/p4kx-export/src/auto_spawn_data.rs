@@ -142,6 +142,7 @@ struct SpawnAssignment<'source> {
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 enum AssignmentKind {
     Base,
     ScheduleArea,

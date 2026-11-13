@@ -1586,7 +1586,8 @@
         "defendArea",
         "authored"
       ],
-      "type": "string"
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "AttachableEntity": {
       "properties": {
