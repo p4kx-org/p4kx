@@ -18,12 +18,7 @@ const INDEXED_PATH: &str = "Animations/Fixture/Exact.caf";
 fn image_candidates_require_original_bank_and_exact_metadata_path() -> TestResult {
     let scratch = tempfile::tempdir()?;
     let archive_path = scratch.path().join("fixture.p4k");
-    let mut source = image(&[field(INDEXED_PATH.as_bytes())])?;
-    source
-        .get_mut(8 + PATH_BYTES + 4..8 + PATH_BYTES + 8)
-        .ok_or("DBA hash word")?
-        .copy_from_slice(&crc32fast::hash(b"animations/fixture/bank.dba").to_le_bytes());
-    let file = TestChunkFile::ivo().chunk(CAF_CHUNK, 0x902, source).bytes();
+    let file = image_with_bank_selector()?;
     let bank = TestDba::new()
         .animation(TestAnimation::new("animations/different/exact.caf", 30))
         .animation(TestAnimation::new("animations/fixture/exact.caf", 30))
@@ -41,6 +36,94 @@ fn image_candidates_require_original_bank_and_exact_metadata_path() -> TestResul
     check_match(row);
     check_origins(&output.join(&index.artifact_base), &rows)?;
     check_filtered(&archive, scratch.path())
+}
+
+#[test]
+fn physical_bank_aliases_are_ambiguous_even_when_only_one_was_authored() -> TestResult {
+    let scratch = tempfile::tempdir()?;
+    let source = scratch.path().join("fixture.p4k");
+    let bank = TestDba::new()
+        .animation(TestAnimation::new(INDEXED_PATH, 30))
+        .bytes();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(IMAGE, image_with_bank_selector()?))
+        .entry(TestEntry::stored(BANK, bank.as_slice()))
+        .entry(TestEntry::stored("data/animations/fixture/BANK.DBA", bank))
+        .write_to(&source)?;
+    let archive = Archive::open(&source)?;
+    let out = scratch.path().join("ambiguous");
+    let index = support::published(p4kx_media::export(&archive, &out, &options())?)?;
+    let rows = support::records(&out, &index, "animation.jsonl")?;
+    let row = image_record(&rows)?;
+    assert_eq!(
+        text(row, "/payload/dba_entry/resolution/status"),
+        Some("ambiguous"),
+        "each physical DBA directory occurrence remains independently selectable",
+    );
+    assert_eq!(
+        text(row, "/payload/dba_clip/status"),
+        Some("bank-unresolved"),
+        "duplicate banks cannot authorize clip content",
+    );
+    Ok(())
+}
+
+#[test]
+fn duplicate_authored_clip_paths_keep_physical_ordinals_and_an_explicit_cap() -> TestResult {
+    let scratch = tempfile::tempdir()?;
+    let source = scratch.path().join("fixture.p4k");
+    let bank = TestDba::new()
+        .animation(TestAnimation::new(INDEXED_PATH, 30))
+        .animation(TestAnimation::new("animations/fixture/exact.caf", 24))
+        .bytes();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(IMAGE, image_with_bank_selector()?))
+        .entry(TestEntry::stored(BANK, bank))
+        .write_to(&source)?;
+    let archive = Archive::open(&source)?;
+    let mut options = options();
+    for (cap, complete, expected) in [(2, true, &[0, 1][..]), (1, false, &[0][..])] {
+        options.limits.reference_candidates = cap;
+        let out = scratch.path().join(cap.to_string());
+        let index = support::published(p4kx_media::export(&archive, &out, &options)?)?;
+        let rows = support::records(&out, &index, "animation.jsonl")?;
+        let clip = image_record(&rows)?
+            .data
+            .pointer("/payload/dba_clip")
+            .ok_or("DBA clip lookup")?;
+        assert_eq!(
+            clip.get("observed_candidates").and_then(Value::as_u64),
+            Some(2),
+            "uncapped observed count"
+        );
+        assert_eq!(
+            clip.get("candidates_complete").and_then(Value::as_bool),
+            Some(complete),
+            "explicit candidate completeness"
+        );
+        let candidates = clip
+            .get("candidates")
+            .and_then(Value::as_array)
+            .ok_or("observed candidates")?;
+        let ordinals: Vec<_> = candidates
+            .iter()
+            .filter_map(|item| item.get("clip_ordinal").and_then(Value::as_u64))
+            .collect();
+        assert_eq!(
+            ordinals, expected,
+            "ordered distinct positions of identical canonical paths"
+        );
+    }
+    Ok(())
+}
+
+fn image_with_bank_selector() -> TestResult<Vec<u8>> {
+    let mut source = image(&[field(INDEXED_PATH.as_bytes())])?;
+    source
+        .get_mut(8 + PATH_BYTES + 4..8 + PATH_BYTES + 8)
+        .ok_or("DBA hash word")?
+        .copy_from_slice(&crc32fast::hash(b"animations/fixture/bank.dba").to_le_bytes());
+    Ok(TestChunkFile::ivo().chunk(CAF_CHUNK, 0x902, source).bytes())
 }
 
 fn check_match(row: &MediaRecord) {

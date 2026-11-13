@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::fmt::{self, Display, Formatter};
 use std::ops::Range;
 
 #[path = "caf_image_bank.rs"]
@@ -42,21 +43,25 @@ pub(super) fn write(
     context: &SourceContext<'_>,
     origins: &AnimationOrigins<'_>,
     writer: &mut MediaWriter<'_>,
-) -> Result<(), MediaError> {
-    if file.container() != Container::Ivo {
-        return Ok(());
-    }
+) -> Result<Option<ImageStructureError>, MediaError> {
     let expected_type = match family {
         Family::CafImage => CAF_IMAGE_TYPE,
         Family::DirectionalBlendImage => DIRECTIONAL_IMAGE_TYPE,
-        Family::Caf | Family::Dba | Family::Aim => return Ok(()),
+        Family::Caf | Family::Dba | Family::Aim => return Ok(None),
     };
+    if file.container() != Container::Ivo {
+        return Ok(Some(ImageStructureError::Container {
+            actual: file.container(),
+        }));
+    }
     let banks = OnceCell::new();
+    let mut found = false;
     for (index, chunk) in file.chunks().iter().enumerate() {
         writer.checkpoint()?;
         if chunk.chunk_type().id() != expected_type {
             continue;
         }
+        found = true;
         let range = chunk.offset()..chunk.offset() + chunk.size();
         let bytes = file.chunk_data(index).ok_or_else(|| {
             MediaError::Contract("validated image chunk has no retained bytes".into())
@@ -91,8 +96,35 @@ pub(super) fn write(
             _ => {}
         }
     }
-    Ok(())
+    Ok((!found).then_some(ImageStructureError::MissingChunk { expected_type }))
 }
+
+#[derive(Debug)]
+pub(super) enum ImageStructureError {
+    Container { actual: Container },
+    MissingChunk { expected_type: u32 },
+}
+
+impl Display for ImageStructureError {
+    fn fmt(&self, formatter: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Container { actual } => {
+                write!(
+                    formatter,
+                    "global animation image needs an IVO container, found {actual}"
+                )
+            }
+            Self::MissingChunk { expected_type } => {
+                write!(
+                    formatter,
+                    "global animation image lacks chunk {expected_type:#010x}"
+                )
+            }
+        }
+    }
+}
+
+impl std::error::Error for ImageStructureError {}
 
 enum Layout<'a> {
     Caf(CafImage<'a>),

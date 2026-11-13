@@ -17,6 +17,8 @@ use super::support;
 mod directional_path_tests;
 #[path = "animation_image_banks.rs"]
 mod image_bank_tests;
+#[path = "animation_image_structure.rs"]
+mod image_structure_tests;
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const IMAGE: &str = "Data/Animations/Animations.img";

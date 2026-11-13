@@ -23,7 +23,7 @@ impl Provider for AnimationProvider {
         let mut capability = Capability::new(
             MediaKind::Animation,
             "p4kx.animation.source",
-            "1.6.0",
+            "1.7.0",
             "Exact animation and image Entry bytes with positioned source data and separate decoded sample chunks.",
         );
         capability.field_groups = vec![
@@ -91,12 +91,17 @@ impl Provider for AnimationProvider {
             skeleton.write(&origins, writer)?;
         }
         let skeleton = skeleton.and_then(skeleton_selection::SkeletonSelection::parsed);
-        image_projection::write(&file, family, context, &origins, writer)?;
-        let issue = clips(name, family, &file, &origins, skeleton, writer)?;
+        let image_issue = image_projection::write(&file, family, context, &origins, writer)?;
+        let clip_issue = clips(name, family, &file, &origins, skeleton, writer)?;
+        let issue = match (&image_issue, &clip_issue) {
+            (Some(cause), _) => Some(cause as &dyn Error),
+            (None, Some(cause)) => Some(cause as &dyn Error),
+            (None, None) => None,
+        };
         entry(
             family,
             Some(file.chunks().len()),
-            issue.as_ref().map(|cause| cause as &dyn Error),
+            issue,
             size,
             &origins,
             writer,

@@ -63,7 +63,9 @@ words are retained from their original four-byte intervals. The DBA word is null
 the projection when its original value is zero. Duplicate paths keep their own
 ordinals. An invalid UTF-8 or unterminated field keeps its physical interval and explicit
 disposition while later fixed-width records remain readable. Unknown versions and
-malformed framing expose the original chunk and a diagnostic disposition.
+malformed framing expose the original chunk and a diagnostic disposition. A canonical
+image in a different container format or without its expected chunk retains the same
+original Entry and chunk table and records a partial source diagnosis.
 
 The directional chunk `0x6B8DF259` v0x901 retains its original bytes and extent.
 The path projection checks for a fixed-width, zero-padded AIM path at byte 12 and
