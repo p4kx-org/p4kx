@@ -46,6 +46,9 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) blueprints: CatalogTable<crate::blueprint_definition::BlueprintDefinition<'source>>,
     pub(crate) contract_generators: CatalogTable<GeneratorDefinition<'source>>,
     pub(crate) mission_module_declarations: CatalogTable<MissionModuleDeclaration<'source>>,
+    pub(crate) mission_items: CatalogTable<
+        crate::catalog_v3::mission_sources::item_definition::MissionItemDefinition<'source>,
+    >,
     pub(crate) mission_scenarios:
         CatalogTable<super::mission_scenario_definition::MissionScenarioDefinition<'source>>,
     pub(crate) contract_templates: CatalogTable<TemplateDefinition<'source>>,

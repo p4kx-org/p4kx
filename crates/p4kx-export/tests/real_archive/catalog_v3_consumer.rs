@@ -104,6 +104,7 @@ const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::AutoSpawns
             | Kind::AutoSpawnSets
             | Kind::EncounterIndices
+            | Kind::MissionItems
             | Kind::ContractScopes
     )
 }
@@ -143,6 +144,7 @@ fn checked_table<'catalog>(
                 | Kind::Jurisdictions
                 | Kind::SecurityNetworkManifests
                 | Kind::MissionModuleDeclarations
+                | Kind::MissionItems
                 | Kind::LocationClasses
                 | Kind::LocationFunctions
                 | Kind::LocationSizes
@@ -274,6 +276,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::Jurisdictions
             | Kind::SecurityNetworkManifests
             | Kind::MissionModuleDeclarations
+            | Kind::MissionItems
             | Kind::LocationClasses
             | Kind::LocationFunctions
             | Kind::LocationSizes

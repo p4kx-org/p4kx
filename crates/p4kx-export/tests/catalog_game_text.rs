@@ -107,7 +107,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 79,
+        marked, 80,
         "every protected field in the canonical schema is accounted for"
     );
 }
@@ -128,6 +128,7 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
             | "onBrickedItemUsed_CannotUse",
         )
         | ("BlueprintPresentation" | "FactionIdentityDefinition", "name")
+        | ("MissionStringVariant", "string")
         | ("StandingDefinition", "perkDescription")
         | ("FactionReputationDefinition", "background")
         | ("InfractionParameters", "graceWarnings")

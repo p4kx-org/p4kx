@@ -183,6 +183,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
             | Kind::SecurityNetworkManifests
             | Kind::MissionScenarios
             | Kind::MissionModuleDeclarations
+            | Kind::MissionItems
             | Kind::LocationClasses
             | Kind::LocationFunctions
             | Kind::LocationSizes

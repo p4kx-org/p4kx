@@ -235,6 +235,7 @@ fn assemble<R>(
             ),
             mission_scenarios: collected.mission_kinds.take_scenario_definitions(&forge),
             mission_module_declarations: collected.mission_kinds.take_module_declarations(&forge),
+            mission_items: collected.mission_kinds.take_items(&forge),
             contract_templates: CatalogTable::new(
                 &forge,
                 &["ContractTemplate"],

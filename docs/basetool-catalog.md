@@ -196,6 +196,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "Ã¢â‚¬Â¦"}` when a Filter selected the Records; global `tags` remains complete independently of that Filter |
 | `exportHealth` | Measured source-read and projection health, directly sourced failed-Record and diagnostic-subject identities with shared text storage, separate Record/Archive Entry counters and bounded diagnostics; independent of Filter completeness ([contract](catalog-export-health.md)) |
 | `definitions.tags`, `declarations.tagRoots`, `declarations.entityTags`, `projections.tagPaths` | Global physical Tag definitions, original root/child/Entity GUID arrays, and separately named first-selected tree paths with exact per-value origin; the taxonomy stays complete under an Entity Filter ([contract](catalog-tags.md)) |
+| `definitions.missionItems` | Physical authored item definitions, ordered tags and localized variants, original weight and Entity reference ([contract](catalog-mission-items.md)) |
 | `definitions.manufacturers` | Source-family availability and directly sourced Manufacturer rows in GUID order, including typed Localization and canonical text references ([contract](catalog-manufacturer-types.md)) |
 | `items` | The items, ordered by GUID |
 | `ships` | The ships and ground vehicles, ordered by GUID |
@@ -1345,7 +1346,7 @@ elsewhere in the Archive:
   not exist and a type nowhere else.
 - 22 titles keep a token in upper case brackets: `[RACETYPE]` (14) and `[ITEM]` (2) are
   `MissionPropertyValue_MissionItem` properties (a `MissionItem` Record, e.g. the race type, or
-  an empty list the game fills in); the catalog does not read `MissionItem` Records;
+  an empty list the game fills in). The original item definitions appear in [`definitions.missionItems`](catalog-mission-items.md);
   `[CONTRACTOR]` (6) is an organisation property whose list of organisations is empty (chosen at
   start) or whose organisation has several string variants and the title names none. The tokens
   `[CARGOGRADETOKEN]` and `[REPUTATIONRANK]` (411 entries each), `[CLAIMNUMBER]` and `[TARGETNAME]`
@@ -1728,7 +1729,7 @@ without a group), `location` (`queryGuid`, an entry of `contractLocationQueries`
 the `matchConditions` as for a location query, and `forcedOrganizationGuid`, the
 `debugForceChosenOrganization`, a `MissionOrganization` Record no kind lists). The contract-level
 properties add `missionItem` (`conditions`, the `matchConditions` as for a location query,
-`forcedItemGuid`, the `debugForceChosenItem`, a `MissionItem` Record no kind lists, `minItemsToFind`
+`forcedItemGuid`, the original debug-only `debugForceChosenItem` reference to a `definitions.missionItems` row when selected, `minItemsToFind`
 and `maxItemsToFind`), `aiName` (the fields of an embedded NPC name, see "NPC and entity spawns":
 `randomName`, `randomLastName`, `randomNickName`, `givenName`, `givenLastName`, `givenNickName`,
 `chanceOfNickName` and `nameDataGuid`), `combinedDataSetEntries` (`entryProperties`, the variables

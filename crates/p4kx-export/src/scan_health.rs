@@ -104,6 +104,9 @@ impl SourceTrace {
                 .type_name()
                 .ok()
                 .and_then(|type_name| match type_name {
+                    crate::catalog_v3::mission_sources::item_definition::SOURCE_TYPE => {
+                        Some(Kind::MissionItems)
+                    }
                     crate::catalog_v3::faction_definition::SOURCE_TYPE => Some(Kind::Factions),
                     crate::catalog_v3::faction_identity_definition::SOURCE_TYPE => {
                         Some(Kind::FactionIdentities)

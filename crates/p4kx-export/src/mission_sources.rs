@@ -9,3 +9,6 @@ pub(crate) mod local_contract_generator_configuration;
 pub(crate) mod module_declaration;
 #[path = "mission_module_property.rs"]
 pub(crate) mod module_property;
+
+#[path = "mission_item_definition.rs"]
+pub(crate) mod item_definition;

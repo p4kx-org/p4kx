@@ -10,6 +10,9 @@ use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::mission_scenario_definition::{
     self, MissionScenarioDefinition, PreparedMissionScenario,
 };
+use crate::catalog_v3::mission_sources::item_definition::{
+    self, MissionItemDefinition, PreparedMissionItem,
+};
 use crate::catalog_v3::mission_sources::module_declaration::{
     self, MissionModuleDeclaration, PreparedModuleDeclaration,
 };
@@ -57,6 +60,8 @@ pub(crate) enum MissionPick<'f> {
     Scenario(ContractScenario<'f>),
     /// A physical mission module declaration.
     ModuleDeclaration(Box<PreparedModuleDeclaration<'f>>),
+    /// A physical mission item definition.
+    Item(Box<PreparedMissionItem<'f>>),
     /// An authored scenario definition.
     ScenarioDefinition(Box<PreparedMissionScenario<'f>>),
     /// A cargo manifest.
@@ -92,6 +97,7 @@ pub(crate) struct MissionKinds<'f> {
     pub(crate) scenarios: Vec<ContractScenario<'f>>,
     pub(crate) scenario_definitions: Vec<PreparedMissionScenario<'f>>,
     module_declarations: Vec<PreparedModuleDeclaration<'f>>,
+    items: Vec<PreparedMissionItem<'f>>,
     pub(crate) manifests: Vec<CargoManifest<'f>>,
 }
 
@@ -121,6 +127,7 @@ impl<'f> MissionKinds<'f> {
             MissionPick::Scenario(entity) => self.scenarios.push(entity),
             MissionPick::ScenarioDefinition(entity) => self.scenario_definitions.push(*entity),
             MissionPick::ModuleDeclaration(entity) => self.module_declarations.push(*entity),
+            MissionPick::Item(entity) => self.items.push(*entity),
             MissionPick::Manifest(entity) => self.manifests.push(entity),
         }
     }
@@ -163,12 +170,20 @@ impl<'f> MissionKinds<'f> {
         module_declaration::table(forge, std::mem::take(&mut self.module_declarations))
     }
 
+    pub(crate) fn take_items(
+        &mut self,
+        forge: &DataForge<'_>,
+    ) -> CatalogTable<MissionItemDefinition<'f>> {
+        item_definition::table(forge, std::mem::take(&mut self.items))
+    }
+
     /// Returns source occurrences of physical mission definitions.
     pub(crate) fn definition_sources(
         &self,
     ) -> impl Iterator<Item = (Kind, Guid, &'f str, &[CapturedNumber])> {
         mission_scenario_definition::sources(&self.scenario_definitions)
             .chain(module_declaration::sources(&self.module_declarations))
+            .chain(item_definition::sources(&self.items))
     }
 
     /// Takes the physical reputation definitions into their canonical catalog tables.
@@ -253,6 +268,7 @@ impl<'f> MissionKinds<'f> {
             Kind::ContractScenarios => self.scenarios.len(),
             Kind::MissionScenarios => self.scenario_definitions.len(),
             Kind::MissionModuleDeclarations => self.module_declarations.len(),
+            Kind::MissionItems => self.items.len(),
             Kind::CargoManifests => self.manifests.len(),
             _ => 0,
         }

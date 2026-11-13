@@ -89,6 +89,9 @@ pub(crate) fn target_kind(
 /// Returns the known catalog target family of a concrete source Record type.
 pub(crate) fn actual_kind(type_name: &str) -> Option<Kind> {
     match type_name {
+        crate::catalog_v3::mission_sources::item_definition::SOURCE_TYPE => {
+            Some(Kind::MissionItems)
+        }
         "Tag" => Some(Kind::Tags),
         "SCItemManufacturer" => Some(Kind::Manufacturers),
         crate::catalog_v3::faction_definition::SOURCE_TYPE => Some(Kind::Factions),

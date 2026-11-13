@@ -65,6 +65,7 @@ pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
         | Kind::EncounterIndices
         | Kind::MissionScenarios
         | Kind::MissionModuleDeclarations
+        | Kind::MissionItems
         | Kind::InventoryContainers
         | Kind::MedicalItemTierConfigs
         | Kind::StarmapTypes

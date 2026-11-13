@@ -77,9 +77,27 @@ impl<'f> Scan<'_, '_, 'f> {
             }
             Kind::ResourceGroups => self.resource_group(admission, tree)?,
             Kind::MissionModuleDeclarations => self.module_declaration(admission, tree)?,
+            Kind::MissionItems => self.mission_item_definition(admission, tree)?,
             _ => return self.read_mission_definition(kind, admission, tree),
         };
         Ok(Some(projection))
+    }
+
+    fn mission_item_definition(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (definition, notes) = crate::catalog_v3::mission_sources::item_definition::read(
+            tree,
+            self.projection,
+            admission,
+            self.options.cancel,
+        )?;
+        Ok((
+            Picked::Mission(MissionPick::Item(Box::new(definition))),
+            notes,
+        ))
     }
 
     fn module_declaration(

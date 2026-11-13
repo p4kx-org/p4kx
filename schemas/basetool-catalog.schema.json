@@ -4593,6 +4593,9 @@
         "missionBrokerEntries": {
           "$ref": "#/$defs/CatalogTableOfBrokerDefinition"
         },
+        "missionItems": {
+          "$ref": "#/$defs/CatalogTableOfMissionItemDefinition"
+        },
         "missionModuleDeclarations": {
           "$ref": "#/$defs/CatalogTableOfMissionModuleDeclaration"
         },
@@ -4685,6 +4688,7 @@
         "manufacturers",
         "medicalItemTierConfigs",
         "missionBrokerEntries",
+        "missionItems",
         "missionModuleDeclarations",
         "missionScenarios",
         "npcArchetypes",
@@ -5957,6 +5961,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/MissionFlowConfiguration"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfMissionItemDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/MissionItemDefinition"
           },
           "type": "array"
         }
@@ -7672,6 +7695,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `missionBrokerEntries`."
         },
+        "missionItems": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The filtered physical mission item definition selection."
+        },
         "missionLocalities": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `missionLocalities`."
@@ -7848,6 +7875,7 @@
         "mineableEntities",
         "miningGlobalParams",
         "missionBrokerEntries",
+        "missionItems",
         "missionLocalities",
         "missionLocationTemplates",
         "missionModuleDeclarations",
@@ -18703,6 +18731,10 @@
           "value": "missionModuleDeclarations"
         },
         {
+          "description": "Physical authored mission item definitions.",
+          "value": "missionItems"
+        },
+        {
           "description": "Physical global definitions of the authored contract scope labels and icons.",
           "value": "contractScopes"
         }
@@ -22364,6 +22396,66 @@
       ],
       "type": "object"
     },
+    "MissionItemDefinition": {
+      "description": "A physical mission item with authored entity, weight and localized variants.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "entityClass": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "stringVariants": {
+          "$ref": "#/$defs/SourcedValueOfMissionStringVariants"
+        },
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "weighting": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "entityClass",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType",
+        "stringVariants",
+        "tags",
+        "weighting"
+      ],
+      "type": "object"
+    },
     "MissionLocality": {
       "description": "A mission locality: a `MissionLocality` Record under `missiondata/pu_missionlocality`, a named\nset of starmap objects. The game does not localise its name.",
       "properties": {
@@ -23001,6 +23093,41 @@
         "recordName",
         "recordPath",
         "sourceType"
+      ],
+      "type": "object"
+    },
+    "MissionStringVariant": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "string": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "tag": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "string",
+        "tag"
+      ],
+      "type": "object"
+    },
+    "MissionStringVariants": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "variants": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfMissionStringVariant"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "variants"
       ],
       "type": "object"
     },
@@ -44337,6 +44464,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfMissionModuleInput"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfMissionStringVariant": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfMissionStringVariant"
                 },
                 "type": "array"
               }
@@ -70663,6 +70923,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/MissionModuleInput"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMissionStringVariant": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MissionStringVariant"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMissionStringVariants": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MissionStringVariants"
               }
             }
           }

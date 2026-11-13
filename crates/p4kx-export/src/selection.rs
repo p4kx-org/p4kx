@@ -209,13 +209,15 @@ pub enum Kind {
     MissionScenarios,
     /// Physical module declarations linked by objective handlers and other modules.
     MissionModuleDeclarations,
+    /// Physical authored mission item definitions.
+    MissionItems,
     /// Physical global definitions of the authored contract scope labels and icons.
     ContractScopes,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 82] = [
+    pub const ALL: [Self; 83] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -297,6 +299,7 @@ impl Kind {
         Self::StarmapAmenities,
         Self::MissionScenarios,
         Self::MissionModuleDeclarations,
+        Self::MissionItems,
         Self::ContractScopes,
     ];
 
@@ -341,6 +344,7 @@ impl Kind {
             Self::ContractScenarios => "contractScenarios",
             Self::MissionScenarios => "missionScenarios",
             Self::MissionModuleDeclarations => "missionModuleDeclarations",
+            Self::MissionItems => "missionItems",
             Self::ContractScopes => "contractScopes",
             Self::LootTables => "lootTables",
             Self::LootArchetypes => "lootArchetypes",
