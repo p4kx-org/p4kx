@@ -60,6 +60,7 @@ mod included;
 mod lod_skeleton_origin;
 mod material;
 mod material_companion;
+mod material_emission;
 mod material_read_observation;
 mod material_request;
 mod mesh;
@@ -176,6 +177,10 @@ pub use included::{
 };
 pub use lod_skeleton_origin::LodSkeletonOrigin;
 pub use material_companion::{MaterialCompanion, MaterialCompanionUse, MaterialReadOrigin};
+pub use material_emission::{
+    EmissionAttribute, EmissionAttributeKind, EmissionNumber, EmissionNumeric, EmissionTextureSlot,
+    EmissionValue, MaterialEmission,
+};
 pub use material_read_observation::{MaterialReadField, MaterialReadObservation, MaterialReadUse};
 pub use material_request::MaterialRequest;
 pub use model::{ChunkUsage, Lod, LodSelection, Mesh, Model, ModelChunk, ModelFile, Node, Submesh};
