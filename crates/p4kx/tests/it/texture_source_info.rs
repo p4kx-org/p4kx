@@ -51,8 +51,8 @@ fn cli_preserves_source_words_and_legacy_fields_for_archive_and_disk() -> TestRe
             Some(&json!(0xface_0007_u32)),
             "authored DX10 extra flags are preserved"
         );
-        verify_header_origin(&value, entry, "transfer~1effective", json!("srgb"))?;
-        verify_header_origin(&value, entry, "alpha_association", json!("reserved"))?;
+        verify_header_origin(&value, entry, "transfer~1effective", "srgb")?;
+        verify_header_origin(&value, entry, "alpha_association", "reserved")?;
         values.push(
             value
                 .get("source_metadata")
@@ -68,11 +68,13 @@ fn cli_preserves_source_words_and_legacy_fields_for_archive_and_disk() -> TestRe
     Ok(())
 }
 
-fn verify_header_origin(value: &Value, entry: bool, pointer: &str, expected: Value) -> TestResult {
+fn verify_header_origin(value: &Value, entry: bool, pointer: &str, expected: &str) -> TestResult {
     let path = pointer.replace("~1", "/");
     assert_eq!(
-        value.pointer(&format!("/source_metadata/{path}")),
-        Some(&expected),
+        value
+            .pointer(&format!("/source_metadata/{path}"))
+            .and_then(Value::as_str),
+        Some(expected),
         "{path}"
     );
     let field = value
