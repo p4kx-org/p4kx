@@ -6,6 +6,7 @@ use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
 use p4kx_assembly::{Assembly, Issue as AssemblyIssue, ModelProvider};
+use p4kx_extraction::ArchiveDefaultMaterial;
 use p4kx_gltf::{AnimationSummary, GlbOptions, TextureLoader};
 
 use crate::build::{Inputs, manifest};
@@ -242,7 +243,11 @@ fn write_scene_files(
 ) -> PackageResult<PackageSummary> {
     let items = &scene.items;
     let plan = MeshPlan::of(items);
-    let collected = Collected::of(items, &plan, options.lod, models);
+    let fallback = crate::package_default_material::select(items, &plan, options.lod, models);
+    let library = fallback
+        .as_deref()
+        .and_then(ArchiveDefaultMaterial::library);
+    let collected = Collected::of(items, &plan, options.lod, models, library);
     context.check()?;
     let outcomes = if collected.wanted.is_empty() {
         Vec::new()
@@ -255,7 +260,16 @@ fn write_scene_files(
             context,
         )?
     };
-    let written = meshes::write_all(items, &plan, options, &staging.join(MESHES_FOLDER), context)?;
+    let written = meshes::write_all(
+        items,
+        &plan,
+        options,
+        &staging.join(MESHES_FOLDER),
+        context,
+        fallback
+            .as_deref()
+            .and_then(ArchiveDefaultMaterial::material),
+    )?;
     context.check()?;
     let mut manifest = manifest(&Inputs {
         entity: scene.entity.clone(),
@@ -275,6 +289,7 @@ fn write_scene_files(
     if authored_soc_bytes.is_some() {
         manifest.authored_soc = Some(crate::package_soc_scene::ManifestSocScene::new());
     }
+    manifest.default_material = fallback.as_deref().map(ArchiveDefaultMaterial::receipt);
     sanitise(&mut manifest);
     let manifest_len = write_manifest(&staging.join(MANIFEST_FILE), &manifest, context)?;
     let mut summary = summarise(&manifest, &outcomes, &written, manifest_len);

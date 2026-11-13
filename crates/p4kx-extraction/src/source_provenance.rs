@@ -5,6 +5,8 @@
 pub(crate) mod archive_layout_origins;
 #[path = "chunk_table_evidence.rs"]
 mod chunk_table_evidence;
+#[path = "default_material_receipt.rs"]
+mod default_material_receipt;
 #[path = "entry_directory_origins.rs"]
 mod entry_directory_origins;
 #[path = "model_archive_source.rs"]
@@ -50,6 +52,9 @@ pub use crate::source_uses::SourceUses;
 pub use crate::source_value::{SourceValue, SourceValueState, SourcedValue};
 pub use archive_layout_origins::{ArchiveLayoutOriginError, ArchiveLayoutOrigins};
 pub use chunk_table_evidence::{ChunkEvidenceError, ChunkTableEvidence, ChunkTableRows};
+pub use default_material_receipt::{
+    DefaultMaterialContainer, DefaultMaterialReceipt, DefaultMaterialSource, DefaultMaterialState,
+};
 pub use entry_directory_origins::{
     EntryDirectoryOrigins, EntryDirectoryOriginsError, directory_path_uses,
 };

@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_extraction::model::{LayerBudget, MaterialStatus, Model};
-use p4kx_extraction::{ArchiveMaterialRead, EntryOrigin, ModelSource};
+use p4kx_extraction::{ArchiveDefaultMaterial, ArchiveMaterialRead, EntryOrigin, ModelSource};
 
 use super::{ArchiveModels, ModelFailure, ModelProvider, ProvidedModel};
 use crate::DeployedGear;
@@ -32,6 +32,13 @@ impl ModelProvider for ArchiveModels<'_> {
             &self.verdicts,
             &self.material_reads,
         )
+    }
+
+    fn default_material(&self) -> Option<Arc<ArchiveDefaultMaterial>> {
+        Some(ModelSource::archive_default_material(
+            &self.index,
+            &self.verdicts,
+        ))
     }
 
     fn layer_budget(&self) -> LayerBudget {

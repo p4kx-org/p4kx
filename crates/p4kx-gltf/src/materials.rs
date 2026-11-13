@@ -47,12 +47,7 @@ impl<'m> MaterialPlan<'m> {
         lod: &Lod,
         fallback: Option<&'m Material>,
     ) -> Self {
-        let ids: BTreeSet<u16> = lod
-            .meshes
-            .iter()
-            .flat_map(|mesh| &mesh.submeshes)
-            .map(|submesh| submesh.material_id)
-            .collect();
+        let ids: BTreeSet<u16> = lod.drawable_material_ids().collect();
         let slots: BTreeMap<u16, Option<Slot>> = ids
             .into_iter()
             .map(|id| {
@@ -152,15 +147,25 @@ impl<'m> MaterialPlan<'m> {
         self.slots.get(&id).copied().flatten()
     }
 
-    /// Returns the distinct slots something is drawn with, in the order of the material IDs.
-    pub(crate) fn drawn_slots(&self) -> Vec<Slot> {
-        let mut drawn: Vec<Slot> = Vec::new();
-        for slot in self.slots.values().flatten() {
-            if !drawn.contains(slot) {
-                drawn.push(*slot);
+    /// Returns distinct drawable slots in first material ID order, with all assigned IDs.
+    pub(crate) fn drawn_slots(&self) -> Vec<(Slot, Vec<u16>)> {
+        let mut by_slot: BTreeMap<Slot, Vec<u16>> = BTreeMap::new();
+        let mut order = Vec::new();
+        for (&id, &slot) in &self.slots {
+            if let Some(slot) = slot {
+                by_slot
+                    .entry(slot)
+                    .or_insert_with(|| {
+                        order.push(slot);
+                        Vec::new()
+                    })
+                    .push(id);
             }
         }
-        drawn
+        order
+            .into_iter()
+            .filter_map(|slot| Some((slot, by_slot.remove(&slot)?)))
+            .collect()
     }
 
     /// Returns the number of material IDs drawn with the engine's default material.

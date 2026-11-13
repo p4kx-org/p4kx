@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_model::{MaterialStatus, Model, Transform};
+use p4kx_model::{Material, MaterialStatus, Model, Transform};
 
 use crate::axes::decompose;
 use crate::materials::{MaterialPlan, Slot, display_name};
@@ -74,8 +74,12 @@ pub struct DrawnMaterial {
     /// `material_<position>`, else `default`.
     pub name: String,
     /// The position of the material in its library's sub-material list (0 for a library that is
-    /// one material); `None` for the engine's default material.
+    /// one material); `None` when no drawable assignment came from the authored library.
     pub library_index: Option<usize>,
+    /// The raw mesh material IDs assigned to this dense glTF material.
+    pub source_material_ids: Vec<u16>,
+    /// Whether this assignment uses the verified physical Archive fallback.
+    pub archive_default: bool,
     /// The diffuse map.
     pub diffuse: Option<TextureFile>,
     /// The normal map.
@@ -98,13 +102,24 @@ pub fn drawn_materials(
     materials: &MaterialStatus,
     level: u32,
 ) -> Vec<DrawnMaterial> {
+    drawn_materials_with_fallback(model, materials, level, None)
+}
+
+/// Returns the materials written with the given physical fallback for missing assignments.
+#[must_use]
+pub fn drawn_materials_with_fallback(
+    model: &Model,
+    materials: &MaterialStatus,
+    level: u32,
+    fallback: Option<&Material>,
+) -> Vec<DrawnMaterial> {
     let Some(lod) = model.nearest_lod(level) else {
         return Vec::new();
     };
-    let plan = MaterialPlan::new(materials.library(), lod);
+    let plan = MaterialPlan::with_fallback(materials.library(), lod, fallback);
     plan.drawn_slots()
         .into_iter()
-        .map(|slot| {
+        .map(|(slot, source_material_ids)| {
             let material = plan.material(slot);
             let found = sources(material);
             DrawnMaterial {
@@ -113,6 +128,8 @@ pub fn drawn_materials(
                     Slot::Library(position) => Some(position),
                     Slot::Default => None,
                 },
+                source_material_ids,
+                archive_default: slot == Slot::Default && fallback.is_some(),
                 diffuse: found.diffuse.map(texture_file),
                 normal: found.normal.map(texture_file),
                 specular: found.specular.map(texture_file),

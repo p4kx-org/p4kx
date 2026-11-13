@@ -46,6 +46,10 @@ fn mapped_materials_use_data_relative_package_paths_and_keep_source_references()
         assert!(validator.is_valid(&value), "the actual package validates");
         let manifest: Manifest = serde_json::from_value(value)?;
         assert_eq!(manifest.materials.len(), 2, "only the used materials");
+        assert!(
+            manifest.default_material.is_none(),
+            "authored assignments need no fallback"
+        );
         for material in &manifest.materials {
             assert_eq!(
                 material.library, "Objects/Test/paint",

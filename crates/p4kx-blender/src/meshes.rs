@@ -5,7 +5,7 @@ use std::io::{BufWriter, Write};
 use std::path::Path;
 
 use p4kx_gltf::{GlbOptions, GlbSummary, GltfError, Scene, SceneNode, ScenePart, write_scene_glb};
-use p4kx_model::Transform;
+use p4kx_model::{Material, Transform};
 use rayon::prelude::*;
 
 use crate::items::Item;
@@ -20,12 +20,13 @@ pub(crate) fn write_all(
     options: &GlbOptions,
     folder: &Path,
     cancelled: &PackageWriteContext<'_>,
+    fallback: Option<&Material>,
 ) -> PackageResult<Vec<GlbSummary>> {
     (0..plan.len())
         .into_par_iter()
         .map(|index| {
             cancelled.check()?;
-            write_one(items, plan, index, options, folder, cancelled)
+            write_one(items, plan, index, options, folder, cancelled, fallback)
         })
         .collect()
 }
@@ -37,6 +38,7 @@ fn write_one(
     options: &GlbOptions,
     folder: &Path,
     context: &PackageWriteContext<'_>,
+    fallback: Option<&Material>,
 ) -> PackageResult<GlbSummary> {
     let id = mesh_id(index);
     let first = plan
@@ -47,6 +49,7 @@ fn write_one(
     if let Some(first) = first {
         first.label.clone_into(&mut name);
         let drawn = ScenePart::new(first.model, first.materials);
+        let drawn = fallback.map_or(drawn, |material| drawn.with_fallback(material));
         let drawn = first
             .palette
             .map_or(drawn, |palette| drawn.with_palette(palette));

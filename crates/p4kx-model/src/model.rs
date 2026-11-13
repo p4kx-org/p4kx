@@ -3,6 +3,9 @@
 
 use p4kx_chunks::{ChunkFile, ChunkType, ivo};
 
+#[path = "model_drawable.rs"]
+mod drawable;
+
 use crate::model_node_sources::{self, ReadCapture};
 use crate::{
     Bone, CompanionResolver, Influences, LodSkeletonOrigin, MaterialReading, MaterialStatus,

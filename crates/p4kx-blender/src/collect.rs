@@ -4,7 +4,7 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use p4kx_assembly::ModelProvider;
-use p4kx_gltf::{DrawnMaterial, drawn_materials, texture_path};
+use p4kx_gltf::{DrawnMaterial, drawn_materials_with_fallback, texture_path};
 use p4kx_model::{LayerBudget, Material, MaterialLayer, MaterialLibrary, TintPalette};
 
 use crate::TextureUse;
@@ -45,6 +45,7 @@ pub(crate) struct Collected {
     pub(crate) library_sources: MaterialLibrarySources,
     pub(crate) materials: Vec<Vec<DrawnMaterial>>,
     pub(crate) described: Vec<Vec<Option<usize>>>,
+    pub(crate) authored_libraries: Vec<Option<usize>>,
     pub(crate) descriptions: Vec<Described>,
     pub(crate) palettes: Vec<TintPalette>,
     pub(crate) palette_of: Vec<Option<usize>>,
@@ -66,6 +67,7 @@ impl Collected {
         plan: &MeshPlan,
         level: u32,
         models: &dyn ModelProvider,
+        fallback: Option<&MaterialLibrary>,
     ) -> Self {
         let mut collected = Self {
             layer_budget: models.layer_budget(),
@@ -73,9 +75,14 @@ impl Collected {
         };
         for index in 0..plan.len() {
             let item = plan.first(index).and_then(|position| items.get(position));
-            let drawn = item
-                .and_then(|item| item.drawn)
-                .map_or_default(|drawn| drawn_materials(drawn.model, drawn.materials, level));
+            let drawn = item.and_then(|item| item.drawn).map_or_default(|drawn| {
+                drawn_materials_with_fallback(
+                    drawn.model,
+                    drawn.materials,
+                    level,
+                    fallback.and_then(|library| library.materials.first()),
+                )
+            });
             let palette = item
                 .and_then(|item| item.drawn?.palette)
                 .map(|palette| collected.palette_index(palette));
@@ -90,10 +97,17 @@ impl Collected {
                 })
                 .unwrap_or_default();
             let library = item.and_then(|item| item.drawn?.materials.library());
+            let authored =
+                collected
+                    .library_sources
+                    .capture_fallback(library, &drawn, &mut collected.issues);
+            collected.authored_libraries.push(authored);
             let described = drawn
                 .iter()
                 .map(|material| {
-                    let position = material.library_index?;
+                    let (library, position) = material
+                        .library_index
+                        .map_or((fallback, 0), |position| (library, position));
                     collected.describe(library?, position, Some(material), models, 0)
                 })
                 .collect();

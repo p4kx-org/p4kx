@@ -63,6 +63,7 @@ pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
             .collect(),
         palettes: palettes(inputs),
         authored_soc: None,
+        default_material: None,
         issues: issues(inputs),
     }
 }
@@ -177,9 +178,25 @@ fn mesh_material(
     material: &DrawnMaterial,
 ) -> MeshMaterial {
     let normal = written_id(inputs, material.normal.as_ref(), crate::TextureUse::Normal);
+    let authored = inputs
+        .plan
+        .first(mesh)
+        .and_then(|item| inputs.items.get(item)?.drawn);
     MeshMaterial {
         index,
         name: material.name.clone(),
+        source_material_ids: material.source_material_ids.clone(),
+        archive_default: material.archive_default,
+        authored_library: inputs
+            .collected
+            .authored_libraries
+            .get(mesh)
+            .copied()
+            .flatten()
+            .filter(|_| material.library_index.is_none()),
+        fallback_slots: authored.map_or_default(|drawn| {
+            crate::package_default_material::fallback_slots(material, drawn.materials)
+        }),
         material: inputs
             .collected
             .described

@@ -176,9 +176,8 @@ impl<'m> Layout<'m> {
             .submeshes
             .iter()
             .filter_map(|submesh| {
-                let end = submesh.first_index.checked_add(submesh.index_count)?;
-                let indices = mesh.indices.get(submesh.first_index..end)?;
-                (!indices.is_empty()).then_some((indices, submesh.material_id))
+                mesh.submesh_indices(submesh)
+                    .map(|indices| (indices, submesh.material_id))
             })
             .collect();
         let primitives: Vec<(&'m [u32], u16)> = drawn
@@ -187,7 +186,7 @@ impl<'m> Layout<'m> {
             .filter(|&(_, id)| !materials.hidden(id))
             .collect();
         self.hidden_primitives += drawn.len() - primitives.len();
-        if mesh.positions.is_empty() || primitives.is_empty() {
+        if primitives.is_empty() {
             return;
         }
         let (min, max) = bounds(&mesh.positions);

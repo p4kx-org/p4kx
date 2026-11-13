@@ -5,6 +5,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use p4kx_extraction::MaterialLibrarySourceInfo;
+use p4kx_gltf::DrawnMaterial;
 use p4kx_model::{MaterialLibrary, MaterialSource};
 
 use crate::manifest::{Issue, IssueOrigin};
@@ -23,6 +24,20 @@ struct RetainedLibrary {
     description: MaterialLibrarySourceDescription,
 }
 impl MaterialLibrarySources {
+    pub(crate) fn capture_fallback(
+        &mut self,
+        library: Option<&MaterialLibrary>,
+        drawn: &[DrawnMaterial],
+        issues: &mut Vec<Issue>,
+    ) -> Option<usize> {
+        let library = library.filter(|_| {
+            drawn
+                .iter()
+                .any(|material| material.library_index.is_none())
+        })?;
+        Some(self.capture(library, issues))
+    }
+
     pub(crate) fn capture(&mut self, library: &MaterialLibrary, issues: &mut Vec<Issue>) -> usize {
         let entries = self.entries.iter().enumerate();
         for (index, entry) in entries {

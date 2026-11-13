@@ -31,12 +31,14 @@ mod items;
 mod manifest;
 mod manifest_light;
 mod manifest_materials;
+mod manifest_mesh;
 mod manifest_rig;
 mod material_library_sources;
 mod mesh_options;
 mod meshes;
 #[cfg(test)]
 mod owned_output_tests;
+mod package_default_material;
 mod package_destination;
 mod package_paths;
 mod package_replacement;
@@ -97,6 +99,7 @@ pub use manifest_materials::{
     MaterialStencil, MaterialTexture, Palette, PaletteColours, PaletteEntry, Parameter, TextureUse,
 };
 pub use manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
+pub use package_default_material::{FallbackMaterialCause, FallbackMaterialSlot};
 pub use package_soc_scene::ManifestSocScene;
 pub use package_write_context::PackageWriteContext;
 pub use schema::manifest_schema;

@@ -192,8 +192,12 @@ impl ModelSource {
             protection: source.into_protection(),
             name,
             inputs: vec![index.archive().path().to_path_buf()],
-            default_material: (reading != MaterialReading::Skipped && requires_default(&model))
-                .then(|| Self::archive_default_material(index, verdicts)),
+            default_material: (reading != MaterialReading::Skipped
+                && model
+                    .lods
+                    .iter()
+                    .any(|lod| lod.requires_material_fallback(&model.materials)))
+            .then(|| Self::archive_default_material(index, verdicts)),
             model,
             archive_sources,
         })
@@ -221,19 +225,4 @@ fn bind_sources(
             }
         }
     }
-}
-
-fn requires_default(model: &Model) -> bool {
-    let library = model.materials.library();
-    model
-        .lods
-        .iter()
-        .flat_map(|lod| &lod.meshes)
-        .flat_map(|mesh| &mesh.submeshes)
-        .any(|submesh| {
-            library.is_none_or(|library| {
-                library.material(submesh.material_id).is_none()
-                    || library.is_empty_slot(submesh.material_id)
-            })
-        })
 }

@@ -9,9 +9,9 @@ use p4kx_extraction::model::{
     PositionBox,
 };
 use p4kx_extraction::{
-    AnimationChoice, AnimationSet, Archive, ArchiveMaterialRead, ArchiveMaterialReads,
-    ArchiveModelRead, ArchiveTextures, ConversionError, ModelArchiveSource, ModelSource, PathIndex,
-    TextureVerdicts, archive_error_in,
+    AnimationChoice, AnimationSet, Archive, ArchiveDefaultMaterial, ArchiveMaterialRead,
+    ArchiveMaterialReads, ArchiveModelRead, ArchiveTextures, ConversionError, ModelArchiveSource,
+    ModelSource, PathIndex, TextureVerdicts, archive_error_in,
 };
 use thiserror::Error;
 
@@ -165,6 +165,11 @@ pub trait ModelProvider: Sync {
     /// Returns the library together with the original reads the provider can prove.
     fn library_observed(&self, entry: &str, name: &str) -> ArchiveMaterialRead {
         ArchiveMaterialRead::unobserved(self.library(entry, name))
+    }
+
+    /// Resolves the physical fallback when this provider owns an Archive.
+    fn default_material(&self) -> Option<Arc<ArchiveDefaultMaterial>> {
+        None
     }
 
     /// Returns the budget of layer files one caller, such as one package, may read through

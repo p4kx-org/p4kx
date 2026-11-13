@@ -135,6 +135,7 @@ written (there are no `null`s).
 | `textures` | The external textures, see below. |
 | `materials` | The material descriptions, see "Materials". Added in 1.1; absent in 1.0 packages. |
 | `material_libraries` | Original authored library-root descriptions (1.9), once per distinct retained reader path/root; optional and default-empty for older manifests. |
+| `default_material` | The optional physical Archive fallback lookup for material IDs that need one, see "Meshes". |
 | `palettes` | The tint palettes, see "Palettes". Added in 1.1; absent in 1.0 packages. |
 | `issues` | What could not be resolved or written. |
 
@@ -315,7 +316,7 @@ objects. The sharing is that of the Assembly ([ADR-0077](adr/0077-scene-meshes-a
 | `instances` | How many nodes draw the mesh. |
 | `bytes`, `vertices`, `triangles` | Size of the file and of its geometry. |
 | `rig` | The skeleton, parts, morph targets and animations of a Character's mesh (1.3) or of a creature's (1.8), see "Characters" and "Creatures"; absent for a static mesh. |
-| `materials` | The materials of the mesh in the order of the glTF materials in its file: `index` is the index in the file's `materials` array, `name` the glTF material's name, and `textures` the ids of the `diffuse`, `normal` and `specular` textures that were written for it, each absent when the material names none or it could not be written, and, from 1.1, `material`, the id of the material's description in `materials`, absent for the engine's default material. Match by `index`; names can repeat. |
+| `materials` | The materials of the mesh in the order of the glTF materials in its file: `index` is the index in the file's `materials` array, `name` the glTF material's name, and `textures` the ids of the `diffuse`, `normal` and `specular` textures that were written for it, each absent when the material names none or it could not be written, and, from 1.1, `material`, the id of the material's description in `materials`, absent for a synthetic fallback. Match by `index`; names can repeat. |
 
 The file is a plain GLB: one scene whose root node (named after the Entity's class name) has the
 identity transform, the nodes of the model below it, plain-colour materials with the tint palette
@@ -326,6 +327,16 @@ file's `materials` array, the `index` of the matching entry in the manifest's `m
 the mesh. Blender's glTF importer creates materials in first-use order and renames duplicates
 (`.001`), so an importer matches materials by this custom property, not by name. `p4kx entity
 glb` files do not carry it.
+
+Each material assignment records `source_material_ids`, the raw geometry material IDs mapped to its dense
+GLB index. A library with one authored material can serve several IDs. For defaulted IDs,
+`fallback_slots` explains the original assignment and `authored_library` links to the authored
+library root when it was readable. `archive_default` marks an
+assignment that uses the physical fallback identified by `default_material`. The receipt records the
+lookup state, original Entry path and ordinal, container chain, effective encryption marker,
+and the decoded SHA-256 when the source could be verified. Ambiguous lookups keep two original
+witnesses. A failed lookup keeps the receipt and uses the synthetic fallback where needed. An
+authored library failure remains in `issues`. This selection is P4KX's policy.
 
 ### Textures
 
@@ -612,9 +623,6 @@ normalized topology, the selected mip and the PNG bytes.
 
 **1.11** adds the optional DDS transfer declarations inside texture source metadata.
 The original header words and existing texture colour-space field retain their meanings.
-The DDS source metadata also records the declared `alpha_association` independently of colour
-transfer, actual channel samples and material alpha mode. Unknown and reserved declarations
-remain visible alongside the exact raw header words.
 
 The schema file is the schema of the version in `FORMAT_VERSION`: a change of the Rust types that
 changes the schema is a change of the format, and the checked-in schema changes with it. A schema

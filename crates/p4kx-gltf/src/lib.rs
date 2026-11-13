@@ -84,8 +84,8 @@ pub use layer_view::{layered_base_key, layered_base_texture, layered_base_textur
 pub use materials::base_colour_factor;
 pub use morphs::MorphTarget;
 pub use package_support::{
-    DrawnMaterial, NodeTransform, TextureFile, drawn_materials, light_node_transform,
-    node_transform, texture_path,
+    DrawnMaterial, NodeTransform, TextureFile, drawn_materials, drawn_materials_with_fallback,
+    light_node_transform, node_transform, texture_path,
 };
 pub use rig::{
     RigPiece, write_rigged_glb, write_rigged_glb_animated, write_rigged_glb_animated_observed,
