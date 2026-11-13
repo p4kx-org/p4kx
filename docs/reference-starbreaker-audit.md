@@ -290,3 +290,43 @@ grid targets. This is part of [#1128](https://github.com/p4kx-org/p4kx/issues/11
 P4KX already tests cancellation while a texture is loaded and preserves a
 previous published package. Keep the same staging check when adding a linked
 asset pair. [P4KX package writer tests](../crates/p4kx-blender/tests/it/package_write_context.rs)
+
+### Global image indexes and multi-rig clip identity
+
+The upstream PR was still open at `14ae2d99` on the follow-up date.
+P4KX integration commit `b9d9cc6f3` resolves concrete CAF paths against all
+authored tracks-database declarations. Its candidates identify the physical
+Archive Entry, DBA clip ordinal and original byte intervals. The separate
+loose-file lookup remains available, with incomplete bank coverage explicit.
+The current integration also carries typed Mannequin and blend-space source
+nodes and physical collision skeleton metadata.
+[Upstream contract](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/docs/decomposed-export-contract.md#L740-L803)
+· [P4KX binding change](https://github.com/p4kx-org/p4kx/commit/b9d9cc6f3)
+
+CRC and chunk-directory checks passed for both global image files in the
+installed LIVE and 5.0 PTU. `Animations.img` contains a `0x370275B7` chunk at
+version `0x902`. An independent walk reconciled its eight-byte prefix,
+308-byte records, first 256-byte path fields and eight trailing bytes in both
+builds. `DirectionalBlends.img` contains a `0x6B8DF259` chunk at version
+`0x901`. The counted path audit found AIM entries separated by variable
+distances. Their full record boundaries and pose semantics remain unverified.
+The current animation provider admits CAF, DBA and AIM only. [#1141](https://github.com/p4kx-org/p4kx/issues/1141)
+tracks both image indexes, their raw spans and source-proven references.
+[CryEngine CAF header description](https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756813/pages/23306441)
+· [CryEngine directional blending description](https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756816/pages/25535363)
+
+P4KX `AnimationListing` reads model-adjacent clip headers without decoding
+their keys. The combined entity view in [#1093](https://github.com/p4kx-org/p4kx/issues/1093)
+still needs to retain root and child rig contributors together. Grouped
+presentation can keep each physical clip, frame rate and controller reference
+independent. A synthetic check should show two unrelated same-name clips
+with different rates and fragment references remaining separately addressable.
+StarBreaker's merged view groups by name and retains the first contributor's
+fragment list. Its optional final-frame pose illustrates why a channel with
+no samples must retain its bind component and why axis conversion must occur
+once. Any future opt-in bake needs an exact source clip, a requested sample
+and separate derived output. Raw clip flags, Mannequin playback settings and
+derived comparison of clip endpoints remain independent facts.
+[Upstream merge limitations](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/docs/decomposed-export-contract.md#L767-L803)
+· [Upstream pose sampler](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/pipeline/default_pose.rs)
+· [P4KX header listing](../crates/p4kx-extraction/src/animation_listing.rs)
