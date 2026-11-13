@@ -158,6 +158,7 @@ fn omission_selects_all_registered_providers() -> TestResult {
             MediaKind::Texture,
             MediaKind::Model,
             MediaKind::Animation,
+            MediaKind::AnimationDefinition,
             MediaKind::Audio,
             MediaKind::AudioControl,
         ],
