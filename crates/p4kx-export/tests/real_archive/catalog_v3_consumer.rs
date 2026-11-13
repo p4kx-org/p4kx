@@ -65,6 +65,7 @@ fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
         Kind::Infractions => "/definitions/infractions",
         Kind::InfractionSets => "/definitions/infractionSets",
         Kind::Jurisdictions => "/definitions/jurisdictions",
+        Kind::SecurityNetworkManifests => "/definitions/securityNetworkManifests",
         Kind::LocationClasses => "/definitions/locationClasses",
         Kind::LocationFunctions => "/definitions/locationFunctions",
         Kind::LocationSizes => "/definitions/locationSizes",
@@ -138,6 +139,7 @@ fn checked_table<'catalog>(
                 | Kind::Infractions
                 | Kind::InfractionSets
                 | Kind::Jurisdictions
+                | Kind::SecurityNetworkManifests
                 | Kind::LocationClasses
                 | Kind::LocationFunctions
                 | Kind::LocationSizes
@@ -266,6 +268,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
             | Kind::Infractions
             | Kind::InfractionSets
             | Kind::Jurisdictions
+            | Kind::SecurityNetworkManifests
             | Kind::LocationClasses
             | Kind::LocationFunctions
             | Kind::LocationSizes

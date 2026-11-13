@@ -8,6 +8,9 @@ use self::fixture::{DEFINITION, ENTITY, FIRST, FUTURE, MISSING, PARENT, PRISON, 
 use crate::commodity_v3_fixture::{self as archive, DcbOrigin, TestResult, at, guid, text_row};
 use crate::health_origin_assertions as proof;
 
+#[path = "catalog_security_network_manifest.rs"]
+mod security_network_manifest;
+
 #[path = "infraction_fixture.rs"]
 mod fixture;
 

@@ -33,6 +33,10 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::jurisdiction_definition::SOURCE_TYPE,
             },
+            Self::SecurityNetworkManifests => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::law_kinds::SECURITY_NETWORK_TYPE,
+            },
             Self::LocationClasses => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::location_vocabulary::CLASS,

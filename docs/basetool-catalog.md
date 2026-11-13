@@ -1627,7 +1627,8 @@ text; the German file lacks 3,246 of the 3,297 variants on LIVE, so `de` is `nul
 falls back to `en`) and `entityClusterMemberGuid`. The sourced `classification` holds the three
 original location class, function and size References. See [the location vocabulary contract](catalog-location-vocabulary.md).
 The sourced location configuration retains authored NPC auto-spawn settings, mission limits and
-the default security-manifest Reference. See [mission location configuration](catalog-location-configuration.md).
+the default Reference to [security network manifests](catalog-security-network-manifests.md).
+See [mission location configuration](catalog-location-configuration.md).
 
 Not exported: SCMDB's own pools, waves and region lists, which are derived and not stated by the
 Archive.

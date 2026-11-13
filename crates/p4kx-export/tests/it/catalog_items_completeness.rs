@@ -81,6 +81,7 @@ fn expected_completeness() -> Value {
         "infractions": {"status": "complete"},
         "infractionSets": {"status": "complete"},
         "jurisdictions": {"status": "complete"},
+        "securityNetworkManifests": {"status": "complete"},
         "locationClasses": {"status": "complete"},
         "locationFunctions": {"status": "complete"},
         "locationSizes": {"status": "complete"},

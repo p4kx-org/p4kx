@@ -38,9 +38,6 @@ impl<'f> Scan<'_, '_, 'f> {
             | Kind::AutoSpawns
             | Kind::AutoSpawnSets
             | Kind::EncounterIndices => self.npc_spawn_definition(kind, admission, tree)?,
-            Kind::Infractions | Kind::InfractionSets | Kind::Jurisdictions => {
-                self.law_definition(kind, admission, tree)?
-            }
             Kind::BlueprintCategoryLists => {
                 let read = crate::catalog_v3::blueprint_category_list_read::read(
                     tree,
@@ -146,6 +143,10 @@ impl<'f> Scan<'_, '_, 'f> {
         let projection = match kind {
             Kind::FactionReputations => self.faction_reputation_definition(admission, tree)?,
             Kind::FactionIdentities => self.faction_identity_definition(admission, tree)?,
+            Kind::Infractions
+            | Kind::InfractionSets
+            | Kind::Jurisdictions
+            | Kind::SecurityNetworkManifests => self.law_definition(kind, admission, tree)?,
             Kind::ReputationContexts => self.context_definition(admission, tree)?,
             Kind::ReputationScopes => self.scope_definition(admission, tree)?,
             Kind::ReputationStandings => self.standing_definition(admission, tree)?,

@@ -171,6 +171,8 @@ pub enum Kind {
     InfractionSets,
     /// Physical jurisdiction definitions.
     Jurisdictions,
+    /// Physical security network manifest definitions.
+    SecurityNetworkManifests,
     /// Physical mission location class definitions.
     LocationClasses,
     /// Physical mission location function definitions.
@@ -209,7 +211,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 79] = [
+    pub const ALL: [Self; 80] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -272,6 +274,7 @@ impl Kind {
         Self::Infractions,
         Self::InfractionSets,
         Self::Jurisdictions,
+        Self::SecurityNetworkManifests,
         Self::LocationClasses,
         Self::LocationFunctions,
         Self::LocationSizes,
@@ -362,6 +365,7 @@ impl Kind {
             Self::Infractions => "infractions",
             Self::InfractionSets => "infractionSets",
             Self::Jurisdictions => "jurisdictions",
+            Self::SecurityNetworkManifests => "securityNetworkManifests",
             Self::LocationClasses => "locationClasses",
             Self::LocationFunctions => "locationFunctions",
             Self::LocationSizes => "locationSizes",

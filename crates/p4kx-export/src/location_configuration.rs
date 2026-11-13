@@ -24,7 +24,6 @@ mod auto_spawn;
 use auto_spawn::LocationAutoSpawnSettings;
 
 const SOURCE_TYPE: &str = "MissionLocationData";
-pub(crate) const SECURITY_MANIFEST_TYPE: &str = "SecurityNetworkManifest";
 
 /// Location-owned spawn settings, limits and default security definition link.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -57,7 +56,7 @@ impl<'source> MissionLocationConfiguration<'source> {
             )?,
             default_security_network_manifest: fields.record_link_to(
                 "defaultSecurityNetworkManifest",
-                SECURITY_MANIFEST_TYPE,
+                super::super::law_kinds::SECURITY_NETWORK_TYPE,
                 notes,
             )?,
         })

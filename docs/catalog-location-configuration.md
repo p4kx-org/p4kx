@@ -8,7 +8,7 @@ Locations with the authored `disabled` flag retain their configuration.
 | --- | --- | --- |
 | `locationData.autoSpawnSettings` | `configuration.value.autoSpawnSettings` | Ordered `AutoSpawnSettings` Class occurrences with their authored tag lists, spawn limits and delays, inventory, faction override and controls. |
 | `locationData.missionLimits` | `configuration.value.missionLimits` | Ordered `LocationMissionLimit` Class occurrences with the Tag Reference, `autoConsumeIfPlayerAtLocation` Bool and `maxMissionInstances` Int32. |
-| `locationData.defaultSecurityNetworkManifest` | `configuration.value.defaultSecurityNetworkManifest` | The authored Reference to `SecurityNetworkManifest`. The physical target identity or dangling GUID remains available. |
+| `locationData.defaultSecurityNetworkManifest` | `configuration.value.defaultSecurityNetworkManifest` | The authored Reference to `SecurityNetworkManifest`. The physical target identity or dangling GUID remains available. Join to [security network manifests](catalog-security-network-manifests.md). |
 
 A present empty array retains its state and array value. Every limit occurrence and member,
 including the original numeric value, carries its own source marker. These fields describe

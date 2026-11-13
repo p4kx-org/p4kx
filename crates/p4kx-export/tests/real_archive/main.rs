@@ -82,6 +82,7 @@ mod real_archive_reputation_standings;
 mod real_archive_resource_components;
 mod real_archive_resource_network;
 mod real_archive_resource_oracles;
+mod real_archive_security_manifests;
 mod real_archive_ship_base;
 mod real_archive_ship_matrix;
 mod real_archive_shop_inventory_v3;

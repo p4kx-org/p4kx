@@ -50,6 +50,7 @@ pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
         | Kind::Infractions
         | Kind::InfractionSets
         | Kind::Jurisdictions
+        | Kind::SecurityNetworkManifests
         | Kind::LocationClasses
         | Kind::LocationFunctions
         | Kind::LocationSizes

@@ -66,34 +66,6 @@ fn kind_health(kind: Kind, written_rows: usize) -> Value {
 
 fn row_count(kind: Kind, catalog: &Value) -> usize {
     match kind {
-        Kind::Blueprints => catalog.pointer("/definitions/blueprints/rows"),
-        Kind::ShopInventories => catalog.pointer("/definitions/shopInventories/rows"),
-        Kind::ExplosionDefinitions => catalog.pointer("/definitions/explosionDefinitions/rows"),
-        Kind::InventoryContainers => catalog.pointer("/definitions/inventoryContainers/rows"),
-        Kind::MedicalItemTierConfigs => catalog.pointer("/definitions/medicalItemTierConfigs/rows"),
-        Kind::MissionScenarios => catalog.pointer("/definitions/missionScenarios/rows"),
-        Kind::Factions => catalog.pointer("/definitions/factions/rows"),
-        Kind::FactionIdentities => catalog.pointer("/definitions/factionIdentities/rows"),
-        Kind::FactionReputations => catalog.pointer("/definitions/factionReputations/rows"),
-        Kind::ReputationPerks => catalog.pointer("/definitions/reputationPerks/rows"),
-        Kind::ReputationTriggerRecords => {
-            catalog.pointer("/definitions/reputationTriggerRecords/rows")
-        }
-        Kind::ReputationRewardAmounts => {
-            catalog.pointer("/definitions/reputationRewardAmounts/rows")
-        }
-        Kind::AmmoDefinitions => catalog.pointer("/definitions/ammoDefinitions/rows"),
-        Kind::Infractions => catalog.pointer("/definitions/infractions/rows"),
-        Kind::InfractionSets => catalog.pointer("/definitions/infractionSets/rows"),
-        Kind::Jurisdictions => catalog.pointer("/definitions/jurisdictions/rows"),
-        Kind::LocationClasses => catalog.pointer("/definitions/locationClasses/rows"),
-        Kind::NpcArchetypes => catalog.pointer("/definitions/npcArchetypes/rows"),
-        Kind::NpcClassPools => catalog.pointer("/definitions/npcClassPools/rows"),
-        Kind::AutoSpawns => catalog.pointer("/definitions/autoSpawns/rows"),
-        Kind::AutoSpawnSets => catalog.pointer("/definitions/autoSpawnSets/rows"),
-        Kind::EncounterIndices => catalog.pointer("/definitions/encounterIndices/rows"),
-        Kind::LocationFunctions => catalog.pointer("/definitions/locationFunctions/rows"),
-        Kind::LocationSizes => catalog.pointer("/definitions/locationSizes/rows"),
         Kind::LocationClassRegistries => {
             catalog.pointer("/definitions/locationRegistries/classes/rows")
         }
@@ -103,23 +75,14 @@ fn row_count(kind: Kind, catalog: &Value) -> usize {
         Kind::LocationSizeRegistries => {
             catalog.pointer("/definitions/locationRegistries/sizes/rows")
         }
-        Kind::StarmapObjects => catalog.pointer("/definitions/starmapObjects/rows"),
-        Kind::StarmapTypes => catalog.pointer("/definitions/starmapTypes/rows"),
-        Kind::StarmapPresets => catalog.pointer("/definitions/starmapPresets/rows"),
-        Kind::StarmapAmenities => catalog.pointer("/definitions/starmapAmenities/rows"),
-        Kind::ContractTemplates => catalog.pointer("/definitions/contractTemplates/rows"),
-        Kind::MissionBrokerEntries => catalog.pointer("/definitions/missionBrokerEntries/rows"),
-        Kind::BlueprintCategories => catalog.pointer("/definitions/blueprintCategories/rows"),
-        Kind::GameplayProperties => catalog.pointer("/definitions/gameplayProperties/rows"),
-        Kind::LootPoolFilters => catalog.pointer("/definitions/lootPoolFilters/rows"),
         Kind::BlueprintCategoryLists => {
             catalog.pointer("/declarations/blueprintCategoryLists/rows")
         }
-        Kind::Manufacturers => catalog.pointer("/definitions/manufacturers/rows"),
-        Kind::Tags => catalog.pointer("/definitions/tags/rows"),
-        Kind::Commodities => catalog.pointer("/definitions/commodities/rows"),
-        Kind::ResourceTypes => catalog.pointer("/definitions/resourceTypes/rows"),
-        _ => catalog.get(kind.name()),
+        _ => catalog
+            .get("definitions")
+            .and_then(|definitions| definitions.get(kind.name()))
+            .and_then(|table| table.get("rows"))
+            .or_else(|| catalog.get(kind.name())),
     }
     .and_then(Value::as_array)
     .map_or(0, Vec::len)

@@ -7,7 +7,7 @@
 | `name`, `description` Locale | `name`, `description` protected `GameTextRef` values with the original keys and observed translations in the shared game text table |
 | `factionTag` Reference<Tag> | `factionTag` original Tag link |
 | `factionRef` Reference<Faction> | `factionRef` original Faction link |
-| `securityNetworkRef` Reference<SecurityNetworkManifest> | `securityNetworkRef` original security manifest link |
+| `securityNetworkRef` Reference<SecurityNetworkManifest> | `securityNetworkRef` original [security manifest](catalog-security-network-manifests.md) link |
 | `encounterPresetWeights` Class<EncounterPresetWeight>[] | `encounterPresetWeights` ordered entries with the authored `EncounterPreset` enum token and exact `Single` weight |
 | `lootPoolThemeTags` Reference<Tag>[] | `lootPoolThemeTags` ordered original Tag links |
 

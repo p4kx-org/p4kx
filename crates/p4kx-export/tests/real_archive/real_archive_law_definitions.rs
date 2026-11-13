@@ -192,7 +192,7 @@ fn verify_parameters(source: &StructValue<'_>, row: &Value) -> TestResult {
     Ok(())
 }
 
-fn verify_class(
+pub(super) fn verify_class(
     source: Option<&Original<'_>>,
     row: &Value,
     verify: impl FnOnce(&StructValue<'_>, &Value) -> TestResult,
@@ -210,7 +210,7 @@ fn verify_class(
     verify(source, payload)
 }
 
-fn verify_scalar(source: Option<&Original<'_>>, row: &Value) -> TestResult {
+pub(super) fn verify_scalar(source: Option<&Original<'_>>, row: &Value) -> TestResult {
     let expected = match source {
         Some(Original::Int32(value)) => json!(value),
         Some(Original::Bool(value)) => json!(value),

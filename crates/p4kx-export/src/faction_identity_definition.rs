@@ -64,8 +64,11 @@ impl<'source> FactionIdentityDefinition<'source> {
         let faction_tag = fields.record_link_to("factionTag", "Tag", notes)?;
         let faction_ref =
             fields.record_link_to("factionRef", super::faction_definition::SOURCE_TYPE, notes)?;
-        let security_network_ref =
-            fields.record_link_to("securityNetworkRef", "SecurityNetworkManifest", notes)?;
+        let security_network_ref = fields.record_link_to(
+            "securityNetworkRef",
+            super::law_kinds::SECURITY_NETWORK_TYPE,
+            notes,
+        )?;
         let encounter_preset_weights = fields.class_array_to(
             "encounterPresetWeights",
             PRESET_WEIGHT,

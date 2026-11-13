@@ -161,6 +161,7 @@ impl<'f> Picked<'f> {
             | Kind::Infractions
             | Kind::InfractionSets
             | Kind::Jurisdictions
+            | Kind::SecurityNetworkManifests
             | Kind::MissionScenarios
             | Kind::LocationClasses
             | Kind::LocationFunctions

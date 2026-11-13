@@ -94,6 +94,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) infraction_sets: KindCompleteness<'a>,
     /// The physical jurisdiction selection.
     pub(crate) jurisdictions: KindCompleteness<'a>,
+    /// The physical security network manifest selection.
+    pub(crate) security_network_manifests: KindCompleteness<'a>,
     pub(crate) location_classes: KindCompleteness<'a>,
     pub(crate) location_functions: KindCompleteness<'a>,
     pub(crate) location_sizes: KindCompleteness<'a>,
@@ -209,6 +211,7 @@ impl<'a> Completeness<'a> {
             infractions: completeness,
             infraction_sets: completeness,
             jurisdictions: completeness,
+            security_network_manifests: completeness,
             location_classes: completeness,
             location_functions: completeness,
             location_sizes: completeness,
