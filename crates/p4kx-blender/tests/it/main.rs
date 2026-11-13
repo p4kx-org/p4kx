@@ -9,6 +9,7 @@ mod material_source_metadata;
 mod package_bone_attachment;
 mod package_character;
 mod package_creature;
+mod package_dds_fallback;
 mod package_interior;
 mod package_landing_gear;
 mod package_layer_limits;

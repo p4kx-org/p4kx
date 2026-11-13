@@ -372,8 +372,11 @@ does not decode it. DDS rows with BC1 use the selected blocks to distinguish tra
 from edge padding. When a normal requires a Y flip, or the original uses a separate alpha or
 smoothness member, the writer uses the usual PNG conversion. Topology and unsupported encodings
 use that same fallback when a PNG can be produced. The row's `dds_fallback` records the reason.
-An ambiguous, missing or corrupt required member produces a texture issue. The model slot is
-left unbound in that case. The [DDS alpha semantics investigation](https://github.com/p4kx-org/p4kx/issues/1137) covers legacy premultiplied formats and alpha projection across consumers.
+The direct DDS path requires unique, fully verified header and selected mip members. A failure
+to establish those inputs produces a texture issue and leaves the slot unbound. PNG fallback
+uses the regular PNG decoder, with its normal texture selection and source receipts. The
+[DDS alpha semantics investigation](https://github.com/p4kx-org/p4kx/issues/1137) covers legacy
+premultiplied formats and alpha projection across consumers.
 
 The optional texture container does not change texture ids, reuse of material inputs, or the
 selected mip policy. The standalone texture tools can export arrays, cubes and volumes. The
