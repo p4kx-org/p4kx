@@ -31,7 +31,7 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.5.0",
+            "1.6.0",
             "Selected original models, geometry and character definitions with positioned source declarations.",
         );
         capability.field_groups = vec![
@@ -59,9 +59,13 @@ impl Provider for ModelSourceProvider {
                 "vehicle-physics-grids",
                 "Original vehicle physics-grid paths from the selected DataForge Entry and exact archive targets.",
             ),
+            FieldGroup::new(
+                "collision-frames",
+                "Original NMC node declarations and composed collision frames with physical parent evidence.",
+            ),
             FieldGroup::new_with_unsupported_projection(
                 "model-semantics",
-                "Render model decoding, material dependencies and entity-frame collision transforms are outside this projection.",
+                "Render model decoding and material dependencies are outside this projection.",
             ),
         ];
         capability
@@ -116,12 +120,7 @@ fn chunk_source(
         Ok(file) => {
             entry(family, &file, &origins, writer)?;
             companions::emit(context, &file, &origins, writer)?;
-            for index in 0..file.chunks().len() {
-                writer.checkpoint()?;
-                chunk(&file, index, &origins, writer)?;
-                physics::emit(&file, index, &mut reader, &origins, writer)?;
-                lod_distances::emit(&file, index, &mut reader, &origins, writer)?;
-            }
+            chunks(&file, &mut reader, &origins, writer)?;
         }
         Err(ChunkDirectoryError::Format(ChunkError::Allocation)) => {
             return Err(MediaError::Contract(
@@ -313,4 +312,32 @@ fn put(
         evidence,
         writer,
     )
+}
+
+fn chunks(
+    file: &ChunkDirectory,
+    reader: &mut RequiredReader<'_>,
+    origins: &ModelOrigins<'_>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let frame_input = if file
+        .chunks()
+        .iter()
+        .any(|chunk| chunk.chunk_type() == p4kx_extraction::chunks::ivo::STAT_OBJ_PHYSICS)
+    {
+        Some(physics::NodeFrames::load(file, reader, origins, writer)?)
+    } else {
+        None
+    };
+    let frames = frame_input
+        .as_ref()
+        .map(|input| input.project(origins, writer))
+        .transpose()?;
+    for index in 0..file.chunks().len() {
+        writer.checkpoint()?;
+        chunk(file, index, origins, writer)?;
+        physics::emit(file, index, reader, frames.as_ref(), origins, writer)?;
+        lod_distances::emit(file, index, reader, origins, writer)?;
+    }
+    Ok(())
 }

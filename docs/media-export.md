@@ -169,12 +169,28 @@ fields and unfamiliar markers or shape selectors keep their bytes with explicit 
 Malformed or truncated collision data produces partial diagnostic rows and keeps readable
 siblings in that diagnostic generation.
 
+Model collision Media additionally retains each supported NodeMeshCombo row, including helper
+nodes and nodes with no rendered mesh. The `model-physics-node` record carries its original
+chunk and physical row positions, the separate stored ID, parent and geometry words, both
+matrix fields and scale as exact binary32 words. The packed collision key names the physical
+row ordinal. It is independent of the stored node ID.
+
+Each collision slot has a `model-physics-frame` sidecar at the same chunk and slot positions.
+Valid node chains have local and entity 3-by-4 row-major affine matrices in CryEngine Z-up
+metres. Scale is applied along the authored node-local axes before composing the parent chain.
+Consumers transform source geometry with the affine, preserving nonuniform scale and shear.
+Whole-object keys carry their own explicit disposition without guessing a geometry node.
+Absent or ambiguous tables and missing, cyclic, singular or nonfinite routes remain explicit.
+The original shape facts and raw bytes stay available for every disposition.
+The ignored installed-source witness is
+`cargo test -p p4kx-media --test real_archive installed_collision_frames_follow_original_unfiltered_node_words -- --ignored`.
+
 Validated version-2 box, sphere, cylinder and capsule shapes carry original float bits and
 finite values. Source-node geometry uses metres and a Z-up frame. A triangle mesh adds
 `model-physics-vertex` and `model-physics-triangle` rows keyed by chunk, slot and original element
 ordinal. Their fields carry original float words, u16 vertex indices and per-triangle material
-bytes. The shared per-field origin receipts identify the exact source bytes. Model material dependencies,
-entity-frame collision transforms and converted geometry have separate coverage.
+bytes. The shared per-field origin receipts identify the exact source bytes. Model material
+dependencies and converted geometry have separate coverage.
 
 `--kind animation` retains CAF, DBA and AIM sources with chunk and clip inventory, original
 metadata and controller words, and typed decoded frame and key chunks.

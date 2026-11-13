@@ -14,7 +14,7 @@ const STREAM: &str = "model.jsonl";
 #[test]
 fn typed_collision_rows_preserve_physical_occurrences_and_original_words() -> TestResult {
     let temp = tempfile::tempdir()?;
-    let sphere = shape(4, &[1.0, -0.0, 3.0, 4.0]);
+    let sphere = collision_shape(4, &[1.0, -0.0, 3.0, 4.0]);
     let mesh = triangle();
     let sdf = 0xDEAD_BEB5_u32.to_le_bytes();
     let slots = [
@@ -22,7 +22,7 @@ fn typed_collision_rows_preserve_physical_occurrences_and_original_words() -> Te
         (0x0002_FFFF, &sdf),
         (0x0006_0123, &mesh),
     ];
-    let data = container(&table(&slots)?);
+    let data = container(&physics_table(&slots)?);
     let original = ChunkFile::parse(data.as_slice())?;
     let chunk_start = original
         .chunks()
@@ -150,9 +150,9 @@ fn assert_encrypted_word(
 #[test]
 fn malformed_collision_blob_keeps_good_siblings_in_diagnostics() -> TestResult {
     let temp = tempfile::tempdir()?;
-    let bad = shape(4, &[f32::NAN, 0.0, 0.0, 1.0]);
-    let good = shape(4, &[0.0, 0.0, 0.0, 1.0]);
-    let data = table(&[(0, &bad), (1, &good)])?;
+    let bad = collision_shape(4, &[f32::NAN, 0.0, 0.0, 1.0]);
+    let good = collision_shape(4, &[0.0, 0.0, 0.0, 1.0]);
+    let data = physics_table(&[(0, &bad), (1, &good)])?;
     let file = TestChunkFile::ivo()
         .chunk(ivo::STAT_OBJ_PHYSICS.id(), 0x901, &data[..])
         .chunk(ivo::STAT_OBJ_PHYSICS.id(), 0x900, &data[..])
@@ -203,7 +203,7 @@ fn find<'a>(
         .ok_or_else(|| format!("missing {namespace} {indices:?}").into())
 }
 
-fn shape(kind: u32, words: &[f32]) -> Vec<u8> {
+pub(super) fn collision_shape(kind: u32, words: &[f32]) -> Vec<u8> {
     let mut bytes = 2_u32.to_le_bytes().to_vec();
     bytes.resize(68, 0);
     bytes.extend(kind.to_le_bytes());
@@ -212,7 +212,7 @@ fn shape(kind: u32, words: &[f32]) -> Vec<u8> {
 }
 
 fn triangle() -> Vec<u8> {
-    let mut bytes = shape(1, &[]);
+    let mut bytes = collision_shape(1, &[]);
     for word in [3_u32, 1, 3, 0, 1] {
         bytes.extend(word.to_le_bytes());
     }
@@ -229,7 +229,7 @@ fn triangle() -> Vec<u8> {
     bytes
 }
 
-fn table(slots: &[(u32, &[u8])]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub(super) fn physics_table(slots: &[(u32, &[u8])]) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let mut bytes = vec![0; 80];
     bytes
         .get_mut(40..44)

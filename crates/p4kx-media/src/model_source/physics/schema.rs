@@ -3,7 +3,7 @@
 
 use serde_json::{Value, json};
 
-use super::payload::{PhysicsPayload, SLOT, TABLE, TRIANGLE, VERTEX};
+use super::payload::{FRAME, NODE, PhysicsPayload, SLOT, TABLE, TRIANGLE, VERTEX};
 use crate::{MediaError, schema_merge};
 
 pub(in crate::provider::model_source) fn bind(base: &mut Value) -> Result<(), MediaError> {
@@ -21,6 +21,8 @@ pub(in crate::provider::model_source) fn bind(base: &mut Value) -> Result<(), Me
         (TABLE, "table", 1),
         (SLOT, "slot", 2),
         (VERTEX, "vertex", 3),
+        (NODE, "node", 2),
+        (FRAME, "frame", 2),
         (TRIANGLE, "triangle", 3),
     ] {
         branches.push(json!({

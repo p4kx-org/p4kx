@@ -5,12 +5,15 @@ use p4kx_extraction::model::PhysicsFloat;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::frame_hierarchy::PhysicsFrame;
 use crate::SourceRange;
 
 pub(super) const TABLE: &str = "model-physics-table";
 pub(super) const SLOT: &str = "model-physics-slot";
 pub(super) const VERTEX: &str = "model-physics-vertex";
 pub(super) const TRIANGLE: &str = "model-physics-triangle";
+pub(super) const NODE: &str = "model-physics-node";
+pub(super) const FRAME: &str = "model-physics-frame";
 
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -49,7 +52,7 @@ pub(super) type Vector = [PhysicsScalar; 3];
 
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
-pub(super) enum PhysicsFrame {
+pub(super) enum GeometryFrame {
     SourceNodeZUpMetres,
 }
 
@@ -101,7 +104,7 @@ pub(super) enum PhysicsSlotBlob {
     },
     Malformed,
     Geometry {
-        frame: PhysicsFrame,
+        frame: GeometryFrame,
         geometry: Box<PhysicsShape>,
     },
 }
@@ -140,7 +143,20 @@ pub(super) struct PhysicsTriangle {
 )]
 pub(super) enum PhysicsPayload {
     Table(PhysicsTable),
+    Node(PhysicsNode),
+    Frame(PhysicsFrame),
     Slot(PhysicsSlot),
     Vertex(PhysicsVertex),
     Triangle(PhysicsTriangle),
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PhysicsNode {
+    pub(super) stored_id: u32,
+    pub(super) parent_word: u16,
+    pub(super) geometry_type: u16,
+    pub(super) local_matrix_bits: [[u32; 4]; 3],
+    pub(super) companion_matrix_bits: [[u32; 4]; 3],
+    pub(super) scale_bits: [u32; 3],
 }

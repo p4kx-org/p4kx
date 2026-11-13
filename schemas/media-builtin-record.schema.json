@@ -8612,6 +8612,22 @@
       ],
       "type": "string"
     },
+    "FrameDisposition": {
+      "enum": [
+        "resolved",
+        "whole-object",
+        "missing-node-table",
+        "ambiguous-node-table",
+        "unsupported-node-table",
+        "malformed-node-table",
+        "missing-node",
+        "invalid-parent",
+        "cycle",
+        "non-finite",
+        "singular"
+      ],
+      "type": "string"
+    },
     "FxObservations": {
       "additionalProperties": false,
       "properties": {
@@ -8741,6 +8757,12 @@
           "type": "object"
         }
       ]
+    },
+    "GeometryFrame": {
+      "enum": [
+        "source-node-z-up-metres"
+      ],
+      "type": "string"
     },
     "GridDatabaseState": {
       "enum": [
@@ -13785,10 +13807,132 @@
       "type": "string"
     },
     "PhysicsFrame": {
-      "enum": [
-        "source-node-z-up-metres"
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "$ref": "#/$defs/FrameDisposition"
+        },
+        "entity": {
+          "items": {
+            "items": {
+              "format": "float",
+              "type": "number"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "local": {
+          "items": {
+            "items": {
+              "format": "float",
+              "type": "number"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "node_chunk": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "disposition",
+        "node_chunk",
+        "local",
+        "entity"
       ],
-      "type": "string"
+      "type": "object"
+    },
+    "PhysicsNode": {
+      "additionalProperties": false,
+      "properties": {
+        "companion_matrix_bits": {
+          "items": {
+            "items": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "geometry_type": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "local_matrix_bits": {
+          "items": {
+            "items": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 4,
+            "minItems": 4,
+            "type": "array"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "parent_word": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "scale_bits": {
+          "items": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        },
+        "stored_id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "stored_id",
+        "parent_word",
+        "geometry_type",
+        "local_matrix_bits",
+        "companion_matrix_bits",
+        "scale_bits"
+      ],
+      "type": "object"
     },
     "PhysicsPayload": {
       "oneOf": [
@@ -13800,6 +13944,40 @@
             },
             "record_type": {
               "const": "table",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PhysicsNode"
+            },
+            "record_type": {
+              "const": "node",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/PhysicsFrame"
+            },
+            "record_type": {
+              "const": "frame",
               "type": "string"
             }
           },
@@ -14234,7 +14412,7 @@
               "type": "string"
             },
             "frame": {
-              "$ref": "#/$defs/PhysicsFrame"
+              "$ref": "#/$defs/GeometryFrame"
             },
             "geometry": {
               "$ref": "#/$defs/PhysicsShape"
@@ -38848,6 +39026,116 @@
               "indices": {
                 "maxItems": 3,
                 "minItems": 3
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-physics-node"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/PhysicsPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "node"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-physics-frame"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/PhysicsPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "frame"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
               }
             }
           }

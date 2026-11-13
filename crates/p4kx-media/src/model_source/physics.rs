@@ -3,6 +3,10 @@
 
 #[path = "physics/evidence.rs"]
 mod evidence;
+#[path = "physics/frame_hierarchy.rs"]
+mod frame_hierarchy;
+#[path = "physics/frame_projection.rs"]
+mod frame_projection;
 #[path = "physics/geometry.rs"]
 mod geometry;
 #[path = "physics/payload.rs"]
@@ -25,12 +29,15 @@ use crate::{MediaError, MediaWriter};
 use evidence::PhysicsOrigins;
 use payload::PhysicsTableStatus;
 
+use frame_projection::FrameProjection;
+pub(super) use frame_projection::NodeFrames;
 pub(super) use schema::bind;
 
 pub(super) fn emit(
     file: &ChunkDirectory,
     index: usize,
     reader: &mut RequiredReader<'_>,
+    frames: Option<&FrameProjection<'_>>,
     origins: &ModelOrigins<'_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
@@ -65,7 +72,16 @@ pub(super) fn emit(
     }
     let bytes = reader.read_chunk(chunk.offset()..chunk.offset() + chunk.size())?;
     match StatObjPhysics::read(&bytes) {
-        Ok(physics) => table::emit(index, &physics, &original, writer),
+        Ok(physics) => {
+            table::emit(index, &physics, &original, writer)?;
+            if let Some(frames) = frames {
+                for slot in physics.slots() {
+                    writer.checkpoint()?;
+                    frames.slot(index, &slot, &original, writer)?;
+                }
+            }
+            Ok(())
+        }
         Err(cause) => {
             let failure = original.use_bytes(0..chunk.size(), "physicsInvalidTable", writer)?;
             table::diagnose(

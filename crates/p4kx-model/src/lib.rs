@@ -107,6 +107,7 @@ mod mtl_vertex_colours;
 mod mtl_xml;
 mod mtl_xml_source;
 mod nmc;
+mod nmc_frames;
 mod nmc_properties;
 mod object_container;
 mod palette;
@@ -205,6 +206,7 @@ pub use mtl_source_error::MaterialReadError;
 pub use mtl_stencil::{STENCIL_SLOT, Stencil, StencilTint};
 pub use mtl_texture::{DIFFUSE_SLOT, texture_suffix, texture_suffix_lowercase};
 pub use mtl_unresolved::UnresolvedLayers;
+pub use nmc_frames::{NmcFrame, NmcFrameField, NmcFrames};
 pub use object_container::{
     ChildContainer, ContainerBounds, MAX_CHILD_CONTAINERS, MAX_STREAMED_SOCS, MAX_STREAMING_DEPTH,
     ObjectContainer, ObjectContainerError, is_external_child_value,

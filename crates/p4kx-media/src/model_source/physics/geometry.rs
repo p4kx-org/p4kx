@@ -7,7 +7,7 @@ use p4kx_extraction::model::{
 };
 
 use super::evidence::{PhysicsOrigins, bind, merge};
-use super::payload::{PhysicsFrame, PhysicsShape, PhysicsSlotBlob};
+use super::payload::{GeometryFrame, PhysicsShape, PhysicsSlotBlob};
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::{MediaError, MediaWriter};
 
@@ -35,7 +35,7 @@ pub(super) fn project(
         _ => return Err(MediaError::Contract("unhandled collision shape".into())),
     };
     Ok(PhysicsSlotBlob::Geometry {
-        frame: PhysicsFrame::SourceNodeZUpMetres,
+        frame: GeometryFrame::SourceNodeZUpMetres,
         geometry: Box::new(geometry),
     })
 }

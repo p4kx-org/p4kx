@@ -15,11 +15,11 @@ use crate::{
     ModelNodeSources, Node, Transform,
 };
 
-const NODE_LEN: usize = 208;
-const LOCAL_TRANSFORM_AT: usize = 80;
-const SCALE_AT: usize = LOCAL_TRANSFORM_AT + 48;
-const PARENT_AT: usize = 148;
-const GEOMETRY_TYPE_AT: usize = PARENT_AT + size_of::<u16>();
+pub(crate) const NODE_LEN: usize = 208;
+pub(crate) const LOCAL_TRANSFORM_AT: usize = 80;
+pub(crate) const SCALE_AT: usize = LOCAL_TRANSFORM_AT + 48;
+pub(crate) const PARENT_AT: usize = 148;
+pub(crate) const GEOMETRY_TYPE_AT: usize = PARENT_AT + size_of::<u16>();
 const FOOTER_LEN: usize = 32;
 const ROOT: u16 = 0xFFFF;
 const EPSILON: f32 = 1e-5;
