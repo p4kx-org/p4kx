@@ -13,6 +13,6 @@ RUN printf '%s\n' \
        -o Acquire::https::CaInfo=/tmp/runner-ca-certificates.crt update \
     && DEBIAN_FRONTEND=noninteractive apt-get -o Dir::Etc::sourcelist=/tmp/blender-fixtures.sources \
        -o Dir::Etc::sourceparts=- -o Acquire::https::CaInfo=/tmp/runner-ca-certificates.crt \
-       install -y --no-install-recommends blender=5.2.2+dfsg-1 python3-cattrs python3-numpy python3-requests \
+       install -y --no-install-recommends blender=5.2.2+dfsg-1 python3-cattr python3-numpy python3-requests \
     && test "$(dpkg-query -W -f='${Architecture}:${Version}' blender)" = 'arm64:5.2.2+dfsg-1' \
     && rm -rf /var/lib/apt/lists/* /tmp/blender-fixtures.sources /tmp/runner-ca-certificates.crt
