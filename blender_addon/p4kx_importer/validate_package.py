@@ -12,6 +12,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any
 
+from . import soc_scene
 from .manifest_fields import PackageError
 from .mesh_preflight import preflight_all_meshes
 from .package import MANIFEST_NAME, MAX_MANIFEST_BYTES, load_package, resolve_file
@@ -38,6 +39,15 @@ def validate_package(location: Path, receipt: Path | None = None) -> dict[str, A
             files[asset.file] = path
         except PackageError as error:
             asset_problems.append({"path": asset.file, "detail": str(error)})
+    if package.authored_soc:
+        reference = package.authored_soc
+        try:
+            companion = resolve_file(package.root, reference)
+            if companion.is_file():
+                files[reference] = companion
+            soc_scene.load(package.root, reference)
+        except PackageError as error:
+            asset_problems.append({"path": reference, "detail": str(error)})
     for texture in package.textures.values():
         if texture.format != "dds" or texture.file not in files:
             continue

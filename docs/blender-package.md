@@ -103,7 +103,8 @@ From the repository's `blender_addon` directory, run the validator with Python 3
 python -B -m p4kx_importer.validate_package 'D:/exports/ship-package'
 ```
 
-The command checks all declared mesh files and the presence of manifest textures. It prints
+The command checks all declared mesh files, manifest textures and the format and hierarchy of
+any declared authored SOC companion. It prints
 JSON to standard output and leaves the package folder untouched. `structure.status` is
 `valid`, `partial` when the package has warnings or geometry counts could not be compared,
 or `failed`. The command exits with status 1 for a structural or digest failure.

@@ -215,3 +215,23 @@ uses the existing tickets above, with two additional implementation units.
   in [#1129](https://github.com/p4kx-org/p4kx/issues/1129). Sensor volumes and
   room containment represent different relationships.
   [StarBreaker interior writer](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/pipeline/interiors.rs).
+
+### Package validation and identity
+
+Rechecked against P4KX integration commit `d6d665694`. A synthetic package
+declared `authored/soc-scene.json` and passed the standalone structural check
+both when the file was missing and when it contained an invalid document. The
+Blender importer already loads the companion before creating scene objects.
+[Issue #1138](https://github.com/p4kx-org/p4kx/issues/1138) covers standalone
+validation and digest coverage for the companion.
+
+The package manifest records exporter version, options and the archive Build
+when available. The [standalone validator](blender-package.md#validate-a-package-without-blender)
+can check a supplied SHA-256 inventory. Native fixture workflows already
+produce such an inventory and record the exact exporter binary digest.
+Regular package exports lack an equivalent inventory. #1138 uses the existing
+receipt format to bind the files in the declared package profile, including
+the SOC companion. Exporter identity, archive identity and output-byte
+consistency are separate facts. An archive directory fingerprint identifies
+directory evidence only. A receipt from the writer is a consistency check.
+[StarBreaker export stamp](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/export_stamp.rs)

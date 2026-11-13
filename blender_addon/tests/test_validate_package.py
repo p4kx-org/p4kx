@@ -11,9 +11,11 @@ from struct import pack_into
 
 import pytest
 
+from p4kx_importer.soc_scene import SOC_SCENE_FILE, SOC_SCENE_VERSION
 from p4kx_importer.package_digests import file_sha256
 from p4kx_importer.validate_package import main, validate_package
 from synthetic import glb, manifest, write_package
+from synthetic_soc_scene import scene as authored_scene
 
 
 def receipt_for(folder: Path, destination: Path, names: list[str]) -> Path:
@@ -109,6 +111,37 @@ def test_full_and_partial_receipts_are_distinct_from_structure(tmp_path: Path) -
     assert partial_result["structure"] == result["structure"]
     assert partial_result["digests"]["status"] == "partial"
     assert partial_result["digests"]["unrecorded"] == sorted(set(names) - {"scene.json"})
+
+
+def test_report_checks_declared_soc_companion_and_its_digest(tmp_path: Path) -> None:
+    folder = tmp_path / "package"
+    data = manifest(version="1.13")
+    data["authored_soc"] = {"file": SOC_SCENE_FILE, "schema_version": SOC_SCENE_VERSION}
+    scene = write_package(folder, data)
+
+    missing = validate_package(scene)["structure"]
+    assert missing["status"] == "failed"
+    assert [problem["path"] for problem in missing["asset_problems"]] == [SOC_SCENE_FILE]
+
+    companion = folder / SOC_SCENE_FILE
+    companion.parent.mkdir()
+    companion.write_text(json.dumps(authored_scene()), encoding="utf-8")
+    names = sorted(path.relative_to(folder).as_posix() for path in folder.rglob("*") if path.is_file())
+    receipt = receipt_for(folder, tmp_path / "receipt.json", names)
+    valid = validate_package(scene, receipt)
+    assert valid["structure"]["status"] == "valid"
+    assert valid["digests"]["status"] == "verified"
+    assert SOC_SCENE_FILE in valid["digests"]["verified"]
+
+    companion.write_text(json.dumps(authored_scene(), indent=2), encoding="utf-8")
+    changed = validate_package(scene, receipt)
+    assert changed["structure"]["status"] == "valid"
+    assert changed["digests"]["mismatches"] == [SOC_SCENE_FILE]
+
+    companion.write_text("{}", encoding="utf-8")
+    malformed = validate_package(scene)["structure"]
+    assert malformed["status"] == "failed"
+    assert [problem["path"] for problem in malformed["asset_problems"]] == [SOC_SCENE_FILE]
 
 
 def test_rehashed_malformed_glb_remains_structurally_failed(tmp_path: Path) -> None:
