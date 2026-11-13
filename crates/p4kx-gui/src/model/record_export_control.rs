@@ -12,6 +12,8 @@ use crate::{RecordExport, RecordExportSetup, RecordTree, RecordTreeStatus, Texts
 pub(crate) struct RecordExportState {
     setup: Option<RecordExportSetup>,
     run: Option<RecordExport>,
+    #[cfg(feature = "test-hooks")]
+    write_gate: Option<Arc<crate::hold::Gate>>,
 }
 
 impl RecordExportState {
@@ -95,9 +97,29 @@ impl Model {
         };
         let index = Arc::clone(browser.shared_index());
         self.extraction_folder = Some(request.folder.clone());
-        self.record_export.run = Some(start(&index, request, wake));
+        #[cfg(feature = "test-hooks")]
+        let run = start(
+            &index,
+            request,
+            wake,
+            self.record_export
+                .write_gate
+                .take()
+                .map_or_else(crate::hold::Pause::default, crate::hold::Pause::at),
+        );
+        #[cfg(not(feature = "test-hooks"))]
+        let run = start(&index, request, wake);
+        self.record_export.run = Some(run);
         self.record_export.setup = None;
         true
+    }
+
+    /// Holds the next Record export after source and target preparation until release or cancellation.
+    #[cfg(feature = "test-hooks")]
+    pub fn hold_record_export_writing(&mut self) -> crate::Hold {
+        let (hold, gate) = crate::hold::Hold::new();
+        self.record_export.write_gate = Some(gate);
+        hold
     }
 
     /// Returns the running or finished Record export, or `None` when there is none.

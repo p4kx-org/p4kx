@@ -168,6 +168,7 @@ pub(crate) fn start(
     index: &Arc<EntryIndex>,
     request: Request,
     wake: impl Fn() + Send + 'static,
+    #[cfg(feature = "test-hooks")] pause: crate::hold::Pause,
 ) -> RecordExport {
     static NEXT_ID: AtomicU64 = AtomicU64::new(0);
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -187,6 +188,8 @@ pub(crate) fn start(
                 request: &request,
                 cancel: &thread_cancel,
                 shared: &thread_shared,
+                #[cfg(feature = "test-hooks")]
+                pause,
             };
             if sender.send(job.run()).is_ok() {
                 wake();
@@ -211,6 +214,8 @@ struct Job<'a> {
     request: &'a Request,
     cancel: &'a CancelToken,
     shared: &'a Shared,
+    #[cfg(feature = "test-hooks")]
+    pause: crate::hold::Pause,
 }
 
 impl Job<'_> {
@@ -251,6 +256,8 @@ impl Job<'_> {
         };
         self.shared.total.store(records.len(), Ordering::Relaxed);
         self.shared.enter(RecordExportStage::Writing);
+        #[cfg(feature = "test-hooks")]
+        self.pause.wait(|| self.cancel.is_cancelled());
         let progress = || {
             self.shared.done.fetch_add(1, Ordering::Relaxed);
         };
