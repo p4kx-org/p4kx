@@ -3,12 +3,13 @@
 
 mod budget;
 mod build;
-mod lookup;
+pub(crate) mod lookup;
 
 use p4kx_gltf::{GltfError, Scene, SceneNode};
 use p4kx_model::{MaterialStatus, Model, Transform};
 
-use crate::placement::{node_transform, offset_transform};
+use crate::placement::offset_transform;
+use crate::room_model_helper::RoomModelHelper;
 use crate::{Assembly, Interior, Issue, IssueKind, ObjectContainerRef};
 use lookup::near;
 
@@ -139,7 +140,7 @@ impl EntityInterior {
         if bone.is_empty() {
             return moved;
         }
-        let Some(anchor) = model.and_then(|model| node_transform(model, bone)) else {
+        let Some(helper) = model.and_then(|model| RoomModelHelper::find(model, bone)) else {
             self.note(
                 at,
                 reference,
@@ -149,8 +150,9 @@ impl EntityInterior {
             );
             return moved;
         };
+        let anchor = helper.transform();
         let anchored = anchor.translation();
-        if near(anchored, [0.0; 3]) {
+        if helper.uses_offset() {
             return anchor.then(&moved);
         }
         if finite && !near(reference.position(), [0.0; 3]) && !near(reference.position(), anchored)

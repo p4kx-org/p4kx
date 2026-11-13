@@ -164,7 +164,9 @@ impl Geometry {
         variants
     }
 
-    pub(crate) fn model_field(&self) -> Option<SourceLocation> {
+    /// Returns the physical Record field that names this geometry.
+    #[must_use]
+    pub fn model_field(&self) -> Option<SourceLocation> {
         self.origins.model_field()
     }
 

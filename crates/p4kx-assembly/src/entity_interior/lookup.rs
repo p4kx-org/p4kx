@@ -12,7 +12,7 @@ use crate::{Assembly, AssemblyError, EntityNode, ObjectContainerRef};
 /// the same place.
 const OFFSET_TOLERANCE: f32 = 0.05;
 
-pub(super) fn near(a: [f32; 3], b: [f32; 3]) -> bool {
+pub(crate) fn near(a: [f32; 3], b: [f32; 3]) -> bool {
     a.iter()
         .zip(b)
         .all(|(x, y)| (x - y).abs() <= OFFSET_TOLERANCE)

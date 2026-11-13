@@ -18,6 +18,7 @@ pub(super) const DESCRIPTOR: &str = "interior.xml";
 pub(super) const STREAM: &str = "interior_room.soc";
 pub(super) const CHILD: &str = "fixture_child";
 pub(super) const CHILD_STREAM: &str = "child_room.soc";
+pub(super) const MODEL: &str = "Objects/Fixture/room_hull.cgf";
 
 #[derive(Clone, Copy)]
 pub(super) enum Case {
@@ -27,6 +28,11 @@ pub(super) enum Case {
     ChildFaults,
     ItemRooms,
     ShipFrame,
+    HelperFrame,
+    HelperAtOrigin,
+    MissingHelper,
+    AmbiguousHelper,
+    AmbiguousModel,
     InvalidOffset,
     MissingOffset,
     MissingStreamAndChild,
@@ -70,9 +76,15 @@ pub(super) fn archive(case: Case) -> TestResult<(tempfile::TempDir, Archive)> {
             .entry(TestEntry::stored("ambiguous.socpak", b"first entry"))
             .entry(TestEntry::stored("AMBIGUOUS.SOCPAK", b"second entry"));
     }
+    let room = TestEntry::stored(format!(r"Data\{ROOM}"), room.build());
+    let room = if uses_model(case) {
+        room
+    } else {
+        room.encrypted()
+    };
     let archive = ArchiveBuilder::new()
         .entry(TestEntry::stored(r"Data\Game2.dcb", database(case).build()))
-        .entry(TestEntry::stored(format!(r"Data\{ROOM}"), room.build()).encrypted())
+        .entry(room)
         .entry(TestEntry::stored(
             "Data/Libs/CosmoTools/LayerRecovery/LayerBackups.xml",
             b"<LayerBackups/>",
@@ -85,9 +97,28 @@ pub(super) fn archive(case: Case) -> TestResult<(tempfile::TempDir, Archive)> {
     } else {
         archive
     };
-    archive.write_to(&path)?;
+    model_entries(archive, case).write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     Ok((folder, archive))
+}
+
+fn model_entries(mut archive: ArchiveBuilder, case: Case) -> ArchiveBuilder {
+    if uses_model(case) {
+        let model = helper_model(case);
+        archive = archive
+            .entry(TestEntry::stored(format!("Data/{MODEL}"), model.cgf()).encrypted())
+            .entry(TestEntry::stored(
+                "Data/Objects/Fixture/room_hull.cgfm",
+                model.cgfm(),
+            ));
+    }
+    if matches!(case, Case::AmbiguousModel) {
+        archive = archive.entry(TestEntry::stored(
+            format!("Data/{}", MODEL.to_ascii_uppercase()),
+            b"second physical entry at the selected path",
+        ));
+    }
+    archive
 }
 
 fn descriptor(case: Case) -> TestResult<Vec<u8>> {
@@ -201,6 +232,11 @@ fn ship(case: Case) -> TestRecord {
         Case::MissingOffset => ("", [10.0, 20.0, 30.0], [0.0; 3]),
         _ => ("fixture_room_bone", [10.0, 20.0, 30.0], [0.0; 3]),
     };
+    let ship = if uses_model(case) {
+        ship.geometry(MODEL, None)
+    } else {
+        ship
+    };
     ship.object_container(ROOM, bone, position, rotation)
         .record()
 }
@@ -247,4 +283,47 @@ fn geometry() -> TestElement {
             ),
         ),
     ))
+}
+
+const fn uses_model(case: Case) -> bool {
+    matches!(
+        case,
+        Case::HelperFrame
+            | Case::HelperAtOrigin
+            | Case::MissingHelper
+            | Case::AmbiguousHelper
+            | Case::AmbiguousModel
+    )
+}
+
+fn helper_model(case: Case) -> p4kx_testkit::TestModel {
+    use p4kx_testkit::{TestModel, TestNode};
+
+    let node = |name: &str, parent, translation: [f32; 3], kind| TestNode {
+        name: name.to_owned(),
+        parent,
+        local: [
+            [1.0, 0.0, 0.0, translation[0]],
+            [0.0, 1.0, 0.0, translation[1]],
+            [0.0, 0.0, 1.0, translation[2]],
+        ],
+        kind,
+    };
+    let mut nodes = vec![
+        node("hull", None, [5.0, 0.0, 0.0], 2),
+        node("hull_mesh", Some(0), [0.0; 3], 0),
+    ];
+    match case {
+        Case::HelperFrame | Case::AmbiguousHelper => {
+            nodes.push(node("Fixture_Room_Bone", Some(0), [0.0, 7.0, 0.0], 2));
+        }
+        Case::HelperAtOrigin => {
+            nodes.push(node("Fixture_Room_Bone", Some(0), [-5.0, 0.0, 0.0], 2));
+        }
+        _ => {}
+    }
+    if matches!(case, Case::AmbiguousHelper) {
+        nodes.push(node("fixture_room_bone", Some(0), [0.0, 9.0, 0.0], 2));
+    }
+    TestModel::cube().with_nodes(nodes)
 }

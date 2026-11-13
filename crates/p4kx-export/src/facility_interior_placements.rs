@@ -10,6 +10,7 @@ use p4kx_extraction::{
 
 use super::super::facility_instance::{FacilityPlacementSource, ShipContext};
 use super::hosts::{RoomAttachment, RoomHost, RoomOwners};
+use super::model_helper::RoomHelperModels;
 use p4kx_extraction::model::Transform;
 
 use super::Projection;
@@ -60,6 +61,7 @@ pub(super) fn project(
         cancel: project.cancel,
     };
     let mut coverage = Vec::new();
+    let mut models = RoomHelperModels::new(&index, forge, capture, project.origins, project.cancel);
     for root in ship_hosts {
         project.check_cancel()?;
         let record = root.source_record_index;
@@ -69,7 +71,7 @@ pub(super) fn project(
             ship: &ship,
             attachment: None,
         };
-        reader.project_host(project, &mut coverage, rooms, &host)?;
+        reader.project_host(project, &mut coverage, rooms, &host, &mut models)?;
     }
     for attachment in attachments {
         project.check_cancel()?;
@@ -78,7 +80,7 @@ pub(super) fn project(
             ship: &attachment.ship,
             attachment: Some(attachment),
         };
-        reader.project_host(project, &mut coverage, rooms, &host)?;
+        reader.project_host(project, &mut coverage, rooms, &host, &mut models)?;
     }
     Ok(coverage)
 }

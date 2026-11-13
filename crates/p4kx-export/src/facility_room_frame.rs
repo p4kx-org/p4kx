@@ -6,7 +6,9 @@ use p4kx_extraction::{SourceUse, SourceUses, SourceValue, SourceValueState, Sour
 
 use super::super::authored_fields::RoomTransformUnavailable;
 use super::super::room_associations::RoomAssociation;
+use super::model_helper::{ObservedRoomHelper, RoomHelperModels};
 use super::walk::RootRoomTransform;
+use crate::CatalogError;
 use crate::catalog_read::original::OriginalDatum;
 
 type Matrix = [[f32; 4]; 3];
@@ -14,7 +16,10 @@ type Matrix = [[f32; 4]; 3];
 #[derive(Clone, Copy)]
 pub(super) enum RoomFrame<'source> {
     DirectItem,
-    Vehicle(&'source RoomAssociation<'source>),
+    Vehicle {
+        room: &'source RoomAssociation<'source>,
+        helper: Option<&'source ObservedRoomHelper>,
+    },
     Attached,
 }
 
@@ -22,12 +27,29 @@ impl<'source> RoomFrame<'source> {
     pub(super) const fn read(
         attached: bool,
         room: Option<&'source RoomAssociation<'source>>,
+        helper: Option<&'source ObservedRoomHelper>,
     ) -> Self {
         match (attached, room) {
             (true, _) => Self::Attached,
-            (false, Some(room)) => Self::Vehicle(room),
+            (false, Some(room)) => Self::Vehicle { room, helper },
             (false, None) => Self::DirectItem,
         }
+    }
+
+    pub(super) fn read_helper(
+        attached: bool,
+        room: Option<&RoomAssociation<'_>>,
+        models: &mut RoomHelperModels<'_, '_, '_>,
+        record: u32,
+    ) -> Result<Option<ObservedRoomHelper>, CatalogError> {
+        if attached {
+            return Ok(None);
+        }
+        let name = room
+            .and_then(|room| room.bone_name.value().copied())
+            .map(str::trim)
+            .filter(|name| !name.is_empty());
+        name.map(|name| models.resolve(record, name)).transpose()
     }
 
     pub(super) fn for_entity(
@@ -55,10 +77,10 @@ impl<'source> RoomFrame<'source> {
     }
 
     fn transform(self, inputs: &mut Vec<SourceUse>) -> Result<Transform, RoomTransformUnavailable> {
-        let room = match self {
+        let (room, helper) = match self {
             Self::DirectItem => return Ok(Transform::IDENTITY),
             Self::Attached => return Err(RoomTransformUnavailable::Unsupported),
-            Self::Vehicle(room) => room,
+            Self::Vehicle { room, helper } => (room, helper),
         };
         inputs.push(room.bone_input.clone());
         match room.bone_name.state() {
@@ -68,9 +90,21 @@ impl<'source> RoomFrame<'source> {
                     .bone_name
                     .value()
                     .is_some_and(|name| name.trim().is_empty()) => {}
-            SourceValueState::Present | SourceValueState::Unsupported => {
-                return Err(RoomTransformUnavailable::Unsupported);
+            SourceValueState::Present => {
+                let helper = helper.ok_or(RoomTransformUnavailable::Unsupported)?;
+                inputs.extend_from_slice(&helper.inputs);
+                let helper = helper.value?;
+                let anchor = helper.transform();
+                if !helper.uses_offset() {
+                    return Ok(anchor);
+                }
+                inputs.extend_from_slice(&room.room_offset.inputs);
+                return anchor
+                    .then(&room.room_offset.transform?)
+                    .finite()
+                    .ok_or(RoomTransformUnavailable::Invalid);
             }
+            SourceValueState::Unsupported => return Err(RoomTransformUnavailable::Unsupported),
             SourceValueState::Unreadable => return Err(RoomTransformUnavailable::Unreadable),
             SourceValueState::Null => return Err(RoomTransformUnavailable::Null),
             _ => return Err(RoomTransformUnavailable::Invalid),

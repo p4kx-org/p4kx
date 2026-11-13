@@ -164,6 +164,7 @@ mod resolver_path_read;
 mod resolver_prefetch;
 mod resolver_vehicle;
 mod resolver_xml;
+mod room_model_helper;
 mod skeleton;
 mod spec;
 mod spec_loadout;
@@ -252,8 +253,10 @@ pub use prefab::{
 pub use provider::{ArchiveModels, ModelFailure, ModelProvider, ProvidedAttachment, ProvidedModel};
 pub use resolver::LoadoutResolver;
 pub use resolver_observation::{LoadoutReadEvent, LoadoutReadObserver};
+pub use room_model_helper::RoomModelHelper;
 pub use skeleton::{MAX_SKELETON_LEN, SkeletonProblem};
 pub use spec::LoadoutOrigin;
+pub use spec::read_geometry;
 pub use tree::{Attachment, EntityNode, PortNode, PortSource, Target, Unresolved};
 pub use vehicle::{
     ElemOverride, LandingGear, ModificationReport, OriginTally, PartKind, PartThreshold,

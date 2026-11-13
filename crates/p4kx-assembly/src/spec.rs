@@ -155,8 +155,7 @@ impl EntitySpec {
         for (at, port) in ports.iter().enumerate() {
             port_index.entry(port_key(&port.name)).or_insert(at);
         }
-        let geometry_component =
-            component_slots(tree).find(|(_, component)| component.type_name() == GEOMETRY_RESOURCE);
+        let geometry_component = geometry_component(tree);
         let position = |ordinal| GeometryComponent {
             record: tree.record_index(),
             ordinal,
@@ -307,10 +306,16 @@ fn components_of<'v, 'f>(tree: &'v RecordTree<'f>) -> Vec<&'v StructValue<'f>> {
         .collect()
 }
 
+fn geometry_component<'tree, 'source>(
+    tree: &'tree RecordTree<'source>,
+) -> Option<(usize, &'tree StructValue<'source>)> {
+    component_slots(tree).find(|(_, component)| component.type_name() == GEOMETRY_RESOURCE)
+}
+
 /// Reads the main geometry an Entity Record names, without its ports and Loadout.
-pub(crate) fn read_geometry(tree: &RecordTree<'_>) -> Option<Geometry> {
-    let (ordinal, component) =
-        component_slots(tree).find(|(_, component)| component.type_name() == GEOMETRY_RESOURCE)?;
+#[must_use]
+pub fn read_geometry(tree: &RecordTree<'_>) -> Option<Geometry> {
+    let (ordinal, component) = geometry_component(tree)?;
     Geometry::read(
         component,
         GeometryComponent {

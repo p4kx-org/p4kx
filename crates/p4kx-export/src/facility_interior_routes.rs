@@ -75,7 +75,7 @@ fn open_selected(
     let entry = match selected {
         Selection::One(entry) => entry,
         Selection::Missing => return Ok(Err(InteriorFindingKind::MissingContainer)),
-        Selection::Ambiguous => return Ok(Err(InteriorFindingKind::AmbiguousContainer)),
+        Selection::Ambiguous(_) => return Ok(Err(InteriorFindingKind::AmbiguousContainer)),
     };
     let receipt = EntryReceipt::outer(capture, archive, entry)?;
     let container = receipt.physical_reference(capture)?;
@@ -152,7 +152,7 @@ impl OpenedRoom {
         let entry = match select(index, [direct, nested], cancel)? {
             Selection::One(entry) => entry,
             Selection::Missing => return Ok(Err(InteriorFindingKind::MissingDescriptor)),
-            Selection::Ambiguous => return Ok(Err(InteriorFindingKind::AmbiguousDescriptor)),
+            Selection::Ambiguous(_) => return Ok(Err(InteriorFindingKind::AmbiguousDescriptor)),
         };
         Ok(self
             .read(owner, capture, entry, cancel)?
@@ -170,7 +170,7 @@ impl OpenedRoom {
         let entry = match select(index, [name], cancel)? {
             Selection::One(entry) => entry,
             Selection::Missing => return Ok(Err(InteriorFindingKind::MissingStream)),
-            Selection::Ambiguous => return Ok(Err(InteriorFindingKind::AmbiguousStream)),
+            Selection::Ambiguous(_) => return Ok(Err(InteriorFindingKind::AmbiguousStream)),
         };
         Ok(self
             .read(owner, capture, entry, cancel)?
@@ -191,13 +191,13 @@ impl OpenedRoom {
 }
 
 #[derive(Clone, Copy)]
-enum Selection<'archive> {
+pub(super) enum Selection<'archive> {
     One(&'archive Entry),
     Missing,
-    Ambiguous,
+    Ambiguous([&'archive Entry; 2]),
 }
 
-fn select<'archive>(
+pub(super) fn select<'archive>(
     index: &PathIndex<'archive>,
     paths: impl IntoIterator<Item = impl AsRef<str>>,
     cancel: Option<&CancelToken>,
@@ -209,13 +209,10 @@ fn select<'archive>(
         let Some(first) = candidates.next().transpose().map_err(path_error)? else {
             continue;
         };
-        return Ok(
-            if candidates.next().transpose().map_err(path_error)?.is_some() {
-                Selection::Ambiguous
-            } else {
-                Selection::One(first)
-            },
-        );
+        let second = candidates.next().transpose().map_err(path_error)?;
+        return Ok(second.map_or(Selection::One(first), |second| {
+            Selection::Ambiguous([first, second])
+        }));
     }
     Ok(Selection::Missing)
 }

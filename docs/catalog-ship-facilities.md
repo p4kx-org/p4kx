@@ -129,8 +129,12 @@ resolved Loadout path identifies the room occurrence.
 the ship frame. For a direct vehicle room with no named helper, it composes
 the complete stored `Offset.Position` in metres and `Offset.Rotation` as
 X/Y/Z degrees with the Child chain and Entity matrix. A scalar room declared
-on the ship uses the ship Entity's origin. A named helper or a resolved
-attachment needs additional placement evidence and yields `unsupported`.
+on the ship uses the ship Entity's origin. A named helper on the direct
+ship model uses its original node and parent matrices. It uses the
+authored offset when the helper is within Assembly's 5 cm origin
+tolerance. A missing or ambiguous helper yields `absent` or `invalid`
+respectively. Character-definition indirection and attached item placement
+yield `unsupported`. The helper lookup covers model nodes and their ancestors.
 An omitted offset, malformed coordinate or unreadable input has its own
 source state. The authored offset remains in the original declaration.
 

@@ -15,6 +15,8 @@ use crate::health_origin_assertions as proof;
 mod fixture;
 #[path = "catalog_facility_item_rooms.rs"]
 mod item_rooms;
+#[path = "catalog_facility_model_helper.rs"]
+mod model_helper;
 #[path = "catalog_facility_nested_interior.rs"]
 mod nested;
 #[path = "catalog_facility_ship_frame.rs"]

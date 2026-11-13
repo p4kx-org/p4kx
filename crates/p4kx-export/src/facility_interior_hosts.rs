@@ -12,6 +12,7 @@ use super::super::loadout_position::LoadoutPosition;
 use super::super::resource_topology_declarations::ItemRoomAssociation;
 use super::super::room_associations::{RoomAssociation, RoomAssociations};
 use super::Projection;
+use super::model_helper::RoomHelperModels;
 use super::room_frame::RoomFrame;
 use super::types::{InteriorRoomCoverage, InteriorRoomDeclaration, InteriorRoomRef};
 use super::walk::RoomReader;
@@ -131,6 +132,7 @@ impl RoomReader<'_> {
         coverage: &mut Vec<InteriorRoomCoverage>,
         rooms: &RoomOwners<'_, '_>,
         host: &RoomHost<'_>,
+        models: &mut RoomHelperModels<'_, '_, '_>,
     ) -> Result<(), CatalogError> {
         for declaration in rooms.definitions(host.record) {
             project.check_cancel()?;
@@ -146,7 +148,7 @@ impl RoomReader<'_> {
                             selector: room.file_use.as_ref(),
                             vehicle: Some(room),
                         };
-                        slot.project(self, project, coverage, host)?;
+                        slot.project(self, project, coverage, host, models)?;
                     }
                 }
                 RoomDefinition::Item(room) => {
@@ -157,7 +159,7 @@ impl RoomReader<'_> {
                         selector: room.file_use.as_ref(),
                         vehicle: None,
                     };
-                    slot.project(self, project, coverage, host)?;
+                    slot.project(self, project, coverage, host, models)?;
                 }
             }
         }
@@ -172,6 +174,7 @@ impl RoomSlot<'_> {
         project: &mut Projection<'_, '_>,
         coverage: &mut Vec<InteriorRoomCoverage>,
         host: &RoomHost<'_>,
+        models: &mut RoomHelperModels<'_, '_, '_>,
     ) -> Result<(), CatalogError> {
         project.check_cancel()?;
         let Some(path) = self.file.filter(|path| !path.trim().is_empty()) else {
@@ -180,10 +183,12 @@ impl RoomSlot<'_> {
         let file = self
             .selector
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let attached = host.attachment.is_some();
+        let helper = RoomFrame::read_helper(attached, self.vehicle, models, host.record)?;
         let selection = RoomSelection {
             file,
             attachment: host.attachment,
-            frame: RoomFrame::read(host.attachment.is_some(), self.vehicle),
+            frame: RoomFrame::read(attached, self.vehicle, helper.as_ref()),
         };
         let identity = InteriorRoomRef {
             owner: self.owner.clone(),
