@@ -13,6 +13,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_facility_interior_fixture.rs"]
 mod fixture;
+#[path = "catalog_facility_item_rooms.rs"]
+mod item_rooms;
 #[path = "catalog_facility_nested_interior.rs"]
 mod nested;
 

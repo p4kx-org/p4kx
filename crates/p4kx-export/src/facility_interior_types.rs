@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::super::item_component_owner::ComponentOwner;
+use super::super::loadout_position::LoadoutPosition;
 use super::child::InteriorChild;
 use crate::catalog_read::original::PhysicalEntryRef;
 use crate::schema_fields::every_field_required;
@@ -15,7 +16,22 @@ use crate::schema_fields::every_field_required;
 #[schemars(transform = every_field_required)]
 pub(in crate::catalog_v3) struct InteriorRoomRef {
     pub(super) owner: ComponentOwner,
-    pub(super) object_container_ordinal: SourcedValue<u32>,
+    #[serde(flatten)]
+    pub(super) declaration: InteriorRoomDeclaration,
+    pub(super) loadout_position: Option<SourcedValue<LoadoutPosition>>,
+}
+
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+pub(super) enum InteriorRoomDeclaration {
+    Vehicle {
+        object_container_ordinal: SourcedValue<u32>,
+    },
+    Item,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

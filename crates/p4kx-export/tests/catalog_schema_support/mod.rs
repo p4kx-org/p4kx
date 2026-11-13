@@ -241,6 +241,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "contractScenarioRequirements": absent_table(),
             "resourceNetworkLinks": absent_table(),
             "roomAssociations": absent_table(),
+            "itemRoomAssociations": absent_table(),
             "resourceGroupMembers": resource_groups::members()
         },
         "placements": {

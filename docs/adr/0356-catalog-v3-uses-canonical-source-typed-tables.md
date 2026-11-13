@@ -203,3 +203,9 @@ route even when multiple nodes select the same physical Entry. Facility rows
 join the occurrence by its local ordinal. Composed root-room coordinates use
 the original Child transforms in route order and the original entity-local
 matrix. The direct local matrix also serves as the root-room matrix.
+
+Item room declarations retain the original scalar component and its physical
+owner once. Placement references identify each selected attachment by its
+resolved Loadout position, including the evidence for the selected Record and
+port path. An occurrence with a parent room shares the same traversal and
+coordinate rules as the ship-room form.

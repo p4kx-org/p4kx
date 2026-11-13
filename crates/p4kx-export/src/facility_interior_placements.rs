@@ -8,8 +8,8 @@ use p4kx_extraction::{
     SourcedValue,
 };
 
-use super::super::catalog_entity_configurations::EntityConfigurationRows;
 use super::super::facility_instance::{FacilityPlacementSource, ShipContext};
+use super::hosts::{RoomAttachment, RoomHost, RoomOwners};
 use p4kx_extraction::model::Transform;
 
 use super::Projection;
@@ -37,24 +37,16 @@ pub(super) fn project(
     archive: &Archive,
     forge: &DataForge<'_>,
     ships: &[Ship<'_>],
-    declarations: &EntityConfigurationRows<'_>,
+    rooms: &RoomOwners<'_, '_>,
+    attachments: &[RoomAttachment],
     capture: &EntryCapture<'_>,
 ) -> Result<Vec<InteriorRoomCoverage>, CatalogError> {
-    let hosts: HashMap<_, _> = ships
+    let mut ship_hosts: Vec<_> = ships
         .iter()
-        .map(|ship| (ship.source_record_index, ship.guid))
+        .filter(|ship| rooms.contains(ship.source_record_index))
         .collect();
-    let mut roots: Vec<_> = declarations
-        .topology
-        .rooms
-        .iter()
-        .filter_map(|room| {
-            let record = room.owner().key().0?;
-            Some((record, *hosts.get(&record)?, room))
-        })
-        .collect();
-    roots.sort_by_key(|(_, _, room)| room.owner().key());
-    if roots.is_empty() {
+    ship_hosts.sort_by_key(|ship| ship.source_record_index);
+    if ship_hosts.is_empty() && attachments.is_empty() {
         return Ok(Vec::new());
     }
     let targets = class_targets(project, forge)?;
@@ -67,24 +59,25 @@ pub(super) fn project(
         cancel: project.cancel,
     };
     let mut coverage = Vec::new();
-    for (index, guid, declaration) in roots {
+    for root in ship_hosts {
         project.check_cancel()?;
-        let ship = ShipContext::read(project.origins, guid, index)?;
-        for room in declaration.containers() {
-            project.check_cancel()?;
-            let Some(path) = room.file_name().filter(|path| !path.trim().is_empty()) else {
-                continue;
-            };
-            let identity = InteriorRoomRef {
-                owner: declaration.owner().clone(),
-                object_container_ordinal: room.container_ordinal.clone(),
-            };
-            let selector = room
-                .file_use
-                .as_ref()
-                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-            coverage.push(reader.room(project, &ship, identity, selector, path)?);
-        }
+        let record = root.source_record_index;
+        let ship = ShipContext::read(project.origins, root.guid, record)?;
+        let host = RoomHost {
+            record,
+            ship: &ship,
+            attachment: None,
+        };
+        reader.project_host(project, &mut coverage, rooms, &host)?;
+    }
+    for attachment in attachments {
+        project.check_cancel()?;
+        let host = RoomHost {
+            record: attachment.record,
+            ship: &attachment.ship,
+            attachment: Some(attachment),
+        };
+        reader.project_host(project, &mut coverage, rooms, &host)?;
     }
     Ok(coverage)
 }

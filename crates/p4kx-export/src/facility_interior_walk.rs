@@ -11,6 +11,7 @@ use super::super::facility_instance::ShipContext;
 use super::super::loadout_position;
 use super::Projection;
 use super::child::{self, ChildDeclaration, InteriorChild};
+use super::hosts::RoomSelection;
 use super::interior::{ClassTarget, StreamRoute};
 use super::routes::{self, ContainerOwner, OpenedRoom, StreamDeclaration};
 use super::types::{
@@ -59,7 +60,7 @@ impl RoomReader<'_> {
         project: &mut Projection<'_, '_>,
         ship: &ShipContext,
         identity: InteriorRoomRef,
-        room_selector: &SourceUse,
+        room_selector: &RoomSelection<'_>,
         path: &str,
     ) -> Result<InteriorRoomCoverage, CatalogError> {
         let mut coverage = InteriorRoomCoverage {
@@ -91,7 +92,7 @@ impl RoomReader<'_> {
         project: &mut Projection<'_, '_>,
         ship: &ShipContext,
         coverage: &mut InteriorRoomCoverage,
-        room_selector: &SourceUse,
+        room_selector: &RoomSelection<'_>,
         root: Occurrence,
     ) -> Result<(), CatalogError> {
         let mut active = BTreeSet::from([routes::physical_ref(&root.opened.container)?.clone()]);
@@ -125,7 +126,7 @@ impl RoomReader<'_> {
         &self,
         sources: &SourceUses,
         coverage: &mut InteriorRoomCoverage,
-        room_selector: &SourceUse,
+        room_selector: &RoomSelection<'_>,
         ancestors: &[ActiveRoom],
         active: &BTreeSet<PhysicalEntryRef>,
         declaration: ChildDeclaration,
@@ -295,7 +296,7 @@ impl Occurrence {
         coverage: &mut InteriorRoomCoverage,
         sources: &SourceUses,
         opened: OpenedRoom,
-        room_selector: &SourceUse,
+        room_selector: &RoomSelection<'_>,
         edge: Option<Edge>,
     ) -> Result<Self, CatalogError> {
         let ordinal = loadout_position::ordinal(coverage.containers.len())?;
@@ -311,9 +312,10 @@ impl Occurrence {
                 edge.transform,
             )
         } else {
-            selectors.push(room_selector.clone());
+            selectors.extend(room_selector.inputs().cloned());
             (None, None, Vec::new(), Some(Transform::IDENTITY))
         };
+        let complete = complete && (parent_ordinal.is_some() || room_selector.complete());
         let value = SourceValue::Present(routes::physical_ref(&opened.container)?.clone());
         coverage.containers.push(InteriorRoomContainer {
             parent_ordinal,

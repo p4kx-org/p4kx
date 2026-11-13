@@ -4106,6 +4106,9 @@
         "entityTags": {
           "$ref": "#/$defs/CatalogTableOfEntityTags"
         },
+        "itemRoomAssociations": {
+          "$ref": "#/$defs/CatalogTableOfItemRoomAssociation"
+        },
         "resourceGroupMembers": {
           "$ref": "#/$defs/CatalogTableOfResourceGroupMembers"
         },
@@ -4127,6 +4130,7 @@
         "blueprintCategoryLists",
         "contractScenarioRequirements",
         "entityTags",
+        "itemRoomAssociations",
         "resourceGroupMembers",
         "resourceNetworkLinks",
         "roomAssociations",
@@ -5243,6 +5247,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ItemRecoveryPolicy"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfItemRoomAssociation": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ItemRoomAssociation"
           },
           "type": "array"
         }
@@ -15510,16 +15533,53 @@
       "type": "object"
     },
     "InteriorRoomRef": {
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "vehicle",
+              "type": "string"
+            },
+            "objectContainerOrdinal": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            }
+          },
+          "required": [
+            "kind",
+            "objectContainerOrdinal"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "item",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
       "properties": {
-        "objectContainerOrdinal": {
-          "$ref": "#/$defs/SourcedValueOfuint32"
+        "loadoutPosition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfLoadoutPosition"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "owner": {
           "$ref": "#/$defs/ComponentOwner"
         }
       },
       "required": [
-        "objectContainerOrdinal",
+        "loadoutPosition",
         "owner"
       ],
       "type": "object"
@@ -16895,6 +16955,34 @@
         "ReplenishOnClaimAndRepair",
         "ReplenishOnRearm",
         "notificationParams",
+        "ownerGuid",
+        "ownerRecordIndex"
+      ],
+      "type": "object"
+    },
+    "ItemRoomAssociation": {
+      "description": "The original scalar object container of one physical item component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "objectContainer": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "componentOrdinal",
+        "objectContainer",
         "ownerGuid",
         "ownerRecordIndex"
       ],

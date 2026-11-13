@@ -7,21 +7,30 @@ use super::resource_network_links::{self, ResourceNetworkLinks};
 use super::room_associations::{self, RoomAssociations};
 use crate::catalog_table::CatalogTable;
 
+#[path = "item_room_association.rs"]
+mod item_room;
+
+pub(super) use item_room::COMPONENT as ITEM_ROOM;
+pub(crate) use item_room::ItemRoomAssociation;
+
 #[derive(Default)]
 pub(crate) struct ResourceTopologyDeclarations<'source> {
     pub(super) links: Vec<ResourceNetworkLinks<'source>>,
     pub(super) rooms: Vec<RoomAssociations<'source>>,
+    pub(super) item_rooms: Vec<ItemRoomAssociation<'source>>,
 }
 
 impl<'source> ResourceTopologyDeclarations<'source> {
     pub(super) fn extend(&mut self, other: Self) {
         self.links.extend(other.links);
         self.rooms.extend(other.rooms);
+        self.item_rooms.extend(other.item_rooms);
     }
 
     pub(crate) fn into_tables(mut self, forge: &DataForge<'_>) -> ResourceTopologyTables<'source> {
         self.links.sort_by_key(|row| row.owner().key());
         self.rooms.sort_by_key(|row| row.owner().key());
+        self.item_rooms.sort_by_key(|row| row.owner().key());
         ResourceTopologyTables {
             resource_network_links: CatalogTable::new(
                 forge,
@@ -29,6 +38,7 @@ impl<'source> ResourceTopologyDeclarations<'source> {
                 self.links,
             ),
             room_associations: CatalogTable::new(forge, &[room_associations::VEHICLE], self.rooms),
+            item_room_associations: CatalogTable::new(forge, &[ITEM_ROOM], self.item_rooms),
         }
     }
 }
@@ -36,4 +46,5 @@ impl<'source> ResourceTopologyDeclarations<'source> {
 pub(crate) struct ResourceTopologyTables<'source> {
     pub(crate) resource_network_links: CatalogTable<ResourceNetworkLinks<'source>>,
     pub(crate) room_associations: CatalogTable<RoomAssociations<'source>>,
+    pub(crate) item_room_associations: CatalogTable<ItemRoomAssociation<'source>>,
 }

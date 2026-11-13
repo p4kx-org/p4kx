@@ -5,7 +5,12 @@ use std::collections::HashMap;
 use std::iter::Enumerate;
 use std::slice::Iter;
 
-use p4kx_extraction::{Archive, CancelToken, DataForge, SourceUse, SourceUseRole, SourceValue};
+use p4kx_extraction::{
+    Archive, CancelToken, DataForge, SourceUse, SourceUseRole, SourceUses, SourceValue,
+    SourcedValue,
+};
+
+use self::hosts::{RoomAttachment, RoomOwners};
 
 use super::catalog_entity_configurations::EntityConfigurationRows;
 use super::catalog_facility;
@@ -16,6 +21,7 @@ use super::facility_instance::{
 use super::inventory_owner_storage;
 use super::item_component_owner::ComponentOwner;
 use super::loadout_position::{self, LoadoutPosition};
+use super::resource_topology_declarations;
 use super::room_associations;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
@@ -29,6 +35,8 @@ use crate::{CatalogError, ExportAccountingError};
 
 #[path = "facility_interior_child.rs"]
 mod child;
+#[path = "facility_interior_hosts.rs"]
+mod hosts;
 #[path = "facility_interior_placements.rs"]
 mod interior;
 #[path = "facility_interior_routes.rs"]
@@ -52,17 +60,32 @@ pub(super) fn table(
 ) -> Result<(CatalogTable<FacilityInstance>, Vec<InteriorRoomCoverage>), CatalogError> {
     input.check_forge(forge)?;
     let mut project = Projection::new(declarations, input.origins(), cancel)?;
-    let coverage = if project.definitions.is_empty() {
+    let rooms = RoomOwners::new(declarations)?;
+    let coverage = if project.definitions.is_empty() && rooms.is_empty() {
         Vec::new()
     } else {
+        let mut attachments = Vec::new();
         for (ordinal, loadout) in loadouts.iter().enumerate() {
             project.check_cancel()?;
             if loadout.entity_kind == EntityKind::Ship {
-                project.loadout(loadout, loadout_position::ordinal(ordinal)?)?;
+                project.loadout(
+                    loadout,
+                    loadout_position::ordinal(ordinal)?,
+                    &rooms,
+                    &mut attachments,
+                )?;
             }
         }
         let capture = EntryCapture::for_input(input);
-        interior::project(&mut project, archive, forge, ships, declarations, &capture)?
+        interior::project(
+            &mut project,
+            archive,
+            forge,
+            ships,
+            &rooms,
+            &attachments,
+            &capture,
+        )?
     };
     let instances = CatalogTable::matching_source_types(
         forge,
@@ -70,7 +93,9 @@ pub(super) fn table(
             catalog_facility::SOURCE_TYPES.contains(&name)
                 || matches!(
                     name,
-                    inventory_owner_storage::ITEM_COMPONENT | room_associations::VEHICLE
+                    inventory_owner_storage::ITEM_COMPONENT
+                        | room_associations::VEHICLE
+                        | resource_topology_declarations::ITEM_ROOM
                 )
         },
         project.rows,
@@ -139,7 +164,13 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
         Ok(projection)
     }
 
-    fn loadout(&mut self, loadout: &Loadout, ordinal: u32) -> Result<(), CatalogError> {
+    fn loadout(
+        &mut self,
+        loadout: &Loadout,
+        ordinal: u32,
+        rooms: &RoomOwners<'_, '_>,
+        room_attachments: &mut Vec<RoomAttachment>,
+    ) -> Result<(), CatalogError> {
         let root = loadout.root_record_index;
         let record = self.origins.record(root);
         let ship = ShipContext::read(self.origins, loadout.entity_guid, root)?;
@@ -164,7 +195,8 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             let Some(record) = attachment.target_record_index.value().copied() else {
                 continue;
             };
-            if port.ports.is_empty() && !self.definitions.contains_key(&record) {
+            let has_rooms = rooms.contains(record);
+            if port.ports.is_empty() && !has_rooms && !self.definitions.contains_key(&record) {
                 continue;
             }
             let parent = walk.checkpoint();
@@ -175,6 +207,15 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             let name_complete = port.append_name_uses(&mut walk.uses)?;
             walk.complete &= proof.source_set_complete && name_complete;
             self.emit(&ship, record, &walk, Some((port, attachment)))?;
+            if has_rooms {
+                room_attachments.push(RoomAttachment {
+                    record,
+                    ship: ship.clone(),
+                    position: walk.position_cell(&self.origins.uses),
+                    selectors: walk.uses.clone(),
+                    complete: walk.complete,
+                });
+            }
             if port.ports.is_empty() {
                 walk.restore(parent);
             } else {
@@ -206,11 +247,7 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             (None, None)
         };
         let source = FacilityPlacementSource::Loadout(LoadoutFacilityPlacement {
-            position: self.origins.uses.value(
-                SourceValue::Present(path.position.clone()),
-                &path.uses,
-                path.complete,
-            ),
+            position: path.position_cell(&self.origins.uses),
             original_port,
             attached_item,
         });
@@ -273,6 +310,14 @@ struct Checkpoint {
 }
 
 impl Path {
+    fn position_cell(&self, sources: &SourceUses) -> SourcedValue<LoadoutPosition> {
+        sources.value(
+            SourceValue::Present(self.position.clone()),
+            &self.uses,
+            self.complete,
+        )
+    }
+
     fn new(loadout_ordinal: u32, root: SourceUse) -> Self {
         Self {
             position: LoadoutPosition {

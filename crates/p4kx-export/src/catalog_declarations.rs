@@ -8,6 +8,7 @@ use super::blueprint_category_list::BlueprintCategoryList;
 use super::catalog_ammo_bindings::AmmoBinding;
 use super::catalog_table::CatalogTable;
 use super::resource_network_links::ResourceNetworkLinks;
+use super::resource_topology_declarations::ItemRoomAssociation;
 use super::room_associations::RoomAssociations;
 use super::tag_catalog::{EntityTags, TagRoots};
 use crate::schema_fields::every_field_required;
@@ -30,6 +31,7 @@ pub(crate) struct CatalogDeclarations<'source> {
     >,
     pub(crate) resource_network_links: CatalogTable<ResourceNetworkLinks<'source>>,
     pub(crate) room_associations: CatalogTable<RoomAssociations<'source>>,
+    pub(crate) item_room_associations: CatalogTable<ItemRoomAssociation<'source>>,
     pub(crate) resource_group_members:
         CatalogTable<super::resource_group_catalog::ResourceGroupMembers>,
 }

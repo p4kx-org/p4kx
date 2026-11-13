@@ -695,8 +695,9 @@ physical owners and per-value provenance.
 
 [Ship facility configurations and placements](catalog-ship-facilities.md) link the authored
 seat, medical and cargo grid components and storage configurations to their resolved
-Loadout contexts and authored ship-room SOC entities. Each placement row groups its
-configuration links in original component order. Room inspection records its container occurrences and coverage in
+Loadout contexts and authored SOC entities in ship rooms and rooms on resolved attachments.
+Each placement row groups its configuration links in original component order. Room inspection
+records its container occurrences and coverage in
 `placements.facilityInteriorCoverage`. Medical tier and resource consumption definitions retain
 their own physical Record identity.
 

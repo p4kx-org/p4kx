@@ -91,8 +91,13 @@ DataForge Record. The resulting row links that Record's published facility and
 storage components. Entity slots that supply their own geometry or have an
 invalid transform can still carry a class and its configuration links.
 
-Use `source.room` to join the physical owner and array slot in
-`declarations.roomAssociations`. The sourced `source.position` identifies the
+For a `vehicle` room, join `source.room.owner` and `objectContainerOrdinal` to the
+physical component and array slot in `declarations.roomAssociations`. For an `item`
+room, the owner identifies the scalar `objectContainer` in
+`declarations.itemRoomAssociations`. That declaration appears once per original
+component. `source.room.loadoutPosition` identifies the resolved attachment path
+for each occurrence and is null for a room declared directly on the ship.
+The sourced `source.position` identifies the
 actual containing SOCpak, descriptor and SOC Entry, the descriptor's original OC
 node, the CrCh chunk-table index and the Entity's original direct element slot.
 Repeated OC declarations keep separate positions even when they use one SOC Entry.
@@ -117,8 +122,9 @@ occurrence while leaving sibling routes available.
 `rootRoomTransform` expresses a nested entity in the root room's coordinates
 using the ordered Child matrices and the entity-local matrix. It is null for a
 direct entity. An invalid Child matrix leaves the local entity and its original
-attributes available and marks the composed matrix invalid. Attached-item
-roots and ship-frame coordinates require separate Loadout and bone evidence.
+attributes available and marks the composed matrix invalid. The attached item's
+resolved Loadout path identifies the room occurrence. Ship-frame coordinates
+require authored attachment and bone transforms.
 
 Findings identify the affected `containerOrdinal`, the original stream name
 when applicable and the Child source for an unresolved edge. Missing,

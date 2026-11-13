@@ -32,7 +32,6 @@ use crate::{CatalogError, CatalogOptions, CatalogProvenance};
 #[path = "build_catalog.rs"]
 mod api;
 pub use api::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
-
 #[path = "catalog_refusal.rs"]
 pub(crate) mod refusal;
 use refusal::CatalogRefusal;
@@ -206,6 +205,7 @@ fn assemble<R>(
                 ),
             resource_network_links: resource_declarations.resource_network_links,
             room_associations: resource_declarations.room_associations,
+            item_room_associations: resource_declarations.item_room_associations,
             shop_inventory_resolution: collected.shop_inventory_resolution,
             tag_roots: CatalogTable::new(&forge, &["TagDatabase"], collected.tags.roots),
             entity_tags: CatalogTable::new(

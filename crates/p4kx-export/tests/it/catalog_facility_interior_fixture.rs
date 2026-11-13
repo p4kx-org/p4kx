@@ -4,14 +4,15 @@
 use p4kx_extraction::Archive;
 use p4kx_testkit::{
     ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, DataForgeBuilder, TestChunkFile,
-    TestContainer, TestElement, TestEntity, TestEntry, TestInstance, TestObjectContainer,
-    TestRecord, TestStruct, TestType, TestValue,
+    TestContainer, TestElement, TestEntity, TestEntry, TestInstance, TestLoadout, TestLoadoutEntry,
+    TestObjectContainer, TestPort, TestRecord, TestStruct, TestType, TestValue,
 };
 
 use crate::commodity_v3_fixture::{self as common, TestResult};
 
 pub(super) const SHIP: u128 = 0x1063_0520;
 pub(super) const SEAT: u128 = 0x1063_0521;
+const MODULE: u128 = 0x1063_0522;
 pub(super) const ROOM: &str = r"ObjectContainers\Ships\Fixture\interior.socpak";
 pub(super) const DESCRIPTOR: &str = "interior.xml";
 pub(super) const STREAM: &str = "interior_room.soc";
@@ -24,6 +25,7 @@ pub(super) enum Case {
     RepeatedStream,
     NestedChildren,
     ChildFaults,
+    ItemRooms,
     MissingStreamAndChild,
     AmbiguousStream,
     AmbiguousClass,
@@ -122,16 +124,7 @@ fn database(case: Case) -> DataForgeBuilder {
                 .parent("DataForgeComponentParams")
                 .field("seatType", TestType::Enum(SEAT_TYPE.to_owned())),
         )
-        .record(
-            TestEntity::new(
-                SHIP,
-                "FixtureInteriorHost",
-                "libs/foundry/records/entities/spaceships/fixture_interior_host.xml",
-            )
-            .vehicle("", "")
-            .object_container(ROOM, "fixture_room_bone", [10.0, 20.0, 30.0], [0.0; 3])
-            .record(),
-        )
+        .record(ship(case))
         .record(
             TestEntity::new(
                 SEAT,
@@ -144,6 +137,18 @@ fn database(case: Case) -> DataForgeBuilder {
             ))
             .record(),
         );
+    if matches!(case, Case::ItemRooms) {
+        return database.record(
+            TestEntity::new(
+                MODULE,
+                "FixtureRoomModule",
+                "libs/foundry/records/entities/scitem/fixture/room_module.xml",
+            )
+            .attach_type("Misc")
+            .item_container(ROOM)
+            .record(),
+        );
+    }
     if matches!(case, Case::AmbiguousClass) {
         return database
             .structure(TestStruct::new("FixtureUnselectedRecord"))
@@ -155,6 +160,30 @@ fn database(case: Case) -> DataForgeBuilder {
             ));
     }
     database
+}
+
+fn ship(case: Case) -> TestRecord {
+    let ship = TestEntity::new(
+        SHIP,
+        "FixtureInteriorHost",
+        "libs/foundry/records/entities/spaceships/fixture_interior_host.xml",
+    )
+    .vehicle("", "");
+    if matches!(case, Case::ItemRooms) {
+        let ports = ["left_room", "right_room"];
+        return ship
+            .port(TestPort::new(ports[0]))
+            .port(TestPort::new(ports[1]))
+            .loadout(TestLoadout::Manual(
+                ports
+                    .into_iter()
+                    .map(|port| TestLoadoutEntry::reference(port, MODULE))
+                    .collect(),
+            ))
+            .record();
+    }
+    ship.object_container(ROOM, "fixture_room_bone", [10.0, 20.0, 30.0], [0.0; 3])
+        .record()
 }
 
 fn soc(case: Case) -> TestResult<Vec<u8>> {

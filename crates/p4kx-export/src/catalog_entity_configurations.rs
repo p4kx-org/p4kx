@@ -22,7 +22,9 @@ use super::inventory_item_occupancy::InventoryItemOccupancy;
 use super::item_alignment_options::AlignmentOptions;
 use super::item_component_owner::ComponentOwner;
 use super::resource_network_links::ResourceNetworkLinks;
-use super::resource_topology_declarations::ResourceTopologyDeclarations;
+use super::resource_topology_declarations::{
+    self as topology, ItemRoomAssociation, ResourceTopologyDeclarations,
+};
 use super::room_associations::{self, RoomAssociations};
 use super::{inventory_owner_bounds, inventory_owner_storage};
 use crate::CatalogError;
@@ -94,6 +96,10 @@ impl<'source> EntityConfigurationRows<'source> {
                     .rooms
                     .push(RoomAssociations::read(owner, source, notes)?);
             }
+            ConfigurationKind::ItemRoomAssociation => self
+                .topology
+                .item_rooms
+                .push(ItemRoomAssociation::read(owner, source, notes)?),
             ConfigurationKind::InventoryStorage => self.inventory.storage(owner, source, notes)?,
             ConfigurationKind::ObjectMetadataBounds => {
                 self.inventory.metadata(owner, source, notes)?;
@@ -194,6 +200,7 @@ enum ConfigurationKind {
     Resource,
     Connection(ConnectionKind),
     RoomAssociations,
+    ItemRoomAssociation,
     Facility(FacilityKind),
     VehicleArmor,
 }
@@ -212,6 +219,9 @@ impl ConfigurationKind {
         }
         if value.type_name() == room_associations::VEHICLE {
             return Some(Self::RoomAssociations);
+        }
+        if value.type_name() == topology::ITEM_ROOM {
+            return Some(Self::ItemRoomAssociation);
         }
         if let Some(kind) = InteractionKind::of(value.type_name()) {
             return Some(Self::Interaction(kind));
