@@ -126,6 +126,7 @@ mod soc_entity_component;
 mod soc_entity_links;
 mod soc_entity_source;
 mod soc_geometry;
+mod soc_group_placement;
 mod soc_inline_loadout;
 mod soc_light;
 mod soc_light_source;
@@ -229,6 +230,7 @@ pub use soc_entities::{
 pub use soc_entity_component::{SocEntityComponent, SocEntityComponentKind};
 pub use soc_entity_links::{SocEntityLink, SocEntityLinks};
 pub use soc_entity_source::{SocEntity, SocEntityChunk, SocEntityFile, SocEntitySourceError};
+pub use soc_group_placement::SocGroupPlacement;
 pub use soc_inline_loadout::{
     SocInlineLoadout, SocInlineLoadoutEntries, SocInlineLoadoutEntry, SocInlineLoadoutKind,
 };
@@ -241,6 +243,6 @@ pub use soc_room_segment::{
     SocRoomSegment, SocSegmentGeometry, SocSegmentPoint, SocSegmentTransform,
 };
 pub use soc_source_node::SocSourceValue;
-pub use soc_tile_port::{SocTileAttachment, SocTileItemPort};
+pub use soc_tile_port::{SocTileAttachment, SocTileItemPort, tile_attachment_point_suffix};
 pub use stat_obj_physics::{StatObjPhysics, StatObjPhysicsError, StatObjPhysicsSlot};
 pub use transform::Transform;

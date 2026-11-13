@@ -5,13 +5,14 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use p4kx_extraction::Archive;
-use p4kx_model::{ChildContainer, MaterialStatus, Transform};
+use p4kx_model::{ChildContainer, MaterialStatus, SocContainerDescriptor, Transform};
 
 use super::child_container_path::ChildContainerPath;
 use super::classes::ClassLookup;
 use super::files::{file_name, find_first, path_key, stem};
 use super::layers::Layers;
 use super::scan::{Scan, StreamScan, scan_container};
+use super::tile_light::{TileLightOwner, TileLightPlacement};
 use super::{
     InteriorOptions, InteriorPart, InteriorPartKind, InteriorWatch, MAX_INTERIOR_CONTAINERS,
     MAX_INTERIOR_DEPTH,
@@ -72,6 +73,7 @@ fn container_part(
         materials: Arc::new(MaterialStatus::Unnamed),
         palette: None,
         light: None,
+        light_placement: None,
     }
 }
 
@@ -83,6 +85,7 @@ pub(super) fn walk<'a>(
     options: &InteriorOptions,
     watch: &InteriorWatch<'_>,
     classes: Option<&'a dyn ClassLookup>,
+    owner: Option<TileLightOwner<'_>>,
 ) -> Result<Walked<'a>, AssemblyError> {
     let mut walker = Walker {
         layers: Layers::new(given),
@@ -120,12 +123,25 @@ pub(super) fn walk<'a>(
         if watch.is_cancelled() {
             return Err(AssemblyError::Cancelled);
         }
-        let scan = walker.scan(&todo);
+        let direct_owner = owner.filter(|_| todo.depth == 0);
+        let scan = walker.scan(&todo, direct_owner.is_some());
         if let Some(error) = scan.fatal {
             return Err(error);
         }
         walker.report(&todo, scan.issues);
-        walker.add_streams(&todo, scan.streams);
+        let descriptor = scan.descriptor.as_ref().and_then(|source| {
+            let descriptor = SocContainerDescriptor::parse(&source.bytes).ok()?;
+            (!descriptor.document().is_lossy()).then_some((source.name.as_str(), descriptor))
+        });
+        let tile = direct_owner.map(|owner| {
+            TileLightPlacement::new(
+                owner,
+                descriptor
+                    .as_ref()
+                    .map(|(name, descriptor)| (*name, descriptor)),
+            )
+        });
+        walker.add_streams(&todo, scan.streams, tile.as_ref());
         let mut nested = walker.add_children(&todo, scan.children)?;
         nested.reverse();
         stack.extend(nested);
@@ -184,7 +200,7 @@ impl<'a> Walker<'a> {
         true
     }
 
-    fn scan(&self, todo: &Todo) -> Scan {
+    fn scan(&self, todo: &Todo, capture_tile: bool) -> Scan {
         let (Some(archive), Some(keys)) = (
             self.layers.get(todo.layer),
             self.layers.keys.get(todo.layer),
@@ -194,12 +210,18 @@ impl<'a> Walker<'a> {
                 streams: Vec::new(),
                 issues: Vec::new(),
                 fatal: None,
+                descriptor: None,
             };
         };
-        scan_container(archive, keys, &todo.stem)
+        scan_container(archive, keys, &todo.stem, capture_tile)
     }
 
-    fn add_streams(&mut self, todo: &Todo, streams: Vec<StreamScan>) {
+    fn add_streams(
+        &mut self,
+        todo: &Todo,
+        streams: Vec<StreamScan>,
+        tile: Option<&TileLightPlacement<'_>>,
+    ) {
         for stream in streams {
             if !self.room(todo) {
                 return;
@@ -243,7 +265,7 @@ impl<'a> Walker<'a> {
                 }
             }
             if let Some(entities) = &stream.entities
-                && !self.add_entities(todo, at, world, file, entities)
+                && !self.add_entities(todo, (at, world), file, entities, tile)
             {
                 return;
             }

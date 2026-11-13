@@ -5,10 +5,10 @@ use p4kx_chunks::{ByteOrder, ChunkFile, ChunkType, Container};
 use p4kx_cryxml::{CryXmlError, Xml};
 use thiserror::Error;
 
-use crate::Transform;
 use crate::mtl_xml::XmlElement;
 use crate::soc_geometry::{EntityGeometry, read_geometry};
 use crate::soc_light::{SocLight, read_light};
+use crate::{SocGroupPlacement, Transform};
 
 pub(crate) const ENTITIES: ChunkType = ChunkType::new(Container::CrCh, 0x0004);
 
@@ -332,9 +332,10 @@ fn read_lights<'a>(
         {
             push_light(out, name, None, transform, component, None)?;
         }
-    } else if let Some(baked) =
-        child(entity, "EntityComponentLightGroup").and_then(|group| child(group, "BakedInLights"))
+    } else if let Some(group) = child(entity, "EntityComponentLightGroup")
+        && let Some(baked) = child(group, "BakedInLights")
     {
+        let group_placement = transform.map(|frame| SocGroupPlacement::read(entity, group, frame));
         for light in baked.children() {
             if !light.name().eq_ignore_ascii_case("Light") {
                 continue;
@@ -344,7 +345,11 @@ fn read_lights<'a>(
             };
             let relative = child(light, "RelativeXForm");
             let own = light.attribute("Name").unwrap_or(name);
+            let before = out.lights.len();
             push_light(out, own, Some(name), transform, component, relative)?;
+            if let Some(placed) = out.lights.get_mut(before) {
+                placed.group_placement.clone_from(&group_placement);
+            }
         }
     }
     Ok(())

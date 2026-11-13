@@ -108,6 +108,7 @@ fn item_port(element: &Element) -> VehicleItemPort {
             })
             .collect(),
         origins: element.origins.clone(),
+        light_attachments: super::light_ports::attachments(element),
     }
 }
 

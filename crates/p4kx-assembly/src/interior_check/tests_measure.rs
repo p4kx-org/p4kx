@@ -120,6 +120,7 @@ fn part(
         materials: Arc::new(MaterialStatus::Unnamed),
         palette: None,
         light: None,
+        light_placement: None,
     }
 }
 

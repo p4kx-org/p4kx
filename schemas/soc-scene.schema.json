@@ -1247,6 +1247,9 @@
           },
           "type": "array"
         },
+        "helper": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "lights": {
           "items": {
             "$ref": "#/$defs/BakedLight"
@@ -1259,6 +1262,7 @@
       },
       "required": [
         "position",
+        "helper",
         "bakedSections",
         "lights"
       ],
@@ -6998,6 +7002,12 @@
     },
     "TileAttachment": {
       "properties": {
+        "attachmentPointSuffix": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "portIndex": {
+          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+        },
         "portName": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
@@ -7011,6 +7021,8 @@
       "required": [
         "position",
         "portName",
+        "portIndex",
+        "attachmentPointSuffix",
         "target"
       ],
       "type": "object"

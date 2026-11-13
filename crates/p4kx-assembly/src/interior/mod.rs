@@ -22,11 +22,16 @@ mod layers;
 mod light;
 mod models;
 mod scan;
+pub(crate) mod tile_light;
 mod unresolved;
 mod walk;
 mod watch;
 
 pub use classes::InteriorForge;
+pub use tile_light::{
+    InteriorLightHelper, InteriorLightHelperError, InteriorLightHelperFrame,
+    InteriorLightHelperSource, InteriorLightPlacement, InteriorTilePort,
+};
 pub use watch::{InteriorProgress, InteriorWatch};
 
 pub(crate) fn model_vertices(model: &Model) -> usize {
@@ -149,6 +154,7 @@ pub struct InteriorPart {
     pub(crate) materials: Arc<MaterialStatus>,
     pub(crate) palette: Option<Arc<TintPalette>>,
     pub(crate) light: Option<SocLight>,
+    pub(crate) light_placement: Option<Box<InteriorLightPlacement>>,
 }
 
 impl InteriorPart {
@@ -165,6 +171,12 @@ impl InteriorPart {
     #[must_use]
     pub const fn light(&self) -> Option<&SocLight> {
         self.light.as_ref()
+    }
+
+    /// Returns separate placement evidence for a baked light in a direct vehicle container.
+    #[must_use]
+    pub fn light_placement(&self) -> Option<&InteriorLightPlacement> {
+        self.light_placement.as_deref()
     }
 
     /// Returns the light of a [`Light`](InteriorPartKind::Light) part as glTF expresses it: its

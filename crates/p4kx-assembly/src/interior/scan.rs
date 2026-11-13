@@ -6,6 +6,7 @@ use p4kx_model::{ChildContainer, IncludedObjects, ObjectContainer, SocEntities, 
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use super::files::{FileFailure, find_first, is_plain, path_key, read_file};
+use super::tile_light::{self, TileDescriptor};
 use crate::{AssemblyError, IssueKind};
 
 pub(super) struct StreamScan {
@@ -19,15 +20,22 @@ pub(super) struct Scan {
     pub(super) streams: Vec<StreamScan>,
     pub(super) issues: Vec<IssueKind>,
     pub(super) fatal: Option<AssemblyError>,
+    pub(super) descriptor: Option<TileDescriptor>,
 }
 
-pub(super) fn scan_container(archive: &Archive, keys: &PathKeys, stem: &str) -> Scan {
+pub(super) fn scan_container(
+    archive: &Archive,
+    keys: &PathKeys,
+    stem: &str,
+    capture_tile: bool,
+) -> Scan {
     let index = keys.index(archive);
     let mut scan = Scan {
         children: Vec::new(),
         streams: Vec::new(),
         issues: Vec::new(),
         fatal: None,
+        descriptor: None,
     };
     let candidates = [format!("{stem}.xml"), format!("{stem}\\{stem}.xml")];
     let mut names: Vec<String> = Vec::new();
@@ -41,16 +49,24 @@ pub(super) fn scan_container(archive: &Archive, keys: &PathKeys, stem: &str) -> 
                 file: entry.path().to_owned(),
                 reason: failure.reason(),
             }),
-            Ok(bytes) => match ObjectContainer::parse(&bytes) {
-                Ok(container) => {
-                    names = container.streams;
-                    scan.children = container.children;
+            Ok(bytes) => {
+                match ObjectContainer::parse(&bytes) {
+                    Ok(container) => {
+                        names = container.streams;
+                        scan.children = container.children;
+                    }
+                    Err(error) => scan.issues.push(IssueKind::FileUnreadable {
+                        file: entry.path().to_owned(),
+                        reason: describe(&error),
+                    }),
                 }
-                Err(error) => scan.issues.push(IssueKind::FileUnreadable {
-                    file: entry.path().to_owned(),
-                    reason: describe(&error),
-                }),
-            },
+                if capture_tile && tile_light::unique_descriptor(&index, &candidates) {
+                    scan.descriptor = Some(TileDescriptor {
+                        name: entry.path().to_owned(),
+                        bytes,
+                    });
+                }
+            }
         },
     }
     if names.is_empty() && scan.children.is_empty() && index.find(&format!("{stem}.soc")).is_some()

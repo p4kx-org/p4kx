@@ -109,6 +109,7 @@ impl From<p4kx_model::LightState> for ModeKind {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct LightGroup {
     position: SocXmlPosition,
+    helper: SourcedValue<String>,
     baked_sections: Vec<SocXmlPosition>,
     lights: Vec<BakedLight>,
 }
@@ -120,6 +121,9 @@ impl LightGroup {
     ) -> Result<Self, SocSceneError> {
         Ok(Self {
             position: position(group.element())?,
+            helper: origin
+                .named(group.element(), "helper", group.helper())?
+                .map(str::to_owned),
             baked_sections: positions(group.baked_sections())?,
             lights: group
                 .lights()

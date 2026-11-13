@@ -33,6 +33,23 @@ impl<'document> SocTileAttachment<'document> {
     pub fn item_port(self) -> SocSourceValue<&'document str> {
         self.node.read("ItemPortName", nonempty)
     }
+
+    /// Reads the authored numeric `ItemPortIndex` independently of the name.
+    #[must_use]
+    pub fn item_port_index(self) -> SocSourceValue<u64> {
+        self.node.read("ItemPortIndex", |value| value.parse().ok())
+    }
+
+    /// Reads the nonempty bracketed suffix of a unique item port name.
+    #[must_use]
+    pub fn attachment_point_suffix(self) -> SocSourceValue<&'document str> {
+        match self.item_port() {
+            SocSourceValue::Present(name) => tile_attachment_point_suffix(name)
+                .map_or(SocSourceValue::Absent, SocSourceValue::Present),
+            SocSourceValue::Absent => SocSourceValue::Absent,
+            _ => SocSourceValue::Invalid,
+        }
+    }
 }
 
 /// One original tile item port in an SOC container descriptor.
@@ -92,6 +109,15 @@ impl<'document> SocTileItemPort<'document> {
         self.node
             .read("interactionOffset", |value| numbers(Some(value)))
     }
+}
+
+/// Returns the nonempty trailing bracketed portion of an authored tile port name.
+#[must_use]
+pub fn tile_attachment_point_suffix(name: &str) -> Option<&str> {
+    let (_, suffix) = name.rsplit_once('[')?;
+    suffix
+        .strip_suffix(']')
+        .filter(|point| !point.is_empty() && !point.contains(']'))
 }
 
 fn nonempty(value: &str) -> Option<&str> {

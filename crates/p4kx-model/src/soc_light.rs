@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::Transform;
+use std::sync::Arc;
+
 use crate::mtl_xml::XmlElement;
 use crate::soc_entities::{child, number};
+use crate::{SocGroupPlacement, Transform};
 
 /// The state of a light whose values a [`SocLight`] carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,6 +66,8 @@ pub struct SocLight {
     pub name: String,
     /// The name of the `LightGroup` entity the light belongs to.
     pub group: Option<String>,
+    /// The authored group frame and selectors, when this light belongs to a baked group.
+    pub group_placement: Option<Arc<SocGroupPlacement>>,
     /// The transform from the light's space to the container's, in `CryEngine` coordinates, Z up
     /// and in metres; the light shines along its +X axis.
     pub transform: Transform,
@@ -136,6 +140,7 @@ pub(crate) fn read_light<'a>(
     Some(SocLight {
         name: name.to_owned(),
         group: group.map(str::to_owned),
+        group_placement: None,
         transform,
         light_type,
         state: values.state,

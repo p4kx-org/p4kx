@@ -46,6 +46,20 @@ impl SocTileLightAnchor {
         Ok(Self { authored, anchored })
     }
 
+    /// Moves a baked light by the group translation while retaining its full basis.
+    #[must_use]
+    pub fn move_light(&self, light: Transform) -> Option<Transform> {
+        let mut rows = light.rows.map(|row| row.map(f64::from));
+        for (([_, _, _, shift], authored), anchored) in rows
+            .iter_mut()
+            .zip(self.authored.translation())
+            .zip(self.anchored.translation())
+        {
+            *shift += f64::from(anchored) - f64::from(authored);
+        }
+        Transform::from_rows_f64(rows)
+    }
+
     /// Returns the original group frame in the container.
     #[must_use]
     pub const fn authored(&self) -> Transform {
@@ -63,6 +77,9 @@ impl SocTileLightAnchor {
 #[derive(Debug, Clone, Copy, Error, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SocTileLightAnchorError {
+    /// The owning container's descriptor has no unique readable source.
+    #[error("tile port descriptor is unavailable")]
+    DescriptorUnavailable,
     /// The group does not declare a port selector.
     #[error("tile attachment has no port selector")]
     AbsentSelector,
@@ -93,6 +110,9 @@ pub enum SocTileLightAnchorError {
     /// The light group's frame is not finite.
     #[error("light group frame is invalid")]
     InvalidGroupFrame,
+    /// The corrected baked-light transform cannot be represented in the scene.
+    #[error("anchored baked light transform is not representable")]
+    UnrepresentableLight,
     /// The corrected frame cannot be represented in the scene.
     #[error("anchored light group frame is not representable")]
     UnrepresentableAnchor,

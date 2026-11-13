@@ -14,7 +14,7 @@ const ENTITIES: &[u8] = br#"<Entities><Entity>
 <emergencyState intensity="9"/><defaultState intensity="0" lightStyle="0"><color r="0"/></defaultState>
 <defaultState intensity="wrong"/><auxiliaryState temperature="NaN"/><cinematicState/>
 </EntityComponentLight></PropertiesDataCore>
-<TileAttachmentParams ItemPortName="matched"/><TileAttachmentParams ItemPortName="duplicate"/><TileAttachmentParams ItemPortName="missing"/><TileAttachmentParams/><TileAttachmentParams ItemPortName=""/><EntityComponentLightGroup><BakedInLights/><BakedInLights><Light>
+<TileAttachmentParams ItemPortName="matched[tip]" ItemPortIndex="0"/><TileAttachmentParams ItemPortName="duplicate"/><TileAttachmentParams ItemPortName="missing"/><TileAttachmentParams/><TileAttachmentParams ItemPortName=""/><EntityComponentLightGroup helper="fixture_helper"><BakedInLights/><BakedInLights><Light>
 <RelativeXForm rotation="1,0,0,0" translation="1,2,3"/>
 <EntityComponentLight lightType="Omni"><defaultState intensity="1"/></EntityComponentLight>
 </Light></BakedInLights></EntityComponentLightGroup>
@@ -24,7 +24,7 @@ fn scene() -> TestResult<Value> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("authored-lights.p4k");
     let descriptor = br#"<ObjectContainer><StreamingOCs><OC name="lights.soc"/></StreamingOCs>
-<TileXmlEntry><TileItemPortEntries><ItemPort name="matched" interactionOffset="1,2,3"/>
+<TileXmlEntry><TileItemPortEntries><ItemPort name="matched[tip]" interactionOffset="1,2,3"/>
 <ItemPort name="duplicate" interactionOffset="4,5,6"/><ItemPort name="duplicate"/>
 </TileItemPortEntries></TileXmlEntry></ObjectContainer>"#;
     let soc = TestChunkFile::crch().chunk(0x0004, 3, ENTITIES).bytes();
@@ -70,6 +70,14 @@ fn light_rows_keep_source_modes_and_empty_group_sections() -> TestResult {
     );
     verify_mode_evidence(modes)?;
     let group = &entity["lightGroups"][0];
+    assert_eq!(
+        group["helper"]["value"], "fixture_helper",
+        "authored helper"
+    );
+    assert_eq!(
+        group["helper"]["containsEncryptedSource"], true,
+        "helper source marker"
+    );
     assert_eq!(
         group["bakedSections"].as_array().map(Vec::len),
         Some(2),
@@ -145,9 +153,43 @@ fn tile_attachments_bind_exact_offsets_and_preserve_conflicts() -> TestResult {
     let [matched, duplicate, missing, absent, invalid] = attachments.as_slice() else {
         return Err("original attachment count".into());
     };
+    verify_selector_fields(matched);
     let offset = matched
         .pointer("/target/value/port/interactionOffset")
         .ok_or("matched offset")?;
+    verify_target_dispositions(offset, duplicate, missing, absent, invalid);
+    Ok(())
+}
+
+fn verify_selector_fields(matched: &Value) {
+    assert_eq!(
+        matched.pointer("/portIndex/value").and_then(Value::as_str),
+        Some("0"),
+        "authored zero port index"
+    );
+    assert_eq!(
+        matched
+            .pointer("/attachmentPointSuffix/value")
+            .and_then(Value::as_str),
+        Some("tip"),
+        "exact bracket suffix"
+    );
+    assert_eq!(
+        matched
+            .pointer("/attachmentPointSuffix/containsEncryptedSource")
+            .and_then(Value::as_bool),
+        Some(true),
+        "selector source marker"
+    );
+}
+
+fn verify_target_dispositions(
+    offset: &Value,
+    duplicate: &Value,
+    missing: &Value,
+    absent: &Value,
+    invalid: &Value,
+) {
     assert_eq!(
         offset["value"],
         serde_json::json!([1.0, 2.0, 3.0]),
@@ -190,5 +232,4 @@ fn tile_attachments_bind_exact_offsets_and_preserve_conflicts() -> TestResult {
         Some("invalid"),
         "invalid selector"
     );
-    Ok(())
 }

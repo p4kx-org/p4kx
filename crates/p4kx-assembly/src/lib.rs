@@ -216,9 +216,11 @@ pub use gear_pose_sources::{
 pub use geometry::{Geometry, GeometryVariant, PaletteRef};
 pub use hologram::{HologramCamera, HologramCameraField, ObservedHologramCamera};
 pub use interior::{
-    ChildContainerPath, Interior, InteriorForge, InteriorOptions, InteriorPart, InteriorPartKind,
-    InteriorProgress, InteriorWatch, MAX_INTERIOR_CONTAINERS, MAX_INTERIOR_DEPTH,
-    MAX_INTERIOR_FILE_LEN, MAX_INTERIOR_PARTS, is_external_child_value,
+    ChildContainerPath, Interior, InteriorForge, InteriorLightHelper, InteriorLightHelperError,
+    InteriorLightHelperFrame, InteriorLightHelperSource, InteriorLightPlacement, InteriorOptions,
+    InteriorPart, InteriorPartKind, InteriorProgress, InteriorTilePort, InteriorWatch,
+    MAX_INTERIOR_CONTAINERS, MAX_INTERIOR_DEPTH, MAX_INTERIOR_FILE_LEN, MAX_INTERIOR_PARTS,
+    is_external_child_value,
 };
 #[cfg(feature = "verification")]
 pub use interior_check::{
@@ -280,7 +282,8 @@ pub use tree::{Attachment, EntityNode, PortNode, PortSource, Target, Unresolved}
 pub use vehicle::{
     ElemOverride, LandingGear, ModificationReport, OriginTally, PartKind, PartThreshold,
     PartialValue, PortVisibility, UnreadableValue, ValueOrigin, VehicleImplementation,
-    VehicleItemPort, VehicleItemType, VehiclePart, VehicleTotals,
+    VehicleItemPort, VehicleItemType, VehicleLightAttachment, VehicleLightPort, VehiclePart,
+    VehicleTotals,
 };
 pub use xml::{MAX_XML_INCLUDE_DEPTH, MAX_XML_INCLUDES};
 

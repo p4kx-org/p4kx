@@ -38,6 +38,7 @@ impl IssueKind {
             Self::ObjectsLeftOut { .. } => "objects_left_out",
             Self::UnsupportedObjects { .. } => "unsupported_objects",
             Self::EntitiesLeftOut { .. } => "entities_left_out",
+            Self::LightAnchor(_) => "light_anchor",
             Self::LightUnsupported { .. } => "light_unsupported",
             Self::BodyZonesHidden(_) => "body_zones_hidden",
             Self::BodyZonesUnknown(_) => "body_zones_unknown",

@@ -73,6 +73,7 @@ mod entity_head_skins;
 mod entity_interior;
 mod entity_interior_cache;
 mod entity_interior_modules;
+mod entity_interior_tile_lights;
 mod entity_lookup;
 mod gear_deploy_clip;
 mod head_animation;

@@ -5,6 +5,7 @@ use p4kx_extraction::Archive;
 
 use super::classes::ClassLookup;
 use super::models::attach;
+use super::tile_light::TileLightOwner;
 use super::walk::walk;
 use super::{Interior, InteriorForge, InteriorOptions, InteriorWatch};
 use crate::{AssemblyError, ModelProvider};
@@ -98,8 +99,19 @@ impl Interior {
         watch: &InteriorWatch<'_>,
         (forge, models): (Option<&InteriorForge<'_>>, Option<&dyn ModelProvider>),
     ) -> Result<Self, AssemblyError> {
+        Self::build_owned(layers, entry, options, watch, (forge, models), None)
+    }
+
+    pub(crate) fn build_owned(
+        layers: &[&Archive],
+        entry: &str,
+        options: &InteriorOptions,
+        watch: &InteriorWatch<'_>,
+        (forge, models): (Option<&InteriorForge<'_>>, Option<&dyn ModelProvider>),
+        owner: Option<TileLightOwner<'_>>,
+    ) -> Result<Self, AssemblyError> {
         let classes = forge.map(|forge| forge as &dyn ClassLookup);
-        let mut walked = walk(layers, entry, options, watch, classes)?;
+        let mut walked = walk(layers, entry, options, watch, classes, owner)?;
         let default_material = attach(&mut walked, options, watch, classes, models)?;
         Ok(Self {
             parts: walked.parts,

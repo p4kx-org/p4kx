@@ -38,6 +38,8 @@ impl<'a> TilePorts<'a> {
 pub(crate) struct TileAttachment {
     position: SocXmlPosition,
     port_name: SourcedValue<String>,
+    port_index: SourcedValue<p4kx_extraction::DecimalU64>,
+    attachment_point_suffix: SourcedValue<String>,
     target: SourcedValue<TileTarget>,
 }
 
@@ -52,6 +54,16 @@ impl TileAttachment {
             position: position(element)?,
             port_name: origin
                 .named(element, "ItemPortName", attachment.item_port())?
+                .map(str::to_owned),
+            port_index: origin
+                .named(element, "ItemPortIndex", attachment.item_port_index())?
+                .map(p4kx_extraction::DecimalU64::new),
+            attachment_point_suffix: origin
+                .named(
+                    element,
+                    "ItemPortName",
+                    attachment.attachment_point_suffix(),
+                )?
                 .map(str::to_owned),
             target: target(attachment, ports, origin)?,
         })

@@ -45,6 +45,12 @@ impl<'document> SocTilePortIndex<'document> {
             SocSourceValue::Absent => return SocTilePortTarget::Absent,
             _ => return SocTilePortTarget::Invalid,
         };
+        self.named(name)
+    }
+
+    /// Resolves an exact tile port name inside this descriptor.
+    #[must_use]
+    pub fn named(&self, name: &str) -> SocTilePortTarget<'_, 'document> {
         let Some(sites) = self.by_name.get(name) else {
             return SocTilePortTarget::Unmatched;
         };

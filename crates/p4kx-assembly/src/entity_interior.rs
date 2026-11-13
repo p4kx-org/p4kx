@@ -4,14 +4,12 @@
 mod budget;
 mod build;
 pub(crate) mod lookup;
+mod placement;
 
 use p4kx_gltf::{GltfError, Scene, SceneNode};
-use p4kx_model::{MaterialStatus, Model, Transform};
+use p4kx_model::{MaterialStatus, Transform};
 
-use crate::placement::offset_transform;
-use crate::room_model_helper::RoomModelHelper;
 use crate::{Assembly, Interior, Issue, IssueKind, ObjectContainerRef};
-use lookup::near;
 
 /// The name of the scene node that groups the Interior below the Entity.
 pub const INTERIOR_NODE: &str = "Interior";
@@ -111,61 +109,6 @@ impl EntityInterior {
     #[must_use]
     pub fn modelled_parts(&self) -> usize {
         self.total(Interior::modelled_parts)
-    }
-
-    fn place(
-        &mut self,
-        at: &str,
-        reference: &ObjectContainerRef,
-        model: Option<&Model>,
-    ) -> Transform {
-        let finite = reference
-            .position()
-            .iter()
-            .chain(&reference.rotation())
-            .all(|value| value.is_finite());
-        let moved = if finite {
-            offset_transform(reference.position(), reference.rotation())
-        } else {
-            self.note(
-                at,
-                reference,
-                IssueKind::InvalidOffset {
-                    name: reference.file().to_owned(),
-                },
-            );
-            Transform::IDENTITY
-        };
-        let bone = reference.bone();
-        if bone.is_empty() {
-            return moved;
-        }
-        let Some(helper) = model.and_then(|model| RoomModelHelper::find(model, bone)) else {
-            self.note(
-                at,
-                reference,
-                IssueKind::HelperNotFound {
-                    helper: bone.to_owned(),
-                },
-            );
-            return moved;
-        };
-        let anchor = helper.transform();
-        let anchored = anchor.translation();
-        if helper.uses_offset() {
-            return anchor.then(&moved);
-        }
-        if finite && !near(reference.position(), [0.0; 3]) && !near(reference.position(), anchored)
-        {
-            self.note(
-                at,
-                reference,
-                IssueKind::OffsetDiffers {
-                    bone: bone.to_owned(),
-                },
-            );
-        }
-        anchor
     }
 
     fn add(

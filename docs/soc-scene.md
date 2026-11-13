@@ -66,10 +66,21 @@ the XML and DataForge sources used for selection and interpretation. Positioned
 array leaves remain available under the class defaults. Baked light members keep
 their original source declarations.
 
-An entity's `tileAttachments` refer to the port declarations of its own descriptor.
+A light group's `helper` records its original selector. An entity's
+`tileAttachments` refer to the port declarations of its own descriptor and preserve
+`ItemPortIndex` independently from the exact port name and its bracket suffix.
 Each matched or ambiguous candidate retains its original position and interaction
 offset in the container owner's frame. An unavailable descriptor leaves the
 target incomplete. The source row does not assume a container-to-owner transform.
+
+An assembled Entity can anchor lights of a directly declared vehicle container when
+its owner frame and descriptor resolve. The group origin moves to the item-port
+offset in the owner frame. The move preserves the group's basis and offsets between
+baked lights. Nested and standalone containers keep their original placement. The
+Assembly exposes the original light frame and separate correction evidence. A
+unique explicit helper, or a unique MultiLight point from the effective owner's
+vehicle implementation, can also provide a helper-local rest frame. This binding
+preserves the owner and helper evidence without choosing animation or power states.
 
 Each sourced value includes `containsEncryptedSource`, `sourceSetComplete` and
 `sourceUsesRefs`. References resolve in the same document's `sourceInventory`. The inventory

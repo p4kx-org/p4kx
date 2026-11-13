@@ -20,7 +20,8 @@ fn a_non_finite_offset_is_the_identity_and_an_issue() {
 
     let placed = built.place(INTERIOR_NODE, &reference([f32::NAN, 0.0, 0.0]), None);
 
-    assert!(placed.is_identity());
+    assert!(placed.transform.is_identity());
+    assert!(placed.tile_owner.is_none());
     assert_eq!(built.issues.len(), 1);
     assert_eq!(built.issues[0].kind.code(), "invalid_offset");
 }

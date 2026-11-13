@@ -118,6 +118,13 @@ impl<'document> SocLightGroupSource<'document> {
         self.node.element()
     }
 
+    /// Reads the unique nonempty helper selector authored by this group.
+    #[must_use]
+    pub fn helper(self) -> SocSourceValue<&'document str> {
+        self.node
+            .read("helper", |value| (!value.is_empty()).then_some(value))
+    }
+
     /// Visits original baked-light sections, including explicit empty sections.
     pub fn baked_sections(self) -> impl Iterator<Item = SourceElement<'document>> {
         SocSourceNode::children(self.element(), "BakedInLights").map(SocSourceNode::element)
