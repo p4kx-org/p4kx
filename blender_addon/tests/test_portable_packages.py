@@ -96,3 +96,13 @@ def test_rejects_semantics_that_differ_between_native_targets(exchange: Path) ->
     write_receipt(folder, LINUX)
     with pytest.raises(ValueError, match="cross-target package manifest differs"):
         verify_exchange(exchange, [WINDOWS, LINUX], REVISION, RUN)
+
+
+def test_rejects_structurally_invalid_glb_with_updated_receipt(exchange: Path) -> None:
+    folder = exchange / (ARTIFACT_PREFIX + LINUX["target"])
+    mesh = folder / "packages/assembly/meshes/m0001.glb"
+    content = mesh.read_bytes()
+    mesh.write_bytes(content[:4] + (9).to_bytes(4, "little") + content[8:])
+    write_receipt(folder, LINUX)
+    with pytest.raises(ValueError, match="package mesh preflight failed.*Unsupported GLB version"):
+        verify_exchange(exchange, [WINDOWS, LINUX], REVISION, RUN)

@@ -19,6 +19,7 @@ sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(HERE))
 
 from p4kx_importer import package  # noqa: E402
+from p4kx_importer.mesh_preflight import preflight_meshes  # noqa: E402
 
 ARTIFACT_PREFIX = "p4kx-blender-package-"
 CASES = ("assembly", "livery")
@@ -98,6 +99,13 @@ def manifests(folder: Path, hashes: dict[str, str]) -> dict[str, dict]:
     for case in CASES:
         directory = root / case
         loaded = package.load_package(directory)
+        preflight = preflight_meshes(loaded)
+        require(
+            not preflight.problems,
+            f"{case}: package mesh preflight failed: " + " | ".join(
+                problem.message() for problem in preflight.problems
+            ),
+        )
         expected.add(f"{case}/scene.json")
         expected.update(f"{case}/{asset.file}" for asset in loaded.meshes.values())
         expected.update(f"{case}/{asset.file}" for asset in loaded.textures.values())

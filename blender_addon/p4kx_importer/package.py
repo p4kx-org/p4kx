@@ -16,6 +16,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any
 
+from .glb_preflight import check_glb as check_glb
 from .manifest_fields import (
     PackageError,
     PackageTooNewError,
@@ -36,7 +37,6 @@ SUPPORTED_MAJOR = 1
 SUPPORTED_MINOR = 11
 MANIFEST_NAME = "scene.json"
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
-MAX_GLB_JSON_BYTES = 16 * 1024 * 1024
 BLENDER_NAME_BYTES = 63
 
 _VERSION = re.compile(r"^([0-9]+)\.([0-9]+)$")
@@ -67,6 +67,7 @@ class Mesh:
     materials: tuple[MeshMaterial, ...]
     palette_id: str | None = None
     rig: Rig | None = None
+    bytes: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -138,39 +139,6 @@ def parse_manifest(data: object, root: Path) -> Package:
         material_descriptions=parse_materials(manifest.get("materials"), warnings),
         palettes=parse_palettes(manifest.get("palettes"), warnings),
     )
-
-
-def check_glb(path: Path) -> None:
-    """Refuses a GLB whose header is wrong or whose JSON names an external ``uri``.
-
-    Only the 12-byte header and the JSON chunk (at most ``MAX_GLB_JSON_BYTES``) are read. The
-    GLBs of a package embed everything, so a ``uri`` on a buffer or image is never legitimate.
-    """
-    try:
-        with path.open("rb") as stream:
-            header = stream.read(20)
-            if len(header) < 20 or header[:4] != b"glTF":
-                raise PackageError(f"{path.name} is not a GLB file.")
-            length = int.from_bytes(header[12:16], "little")
-            if header[16:20] != b"JSON" or length > MAX_GLB_JSON_BYTES:
-                raise PackageError(f"{path.name} has no usable JSON chunk.")
-            raw = stream.read(length)
-    except OSError as error:
-        raise PackageError(f"Cannot read {path.name}: {error.strerror}.") from error
-    if len(raw) != length:
-        raise PackageError(f"{path.name} is truncated.")
-    try:
-        document = json.loads(raw)
-    except (RecursionError, ValueError) as error:
-        raise PackageError(f"{path.name} has invalid JSON.") from error
-    if not isinstance(document, dict):
-        raise PackageError(f"{path.name} has invalid JSON.")
-    for key in ("buffers", "images"):
-        entries = document.get(key)
-        if isinstance(entries, list) and any(
-            isinstance(entry, dict) and "uri" in entry for entry in entries
-        ):
-            raise PackageError(f"{path.name} refers to an external file in {key}.")
 
 
 def blender_name(name: str, limit: int = BLENDER_NAME_BYTES) -> str:
@@ -300,12 +268,16 @@ def _parse_meshes(items: list[Any], textures: dict[str, Texture]) -> dict[str, M
             for slot, material in enumerate(read_array(entry.get("materials"), f"{where}.materials"))
         )
         palette_id = entry.get("palette_id")
+        size = entry.get("bytes")
+        if size is not None and (type(size) is not int or size < 0):
+            raise PackageError(f"{where}: bytes is not a non-negative integer.")
         meshes[mesh_id] = Mesh(
             mesh_id,
             file,
             materials,
             palette_id if isinstance(palette_id, str) else None,
             _rig(entry.get("rig"), f"{where}.rig"),
+            size,
         )
     return meshes
 

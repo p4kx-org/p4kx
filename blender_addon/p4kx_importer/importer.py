@@ -15,6 +15,7 @@ from mathutils import Quaternion, Vector
 from .glass_tint import drop_tint_without_colours
 from .lights import gltf_to_blender_light_quaternion, light_settings
 from .material_surface import GLTF_COLOUR_ATTRIBUTE
+from .mesh_preflight import preflight_meshes
 from .materials import ImageCache, apply_materials
 from .light_model import Light
 from .package import (
@@ -23,11 +24,9 @@ from .package import (
     Package,
     PackageError,
     blender_name,
-    check_glb,
     gltf_to_blender_quaternion,
     gltf_to_blender_scale,
     gltf_to_blender_vector,
-    resolve_file,
 )
 
 
@@ -61,10 +60,12 @@ def import_package(
     """
     if not hasattr(bpy.ops.import_scene, "gltf"):
         raise PackageError("Enable Blender's 'glTF 2.0 format' add-on first.")
+    preflight = preflight_meshes(package)
     root = bpy.data.collections.new(blender_name(package.entity_name))
     context.scene.collection.children.link(root)
     result = ImportResult(root=root)
-    templates = _import_meshes(context, package, root, result)
+    result.warnings.extend(problem.message() for problem in preflight.problems)
+    templates = _import_meshes(context, package, root, result, preflight.paths)
     created: dict[int, bpy.types.Object] = {}
     for node in package.nodes:
         template = templates.get(node.mesh) if node.mesh else None
@@ -74,8 +75,8 @@ def import_package(
         else:
             created[node.index] = _create_object(node, template, created, root)
             mesh = package.meshes[node.mesh] if node.mesh else None
-            if mesh is not None and mesh.rig is not None:
-                _import_rigged(context, package, mesh, created[node.index], root, result)
+            if mesh is not None and mesh.rig is not None and mesh.id in preflight.paths:
+                _import_rigged(context, mesh, preflight.paths[mesh.id], created[node.index], root, result)
         result.objects += 1
         result.instances += template is not None
     result.warnings.extend(package.warnings)
@@ -83,21 +84,24 @@ def import_package(
 
 
 def _import_meshes(
-    context: bpy.types.Context, package: Package, root: bpy.types.Collection, result: ImportResult
+    context: bpy.types.Context,
+    package: Package,
+    root: bpy.types.Collection,
+    result: ImportResult,
+    paths: dict[str, Path],
 ) -> dict[str, bpy.types.Collection]:
-    wanted = {
-        node.mesh for node in package.nodes if node.mesh and package.meshes[node.mesh].rig is None
-    }
     holder = bpy.data.collections.new(blender_name(f"{package.entity_name} meshes"))
     root.children.link(holder)
     holder_layer = _layer_collection(context.view_layer.layer_collection, holder)
     images = ImageCache(package)
     templates: dict[str, bpy.types.Collection] = {}
-    for mesh_id in sorted(wanted):
+    for mesh_id, path in paths.items():
         mesh = package.meshes[mesh_id]
+        if mesh.rig is not None:
+            continue
         template = bpy.data.collections.new(mesh_id)
         holder.children.link(template)
-        if _import_glb(context, package, mesh, template, images):
+        if _import_glb(context, package, mesh, path, template, images):
             templates[mesh_id] = template
             result.meshes += 1
         else:
@@ -111,17 +115,10 @@ def _import_glb(
     context: bpy.types.Context,
     package: Package,
     mesh: Mesh,
+    path: Path,
     template: bpy.types.Collection,
     images: ImageCache,
 ) -> bool:
-    try:
-        path = resolve_file(package.root, mesh.file)
-        if not path.is_file():
-            return False
-        check_glb(path)
-    except PackageError as error:
-        package.warnings.append(str(error))
-        return False
     layer = _layer_collection(context.view_layer.layer_collection, template)
     previous = context.view_layer.active_layer_collection
     context.view_layer.active_layer_collection = layer
@@ -143,21 +140,12 @@ def _import_glb(
 
 def _import_rigged(
     context: bpy.types.Context,
-    package: Package,
     mesh: Mesh,
+    path: Path,
     parent: bpy.types.Object,
     root: bpy.types.Collection,
     result: ImportResult,
 ) -> None:
-    try:
-        path = resolve_file(package.root, mesh.file)
-        if not path.is_file():
-            package.warnings.append(f"Mesh {mesh.id} could not be imported.")
-            return
-        check_glb(path)
-    except PackageError as error:
-        package.warnings.append(str(error))
-        return
     layer = _layer_collection(context.view_layer.layer_collection, root)
     previous = context.view_layer.active_layer_collection
     if layer is not None:
@@ -171,7 +159,7 @@ def _import_rigged(
         context.view_layer.active_layer_collection = previous
     if "FINISHED" not in status:
         _discard_new(before)
-        package.warnings.append(f"Mesh {mesh.id} could not be imported.")
+        result.warnings.append(f"Mesh {mesh.id} could not be imported.")
         return
     created = [obj for obj in bpy.data.objects if obj not in before["objects"]]
     for obj in created:

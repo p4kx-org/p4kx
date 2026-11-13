@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 import platform
+import struct
 import sys
 import tempfile
 from importlib import import_module
@@ -293,10 +294,54 @@ def main() -> None:
             check(False, "a newer package must be refused")
         extension.unregister()
 
+        check_invalid_package_mesh(Path(folder) / "invalid_mesh")
         check_layered_material(Path(folder) / "layered")
         check_glass_tint()
 
     print("smoke test passed")
+
+
+def check_invalid_package_mesh(folder: Path) -> None:
+    """Checks malformed mesh diagnostics, scene timing and import of intact meshes."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    addon_utils.enable("io_scene_gltf2", default_set=False)
+    scene = synthetic.write_package(folder)
+    broken = folder / "meshes/m0001.glb"
+    content = bytearray(broken.read_bytes())
+    struct.pack_into("<I", content, 4, 9)
+    broken.write_bytes(content)
+
+    loaded = package.load_package(scene)
+    original_preflight = importer.preflight_meshes
+    original_run = importer._run_gltf
+    collections_before = set(bpy.data.collections)
+    imports = []
+
+    def preflight(candidate):
+        check(set(bpy.data.collections) == collections_before, "preflight runs before scene creation")
+        result = original_preflight(candidate)
+        check(len(result.problems) == 1, "invalid GLB has a structured preflight result")
+        check(result.problems[0].mesh_id == "m0001", "preflight identifies invalid mesh")
+        return result
+
+    def run(context, path):
+        imports.append(path.name)
+        return original_run(context, path)
+
+    importer.preflight_meshes = preflight
+    importer._run_gltf = run
+    try:
+        result = importer.import_package(bpy.context, loaded)
+    finally:
+        importer.preflight_meshes = original_preflight
+        importer._run_gltf = original_run
+
+    check(imports == ["m0002.glb"], f"only the valid GLB reached Blender: {imports}")
+    check(result.meshes == 1 and result.instances == 1, "intact GLB still imports")
+    check(
+        any("m0001" in warning and "Unsupported GLB version" in warning for warning in result.warnings),
+        f"corrupt asset warning: {result.warnings}",
+    )
 
 
 def check_glass_tint() -> None:
