@@ -3,6 +3,7 @@
 
 use serde_json::{Value, json};
 
+use super::character_payload;
 use super::companions::{self, CompanionRecord};
 use super::lod_distances;
 use super::payload::{self, ModelSourcePayload};
@@ -22,6 +23,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         COMPANION,
         schema_merge::serialized_payload::<CompanionRecord>(),
     )?;
+    character_payload::insert_schema(&mut base)?;
     let branches = base
         .get_mut("allOf")
         .and_then(Value::as_array_mut)
@@ -31,7 +33,10 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         (payload::CHUNK, "chunk", 1, PAYLOAD),
         (lod_distances::NAMESPACE, "lod-distance-words", 1, PAYLOAD),
         (companions::NAMESPACE, "companion", 1, COMPANION),
-    ] {
+    ]
+    .into_iter()
+    .chain(character_payload::SCHEMA_ROWS)
+    {
         branches.push(json!({
             "if": {
                 "properties": {

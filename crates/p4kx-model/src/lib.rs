@@ -45,6 +45,7 @@ mod bone_map;
 mod bone_match;
 mod build;
 mod build_lod;
+pub mod character_definition;
 mod companion;
 mod controller_binding;
 mod crch;

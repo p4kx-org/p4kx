@@ -13,6 +13,8 @@ use crate::cdf_model_sources::CdfModelSources;
 use crate::loadout_xml::Node;
 use crate::markup::{self, Budget, Element};
 
+pub(crate) use p4kx_extraction::model::character_definition::is_definition_path as is_character_definition;
+
 /// The most bytes of a character definition that are read.
 pub(crate) const MAX_CDF_BYTES: u64 = 1 << 20;
 
@@ -27,14 +29,6 @@ pub(crate) struct Character {
     pub(crate) left_out: Vec<String>,
     pub(crate) skeleton: Option<String>,
     pub(crate) model_sources: Option<CdfModelSources>,
-}
-
-/// Returns whether `path` names a character definition.
-pub(crate) fn is_character_definition(path: &str) -> bool {
-    path.len() > 4
-        && path
-            .get(path.len() - 4..)
-            .is_some_and(|extension| extension.eq_ignore_ascii_case(".cdf"))
 }
 
 /// Reads the character definition in `bytes`.

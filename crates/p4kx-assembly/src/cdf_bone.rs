@@ -3,12 +3,11 @@
 
 use std::sync::Arc;
 
-use p4kx_foundation::read_text_number;
+use p4kx_extraction::model::character_definition::{relative_position, relative_rotation};
 
 use crate::CdfAttachmentSite;
 use crate::cdf::slashes;
 use crate::markup::Element;
-use crate::read::narrow;
 
 /// A bone attachment (`CA_BONE`) of a character definition: a rigid model bound to a bone of the
 /// skeleton and offset from it.
@@ -42,14 +41,8 @@ impl BoneAttachment {
         let (true, Some(bone)) = (is_bone, bone) else {
             return None;
         };
-        let position = match element.attribute("RelPosition") {
-            Some(text) => numbers::<3>(text)?,
-            None => [0.0; 3],
-        };
-        let rotation = match element.attribute("RelRotation") {
-            Some(text) => numbers::<4>(text).filter(|q| q.iter().any(|part| *part != 0.0))?,
-            None => [1.0, 0.0, 0.0, 0.0],
-        };
+        let position = relative_position(element.attribute("RelPosition"))?;
+        let rotation = relative_rotation(element.attribute("RelRotation"))?;
         let binding = slashes(binding);
         let name = element
             .attribute("AName")
@@ -65,18 +58,6 @@ impl BoneAttachment {
             sources: None,
         })
     }
-}
-
-/// Reads `N` comma-separated numbers, or `None` for another count, an unreadable number or one
-/// that is not finite as an `f32`.
-fn numbers<const N: usize>(text: &str) -> Option<[f32; N]> {
-    let mut out = [0.0_f32; N];
-    let mut parts = text.split(',');
-    for slot in &mut out {
-        let number = read_text_number(parts.next()?).filter(|number| !number.is_partial())?;
-        *slot = Some(narrow(number.value())).filter(|value| value.is_finite())?;
-    }
-    parts.next().is_none().then_some(out)
 }
 
 /// Returns the file name of `path` without its extension.

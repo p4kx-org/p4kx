@@ -8,6 +8,7 @@ use std::path::Path;
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::chunks::{ChunkDirectory, ChunkDirectoryError, ChunkError, Container};
 
+use super::character;
 use super::companions;
 use super::lod_distances;
 use super::origins::{self, ModelOrigins};
@@ -29,8 +30,8 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.3.0",
-            "Selected original model and geometry Entry bytes with positioned chunk table records.",
+            "1.4.0",
+            "Selected original models, geometry and character definitions with positioned source declarations.",
         );
         capability.field_groups = vec![
             FieldGroup::new(
@@ -49,6 +50,10 @@ impl Provider for ModelSourceProvider {
                 "lod-distance-words",
                 "Positioned original words of measured LodDistances chunks.",
             ),
+            FieldGroup::new(
+                "character-definitions",
+                "Original CDF skeleton and attachment declarations, physical path references and bone-relative offsets.",
+            ),
             FieldGroup::new_with_unsupported_projection(
                 "model-semantics",
                 "Render model decoding, material dependencies and entity-frame collision transforms are outside this projection.",
@@ -62,6 +67,9 @@ impl Provider for ModelSourceProvider {
         context: &SourceContext<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<Projection, MediaError> {
+        if p4kx_extraction::model::character_definition::is_definition_path(context.entry.path()) {
+            return character::emit(context, writer);
+        }
         let Some(family) = ModelSourceFamily::of(context.entry.path()) else {
             return Ok(Projection::Skipped);
         };

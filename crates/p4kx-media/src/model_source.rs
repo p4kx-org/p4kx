@@ -21,3 +21,12 @@ mod companions;
 
 #[path = "model_source/lod_distances.rs"]
 mod lod_distances;
+
+#[path = "model_source/character.rs"]
+mod character;
+#[path = "model_source/character_origin.rs"]
+mod character_origin;
+#[path = "model_source/character_payload.rs"]
+mod character_payload;
+#[path = "model_source/character_reference.rs"]
+mod character_reference;

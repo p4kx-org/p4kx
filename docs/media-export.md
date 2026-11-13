@@ -118,6 +118,29 @@ construct that name under its supported naming and LOD range. Additional discove
 remain visible. The directory is indexed once per owning Archive and uses the shared metadata
 work and reference budgets.
 
+The model provider also reads selected CDF Entries. A `model-character-definition` row
+identifies the authored XML encoding and root, and retains valid alternate roots as opaque.
+A malformed document or repaired binary strings are recorded in a partial diagnostic export.
+A `model-character-skeleton` row uses the zero-based root child index of each Model
+declaration. A `model-character-attachment` row uses the zero-based root child index of its
+AttachmentList and the zero-based child index within that list. Nonattachment siblings still
+count toward the index. The records share the CDF Entry's retained raw data.
+
+Skeleton File and attachment Binding keep the exact authored path and the owning Archive's
+candidate identities. The lookup uses the existing Data-prefixed path convention and falls back
+to the exact relative path after a complete miss. Absent attributes, authored empty or invalid
+paths, missing targets, duplicate targets and unselected physical targets stay distinguishable.
+The references establish physical identities without reading their target payloads. Join them
+to model collision or skeleton facts by the root Archive and physical Entry identity.
+
+Bone attachments carry the authored bone name, material override, relative position in metres
+and relative quaternion in WXYZ order. An absent position or rotation uses the CDF offset
+default for that bone attachment. Malformed values retain their original spelling with a null
+decoded value. Nonbone attachments retain any source strings for these offsets. These are
+bone-relative declarations. They do not assert that a named bone exists, or apply a skeleton
+bind pose to the collider. Each field retains its original text attribute span or CryXml node
+and attribute table coordinates, including its source encryption state.
+
 Measured IVO LodDistances chunks emit one `model-lod-distance-words` row per physical
 chunk. The v0x900 layout with a 48-byte inferred range carries twelve ordered original
 little-endian words. Each word has its unsigned bits and, when finite, its binary32
