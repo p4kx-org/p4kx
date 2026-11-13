@@ -16,6 +16,9 @@ use crate::schema_fields::every_field_required;
 use crate::source_value_catalog::{SourceArenaOutput, SourceValueRef};
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "generator_mission_item_property.rs"]
+pub(crate) mod item_properties;
+
 /// The complete owned source of one admitted `ContractGenerator` Record.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -25,6 +28,7 @@ pub(crate) struct GeneratorDefinition<'source> {
     #[serde(flatten)]
     pub(crate) header: CanonicalRecordHeader<'source>,
     pub(crate) source: SourceArenaOutput<'source>,
+    pub(crate) mission_item_properties: Vec<item_properties::GeneratorMissionItemProperty>,
 }
 
 /// The actual owner-local sites of one projected contract or sub contract.

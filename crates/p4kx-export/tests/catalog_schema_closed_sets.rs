@@ -33,6 +33,7 @@ const CONTROL_TYPES: &[&str] = &[
     "LinkFamily",
     "LocalizationMeaning",
     "LocationConditionKind",
+    "MissionItemGap",
     "NoteInterpretation",
     "ObjectiveInterpretation",
     "OwnedReferenceStatus",

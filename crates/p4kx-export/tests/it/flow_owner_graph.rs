@@ -16,10 +16,8 @@ pub(crate) struct Owner<'catalog> {
 
 impl<'catalog> Owner<'catalog> {
     pub(crate) fn new(definition: &'catalog Value) -> TestResult<Self> {
-        let source = definition
-            .get("source")
-            .ok_or("one physical owner source inventory")?;
-        let values = raw::array(source, "values")?;
+        let owner = Self::complete(definition)?;
+        let values = owner.values;
         let mut previous = None;
         for node in values {
             let ordinal = ordinal(node)?;
@@ -29,6 +27,14 @@ impl<'catalog> Owner<'catalog> {
             );
             previous = Some(ordinal);
         }
+        Ok(owner)
+    }
+
+    pub(crate) fn complete(definition: &'catalog Value) -> TestResult<Self> {
+        let source = definition
+            .get("source")
+            .ok_or("one physical owner source inventory")?;
+        let values = raw::array(source, "values")?;
         Ok(Self { source, values })
     }
 

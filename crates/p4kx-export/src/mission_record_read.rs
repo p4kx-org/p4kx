@@ -19,6 +19,7 @@ use crate::mission_generator::GeneratorDefinition;
 use crate::mission_layers;
 use crate::mission_property_set_registry::MissionPropertySetRegistry;
 use crate::record_observation::RecordObservation;
+use crate::record_read::ReadError;
 use crate::selection::Kind;
 use crate::source_fields::FieldCapture;
 use crate::source_value_catalog;
@@ -99,17 +100,16 @@ fn project_tree<'source>(
     let scope = input.record_scope(admission.record(), tree)?;
     let indexed = source_value_catalog::read_indexed_arena(&scope, cancel, |_| {})?;
     let fields = &indexed.facts;
-    let definition = GeneratorDefinition {
-        input_ref: fields.input_ref().clone(),
-        header: CanonicalRecordHeader::read(tree, input.origins())?,
-        source: indexed.source,
-    };
     let capture = TemplateFieldCapture::new(fields, input, admission)?;
+    let (definition, item_error) =
+        generator_definition(input, tree, fields, indexed.source, &capture)?;
     let Authored {
         scenario_requirements,
         local_generators,
     } = authored(input, admission, tree, fields, &capture, &mut ledger)?;
-    match project(admission, tree, context, fields, &capture) {
+    let projected =
+        item_error.map_or_else(|| project(admission, tree, context, fields, &capture), Err);
+    match projected {
         Ok(piece) => {
             crate::mission_ledger::observe(
                 &mut ledger,
@@ -143,6 +143,27 @@ fn project_tree<'source>(
             }
         },
     }
+}
+
+fn generator_definition<'source>(
+    input: &OriginalCatalogInput<'_, 'source>,
+    tree: &RecordTree<'source>,
+    fields: &OriginalFlowFields<'_, '_, 'source>,
+    source: source_value_catalog::SourceArenaOutput<'source>,
+    capture: &dyn FieldCapture<'source>,
+) -> Result<(GeneratorDefinition<'source>, Option<ReadError>), CatalogError> {
+    let (mission_item_properties, error) =
+        match crate::mission_generator::item_properties::read(fields, capture) {
+            Ok(items) => (items, None),
+            Err(error) => (Vec::new(), Some(error)),
+        };
+    let definition = GeneratorDefinition {
+        input_ref: fields.input_ref().clone(),
+        header: CanonicalRecordHeader::read(tree, input.origins())?,
+        source,
+        mission_item_properties,
+    };
+    Ok((definition, error))
 }
 
 struct Authored<'source> {

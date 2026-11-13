@@ -254,7 +254,7 @@ fn project<'source>(
 ) -> Result<Option<Piece<'source>>, crate::record_read::ReadError> {
     let scope = if matches!(
         action,
-        Action::Template | Action::Broker | Action::Organization
+        Action::Template | Action::Broker | Action::Organization | Action::Item
     ) {
         input
             .map(|input| input.record_scope(admission.record(), tree))

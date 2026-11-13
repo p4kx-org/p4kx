@@ -11,6 +11,12 @@ use crate::scoped_location_kind::ScopedLocationFilterKind;
 use crate::source_value_catalog::SourceValueRef;
 use crate::template_property_kind::PropertyValueKind;
 
+#[path = "template_mission_item_selection.rs"]
+mod mission_item;
+
+use self::mission_item::TemplateSpecificItems;
+pub(crate) use self::mission_item::{TemplateMissionItemSelection, dataset_conditions};
+
 /// The result of the required property interpretation independently of raw readability.
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -29,6 +35,7 @@ pub(crate) enum TemplateValueStatus {
 pub(crate) struct TemplateDatasetCondition {
     pub(crate) source: SourceValueRef,
     pub(crate) kind: SourcedValue<Option<LocationConditionKind>>,
+    pub(crate) specific_items: Option<TemplateSpecificItems>,
 }
 
 /// A `ScopedLocation` filter operation without a copied raw filter DTO.
@@ -49,5 +56,6 @@ pub(crate) struct TemplateValueMeaning {
     pub(crate) kind: SourcedValue<Option<PropertyValueKind>>,
     pub(crate) status: TemplateValueStatus,
     pub(crate) conditions: Vec<TemplateDatasetCondition>,
+    pub(crate) mission_item: Option<TemplateMissionItemSelection>,
     pub(crate) scoped_filters: Vec<TemplateScopedFilter>,
 }

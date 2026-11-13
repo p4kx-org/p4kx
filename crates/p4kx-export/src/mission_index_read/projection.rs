@@ -6,7 +6,7 @@ use p4kx_extraction::{Guid, RecordTree, StructValue, Value};
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_v3::tag_catalog::CapturedTags;
-use crate::mission_text_inputs::{BrokerTexts, OrganizationTexts, TemplateTexts};
+use crate::mission_text_inputs::{BrokerTexts, MissionItemTexts, OrganizationTexts, TemplateTexts};
 
 use crate::mission_hauling;
 use crate::mission_layers;
@@ -62,6 +62,18 @@ pub(super) fn project<'f>(
                 })
                 .transpose()?,
         )),
+        Action::Item => texts
+            .map(|input| {
+                Ok::<_, ReadError>(Piece::Item(
+                    (guid, tree.record_index()),
+                    MissionItemTexts::read(
+                        input.fields,
+                        input.origins,
+                        input.tags.ok_or(crate::CatalogError::MissionTextPlan)?,
+                    )?,
+                ))
+            })
+            .transpose()?,
         Action::Locality => Some(Piece::Locality(guid, available_locations(root))),
         Action::Broker => Some(Piece::Broker(
             guid,

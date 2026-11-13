@@ -15,7 +15,7 @@ fn run(text: &str, table: &[(&str, &str)]) -> Result<String, CatalogError> {
             .find(|(name, _)| *name == key)
             .map(|(_, text)| Cow::Borrowed(*text)))
     };
-    let mut resolve = |name: &str, _: Option<&str>| {
+    let mut resolve = |_: &str, name: &str, _: Option<&str>| {
         Ok(table
             .iter()
             .find(|(token, _)| token.eq_ignore_ascii_case(name))
@@ -74,7 +74,7 @@ fn an_unaddressable_acyclic_render_fails_before_reserving_its_output() {
         let next = index + 1;
         Some(Cow::Owned(format!("~mission(K{next})~mission(K{next})")))
     };
-    let mut resolve = |name: &str, _: Option<&str>| {
+    let mut resolve = |_: &str, name: &str, _: Option<&str>| {
         Ok(keys
             .iter()
             .find(|key| *key == name)

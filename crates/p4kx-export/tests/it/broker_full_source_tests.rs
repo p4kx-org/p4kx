@@ -90,8 +90,8 @@ fn original_fields(tree: &RecordTree<'_>) -> TestResult {
     };
     assert_eq!(
         properties.len(),
-        4,
-        "the four real original property declarations"
+        5,
+        "all original property declarations in the fixture"
     );
     Ok(())
 }

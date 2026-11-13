@@ -14,7 +14,7 @@ use crate::catalog_read::original::RewardRead;
 use crate::contract_hauling::HaulingRequirement;
 use crate::export_ledger::ExportLedger;
 use crate::mission_hauling::HaulingProperty;
-use crate::mission_text_inputs::{BrokerTexts, OrganizationTexts, TemplateTexts};
+use crate::mission_text_inputs::{BrokerTexts, MissionItemTexts, OrganizationTexts, TemplateTexts};
 use crate::spawn_layers::Level;
 use crate::spawn_pools::SpawnPools;
 use crate::{CatalogError, CatalogReadFailure};
@@ -85,6 +85,7 @@ enum Piece<'f> {
     FailedTemplate(CatalogReadFailure<'f>, FailedTemplate),
     Type(Guid, MissionTypeName<'f>),
     Organization(Guid, Option<OrganizationTexts<'f>>),
+    Item((Guid, u32), MissionItemTexts<'f>),
     Reward(Guid, u32, RewardDependency),
     UnusableRewardCandidate(CatalogReadFailure<'f>, RewardDependency),
     Locality(Guid, Vec<Guid>),
@@ -102,6 +103,7 @@ pub(crate) struct MissionIndex<'f> {
     template_source: Option<TemplateReadSource>,
     types: HashMap<Guid, MissionTypeName<'f>>,
     organizations: HashMap<Guid, OrganizationTexts<'f>>,
+    items: HashMap<(Guid, u32), MissionItemTexts<'f>>,
     rewards: BTreeMap<(Guid, u32), RewardDependency>,
     localities: HashMap<Guid, Vec<Guid>>,
     brokers: HashMap<Guid, Broker<'f>>,
@@ -277,6 +279,9 @@ impl<'f> MissionIndex<'f> {
                     self.organizations.insert(guid, variants);
                 }
             }
+            Piece::Item(key, variants) => {
+                self.items.insert(key, variants);
+            }
             Piece::Reward(guid, position, amount) => {
                 self.rewards.insert((guid, position), amount);
             }
@@ -352,6 +357,10 @@ impl<'f> MissionIndex<'f> {
     }
 
     /// Returns the actual ordered authored text variants of the chosen dependency.
+    pub(crate) fn item(&self, guid: Guid, record_index: u32) -> Option<&MissionItemTexts<'f>> {
+        self.items.get(&(guid, record_index))
+    }
+
     pub(crate) fn organization(&self, guid: Guid) -> Option<&OrganizationTexts<'f>> {
         self.organizations.get(&guid)
     }

@@ -7,7 +7,6 @@ use p4kx_extraction::{SourceUseRole, SourceValue, SourcedValue, Value};
 
 use crate::catalog_read::original::{OriginalValueFact, OriginalValuePart};
 use crate::export_diagnostic::ExportDiagnosticCode;
-use crate::location_condition_kind::LocationConditionKind;
 use crate::record_read::ReadError;
 use crate::scoped_location_kind::ScopedLocationFilterKind;
 use crate::source_fields::{FieldCapture, unknown_struct};
@@ -15,7 +14,8 @@ use crate::template_property_kind::PropertyValueKind;
 use crate::template_property_plan::SelectedProperty;
 use crate::template_source_members::TemplateMembers;
 use crate::template_value_meaning::{
-    TemplateDatasetCondition, TemplateScopedFilter, TemplateValueMeaning, TemplateValueStatus,
+    TemplateDatasetCondition, TemplateMissionItemSelection, TemplateScopedFilter,
+    TemplateValueMeaning, TemplateValueStatus,
 };
 use crate::{CatalogError, ExportAccountingError};
 
@@ -100,6 +100,13 @@ pub(crate) fn one<'scope, 'read, 'source>(
             kind: kind_cell(members, fact, kind)?,
             status,
             conditions: conditions(members, fact, kind)?,
+            mission_item: matches!(kind, Some(PropertyValueKind::MissionItem))
+                .then(|| {
+                    TemplateMissionItemSelection::read(members.fields(), fact, |value| {
+                        members.value_ref(value)
+                    })
+                })
+                .transpose()?,
             scoped_filters: scoped(members, fact, kind)?,
         },
         failure,
@@ -134,37 +141,17 @@ fn conditions<'scope, 'read, 'source>(
     fact: &OriginalValueFact<'scope, 'read, 'source>,
     kind: Option<PropertyValueKind>,
 ) -> Result<Vec<TemplateDatasetCondition>, CatalogError> {
-    if !matches!(
-        kind,
-        Some(PropertyValueKind::Organization | PropertyValueKind::MissionItem)
-    ) {
-        return Ok(Vec::new());
+    match kind {
+        Some(PropertyValueKind::Organization | PropertyValueKind::MissionItem) => {
+            crate::template_value_meaning::dataset_conditions(
+                members.fields(),
+                fact,
+                matches!(kind, Some(PropertyValueKind::MissionItem)),
+                |fact| members.value_ref(fact),
+            )
+        }
+        _ => Ok(Vec::new()),
     }
-    let fields = members.fields();
-    let Some((_, declaration)) = fields.field(Some(fact), "matchConditions")? else {
-        return Ok(Vec::new());
-    };
-    let selected = if matches!(declaration.value(), Value::Struct(_)) {
-        vec![declaration]
-    } else {
-        fields.structs(declaration)?
-    };
-    selected
-        .into_iter()
-        .map(|fact| {
-            let Value::Struct(source) = fact.value() else {
-                return Err(ExportAccountingError::ConflictingSourceDatum.into());
-            };
-            Ok(TemplateDatasetCondition {
-                source: members.value_ref(fact)?,
-                kind: kind_cell(
-                    members,
-                    fact,
-                    LocationConditionKind::read(source.type_name()),
-                )?,
-            })
-        })
-        .collect()
 }
 
 fn scoped<'scope, 'read, 'source>(

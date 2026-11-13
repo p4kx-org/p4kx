@@ -69,6 +69,7 @@ mod real_archive_mining;
 mod real_archive_mining_stats;
 mod real_archive_missile_configuration;
 mod real_archive_mission_boards;
+mod real_archive_mission_item_tokens;
 mod real_archive_mission_items;
 mod real_archive_mission_module_declarations;
 mod real_archive_mission_scenarios;

@@ -33,6 +33,7 @@ pub(super) enum Segment<'source> {
 }
 
 pub(super) struct Node<'source> {
+    key: &'source str,
     pub(super) text: Cow<'source, str>,
     pub(super) segments: Vec<Segment<'source>>,
 }
@@ -54,14 +55,20 @@ impl<'source> Graph<'source> {
             nodes: Vec::new(),
             keys: HashMap::new(),
         };
-        let root = graph.add(root)?;
+        let root = graph.add(key, root)?;
         graph.insert(key, Some(root))?;
         let mut next = 0;
         while next < graph.nodes.len() {
             check_cancel(cancel)?;
-            let text = std::mem::take(&mut graph.node_mut(next)?.text);
-            let segments = graph.segments(&text, localise, resolve, cancel)?;
-            *graph.node_mut(next)? = Node { text, segments };
+            let node = graph.node_mut(next)?;
+            let key = node.key;
+            let text = std::mem::take(&mut node.text);
+            let segments = graph.segments(key, &text, localise, resolve, cancel)?;
+            *graph.node_mut(next)? = Node {
+                key,
+                text,
+                segments,
+            };
             next += 1;
         }
         Ok(graph)
@@ -81,11 +88,12 @@ impl<'source> Graph<'source> {
             .ok_or(CatalogError::MissionTextPlan)
     }
 
-    fn add(&mut self, text: Cow<'source, str>) -> Result<usize, CatalogError> {
+    fn add(&mut self, key: &'source str, text: Cow<'source, str>) -> Result<usize, CatalogError> {
         let index = self.nodes.len();
         push(
             &mut self.nodes,
             Node {
+                key,
                 text,
                 segments: Vec::new(),
             },
@@ -109,13 +117,14 @@ impl<'source> Graph<'source> {
         if let Some(target) = self.keys.get(&AsciiKey::locale(key)) {
             return Ok(*target);
         }
-        let target = localise(key)?.map(|text| self.add(text)).transpose()?;
+        let target = localise(key)?.map(|text| self.add(key, text)).transpose()?;
         self.insert(key, target)?;
         Ok(target)
     }
 
     fn segments(
         &mut self,
+        source_key: &'source str,
         text: &str,
         localise: &mut Localise<'_, 'source>,
         resolve: &mut Resolve<'_, 'source>,
@@ -136,7 +145,7 @@ impl<'source> Graph<'source> {
                 start: token_start,
                 end: token_start + name.len(),
             };
-            let segment = match resolve(name, variant)? {
+            let segment = match resolve(source_key, name, variant)? {
                 Some(Token::Placeholder(label)) => Segment::Runtime(label),
                 Some(Token::Key(key)) => {
                     self.target(key, localise)?

@@ -18,6 +18,7 @@ pub(super) enum Action {
     Template,
     Type,
     Organization,
+    Item,
     Reward,
     Locality,
     Broker,
@@ -63,5 +64,9 @@ pub(super) fn choose_at_path(
             return Ok(Some(action));
         }
     }
-    Ok((record.type_name()? == "ContractTemplate").then_some(Action::Template))
+    Ok(match record.type_name()? {
+        "ContractTemplate" => Some(Action::Template),
+        "MissionItem" => Some(Action::Item),
+        _ => None,
+    })
 }

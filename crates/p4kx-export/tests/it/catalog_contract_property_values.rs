@@ -3,11 +3,12 @@
 
 //! Canonical contract-level source values and their separate contextual interpretations.
 
-use serde_json::json;
+use serde_json::{Value, json};
 
 use crate::catalog_contract_templates::{build, canonical};
 use crate::health_origin_fixture::TestResult;
 use crate::loot_v3_graph as raw;
+use crate::template_canonical_graph::{BrokerContext, Context};
 use crate::template_fixture_context as context;
 use crate::template_fixture_fields as fields;
 use crate::template_fixture_text as texts;
@@ -77,47 +78,130 @@ fn a_boolean_and_hauling_orders_state_their_content() -> TestResult {
 #[test]
 fn a_mission_item_states_its_conditions_and_limits() -> TestResult {
     let catalog = build()?;
-    let graph = canonical(&catalog)?;
-    let property = context::named(&graph, "Item_BP")?;
-    context::kind(&graph, property, "missionItem")?;
-    let item = context::value(&graph, property)?;
-    fields::reference(graph.field(item, "debugForceChosenItem")?, OWNER)?;
+    let template = canonical(&catalog)?;
+    let broker = BrokerContext::new(
+        &catalog,
+        &crate::commodity_v3_fixture::guid(crate::spawns_fixture::BROKER),
+    )?;
+    verify_item(&template)?;
+    verify_item(&broker)
+}
+
+fn verify_item(graph: &dyn Context<'_>) -> TestResult {
+    let property = context::named(graph, "Item_BP")?;
+    context::kind(graph, property, "missionItem")?;
+    let item = context::value(graph, property)?;
+    let meaning = raw::array(graph.projection(), "valueMeanings")?
+        .iter()
+        .find(|row| row.get("source") == property.get("value"))
+        .ok_or("one contextual value meaning for the original item property")?;
+    let selection = meaning
+        .get("missionItem")
+        .ok_or("MissionItem field bindings")?;
+    for field in [
+        "minItemsToFind",
+        "maxItemsToFind",
+        "debugForceChosenItem",
+        "matchConditions",
+    ] {
+        assert!(
+            std::ptr::eq(bound(graph, selection, field)?, graph.field(item, field)?),
+            "each field binding leads to the original cell in this owner"
+        );
+    }
+    fields::reference(bound(graph, selection, "debugForceChosenItem")?, OWNER)?;
     fields::numeric_fields(
-        &graph,
+        graph,
         item,
         &[("minItemsToFind", json!(1)), ("maxItemsToFind", json!(3))],
     )?;
-    let conditions = fields::elements(&graph, graph.field(item, "matchConditions")?)?;
-    assert_eq!(
-        conditions.len(),
-        2,
-        "both actual conditions in original order"
-    );
-    let source = property.get("value").ok_or("actual item source")?;
-    let meaning = raw::array(graph.projection, "valueMeanings")?
-        .iter()
-        .find(|row| row.get("source") == Some(source))
-        .ok_or("actual item meaning")?;
-    for (row, expected) in raw::array(meaning, "conditions")?
-        .iter()
-        .zip(["tagSearch", "specificItems"])
-    {
+    verify_conditions(graph, meaning)
+}
+
+fn verify_conditions(graph: &dyn Context<'_>, meaning: &Value) -> TestResult {
+    let [tag, specific] = raw::array(meaning, "conditions")? else {
+        return Err("both original conditions retained in order".into());
+    };
+    for (row, expected) in [(tag, "tagSearch"), (specific, "specificItems")] {
         assert_eq!(
             raw::present(row.get("kind").ok_or("actual condition kind")?)?,
             &json!(expected),
-            "the recognized original condition family"
+            "the original condition kind follows its own source"
         );
     }
-    assert_eq!(
-        raw::array(meaning, "conditions")?.len(),
-        2,
-        "no contextual condition disappears"
+    assert!(
+        tag.get("specificItems").is_some_and(Value::is_null),
+        "tag matching has no explicit item list"
     );
-    let specific = *conditions.get(1).ok_or("actual specific-items condition")?;
-    let items = fields::elements(&graph, graph.field(specific, "items")?)?;
-    assert_eq!(items.len(), 1, "the original selected item list");
-    fields::reference(items.first().ok_or("actual specific item")?, OWNER)?;
+    verify_candidates(graph, specific)
+}
+
+fn verify_candidates(graph: &dyn Context<'_>, specific: &Value) -> TestResult {
+    let original = graph
+        .owner()
+        .follow(specific.get("source").ok_or("condition source")?)?;
+    let navigation = specific
+        .get("specificItems")
+        .ok_or("explicit candidate binding")?;
+    let items = bound(graph, navigation, "items")?;
+    assert!(
+        std::ptr::eq(items, graph.field(original, "items")?),
+        "the list binding resolves to the condition's original items array"
+    );
+    let candidates = raw::array(navigation, "candidates")?;
+    assert_eq!(
+        candidates,
+        raw::elements(items)?,
+        "every slot is navigable in original order"
+    );
+    let [first, null, repeated, last] = candidates else {
+        return Err("four original candidate slots".into());
+    };
+    fields::reference(graph.owner().follow(first)?, OWNER)?;
+    raw::source_null(graph.owner().follow(null)?);
+    fields::reference(graph.owner().follow(repeated)?, OWNER)?;
+    let unreadable = graph.owner().follow(last)?;
+    assert_eq!(
+        unreadable.pointer("/value/state"),
+        Some(&json!("unreadable")),
+        "the dangling candidate retains its original unreadable cell"
+    );
+    assert_eq!(
+        unreadable.pointer("/originalError/type"),
+        Some(&json!("danglingReference")),
+        "the original reference failure remains available"
+    );
+    let guid = unreadable
+        .pointer("/originalError/guid")
+        .ok_or("original dangling candidate GUID")?;
+    assert_eq!(
+        raw::present(guid)?,
+        &json!(crate::commodity_v3_fixture::guid(
+            crate::spawns_fixture::RESOURCE
+        )),
+        "the unreadable candidate keeps its authored target"
+    );
+    assert_ne!(
+        first, repeated,
+        "same target still has two original physical cells"
+    );
     Ok(())
+}
+
+fn bound<'catalog>(
+    graph: &dyn Context<'catalog>,
+    bindings: &Value,
+    name: &str,
+) -> TestResult<&'catalog Value> {
+    let binding = bindings
+        .get(name)
+        .ok_or("required authored field binding")?;
+    assert_eq!(
+        binding.get("state"),
+        Some(&json!("present")),
+        "original declared field"
+    );
+    graph.bound(binding.get("field").ok_or("original field address")?)
 }
 
 #[test]

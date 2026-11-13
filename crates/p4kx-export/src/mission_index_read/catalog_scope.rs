@@ -41,7 +41,7 @@ pub(in crate::mission_index) fn needed(
             return Ok(true);
         }
         match selection::choose(&record) {
-            Ok(None) => {}
+            Ok(Some(selection::Action::Item) | None) => {}
             Ok(Some(_)) | Err(_) => return Ok(true),
         }
     }

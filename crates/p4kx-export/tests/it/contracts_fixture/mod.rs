@@ -7,6 +7,7 @@
 mod fixed_reward_origins;
 mod gaps;
 mod lookups;
+mod mission_item_titles;
 mod prerequisites;
 mod records;
 mod referenced;

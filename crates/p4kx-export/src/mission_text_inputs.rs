@@ -9,12 +9,18 @@ use crate::catalog_read::original::{OriginalFlowFields, OriginalValuePart};
 
 #[path = "mission_text_evidence.rs"]
 mod evidence;
+#[path = "mission_item_token_choice.rs"]
+mod item_choice;
+#[path = "mission_item_token_texts.rs"]
+mod item_texts;
 #[path = "mission_text_organization.rs"]
 mod organization;
 #[path = "mission_text_token_inputs.rs"]
 mod token_inputs;
 
 pub(crate) use self::evidence::{Consulted, Decisions, MissionKey};
+pub(crate) use self::item_choice::{MissionItemChoice, MissionItemGap};
+pub(crate) use self::item_texts::MissionItemTexts;
 pub(crate) use self::organization::OrganizationTexts;
 pub(crate) use self::token_inputs::TokenChoice;
 

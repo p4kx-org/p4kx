@@ -96,11 +96,13 @@ pub(super) fn titles() -> Value {
         "contract": occurrence(),
         "title": {
             "key": present(json!("fixture-protected-title")),
-            "translations": {"en": present(json!("Deliver Scrap to [LOCATION]"))}
+            "translations": {"en": present(json!("Deliver Scrap to [LOCATION]"))},
+            "itemTokens": {}
         },
         "description": {
             "key": source(SourceValue::Absent),
-            "translations": {}
+            "translations": {},
+            "itemTokens": {}
         }
     }]})
 }

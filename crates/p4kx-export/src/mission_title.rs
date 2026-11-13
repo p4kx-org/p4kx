@@ -18,8 +18,8 @@ mod render;
 
 pub(crate) use key::AsciiKey;
 
-type Resolve<'query, 'source> =
-    dyn FnMut(&str, Option<&str>) -> Result<Option<Token<'source>>, CatalogError> + 'query;
+type Resolve<'query, 'source> = dyn FnMut(&'source str, &str, Option<&str>) -> Result<Option<Token<'source>>, CatalogError>
+    + 'query;
 type Localise<'query, 'source> =
     dyn FnMut(&'source str) -> Result<Option<Cow<'source, str>>, CatalogError> + 'query;
 

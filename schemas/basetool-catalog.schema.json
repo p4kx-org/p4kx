@@ -13877,6 +13877,12 @@
         "metadataTag": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
+        "missionItemProperties": {
+          "items": {
+            "$ref": "#/$defs/GeneratorMissionItemProperty"
+          },
+          "type": "array"
+        },
         "recordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
         },
@@ -13899,11 +13905,47 @@
         "guid",
         "inputRef",
         "metadataTag",
+        "missionItemProperties",
         "recordIndex",
         "recordName",
         "recordPath",
         "source",
         "sourceType"
+      ],
+      "type": "object"
+    },
+    "GeneratorMissionItemProperty": {
+      "description": "A physical Generator item's authored inputs within the original Generator source.",
+      "properties": {
+        "conditions": {
+          "items": {
+            "$ref": "#/$defs/TemplateDatasetCondition"
+          },
+          "type": "array"
+        },
+        "level": {
+          "$ref": "#/$defs/MissionPropertyLevel"
+        },
+        "missionItem": {
+          "$ref": "#/$defs/TemplateMissionItemSelection"
+        },
+        "property": {
+          "$ref": "#/$defs/SourceValueRef"
+        },
+        "propertySet": {
+          "$ref": "#/$defs/SourceValueRef"
+        },
+        "source": {
+          "$ref": "#/$defs/SourceValueRef"
+        }
+      },
+      "required": [
+        "conditions",
+        "level",
+        "missionItem",
+        "property",
+        "propertySet",
+        "source"
       ],
       "type": "object"
     },
@@ -18150,6 +18192,69 @@
         "openLootingInteraction"
       ],
       "type": "object"
+    },
+    "ItemToken": {
+      "description": "One authored `MissionItem` token and the outcome of its static text projection.",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "outcome": {
+          "$ref": "#/$defs/SourcedValueOfItemTokenOutcome"
+        },
+        "variant": {
+          "$ref": "#/$defs/SourcedValueOfNullable_string"
+        }
+      },
+      "required": [
+        "name",
+        "outcome",
+        "variant"
+      ],
+      "type": "object"
+    },
+    "ItemTokenOutcome": {
+      "oneOf": [
+        {
+          "properties": {
+            "itemGuid": {
+              "$ref": "#/$defs/Guid"
+            },
+            "itemRecordIndex": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "staticPreview",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "itemGuid",
+            "itemRecordIndex"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/MissionItemGap"
+            },
+            "type": {
+              "const": "unresolved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
     },
     "JsonMember": {
       "properties": {
@@ -22771,6 +22876,20 @@
       ],
       "type": "object"
     },
+    "MissionItemGap": {
+      "description": "A reason why the authored `MissionItem` token cannot be rendered statically.",
+      "enum": [
+        "runtimeQuery",
+        "emptyCandidates",
+        "ambiguousCandidates",
+        "missingItem",
+        "missingVariant",
+        "ambiguousVariants",
+        "missingTranslation"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
+    },
     "MissionLocality": {
       "description": "A mission locality: a `MissionLocality` Record under `missiondata/pu_missionlocality`, a named\nset of starmap objects. The game does not localise its name.",
       "properties": {
@@ -25880,6 +25999,16 @@
     "ProjectedMissionText": {
       "description": "One authored key and the derived text of each actually available language.",
       "properties": {
+        "itemTokens": {
+          "additionalProperties": {
+            "items": {
+              "$ref": "#/$defs/ItemToken"
+            },
+            "type": "array"
+          },
+          "type": "object",
+          "x-gameText": true
+        },
         "key": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
           "x-gameText": true
@@ -25893,6 +26022,7 @@
         }
       },
       "required": [
+        "itemTokens",
         "key",
         "translations"
       ],
@@ -68281,6 +68411,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfItemTokenOutcome": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ItemTokenOutcome"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfJsonString": {
       "allOf": [
         {
@@ -75203,6 +75463,139 @@
                 "format": "float",
                 "type": [
                   "number",
+                  "null"
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfNullable_string": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": [
+                  "string",
                   "null"
                 ]
               }
@@ -97116,11 +97509,22 @@
         },
         "source": {
           "$ref": "#/$defs/SourceValueRef"
+        },
+        "specificItems": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemplateSpecificItems"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
         "kind",
-        "source"
+        "source",
+        "specificItems"
       ],
       "type": "object"
     },
@@ -97350,6 +97754,30 @@
         "interpretation",
         "source",
         "text"
+      ],
+      "type": "object"
+    },
+    "TemplateMissionItemSelection": {
+      "description": "Navigates the original authored `MissionItem` selection inputs in the owner's arena.",
+      "properties": {
+        "debugForceChosenItem": {
+          "$ref": "#/$defs/DeclarationBinding"
+        },
+        "matchConditions": {
+          "$ref": "#/$defs/DeclarationBinding"
+        },
+        "maxItemsToFind": {
+          "$ref": "#/$defs/DeclarationBinding"
+        },
+        "minItemsToFind": {
+          "$ref": "#/$defs/DeclarationBinding"
+        }
+      },
+      "required": [
+        "debugForceChosenItem",
+        "matchConditions",
+        "maxItemsToFind",
+        "minItemsToFind"
       ],
       "type": "object"
     },
@@ -97990,6 +98418,25 @@
       ],
       "required": []
     },
+    "TemplateSpecificItems": {
+      "description": "Navigates every original candidate slot of one `SpecificItems` condition.",
+      "properties": {
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/SourceValueRef"
+          },
+          "type": "array"
+        },
+        "items": {
+          "$ref": "#/$defs/DeclarationBinding"
+        }
+      },
+      "required": [
+        "candidates",
+        "items"
+      ],
+      "type": "object"
+    },
     "TemplateTagInterpretation": {
       "description": "The actual lookup decision independently of the original reference cell's state.",
       "enum": [
@@ -98036,6 +98483,16 @@
         "kind": {
           "$ref": "#/$defs/SourcedValueOfNullable_PropertyValueKind"
         },
+        "missionItem": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TemplateMissionItemSelection"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "scopedFilters": {
           "items": {
             "$ref": "#/$defs/TemplateScopedFilter"
@@ -98052,6 +98509,7 @@
       "required": [
         "conditions",
         "kind",
+        "missionItem",
         "scopedFilters",
         "source",
         "status"

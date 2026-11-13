@@ -102,7 +102,7 @@ pub(super) fn spawns(
     ];
     assert_eq!(
         properties.len(),
-        expected.len(),
+        expected.len() + 1,
         "all selected original properties in order"
     );
     for (property, (variable, original, meaning, table)) in properties.iter().zip(expected) {

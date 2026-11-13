@@ -11,11 +11,13 @@ use crate::catalog_projection::CatalogProjection;
 use crate::mission_generator::ContractOccurrence;
 use crate::mission_index::MissionIndex;
 use crate::mission_text_inputs::{
-    BrokerTexts, Consulted, Decisions, LayerTexts, TemplateTexts, TextDependencyLinks,
-    TextSelection, TokenChoice,
+    BrokerTexts, Consulted, Decisions, LayerTexts, MissionItemChoice, MissionItemGap,
+    TemplateTexts, TextDependencyLinks, TextSelection, TokenChoice,
 };
 use crate::mission_title;
-use crate::mission_title_origin::{self, ProjectedMissionText, ResolvedToken, SelectedMissionText};
+use crate::mission_title_origin::{
+    self, ProjectedMissionText, ResolvedToken, SelectedItemKey, SelectedMissionText,
+};
 use crate::schema_fields::every_field_required;
 
 /// The title and description of the same physically identified projected contract.
@@ -183,6 +185,7 @@ fn resolve_choice<'read, 'source>(
 ) -> Result<Option<ResolvedToken<'read, 'source>>, CatalogError> {
     Ok(match choice {
         TokenChoice::Key(key) => Some(ResolvedToken::Key(key)),
+        TokenChoice::MissionItem(choice) => Some(resolve_item(choice, variant, inputs, evidence)?),
         TokenChoice::Runtime(label) => Some(ResolvedToken::Runtime(label)),
         TokenChoice::Organization(guid) => inputs
             .index
@@ -193,4 +196,29 @@ fn resolve_choice<'read, 'source>(
             .map(ResolvedToken::Key),
         TokenChoice::Unknown => None,
     })
+}
+
+fn resolve_item<'read, 'source>(
+    choice: &MissionItemChoice,
+    variant: Option<&str>,
+    inputs: &Inputs<'read, '_, 'source>,
+    evidence: &mut Consulted<'read>,
+) -> Result<ResolvedToken<'read, 'source>, CatalogError> {
+    let (guid, record_index) = match *choice {
+        MissionItemChoice::Unresolved(reason) => return Ok(ResolvedToken::ItemGap(reason)),
+        MissionItemChoice::Static { guid, record_index } => (guid, record_index),
+    };
+    let Some(item) = inputs.index.item(guid, record_index) else {
+        return Ok(ResolvedToken::ItemGap(MissionItemGap::MissingItem));
+    };
+    Ok(
+        match item.select(variant, inputs.projection.origins(), evidence)? {
+            Ok(key) => ResolvedToken::ItemKey(SelectedItemKey {
+                key,
+                guid,
+                record_index,
+            }),
+            Err(reason) => ResolvedToken::ItemGap(reason),
+        },
+    )
 }

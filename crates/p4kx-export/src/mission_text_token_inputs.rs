@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use p4kx_extraction::{Guid, Value};
 
 use super::evidence::{Consulted, Decisions, Fact, Fields, MissionKey};
+use super::item_choice::{self, MissionItemChoice};
 use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_read::original::OriginalValuePart;
@@ -16,6 +17,7 @@ use crate::mission_title::AsciiKey;
 pub(crate) enum TokenChoice<'source> {
     Key(MissionKey<'source>),
     Organization(Guid),
+    MissionItem(MissionItemChoice),
     Runtime(&'static str),
     Unknown,
 }
@@ -132,6 +134,9 @@ fn read_choice<'fields, 'scope, 'read, 'source>(
     Ok(match source.type_name() {
         "MissionPropertyValue_StringHash" => {
             first_key(fields, value, inputs)?.map_or(TokenChoice::Unknown, TokenChoice::Key)
+        }
+        "MissionPropertyValue_MissionItem" => {
+            TokenChoice::MissionItem(item_choice::select(fields, value, inputs)?)
         }
         "MissionPropertyValue_Organization" => first_organization(fields, value, inputs)?
             .map_or(TokenChoice::Unknown, TokenChoice::Organization),
