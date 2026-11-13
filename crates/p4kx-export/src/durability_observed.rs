@@ -28,6 +28,9 @@ mod float_fields;
 mod links;
 #[path = "authored_owned_fields.rs"]
 mod owned_fields;
+#[path = "authored_room_offset.rs"]
+mod room_offset;
+pub(super) use room_offset::{RoomOffset, RoomTransformUnavailable};
 #[path = "authored_text_fields.rs"]
 mod text_fields;
 #[path = "authored_unsigned_fields.rs"]

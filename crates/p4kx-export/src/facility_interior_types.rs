@@ -44,6 +44,7 @@ pub(in crate::catalog_v3) struct InteriorFacilityPlacement {
     pub(super) class_record_index: SourcedValue<u32>,
     pub(super) local_transform: SourcedValue<[[f32; 4]; 3]>,
     pub(super) root_room_transform: Option<SourcedValue<[[f32; 4]; 3]>>,
+    pub(super) ship_frame_transform: SourcedValue<[[f32; 4]; 3]>,
     pub(super) entity_attributes: Vec<SocAttribute>,
 }
 

@@ -13,6 +13,7 @@ use super::Projection;
 use super::child::{self, ChildDeclaration, InteriorChild};
 use super::hosts::RoomSelection;
 use super::interior::{ClassTarget, StreamRoute};
+use super::room_frame::RoomFrame;
 use super::routes::{self, ContainerOwner, OpenedRoom, StreamDeclaration};
 use super::types::{
     InteriorFindingKind, InteriorRoomContainer, InteriorRoomCoverage, InteriorRoomRef,
@@ -96,7 +97,8 @@ impl RoomReader<'_> {
         root: Occurrence,
     ) -> Result<(), CatalogError> {
         let mut active = BTreeSet::from([routes::physical_ref(&root.opened.container)?.clone()]);
-        let mut rooms = vec![self.inspect(project, ship, coverage, &[], root)?];
+        let mut rooms =
+            vec![self.inspect(project, ship, coverage, room_selector.frame, &[], root)?];
         while let Some(room) = rooms.last_mut() {
             routes::check_cancel(self.cancel)?;
             let Some(declaration) = room.children.next() else {
@@ -115,7 +117,8 @@ impl RoomReader<'_> {
             )?;
             if let Some(child) = child {
                 active.insert(routes::physical_ref(&child.opened.container)?.clone());
-                let frame = self.inspect(project, ship, coverage, &rooms, child)?;
+                let frame =
+                    self.inspect(project, ship, coverage, room_selector.frame, &rooms, child)?;
                 rooms.push(frame);
             }
         }
@@ -190,6 +193,7 @@ impl RoomReader<'_> {
         project: &mut Projection<'_, '_>,
         ship: &ShipContext,
         coverage: &mut InteriorRoomCoverage,
+        frame: RoomFrame<'_>,
         ancestors: &[ActiveRoom],
         occurrence: Occurrence,
     ) -> Result<ActiveRoom, CatalogError> {
@@ -221,6 +225,7 @@ impl RoomReader<'_> {
             index: &index,
             descriptor: &descriptor,
             route: &route,
+            frame,
         };
         for stream in &streams {
             self.stream(project, ship, coverage, &context, stream)?;
@@ -388,4 +393,5 @@ pub(super) struct StreamContext<'read> {
     index: &'read PathIndex<'read>,
     pub(super) descriptor: &'read OriginalDatum<PhysicalEntryRef>,
     pub(super) route: &'read ContainerRoute,
+    pub(super) frame: RoomFrame<'read>,
 }

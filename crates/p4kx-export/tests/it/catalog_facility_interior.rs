@@ -17,6 +17,8 @@ mod fixture;
 mod item_rooms;
 #[path = "catalog_facility_nested_interior.rs"]
 mod nested;
+#[path = "catalog_facility_ship_frame.rs"]
+mod ship_frame;
 
 #[test]
 fn catalog_links_original_soc_entity_slots_to_their_physical_facility_owner() -> TestResult {

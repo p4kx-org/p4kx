@@ -26,6 +26,9 @@ pub(super) enum Case {
     NestedChildren,
     ChildFaults,
     ItemRooms,
+    ShipFrame,
+    InvalidOffset,
+    MissingOffset,
     MissingStreamAndChild,
     AmbiguousStream,
     AmbiguousClass,
@@ -45,7 +48,10 @@ pub(super) fn archive(case: Case) -> TestResult<(tempfile::TempDir, Archive)> {
     if matches!(case, Case::AmbiguousStream) {
         room = room.entry(TestEntry::stored(STREAM.to_ascii_uppercase(), soc(case)?));
     }
-    if matches!(case, Case::NestedChildren | Case::ChildFaults) {
+    if matches!(
+        case,
+        Case::NestedChildren | Case::ChildFaults | Case::ShipFrame
+    ) {
         let child = TestObjectContainer::new(CHILD).stream(CHILD_STREAM);
         let child = if matches!(case, Case::NestedChildren) {
             child.child(ROOM, [0.0; 3], [1.0, 0.0, 0.0, 0.0])
@@ -92,7 +98,7 @@ fn descriptor(case: Case) -> TestResult<Vec<u8>> {
         let room = TestObjectContainer::new("interior").stream(STREAM);
         match case {
             Case::RepeatedStream => room.stream(STREAM),
-            Case::NestedChildren => room
+            Case::NestedChildren | Case::ShipFrame => room
                 .child(CHILD, [2.0, 3.0, 4.0], [0.0, 0.0, 0.0, 1.0])
                 .child(CHILD, [10.0, 3.0, 4.0], [0.0, 0.0, 0.0, 1.0]),
             Case::ChildFaults => room
@@ -137,6 +143,13 @@ fn database(case: Case) -> DataForgeBuilder {
             ))
             .record(),
         );
+    if matches!(case, Case::MissingOffset) {
+        return database.structure(
+            TestStruct::new("SVehicleObjectContainerParams")
+                .field("fileName", TestType::String)
+                .field("boneName", TestType::String),
+        );
+    }
     if matches!(case, Case::ItemRooms) {
         return database.record(
             TestEntity::new(
@@ -182,7 +195,13 @@ fn ship(case: Case) -> TestRecord {
             ))
             .record();
     }
-    ship.object_container(ROOM, "fixture_room_bone", [10.0, 20.0, 30.0], [0.0; 3])
+    let (bone, position, rotation) = match case {
+        Case::ShipFrame => ("", [10.0, 20.0, 30.0], [0.0, 0.0, 90.0]),
+        Case::InvalidOffset => ("", [f32::INFINITY, 20.0, 30.0], [0.0; 3]),
+        Case::MissingOffset => ("", [10.0, 20.0, 30.0], [0.0; 3]),
+        _ => ("fixture_room_bone", [10.0, 20.0, 30.0], [0.0; 3]),
+    };
+    ship.object_container(ROOM, bone, position, rotation)
         .record()
 }
 

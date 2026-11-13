@@ -15394,6 +15394,9 @@
             }
           ]
         },
+        "shipFrameTransform": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+        },
         "streamName": {
           "$ref": "#/$defs/SourcedValueOfstring"
         }
@@ -15405,6 +15408,7 @@
         "position",
         "room",
         "rootRoomTransform",
+        "shipFrameTransform",
         "streamName"
       ],
       "type": "object"

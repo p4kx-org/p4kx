@@ -209,3 +209,10 @@ owner once. Placement references identify each selected attachment by its
 resolved Loadout position, including the evidence for the selected Record and
 port path. An occurrence with a parent room shares the same traversal and
 coordinate rules as the ship-room form.
+
+A direct ship room derives its ship-frame matrix from the original complete
+Offset and the absence of a named helper. A scalar room on the root Entity
+uses that Entity's origin. Assembly and Catalog share the Euler conversion.
+The Catalog retains incomplete transform states for dependencies whose
+actual placement cannot be proved. These states leave the existing room-local
+transforms available.

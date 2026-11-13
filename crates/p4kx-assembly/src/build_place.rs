@@ -8,7 +8,7 @@ use crate::build_models::Loaded;
 use crate::creature_rig;
 use crate::flatten::Draft;
 use crate::model_placement_sources::{BoneOwner, ModelAnchor, ModelPlacement};
-use crate::placement::{self, BonePlacement, NodePlacement, PlacementSkeleton, offset};
+use crate::placement::{self, BonePlacement, NodePlacement, PlacementSkeleton, offset_transform};
 use crate::{
     GearPlacementSource, Issue, IssueKind, LandingGear, Part, Placement, PortDefinition, PortNode,
     PortPlacementSource, PortTransform,
@@ -172,7 +172,10 @@ fn with_offset(
     let Some(definition) = definition else {
         return (base, None);
     };
-    let local = base.then(&offset(definition.position(), definition.rotation()));
+    let local = base.then(&offset_transform(
+        definition.position(),
+        definition.rotation(),
+    ));
     let inner = (!definition.offset_helper().is_empty())
         .then(|| {
             let child = model?;

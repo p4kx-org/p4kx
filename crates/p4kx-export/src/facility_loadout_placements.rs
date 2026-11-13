@@ -39,6 +39,8 @@ mod child;
 mod hosts;
 #[path = "facility_interior_placements.rs"]
 mod interior;
+#[path = "facility_room_frame.rs"]
+mod room_frame;
 #[path = "facility_interior_routes.rs"]
 mod routes;
 #[path = "facility_interior_types.rs"]

@@ -13,6 +13,7 @@ use super::hosts::{RoomAttachment, RoomHost, RoomOwners};
 use p4kx_extraction::model::Transform;
 
 use super::Projection;
+use super::room_frame::RoomFrame;
 use super::routes::{self, StreamDeclaration};
 use super::types::{
     InteriorFacilityPlacement, InteriorFindingKind, InteriorRoomCoverage, InteriorRoomRef,
@@ -155,6 +156,7 @@ pub(super) struct StreamRoute<'room> {
     name: SourcedValue<String>,
     ordinal: u32,
     root_transform: Option<&'room RootRoomTransform>,
+    ship_frame: RoomFrame<'room>,
     container: PhysicalEntryRef,
     descriptor: PhysicalEntryRef,
     descriptor_node_index: u32,
@@ -183,6 +185,7 @@ impl<'room> StreamRoute<'room> {
             name,
             ordinal: context.route.ordinal,
             root_transform: context.route.root_transform.as_ref(),
+            ship_frame: context.frame,
             container: routes::physical_ref(&context.opened.container)?.clone(),
             descriptor: routes::physical_ref(context.descriptor)?.clone(),
             descriptor_node_index: declaration.node_index,
@@ -233,6 +236,13 @@ impl<'room> StreamRoute<'room> {
             root_room_transform: self
                 .root_transform
                 .map(|root| root.for_entity(sources, &fields.local_transform)),
+            ship_frame_transform: self.ship_frame.for_entity(
+                sources,
+                self.root_transform,
+                &fields.local_transform,
+                &route,
+                self.complete && fields.complete,
+            ),
             local_transform: fields.local_transform.into_cell(sources),
             entity_attributes: fields
                 .attributes

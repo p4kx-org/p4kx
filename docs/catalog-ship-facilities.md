@@ -123,8 +123,16 @@ occurrence while leaving sibling routes available.
 using the ordered Child matrices and the entity-local matrix. It is null for a
 direct entity. An invalid Child matrix leaves the local entity and its original
 attributes available and marks the composed matrix invalid. The attached item's
-resolved Loadout path identifies the room occurrence. Ship-frame coordinates
-require authored attachment and bone transforms.
+resolved Loadout path identifies the room occurrence.
+
+`shipFrameTransform` is a sourced 3x4 matrix from the Entity's local space to
+the ship frame. For a direct vehicle room with no named helper, it composes
+the complete stored `Offset.Position` in metres and `Offset.Rotation` as
+X/Y/Z degrees with the Child chain and Entity matrix. A scalar room declared
+on the ship uses the ship Entity's origin. A named helper or a resolved
+attachment needs additional placement evidence and yields `unsupported`.
+An omitted offset, malformed coordinate or unreadable input has its own
+source state. The authored offset remains in the original declaration.
 
 Findings identify the affected `containerOrdinal`, the original stream name
 when applicable and the Child source for an unresolved edge. Missing,

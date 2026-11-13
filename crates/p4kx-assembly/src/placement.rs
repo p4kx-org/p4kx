@@ -3,9 +3,9 @@
 
 use p4kx_model::{Bone, Lod, Model, ModelFile, Transform, chained_world_poses};
 
-/// Returns the transform of a port's offset from its helper: the rotation `rotation` in degrees,
-/// about X first, then Y, then Z, and the translation `position` in metres.
-pub(crate) fn offset(position: [f32; 3], rotation: [f32; 3]) -> Transform {
+/// Converts an authored offset with translation in metres and rotation in X, Y, Z degrees.
+#[must_use]
+pub fn offset_transform(position: [f32; 3], rotation: [f32; 3]) -> Transform {
     let [x, y, z] = rotation.map(|degrees| f64::from(degrees).to_radians());
     let (sx, cx) = x.sin_cos();
     let (sy, cy) = y.sin_cos();
@@ -158,7 +158,7 @@ fn named_bone_pose(bones: &[Bone], name: &str) -> Option<(usize, Transform)> {
 
 #[cfg(test)]
 mod tests {
-    use super::offset;
+    use super::offset_transform;
 
     fn close(actual: [f32; 4], expected: [f32; 4]) {
         for (a, e) in actual.iter().zip(expected) {
@@ -168,7 +168,7 @@ mod tests {
 
     #[test]
     fn a_quarter_turn_about_z_maps_x_to_y() {
-        let transform = offset([1.0, 2.0, 3.0], [0.0, 0.0, 90.0]);
+        let transform = offset_transform([1.0, 2.0, 3.0], [0.0, 0.0, 90.0]);
         close(transform.rows[0], [0.0, -1.0, 0.0, 1.0]);
         close(transform.rows[1], [1.0, 0.0, 0.0, 2.0]);
         close(transform.rows[2], [0.0, 0.0, 1.0, 3.0]);
@@ -176,7 +176,7 @@ mod tests {
 
     /// The local axes of a part placed with `rotation`, as the columns of its rotation matrix.
     fn axes(rotation: [f32; 3]) -> [[f32; 3]; 3] {
-        let rows = offset([0.0; 3], rotation).rows;
+        let rows = offset_transform([0.0; 3], rotation).rows;
         [0, 1, 2].map(|column| rows.map(|row| row[column]))
     }
 
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn rotations_apply_x_before_y_before_z() {
-        let transform = offset([0.0; 3], [90.0, 0.0, 90.0]);
+        let transform = offset_transform([0.0; 3], [90.0, 0.0, 90.0]);
         let up = transform.rows.map(|row| row[2]);
         for (actual, expected) in up.iter().zip([1.0, 0.0, 0.0]) {
             assert!((actual - expected).abs() < 1e-5, "{up:?}");

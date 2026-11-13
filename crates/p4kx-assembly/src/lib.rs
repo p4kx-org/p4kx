@@ -241,6 +241,7 @@ pub use palette::{
     PaletteRecords,
 };
 pub use pick::LoadoutPicks;
+pub use placement::offset_transform;
 pub use port::{PortDefinition, PortDefinitionPosition, PortTransform, PortType};
 pub use port_placement_origin::{PortPlacementField, PortPlacementSource};
 pub use prefab::{

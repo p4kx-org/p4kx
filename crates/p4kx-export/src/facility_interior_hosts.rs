@@ -10,8 +10,9 @@ use super::super::facility_instance::ShipContext;
 use super::super::item_component_owner::ComponentOwner;
 use super::super::loadout_position::LoadoutPosition;
 use super::super::resource_topology_declarations::ItemRoomAssociation;
-use super::super::room_associations::RoomAssociations;
+use super::super::room_associations::{RoomAssociation, RoomAssociations};
 use super::Projection;
+use super::room_frame::RoomFrame;
 use super::types::{InteriorRoomCoverage, InteriorRoomDeclaration, InteriorRoomRef};
 use super::walk::RoomReader;
 use crate::{CatalogError, ExportAccountingError};
@@ -98,6 +99,7 @@ pub(super) struct RoomHost<'host> {
 pub(super) struct RoomSelection<'source> {
     file: &'source SourceUse,
     attachment: Option<&'source RoomAttachment>,
+    pub(super) frame: RoomFrame<'source>,
 }
 
 impl RoomSelection<'_> {
@@ -119,6 +121,7 @@ struct RoomSlot<'row> {
     declaration: InteriorRoomDeclaration,
     file: Option<&'row str>,
     selector: Option<&'row SourceUse>,
+    vehicle: Option<&'row RoomAssociation<'row>>,
 }
 
 impl RoomReader<'_> {
@@ -141,6 +144,7 @@ impl RoomReader<'_> {
                             },
                             file: room.file_name(),
                             selector: room.file_use.as_ref(),
+                            vehicle: Some(room),
                         };
                         slot.project(self, project, coverage, host)?;
                     }
@@ -151,6 +155,7 @@ impl RoomReader<'_> {
                         declaration: InteriorRoomDeclaration::Item,
                         file: room.file_name(),
                         selector: room.file_use.as_ref(),
+                        vehicle: None,
                     };
                     slot.project(self, project, coverage, host)?;
                 }
@@ -178,6 +183,7 @@ impl RoomSlot<'_> {
         let selection = RoomSelection {
             file,
             attachment: host.attachment,
+            frame: RoomFrame::read(host.attachment.is_some(), self.vehicle),
         };
         let identity = InteriorRoomRef {
             owner: self.owner.clone(),

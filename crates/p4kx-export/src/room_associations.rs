@@ -5,7 +5,7 @@ use p4kx_extraction::{SourceUse, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::authored_fields::Observed;
+use super::authored_fields::{Observed, RoomOffset};
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::schema_fields::every_field_required;
@@ -64,8 +64,12 @@ pub(super) struct RoomAssociation<'source> {
     pub(super) port_use: Option<SourceUse>,
     #[serde(skip)]
     pub(super) file_use: Option<SourceUse>,
+    #[serde(skip)]
+    pub(super) room_offset: RoomOffset,
+    #[serde(skip)]
+    pub(super) bone_input: SourceUse,
     pub(super) resource_network_itemport_name: SourcedValue<&'source str>,
-    bone_name: SourcedValue<&'source str>,
+    pub(super) bone_name: SourcedValue<&'source str>,
     file_name: SourcedValue<&'source str>,
     guid: SourcedValue<&'source str>,
     should_request_nav_mesh_regeneration_on_load: SourcedValue<bool>,
@@ -105,6 +109,8 @@ impl<'source> RoomAssociation<'source> {
             container_ordinal: source.owned_element_ordinal()?,
             port_use: source.selector_use("resourceNetworkItemportName")?,
             file_use: source.selector_use("fileName")?,
+            room_offset: source.room_offset()?,
+            bone_input: source.room_bone_input()?,
             resource_network_itemport_name,
             bone_name,
             file_name,

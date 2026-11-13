@@ -8,7 +8,7 @@ mod lookup;
 use p4kx_gltf::{GltfError, Scene, SceneNode};
 use p4kx_model::{MaterialStatus, Model, Transform};
 
-use crate::placement::{node_transform, offset};
+use crate::placement::{node_transform, offset_transform};
 use crate::{Assembly, Interior, Issue, IssueKind, ObjectContainerRef};
 use lookup::near;
 
@@ -124,7 +124,7 @@ impl EntityInterior {
             .chain(&reference.rotation())
             .all(|value| value.is_finite());
         let moved = if finite {
-            offset(reference.position(), reference.rotation())
+            offset_transform(reference.position(), reference.rotation())
         } else {
             self.note(
                 at,
