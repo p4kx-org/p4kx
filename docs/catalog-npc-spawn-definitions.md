@@ -28,3 +28,10 @@ Reference payloads keep the declared target identity and source resolution. Expo
 when a known target is excluded by the Filter. Readers can join a pool by its physical identity.
 Weights are authored values. The catalog leaves class selection and effective spawn chances to the
 runtime.
+
+Mission properties and location consumers can join AutoSpawns References to
+`definitions.autoSpawnSets` by physical Record index and GUID. The sets then link their
+`AutoSpawn` Records in `definitions.autoSpawns`. The source namespace for faction identity is
+`FactionIdentity`. A faction override on a location setting is a separate authored fact.
+Any additional source members, including faction configuration authored on a definition, stay
+in that owner's source arena. Reference cycles remain links to independent rows.

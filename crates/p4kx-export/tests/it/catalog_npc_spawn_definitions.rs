@@ -11,6 +11,8 @@ use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult, at, gui
 mod auto_spawn_definitions;
 #[path = "catalog_auto_spawn_fixture.rs"]
 mod auto_spawn_fixture;
+#[path = "catalog_npc_spawn_cycles.rs"]
+mod cycles;
 
 const ARCHETYPE: u128 = 0x1084_0001;
 const POOL: u128 = 0x1084_0002;

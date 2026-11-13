@@ -29,7 +29,8 @@ Reference and optional `searchOptions`:
 
 An absent pointer is null; the fieldless base is an explicit concrete object. Empty tag lists
 remain empty, and unresolved target identities remain present. This value references the
-independent AutoSpawns definitions without flattening them into legacy NPC-spawn descriptions.
+independent [AutoSpawns set definitions](catalog-npc-spawn-definitions.md). Join its physical
+target to `definitions.autoSpawnSets` by `targetRecordIndex` and `guid`.
 
 The ignored AutoSpawns source comparison requires a physical Template with a readable target.
 Set P4KX_EXPECT_AUTO_SPAWNS_CLOSET_TAGS=1 to also require authored closet tags. Both modes
