@@ -155,6 +155,7 @@ fn omission_selects_all_registered_providers() -> TestResult {
             MediaKind::Archive,
             MediaKind::Shader,
             MediaKind::Material,
+            MediaKind::Texture,
             MediaKind::Animation,
             MediaKind::Audio,
             MediaKind::AudioControl,
@@ -180,6 +181,12 @@ fn omission_selects_all_registered_providers() -> TestResult {
         fs::read(material)?,
         b"",
         "default material provider emits no invented row for a shader-only fixture"
+    );
+    let texture = output.join(&index.artifact_base).join("texture.jsonl");
+    assert_eq!(
+        fs::read(texture)?,
+        b"",
+        "default texture provider emits no invented row for a shader-only fixture"
     );
     let audio_control = output
         .join(&index.artifact_base)
