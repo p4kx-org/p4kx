@@ -16,6 +16,7 @@ use crate::audio_bank_container_node;
 use crate::audio_bank_dialogue_event;
 use crate::audio_bank_failure::BankPhase;
 use crate::audio_bank_inventory::{BankInventory, VersionSite};
+use crate::audio_bank_music_node;
 use crate::audio_bank_music_track_controls;
 use crate::audio_bank_music_transition_rules;
 use crate::audio_bank_node_declarations::{self, Owner};
@@ -177,10 +178,15 @@ fn emit_raw(
         HircKind::DialogueEvent => {
             audio_bank_dialogue_event::unsupported(projection, version, original, writer)
         }
+        HircKind::MusicSegment => {
+            audio_bank_music_node::unsupported(projection, version, original, writer)
+        }
         HircKind::MusicTrack => {
+            audio_bank_music_node::unsupported(projection, version, original, writer)?;
             audio_bank_music_track_controls::unsupported(projection, version, original, writer)
         }
         HircKind::MusicSwitch | HircKind::MusicPlaylist => {
+            audio_bank_music_node::unsupported(projection, version, original, writer)?;
             audio_bank_music_transition_rules::unsupported(projection, version, original, writer)
         }
         _ => Ok(()),

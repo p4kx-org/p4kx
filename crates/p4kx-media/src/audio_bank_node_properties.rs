@@ -4,9 +4,10 @@
 use std::io::{Read, Seek};
 use std::ops::Range;
 
+use p4kx_extraction::BankError;
 use p4kx_extraction::bank::{
     BankContainerRead, BankHircActorMixer, BankHircContainerNode, BankHircObject,
-    BankHircSoundNode, BankNodePropertyKind, BankSoundContinuation, BankSoundRead,
+    BankHircSoundNode, BankNodePropertyKind, BankSharedNode, BankSoundContinuation, BankSoundRead,
 };
 
 use crate::audio_bank_inventory::VersionSite;
@@ -150,6 +151,29 @@ pub(crate) fn container<R: Read + Seek>(
     let properties = PropertyRows::new(bank, &projection.sites, PropertyScope::Node);
     for kind in LISTS {
         if let Some(rows) = container.properties(kind) {
+            audio_bank_node_property_rows::emit(&properties, kind, rows, writer)?;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn shared<R: Read + Seek>(
+    bank: &BankProjection<'_>,
+    version: VersionSite,
+    object: &BankHircObject,
+    node: &mut BankSharedNode<'_, R>,
+    error: Option<&BankError>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let projection = NodePropertyProjection::new(bank, object, version);
+    let original = SourceNode {
+        routing: node.parent(),
+        properties: &node.parameters().properties,
+    };
+    audio_bank_node_property_summary::supported(&projection, Some(&original), error, writer)?;
+    let properties = PropertyRows::new(bank, &projection.sites, PropertyScope::Node);
+    for kind in LISTS {
+        if let Some(rows) = node.properties(kind) {
             audio_bank_node_property_rows::emit(&properties, kind, rows, writer)?;
         }
     }

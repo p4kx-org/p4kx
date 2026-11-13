@@ -48,6 +48,7 @@ mod audio_bank_inline_state;
 mod audio_bank_inventory;
 mod audio_bank_media;
 mod audio_bank_media_origins;
+mod audio_bank_music_node;
 mod audio_bank_music_playlist;
 mod audio_bank_music_segment;
 mod audio_bank_music_stinger_schedule;

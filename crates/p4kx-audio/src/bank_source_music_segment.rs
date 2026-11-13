@@ -29,6 +29,17 @@ pub struct BankHircMusicSegment<'input, R> {
     pub rows: BankMusicSegmentRows<'input, R>,
 }
 
+impl<R> BankHircMusicSegment<'_, R> {
+    /// Borrows the checked shared node fields and original bank cursors.
+    pub const fn shared_node(&mut self) -> crate::BankSharedNode<'_, R> {
+        crate::BankSharedNode::new(
+            &self.fields.node.parent,
+            &self.fields.node.parameters,
+            self.rows.input,
+        )
+    }
+}
+
 /// Result of the selected original `MusicSegment` layout.
 #[derive(Debug)]
 #[non_exhaustive]

@@ -44,6 +44,8 @@ pub struct BankMusicTrackFields {
     pub automation_extent: Option<BankTrackAutomationExtent>,
     /// Original parent and preceding node selectors.
     pub parent: BankNodeParentFields,
+    /// Original checked groups following the parent declaration.
+    pub parameters: crate::BankNodeParameters,
     /// Traversed node prefix.
     pub node_range: Option<Range<u64>>,
     /// Original track kind byte.
@@ -163,7 +165,7 @@ pub(crate) fn read<F: ObjectFields>(
     read_clips(version, input, fields, &mut emit)?;
     automations(input, fields)?;
     let start = input.offset();
-    let parent = hirc_node::read_base(input, &mut fields.parent);
+    let parent = hirc_node::read_base_parameters(input, &mut fields.parent, &mut fields.parameters);
     fields.node_range = Some(start..input.offset());
     let parent = parent?;
     let code = input.read_u8()?;

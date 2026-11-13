@@ -23,10 +23,12 @@ malformed disposition and raw body. Its earlier override bus and parent words
 remain available when their original reads succeeded, including an explicit
 zero in either field.
 
-Sound and ActorMixer provide fixed-memory property cursors bound to the
-original bank. The shared layout traversal retains the same bounds and resolver
-behavior for container and music objects. The Action property format and
-bulk Media field groups have separate coverage.
+Sound, ActorMixer, Random/Sequence, Switch and Blend containers, and music nodes
+provide fixed-memory property cursors bound to the original bank. A music
+object lends its checked node spans through the same physical reader that owns
+its authored lists. Shared node bounds, original object interpretation and
+playback resolution stay independent of the exported field groups. Play Action
+property lists have their own original layout.
 
 The field ordering follows [wwiser's property bundle](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L108),
 [wwiser's ranged bundle](https://github.com/bnnm/wwiser/blob/6d4b5bfb45afc52cda9d68fbbe0cbd97de0e26a3/wwiser/parser/wparser.py#L148),

@@ -22,6 +22,7 @@ mod bank_positioning_rows;
 mod bank_random_sequence_rows;
 mod bank_reader;
 mod bank_rtpc_rows;
+mod bank_shared_node;
 mod bank_source;
 mod bank_source_actor_mixer;
 mod bank_source_container;
@@ -125,6 +126,7 @@ pub use bank_positioning_rows::{
 };
 pub use bank_random_sequence_rows::{BankRandomSequenceItem, BankRandomSequenceRows};
 pub use bank_rtpc_rows::{BankRtpcRow, BankRtpcRows};
+pub use bank_shared_node::BankSharedNode;
 pub use bank_source::{
     BankObservedHeader, BankReadError, BankSectionCursor, BankSource, BankSourceSection,
 };

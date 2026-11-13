@@ -9,7 +9,7 @@ use p4kx_extraction::bank::{
     BankContainerRead, BankHircActorMixer, BankHircContainerNode, BankHircObject,
     BankHircSoundNode, BankNodeAuxFields, BankNodeFxKind, BankNodeFxSlots, BankNodeParentFields,
     BankNodePlaybackFields, BankNodeUserAuxBuses, BankPositioningRows, BankPositioningTableKind,
-    BankSoundContinuation, BankSoundRead,
+    BankSharedNode, BankSoundContinuation, BankSoundRead,
 };
 
 use crate::audio_bank_inventory::VersionSite;
@@ -30,6 +30,11 @@ pub(crate) enum Owner<'node, 'input, R> {
     Sound(&'node mut BankHircSoundNode<'input, R>),
     ActorMixer(&'node mut BankHircActorMixer<'input, R>),
     Container(&'node mut BankHircContainerNode<'input, R>),
+    Shared {
+        object: BankHircObject,
+        node: &'node mut BankSharedNode<'input, R>,
+        error: Option<&'node BankError>,
+    },
 }
 
 pub(crate) struct Declarations<'context, 'source> {
@@ -74,6 +79,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
             Self::Sound(node) => node.sound().object,
             Self::ActorMixer(node) => *node.object(),
             Self::Container(node) => *node.object(),
+            Self::Shared { object, .. } => *object,
         }
     }
 
@@ -99,6 +105,12 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
                     disposition: container_disposition(node.status())?,
                 })
             }
+            Self::Shared { node, error, .. } => Ok(Source {
+                fields: Some(node.parent()),
+                aux: Some(&node.parameters().aux),
+                playback: Some(&node.parameters().playback),
+                disposition: Disposition::Observed(*error),
+            }),
         }
     }
 
@@ -110,6 +122,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
             Self::Sound(node) => node.user_aux_buses(),
             Self::ActorMixer(node) => node.user_aux_buses(),
             Self::Container(node) => node.user_aux_buses(),
+            Self::Shared { node, .. } => node.user_aux_buses(),
         }
         .map_err(|cause| bank.replay_failure(cause))
     }
@@ -122,6 +135,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
             Self::Sound(node) => node.positioning_rows(kind),
             Self::ActorMixer(node) => node.positioning_rows(kind),
             Self::Container(node) => node.positioning_rows(kind),
+            Self::Shared { node, .. } => node.positioning_rows(kind),
         }
     }
 
@@ -130,6 +144,7 @@ impl<R: Read + Seek> Owner<'_, '_, R> {
             Self::Sound(node) => node.fx_slots(kind),
             Self::ActorMixer(node) => node.fx_slots(kind),
             Self::Container(node) => node.fx_slots(kind),
+            Self::Shared { node, .. } => node.fx_slots(kind),
         }
     }
 }

@@ -6,6 +6,7 @@ use std::io::{Read, Seek};
 use p4kx_extraction::bank::{BankHircMusicTrack, BankMusicTrackRead, BankMusicTrackRow};
 
 use crate::audio_bank_inventory::VersionSite;
+use crate::audio_bank_music_node;
 use crate::audio_bank_music_track_controls;
 use crate::audio_bank_projection::BankProjection;
 use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status};
@@ -32,6 +33,29 @@ pub(crate) fn project<R: Read + Seek>(
     mut track: BankHircMusicTrack<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
+    let object = track.object;
+    let error = match &track.status {
+        BankMusicTrackRead::Decoded => Some(None),
+        BankMusicTrackRead::Malformed(error) => Some(Some(error.clone())),
+        BankMusicTrackRead::Unsupported(_) => None,
+        _ => {
+            return Err(MediaError::Contract(
+                "unexpected shared music node disposition".into(),
+            ));
+        }
+    };
+    if let Some(error) = error {
+        audio_bank_music_node::project(
+            projection,
+            version,
+            object,
+            track.shared_node(),
+            error.as_ref(),
+            writer,
+        )?;
+    } else {
+        audio_bank_music_node::unsupported(projection, version, &object, writer)?;
+    }
     let sites = TrackSites::new(&track.object, version, &track.fields);
     let (layout, status, issue) = interpretation(&track.status)?;
     let data = MusicTrackPayload::Track(TrackRecord::new(&track.fields, layout));

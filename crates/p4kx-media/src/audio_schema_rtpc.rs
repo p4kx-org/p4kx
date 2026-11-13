@@ -33,8 +33,9 @@ pub(super) fn insert_payload(base: &mut Value) -> Result<(), MediaError> {
     )
 }
 
-pub(super) const fn bindings() -> [Binding; 12] {
+pub(super) const fn bindings() -> [Binding; 15] {
     let [summary, curve, point] = container_bindings();
+    let [music_summary, music_curve, music_point] = music_bindings();
     let [blend_summary, blend_curve, blend_point] = blend_bindings();
     [
         Binding::exact(
@@ -85,6 +86,9 @@ pub(super) const fn bindings() -> [Binding; 12] {
         blend_summary,
         blend_curve,
         blend_point,
+        music_summary,
+        music_curve,
+        music_point,
     ]
 }
 
@@ -108,6 +112,32 @@ const fn container_bindings() -> [Binding; 3] {
             CONTAINER_PAYLOAD,
             RtpcOwner::Container.point_namespace(),
             "bank-hirc-container-rtpc-point",
+            4,
+            StatusRule::Complete,
+        ),
+    ]
+}
+
+const fn music_bindings() -> [Binding; 3] {
+    [
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::MusicNode.summary_namespace(),
+            "bank-hirc-music-node-rtpc",
+            2,
+            StatusRule::MalformedLayout,
+        ),
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::MusicNode.curve_namespace(),
+            "bank-hirc-music-node-rtpc-curve",
+            3,
+            StatusRule::Complete,
+        ),
+        Binding::exact(
+            RTPC_PAYLOAD,
+            RtpcOwner::MusicNode.point_namespace(),
+            "bank-hirc-music-node-rtpc-point",
             4,
             StatusRule::Complete,
         ),

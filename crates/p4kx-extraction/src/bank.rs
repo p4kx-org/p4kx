@@ -54,7 +54,7 @@ pub use p4kx_audio::{
 };
 pub use p4kx_audio::{
     BankHircRtpc, BankRtpcCurve, BankRtpcExtent, BankRtpcPoint, BankRtpcRead, BankRtpcRow,
-    BankRtpcRows,
+    BankRtpcRows, BankSharedNode,
 };
 pub use p4kx_audio::{
     BankHircSoundStates, BankInlineStateRow, BankInlineStateRows, BankSoundStateRead,

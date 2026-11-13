@@ -87,21 +87,6 @@ impl BankNodeParentFields {
     }
 }
 
-pub(crate) fn read_base<F: ObjectFields>(
-    fields: &mut F,
-    observed: &mut BankNodeParentFields,
-) -> Result<u32, F::Error> {
-    read_base_observed(
-        fields,
-        observed,
-        &mut BankNodePropertyExtents::default(),
-        &mut BankNodeAuxFields::default(),
-        &mut BankNodePlaybackFields::default(),
-        &mut None,
-        &mut None,
-    )
-}
-
 pub(crate) fn read_base_parameters<F: ObjectFields>(
     fields: &mut F,
     parent: &mut BankNodeParentFields,

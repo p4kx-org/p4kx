@@ -9,6 +9,7 @@ use p4kx_extraction::bank::{
 };
 
 use crate::audio_bank_inventory::VersionSite;
+use crate::audio_bank_music_node;
 use crate::audio_bank_music_segment::MusicChildField;
 use crate::audio_bank_music_stinger_schedule;
 use crate::audio_bank_music_transition_rules::{self, Owner as TransitionOwner};
@@ -41,6 +42,29 @@ pub(crate) fn project<R: Read + Seek>(
     mut switch: BankHircMusicSwitch<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
+    let object = switch.object;
+    let error = match &switch.status {
+        BankMusicSwitchRead::Decoded => Some(None),
+        BankMusicSwitchRead::Malformed(error) => Some(Some(error.clone())),
+        BankMusicSwitchRead::Unsupported(_) => None,
+        _ => {
+            return Err(MediaError::Contract(
+                "unexpected shared music node disposition".into(),
+            ));
+        }
+    };
+    if let Some(error) = error {
+        audio_bank_music_node::project(
+            projection,
+            version,
+            object,
+            switch.shared_node(),
+            error.as_ref(),
+            writer,
+        )?;
+    } else {
+        audio_bank_music_node::unsupported(projection, version, &object, writer)?;
+    }
     let sites = SwitchSites::new(&switch.object, version, &switch.fields);
     let (layout, status, issue) = interpretation(&switch.status)?;
     let payload = MusicSwitchPayload::Switch(Box::new(SwitchRecord::new(&switch.fields, layout)));

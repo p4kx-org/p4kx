@@ -23,6 +23,12 @@ pub(crate) enum RtpcPayload<'row> {
     ActorMixerCurve(&'row RtpcCurveRecord),
     #[serde(rename = "bank-hirc-actor-mixer-rtpc-point")]
     ActorMixerPoint(&'row RtpcPointRecord),
+    #[serde(rename = "bank-hirc-music-node-rtpc")]
+    MusicSummary(&'row RtpcRecord),
+    #[serde(rename = "bank-hirc-music-node-rtpc-curve")]
+    MusicCurve(&'row RtpcCurveRecord),
+    #[serde(rename = "bank-hirc-music-node-rtpc-point")]
+    MusicPoint(&'row RtpcPointRecord),
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -64,6 +70,7 @@ pub(crate) enum RtpcOwner {
     Sound,
     ActorMixer,
     Container,
+    MusicNode,
     BlendLayer(BlendLayerSite),
 }
 
@@ -111,6 +118,7 @@ impl RtpcOwner {
             Self::Sound => "audio-bank-hirc-sound-rtpc",
             Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc",
             Self::Container => "audio-bank-hirc-container-rtpc",
+            Self::MusicNode => "audio-bank-hirc-music-node-rtpc",
             Self::BlendLayer(_) => BLEND_SUMMARY_NAMESPACE,
         }
     }
@@ -120,6 +128,7 @@ impl RtpcOwner {
             Self::Sound => "audio-bank-hirc-sound-rtpc-curve",
             Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc-curve",
             Self::Container => "audio-bank-hirc-container-rtpc-curve",
+            Self::MusicNode => "audio-bank-hirc-music-node-rtpc-curve",
             Self::BlendLayer(_) => BLEND_CURVE_NAMESPACE,
         }
     }
@@ -129,6 +138,7 @@ impl RtpcOwner {
             Self::Sound => "audio-bank-hirc-sound-rtpc-point",
             Self::ActorMixer => "audio-bank-hirc-actor-mixer-rtpc-point",
             Self::Container => "audio-bank-hirc-container-rtpc-point",
+            Self::MusicNode => "audio-bank-hirc-music-node-rtpc-point",
             Self::BlendLayer(_) => BLEND_POINT_NAMESPACE,
         }
     }
@@ -138,6 +148,7 @@ impl RtpcOwner {
             Self::Sound => RtpcExport::Shared(RtpcPayload::SoundSummary(value)),
             Self::ActorMixer => RtpcExport::Shared(RtpcPayload::ActorMixerSummary(value)),
             Self::Container => RtpcExport::Container(ContainerRtpcPayload::Summary(value)),
+            Self::MusicNode => RtpcExport::Shared(RtpcPayload::MusicSummary(value)),
             Self::BlendLayer(_) => RtpcExport::BlendLayer(BlendLayerRtpcPayload::Summary(value)),
         }
     }
@@ -147,6 +158,7 @@ impl RtpcOwner {
             Self::Sound => RtpcExport::Shared(RtpcPayload::SoundCurve(value)),
             Self::ActorMixer => RtpcExport::Shared(RtpcPayload::ActorMixerCurve(value)),
             Self::Container => RtpcExport::Container(ContainerRtpcPayload::Curve(value)),
+            Self::MusicNode => RtpcExport::Shared(RtpcPayload::MusicCurve(value)),
             Self::BlendLayer(_) => RtpcExport::BlendLayer(BlendLayerRtpcPayload::Curve(value)),
         }
     }
@@ -156,6 +168,7 @@ impl RtpcOwner {
             Self::Sound => RtpcExport::Shared(RtpcPayload::SoundPoint(value)),
             Self::ActorMixer => RtpcExport::Shared(RtpcPayload::ActorMixerPoint(value)),
             Self::Container => RtpcExport::Container(ContainerRtpcPayload::Point(value)),
+            Self::MusicNode => RtpcExport::Shared(RtpcPayload::MusicPoint(value)),
             Self::BlendLayer(_) => RtpcExport::BlendLayer(BlendLayerRtpcPayload::Point(value)),
         }
     }

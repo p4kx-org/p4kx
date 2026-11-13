@@ -3,11 +3,11 @@
 
 use std::ops::Range;
 
-use crate::BankHircField;
 use crate::bank_object_fields::ObjectFields;
 use crate::hirc_music::MusicMeter;
 use crate::hirc_music_stinger::{self, BankMusicStingerTail};
 use crate::hirc_node::{self, BankNodeParentFields};
+use crate::{BankHircField, BankNodeParameters};
 
 pub(crate) use crate::hirc_music_stinger::{BankMusicStinger, STINGER_LEN, stinger};
 
@@ -17,6 +17,8 @@ pub(crate) use crate::hirc_music_stinger::{BankMusicStinger, STINGER_LEN, stinge
 pub struct BankMusicNodeFields {
     /// Original parent and the preceding fields that locate it.
     pub parent: BankNodeParentFields,
+    /// Original checked groups following the parent declaration.
+    pub parameters: BankNodeParameters,
     /// Traversed node base prefix, including checked opaque fields.
     pub node_range: Option<Range<u64>>,
     /// Original count of ordered child IDs.
@@ -90,7 +92,8 @@ pub(crate) fn head<F: ObjectFields>(
 ) -> Result<(u32, u32, u64), F::Error> {
     let start = reader.offset();
     reader.read_u8()?;
-    let parent = hirc_node::read_base(reader, &mut fields.parent);
+    let parent =
+        hirc_node::read_base_parameters(reader, &mut fields.parent, &mut fields.parameters);
     fields.node_range = Some(start..reader.offset());
     let parent = parent?;
     let count = reader.read_u32()?;

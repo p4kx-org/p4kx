@@ -26,6 +26,15 @@ pub struct BankHircMusicTrack<'input, R> {
 }
 
 impl<R> BankHircMusicTrack<'_, R> {
+    /// Borrows the checked shared node fields and original bank cursors.
+    pub const fn shared_node(&mut self) -> crate::BankSharedNode<'_, R> {
+        crate::BankSharedNode::new(
+            &self.fields.parent,
+            &self.fields.parameters,
+            self.rows.input,
+        )
+    }
+
     /// Borrows checked original automation rows in physical order.
     pub fn automations(&mut self) -> Option<BankMusicTrackAutomationRows<'_, R>> {
         let extent = self.fields.automation_extent.as_ref()?;

@@ -80,6 +80,9 @@ and fallback selection.
 | `audio-bank-hirc-container-rtpc` | `bank-hirc-container-rtpc` | HIRC section and container object ordinals |
 | `audio-bank-hirc-container-rtpc-curve` | `bank-hirc-container-rtpc-curve` | HIRC section, container object and curve ordinals |
 | `audio-bank-hirc-container-rtpc-point` | `bank-hirc-container-rtpc-point` | HIRC section, container object, curve and point ordinals |
+| `audio-bank-hirc-music-node-rtpc` | `bank-hirc-music-node-rtpc` | HIRC section and music object ordinals |
+| `audio-bank-hirc-music-node-rtpc-curve` | `bank-hirc-music-node-rtpc-curve` | HIRC section, music object and curve ordinals |
+| `audio-bank-hirc-music-node-rtpc-point` | `bank-hirc-music-node-rtpc-point` | HIRC section, music object, curve and point ordinals |
 | `audio-bank-music-segment` | `bank-music-segment` | HIRC section and segment object ordinals |
 | `audio-bank-music-segment-child` | `bank-music-segment-child` | HIRC section, segment and child ordinals |
 | `audio-bank-music-segment-stinger` | `bank-music-segment-stinger` | HIRC section, segment and stinger ordinals |
@@ -273,6 +276,12 @@ and CLI/MCP inspection fields keep their established meanings.
 The shared node properties also carry the original `priority_flags` byte after the
 parent ID. It retains the packed priority and MIDI behavior bits with their exact
 source range, including explicit zero.
+
+Version-154 MusicSegment, MusicPlaylist, MusicSwitch and MusicTrack also retain shared
+node properties, effect and metadata slots, routing, positioning, advanced settings and
+inline State at the same physical HIRC identity as their music rows. Music RTPC records
+use a dedicated namespace with original curve and point positions. The shared node
+fields preserve the source configuration independently of the music decision graph.
 
 Version-154 Random/Sequence, Switch and Blend containers use the same shared
 node property, effect, auxiliary routing, positioning, advanced settings

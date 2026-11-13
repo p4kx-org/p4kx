@@ -30,6 +30,15 @@ pub struct BankHircMusicPlaylist<'input, R> {
 }
 
 impl<R> BankHircMusicPlaylist<'_, R> {
+    /// Borrows the checked shared node fields and original bank cursors.
+    pub const fn shared_node(&mut self) -> crate::BankSharedNode<'_, R> {
+        crate::BankSharedNode::new(
+            &self.fields.node.parent,
+            &self.fields.node.parameters,
+            self.rows.input,
+        )
+    }
+
     /// Borrows the original transition rule count and checked rule prefix.
     pub fn transition_rules(&mut self) -> Option<BankMusicTransitionRows<'_, R>> {
         BankMusicTransitionRows::new(self.rows.input, self.rows.stopped, &self.fields.transitions)

@@ -11,6 +11,7 @@ use p4kx_extraction::bank::{
 };
 
 use crate::audio_bank_inventory::VersionSite;
+use crate::audio_bank_music_node;
 use crate::audio_bank_music_stinger_schedule;
 use crate::audio_bank_music_value::MusicStingerRecord;
 use crate::audio_bank_projection::BankProjection;
@@ -36,9 +37,32 @@ pub(crate) const MARKER: &str = "audio-bank-music-segment-marker";
 pub(crate) fn project<R: Read + Seek>(
     projection: &BankProjection<'_>,
     version: VersionSite,
-    segment: BankHircMusicSegment<'_, R>,
+    mut segment: BankHircMusicSegment<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
+    let object = segment.object;
+    let error = match &segment.status {
+        BankMusicSegmentRead::Decoded => Some(None),
+        BankMusicSegmentRead::Malformed(error) => Some(Some(error.clone())),
+        BankMusicSegmentRead::Unsupported(_) => None,
+        _ => {
+            return Err(MediaError::Contract(
+                "unexpected shared music node disposition".into(),
+            ));
+        }
+    };
+    if let Some(error) = error {
+        audio_bank_music_node::project(
+            projection,
+            version,
+            object,
+            segment.shared_node(),
+            error.as_ref(),
+            writer,
+        )?;
+    } else {
+        audio_bank_music_node::unsupported(projection, version, &object, writer)?;
+    }
     let sites = MusicSites::new(&segment.object, version, &segment.fields);
     let (layout, status, issue) = interpretation(&segment.status)?;
     let data = MusicSegmentPayload::Segment(SegmentRecord::read(&segment.fields, layout));

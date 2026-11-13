@@ -108,6 +108,10 @@ pub struct BankMusicSwitchRows<'input, R> {
 }
 
 impl<'input, R> BankMusicSwitchRows<'input, R> {
+    pub(super) const fn node_input(&mut self) -> &mut SeekSource<R> {
+        self.input
+    }
+
     pub(super) fn transition_rules(
         &mut self,
         fields: &BankMusicTransitionFields,

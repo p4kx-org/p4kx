@@ -8,6 +8,7 @@ use p4kx_extraction::bank::{
 };
 
 use crate::audio_bank_inventory::VersionSite;
+use crate::audio_bank_music_node;
 use crate::audio_bank_music_segment::MusicChildField;
 use crate::audio_bank_music_stinger_schedule;
 use crate::audio_bank_music_transition_rules::{self, Owner as TransitionOwner};
@@ -35,6 +36,29 @@ pub(crate) fn project<R: Read + Seek>(
     mut playlist: BankHircMusicPlaylist<'_, R>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
+    let object = playlist.object;
+    let error = match &playlist.status {
+        BankMusicPlaylistRead::Decoded => Some(None),
+        BankMusicPlaylistRead::Malformed(error) => Some(Some(error.clone())),
+        BankMusicPlaylistRead::Unsupported(_) => None,
+        _ => {
+            return Err(MediaError::Contract(
+                "unexpected shared music node disposition".into(),
+            ));
+        }
+    };
+    if let Some(error) = error {
+        audio_bank_music_node::project(
+            projection,
+            version,
+            object,
+            playlist.shared_node(),
+            error.as_ref(),
+            writer,
+        )?;
+    } else {
+        audio_bank_music_node::unsupported(projection, version, &object, writer)?;
+    }
     let sites = PlaylistSites::new(&playlist.object, version, &playlist.fields);
     let (layout, status, issue) = interpretation(&playlist.status)?;
     let payload = MusicPlaylistPayload::Playlist(PlaylistRecord::new(&playlist.fields, layout));
