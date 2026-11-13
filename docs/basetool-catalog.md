@@ -1538,6 +1538,12 @@ Faction outcomes also keep the original faction reputation Reference. The
 `SReputationRewardAmount` rows, each with an authored `editorName` and a signed Int32
 `reputationAmount`. Each exported value carries its own source provenance.
 
+The ignored `original_reputation_owners_perks_and_triggers_match_the_scoped_catalog`
+source test reads the seven physical reputation definition families and their owned
+configuration from the installed DataForge. Its Record Filter is
+`libs/foundry/records/*reputation/*`. The test compares physical identity, authored order,
+field states, original values and selected source coordinates in one diagnostic export.
+
 **Mission types (`missionTypes`).** `typeName` is the `LocalisedTypeName`, a game text (41 of 42
 have an English one). Every `missionTypeGuid` of `contracts` (26 types on LIVE) is an entry.
 

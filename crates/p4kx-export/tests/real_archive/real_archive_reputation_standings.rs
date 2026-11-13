@@ -3,34 +3,31 @@
 
 use std::collections::BTreeSet;
 use std::error::Error;
-use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, Kind, build_catalog_from};
-use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry, TreeBuilder, Value as Original};
-use p4kx_testkit::{real_archive_key, real_archive_path};
+use p4kx_export::Kind;
+use p4kx_extraction::{DataForge, StructValue, TreeBuilder, Value as Original};
 use serde_json::Value;
+
+use crate::authored_definition_witness::field;
+use crate::real_archive_auto_spawns::provenance::Origins;
+use crate::real_archive_canonical_texts::TextIndex;
+use crate::real_archive_faction_reputation_source::presentation::{Witness, verify_number};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-#[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn original_standing_drift_words_match_the_physical_source_rows() -> TestResult {
-    let path = real_archive_path().map_err(|_| "configured Archive path")?;
-    let key = real_archive_key().map_err(|_| "configured Archive key")?;
-    let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
-    let watch = ArchiveWatch::new(&archive);
-    let entry = DataForgeEntry::read(&archive).map_err(|_| "read original DataForge")?;
-    let options = CatalogOptions {
-        publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..CatalogOptions::new(SystemTime::now())
-    };
-    let built = build_catalog_from(&archive, &entry, &options)
-        .map_err(|_| "build reputation standing catalog")?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
-    crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
-    let rows = crate::catalog_v3_consumer::rows(&catalog, Kind::ReputationStandings)?;
+pub(super) fn compare(
+    forge: &DataForge<'_>,
+    catalog: &Value,
+    origins: &Origins<'_>,
+    texts: &TextIndex<'_>,
+) -> TestResult<(usize, usize)> {
+    let rows = crate::catalog_v3_consumer::rows(catalog, Kind::ReputationStandings)?;
     let mut positions = BTreeSet::new();
-    let forge = entry.open().map_err(|_| "open original DataForge")?;
+    let expected: BTreeSet<_> = forge
+        .records()
+        .filter(|record| record.type_name().ok() == Some("SReputationStandingParams"))
+        .map(|record| record.index())
+        .collect();
     let mut trees = TreeBuilder::new();
     let mut source_singles = 0;
     for row in rows {
@@ -52,19 +49,39 @@ fn original_standing_drift_words_match_the_physical_source_rows() -> TestResult 
         {
             return Err("original standing identity differs".into());
         }
-        let drift = row.get("driftTimeHours").ok_or("sourced standing drift")?;
+        let witness = Witness::new(forge, &tree, origins, texts);
+        compare_fields(&witness, tree.root(), row)?;
+        let drift = field(row, "driftTimeHours")?;
+        witness.occurrence(tree.field("driftTimeHours"), drift)?;
         source_singles += usize::from(check_drift(drift, tree.field("driftTimeHours"))?);
     }
+    assert!(
+        positions == expected,
+        "every physical reputation standing retained"
+    );
     if source_singles == 0 {
         return Err("configured Build contains no traced standing drift Single".into());
     }
-    watch
-        .check()
-        .map_err(|_| "Archive changed during standing verification")?;
-    crate::real_archive_verification::print_line(&format!(
-        "reputation standings: {} physical rows and {source_singles} original drift words checked",
-        positions.len(),
-    ));
+    Ok((positions.len(), source_singles))
+}
+
+fn compare_fields<'source>(
+    witness: &Witness<'_, '_, 'source>,
+    source: &StructValue<'source>,
+    row: &Value,
+) -> TestResult {
+    for name in ["name", "description", "icon", "missionBoardIcon", "gated"] {
+        witness.scalar(source.field(name), field(row, name)?)?;
+    }
+    for name in ["displayName", "perkDescription"] {
+        witness.locale(source.field(name), field(row, name)?)?;
+    }
+    for name in ["minReputation", "driftReputation"] {
+        let original = source.field(name);
+        let cell = field(row, name)?;
+        witness.occurrence(original, cell)?;
+        verify_number(original, cell)?;
+    }
     Ok(())
 }
 

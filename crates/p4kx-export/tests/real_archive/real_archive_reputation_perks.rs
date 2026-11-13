@@ -3,51 +3,28 @@
 
 use std::collections::BTreeSet;
 use std::error::Error;
-use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, Kind, build_catalog_from};
-use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForge, DataForgeEntry, TreeBuilder, Value as Original, ValueError,
-};
-use p4kx_testkit::{real_archive_key, real_archive_path};
+use p4kx_export::Kind;
+use p4kx_extraction::{DataForge, StructValue, TreeBuilder, Value as Original};
 use serde_json::Value;
 
+use crate::authored_definition_witness::{field, verify_state};
 use crate::catalog_v3_consumer as consumer;
-use crate::real_archive_verification::print_line;
+use crate::real_archive_auto_spawns::provenance::Origins;
+use crate::real_archive_canonical_texts::TextIndex;
+use crate::real_archive_faction_reputation_source::presentation::Witness;
 
 const LIST_TYPE: &str = "SPerkReputationListParams";
 const KIND: Kind = Kind::ReputationPerks;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-#[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn original_perk_list_occurrences_match_catalog_rows() -> TestResult {
-    let path = real_archive_path().map_err(|_| "configured Archive path")?;
-    let key = real_archive_key().map_err(|_| "configured Archive key")?;
-    let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
-    let watch = ArchiveWatch::new(&archive);
-    let entry = DataForgeEntry::read(&archive).map_err(|_| "read original DataForge")?;
-    let options = CatalogOptions {
-        publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..CatalogOptions::new(SystemTime::now())
-    };
-    let built = build_catalog_from(&archive, &entry, &options)
-        .map_err(|_| "build reputation perks catalog")?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
-    crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
-    let forge = entry.open().map_err(|_| "open original DataForge")?;
-    let (lists, entries) = check_lists(&forge, &catalog)?;
-    watch
-        .check()
-        .map_err(|_| "Archive changed during perk verification")?;
-    print_line(&format!(
-        "reputation perks: {lists} physical lists and {entries} owned slots checked"
-    ));
-    Ok(())
-}
-
-fn check_lists(forge: &DataForge<'_>, catalog: &Value) -> TestResult<(usize, usize)> {
+pub(super) fn check_lists(
+    forge: &DataForge<'_>,
+    catalog: &Value,
+    origins: &Origins<'_>,
+    texts: &TextIndex<'_>,
+) -> TestResult<(usize, usize)> {
     let rows = consumer::rows(catalog, KIND)?;
     let expected: BTreeSet<_> = forge
         .records()
@@ -80,10 +57,14 @@ fn check_lists(forge: &DataForge<'_>, catalog: &Value) -> TestResult<(usize, usi
         let tree = trees
             .build(&source)
             .map_err(|_| "read original perk-list body")?;
-        entries += check_entries(
-            row.get("perks").ok_or("sourced perk slots")?,
-            tree.field("perks"),
-        )?;
+        let witness = Witness::new(forge, &tree, origins, texts);
+        let slots = tree.field("perks");
+        witness.array(slots, field(row, "perks")?, |source, cell| {
+            check_entry(&witness, source, cell)
+        })?;
+        if let Some(Original::Array(slots)) = slots {
+            entries += slots.len();
+        }
     }
     assert_eq!(seen, expected, "all physical perk-list records emitted");
     assert!(
@@ -93,76 +74,91 @@ fn check_lists(forge: &DataForge<'_>, catalog: &Value) -> TestResult<(usize, usi
     Ok((rows.len(), entries))
 }
 
-fn check_entries(carrier: &Value, original: Option<&Original<'_>>) -> TestResult<usize> {
-    let projected = consumer::source_value(carrier)?;
-    let Some(Original::Array(entries)) = original else {
-        check_nonpresent(carrier, original)?;
-        return Ok(0);
-    };
-    let rows = projected
-        .and_then(Value::as_array)
-        .ok_or("ordered perk slots")?;
-    assert_eq!(rows.len(), entries.len(), "one carrier per original entry");
-    for (row, original) in rows.iter().zip(entries.iter()) {
-        let Original::Struct(entry) = original else {
-            check_nonpresent(row, Some(original))?;
-            continue;
-        };
-        let row = consumer::source_value(row)?.ok_or("original perk entry")?;
-        for name in ["scope", "standing"] {
-            check_reference(
-                row.get(name).ok_or("sourced perk binding")?,
-                entry.field(name),
+fn check_entry<'source>(
+    witness: &Witness<'_, '_, 'source>,
+    source: Option<&Original<'source>>,
+    cell: &Value,
+) -> TestResult {
+    witness.owned(source, cell, |source, row| {
+        for (name, target) in [
+            ("scope", "SReputationScopeParams"),
+            ("standing", "SReputationStandingParams"),
+        ] {
+            witness.link(source.field(name), field(row, name)?, target)?;
+        }
+        witness.owned(source.field("perk"), field(row, "perk")?, |source, row| {
+            check_perk(witness, source, row)
+        })
+    })
+}
+
+fn check_perk<'source>(
+    witness: &Witness<'_, '_, 'source>,
+    source: &StructValue<'source>,
+    row: &Value,
+) -> TestResult {
+    for name in ["name", "description", "icon"] {
+        witness.scalar(source.field(name), field(row, name)?)?;
+    }
+    for name in ["displayName", "displayDescription"] {
+        witness.locale(source.field(name), field(row, name)?)?;
+    }
+    let details = field(row, "details")?;
+    let kind = match source.type_name() {
+        "SPerkParamsBase" => "base",
+        "SPerkParamsItem" => {
+            witness.link(
+                source.field("rewardItem"),
+                field(details, "rewardItem")?,
+                "EntityClassDefinition",
             )?;
+            "item"
         }
-        let carrier = row.get("perk").ok_or("sourced concrete perk")?;
-        let Some(Original::Struct(perk)) = entry.field("perk") else {
-            check_nonpresent(carrier, entry.field("perk"))?;
-            continue;
-        };
-        let body = consumer::source_value(carrier)?.ok_or("original perk body")?;
-        assert!(
-            body.pointer("/sourceType/value").and_then(Value::as_str) == Some(perk.type_name()),
-            "concrete perk source type"
-        );
-        if let Some(Original::Single(original)) = perk.field("discountPercentage") {
-            let bits = format!("{:08x}", original.to_bits());
-            assert!(
-                body.pointer("/details/discountPercentage/value/rawBits")
-                    .and_then(Value::as_str)
-                    == Some(bits.as_str()),
-                "exact original discount word"
-            );
+        "SPerkShopItemCategoryBase" => "shopItemCategory",
+        "SPerkEnabledItemCategory" => "enabledItemCategory",
+        "SPerkDiscountItemCategory" => {
+            witness.scalar(
+                source.field("discountPercentage"),
+                field(details, "discountPercentage")?,
+            )?;
+            "discountItemCategory"
         }
-    }
-    Ok(entries.len())
-}
-
-fn check_reference(carrier: &Value, original: Option<&Original<'_>>) -> TestResult {
-    let (guid, status) = match original {
-        Some(Original::Reference(target)) => (target.guid(), "present"),
-        Some(Original::Error(ValueError::DanglingReference { guid })) => (*guid, "dangling"),
-        _ => return check_nonpresent(carrier, original),
+        _ => "authored",
     };
-    let guid = guid.to_string();
     assert!(
-        carrier.pointer("/value/guid/value").and_then(Value::as_str) == Some(guid.as_str())
-            && carrier.pointer("/value/status").and_then(Value::as_str) == Some(status),
-        "exact original perk association GUID and resolution"
+        details.get("type").and_then(Value::as_str) == Some(kind),
+        "original concrete perk type"
     );
+    if matches!(
+        kind,
+        "shopItemCategory" | "enabledItemCategory" | "discountItemCategory"
+    ) {
+        check_category(witness, source, field(details, "category")?)?;
+    }
     Ok(())
 }
 
-fn check_nonpresent(carrier: &Value, original: Option<&Original<'_>>) -> TestResult {
-    let state = carrier.get("state").and_then(Value::as_str);
-    let accepted = match original {
-        None => state == Some("absent"),
-        Some(Original::Null) => state == Some("null"),
-        Some(Original::Error(_)) => state == Some("unreadable"),
-        Some(_) => matches!(state, Some("invalid" | "unsupported")),
-    };
-    if !accepted {
-        return Err("original nonpresent perk state differs".into());
+fn check_category<'source>(
+    witness: &Witness<'_, '_, 'source>,
+    source: &StructValue<'source>,
+    row: &Value,
+) -> TestResult {
+    for name in ["type", "subType"] {
+        witness.scalar(source.field(name), field(row, name)?)?;
     }
-    Ok(())
+    for (name, target) in [("franchise", "ShopFranchise"), ("requiredTag", "Tag")] {
+        witness.link(source.field(name), field(row, name)?, target)?;
+    }
+    let original = source.field("id");
+    let cell = field(row, "id")?;
+    witness.occurrence(original, cell)?;
+    if let Some(Original::Guid(guid)) = original {
+        assert!(
+            consumer::present(cell)?.as_str() == Some(guid.to_string().as_str()),
+            "original perk category GUID"
+        );
+        Ok(())
+    } else {
+        verify_state(original, cell)
+    }
 }

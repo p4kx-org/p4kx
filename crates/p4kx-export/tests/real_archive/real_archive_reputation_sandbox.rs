@@ -3,17 +3,11 @@
 
 use std::collections::BTreeSet;
 use std::error::Error;
-use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
-use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForge, DataForgeEntry, TreeBuilder, Value as Original, ValueError,
-};
-use p4kx_testkit::{real_archive_key, real_archive_path};
+use p4kx_extraction::{DataForge, TreeBuilder, Value as Original, ValueError};
 use serde_json::Value;
 
 use crate::catalog_v3_consumer as consumer;
-use crate::real_archive_verification::print_line;
 
 const FACTION: &str = "FactionReputation";
 const TRIGGER: &str = "SandboxTriggerRecord";
@@ -21,42 +15,18 @@ const REWARD: &str = "SReputationRewardAmount";
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-#[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn sandbox_owners_and_definitions_match_original_records() -> TestResult {
-    let path = real_archive_path().map_err(|_| "configured Archive path")?;
-    let key = real_archive_key().map_err(|_| "configured Archive key")?;
-    let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
-    let watch = ArchiveWatch::new(&archive);
-    let entry = DataForgeEntry::read(&archive).map_err(|_| "read original DataForge")?;
-    let options = CatalogOptions {
-        publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..CatalogOptions::new(SystemTime::now())
-    };
-    let built = build_catalog_from(&archive, &entry, &options)
-        .map_err(|_| "build sandbox reputation catalog")?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
-    crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
-    let forge = entry.open().map_err(|_| "open original DataForge")?;
-
-    let owner_rows = rows(&catalog, "/configurations/reputationTriggers/rows")?;
-    let record_rows = rows(&catalog, "/definitions/reputationTriggerRecords/rows")?;
-    let reward_rows = rows(&catalog, "/definitions/reputationRewardAmounts/rows")?;
-    let owner_slots = check_family(&forge, owner_rows, FACTION, Some("sandboxTriggers"))?;
-    let record_slots = check_family(&forge, record_rows, TRIGGER, Some("triggerManualParams"))?;
-    check_family(&forge, reward_rows, REWARD, None)?;
+pub(super) fn compare(forge: &DataForge<'_>, catalog: &Value) -> TestResult<(usize, usize, usize)> {
+    let owner_rows = rows(catalog, "/configurations/reputationTriggers/rows")?;
+    let record_rows = rows(catalog, "/definitions/reputationTriggerRecords/rows")?;
+    let reward_rows = rows(catalog, "/definitions/reputationRewardAmounts/rows")?;
+    let owner_slots = check_family(forge, owner_rows, FACTION, Some("sandboxTriggers"))?;
+    let record_slots = check_family(forge, record_rows, TRIGGER, Some("triggerManualParams"))?;
+    check_family(forge, reward_rows, REWARD, None)?;
     assert!(
         owner_slots + record_slots > 0,
         "Build contains sandbox trigger slots"
     );
-    watch
-        .check()
-        .map_err(|_| "Archive changed during sandbox verification")?;
-    print_line(&format!(
-        "reputation sandbox: {owner_slots} owner slots, {record_slots} definition slots and {} rewards checked",
-        reward_rows.len()
-    ));
-    Ok(())
+    Ok((owner_slots, record_slots, reward_rows.len()))
 }
 
 fn rows<'catalog>(catalog: &'catalog Value, path: &str) -> TestResult<&'catalog [Value]> {
