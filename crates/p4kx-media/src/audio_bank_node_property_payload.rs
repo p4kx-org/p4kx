@@ -45,6 +45,8 @@ pub(crate) struct NodePropertyObservations {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) parent_id: Option<BankField<u32>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) priority_flags: Option<BankField<u8>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) properties: Option<NodePropertyListRecord>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) ranged_modifiers: Option<NodePropertyListRecord>,

@@ -6,8 +6,8 @@ use p4kx_media::{ExportOutcome, MediaRecord, Status};
 use serde_json::json;
 
 use super::audio_bank_node_properties_fixture::{
-    self as fixture, BITS, Evidence, IDS, Lists, Node, OVERRIDE_BUS_ID, PARENT_ID, RANGE_BITS,
-    RANGE_IDS,
+    self as fixture, BITS, Evidence, IDS, Lists, Node, OVERRIDE_BUS_ID, PARENT_ID, PRIORITY_FLAGS,
+    RANGE_BITS, RANGE_IDS,
 };
 use super::audio_bank_state_provider::{check_retained, options, row, verify_layout};
 use super::support;
@@ -304,6 +304,13 @@ fn assert_routing(evidence: &Evidence<'_>, row: (usize, &MediaRecord), bus: u32)
         "nodeParentId",
         PARENT_ID,
         &PARENT_ID.to_le_bytes(),
+    )?;
+    evidence.word(
+        row,
+        "observed/priority_flags",
+        "nodePriorityFlags",
+        u32::from(PRIORITY_FLAGS),
+        &[PRIORITY_FLAGS],
     )
 }
 

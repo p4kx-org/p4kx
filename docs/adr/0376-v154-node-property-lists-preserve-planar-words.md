@@ -1,7 +1,10 @@
 # Version-154 node property lists preserve planar IDs and raw words
 
-The shared Wwise NodeBase layout in version 154 stores two property lists before
-positioning. Each begins with an unsigned byte count and a planar array of that
+The shared Wwise NodeBase layout in version 154 stores a packed priority and MIDI
+behavior byte immediately after the direct parent word. The export retains its
+original value and one-byte source span, including unassigned bits and explicit
+zero. Two property lists follow before positioning. Each begins with an unsigned
+byte count and a planar array of that
 many unsigned byte IDs. The property list then stores one little-endian u32 word
 per ID. The ranged modifier list stores a little-endian minimum and maximum u32
 pair per ID. IDs and words retain their original order, including repeated IDs,

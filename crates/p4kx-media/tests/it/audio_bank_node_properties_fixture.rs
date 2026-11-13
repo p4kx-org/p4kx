@@ -13,6 +13,7 @@ use super::support::audio_provider::{Origins, Owner, TestResult};
 
 pub(super) const PATH: &str = "node-properties.bnk";
 pub(super) const PARENT_ID: u32 = 0x2C21_1B2E;
+pub(super) const PRIORITY_FLAGS: u8 = 0xD3;
 pub(super) const OVERRIDE_BUS_ID: u32 = 0x7812_1081;
 pub(super) const IDS: [u8; 3] = [0xF1, 0x03, 0xF1];
 pub(super) const BITS: [u32; 3] = [0x7FC1_2345, 0, 0x8000_0000];
@@ -119,6 +120,7 @@ fn prefix(source: &[u8], node: Node, bus: u32) -> TestResult<Vec<u8>> {
     body.get_mut(start..start + 4)
         .ok_or("original override bus word")?
         .copy_from_slice(&bus.to_le_bytes());
+    *body.last_mut().ok_or("original priority flag byte")? = PRIORITY_FLAGS;
     Ok(body)
 }
 

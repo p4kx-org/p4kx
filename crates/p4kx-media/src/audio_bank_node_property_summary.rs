@@ -26,6 +26,7 @@ impl SourceNode<'_> {
     fn checked_range(&self) -> Option<Range<u64>> {
         let bus = self.routing.override_bus_id()?;
         self.routing.parent_id.as_ref()?;
+        self.routing.priority_flags.as_ref()?;
         let properties = self.properties.get(BankNodePropertyKind::Properties)?;
         let ranges = self.properties.get(BankNodePropertyKind::RangedModifiers)?;
         if properties.is_complete() && ranges.is_complete() {
@@ -163,6 +164,12 @@ fn observations(
             "observed/parent_id",
             source.routing.parent_id.as_ref(),
             "nodeParentId",
+        )?,
+        priority_flags: sites.scalar(
+            prepared,
+            "observed/priority_flags",
+            source.routing.priority_flags.as_ref(),
+            "nodePriorityFlags",
         )?,
         properties: audio_bank_property_list::record(
             sites,

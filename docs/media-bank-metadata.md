@@ -270,6 +270,10 @@ is truncated. Other Action groups report absent Play properties. Other bank
 versions report unsupported property coverage. The Action target, PlayBank
 and CLI/MCP inspection fields keep their established meanings.
 
+The shared node properties also carry the original `priority_flags` byte after the
+parent ID. It retains the packed priority and MIDI behavior bits with their exact
+source range, including explicit zero.
+
 Version-154 Random/Sequence, Switch and Blend containers use the same shared
 node property, effect, auxiliary routing, positioning, advanced settings
 and inline State records. Container RTPC curves and points have their own

@@ -202,7 +202,7 @@ fn bank_field_groups() -> [FieldGroup; 15] {
         ),
         FieldGroup::new(
             "bank-container-fields",
-            "Original HIRC container parent, kind, mode and ordered children, ActorMixer children, and version-154 shared node properties, FX, auxiliary routing, positioning, advanced settings, State and RTPC fields for containers and ActorMixer. Version-154 Random/Sequence timing, mode codes, flags and ordered signed playlist weights, Switch defaults, ordered memberships and per-child configurations, and Blend layers, per-layer RTPCs, child associations and crossfade graph points.",
+            "Original HIRC container parent, kind, mode and ordered children, ActorMixer children, and version-154 shared node properties, original priority flags, FX, auxiliary routing, positioning, advanced settings, State and RTPC fields for containers and ActorMixer. Version-154 Random/Sequence timing, mode codes, flags and ordered signed playlist weights, Switch defaults, ordered memberships and per-child configurations, and Blend layers, per-layer RTPCs, child associations and crossfade graph points.",
         ),
         FieldGroup::new(
             "bank-music-playlist-fields",
@@ -223,7 +223,7 @@ fn bank_field_groups() -> [FieldGroup; 15] {
         ),
         FieldGroup::new(
             "bank-sound-fields",
-            "Original HIRC Sound source, node property, FX, routing, positioning and advanced playback fields, physical DIDX candidates for embedded and prefetch media, and owning-directory loose WEM references for streamed and prefetch media.",
+            "Original HIRC Sound source, node properties, original priority flags, FX, routing, positioning and advanced playback fields, physical DIDX candidates for embedded and prefetch media, and owning-directory loose WEM references for streamed and prefetch media.",
         ),
         FieldGroup::new(
             "bank-name-index",

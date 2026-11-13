@@ -60,6 +60,8 @@ pub struct BankNodeParentFields {
     pub pre_parent_word: Option<BankHircField<u32>>,
     /// Original parent ID, including zero, when readable.
     pub parent_id: Option<BankHircField<u32>>,
+    /// Original packed priority and MIDI behavior flags immediately after the parent.
+    pub priority_flags: Option<BankHircField<u8>>,
 }
 
 impl BankNodeParentFields {
@@ -126,7 +128,7 @@ pub(crate) fn read_base_observed<F: ObjectFields>(
     rtpc: &mut Option<BankRtpcExtent>,
 ) -> Result<u32, F::Error> {
     let parent = read_parent(fields, observed)?;
-    fields.read_array::<1>()?;
+    observed.priority_flags = Some(fields.read_u8()?);
     hirc_node_property::scan(fields, properties)?;
     hirc_node_positioning::scan(fields, &mut playback.positioning)?;
     hirc_node_aux::scan(fields, aux)?;

@@ -12015,6 +12015,16 @@
             }
           ]
         },
+        "priority_flags": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BankField_uint8"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "properties": {
           "anyOf": [
             {
