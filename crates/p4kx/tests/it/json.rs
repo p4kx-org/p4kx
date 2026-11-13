@@ -327,7 +327,26 @@ fn texture_info() -> TestResult {
         0,
     )?;
 
-    insta::assert_snapshot!(json);
+    let mut value: Value = serde_json::from_str(&json)?;
+    let object = value.as_object_mut().ok_or("texture info JSON object")?;
+    let fields = object
+        .remove("field_origins")
+        .ok_or("texture field origins")?;
+    let source = object
+        .remove("provenance")
+        .ok_or("texture source inventory")?;
+    assert!(
+        fields.get("/source_metadata/raw/legacy/width").is_some(),
+        "authored width has exact evidence"
+    );
+    assert!(
+        source
+            .get("uses")
+            .and_then(Value::as_array)
+            .is_some_and(|uses| !uses.is_empty()),
+        "field uses resolve in the shared inventory"
+    );
+    insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }
 

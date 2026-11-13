@@ -50,6 +50,11 @@ Entry directory metadata in the common field-origin receipts. A malformed header
 a diagnosed row in diagnostic output. Structurally readable words survive normalization
 failure. Raw source preservation includes selected split parts.
 
+`texture info --json` exposes the same DDS metadata for the selected header and any readable
+alpha header, with field-addressed origins and a physical source-use inventory. Standalone DDS
+files retain an observed file binding when available. Original P4K encryption is unknown for
+standalone input.
+
 Each selected physical header owns one family graph. `texture.dds-member` identifies every
 directory candidate by its original Entry index, with its role, declared size, selection
 and key availability. Duplicate paths and unproved raw paths remain separate occurrences.

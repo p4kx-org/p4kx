@@ -22,18 +22,14 @@ impl PreviewHeaderEvidence {
         uses: &SourceUses,
         parts: &Parts<'_>,
         raw: DdsRawHeader,
+        file: Option<&crate::ObservedFileOrigin>,
     ) -> Result<Self, SourceEvidenceError> {
-        let entry = match parts {
-            Parts::Source { header, .. } => header.observed_entry(),
-            Parts::Files(_) => None,
+        let input = match parts {
+            Parts::Source { header, .. } => header.observed_entry().map(SourceInput::ArchiveView),
+            Parts::Files(_) => file.map(SourceInput::File),
         };
-        Self::of_read(
-            uses,
-            entry.map_or(SourceInput::Unknown, SourceInput::ArchiveView),
-            raw,
-        )
+        Self::of_read(uses, input.unwrap_or(SourceInput::Unknown), raw)
     }
-
     pub(crate) fn of_read(
         uses: &SourceUses,
         input: SourceInput<'_>,
@@ -110,7 +106,11 @@ impl PreviewHeaderEvidence {
         self.metadata_use(field, role)
     }
 
-    pub(crate) fn size_use(&self) -> Result<SourceUse, SourceEvidenceError> {
+    /// Registers the original header Entry or file size used for its byte layout.
+    ///
+    /// # Errors
+    /// Returns an error if the evidence inventory was interrupted.
+    pub fn size_use(&self) -> Result<SourceUse, SourceEvidenceError> {
         let field = if self.archive_ancestry.is_some() {
             "uncompressedSize"
         } else {

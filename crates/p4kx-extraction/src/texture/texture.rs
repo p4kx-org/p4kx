@@ -148,6 +148,10 @@ impl<'a> Texture<'a> {
         self.raw_header
     }
 
+    pub(crate) const fn disk_header_origin(&self) -> Option<&crate::ObservedFileOrigin> {
+        self.disk_header.as_ref()
+    }
+
     /// Returns all captured source header words and separate normalized topology without I/O.
     #[must_use]
     pub fn source_metadata(&self) -> DdsSourceInfo {

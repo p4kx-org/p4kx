@@ -9,6 +9,10 @@ use crate::texture_job::{Member, Role, role};
 use crate::texture_preview_png::input::PreviewInputs;
 use crate::{ConversionError, PreviewPngEvidence, SourceEvidenceError, SourceUses, Texture};
 
+#[path = "dds_info_origins.rs"]
+mod info_origins;
+
+pub use self::info_origins::{DdsInfoOriginError, dds_info_origins};
 pub use crate::dds_source_info::{DdsSourceWord, raw_dds_source_words};
 pub use crate::model_textures::ObservedModelTexture;
 pub use crate::texture_preview_png::input::PreviewHeaderEvidence;
@@ -133,7 +137,12 @@ impl<'a> Texture<'a> {
         &self,
         uses: &SourceUses,
     ) -> Result<PreviewHeaderEvidence, SourceEvidenceError> {
-        PreviewHeaderEvidence::of_header(uses, self.parts(), self.raw_header())
+        PreviewHeaderEvidence::of_header(
+            uses,
+            self.parts(),
+            self.raw_header(),
+            self.disk_header_origin(),
+        )
     }
 
     pub(crate) fn decode_preview_selected(

@@ -1,6 +1,6 @@
 ---
 source: crates/p4kx/tests/it/json.rs
-expression: json
+expression: "serde_json::to_string_pretty(&value)?"
 ---
 {
   "alpha_tail": null,

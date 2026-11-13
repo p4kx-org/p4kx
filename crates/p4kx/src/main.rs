@@ -142,6 +142,7 @@ mod socpak;
 mod test_build;
 mod texture;
 mod texture_image;
+mod texture_info_origin;
 mod ui;
 mod ui_asset_origins;
 mod ui_extract;
