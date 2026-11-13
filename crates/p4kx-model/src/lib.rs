@@ -118,6 +118,7 @@ mod skeleton_source;
 mod skin;
 mod smooth_normals;
 mod soc_area_component;
+mod soc_container_descriptor;
 mod soc_entities;
 mod soc_entity_component;
 mod soc_entity_links;
@@ -207,6 +208,10 @@ pub use prefab::{
 pub use rig_logic_bytes::RigLogicBytes;
 pub use skeleton_source::SkeletonSource;
 pub use soc_area_component::{SocAreaComponent, SocAreaLink};
+pub use soc_container_descriptor::{
+    SocContainerDeclaration, SocContainerDescriptor, SocContainerDescriptorError,
+    SocStreamDeclaration,
+};
 pub use soc_entities::{
     MAX_SOC_ENTITIES, MAX_SOC_PLACED, SocClassEntity, SocEntities, SocEntitiesError, SocPalette,
     SocProp,

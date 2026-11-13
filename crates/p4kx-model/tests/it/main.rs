@@ -40,6 +40,7 @@ mod render_to_texture;
 mod rig_logic_chunk;
 mod skeleton;
 mod skin_levels;
+mod soc_container_descriptor;
 mod soc_door_source;
 mod soc_entities;
 mod soc_entity_source;

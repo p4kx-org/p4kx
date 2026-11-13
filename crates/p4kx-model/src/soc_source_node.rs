@@ -40,9 +40,16 @@ impl<'document> SocSourceNode<'document> {
         self,
         name: &'static str,
     ) -> impl Iterator<Item = SourceAttribute<'document>> {
+        self.attributes_where(move |attribute| attribute == name)
+    }
+
+    pub(crate) fn attributes_where(
+        self,
+        matches: impl Fn(&str) -> bool,
+    ) -> impl Iterator<Item = SourceAttribute<'document>> {
         self.element
             .attributes()
-            .filter(move |attribute| attribute.namespace().is_none() && attribute.name() == name)
+            .filter(move |attribute| attribute.namespace().is_none() && matches(attribute.name()))
     }
 
     pub(crate) fn read<T>(
@@ -54,10 +61,11 @@ impl<'document> SocSourceNode<'document> {
     }
 
     pub(crate) fn attribute(self, name: &str) -> Attribute<'document> {
-        let mut matches = self
-            .element
-            .attributes()
-            .filter(|attribute| attribute.namespace().is_none() && attribute.name() == name);
+        self.attribute_where(|attribute| attribute == name)
+    }
+
+    pub(crate) fn attribute_where(self, matches: impl Fn(&str) -> bool) -> Attribute<'document> {
+        let mut matches = self.attributes_where(matches);
         match (matches.next(), matches.next()) {
             (None, _) => Attribute::Absent,
             (Some(attribute), None) => Attribute::Value(attribute.value()),
