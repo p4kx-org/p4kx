@@ -28,6 +28,12 @@ impl BankHeader {
     pub const fn is_supported_version(self) -> bool {
         bank_parse::supported_version(self.version)
     }
+
+    /// Returns whether this bank uses the observed shared HIRC node layout.
+    #[must_use]
+    pub const fn has_shared_node_layout(self) -> bool {
+        self.version == crate::hirc_source::NODE_BASE_VERSION
+    }
 }
 
 /// One section of a soundbank with its raw body.

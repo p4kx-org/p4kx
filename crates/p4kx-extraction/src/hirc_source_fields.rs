@@ -20,7 +20,7 @@ mod dto;
 #[path = "hirc_music_track_source.rs"]
 mod music_track;
 #[path = "hirc_source_origins.rs"]
-mod origins;
+pub(super) mod origins;
 #[path = "hirc_random_sequence_source.rs"]
 mod random_sequence;
 #[path = "hirc_dialogue_rows.rs"]

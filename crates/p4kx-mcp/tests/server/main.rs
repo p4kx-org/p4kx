@@ -20,6 +20,7 @@ mod audio_limits;
 mod audio_music_track_source_fields;
 mod audio_objects;
 mod audio_random_sequence_source_fields;
+mod audio_shared_node_fields;
 mod audio_switch_source_fields;
 mod audio_wem;
 mod channel_notice;

@@ -17,15 +17,28 @@ use crate::source_value::{SourceValue, SourcedValue};
 
 use super::SourceFamily;
 
-pub(super) struct ObjectOrigins {
+pub(in crate::hirc_view) struct ObjectOrigins {
     uses: SourceUses,
     scope: SourceScope,
     complete: bool,
-    family: SourceFamily,
+    namespace: &'static str,
+    extent_label: &'static str,
 }
 
 impl ObjectOrigins {
     pub(super) fn new(bank: &Bank, family: SourceFamily) -> Result<Self, SourceEvidenceError> {
+        Self::with_site(bank, family.namespace(), family.extent_label())
+    }
+
+    pub(in crate::hirc_view) fn shared_node(bank: &Bank) -> Result<Self, SourceEvidenceError> {
+        Self::with_site(bank, "bnkHircSharedNode", "nodeObjectExtent")
+    }
+
+    fn with_site(
+        bank: &Bank,
+        namespace: &'static str,
+        extent_label: &'static str,
+    ) -> Result<Self, SourceEvidenceError> {
         let uses = SourceUses::new();
         let input = bank.observed_input();
         let complete = !matches!(input, SourceInput::Unknown);
@@ -34,25 +47,21 @@ impl ObjectOrigins {
             uses,
             scope,
             complete,
-            family,
+            namespace,
+            extent_label,
         })
     }
 
-    pub(super) fn field<T: Copy>(
+    pub(in crate::hirc_view) fn field<T: Copy>(
         &self,
         field: &BankHircField<T>,
         label: &'static str,
     ) -> Result<SourcedValue<T>, SourceEvidenceError> {
-        let used = self.site(
-            self.family.namespace(),
-            label,
-            &field.range,
-            SourceUseRole::Payload,
-        )?;
+        let used = self.site(self.namespace, label, &field.range, SourceUseRole::Payload)?;
         Ok(self.value(field.value, &[used]))
     }
 
-    pub(super) fn optional<T: Copy>(
+    pub(in crate::hirc_view) fn optional<T: Copy>(
         &self,
         field: Option<&BankHircField<T>>,
         label: &'static str,
@@ -60,18 +69,13 @@ impl ObjectOrigins {
         field.map(|field| self.field(field, label)).transpose()
     }
 
-    pub(super) fn derived<T>(
+    pub(in crate::hirc_view) fn derived<T>(
         &self,
         value: T,
         extent: &Range<u64>,
         label: &'static str,
     ) -> Result<SourcedValue<T>, SourceEvidenceError> {
-        let used = self.site(
-            self.family.namespace(),
-            label,
-            extent,
-            SourceUseRole::Conversion,
-        )?;
+        let used = self.site(self.namespace, label, extent, SourceUseRole::Conversion)?;
         Ok(self.value(value, &[used]))
     }
 
@@ -80,16 +84,11 @@ impl ObjectOrigins {
         extent: &Range<u64>,
         label: &'static str,
     ) -> Result<SourcedValue<StateRange>, SourceEvidenceError> {
-        let used = self.site(
-            self.family.namespace(),
-            label,
-            extent,
-            SourceUseRole::Selector,
-        )?;
+        let used = self.site(self.namespace, label, extent, SourceUseRole::Selector)?;
         Ok(self.value(StateRange::new(extent), &[used]))
     }
 
-    pub(super) fn version(
+    pub(in crate::hirc_view) fn version(
         &self,
         header: &BankObservedHeader,
     ) -> Result<SourcedValue<u32>, SourceEvidenceError> {
@@ -99,7 +98,7 @@ impl ObjectOrigins {
         Ok(self.value(header.header().version, &[used]))
     }
 
-    pub(super) fn coverage<T>(
+    pub(in crate::hirc_view) fn coverage<T>(
         &self,
         value: T,
         header: &BankObservedHeader,
@@ -113,8 +112,8 @@ impl ObjectOrigins {
             SourceUseRole::Selector,
         )?;
         let body = self.site(
-            self.family.namespace(),
-            self.family.extent_label(),
+            self.namespace,
+            self.extent_label,
             &(object.header_offset()..object.body_end_exclusive()),
             SourceUseRole::Conversion,
         )?;

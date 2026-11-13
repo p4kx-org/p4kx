@@ -7,11 +7,12 @@ use std::ops::Range;
 
 use p4kx_audio::{
     BankDialogueEventRow, BankDialogueNode, BankHircDialogueEvent, BankHircField,
-    BankNodePropertyKind, BankNodePropertyRow, BankNodePropertyValue,
+    BankNodePropertyKind, BankNodePropertyRow,
 };
 use serde::ser::{Error as _, SerializeSeq};
 use serde::{Serialize, Serializer};
 
+use crate::hirc_view::node_property::PropertyWords;
 use crate::source_evidence_error::SourceEvidenceError;
 
 use super::dto::{DialogueLinkInterpretation, DialoguePropertyKind, DialogueSourceRow};
@@ -134,30 +135,15 @@ fn property<E: serde::ser::Error>(
     kind: DialoguePropertyKind,
     row: &BankNodePropertyRow,
 ) -> Result<DialogueSourceRow, E> {
-    let (scalar, minimum, maximum) = match &row.value {
-        BankNodePropertyValue::Scalar(bits) => (bits.as_ref(), None, None),
-        BankNodePropertyValue::Ranged {
-            minimum, maximum, ..
-        } => (None, minimum.as_ref(), maximum.as_ref()),
-        _ => return Err(E::custom("unexpected DialogueEvent property layout")),
-    };
-    let convert = |error: SourceEvidenceError| E::custom(error);
+    let words = PropertyWords::read(origins, row)?;
     Ok(DialogueSourceRow::Property {
         list: origins
             .derived(kind, count, "nodePropertyWordLayout")
-            .map_err(convert)?,
-        ordinal: origins
-            .derived(row.ordinal, &row.id.range, "nodePropertyPosition")
-            .map_err(convert)?,
-        property_id: origins.field(&row.id, "nodePropertyId").map_err(convert)?,
-        scalar_bits: origins
-            .optional(scalar, "nodePropertyScalarBits")
-            .map_err(convert)?,
-        minimum_bits: origins
-            .optional(minimum, "nodePropertyMinimumBits")
-            .map_err(convert)?,
-        maximum_bits: origins
-            .optional(maximum, "nodePropertyMaximumBits")
-            .map_err(convert)?,
+            .map_err(E::custom)?,
+        ordinal: words.ordinal,
+        property_id: words.property_id,
+        scalar_bits: words.scalar_bits,
+        minimum_bits: words.minimum_bits,
+        maximum_bits: words.maximum_bits,
     })
 }

@@ -22,6 +22,8 @@ mod dialogue_source_fields;
 mod music_track_source_fields;
 #[path = "bnk_random_sequence_source_fields.rs"]
 mod random_sequence_source_fields;
+#[path = "bnk_shared_node_fields.rs"]
+mod shared_node_fields;
 #[path = "bnk_switch_source_fields.rs"]
 mod switch_source_fields;
 
@@ -132,6 +134,12 @@ fn the_json_has_a_stable_shape() -> TestResult {
 
     let mut report = json(&[], &file)?;
     report["soundbank"] = "[FILE]".into();
+    for object in report["objects"].as_array_mut().ok_or("objects")? {
+        object
+            .as_object_mut()
+            .ok_or("object")?
+            .remove("node_fields");
+    }
 
     insta::assert_snapshot!(serde_json::to_string_pretty(&report)?);
     Ok(())

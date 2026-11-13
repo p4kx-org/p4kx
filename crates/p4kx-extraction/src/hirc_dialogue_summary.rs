@@ -2,15 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_audio::{
-    BankDialogueTree, BankDialogueTreeCoverage, BankHircDialogueEvent, BankNodePropertyExtent,
-    BankNodePropertyKind,
+    BankDialogueTree, BankDialogueTreeCoverage, BankHircDialogueEvent, BankNodePropertyKind,
 };
 
+use crate::hirc_view::node_property::PropertyExtent;
 use crate::source_evidence_error::SourceEvidenceError;
 
-use super::dto::{
-    DialoguePropertyExtent, DialogueSummary, DialogueTreeStatus, DialogueTreeSummary,
-};
+use super::dto::{DialogueSummary, DialogueTreeStatus, DialogueTreeSummary};
 use super::origins::ObjectOrigins;
 
 pub(super) fn collect<R>(
@@ -48,14 +46,16 @@ pub(super) fn collect<R>(
         tree_size: origins.optional(fields.tree_size.as_ref(), "dialogueTreeSize")?,
         mode_code: origins.optional(fields.mode_code.as_ref(), "dialogueModeCode")?,
         tree,
-        properties: property_extent(
-            origins,
-            fields.properties.get(BankNodePropertyKind::Properties),
-        )?,
-        ranged_modifiers: property_extent(
-            origins,
-            fields.properties.get(BankNodePropertyKind::RangedModifiers),
-        )?,
+        properties: fields
+            .properties
+            .get(BankNodePropertyKind::Properties)
+            .map(|extent| PropertyExtent::read(origins, extent))
+            .transpose()?,
+        ranged_modifiers: fields
+            .properties
+            .get(BankNodePropertyKind::RangedModifiers)
+            .map(|extent| PropertyExtent::read(origins, extent))
+            .transpose()?,
     })
 }
 
@@ -81,30 +81,4 @@ fn tree_summary(
             .map(|tail| origins.range(tail, "dialoguePartialNodeExtent"))
             .transpose()?,
     })
-}
-
-fn property_extent(
-    origins: &ObjectOrigins,
-    extent: Option<&BankNodePropertyExtent>,
-) -> Result<Option<DialoguePropertyExtent>, SourceEvidenceError> {
-    let Some(extent) = extent else {
-        return Ok(None);
-    };
-    let count = &extent.declared_count;
-    let ids = count.range.start..extent.ids_range.end;
-    let words_end = extent
-        .words_range
-        .as_ref()
-        .map_or(ids.end, |words| words.end);
-    let inspected = count.range.start..words_end;
-    Ok(Some(DialoguePropertyExtent {
-        declared_count: origins.field(count, "nodePropertyCount")?,
-        checked_ids: origins.derived(extent.checked_id_count(), &ids, "nodePropertyCheckedIds")?,
-        checked_words: origins.derived(
-            extent.checked_word_count(),
-            &inspected,
-            "nodePropertyCheckedWords",
-        )?,
-        complete: origins.derived(extent.is_complete(), &inspected, "nodePropertyCoverage")?,
-    }))
 }

@@ -5,6 +5,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::hirc_view::StateRange;
+use crate::hirc_view::node_property::PropertyExtent;
 use crate::source_inventory::SourceInventory;
 use crate::source_value::SourcedValue;
 
@@ -59,9 +60,9 @@ pub(crate) struct DialogueSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) tree: Option<DialogueTreeSummary>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) properties: Option<DialoguePropertyExtent>,
+    pub(crate) properties: Option<PropertyExtent>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) ranged_modifiers: Option<DialoguePropertyExtent>,
+    pub(crate) ranged_modifiers: Option<PropertyExtent>,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -81,15 +82,6 @@ pub(crate) enum DialogueTreeStatus {
     Truncated,
     Misaligned,
     Unsupported,
-}
-
-#[derive(Serialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub(crate) struct DialoguePropertyExtent {
-    pub(crate) declared_count: SourcedValue<u8>,
-    pub(crate) checked_ids: SourcedValue<u8>,
-    pub(crate) checked_words: SourcedValue<u16>,
-    pub(crate) complete: SourcedValue<bool>,
 }
 
 #[derive(Serialize, JsonSchema)]

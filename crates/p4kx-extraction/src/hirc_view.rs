@@ -10,6 +10,10 @@ use serde::{Serialize, Serializer};
 
 #[path = "hirc_view_build.rs"]
 mod build;
+#[path = "hirc_node_property_projection.rs"]
+mod node_property;
+#[path = "hirc_node_source.rs"]
+mod node_source;
 #[path = "hirc_source_fields.rs"]
 mod source_fields;
 #[path = "hirc_view_state.rs"]
@@ -18,6 +22,8 @@ mod state;
 use crate::bank::Bank;
 
 use self::build::detail;
+pub use self::node_source::NodeSourceFields;
+use self::node_source::NodeSourceSchema;
 pub use self::source_fields::ObjectSourceFields;
 use self::source_fields::ObjectSourceSchema;
 pub use self::state::{StateDetail, StatePropertyView, StateRange};
@@ -52,6 +58,10 @@ pub struct ObjectView<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<ObjectSourceSchema>")]
     pub source_fields: Option<ObjectSourceFields<'a>>,
+    /// Original fields of the shared Wwise node declaration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<NodeSourceSchema>")]
+    pub node_fields: Option<NodeSourceFields<'a>>,
 }
 
 /// The fields of an object that depend on its type.
@@ -260,11 +270,11 @@ pub struct ItemView {
 
 impl<'a> ObjectView<'a> {
     pub(crate) fn attach_source_fields(&mut self, bank: &'a Bank) {
-        self.source_fields = bank
-            .soundbank()
-            .objects()
-            .get(self.index)
-            .and_then(|object| ObjectSourceFields::new(bank, self.index, object.kind));
+        if let Some(object) = bank.soundbank().objects().get(self.index) {
+            self.source_fields = ObjectSourceFields::new(bank, self.index, object.kind);
+            self.node_fields =
+                NodeSourceFields::new(bank, self.index, object.kind, Status::from(self.layout));
+        }
     }
 
     /// Describes the object at `index` in bank order.
@@ -284,12 +294,13 @@ impl<'a> ObjectView<'a> {
             children: object.children().collect(),
             detail: detail(&object.value),
             source_fields: None,
+            node_fields: None,
         }
     }
 }
 
 /// The `status` of an object in JSON: [`HircLayout`] by name.
-#[derive(Serialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 enum Status {
     Decoded,
