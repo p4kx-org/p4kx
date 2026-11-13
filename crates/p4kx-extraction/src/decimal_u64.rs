@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use std::fmt;
 
 use schemars::{JsonSchema, Schema, SchemaGenerator, json_schema};
-use serde::{Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// An unsigned 64-bit source integer encoded as a canonical decimal JSON string.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +28,22 @@ impl DecimalU64 {
 impl Serialize for DecimalU64 {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.collect_str(&self.0)
+    }
+}
+
+impl<'de> Deserialize<'de> for DecimalU64 {
+    fn deserialize<D: Deserializer<'de>>(source: D) -> Result<Self, D::Error> {
+        use serde::de::Error as _;
+
+        let text = String::deserialize(source)?;
+        if text.is_empty()
+            || text.len() > 20
+            || text.len() > 1 && text.starts_with('0')
+            || !text.bytes().all(|byte| byte.is_ascii_digit())
+        {
+            return Err(D::Error::custom("invalid canonical unsigned integer"));
+        }
+        text.parse().map(Self::new).map_err(D::Error::custom)
     }
 }
 

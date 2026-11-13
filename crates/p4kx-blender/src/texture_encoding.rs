@@ -18,7 +18,7 @@ pub enum TextureChannelTransform {
     FlipNormalGreen,
 }
 
-/// How the package importer samples the PNG's colour channels.
+/// How the package importer samples the image's colour channels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum TextureEncoding {

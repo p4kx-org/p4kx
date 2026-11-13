@@ -6,6 +6,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use clap::{Args, Subcommand, ValueEnum};
 
+use crate::cli_entity::PackageTextureContainerArg;
 use crate::cli_model::lod_range;
 use crate::exit::EXIT_CODES_HELP;
 
@@ -108,6 +109,9 @@ pub(crate) struct InteriorPackageArgs {
     /// a texture with fewer mips gives its smallest.
     #[arg(long, value_name = "N", default_value_t = 0)]
     pub(crate) texture_mip: u32,
+    /// Writes supported DDS mips unchanged, with PNG fallback for other textures.
+    #[arg(long, value_enum, value_name = "CONTAINER", default_value_t)]
+    pub(crate) texture_container: PackageTextureContainerArg,
     /// Leaves the vertex colours out of the models.
     #[arg(long)]
     pub(crate) no_vertex_colours: bool,

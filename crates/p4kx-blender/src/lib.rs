@@ -56,8 +56,10 @@ mod soc_scene_rooms;
 mod soc_scene_stream;
 mod soc_scene_xml;
 mod stage;
+mod texture_dds;
 mod texture_encoding;
 mod texture_field_origins;
+mod texture_format;
 mod texture_source_metadata;
 mod textures;
 mod write;
@@ -71,7 +73,7 @@ pub use manifest::{
     AlphaMeaning, Basis, BuildInfo, CharacterSource, ColourSpace, Coordinates, EntityRef, FORMAT,
     FORMAT_VERSION, Format, Generator, Issue, IssueOrigin, MANIFEST_FILE, MESHES_FOLDER, Manifest,
     MaterialTextures, Mesh, MeshMaterial, Node, NodeKind, Options, Replacement, Source,
-    TEXTURES_FOLDER, Texture, TextureFormat, Unit,
+    TEXTURES_FOLDER, Texture, Unit,
 };
 pub use manifest_light::{Light, LightKind};
 pub use manifest_materials::{
@@ -84,7 +86,11 @@ pub use package_write_context::PackageWriteContext;
 pub use schema::manifest_schema;
 pub use soc_scene::{SOC_SCENE_VERSION, SocScene, SocSceneError, SocXmlPosition, soc_scene_schema};
 pub use stage::{check_output, check_output_with_context};
+pub use texture_dds::{
+    DdsTextureAsset, DdsTextureFallback, DdsTextureSourceChecksum, PackageTextureContainer,
+};
 pub use texture_encoding::{TextureChannelTransform, TextureEncoding};
+pub use texture_format::TextureFormat;
 pub use texture_source_metadata::TextureSourceMetadata;
 pub use write::{PackageInfo, PackageSummary, write_package, write_package_with_context};
 

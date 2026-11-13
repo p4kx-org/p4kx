@@ -100,7 +100,7 @@ pub(super) fn metadata_error<E: std::error::Error + Send + Sync + 'static>(
     PackageError::TextureEvidence(Box::new(error))
 }
 
-fn read_field_origins<'de, D: serde::Deserializer<'de>>(
+pub(crate) fn read_field_origins<'de, D: serde::Deserializer<'de>>(
     source: D,
 ) -> Result<FieldOrigins, D::Error> {
     // One fixed DDS header, one selected mip, and two possible physical texture branches.

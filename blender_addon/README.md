@@ -5,7 +5,8 @@ Imports a [Blender package](../docs/blender-package.md) written by `p4kx entity 
 [ADR-0093](../docs/adr/0093-the-blender-add-on-is-an-extension-that-reads-and-validates-a-package-without-blender.md).
 
 **Supported Blender: 5.2 LTS and 5.3** (Python 3.13). The glTF 2.0
-importer that ships with Blender must be enabled.
+importer that ships with Blender must be enabled. Optional DDS textures written with
+`--texture-container dds` are verified with Blender 5.3. [Package texture formats](../docs/blender-package.md#optional-dds-textures).
 
 ## What the import does
 

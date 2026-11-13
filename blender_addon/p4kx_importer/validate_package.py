@@ -15,7 +15,7 @@ from typing import Any
 from .manifest_fields import PackageError
 from .mesh_preflight import preflight_all_meshes
 from .package import MANIFEST_NAME, MAX_MANIFEST_BYTES, load_package, resolve_file
-from .package_digests import read_expected, verify_digests
+from .package_digests import file_sha256, read_expected, verify_digests
 
 
 def validate_package(location: Path, receipt: Path | None = None) -> dict[str, Any]:
@@ -38,6 +38,15 @@ def validate_package(location: Path, receipt: Path | None = None) -> dict[str, A
             files[asset.file] = path
         except PackageError as error:
             asset_problems.append({"path": asset.file, "detail": str(error)})
+    for texture in package.textures.values():
+        if texture.format != "dds" or texture.file not in files:
+            continue
+        try:
+            path = files[texture.file]
+            if path.stat().st_size != texture.byte_length or file_sha256(path) != texture.sha256:
+                asset_problems.append({"path": texture.file, "detail": "DDS byte binding differs."})
+        except OSError:
+            asset_problems.append({"path": texture.file, "detail": "DDS byte binding cannot be read."})
     asset_problems.sort(key=lambda problem: problem["path"])
     preflight = preflight_all_meshes(package)
     status = "valid"

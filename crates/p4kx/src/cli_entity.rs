@@ -140,6 +140,9 @@ pub(crate) struct EntityPackageArgs {
     /// a texture with fewer mips gives its smallest.
     #[arg(long, value_name = "N", default_value_t = 0)]
     pub(crate) texture_mip: u32,
+    /// Writes supported DDS mips unchanged, with PNG fallback for other textures.
+    #[arg(long, value_enum, value_name = "CONTAINER", default_value_t)]
+    pub(crate) texture_container: PackageTextureContainerArg,
     /// Leaves the vertex colours out of the parts.
     #[arg(long)]
     pub(crate) no_vertex_colours: bool,
@@ -153,6 +156,25 @@ pub(crate) struct EntityPackageArgs {
     pub(crate) interior: bool,
     #[command(flatten)]
     pub(crate) changes: LoadoutChangeArgs,
+}
+
+/// An external texture container supported by the Blender package importer.
+#[derive(Debug, Default, Clone, Copy, ValueEnum)]
+pub(crate) enum PackageTextureContainerArg {
+    /// Converts textures to PNG.
+    #[default]
+    Png,
+    /// Uses verified DDS blocks for compatible material textures.
+    Dds,
+}
+
+impl PackageTextureContainerArg {
+    pub(crate) const fn container(self) -> p4kx_blender::PackageTextureContainer {
+        match self {
+            Self::Png => p4kx_blender::PackageTextureContainer::Png,
+            Self::Dds => p4kx_blender::PackageTextureContainer::BlenderDds,
+        }
+    }
 }
 
 /// Arguments of `p4kx entity glb`.

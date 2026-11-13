@@ -7,12 +7,13 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use p4kx_extraction::ArchiveTextures;
 use p4kx_guard::{ArchiveWriteProtection, CreatedOutputFile, OwnedDirectoryPermit, OwnedFileToken};
 
-use crate::{PackageError, PackageResult};
+use crate::{PackageError, PackageResult, PackageTextureContainer};
 
 /// Source identity and cancellation shared by every output of a package job.
 #[derive(Clone, Copy)]
 pub struct PackageWriteContext<'a> {
     scope: Scope<'a>,
+    pub(crate) texture_container: PackageTextureContainer,
     pub(crate) texture_source: Option<&'a ArchiveTextures<'a, 'a>>,
 }
 
@@ -34,6 +35,7 @@ impl<'a> PackageWriteContext<'a> {
     pub const fn new(protection: &'a ArchiveWriteProtection, cancel: &'a AtomicBool) -> Self {
         Self {
             scope: Scope::Archive { protection, cancel },
+            texture_container: PackageTextureContainer::Png,
             texture_source: None,
         }
     }
@@ -48,11 +50,19 @@ impl<'a> PackageWriteContext<'a> {
         self
     }
 
+    /// Selects a texture container accepted by the package consumer.
+    #[must_use]
+    pub const fn with_texture_container(mut self, container: PackageTextureContainer) -> Self {
+        self.texture_container = container;
+        self
+    }
+
     pub(crate) const fn standalone(
         cancelled: &'a (dyn Fn() -> bool + Sync),
         observed: &'a AtomicBool,
     ) -> Self {
         Self {
+            texture_container: PackageTextureContainer::Png,
             texture_source: None,
             scope: Scope::Standalone {
                 cancelled,

@@ -10,9 +10,12 @@ use crate::path_index::PathIndex;
 use crate::texture_preview::ObservedPreviewImage;
 use crate::{ConversionError, DdsSourceInfo, Texture};
 
+#[path = "model_texture_dds.rs"]
+mod dds;
 #[path = "model_texture_origins.rs"]
 mod origin;
 
+pub use dds::{ModelDdsRefusal, ObservedModelDds};
 pub use origin::{ArchiveTextureReads, TextureTransferUses};
 
 /// The most pixels one texture of a model may hold: 8192 × 8192.
@@ -97,7 +100,7 @@ impl<'a> ArchiveTextures<'_, 'a> {
     /// Opens the texture at `path` and returns it with the mip `mip` selects and that mip's
     /// size, after checking it is one image within the pixel limit.
     fn open(&self, path: &str, mip: u32) -> Result<OpenTexture<'a>, TextureLoadError> {
-        let entry = format!("Data\\{}", path.replace('/', "\\"));
+        let entry = archive_path(path);
         let texture = Texture::from_index(self.index, &entry).map_err(|error| match error {
             ConversionError::UnknownEntry(_) => TextureLoadError::NotFound,
             other => TextureLoadError::Unreadable(describe(&other)),
@@ -162,6 +165,10 @@ impl TextureLoader for ArchiveTextures<'_, '_> {
     fn dimensions(&self, path: &str, mip: u32) -> Result<Option<(u32, u32)>, TextureLoadError> {
         self.open(path, mip).map(|opened| Some(opened.size))
     }
+}
+
+fn archive_path(path: &str) -> String {
+    format!("Data\\{}", path.replace('/', "\\"))
 }
 
 /// Returns whether pixels of `format` have an alpha channel that holds data.

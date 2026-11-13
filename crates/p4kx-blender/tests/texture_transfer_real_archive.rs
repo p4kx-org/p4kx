@@ -20,6 +20,9 @@ use p4kx_testkit::{
     check_glb, entity_schema,
 };
 
+#[path = "texture_direct_dds_real_archive/installed.rs"]
+mod direct_dds;
+
 type Check<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const SAMPLES: usize = 512;
@@ -144,7 +147,7 @@ fn select<'a>(archive: &'a Archive, watch: &ArchiveWatch) -> Check<[&'a Entry; 2
     Err("two installed colour strata".into())
 }
 
-fn assembly(root: &Path, path: &str) -> Check<Assembly> {
+pub(crate) fn assembly(root: &Path, path: &str) -> Check<Assembly> {
     let model = TestModel::cube();
     let material = TestMtlMaterial::new("surface")
         .diffuse([1.0; 3])

@@ -37,7 +37,6 @@ pub struct DdsSourceInfo {
     #[schemars(extend("const" = DDS_SOURCE_INFO_VERSION))]
     pub schema_version: u8,
     /// Header Entry declared decoded length or disk file length, excluding separate siblings.
-    #[serde(deserialize_with = "deserialize_header_source_bytes")]
     pub header_source_bytes: DecimalU64,
     /// Every declared source header word without defaults.
     pub raw: DdsRawHeaderInfo,
@@ -187,21 +186,4 @@ impl DdsNormalizedInfo {
             }),
         }
     }
-}
-
-fn deserialize_header_source_bytes<'de, D: serde::Deserializer<'de>>(
-    source: D,
-) -> Result<DecimalU64, D::Error> {
-    use serde::de::Error as _;
-    let text = String::deserialize(source)?;
-    if text.is_empty()
-        || text.len() > 20
-        || text.len() > 1 && text.starts_with('0')
-        || !text.bytes().all(|byte| byte.is_ascii_digit())
-    {
-        return Err(D::Error::custom(
-            "invalid canonical unsigned DDS header length",
-        ));
-    }
-    text.parse().map(DecimalU64::new).map_err(D::Error::custom)
 }

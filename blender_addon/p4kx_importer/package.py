@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from itertools import chain
 from pathlib import Path
 from typing import Any
@@ -28,6 +28,7 @@ from .manifest_fields import (
 )
 from .material_model import MaterialDesc, Palette, parse_materials, parse_palettes
 from .node_model import Node, parse_nodes
+from .package_digests import is_sha256
 from .package_paths import require_exact_asset_case
 from .package_paths import resolve_file as resolve_file
 from .rig_model import Rig, RigError, parse_rig
@@ -35,7 +36,7 @@ from .soc_scene import parse_ref as parse_soc_ref
 
 FORMAT_NAME = "p4kx-blender-package"
 SUPPORTED_MAJOR = 1
-SUPPORTED_MINOR = 13
+SUPPORTED_MINOR = 14
 MANIFEST_NAME = "scene.json"
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
 BLENDER_NAME_BYTES = 63
@@ -44,7 +45,7 @@ _VERSION = re.compile(r"^([0-9]+)\.([0-9]+)$")
 _MESH_ID = re.compile(r"^m[0-9]{4,}$")
 _TEXTURE_ID = re.compile(r"^t[0-9]{4,}$")
 _MESH_FILE = re.compile(r"^meshes/m[0-9]{4,}\.glb$")
-_TEXTURE_FILE = re.compile(r"^textures/t[0-9]{4,}\.png$")
+_TEXTURE_FILE = re.compile(r"^textures/t[0-9]{4,}\.(png|dds)$")
 _ROLES = ("diffuse", "normal", "specular")
 _COLOUR_SPACES = frozenset({"srgb", "linear"})
 _TEXTURE_ENCODINGS = frozenset({"srgb", "linear_colour", "data"})
@@ -76,13 +77,17 @@ class Mesh:
 
 @dataclass(frozen=True, slots=True)
 class Texture:
-    """One PNG file of the package."""
+    """One PNG or DDS texture file of the package."""
 
     id: str
     file: str
     colour_space: str
     alpha: str
     encoding: str | None = None
+    format: str = "png"
+    dimensions: tuple[int, int] | None = None
+    byte_length: int | None = None
+    sha256: str | None = None
 
 
 @dataclass(slots=True)
@@ -129,7 +134,7 @@ def parse_manifest(data: object, root: Path) -> Package:
         raise PackageError(f"Not a P4KX Blender package: format is not {FORMAT_NAME}.")
     version, warnings = _check_version(manifest.get("version"))
     _check_coordinates(read_object(manifest.get("coordinates"), "coordinates"))
-    textures = _parse_textures(read_array(manifest.get("textures"), "textures"), warnings)
+    textures = _parse_textures(read_array(manifest.get("textures"), "textures"), version, warnings)
     meshes = _parse_meshes(read_array(manifest.get("meshes"), "meshes"), textures)
     nodes = parse_nodes(
         manifest.get("nodes"), {mesh_id: mesh.rig is not None for mesh_id, mesh in meshes.items()}, warnings
@@ -232,7 +237,9 @@ def _entity_name(manifest: dict[str, Any]) -> str:
     return name if isinstance(name, str) and name else "P4KX package"
 
 
-def _parse_textures(items: list[Any], warnings: list[str]) -> dict[str, Texture]:
+def _parse_textures(
+    items: list[Any], version: tuple[int, int], warnings: list[str]
+) -> dict[str, Texture]:
     textures: dict[str, Texture] = {}
     for position, item in enumerate(items):
         where = f"textures[{position}]"
@@ -242,12 +249,14 @@ def _parse_textures(items: list[Any], warnings: list[str]) -> dict[str, Texture]
             raise PackageError(f"{where}: id {texture_id!r} is not a texture id.")
         if texture_id in textures:
             raise PackageError(f"{where}: duplicate texture id {texture_id}.")
-        if entry.get("format") != "png":
+        image_format = entry.get("format")
+        if image_format != "png" and (image_format != "dds" or version < (1, 14)):
             warnings.append(f"Texture {texture_id} has a format this add-on does not read.")
             continue
         file = read_text(entry, "file", where)
-        if not _TEXTURE_FILE.fullmatch(file):
-            raise PackageError(f"{where}: file {file!r} is not a package texture path.")
+        matched = _TEXTURE_FILE.fullmatch(file)
+        if not matched or matched.group(1) != image_format:
+            raise PackageError(f"{where}: file {file!r} does not match its texture format.")
         colour_space = read_text(entry, "colour_space", where)
         alpha = read_text(entry, "alpha", where)
         if colour_space not in _COLOUR_SPACES or alpha not in _ALPHA_MEANINGS:
@@ -259,8 +268,41 @@ def _parse_textures(items: list[Any], warnings: list[str]) -> dict[str, Texture]
         ):
             warnings.append(f"Texture {texture_id} has an unknown input encoding.")
             encoding = None
-        textures[texture_id] = Texture(texture_id, file, colour_space, alpha, encoding)
+        if image_format == "dds":
+            textures[texture_id] = _parse_dds_texture(
+                entry, where, Texture(texture_id, file, colour_space, alpha, encoding)
+            )
+        else:
+            textures[texture_id] = Texture(texture_id, file, colour_space, alpha, encoding)
     return textures
+
+
+def _parse_dds_texture(entry: dict[str, Any], where: str, texture: Texture) -> Texture:
+    if texture.file != f"textures/{texture.id}.dds" or entry.get("dds_fallback") is not None:
+        raise PackageError(f"{where}: invalid DDS texture identity or fallback.")
+    asset = read_object(entry.get("dds_asset"), f"{where}.dds_asset")
+    artifact = read_object(asset.get("artifact"), f"{where}.dds_asset.artifact")
+    digest = artifact.get("sha256")
+    byte_length = artifact.get("byteLength")
+    width, height = entry.get("width"), entry.get("height")
+    if not is_sha256(digest) or not _valid_dds_length(byte_length):
+        raise PackageError(f"{where}: invalid DDS artifact digest or byte length.")
+    if type(width) is not int or type(height) is not int or min(width, height) < 1:
+        raise PackageError(f"{where}: invalid DDS texture dimensions.")
+    return replace(
+        texture, format="dds", dimensions=(width, height), byte_length=int(byte_length), sha256=digest
+    )
+
+
+def _valid_dds_length(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and 1 <= len(value) <= 20
+        and value.isascii()
+        and value.isdecimal()
+        and value[0] != "0"
+        and int(value) <= (1 << 64) - 1
+    )
 
 
 def _parse_meshes(items: list[Any], textures: dict[str, Texture]) -> dict[str, Mesh]:

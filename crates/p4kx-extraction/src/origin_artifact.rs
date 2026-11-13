@@ -117,7 +117,7 @@ fn native_name(name: &OsStr) -> io::Result<ArtifactName> {
 }
 
 /// Actual written byte length and SHA-256.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct OriginArtifactDigest {
     byte_length: DecimalU64,

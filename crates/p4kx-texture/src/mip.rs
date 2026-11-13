@@ -191,7 +191,7 @@ where
 ///
 /// Returns the errors of a mip read.
 pub fn read_mip_with_location<R, S>(
-    mut header: R,
+    header: R,
     header_size: u64,
     siblings: &S,
     level: u32,
@@ -200,6 +200,43 @@ where
     R: Read,
     S: SiblingReader + ?Sized,
 {
+    read_located(header, header_size, siblings, level, ReadExtent::Selected)
+}
+
+impl LocatedMip {
+    /// Reads a selected mip and drains its original header and used sibling to checked EOF.
+    ///
+    /// # Errors
+    /// Returns the source reader, format or selected mip errors.
+    pub fn read_complete(
+        header: impl Read,
+        header_size: u64,
+        siblings: &(impl SiblingReader + ?Sized),
+        level: u32,
+    ) -> Result<Self, TextureError> {
+        read_located(
+            header,
+            header_size,
+            siblings,
+            level,
+            ReadExtent::CompleteEntries,
+        )
+    }
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ReadExtent {
+    Selected,
+    CompleteEntries,
+}
+
+fn read_located(
+    mut header: impl Read,
+    header_size: u64,
+    siblings: &(impl SiblingReader + ?Sized),
+    level: u32,
+    extent: ReadExtent,
+) -> Result<LocatedMip, TextureError> {
     let mut prefix = [0; MAX_HEADER_LEN];
     let limit =
         usize::try_from(header_size).map_or(MAX_HEADER_LEN, |size| size.min(MAX_HEADER_LEN));
@@ -222,7 +259,14 @@ where
             .mip_size(level)
             .ok_or_else(|| TextureError::UnsupportedFormat(dds.format()))?;
         let index = parts - level;
-        let data = read_from_part(&dds, parts, index, size, siblings)?;
+        let data = read_from_part(&dds, parts, index, size, siblings, extent)?;
+        if extent == ReadExtent::CompleteEntries && trailer_len > 0 {
+            let tail = start
+                .get(dds.header_len()..)
+                .unwrap_or_default()
+                .chain(&mut header);
+            verify_split_trailer(tail, dds.header_len() as u64, header_size, trailer_len)?;
+        }
         let location = MipPayloadLocation::part(index, data.len() as u64, &dds, level);
         (data, location)
     } else {
@@ -231,10 +275,13 @@ where
             &dds,
             parts,
             level,
-            tail.chain(header),
+            tail.chain(&mut header),
             (header_size, trailer_len),
         )?
     };
+    if extent == ReadExtent::CompleteEntries {
+        io::copy(&mut header, &mut io::sink()).map_err(TextureError::ReadHeader)?;
+    }
     Ok(LocatedMip {
         mip: Mip {
             header: dds,
@@ -246,28 +293,51 @@ where
     })
 }
 
+fn verify_split_trailer(
+    mut tail: impl Read,
+    prefix_size: u64,
+    header_size: u64,
+    trailer_len: u64,
+) -> Result<(), TextureError> {
+    let distance = header_size - prefix_size;
+    let skipped = io::copy(&mut tail.by_ref().take(distance), &mut io::sink())
+        .map_err(TextureError::ReadHeader)?;
+    if skipped < distance {
+        return Err(TextureError::TruncatedHeader {
+            len: prefix_size + skipped,
+            needed: header_size,
+        });
+    }
+    check_trailer(tail, trailer_len, header_size)
+}
+
 fn read_from_part<S>(
     dds: &DdsHeader,
     parts: u32,
     index: u32,
     size: u64,
     siblings: &S,
+    extent: ReadExtent,
 ) -> Result<Vec<u8>, TextureError>
 where
     S: SiblingReader + ?Sized,
 {
     checked_part_len(dds, parts, index, siblings)?;
-    let reader = siblings
+    let mut reader = siblings
         .open_part(index)
         .map_err(|source| TextureError::ReadPart { index, source })?;
     let data =
-        read_up_to(reader, size).map_err(|source| TextureError::ReadPart { index, source })?;
+        read_up_to(&mut reader, size).map_err(|source| TextureError::ReadPart { index, source })?;
     if (data.len() as u64) < size {
         return Err(TextureError::TruncatedPart {
             index,
             expected: size,
             actual: data.len() as u64,
         });
+    }
+    if extent == ReadExtent::CompleteEntries {
+        io::copy(&mut reader, &mut io::sink())
+            .map_err(|source| TextureError::ReadPart { index, source })?;
     }
     Ok(data)
 }

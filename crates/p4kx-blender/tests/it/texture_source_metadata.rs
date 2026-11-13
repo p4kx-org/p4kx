@@ -6,11 +6,13 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use p4kx_blender::{
-    Manifest, PackageInfo, PackageWriteContext, TextureChannelTransform, TextureEncoding,
-    write_package_with_context,
+    DdsTextureFallback, Manifest, PackageInfo, PackageTextureContainer, PackageWriteContext,
+    TextureChannelTransform, TextureEncoding, TextureFormat, write_package_with_context,
 };
 use p4kx_extraction::texture_codec::{DdsPngTransform, DdsTransfer};
-use p4kx_extraction::{Archive, ArchiveWriteProtection, CancelToken, FieldPath, OpenOptions};
+use p4kx_extraction::{
+    Archive, ArchiveWriteProtection, CancelToken, FieldPath, OpenOptions, OriginDigestWriter,
+};
 use p4kx_testkit::{SplitDds, TestEntry, TestTextureFormat, layered_entries, test_key};
 
 use crate::support::{TestResult, assemble, glb_options};
@@ -23,7 +25,7 @@ fn package_texture_keeps_plain_dds_words_separate_from_used_encrypted_alpha() ->
     fs::create_dir_all(folder)?;
     let path = "Data\\Objects\\Test\\layers\\textures\\base_ddna.dds";
     let input = archive(folder, path)?;
-    let manifest = write(&input, folder)?;
+    let manifest = write(&input, &folder.join("ship"), PackageTextureContainer::Png)?;
     verify_linear_colour(&manifest, folder)?;
     let receipt = manifest
         .textures
@@ -176,22 +178,27 @@ fn archive(folder: &Path, path: &str) -> Result<Archive, Box<dyn Error>> {
         OpenOptions::new().key(Some(test_key())),
     )?)
 }
-fn write(archive: &Archive, output: &Path) -> Result<Manifest, Box<dyn Error>> {
+fn write(
+    archive: &Archive,
+    package: &Path,
+    container: PackageTextureContainer,
+) -> Result<Manifest, Box<dyn Error>> {
     let assembly = assemble(archive, "TEST_Layered")?;
     let models = p4kx_assembly::ArchiveModels::new(archive);
     let loader = models.textures();
     let cancel = CancelToken::new();
     let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
-    let context =
-        PackageWriteContext::new(&protection, cancel.flag()).with_archive_texture_source(&loader);
-    let package = output.join("ship");
+    let context = PackageWriteContext::new(&protection, cancel.flag())
+        .with_archive_texture_source(&loader)
+        .with_texture_container(container);
+
     write_package_with_context(
         &assembly,
         &models,
         &loader,
         &glb_options(0),
         &PackageInfo::default(),
-        &package,
+        package,
         &context,
     )?;
     let bytes = fs::read(package.join("scene.json"))?;
@@ -201,4 +208,127 @@ fn write(archive: &Archive, output: &Path) -> Result<Manifest, Box<dyn Error>> {
         .validate(&value)
         .map_err(|error| error.to_string())?;
     Ok(serde_json::from_slice(&bytes)?)
+}
+
+#[test]
+fn optional_dds_writes_exact_mip_and_digest_with_composed_png_fallback() -> TestResult {
+    let temporary = tempfile::tempdir()?;
+    let retained = std::env::var_os("P4KX_SYNTHETIC_DDS_PACKAGE").map(PathBuf::from);
+    let folder = retained.as_deref().unwrap_or_else(|| temporary.path());
+    fs::create_dir_all(folder)?;
+    let normal_path = r"Data\Objects\Test\layers\textures\base_ddna.dds";
+    let input = archive(folder, normal_path)?;
+    let package = folder.join("dds");
+    let manifest = write(&input, &package, PackageTextureContainer::BlenderDds)?;
+    verify_dds_asset(&manifest, &package)?;
+    let normal = manifest
+        .textures
+        .iter()
+        .find(|item| item.source.ends_with("base_ddna.dds"))
+        .ok_or("PNG normal fallback")?;
+    assert_eq!(
+        normal.format,
+        TextureFormat::Png,
+        "composed texture stays PNG"
+    );
+    assert_eq!(
+        normal.dds_fallback,
+        Some(DdsTextureFallback::SplitAlpha),
+        "split-alpha fallback is explicit"
+    );
+    let metadata = normal
+        .source_metadata
+        .as_deref()
+        .ok_or("combined PNG receipt")?;
+    let origin = metadata
+        .field_origins
+        .get(&FieldPath::parse("/image")?)
+        .ok_or("combined image origin")?;
+    assert_eq!(
+        origin.contains_encrypted_source(),
+        Some(true),
+        "fallback uses encrypted alpha"
+    );
+    let default_folder = folder.join("default");
+    let default = write(&input, &default_folder, PackageTextureContainer::Png)?;
+    let default_normal = default
+        .textures
+        .iter()
+        .find(|item| item.id == normal.id)
+        .ok_or("corresponding default normal")?;
+    assert_eq!(
+        default_normal.dds_fallback, None,
+        "default PNG has no fallback"
+    );
+    assert_eq!(
+        fs::read(package.join(&normal.file))?,
+        fs::read(default_folder.join(&normal.file))?,
+        "fallback and default use identical PNG bytes"
+    );
+    assert_eq!(
+        manifest.textures.len(),
+        default.textures.len(),
+        "deduplication is independent of format"
+    );
+    Ok(())
+}
+
+fn verify_dds_asset(manifest: &Manifest, package: &Path) -> TestResult {
+    use std::io::Write as _;
+
+    let colour = manifest
+        .textures
+        .iter()
+        .find(|item| item.source.ends_with("base_diff.dds"))
+        .ok_or("DDS colour asset")?;
+    assert_eq!(
+        colour.format,
+        TextureFormat::Dds,
+        "compatible colour is stored in DDS"
+    );
+    assert_eq!(
+        colour.encoding,
+        Some(TextureEncoding::LinearColour),
+        "source transfer drives importer sampling"
+    );
+    let asset = colour.dds_asset.as_deref().ok_or("same-read DDS receipt")?;
+    assert_eq!(asset.mip_level, 0, "selected original mip");
+    assert_eq!(
+        asset.dds.transfer.ok_or("authored transfer")?.effective,
+        DdsTransfer::Linear,
+        "original transfer survives DDS normalization"
+    );
+    let artifact = fs::read(package.join(&colour.file))?;
+    assert!(artifact.starts_with(b"DDS "), "standard magic");
+    let body = artifact
+        .get(asset.dds.raw.header_length..)
+        .ok_or("DDS payload")?;
+    assert_eq!(
+        body,
+        [128, 64, 16, 81].repeat(64),
+        "unchanged authored samples"
+    );
+    let mut measured = OriginDigestWriter::new(std::io::sink());
+    measured.write_all(&artifact)?;
+    assert_eq!(
+        asset.artifact,
+        measured.finish()?,
+        "written length and digest"
+    );
+    for field in ["/artifact", "/header_checksum"] {
+        let origin = asset
+            .field_origins
+            .get(&FieldPath::parse(field)?)
+            .ok_or(field)?;
+        assert_eq!(
+            origin.contains_encrypted_source(),
+            Some(false),
+            "{field} uses plain colour"
+        );
+        assert!(
+            origin.source_set_complete(),
+            "{field} binds complete source uses"
+        );
+    }
+    Ok(())
 }

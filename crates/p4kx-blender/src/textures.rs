@@ -4,14 +4,17 @@
 use std::io::{BufWriter, Write};
 use std::path::Path;
 
+use crate::texture_dds::{self, SourceFallback};
 use crate::texture_encoding::TextureMode;
 use crate::texture_source_metadata;
+use p4kx_extraction::OriginDigestWriter;
 use p4kx_gltf::TextureLoader;
-use p4kx_texture::{RgbaImage, TextureError, write_png_with_transfer};
+use p4kx_texture::{DdsTransfer, RgbaImage, TextureError, write_png_with_transfer};
 use rayon::prelude::*;
 
 use crate::{
-    AlphaMeaning, ColourSpace, PackageError, PackageResult, PackageWriteContext, TextureEncoding,
+    AlphaMeaning, ColourSpace, DdsTextureAsset, DdsTextureFallback, PackageError, PackageResult,
+    PackageTextureContainer, PackageWriteContext, TextureEncoding, TextureFormat,
 };
 
 /// How many textures are decoded and encoded at once; a texture can hold 64 megapixels.
@@ -37,8 +40,14 @@ pub(crate) enum Outcome {
         encoding: TextureEncoding,
         alpha: AlphaMeaning,
         source_metadata: Option<Box<crate::TextureSourceMetadata>>,
+        format: TextureFormat,
+        dds_asset: Option<Box<DdsTextureAsset>>,
+        dds_fallback: Option<DdsTextureFallback>,
     },
-    Failed(String),
+    Failed {
+        reason: String,
+        dds: Option<DdsTextureFallback>,
+    },
 }
 
 /// Returns the file name of the texture at position `index` of the wanted ones.
@@ -46,7 +55,7 @@ pub(crate) fn id_of(index: usize) -> String {
     format!("t{:04}", index + 1)
 }
 
-/// Loads every wanted texture at `mip` and writes it as `<folder>/<id>.png`.
+/// Writes one PNG or supported DDS file for each successfully loaded texture.
 ///
 /// A texture that cannot be loaded or encoded is a [`Outcome::Failed`] and leaves no file.
 pub(crate) fn write_all(
@@ -87,59 +96,178 @@ fn write_one(
     folder: &Path,
     context: &PackageWriteContext<'_>,
 ) -> PackageResult<Outcome> {
-    let (decoded, source_metadata, transfer) =
-        match texture_source_metadata::load(loader, &texture.path, mip, texture.mode, context)? {
-            Ok(decoded) => decoded,
-            Err(error) => return Ok(Outcome::Failed(error.to_string())),
+    let output = TextureOutput {
+        texture,
+        id,
+        folder,
+        context,
+    };
+    let fallback = match context.texture_container {
+        PackageTextureContainer::Png => None,
+        PackageTextureContainer::BlenderDds => match output.direct_dds(mip)? {
+            Ok(written) => return Ok(written),
+            Err(reason) => Some(reason),
+        },
+    };
+    output.png(loader, mip, fallback)
+}
+
+struct TextureOutput<'a, 'source> {
+    texture: &'a Wanted,
+    id: &'a str,
+    folder: &'a Path,
+    context: &'a PackageWriteContext<'source>,
+}
+
+impl TextureOutput<'_, '_> {
+    fn direct_dds(&self, mip: u32) -> PackageResult<Result<Outcome, DdsTextureFallback>> {
+        let Some(source) = self.context.texture_source else {
+            return Ok(Err(DdsTextureFallback::UnavailableSource));
         };
-    let alpha = match (decoded.has_alpha, texture.mode) {
-        (false, _) => AlphaMeaning::None,
-        (true, TextureMode::Normal { gloss: true }) => AlphaMeaning::Smoothness,
-        (true, _) => AlphaMeaning::Opacity,
-    };
-    let image = if matches!(texture.mode, TextureMode::Normal { .. }) {
-        match flip_green(decoded.image) {
-            Ok(image) => image,
-            Err(error) => return Ok(Outcome::Failed(error.to_string())),
+        self.context.check()?;
+        let observed = match source.load_dds(&self.texture.path, mip) {
+            Ok(observed) => observed,
+            Err(error) => {
+                return Ok(match DdsTextureFallback::source_error(&error) {
+                    SourceFallback::Png(reason) => Err(reason),
+                    SourceFallback::Refused(reason) => {
+                        Ok(Self::failed(error.to_string(), Some(reason)))
+                    }
+                });
+            }
+        };
+        self.context.check()?;
+        let mode = self.texture.mode;
+        if let Some(reason) = texture_dds::unsupported(&observed.read, mode) {
+            return Ok(Err(reason));
         }
-    } else {
-        decoded.image
-    };
-    let path = folder.join(format!("{id}.png"));
-    let (file, ownership) = context.create_file(&path)?.into_parts();
-    let mut writer = BufWriter::new(file);
-    let written = write_png_with_transfer(&image, texture.mode.tag(transfer), &mut writer);
-    match written {
-        Ok(()) => {}
-        Err(TextureError::Write(source)) => return Err(PackageError::write(&path, source)),
-        Err(error) => {
-            drop(writer);
-            context.cleanup_file(&ownership, &path)?;
-            return Ok(Outcome::Failed(error.to_string()));
+        let width = observed.read.mip.width();
+        let height = observed.read.mip.height();
+        let transfer = observed
+            .metadata
+            .transfer
+            .map_or(DdsTransfer::Unknown, |source| source.effective);
+        let alpha = Self::alpha(texture_dds::alpha_has_samples(&observed), mode);
+        let written = self.write(TextureFormat::Dds, |writer| {
+            let mut measured = OriginDigestWriter::new(writer);
+            observed.read.write_dds(&mut measured)?;
+            measured.finish().map_err(TextureError::Write)
+        })?;
+        let (artifact, bytes) = match written {
+            Ok(written) => written,
+            Err(error) => {
+                return Ok(Ok(Self::failed(
+                    error.to_string(),
+                    Some(DdsTextureFallback::InvalidInput),
+                )));
+            }
+        };
+        let dds_asset = DdsTextureAsset::bind(observed, artifact)?;
+        Ok(Ok(Outcome::Written {
+            width,
+            height,
+            bytes,
+            colour_space: mode.legacy_space(),
+            encoding: mode.encoding(transfer),
+            alpha,
+            source_metadata: None,
+            format: TextureFormat::Dds,
+            dds_asset: Some(Box::new(dds_asset)),
+            dds_fallback: None,
+        }))
+    }
+
+    fn png(
+        &self,
+        loader: &dyn TextureLoader,
+        mip: u32,
+        fallback: Option<DdsTextureFallback>,
+    ) -> PackageResult<Outcome> {
+        let mode = self.texture.mode;
+        let (decoded, source_metadata, transfer) = match texture_source_metadata::load(
+            loader,
+            &self.texture.path,
+            mip,
+            mode,
+            self.context,
+        )? {
+            Ok(decoded) => decoded,
+            Err(error) => return Ok(Self::failed(error.to_string(), fallback)),
+        };
+        let alpha = Self::alpha(decoded.has_alpha, mode);
+        let image = if matches!(mode, TextureMode::Normal { .. }) {
+            match flip_green(decoded.image) {
+                Ok(image) => image,
+                Err(error) => return Ok(Self::failed(error.to_string(), fallback)),
+            }
+        } else {
+            decoded.image
+        };
+        let written = self.write(TextureFormat::Png, |writer| {
+            write_png_with_transfer(&image, mode.tag(transfer), writer)
+        })?;
+        let bytes = match written {
+            Ok(((), bytes)) => bytes,
+            Err(error) => return Ok(Self::failed(error.to_string(), fallback)),
+        };
+        Ok(Outcome::Written {
+            width: image.width(),
+            height: image.height(),
+            bytes,
+            colour_space: mode.legacy_space(),
+            encoding: mode.encoding(transfer),
+            alpha,
+            source_metadata,
+            format: TextureFormat::Png,
+            dds_asset: None,
+            dds_fallback: fallback,
+        })
+    }
+
+    fn write<T>(
+        &self,
+        format: TextureFormat,
+        encode: impl FnOnce(&mut dyn Write) -> Result<T, TextureError>,
+    ) -> PackageResult<Result<(T, u64), TextureError>> {
+        let path = self
+            .folder
+            .join(format!("{}.{}", self.id, format.extension()));
+        let (file, ownership) = self.context.create_file(&path)?.into_parts();
+        let mut writer = BufWriter::new(file);
+        let encoded = match encode(&mut writer) {
+            Ok(encoded) => encoded,
+            Err(TextureError::Write(source)) => return Err(PackageError::write(&path, source)),
+            Err(error) => {
+                drop(writer);
+                self.context.cleanup_file(&ownership, &path)?;
+                return Ok(Err(error));
+            }
+        };
+        writer
+            .flush()
+            .map_err(|source| PackageError::write(&path, source))?;
+        ownership.ensure_writable(&path, self.context.cancel_flag())?;
+        let file = writer.get_ref();
+        file.sync_all()
+            .map_err(|source| PackageError::write(&path, source))?;
+        let bytes = file
+            .metadata()
+            .map_err(|source| PackageError::write(&path, source))?
+            .len();
+        Ok(Ok((encoded, bytes)))
+    }
+
+    const fn alpha(has_samples: bool, mode: TextureMode) -> AlphaMeaning {
+        match (has_samples, mode) {
+            (false, _) => AlphaMeaning::None,
+            (true, TextureMode::Normal { gloss: true }) => AlphaMeaning::Smoothness,
+            (true, _) => AlphaMeaning::Opacity,
         }
     }
-    writer
-        .flush()
-        .map_err(|source| PackageError::write(&path, source))?;
-    ownership.ensure_writable(&path, context.cancel_flag())?;
-    writer
-        .get_ref()
-        .sync_all()
-        .map_err(|source| PackageError::write(&path, source))?;
-    let bytes = writer
-        .get_ref()
-        .metadata()
-        .map_err(|source| PackageError::write(&path, source))?
-        .len();
-    Ok(Outcome::Written {
-        width: image.width(),
-        height: image.height(),
-        bytes,
-        colour_space: texture.mode.legacy_space(),
-        encoding: texture.mode.encoding(transfer),
-        alpha,
-        source_metadata,
-    })
+
+    const fn failed(reason: String, dds: Option<DdsTextureFallback>) -> Outcome {
+        Outcome::Failed { reason, dds }
+    }
 }
 
 /// Returns `image` with the green channel inverted: the engine's normal maps have Y pointing down

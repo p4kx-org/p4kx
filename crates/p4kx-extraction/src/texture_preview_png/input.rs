@@ -97,27 +97,32 @@ impl<'a> TexturePreviewInput<'a, MipPayloadLocation> {
         raw: DdsRawHeader,
         location: MipPayloadLocation,
     ) -> Self {
+        match parts {
+            Parts::Source { header, parts, .. } => Self::from_archive(
+                raw,
+                location,
+                header.observed_entry(),
+                location
+                    .part_index()
+                    .and_then(|part| parts.get(&part).and_then(SourceEntry::observed_entry)),
+            ),
+            Parts::Files(_) => Self::from_archive(raw, location, None, None),
+        }
+    }
+
+    pub(crate) fn from_archive(
+        raw: DdsRawHeader,
+        location: MipPayloadLocation,
+        header: Option<ObservedEntry<'a>>,
+        part: Option<ObservedEntry<'a>>,
+    ) -> Self {
         let archive_input =
             |entry: Option<ObservedEntry<'a>>| entry.map_or(ReadInput::Unknown, ReadInput::Archive);
-        let (header, payload) = match parts {
-            Parts::Source { header, parts, .. } => (
-                archive_input(header.observed_entry()),
-                location.part_index().map_or(PayloadEntry::Header, |part| {
-                    PayloadEntry::Split(archive_input(
-                        parts.get(&part).and_then(SourceEntry::observed_entry),
-                    ))
-                }),
-            ),
-            Parts::Files(_) => (
-                ReadInput::Unknown,
-                location.part_index().map_or(PayloadEntry::Header, |_| {
-                    PayloadEntry::Split(ReadInput::Unknown)
-                }),
-            ),
-        };
         Self {
-            header,
-            payload,
+            header: archive_input(header),
+            payload: location.part_index().map_or(PayloadEntry::Header, |_| {
+                PayloadEntry::Split(archive_input(part))
+            }),
             raw,
             spans: location,
             disk_selection: None,

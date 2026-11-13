@@ -708,6 +708,172 @@
       ],
       "type": "object"
     },
+    "DdsTextureAsset": {
+      "additionalProperties": false,
+      "description": "A normalized one-surface DDS asset and its original selected mip evidence.",
+      "properties": {
+        "artifact": {
+          "$ref": "#/$defs/OriginArtifactDigest",
+          "description": "Byte length and SHA-256 of the DDS file, including its normalized header."
+        },
+        "dds": {
+          "$ref": "#/$defs/DdsSourceInfo",
+          "description": "Raw and reader-normalized original header."
+        },
+        "field_origins": {
+          "$ref": "#/$defs/FieldOrigins",
+          "description": "Source origins relative to this object; /artifact includes the actual copied bytes."
+        },
+        "header_checksum": {
+          "$ref": "#/$defs/DdsTextureSourceChecksum",
+          "description": "Original archive checksum of the header Entry."
+        },
+        "mip_level": {
+          "description": "Original zero-based mip copied into this two-dimensional asset.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "part_checksum": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTextureSourceChecksum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original archive checksum of the split mip Entry when separate."
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory",
+          "description": "Read and directory inputs referenced by the immediate origins."
+        }
+      },
+      "required": [
+        "artifact",
+        "dds",
+        "mip_level",
+        "header_checksum",
+        "field_origins",
+        "provenance"
+      ],
+      "type": "object"
+    },
+    "DdsTextureFallback": {
+      "description": "Why a requested DDS asset could not be used.",
+      "oneOf": [
+        {
+          "const": "unavailable_source",
+          "description": "The package caller does not provide a physical DDS source.",
+          "type": "string"
+        },
+        {
+          "const": "missing_member",
+          "description": "The required physical member does not exist.",
+          "type": "string"
+        },
+        {
+          "const": "ambiguous_member",
+          "description": "More than one physical member has the required path.",
+          "type": "string"
+        },
+        {
+          "const": "unproved_member",
+          "description": "The original path could not be established.",
+          "type": "string"
+        },
+        {
+          "const": "split_alpha",
+          "description": "The output requires combining colour with a separate alpha or smoothness member.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported_topology",
+          "description": "The consumer material slot requires one two-dimensional surface.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported_format",
+          "description": "The consumer has no verified sample-compatible decoder for this encoding and role.",
+          "type": "string"
+        },
+        {
+          "const": "signed_bc5",
+          "description": "Blender does not decode the signed BC5 format.",
+          "type": "string"
+        },
+        {
+          "const": "normal_coordinate_transform",
+          "description": "The material role requires a flipped normal Y channel.",
+          "type": "string"
+        },
+        {
+          "const": "invalid_input",
+          "description": "An input could not be read, parsed or verified completely.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdsTextureSourceChecksum": {
+      "description": "The archive directory's checksum of a completely verified original input.",
+      "oneOf": [
+        {
+          "description": "CRC-32 of decoded Entry bytes.",
+          "properties": {
+            "hex": {
+              "pattern": "^[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "kind": {
+              "const": "crc32",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "hex"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "CRC-32C of decoded Entry bytes.",
+          "properties": {
+            "hex": {
+              "pattern": "^[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "kind": {
+              "const": "crc32c",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "hex"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "SHA-256 of stored Entry bytes.",
+          "properties": {
+            "hex": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "kind": {
+              "const": "sha256",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "hex"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "DdsTransfer": {
       "description": "Transfer function declared for DDS colour samples.",
       "oneOf": [
@@ -2334,6 +2500,24 @@
         "vertex_colours",
         "exclude",
         "replace"
+      ],
+      "type": "object"
+    },
+    "OriginArtifactDigest": {
+      "additionalProperties": false,
+      "description": "Actual written byte length and SHA-256.",
+      "properties": {
+        "byteLength": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "byteLength",
+        "sha256"
       ],
       "type": "object"
     },
@@ -4031,6 +4215,28 @@
           "$ref": "#/$defs/ColourSpace",
           "description": "How the colour channels are encoded."
         },
+        "dds_asset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTextureAsset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A lossless selected-mip DDS byte binding and its original entry checksums."
+        },
+        "dds_fallback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTextureFallback"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The reason the requested direct DDS texture required PNG."
+        },
         "encoding": {
           "anyOf": [
             {
@@ -4111,7 +4317,7 @@
       ]
     },
     "TextureEncoding": {
-      "description": "How the package importer samples the PNG's colour channels.",
+      "description": "How the package importer samples the image's colour channels.",
       "oneOf": [
         {
           "const": "srgb",
@@ -4136,6 +4342,11 @@
         {
           "const": "png",
           "description": "An 8-bit RGBA PNG.",
+          "type": "string"
+        },
+        {
+          "const": "dds",
+          "description": "A standard DDS container holding an original selected mip.",
           "type": "string"
         }
       ]

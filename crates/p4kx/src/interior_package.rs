@@ -88,6 +88,13 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
         scene = scene.with_authored_soc(authored);
     }
     let loader = models.textures();
+    let container = args.texture_container.container();
+    let context = context.with_texture_container(container);
+    let context = if container == p4kx_blender::PackageTextureContainer::BlenderDds {
+        context.with_archive_texture_source(&loader)
+    } else {
+        context
+    };
     let summary = write_interior_package_with_context(
         &scene, &models, &loader, &glb, &info, &args.out, &context,
     )?;

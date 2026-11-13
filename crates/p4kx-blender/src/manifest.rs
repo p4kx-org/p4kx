@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::manifest_light::Light;
 use crate::manifest_materials::{MaterialDescription, MaterialLibrarySourceDescription, Palette};
 use crate::manifest_rig::Rig;
+use crate::texture_format::TextureFormat;
 
 /// The value of [`Manifest::format`] as text.
 pub const FORMAT: &str = "p4kx-blender-package";
@@ -15,7 +16,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 ///
 /// A new minor version only adds fields and values readers may ignore; a new major version changes
 /// the meaning of existing ones.
-pub const FORMAT_VERSION: &str = "1.13";
+pub const FORMAT_VERSION: &str = "1.14";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
@@ -23,7 +24,7 @@ pub const MANIFEST_FILE: &str = "scene.json";
 /// The folder of the GLB meshes in the package folder.
 pub const MESHES_FOLDER: &str = "meshes";
 
-/// The folder of the PNG textures in the package folder.
+/// The folder of the texture files in the package folder.
 pub const TEXTURES_FOLDER: &str = "textures";
 
 /// The format name in `scene.json`.
@@ -48,14 +49,6 @@ pub enum Unit {
     /// Metres. A reader refuses a unit it does not know.
     #[serde(rename = "metre")]
     Metre,
-}
-
-/// The image format of a texture file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub enum TextureFormat {
-    /// An 8-bit RGBA PNG.
-    #[serde(rename = "png")]
-    Png,
 }
 
 /// How the colour channels of a texture are encoded.
@@ -366,6 +359,12 @@ pub struct Texture {
     /// The importer input encoding for this specific output role.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub encoding: Option<crate::TextureEncoding>,
+    /// A lossless selected-mip DDS byte binding and its original entry checksums.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dds_asset: Option<Box<crate::DdsTextureAsset>>,
+    /// The reason the requested direct DDS texture required PNG.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dds_fallback: Option<crate::DdsTextureFallback>,
     /// What the alpha channel holds.
     pub alpha: AlphaMeaning,
     /// Original DDS header and actual mip evidence, when the loader exposes its physical input.

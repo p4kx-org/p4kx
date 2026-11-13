@@ -1,7 +1,7 @@
 # Blender package
 
 A Blender package is a folder that describes an Assembly in files any importer can read: a scene
-description, shared GLB meshes and PNG textures. It does not depend on Blender's file format, so
+description, shared GLB meshes and external textures. It does not depend on Blender's file format, so
 new Blender versions do not break it; the [Blender add-on](../blender_addon/README.md) imports it
 ([ADR-0093](adr/0093-the-blender-add-on-is-an-extension-that-reads-and-validates-a-package-without-blender.md)),
 and so can any other tool. `p4kx entity package` writes it ([ADR-0083](adr/0083-a-blender-package-is-a-versioned-manifest-with-shared-glb-meshes-and-png-textures.md)),
@@ -22,7 +22,7 @@ glossary); a **mesh** of the package is a GLB file with the geometry of one mode
   scene.json            the manifest
   meshes/m0001.glb      one GLB per distinct mesh
   meshes/m0002.glb
-  textures/t0001.png    one PNG per distinct texture
+  textures/t0001.png    one PNG or DDS file per distinct texture
 ```
 
 - The folder holds nothing but these. Every file name is an id made by the writer (`m` or `t` and
@@ -131,7 +131,7 @@ written (there are no `null`s).
 | `options` | What the package was made with: `lod`, `texture_mip`, `vertex_colours`, `exclude` (ports) and `replace` (`port`, `entity`). |
 | `nodes` | The scene hierarchy, see below. |
 | `meshes` | The GLB meshes, see below. |
-| `textures` | The PNG textures, see below. |
+| `textures` | The external textures, see below. |
 | `materials` | The material descriptions, see "Materials". Added in 1.1; absent in 1.0 packages. |
 | `material_libraries` | Original authored library-root descriptions (1.9), once per distinct retained reader path/root; optional and default-empty for older manifests. |
 | `palettes` | The tint palettes, see "Palettes". Added in 1.1; absent in 1.0 packages. |
@@ -339,7 +339,7 @@ materials from them; the `textures` of a material description say which slot use
 | --- | --- |
 | `id`, `file` | The id and the file relative to the package folder (`textures/t0001.png`). |
 | `source` | The texture's path in the Archive, below `Data`. |
-| `format`, `bit_depth` | `png` and `8` in version 1. High-range textures (EXR, 16 bits) will be new `format` values in a later minor version. |
+| `format`, `bit_depth` | `png` or `dds`. The supported package images use 8-bit decoded channels. |
 | `colour_space` | Compatibility setting for readers of earlier 1.x packages. |
 | `encoding` | Importer input for this image: `srgb`, `linear_colour` (Linear Rec.709) or `data` (Non-Color). The same source can supply different image files when its uses require different sampling or channel transforms. |
 | `alpha` | What the alpha channel holds: `none` (opaque, ignore it), `opacity`, or `smoothness` (the alpha channel of a `_ddna` normal map). |
@@ -350,6 +350,35 @@ materials from them; the `textures` of a material description say which slot use
 the writer inverts the green channel of the engine's maps, exactly as the GLB writer does. The
 red channel and the reconstructed blue channel are as the Archive has them. A reader that wants
 the DirectX convention inverts green again.
+
+#### Optional DDS textures
+
+`entity package` and `interior package` accept `--texture-container dds`. This is intended for
+the Blender 5.3 package importer. PNG is the default for package writers. GLB textures follow
+the glTF format as before.
+
+A DDS row identifies one 2D original mip in `dds_asset.mip_level`. The file is a standard
+single-mip DDS with a normalized layout header and the original payload bytes. Its source
+metadata preserves the original header, transfer declarations and normalized source topology.
+The artifact binding measures the written file's length and SHA-256. Header and selected split
+member checksums identify the verified archive entries. The source inventory records the exact
+header and selected payload ranges, including encryption provenance. Per-role sampling continues
+to use `encoding`.
+
+The Blender DDS capability accepts legacy DXT1, DXT5, ATI1, ATI2 and BC5U, plus supported
+legacy 32-bit RGBA/BGRA masks. It accepts DX10 RGBA8, BC1, BC3 and unsigned BC5 for 2D textures.
+Unsigned BC5 is emitted directly for data inputs. Signed BC5 uses PNG because Blender 5.3
+does not decode it. DDS rows with BC1 use the selected blocks to distinguish transparent samples
+from edge padding. When a normal requires a Y flip, or the original uses a separate alpha or
+smoothness member, the writer uses the usual PNG conversion. Topology and unsupported encodings
+use that same fallback when a PNG can be produced. The row's `dds_fallback` records the reason.
+An ambiguous, missing or corrupt required member produces a texture issue. The model slot is
+left unbound in that case. The [DDS alpha semantics investigation](https://github.com/p4kx-org/p4kx/issues/1137) covers legacy premultiplied formats and alpha projection across consumers.
+
+The optional texture container does not change texture ids, reuse of material inputs, or the
+selected mip policy. The standalone texture tools can export arrays, cubes and volumes. The
+Blender material slot uses a single 2D image. Older add-ons can read PNG packages and warn on
+the higher minor version. Use the matching add-on for DDS.
 
 ### Materials
 
@@ -600,6 +629,9 @@ from the glTF materials of the meshes and the `diffuse`, `normal` and `specular`
 channel transform in same-read source metadata. Older manifests use their authored
 compatibility colour-space field. Missing or conflicting declarations retain their
 role's compatibility sampling, with unknown actual transfer and an untagged PNG.
+**1.13** adds the optional authored SOC reference. **1.14** adds the optional selected-mip DDS
+asset and explicit PNG fallback reason.
+
 ## Authored SOC scene
 
 An interior package written with `--authored-soc` has an `authored_soc` reference in

@@ -376,7 +376,7 @@ fn summarise(
                 summary.bytes += bytes;
                 summary.texture_pixels += u64::from(*width) * u64::from(*height);
             }
-            Outcome::Failed(_) => summary.texture_failures += 1,
+            Outcome::Failed { .. } => summary.texture_failures += 1,
         }
     }
     summary

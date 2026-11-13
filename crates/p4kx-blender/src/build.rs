@@ -11,7 +11,7 @@ use crate::items::Item;
 use crate::manifest::{
     Basis, Coordinates, EntityRef, FORMAT_VERSION, Format, Generator, Issue, IssueOrigin,
     MESHES_FOLDER, Manifest, MaterialTextures, Mesh, MeshMaterial, Node, Options, Source,
-    TEXTURES_FOLDER, Texture, TextureFormat, Unit,
+    TEXTURES_FOLDER, Texture, Unit,
 };
 use crate::manifest_light::Light;
 use crate::manifest_materials::{MaterialDescription, Palette, PaletteColours};
@@ -262,24 +262,29 @@ fn textures(inputs: &Inputs<'_>) -> Vec<Texture> {
                 encoding,
                 alpha,
                 source_metadata,
+                format,
+                dds_asset,
+                dds_fallback,
                 ..
             } => {
                 let id = id_of(position);
                 Some(Texture {
-                    file: format!("{TEXTURES_FOLDER}/{id}.png"),
+                    file: format!("{TEXTURES_FOLDER}/{id}.{}", format.extension()),
                     id,
                     source: wanted.path.clone(),
-                    format: TextureFormat::Png,
+                    format: *format,
                     bit_depth: 8,
                     colour_space: *colour_space,
                     encoding: Some(*encoding),
                     alpha: *alpha,
                     source_metadata: source_metadata.clone(),
+                    dds_asset: dds_asset.clone(),
+                    dds_fallback: *dds_fallback,
                     width: *width,
                     height: *height,
                 })
             }
-            Outcome::Failed(_) => None,
+            Outcome::Failed { .. } => None,
         })
         .collect()
 }
@@ -299,10 +304,12 @@ pub(crate) fn assembly_issue(issue: &AssemblyIssue) -> Issue {
 fn issues(inputs: &Inputs<'_>) -> Vec<Issue> {
     let mut issues: Vec<Issue> = inputs.assembly_issues.iter().map(assembly_issue).collect();
     for (wanted, outcome) in inputs.collected.wanted.iter().zip(inputs.outcomes) {
-        if let Outcome::Failed(reason) = outcome {
+        if let Outcome::Failed { reason, dds } = outcome {
             issues.push(Issue {
                 origin: IssueOrigin::Texture,
-                kind: "texture".to_owned(),
+                kind: dds
+                    .map_or("texture", crate::DdsTextureFallback::code)
+                    .to_owned(),
                 path: wanted.file.clone(),
                 name: wanted.material.clone(),
                 skipped: false,
