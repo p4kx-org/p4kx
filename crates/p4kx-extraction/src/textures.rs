@@ -14,6 +14,10 @@ mod texture;
 
 pub use texture::Texture;
 
+pub use crate::texture_artifacts::{TextureArtifacts, TextureImageArtifact};
+pub use crate::texture_image_plan::{
+    TextureImage, TextureImageFace, TextureImageFormat, TextureImagePlan,
+};
 pub use crate::texture_preview_png::{
     ObservedPreviewPng, PreviewPng, PreviewPngEvidence, PreviewTextureEvidence,
 };

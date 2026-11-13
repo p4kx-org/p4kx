@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+mod evidence;
 pub(crate) mod input;
 
 use p4kx_texture::{MipByteSpans, write_png};
@@ -8,7 +9,7 @@ use p4kx_texture::{MipByteSpans, write_png};
 use self::input::PreviewInputs;
 use crate::{ConversionError, SourceEvidenceError, SourceUses, Texture};
 
-pub use self::input::{PreviewPngEvidence, PreviewTextureEvidence};
+pub use self::evidence::{PreviewPngEvidence, PreviewTextureEvidence};
 
 /// A preview of one mip of a texture, encoded as an 8-bit RGBA PNG.
 #[derive(Debug, Clone, PartialEq, Eq)]

@@ -374,13 +374,9 @@ pub use source_provenance::*;
 pub use target::{
     create_default_target, create_default_target_protected, default_target_name, utc_rfc3339,
 };
-pub use texture_artifacts::{TextureArtifacts, TextureImageArtifact};
 pub use texture_exr::ExrReport;
 pub use texture_grey::{TextureVerdicts, probe_saturation};
 pub use texture_groups::{TextureGroup, TextureGroups};
-pub use texture_image_plan::{
-    TextureImage, TextureImageFace, TextureImageFormat, TextureImagePlan,
-};
 pub use texture_job::{Member as TextureMember, Role as TextureMemberRole, role as texture_role};
 pub use texture_member_keys::{
     TextureMemberCandidate, TextureMemberIndex, TextureMemberKeys, TextureMemberRelation,
@@ -388,6 +384,8 @@ pub use texture_member_keys::{
 pub use texture_png::{CUBE_FACE_NAMES, CubemapLayout, PngReport};
 pub use textures::{
     ObservedPreviewPng, PreviewPng, PreviewPngEvidence, PreviewTextureEvidence, Texture,
+    TextureArtifacts, TextureImage, TextureImageArtifact, TextureImageFace, TextureImageFormat,
+    TextureImagePlan,
 };
 use ui_service::{ui_jobs, ui_movie};
 
