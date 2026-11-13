@@ -47,7 +47,7 @@ delay and, for the declared box shape, the sensor-local extent and offset. Its a
 links identify the target independently of trigger shape.
 
 An entity with authored light components includes `lights` and/or `lightGroups`.
-Modes retain source order, including repeated or empty declarations. Type, intensity,
+Modes retain source order, including repeated or empty declarations and `offState`. Type, intensity,
 temperature, style and the temperature switch carry their original value states and
 source uses. Colour elements, empty baked sections and relative-frame declarations
 point to their original XML coordinates in the same chunk. These fields describe

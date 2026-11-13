@@ -87,6 +87,7 @@ enum ModeKind {
     Auxiliary,
     Emergency,
     Cinematic,
+    Off,
     Other,
 }
 
@@ -98,6 +99,7 @@ impl From<p4kx_model::LightState> for ModeKind {
             LightState::Auxiliary => Self::Auxiliary,
             LightState::Emergency => Self::Emergency,
             LightState::Cinematic => Self::Cinematic,
+            LightState::Off => Self::Off,
             _ => Self::Other,
         }
     }

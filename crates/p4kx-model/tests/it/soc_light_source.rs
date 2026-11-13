@@ -21,6 +21,7 @@ fn original_modes_preserve_order_zero_false_and_malformed_fields() -> TestResult
         <auxiliaryState temperature="NaN"/>
         <defaultState intensity="bad"/>
         <cinematicState/>
+        <offState intensity="0"/>
         <projectorParams FOV="9" fixtureExtra="kept"/>
         </EntityComponentLight></PropertiesDataCore></Entity></Entities>"#
             .as_slice(),
@@ -59,6 +60,7 @@ fn original_modes_preserve_order_zero_false_and_malformed_fields() -> TestResult
             (LightState::Auxiliary, SocSourceValue::Absent),
             (LightState::Default, SocSourceValue::Invalid),
             (LightState::Cinematic, SocSourceValue::Absent),
+            (LightState::Off, SocSourceValue::Present(0.0)),
         ],
         "physical order and missing, zero and invalid values"
     );

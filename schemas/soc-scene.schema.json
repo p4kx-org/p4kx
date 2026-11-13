@@ -1993,6 +1993,7 @@
         "auxiliary",
         "emergency",
         "cinematic",
+        "off",
         "other"
       ],
       "type": "string"

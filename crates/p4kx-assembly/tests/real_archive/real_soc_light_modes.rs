@@ -87,6 +87,7 @@ fn compare_modes(light: SocLightSource<'_>, coverage: &mut Coverage) -> TestResu
             "auxiliaryState" => LightState::Auxiliary,
             "emergencyState" => LightState::Emergency,
             "cinematicState" => LightState::Cinematic,
+            "offState" => LightState::Off,
             _ => return None,
         };
         Some((kind, element))

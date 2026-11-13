@@ -17,6 +17,8 @@ pub enum LightState {
     Emergency,
     /// The cinematic state, `cinematicState`.
     Cinematic,
+    /// The off state, `offState`.
+    Off,
 }
 
 impl LightState {
@@ -33,6 +35,7 @@ impl LightState {
         }
         Self::ORDER
             .into_iter()
+            .chain([(Self::Off, "offState")])
             .find_map(|(kind, name)| (element.name() == name).then_some(kind))
     }
 
@@ -44,6 +47,7 @@ impl LightState {
             Self::Auxiliary => "auxiliary",
             Self::Emergency => "emergency",
             Self::Cinematic => "cinematic",
+            Self::Off => "off",
         }
     }
 }
