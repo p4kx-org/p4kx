@@ -246,3 +246,47 @@ separate catalog lookup to classify installed parts. [Issue #1139](https://githu
 carries the exact selected fields and their source evidence through Assembly
 to the corresponding package entity node.
 [StarBreaker scene contract](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/docs/decomposed-export-contract.md)
+
+### Split DDNA and current implementation
+
+The recheck uses the same open StarBreaker head and P4KX integration commit
+`b6beb5416`. P4KX now has GLB preflight, DDS transfer and alpha handling,
+opt-in DDS packaging, deterministic file receipts, room and door data,
+physical default-material selection and authored item classification. The
+integration branch also anchors direct vehicle tile light groups to the
+unique owner helper. Package light origins and consumer verification remain
+in [#1130](https://github.com/p4kx-org/p4kx/issues/1130).
+
+The package DDS loader refuses a split tail before testing the selected DDS
+members separately. The PNG path preserves the shared selected mip and merges
+the tail into the normal image. StarBreaker can publish two DDS assets with
+copied payloads. [#1140](https://github.com/p4kx-org/p4kx/issues/1140) owns that
+route in P4KX, with independent per-artifact provenance and a documented PNG
+fallback. A synthetic DX10 BC4_UNORM image in headless Blender 5.3.0 returned
+the expected size and red sample. The tested DX10 R8_UNORM and A8_UNORM
+images returned zero size and no pixels. The probe checked image loading.
+Material-graph and installed-source equivalence remain acceptance checks.
+[Current P4KX DDS loader](../crates/p4kx-extraction/src/model_texture_dds.rs)
+· [StarBreaker texture pipeline](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/pipeline/textures.rs)
+
+For animation, the positioned Media rows capture definitions and declared
+database links. [#1094](https://github.com/p4kx-org/p4kx/issues/1094) owns
+ordered `#filepath` scope, exact CAF bindings and event timelines.
+[#1095](https://github.com/p4kx-org/p4kx/issues/1095) owns the typed Mannequin
+and blend-space graph. Player variants, weapon motion and package projection
+stay in [#1131](https://github.com/p4kx-org/p4kx/issues/1131). P4KX retains the
+original declaration and physical DBA index independently of optional pose
+selection. Upstream's default-pose export evaluates a caller-selected clip.
+[StarBreaker directives](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/chrparams.rs)
+· [StarBreaker default pose](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/pipeline/default_pose.rs)
+
+For collision, retain each original shape, its placement and the actual
+affine transform independently. A transformed sphere or capsule can have
+non-spherical or non-uniform cross sections under a non-rigid transform.
+Keep missing and ambiguous references visible when following CDF and vehicle
+grid targets. This is part of [#1128](https://github.com/p4kx-org/p4kx/issues/1128).
+[StarBreaker collision export](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/decomposed_physics.rs)
+
+P4KX already tests cancellation while a texture is loaded and preserves a
+previous published package. Keep the same staging check when adding a linked
+asset pair. [P4KX package writer tests](../crates/p4kx-blender/tests/it/package_write_context.rs)
