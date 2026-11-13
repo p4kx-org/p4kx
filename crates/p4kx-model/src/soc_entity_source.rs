@@ -12,6 +12,7 @@ use crate::soc_area_component::SocAreaComponent;
 use crate::soc_entities::{self, ENTITIES};
 use crate::soc_entity_component::SocEntityComponent;
 use crate::soc_entity_links::SocEntityLinks;
+use crate::soc_light_source::{SocLightGroupSource, SocLightSource};
 use crate::soc_source_node::SocSourceNode;
 
 /// A failure to open or interpret an authored SOC entity chunk.
@@ -191,6 +192,16 @@ impl<'document> SocEntity<'document> {
     /// Visits authored entity components with their original scopes and positions.
     pub fn authored_components(self) -> impl Iterator<Item = SocEntityComponent<'document>> {
         SocEntityComponent::read(self.element)
+    }
+
+    /// Visits original single-light components, regardless of the owner's class.
+    pub fn authored_lights(self) -> impl Iterator<Item = SocLightSource<'document>> {
+        SocLightSource::read(self.element)
+    }
+
+    /// Visits original light groups in either authored Entity scope.
+    pub fn authored_light_groups(self) -> impl Iterator<Item = SocLightGroupSource<'document>> {
+        SocLightGroupSource::read(self.element)
     }
 
     /// Visits `AreaComponent` occurrences in their original Entity slots.

@@ -27,6 +27,15 @@ impl LightState {
         (Self::Cinematic, "cinematicState"),
     ];
 
+    pub(crate) fn from_element(element: p4kx_cryxml::SourceElement<'_>) -> Option<Self> {
+        if element.namespace().is_some() {
+            return None;
+        }
+        Self::ORDER
+            .into_iter()
+            .find_map(|(kind, name)| (element.name() == name).then_some(kind))
+    }
+
     /// Returns the stable code of the state, e.g. `default`.
     #[must_use]
     pub const fn code(self) -> &'static str {

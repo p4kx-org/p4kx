@@ -77,6 +77,7 @@ mod real_skin_port_helpers;
 mod real_skin_port_props;
 mod real_soc_capture;
 mod real_soc_doors;
+mod real_soc_light_modes;
 mod real_soc_lights;
 mod real_soc_palette;
 mod real_soc_rooms;

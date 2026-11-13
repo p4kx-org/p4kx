@@ -44,6 +44,7 @@ mod soc_container_descriptor;
 mod soc_door_source;
 mod soc_entities;
 mod soc_entity_source;
+mod soc_light_source;
 mod soc_room_source;
 mod stat_obj_physics;
 mod structured;
