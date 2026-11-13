@@ -127,19 +127,16 @@ impl OwnedFileToken {
     }
 }
 
+#[cfg(windows)]
 fn redirected_file(metadata: &fs::Metadata) -> bool {
-    if metadata.file_type().is_symlink() {
-        return true;
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::MetadataExt as _;
-        content_reparse_point(metadata.file_attributes())
-    }
-    #[cfg(not(windows))]
-    {
-        false
-    }
+    use std::os::windows::fs::MetadataExt as _;
+
+    metadata.file_type().is_symlink() || content_reparse_point(metadata.file_attributes())
+}
+
+#[cfg(not(windows))]
+fn redirected_file(metadata: &fs::Metadata) -> bool {
+    metadata.file_type().is_symlink()
 }
 
 #[cfg(any(windows, test))]
