@@ -36,6 +36,7 @@ fn vehicle_and_suit_armor_keep_independent_original_tuning() -> TestResult {
         check_resistance(vehicle, encrypted)?;
         check_suit_owners(&catalog, encrypted)?;
         check_other_multipliers(&catalog, encrypted)?;
+        check_unknown_diagnostic(&catalog, encrypted)?;
         proof::closure(&catalog)?;
     }
     Ok(())
@@ -265,6 +266,35 @@ fn check_other_multipliers(catalog: &Value, encrypted: bool) -> TestResult {
         macro_link,
         "guid",
         &json!(common::guid(fixture::MISSING)),
+        Some(encrypted),
+    )?;
+    Ok(())
+}
+
+fn check_unknown_diagnostic(catalog: &Value, encrypted: bool) -> TestResult {
+    let note = proof::rows(catalog, "/exportHealth/diagnostics")?
+        .iter()
+        .find(|row| {
+            row["kind"] == "items"
+                && row["stage"] == "projection"
+                && row["code"] == "unsupportedValue"
+                && row["severity"] == "information"
+        })
+        .ok_or("source diagnostic for a retained unknown armour multiplier")?;
+    assert_eq!(note["count"], 1, "one retained unknown multiplier");
+    let example = proof::at(note, "/examples/0")?;
+    proof::present_text(
+        catalog,
+        example,
+        "sourceType",
+        &json!("FixtureFutureDamage"),
+        Some(encrypted),
+    )?;
+    proof::present_text(
+        catalog,
+        example,
+        "field",
+        &json!("Components[1].damageMultiplier"),
         Some(encrypted),
     )?;
     Ok(())

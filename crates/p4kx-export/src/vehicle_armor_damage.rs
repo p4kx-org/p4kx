@@ -64,9 +64,12 @@ impl<'source> VehicleArmorDamage<'source> {
                     value: Box::new(value),
                 }
             }
-            _ => Self::Unknown {
-                source: ArmorDamageSource::read(source, [])?,
-            },
+            _ => {
+                source.note_retained_variant(notes)?;
+                Self::Unknown {
+                    source: ArmorDamageSource::read(source, [])?,
+                }
+            }
         })
     }
 }

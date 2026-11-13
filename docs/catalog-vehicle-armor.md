@@ -17,7 +17,8 @@ The port path identifies each placement and carries its original visibility.
 DamageInfo publishes its original physical, energy, distortion, thermal,
 biochemical and stun words. `DamageParams` retains its linked damage Macro
 and original `damageTotal`. The unknown alternative preserves the original
-concrete type and authored value arena. The curve preserves every authored
+concrete type and authored value arena and records an informational projection
+diagnostic at that field. The curve preserves every authored
 `Vec2` point in order and the original `useLUT` value under `useLut`.
 
 Each field retains its direct source state, exact contributors and encryption
