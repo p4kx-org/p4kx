@@ -166,6 +166,7 @@ mod resolver_vehicle;
 mod resolver_xml;
 mod room_model_helper;
 mod skeleton;
+mod soc_container_capture;
 mod soc_entity_index;
 mod soc_room_index;
 mod soc_source_guid;
@@ -258,6 +259,10 @@ pub use resolver::LoadoutResolver;
 pub use resolver_observation::{LoadoutReadEvent, LoadoutReadObserver};
 pub use room_model_helper::RoomModelHelper;
 pub use skeleton::{MAX_SKELETON_LEN, SkeletonProblem};
+pub use soc_container_capture::{
+    SocArchiveMember, SocCaptureError, SocChildInput, SocChildState, SocContainerCapture,
+    SocContainerOccurrence, SocMemberError, SocMemberSelection, SocMemberSelector, SocStreamInput,
+};
 pub use soc_entity_index::{SocEntityIndex, SocEntitySite, SocEntityTarget};
 pub use soc_room_index::{SocRoomIndex, SocRoomTarget};
 pub use soc_source_guid::SocSourceGuid;

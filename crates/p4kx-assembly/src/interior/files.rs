@@ -68,14 +68,14 @@ pub(super) fn file_name(path: &str) -> &str {
 }
 
 /// Returns the name of the file at `path` without folders and extension.
-pub(super) fn stem(path: &str) -> &str {
+pub(crate) fn stem(path: &str) -> &str {
     let name = path.rsplit(['/', '\\']).next().unwrap_or(path);
     name.rsplit_once('.').map_or(name, |(stem, _)| stem)
 }
 
 /// Returns whether `path` is a plain relative path: no empty, `.` or `..` component and no drive
 /// or stream marker.
-pub(super) fn is_plain(path: &str) -> bool {
+pub(crate) fn is_plain(path: &str) -> bool {
     path.split(['/', '\\'])
         .skip_while(|part| part.is_empty())
         .all(|part| {

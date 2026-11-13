@@ -18,6 +18,7 @@ mod classes;
 mod files;
 
 pub use child_container_path::ChildContainerPath;
+pub(crate) use files::{is_plain as plain_container_path, stem as container_stem};
 pub use p4kx_model::is_external_child_value;
 mod layers;
 mod light;
