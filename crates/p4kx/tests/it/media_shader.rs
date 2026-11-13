@@ -156,6 +156,7 @@ fn omission_selects_all_registered_providers() -> TestResult {
             MediaKind::Shader,
             MediaKind::Material,
             MediaKind::Texture,
+            MediaKind::Model,
             MediaKind::Animation,
             MediaKind::Audio,
             MediaKind::AudioControl,
@@ -176,7 +177,12 @@ fn omission_selects_all_registered_providers() -> TestResult {
             .is_file(),
         "shader stream remains available in the complete default selection"
     );
-    for name in ["material.jsonl", "texture.jsonl", "audio-control.jsonl"] {
+    for name in [
+        "material.jsonl",
+        "texture.jsonl",
+        "model.jsonl",
+        "audio-control.jsonl",
+    ] {
         let stream = output.join(&index.artifact_base).join(name);
         assert_eq!(
             fs::read(stream)?,
