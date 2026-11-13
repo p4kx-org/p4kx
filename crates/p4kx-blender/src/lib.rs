@@ -40,6 +40,7 @@ mod manifest_light;
 mod manifest_materials;
 mod manifest_mesh;
 mod manifest_rig;
+mod material_emission_origins;
 mod material_library_sources;
 mod mesh_options;
 mod meshes;
@@ -49,6 +50,7 @@ mod package_default_material;
 mod package_destination;
 mod package_glow;
 mod package_light_placements;
+mod package_material_emission;
 mod package_paths;
 mod package_receipt;
 mod package_replacement;
@@ -116,6 +118,10 @@ pub use manifest_materials::{
 };
 pub use manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
 pub use package_default_material::{FallbackMaterialCause, FallbackMaterialSlot};
+pub use package_material_emission::{
+    AuthoredEmission, EmissionField, EmissionSample, EmissionSlot, EmissionSource,
+    PackageMaterialEmission, StaticEmission,
+};
 pub use package_soc_scene::ManifestSocScene;
 pub use package_write_context::PackageWriteContext;
 pub use schema::manifest_schema;

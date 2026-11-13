@@ -202,6 +202,93 @@
       ],
       "type": "object"
     },
+    "AuthoredEmission": {
+      "description": "A typed source token with explicit invalid and nonfinite states.",
+      "oneOf": [
+        {
+          "description": "The field is an authored text.",
+          "properties": {
+            "kind": {
+              "const": "text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One numeric source value.",
+          "properties": {
+            "kind": {
+              "const": "scalar",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/EmissionSample"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Three authored channels without reinterpretation.",
+          "properties": {
+            "kind": {
+              "const": "colour",
+              "type": "string"
+            },
+            "value": {
+              "items": {
+                "$ref": "#/$defs/EmissionSample"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Original material flags retained without numeric truncation.",
+          "properties": {
+            "kind": {
+              "const": "flags",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/DecimalU64"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Invalid grammar for the original field.",
+          "properties": {
+            "kind": {
+              "const": "invalid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "Basis": {
       "description": "The axes of every transform and of the GLB meshes.",
       "oneOf": [
@@ -1569,6 +1656,145 @@
       ],
       "type": "object"
     },
+    "EmissionField": {
+      "description": "Authored location and typed parsing of one material emission field.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/EmissionSource",
+          "description": "Original element and attribute position in the referenced library."
+        },
+        "value": {
+          "$ref": "#/$defs/AuthoredEmission",
+          "description": "Literal field token and non-destructive numeric interpretation."
+        }
+      },
+      "required": [
+        "source",
+        "value"
+      ],
+      "type": "object"
+    },
+    "EmissionSample": {
+      "description": "One token in an authored emission scalar or colour.",
+      "oneOf": [
+        {
+          "description": "The finite stored float.",
+          "properties": {
+            "kind": {
+              "const": "finite",
+              "type": "string"
+            },
+            "value": {
+              "format": "float",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Nonfinite NaN.",
+          "properties": {
+            "kind": {
+              "const": "nan",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Positive infinity.",
+          "properties": {
+            "kind": {
+              "const": "positive_infinity",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Negative infinity.",
+          "properties": {
+            "kind": {
+              "const": "negative_infinity",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EmissionSlot": {
+      "description": "Original explicit texture slot and filename declarations.",
+      "properties": {
+        "file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EmissionSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "File attribute and its coordinate when authored."
+        },
+        "map": {
+          "$ref": "#/$defs/EmissionSource",
+          "description": "Map attribute and its coordinate."
+        }
+      },
+      "required": [
+        "map"
+      ],
+      "type": "object"
+    },
+    "EmissionSource": {
+      "description": "An original material input token.",
+      "properties": {
+        "attribute": {
+          "description": "Original attribute ordinal of the selected element.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "element": {
+          "description": "Original child ordinals within the retained material library root.",
+          "items": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Exact original field name including case.",
+          "type": "string"
+        },
+        "raw": {
+          "description": "Exact original decoded value.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "element",
+        "attribute",
+        "name",
+        "raw"
+      ],
+      "type": "object"
+    },
     "EntityClassification": {
       "additionalProperties": false,
       "description": "The authored classification of an Entity node and its immediate origins.",
@@ -2481,6 +2707,17 @@
           },
           "type": "array"
         },
+        "emission_source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageMaterialEmission"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exact authored emission and coverage controls with an explicit static preview disposition."
+        },
         "emissive": {
           "description": "The emissive colour, linear; it counts times `glow`.",
           "items": {
@@ -2886,6 +3123,17 @@
         "authored": {
           "$ref": "#/$defs/MaterialLibrarySourceInfo",
           "description": "Bounded source root, namespaces/content and actual projection boundaries."
+        },
+        "emission_provenance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceInventory"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Physical sources and exact use references for this library's emission fields."
         },
         "path": {
           "description": "Library path exposed by the model reader, without a unique physical-source claim.",
@@ -3519,6 +3767,72 @@
       "required": [
         "declarations",
         "owners"
+      ],
+      "type": "object"
+    },
+    "PackageMaterialEmission": {
+      "description": "Original material emission controls and the static preview selected from them.",
+      "properties": {
+        "attributes": {
+          "description": "Ordered original emission and coverage inputs.",
+          "items": {
+            "$ref": "#/$defs/EmissionField"
+          },
+          "type": "array"
+        },
+        "emittance_requested": {
+          "description": "Original mask requests an emittance map when a unique mask was present.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "field_origins": {
+          "$ref": "#/$defs/FieldOrigins",
+          "description": "Immediate origins of the scalar values and members within this description."
+        },
+        "forward_enabled": {
+          "description": "Original material flags request forward rendering when a unique value was present.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "preview": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StaticEmission"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional Blender static preview with explicit valid authored inputs."
+        },
+        "source_complete": {
+          "description": "Whether the retained material source was complete.",
+          "type": "boolean"
+        },
+        "source_library": {
+          "description": "Original library root row holding the exact XML declarations.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "texture_slots": {
+          "description": "Explicit authored emissive texture declarations.",
+          "items": {
+            "$ref": "#/$defs/EmissionSlot"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_library",
+        "source_complete",
+        "attributes",
+        "texture_slots",
+        "field_origins"
       ],
       "type": "object"
     },
@@ -5743,6 +6057,41 @@
         "sourceUsesRefs",
         "state",
         "value"
+      ],
+      "type": "object"
+    },
+    "StaticEmission": {
+      "description": "Blender static emission preview parameters, derived from authored data.",
+      "properties": {
+        "file": {
+          "description": "Original material texture filename token.",
+          "type": "string"
+        },
+        "slot": {
+          "description": "Original material texture-slot name.",
+          "type": "string"
+        },
+        "strength": {
+          "description": "Finite positive authored Glow strength.",
+          "format": "float",
+          "type": "number"
+        },
+        "tint": {
+          "description": "Finite authored linear emissive tint.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "slot",
+        "file",
+        "tint",
+        "strength"
       ],
       "type": "object"
     },

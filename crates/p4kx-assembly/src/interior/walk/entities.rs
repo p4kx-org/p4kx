@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_dataforge::Guid;
-use p4kx_extraction::EntryOrigin;
+use p4kx_extraction::{ArchiveMaterialRead, EntryOrigin};
 use p4kx_model::{MaterialStatus, SocEntities, SocPalette, Transform};
 
 use super::{Placement, Todo, Walker};
@@ -72,7 +72,7 @@ impl Walker<'_> {
             world: world.then(&placed.transform),
             model_path: placed.path.map(str::to_owned),
             model: None,
-            materials: Arc::new(MaterialStatus::Unnamed),
+            materials: Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed)),
             palette: None,
             light: None,
             light_placement: None,

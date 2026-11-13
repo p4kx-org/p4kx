@@ -4,14 +4,16 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use p4kx_extraction::MaterialLibrarySourceInfo;
+use p4kx_extraction::{EntryOrigin, MaterialLibrarySourceInfo, ObservedEntryBinding};
 use p4kx_gltf::DrawnMaterial;
 use p4kx_model::{MaterialLibrary, MaterialSource};
 
 use crate::manifest::{Issue, IssueOrigin};
 use crate::manifest_materials::MaterialLibrarySourceDescription;
+use crate::material_emission_origins::EmissionEvidence;
+use crate::{PackageResult, PackageWriteContext};
 
-/// Source root descriptions deduplicated only when both reader path and authored data agree.
+/// Source roots retained by their reader path, authored data and physical Entry.
 #[derive(Debug, Default)]
 pub(crate) struct MaterialLibrarySources {
     entries: Vec<RetainedLibrary>,
@@ -21,12 +23,15 @@ pub(crate) struct MaterialLibrarySources {
 #[derive(Debug)]
 struct RetainedLibrary {
     owner: Arc<MaterialSource>,
+    binding: Option<ObservedEntryBinding>,
+    evidence: Option<EmissionEvidence>,
     description: MaterialLibrarySourceDescription,
 }
 impl MaterialLibrarySources {
     pub(crate) fn capture_fallback(
         &mut self,
         library: Option<&MaterialLibrary>,
+        entry: Option<&EntryOrigin>,
         drawn: &[DrawnMaterial],
         issues: &mut Vec<Issue>,
     ) -> Option<usize> {
@@ -35,13 +40,20 @@ impl MaterialLibrarySources {
                 .iter()
                 .any(|material| material.library_index.is_none())
         })?;
-        Some(self.capture(library, issues))
+        Some(self.capture(library, entry, issues))
     }
 
-    pub(crate) fn capture(&mut self, library: &MaterialLibrary, issues: &mut Vec<Issue>) -> usize {
+    pub(crate) fn capture(
+        &mut self,
+        library: &MaterialLibrary,
+        entry: Option<&EntryOrigin>,
+        issues: &mut Vec<Issue>,
+    ) -> usize {
+        let binding = entry.map(EntryOrigin::binding);
         let entries = self.entries.iter().enumerate();
         for (index, entry) in entries {
             if entry.description.path == library.path
+                && entry.binding == binding
                 && (Arc::ptr_eq(&entry.owner, &library.authored)
                     || entry.owner.as_ref() == library.authored.as_ref())
             {
@@ -62,12 +74,42 @@ impl MaterialLibrarySources {
         }
         self.entries.push(RetainedLibrary {
             owner: Arc::clone(&library.authored),
+            binding,
+            evidence: None,
             description: MaterialLibrarySourceDescription {
                 path: library.path.clone(),
                 authored,
+                emission_provenance: None,
             },
         });
         index
+    }
+
+    pub(crate) fn evidence(
+        &mut self,
+        index: usize,
+        entry: Option<&EntryOrigin>,
+    ) -> PackageResult<&EmissionEvidence> {
+        let row = self
+            .entries
+            .get_mut(index)
+            .ok_or_else(crate::material_emission_origins::missing_inventory)?;
+        if row.evidence.is_none() {
+            row.evidence = Some(EmissionEvidence::new(entry)?);
+        }
+        row.evidence
+            .as_ref()
+            .ok_or_else(crate::material_emission_origins::missing_inventory)
+    }
+
+    pub(crate) fn finish(&mut self, context: &PackageWriteContext<'_>) -> PackageResult<()> {
+        for entry in &mut self.entries {
+            context.check()?;
+            if let Some(evidence) = entry.evidence.take() {
+                entry.description.emission_provenance = Some(evidence.finish()?);
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn descriptions(&self) -> impl Iterator<Item = &MaterialLibrarySourceDescription> {
@@ -90,7 +132,7 @@ impl MaterialLibrarySources {
             path: path.to_owned(),
             name: name.to_owned(),
             skipped: false,
-            reason: "Distinct authored library roots share one renderer material identity; both source descriptions are retained.".into(),
+            reason: "Distinct authored library roots share a normalized material name; each actual description is retained.".into(),
         })
     }
 }
@@ -99,9 +141,44 @@ impl MaterialLibrarySources {
 mod tests {
     use std::error::Error;
 
+    use p4kx_extraction::{Archive, OpenOptions};
     use p4kx_model::MaterialLibrary;
+    use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 
     use super::MaterialLibrarySources;
+
+    #[test]
+    fn equal_authored_libraries_with_different_physical_inputs_stay_distinct()
+    -> Result<(), Box<dyn Error>> {
+        const PLAIN: &str = "Data/plain.mtl";
+        const ENCRYPTED: &str = "Data/encrypted.mtl";
+        const XML: &[u8] = br#"<Material Shader="Illum" Glow="2"/>"#;
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("synthetic.p4k");
+        ArchiveBuilder::new()
+            .entry(TestEntry::stored(PLAIN, XML))
+            .entry(TestEntry::stored(ENCRYPTED, XML).encrypted())
+            .write_to(&path)?;
+        let archive = Archive::open_with(path, OpenOptions::new().key(Some(test_key())))?;
+        let origin = |path| {
+            archive
+                .entries()
+                .iter()
+                .find(|row| row.path() == path)
+                .and_then(|row| archive.entry_origin(row))
+                .ok_or("physical test Entry absent")
+        };
+        let first = origin(PLAIN)?;
+        let second = origin(ENCRYPTED)?;
+        let library = MaterialLibrary::parse("same/authored", XML)?;
+        let mut sources = MaterialLibrarySources::default();
+        let mut issues = Vec::new();
+        assert_eq!(sources.capture(&library, Some(&first), &mut issues), 0);
+        assert_eq!(sources.capture(&library, Some(&first), &mut issues), 0);
+        assert_eq!(sources.capture(&library, Some(&second), &mut issues), 1);
+        assert_eq!(sources.capture(&library, None, &mut issues), 2);
+        Ok(())
+    }
 
     #[test]
     fn the_same_authored_library_is_retained_once_and_same_path_different_roots_survive()
@@ -114,17 +191,17 @@ mod tests {
         let mut sources = MaterialLibrarySources::default();
         let mut issues = Vec::new();
         assert_eq!(
-            sources.capture(&first, &mut issues),
+            sources.capture(&first, None, &mut issues),
             0,
             "first observed root receives its source ordinal"
         );
         assert_eq!(
-            sources.capture(&first, &mut issues),
+            sources.capture(&first, None, &mut issues),
             0,
             "several child materials do not clone the root"
         );
         assert_eq!(
-            sources.capture(&second, &mut issues),
+            sources.capture(&second, None, &mut issues),
             1,
             "same path does not erase a distinct authored root"
         );

@@ -390,10 +390,7 @@ class _Maker(LayerBlending, GlassSurface):
         if self.family == "glass":
             b.spec.node(bsdf).inputs["Transmission Weight"] = 1.0
             b.spec.node(bsdf).inputs["IOR"] = 1.45
-        emissive = desc.emissive
-        if desc.glow > 0 and any(c > 0 for c in emissive):
-            b.spec.node(bsdf).inputs["Emission Color"] = emissive
-            b.spec.node(bsdf).inputs["Emission Strength"] = desc.glow
+        self._emission(bsdf)
         if self.family == "hologram":
             b.put(bsdf, "Emission Color", colour)
             b.spec.node(bsdf).inputs["Emission Strength"] = max(desc.glow, 1.0)
@@ -404,3 +401,31 @@ class _Maker(LayerBlending, GlassSurface):
         b.link(Ref(bsdf, "BSDF"), out, "Surface")
         if alpha is not None:
             b.put(bsdf, "Alpha", alpha)
+
+    def _emission(self, bsdf: str) -> None:
+        b, desc = self.builder, self.desc
+        preview = desc.emission
+        if preview is not None:
+            slots = [
+                slot for slot in desc.textures
+                if slot.slot == preview.slot and slot.file == preview.file and slot.texture
+            ]
+            if len(slots) == 1:
+                sampled = Ref(self._image(slots[0], 1.0), "Color")
+                if preview.tint == WHITE:
+                    value = sampled
+                else:
+                    tint = b.add(
+                        "ShaderNodeMix",
+                        props={"data_type": "RGBA", "blend_type": "MULTIPLY"},
+                        inputs={"Factor": 1.0, "B": preview.tint},
+                    )
+                    b.link(sampled, tint, "A")
+                    value = Ref(tint, "Result")
+                b.put(bsdf, "Emission Color", value)
+                b.spec.node(bsdf).inputs["Emission Strength"] = preview.strength
+                return
+        colour = desc.emissive
+        if desc.glow > 0 and any(channel > 0 for channel in colour):
+            b.spec.node(bsdf).inputs["Emission Color"] = colour
+            b.spec.node(bsdf).inputs["Emission Strength"] = desc.glow

@@ -33,9 +33,18 @@ pub(crate) struct Inputs<'a> {
 
 /// Builds the manifest of a package whose files are written.
 pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
+    let materials = materials(inputs);
+    let version = if materials
+        .iter()
+        .any(|material| material.emission_source.is_some())
+    {
+        crate::manifest::AUTHORED_HELPER_FORMAT_VERSION
+    } else {
+        FORMAT_VERSION
+    };
     Manifest {
         format: Format::P4kxBlenderPackage,
-        version: FORMAT_VERSION.to_owned(),
+        version: version.to_owned(),
         generator: generator(),
         source: Source {
             channel: inputs.info.channel.clone(),
@@ -54,7 +63,7 @@ pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
         nodes: nodes(inputs),
         meshes: meshes(inputs),
         textures: textures(inputs),
-        materials: materials(inputs),
+        materials,
         material_libraries: inputs
             .collected
             .library_sources

@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
-use p4kx_archive::Archive;
+use p4kx_archive::{Archive, EntryOrigin};
 use p4kx_model::{
     LayerBudget, LayerCache, LodSelection, MaterialReading, MaterialStatus, Model, PositionBox,
 };
@@ -183,6 +183,31 @@ impl ModelSource {
         budget: &mut LayerBudget,
         reads: Option<&ArchiveMaterialReads>,
     ) -> Arc<MaterialStatus> {
+        Self::read_layer(index, path, cache, verdicts, budget, reads).0
+    }
+
+    /// Reads the cached layer and resolves the physical Entry of that exact read.
+    #[must_use]
+    pub fn layer_library_observed(
+        index: &PathIndex<'_>,
+        path: &str,
+        cache: &LayerCache,
+        verdicts: &TextureVerdicts,
+        budget: &mut LayerBudget,
+        reads: &ArchiveMaterialReads,
+    ) -> (Arc<MaterialStatus>, Option<EntryOrigin>) {
+        let (status, read) = Self::read_layer(index, path, cache, verdicts, budget, Some(reads));
+        (status, read.as_ref().and_then(|read| reads.origin(read)))
+    }
+
+    fn read_layer(
+        index: &PathIndex<'_>,
+        path: &str,
+        cache: &LayerCache,
+        verdicts: &TextureVerdicts,
+        budget: &mut LayerBudget,
+        reads: Option<&ArchiveMaterialReads>,
+    ) -> (Arc<MaterialStatus>, Option<p4kx_model::MaterialReadOrigin>) {
         let material_observation = reads.map(|reads| MaterialObservation { reads, used: None });
         let mut companions = ArchiveCompanions {
             index,
@@ -191,7 +216,7 @@ impl ModelSource {
             model_sources: None,
             material_observation,
         };
-        cache.library(path, &mut companions, budget)
+        cache.library_with_read_origin(path, &mut companions, budget)
     }
 
     /// Returns the actual model and companion Entry observations.

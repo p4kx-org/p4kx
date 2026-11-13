@@ -46,13 +46,21 @@ impl ModelProvider for ArchiveModels<'_> {
     }
 
     fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
-        ModelSource::layer_library_tracking(
+        self.layer_library_observed(path, budget).0
+    }
+
+    fn layer_library_observed(
+        &self,
+        path: &str,
+        budget: &mut LayerBudget,
+    ) -> (Arc<MaterialStatus>, Option<EntryOrigin>) {
+        ModelSource::layer_library_observed(
             &self.index,
             path,
             &self.layers,
             &self.verdicts,
             budget,
-            Some(&self.material_reads),
+            &self.material_reads,
         )
     }
 

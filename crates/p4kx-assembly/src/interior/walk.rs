@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, ArchiveMaterialRead};
 use p4kx_model::{ChildContainer, MaterialStatus, SocContainerDescriptor, Transform};
 
 use super::child_container_path::ChildContainerPath;
@@ -69,7 +69,7 @@ fn container_part(
         world,
         model_path: None,
         model: None,
-        materials: Arc::new(MaterialStatus::Unnamed),
+        materials: Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed)),
         palette: None,
         light: None,
         light_placement: None,

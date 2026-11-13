@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::ArchiveDefaultMaterial;
+use p4kx_extraction::{ArchiveDefaultMaterial, ArchiveMaterialRead, MaterialArchiveOrigins};
 use p4kx_gltf::SceneLight;
 use p4kx_model::{Lod, MaterialStatus, Model, SocLight, TintPalette, Transform};
 
@@ -151,7 +151,7 @@ pub struct InteriorPart {
     pub(crate) world: Transform,
     pub(crate) model_path: Option<String>,
     pub(crate) model: Option<Arc<Model>>,
-    pub(crate) materials: Arc<MaterialStatus>,
+    pub(crate) materials: Arc<ArchiveMaterialRead>,
     pub(crate) palette: Option<Arc<TintPalette>>,
     pub(crate) light: Option<SocLight>,
     pub(crate) light_placement: Option<Box<InteriorLightPlacement>>,
@@ -236,7 +236,13 @@ impl InteriorPart {
     /// Returns the material library the part's model is drawn with.
     #[must_use]
     pub fn materials(&self) -> &MaterialStatus {
-        &self.materials
+        &self.materials.status
+    }
+
+    /// Returns the physical reads retained by this placed model's material resolver.
+    #[must_use]
+    pub fn material_archive_origins(&self) -> &MaterialArchiveOrigins {
+        &self.materials.origins
     }
 }
 

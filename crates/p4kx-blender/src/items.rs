@@ -3,6 +3,7 @@
 
 use crate::package_light_placements::PlacedLight;
 use p4kx_assembly::{Assembly, INTERIOR_NODE, Interior, InteriorPart, InteriorPartKind, Part};
+use p4kx_extraction::EntryOrigin;
 use p4kx_gltf::{NodeTransform, SceneLight, light_node_transform, node_transform};
 use p4kx_model::{MaterialStatus, Model, TintPalette, Transform};
 
@@ -13,6 +14,7 @@ use crate::manifest::{EntityRef, NodeKind};
 pub(crate) struct Drawn<'a> {
     pub(crate) model: &'a Model,
     pub(crate) materials: &'a MaterialStatus,
+    pub(crate) material_entry: Option<&'a EntryOrigin>,
     pub(crate) palette: Option<&'a TintPalette>,
     pub(crate) label: &'a str,
 }
@@ -146,6 +148,7 @@ fn push_attachments<'a>(items: &mut Vec<Item<'a>>, assembly: &'a Assembly) {
             drawn: Some(Drawn {
                 model: attached.model(),
                 materials: attached.materials(),
+                material_entry: attached.material_archive_origins().library(),
                 palette: part.and_then(Part::palette),
                 label: attached.name(),
             }),
@@ -176,6 +179,7 @@ fn part_item(part: &Part) -> Item<'_> {
         drawn: part.model().map(|model| Drawn {
             model,
             materials: part.materials(),
+            material_entry: part.material_archive_origins().library(),
             palette: part.palette(),
             label: part.class_name(),
         }),
@@ -211,6 +215,7 @@ fn interior_item<'a>(
         drawn: part.model().map(|model| Drawn {
             model,
             materials: part.materials(),
+            material_entry: part.material_archive_origins().library(),
             palette: part.palette(),
             label: part.name(),
         }),

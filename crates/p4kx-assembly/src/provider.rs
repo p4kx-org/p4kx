@@ -10,8 +10,8 @@ use p4kx_extraction::model::{
 };
 use p4kx_extraction::{
     AnimationChoice, AnimationSet, Archive, ArchiveDefaultMaterial, ArchiveMaterialRead,
-    ArchiveMaterialReads, ArchiveModelRead, ArchiveTextures, ConversionError, ModelArchiveSource,
-    ModelSource, PathIndex, TextureVerdicts, archive_error_in,
+    ArchiveMaterialReads, ArchiveModelRead, ArchiveTextures, ConversionError, EntryOrigin,
+    ModelArchiveSource, ModelSource, PathIndex, TextureVerdicts, archive_error_in,
 };
 use thiserror::Error;
 
@@ -47,7 +47,7 @@ pub struct ProvidedModel {
     pub skeleton: Option<SkeletonProblem>,
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
     pub(crate) cdf_model_sources: Option<Arc<CdfModelSources>>,
-    pub(crate) definition_origin: Option<p4kx_extraction::EntryOrigin>,
+    pub(crate) definition_origin: Option<EntryOrigin>,
 }
 
 /// A rigid model a character definition binds to a bone of its skeleton.
@@ -186,6 +186,15 @@ pub trait ModelProvider: Sync {
         Arc::new(self.library("", path))
     }
 
+    /// Returns a layer library and the original Entry when this provider can prove it.
+    fn layer_library_observed(
+        &self,
+        path: &str,
+        budget: &mut LayerBudget,
+    ) -> (Arc<MaterialStatus>, Option<EntryOrigin>) {
+        (self.layer_library(path, budget), None)
+    }
+
     /// Reads the bytes of the file at `path`, a path below `Data`, such as the DNA rig a piece is
     /// shaped by. The default has no such files. A provider that does not implement it holds no
     /// own skin of a story character's head, as the Armour looks for those through this method.
@@ -204,10 +213,7 @@ pub trait ModelProvider: Sync {
         &self,
         path: &str,
         limit: u64,
-    ) -> (
-        Option<p4kx_extraction::EntryOrigin>,
-        Result<Vec<u8>, ModelFailure>,
-    ) {
+    ) -> (Option<EntryOrigin>, Result<Vec<u8>, ModelFailure>) {
         (None, self.file(path, limit))
     }
 

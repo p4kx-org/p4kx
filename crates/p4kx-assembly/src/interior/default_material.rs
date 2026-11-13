@@ -74,7 +74,7 @@ impl Interior {
             });
             let mut node = SceneNode::new(part.name.clone(), above, local);
             if let Some(model) = &part.model {
-                let scene_part = ScenePart::new(model, &part.materials);
+                let scene_part = ScenePart::new(model, part.materials());
                 let mut scene_part =
                     fallback.map_or(scene_part, |material| scene_part.with_fallback(material));
                 if let Some(palette) = &part.palette {

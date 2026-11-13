@@ -251,22 +251,22 @@ fn write_scene_files(
     let items = &scene.items;
     let plan = MeshPlan::of(items);
     let fallback = crate::package_default_material::select(items, &plan, options.lod, models);
-    let library = fallback
-        .as_deref()
-        .and_then(ArchiveDefaultMaterial::library);
-    let collected = Collected::of(items, &plan, options.lod, models, library);
+    let collected = Collected::of(
+        items,
+        &plan,
+        options.lod,
+        models,
+        fallback.as_deref(),
+        context,
+    )?;
     context.check()?;
-    let outcomes = if collected.wanted.is_empty() {
-        Vec::new()
-    } else {
-        textures::write_all(
-            &collected.wanted,
-            textures,
-            options.texture_mip,
-            &staging.join(TEXTURES_FOLDER),
-            context,
-        )?
-    };
+    let outcomes = textures::write_all(
+        &collected.wanted,
+        textures,
+        options.texture_mip,
+        &staging.join(TEXTURES_FOLDER),
+        context,
+    )?;
     let written = meshes::write_all(
         items,
         &plan,

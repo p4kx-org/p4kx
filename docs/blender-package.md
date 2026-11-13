@@ -775,3 +775,30 @@ An interior package written with `--authored-soc` has an `authored_soc` referenc
 `scene.json` (package format 1.13). It names the fixed file `authored/soc-scene.json` and its
 independent schema version. The add-on loads its non-rendering hierarchy alongside the visible
 scene. See [Authored SOC scene](soc-scene.md) for the sidecar contract.
+
+### Static material emission
+
+Materials with original emission declarations carry `emission_source`. Its original tokens
+and typed values link through `source_library` and the original element and attribute ordinals.
+That library retains the XML syntax, including original spelling, opaque parameters and source
+coverage. Zero, malformed and nonfinite input values are preserved independently.
+
+The emission description's `field_origins` map addresses individual output values through
+JSON Pointers relative to `emission_source`. Original attribute coordinates use the
+`materialXmlAttribute` namespace, whose indices hold the zero-based XML child ordinals followed
+by the attribute ordinal. Derived controls also identify their actual attribute or element uses.
+The references resolve in `material_libraries[source_library].emission_provenance`, which retains
+the actual observed library or layer Entry and any container ancestry. A known encrypted payload
+yields `containsEncryptedSource: true`. Complete unencrypted contributions yield `false`.
+Unobserved provider inputs and other incomplete contributions without an encrypted witness yield
+`null`. Equal XML from distinct physical Entries keeps its own material assignment and provenance.
+The marks on static preview parameters describe their authored XML inputs; the image asset
+retains its own independent origin.
+
+The optional `preview` is evaluated only for a complete material with an explicit emittance
+shader permutation, a unique named texture slot and finite authored colour and positive Glow.
+Blender samples that slot with its own UV transforms, multiplies the scene-linear RGB by the
+authored tint once, and supplies the Glow value to the shader's emission strength.
+The surface retains its normal alpha coverage rules. A missing image uses the ordinary flat
+material emission. Dynamic Entity links and shader-specific coverage controls such as
+`AlphaGlowCutoff` remain authored data.

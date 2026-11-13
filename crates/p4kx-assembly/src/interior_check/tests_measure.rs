@@ -7,6 +7,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use p4kx_chunks::ChunkFile;
+use p4kx_extraction::ArchiveMaterialRead;
 use p4kx_model::{CompanionError, CompanionPath, MaterialStatus, Model, Transform};
 use p4kx_testkit::{TestModel, TestNode};
 
@@ -117,7 +118,7 @@ fn part(
         world: at,
         model_path: path.map(str::to_owned),
         model,
-        materials: Arc::new(MaterialStatus::Unnamed),
+        materials: Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed)),
         palette: None,
         light: None,
         light_placement: None,

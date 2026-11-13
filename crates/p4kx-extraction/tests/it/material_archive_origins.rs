@@ -47,6 +47,8 @@ fn material_sources_follow_the_actual_sibling_and_already_cached_layer_selection
     );
     assert!(warmed.library().is_some());
 
+    check_shared_layer(&index, &cache, &verdicts, &reads, &warmed)?;
+
     let read = ModelSource::material_library_observed(
         &index,
         r"Data\Objects\Test\test.cgf",
@@ -67,5 +69,38 @@ fn material_sources_follow_the_actual_sibling_and_already_cached_layer_selection
     assert_eq!(attempted.entry().entry().path(), LAYER);
     assert_eq!(attempted.source_material(), None);
     assert!(read.origins.layer(0, 2).is_none());
+    Ok(())
+}
+
+fn check_shared_layer(
+    index: &PathIndex<'_>,
+    cache: &LayerCache,
+    verdicts: &TextureVerdicts,
+    reads: &ArchiveMaterialReads,
+    warmed: &std::sync::Arc<p4kx_extraction::model::MaterialStatus>,
+) -> TestResult {
+    let (cached, original) = ModelSource::layer_library_observed(
+        index,
+        "LAYERS/SHARED.MTL",
+        cache,
+        verdicts,
+        &mut cache.budget(),
+        reads,
+    );
+    assert!(
+        std::sync::Arc::ptr_eq(&cached, warmed),
+        "observed lookup reuses the already cached decode"
+    );
+    let original = original.ok_or("the exact cached layer Entry")?;
+    assert_eq!(
+        original.entry().path(),
+        r"Data\layers\shared.mtl",
+        "physical path is from the actual cached read"
+    );
+    assert_eq!(
+        original.encryption(),
+        SourceEncryption::Unencrypted,
+        "a plain cached layer retains its own encryption state"
+    );
     Ok(())
 }

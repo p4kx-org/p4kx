@@ -230,7 +230,19 @@ impl LayerCache {
         companions: &mut dyn CompanionResolver,
         budget: &mut LayerBudget,
     ) -> Arc<MaterialStatus> {
-        self.read_library(path, companions, budget).status
+        self.library_with_read_origin(path, companions, budget).0
+    }
+
+    /// Returns the cached library and the opaque identity of the read that supplied it.
+    #[must_use]
+    pub fn library_with_read_origin(
+        &self,
+        path: &str,
+        companions: &mut dyn CompanionResolver,
+        budget: &mut LayerBudget,
+    ) -> (Arc<MaterialStatus>, Option<crate::MaterialReadOrigin>) {
+        let read = self.read_library(path, companions, budget);
+        (read.status, read.origin)
     }
 
     fn read_library(

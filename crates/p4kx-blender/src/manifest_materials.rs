@@ -244,6 +244,9 @@ pub struct MaterialDescription {
     pub alpha_test: f32,
     /// The glow amount the emissive colour is multiplied by.
     pub glow: f32,
+    /// Exact authored emission and coverage controls with an explicit static preview disposition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub emission_source: Option<crate::PackageMaterialEmission>,
     /// How the material is blended, derived from `opacity`, `alpha_test` and the shader.
     pub alpha_mode: AlphaMode,
     /// Whether the material reads the vertex colours of its mesh (1.4): glass with
@@ -329,4 +332,8 @@ pub struct MaterialLibrarySourceDescription {
     pub path: String,
     /// Bounded source root, namespaces/content and actual projection boundaries.
     pub authored: MaterialLibrarySourceInfo<'static>,
+    /// Physical sources and exact use references for this library's emission fields.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<p4kx_extraction::SourceInventory>")]
+    pub emission_provenance: Option<serde_json::Value>,
 }

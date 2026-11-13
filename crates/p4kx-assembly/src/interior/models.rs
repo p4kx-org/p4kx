@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use p4kx_extraction::ArchiveDefaultMaterial;
+use p4kx_extraction::{ArchiveDefaultMaterial, ArchiveMaterialRead};
 use p4kx_model::{Lod, MaterialStatus, Model};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -65,7 +65,7 @@ pub(super) fn attach(
     let mut fill = Fill {
         outcomes,
         libraries,
-        unnamed: Arc::new(MaterialStatus::Unnamed),
+        unnamed: Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed)),
         palettes: Palettes::new(classes.map(ClassLookup::palettes)),
         max_vertices: options.max_vertices,
         reported: HashSet::new(),
@@ -93,8 +93,8 @@ pub(super) fn attach(
 /// The models and libraries that were read, and the issues found while handing them to parts.
 struct Fill<'p> {
     outcomes: HashMap<Key, Outcome>,
-    libraries: HashMap<Key, Arc<MaterialStatus>>,
-    unnamed: Arc<MaterialStatus>,
+    libraries: HashMap<Key, Arc<ArchiveMaterialRead>>,
+    unnamed: Arc<ArchiveMaterialRead>,
     palettes: Palettes<'p>,
     max_vertices: usize,
     reported: HashSet<(String, String)>,
@@ -133,15 +133,13 @@ impl Fill<'_> {
                     .map_or_else(|| Arc::clone(&self.unnamed), Arc::clone);
                 let (palette, palette_issues) = self
                     .palettes
-                    .of_named(placement.palette.as_ref(), &part.materials);
+                    .of_named(placement.palette.as_ref(), part.materials());
                 part.palette = palette;
                 for kind in palette_issues {
                     self.note(container, &name, kind);
                 }
-                let problem = part
-                    .materials
-                    .problem()
-                    .or_else(|| part.materials.layer_problem());
+                let materials = part.materials();
+                let problem = materials.problem().or_else(|| materials.layer_problem());
                 match (library, problem) {
                     (Some(_), Some(reason)) => IssueKind::MaterialLibrary { reason },
                     _ => return,
@@ -315,7 +313,7 @@ fn read_libraries(
     chosen: &[(Key, &str, &str)],
     providers: &[ArchiveModels<'_>],
     watch: &InteriorWatch<'_>,
-) -> Result<HashMap<Key, Arc<MaterialStatus>>, AssemblyError> {
+) -> Result<HashMap<Key, Arc<ArchiveMaterialRead>>, AssemblyError> {
     let mut seen = HashSet::new();
     let named = outcomes.iter().filter_map(|(key, outcome)| match outcome {
         Outcome::Loaded(loaded) => {
@@ -340,7 +338,10 @@ fn read_libraries(
                 return None;
             }
             let provider = providers.get(key.0)?;
-            Some((key.clone(), Arc::new(provider.library(entry, name))))
+            Some((
+                key.clone(),
+                Arc::new(provider.library_observed(entry, name)),
+            ))
         })
         .collect();
     if watch.is_cancelled() {
