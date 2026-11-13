@@ -1493,9 +1493,9 @@ texts without the `'` and keeps the byte order mark; it is invalid input (exit c
 `--format json`.
 
 With `--out` and `--json` the command prints `{"archive": "…", "out": "…", "format": "csv",
-"language": "en", "action_maps": 50, "actions": 1103, "unresolved_labels": 1}`;
+"language": "en", "action_maps": 50, "actions": 1103, "unresolved_labels": 1, "origin_receipt": "actions.csv.p4kx-origin.jsonl"}`;
 `unresolved_labels` counts the label keys, of actions and of action maps, with no text in the
-language.
+language. The report also includes `fieldOrigins` and `provenance`.
 
 ## `p4kx key set|show|remove --json`
 

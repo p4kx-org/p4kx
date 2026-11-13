@@ -56,6 +56,9 @@
 //! the chosen languages as JSON or CSV.
 
 mod action_map;
+mod action_map_origin;
+mod action_map_profile;
+mod action_map_source;
 #[cfg(test)]
 mod action_map_tests;
 mod action_map_write;

@@ -52,6 +52,12 @@ pub(crate) struct ActionMapExportArgs {
     /// The file to write; an existing file is replaced. The export goes to stdout without it.
     #[arg(long, value_name = "FILE")]
     pub(crate) out: Option<PathBuf>,
+    /// Writes the raw stdout stream's field-origin companion to stderr.
+    #[arg(long, conflicts_with = "out")]
+    pub(crate) origin_stderr: bool,
+    /// Saves the raw stdout stream's field-origin companion to this file.
+    #[arg(long, value_name = "FILE", conflicts_with = "out")]
+    pub(crate) origin_out: Option<PathBuf>,
 }
 
 /// The values of `p4kx actionmap export --format`.

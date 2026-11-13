@@ -7,7 +7,12 @@ pub use crate::action_map::{
     ACTION_MAP_PROFILE_PATH, Action, ActionMap, ActionMapError, ActionMaps, Binding, Device,
     parse_action_maps, read_action_maps,
 };
-pub use crate::action_map_write::{ActionMapCounts, ActionMapFormat, write_action_maps};
+pub use crate::action_map_origin::{ActionMapOrigins, action_map_summary_origins};
+pub use crate::action_map_profile::ActionMapProfile;
+pub use crate::action_map_write::{
+    ActionMapCounts, ActionMapFormat, ActionMapLabels, write_action_maps,
+    write_action_maps_with_origins,
+};
 pub use crate::archive_key_use::{ArchiveKeyState, ArchiveKeyUse};
 pub use crate::build::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
 pub use crate::built_catalog::BuiltCatalog;

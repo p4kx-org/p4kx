@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{self, Read};
+use std::io;
 
-use p4kx_extraction::cryxml::{self, CryXmlError, Xml};
-use p4kx_extraction::{Archive, ArchiveError, find_entry};
+use p4kx_extraction::cryxml::CryXmlError;
+use p4kx_extraction::{Archive, ArchiveError};
 use thiserror::Error;
 
-use crate::starmap_xml::{Node, attribute};
+use crate::action_map_profile::ActionMapProfile;
 
 /// The path of the default profile that holds the action maps.
 pub const ACTION_MAP_PROFILE_PATH: &str = "Data\\Libs\\Config\\defaultProfile.xml";
 
-const MAX_PROFILE_LEN: u64 = 64 << 20;
+pub(crate) const MAX_PROFILE_LEN: u64 = 64 << 20;
 
 /// An input device a default binding belongs to.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -129,19 +129,7 @@ pub enum ActionMapError {
 ///
 /// Returns [`ActionMapError`] when the profile is missing, too large, unreadable or not XML.
 pub fn read_action_maps(archive: &Archive) -> Result<ActionMaps, ActionMapError> {
-    let entry = find_entry(archive, ACTION_MAP_PROFILE_PATH).ok_or(ActionMapError::NotFound)?;
-    let size = entry.uncompressed_size();
-    if size > MAX_PROFILE_LEN {
-        return Err(ActionMapError::TooLarge { size });
-    }
-    let mut bytes = Vec::new();
-    archive
-        .open_entry(entry)
-        .map_err(ActionMapError::Open)?
-        .take(MAX_PROFILE_LEN)
-        .read_to_end(&mut bytes)
-        .map_err(ActionMapError::Read)?;
-    parse_action_maps(&bytes)
+    Ok(ActionMapProfile::read(archive)?.into_maps())
 }
 
 /// Parses the action maps of the profile `bytes`, text XML or `CryXml`.
@@ -154,81 +142,5 @@ pub fn read_action_maps(archive: &Archive) -> Result<ActionMaps, ActionMapError>
 ///
 /// Returns [`ActionMapError::Xml`] or [`ActionMapError::Text`] when `bytes` are no XML.
 pub fn parse_action_maps(bytes: &[u8]) -> Result<ActionMaps, ActionMapError> {
-    match cryxml::read(bytes).map_err(ActionMapError::Xml)? {
-        Xml::CryXml(document) => Ok(collect(document.root())),
-        Xml::Text(text) => {
-            let text = std::str::from_utf8(text)
-                .map_err(|error| ActionMapError::Text(error.to_string()))?
-                .trim_start_matches('\u{feff}');
-            cryxml::check_text_depth(text)
-                .map_err(|error| ActionMapError::Text(error.to_string()))?;
-            let document = roxmltree::Document::parse(text)
-                .map_err(|error| ActionMapError::Text(error.to_string()))?;
-            Ok(collect(document.root_element()))
-        }
-    }
-}
-
-fn named<'d, N: Node<'d>>(node: N, name: &'static str) -> impl Iterator<Item = N> {
-    node.children()
-        .filter(move |child| child.name().eq_ignore_ascii_case(name))
-}
-
-fn text<'d>(node: impl Node<'d>, name: &str) -> Option<&'d str> {
-    attribute(node, name)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-}
-
-fn collect<'d, N: Node<'d>>(root: N) -> ActionMaps {
-    let maps = named(root, "actionmap")
-        .filter_map(|map| {
-            Some(ActionMap {
-                name: text(map, "name")?.to_owned(),
-                label_key: text(map, "UILabel")
-                    .or_else(|| text(map, "UILable"))
-                    .map(str::to_owned),
-                actions: named(map, "action").filter_map(read_action).collect(),
-            })
-        })
-        .collect();
-    ActionMaps { maps }
-}
-
-fn read_action<'d>(action: impl Node<'d>) -> Option<Action> {
-    let name = text(action, "name")?.to_owned();
-    let activation_mode = text(action, "activationMode");
-    let mut bindings = Vec::new();
-    for device in Device::ALL {
-        let mut push = |input: &str, mode: Option<&str>| {
-            let binding = Binding {
-                device,
-                input: input.to_owned(),
-                activation_mode: mode.or(activation_mode).map(str::to_owned),
-            };
-            if !bindings.contains(&binding) {
-                bindings.push(binding);
-            }
-        };
-        if let Some(input) = text(action, device.name()) {
-            push(input, None);
-        }
-        for element in named(action, device.name()) {
-            let mode = text(element, "activationMode");
-            if let Some(input) = text(element, "input") {
-                push(input, mode);
-            }
-            for data in named(element, "inputdata") {
-                if let Some(input) = text(data, "input") {
-                    push(input, mode);
-                }
-            }
-        }
-    }
-    Some(Action {
-        name,
-        label_key: text(action, "UILabel").map(str::to_owned),
-        activation_mode: activation_mode.map(str::to_owned),
-        bindings,
-    })
+    Ok(ActionMapProfile::parse(bytes)?.into_maps())
 }

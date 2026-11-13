@@ -89,6 +89,30 @@ A file replacement also invalidates any existing sibling or directory
 companion that covers the replaced name. A verified directory artifact
 table for disjoint names remains usable after a single-file replacement.
 
+## Action-map exports
+
+Action-map file exports publish a sibling `<file>.p4kx-origin.jsonl`. The raw
+JSON and CSV retain their existing fields and bytes. Use `--origin-out <file>`
+for a companion bound to stdout, or `--origin-stderr` for the JSONL block on
+stderr. Both switches can be used together. The stderr block starts at the
+`p4kx-source-origin` header and ends at its end record. Human diagnostics may
+appear outside that block. Require a successful exit and verify the binding,
+counts and references before using the proof.
+
+JSON addresses are pointers into the exported object. CSV addresses use
+`/rows/<index>/<column>` with zero-based data rows and the exact header name.
+Their half-open byte ranges include any CSV quotes and formula neutralisation.
+An empty cell has a zero-length range at its own logical address.
+
+The companion retains the selected profile's original text XML attribute
+range or binary CryXml node and attribute positions. A label records the
+authored selector and the language Entry consulted. The selected INI value
+uses its byte range in the decoded INI. An unresolved label records the
+lookup without a payload use. A placeholder that bypasses the lookup
+carries the profile selector alone. Bindings identify their own input and
+their inherited or overridden activation mode. A device cell uses the
+bindings actually joined into it.
+
 ## CHF conversion
 
 `p4kx chf to-json` addresses the exact scalar and empty-container JSON values

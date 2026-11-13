@@ -404,6 +404,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   joystick. The CSV has one row per action and a cell per device, bindings joined with ` | `; the
   JSON lists every binding with its device, input and activation mode ([ADR-0180](adr/0180-the-action-map-export-lists-every-default-binding-of-the-default-profile.md)).
   A label whose key has no text in `--language` (English by default) stays empty.
+  File exports write a sibling origin companion. With raw stdout, use `--origin-stderr` or
+  `--origin-out <file>` to receive the same per-field evidence without changing the export.
+  See [Action-map origins](source-origin.md#action-map-exports).
 - `p4kx media export <archive> --out <directory> [--kind <kind>] [--filter <filter>]
   [--exclude <filter>] [--conflict skip|overwrite|if-changed] [--audio-format raw|wav|ogg]
   [--animation-skeleton <entry>] [--diagnostic]` writes the
