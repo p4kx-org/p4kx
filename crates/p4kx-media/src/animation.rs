@@ -5,11 +5,14 @@ mod binding_payload;
 mod binding_projection;
 mod controller_projection;
 mod dba_projection;
+mod image_payload;
+mod image_projection;
 mod origin;
 mod payload;
 mod projection;
 mod provider;
 mod schema;
+pub(crate) mod selection_path;
 mod skeleton_selection;
 
 pub(crate) use provider::AnimationProvider;

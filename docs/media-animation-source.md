@@ -2,7 +2,7 @@
 
 `p4kx media export ARCHIVE --out DIR --kind animation` writes the shared
 `animation.jsonl` stream. The source inventory retains the exact decoded Entry bytes
-of selected CAF, DBA and AIM files through the normal RawReference. Filter expressions,
+of selected CAF, DBA and AIM files and the two global animation images through the normal RawReference. Filter expressions,
 nested Archive traversal and atomic publication follow the [media export contract](media-export.md).
 
 | Namespace | Indices | Payload |
@@ -12,6 +12,8 @@ nested Archive traversal and atomic publication follow the [media export contrac
 | `animation-clip` | original clip ordinal, zero for CAF | Original 48 metadata bytes, full flag word, interpreted timing, physical ranges and DBA name |
 | `animation-controller` | clip ordinal, controller ordinal | Original ID and both 12-byte channel declarations, with independent sample outcomes |
 | `animation-dba-metadata` | original clip ordinal | Uncovered DBA metadata and name with explicitly unavailable controller data |
+| `animation-image-index` | original chunk table ordinal | Global image extent and layout disposition with the CAF prefix, record count and trailer when proved |
+| `animation-image-record` | original chunk table ordinal, original record ordinal | Physical CAF record and path field ranges, original path text or lexical error, and the independent loose Entry lookup |
 
 All ranges are half-open and relative to the original retained Entry. IVO chunk extents come
 from the validated directory and may include padding. DBA controller keys can refer to a
@@ -48,6 +50,26 @@ source descriptor and encoded interval to each emitted artifact occurrence. A so
 field from an encrypted Entry is marked independently of the Entry name or suffix derived
 from the Archive directory.
 
+## Global animation images
+
+The provider recognizes the canonical `Data/Animations/Animations.img` and
+`Data/Animations/DirectionalBlends.img` paths with normal Archive case and slash matching.
+A CAF image chunk of type `0x370275B7` v0x902 with prefix format word 2 has an
+eight-byte prefix, ordered 308-byte records and an eight-byte trailer. The 256-byte
+path field starts at each record's beginning. The ranges recover each original record,
+its path bytes and the trailer from the retained Entry. Duplicate paths keep their own
+ordinals. An invalid UTF-8 or unterminated field keeps its physical interval and explicit
+disposition while later fixed-width records remain readable. Unknown versions and
+malformed framing expose the original chunk and a diagnostic disposition.
+
+The directional chunk `0x6B8DF259` v0x901 remains opaque. Its original bytes
+and extent are available. The CAF path's lookup describes only a physical loose Entry
+in the owning Archive. It distinguishes missing, ambiguous and filtered identities.
+A successful lookup needs no target payload read. DBA ownership, timing interpretation
+and pose semantics require separate evidence. The source path depends on the image payload.
+The resolved target identity carries
+both the authored selector and the target's directory metadata.
+
 ## Installed Archive verification
 
 The opt-in Media census selects every CAF, DBA and AIM Entry across the root and nested
@@ -64,6 +86,7 @@ counts without recording asset names or payloads.
 
 ```powershell
 cargo test --locked -p p4kx-media --test real_archive all_selected_animation_entries_clips_and_keys_reconcile -- --ignored
+cargo test --locked -p p4kx-media --test real_archive global_animation_images_match_verified_physical_sources -- --ignored
 ```
 
 ## Optional skeleton bindings

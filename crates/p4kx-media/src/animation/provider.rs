@@ -7,6 +7,7 @@ use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::chunks::ChunkFile;
 use p4kx_extraction::model::{AnimationError, AnimationSource};
 
+use super::image_projection;
 use super::origin::{self as proof, AnimationOrigins};
 use super::payload::{self as wire, AnimationPayload, Entry, EntryLayout, Family};
 use super::skeleton_selection::{self, SelectedSkeleton};
@@ -22,8 +23,8 @@ impl Provider for AnimationProvider {
         let mut capability = Capability::new(
             MediaKind::Animation,
             "p4kx.animation.source",
-            "1.2.0",
-            "Exact CAF, DBA and AIM Entry bytes with authored chunk, clip and controller positions. Decoded samples are separate typed chunks.",
+            "1.3.0",
+            "Exact animation and image Entry bytes with positioned source data and separate decoded sample chunks.",
         );
         capability.field_groups = vec![
             FieldGroup::new(
@@ -41,6 +42,14 @@ impl Provider for AnimationProvider {
             FieldGroup::new_with_unsupported_projection(
                 "aim-pose-semantics",
                 "AIM retains original bytes and chunk table without interpreting poses.",
+            ),
+            FieldGroup::new(
+                "animation-images",
+                "Global animation image chunks and ordered CAF image paths.",
+            ),
+            FieldGroup::new_with_unsupported_projection(
+                "directional-image-records",
+                "The directional image retains original bytes without interpreting record boundaries.",
             ),
             FieldGroup::new(
                 "skeleton-binding",
@@ -76,12 +85,13 @@ impl Provider for AnimationProvider {
         super::projection::table(&file, &origins, writer)?;
         let skeleton = match family {
             Family::Caf | Family::Dba => skeleton_selection::selected(context, writer)?,
-            Family::Aim => None,
+            Family::Aim | Family::CafImage | Family::DirectionalBlendImage => None,
         };
         if let Some(skeleton) = skeleton {
             skeleton.write(&origins, writer)?;
         }
         let skeleton = skeleton.and_then(skeleton_selection::SkeletonSelection::parsed);
+        image_projection::write(&file, family, context, &origins, writer)?;
         let issue = clips(name, family, &file, &origins, skeleton, writer)?;
         entry(
             family,
@@ -104,7 +114,7 @@ fn clips(
     writer: &mut MediaWriter<'_>,
 ) -> Result<Option<AnimationError>, MediaError> {
     match family {
-        Family::Aim => {}
+        Family::Aim | Family::CafImage | Family::DirectionalBlendImage => {}
         Family::Caf => match AnimationSource::read_caf(name, file) {
             Ok(clip) => super::projection::clip(file, clip, origins, skeleton, writer)?,
             Err(error) => return Ok(Some(error)),
@@ -146,6 +156,7 @@ fn entry(
     let layout = match (chunk_count, family) {
         (None, _) => EntryLayout::InvalidContainer,
         (Some(_), Family::Aim) => EntryLayout::OpaqueAim,
+        (Some(_), Family::CafImage | Family::DirectionalBlendImage) => EntryLayout::ImageIndex,
         (Some(_), _) => EntryLayout::ClipInventory,
     };
     let layout_source = if chunk_count.is_some() {

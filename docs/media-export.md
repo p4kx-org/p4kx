@@ -201,7 +201,8 @@ bytes. The shared per-field origin receipts identify the exact source bytes. Mod
 dependencies and converted geometry have separate coverage.
 
 `--kind animation` retains CAF, DBA and AIM sources with chunk and clip inventory, original
-metadata and controller words, and typed decoded frame and key chunks.
+metadata and controller words, and typed decoded frame and key chunks. The same provider
+retains both global animation images and writes the ordered CAF image records.
 [Animation source export](media-animation-source.md) describes the layouts and dispositions.
 
 `--kind audio` exports standalone and complete embedded WEM summaries, ordered RIFF chunks,

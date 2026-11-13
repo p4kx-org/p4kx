@@ -194,7 +194,7 @@ fn target_reference<'source>(
         selector: &proof,
     }
     .resolve_at(
-        projection,
+        projection.context.directory,
         "/data/payload/target/reference",
         prepared,
         writer,

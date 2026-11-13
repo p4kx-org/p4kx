@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::cryxml::{
     SourceAttributePosition, SourceDeclaration, SourceDeclarationKind, SourceElement,
 };
-use p4kx_extraction::{FieldPath, SourceUseRole};
 
 use super::graph_source::GraphRole;
 use super::origins;
@@ -12,14 +12,14 @@ use super::payload::{self as wire, DefinitionFamily, DefinitionLink, DefinitionP
 use super::projection::DefinitionProjection;
 use super::sub_database_cycles::Edge;
 use super::sub_database_frontier::{self, FrontierReason};
+pub(super) use crate::animation::selection_path::{ReferenceSelection, archive_animation_path};
 use crate::audio_control_payload::AtlPosition;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_prepared::PreparedRecordOrigins;
-use crate::origin_reference::{ReferenceIdentifier, ReferenceOriginInputs, ReferenceSubresource};
 use crate::xml_source_projection::declaration_position;
 use crate::{
-    CandidateInventory, Identity, MediaError, MediaKind, MediaWriter, OriginalIdentifier,
-    Reference, ReferenceResolution, ReferenceUnavailable, Status, Subresource, origin_error,
+    Identity, MediaError, MediaKind, MediaWriter, Reference, ReferenceResolution, Status,
+    Subresource,
 };
 
 pub(super) struct LinkSelector {
@@ -248,14 +248,6 @@ pub(super) fn write(
     )
 }
 
-pub(super) struct ReferenceSelection<'a> {
-    pub(super) authored_path: &'a str,
-    pub(super) archive_path: Option<&'a str>,
-    pub(super) kind: Option<MediaKind>,
-    pub(super) original: &'a OriginContributions,
-    pub(super) selector: &'a OriginContributions,
-}
-
 impl ReferenceSelection<'_> {
     pub(super) fn resolve(
         &self,
@@ -263,49 +255,12 @@ impl ReferenceSelection<'_> {
         prepared: &mut PreparedRecordOrigins,
         writer: &mut MediaWriter<'_>,
     ) -> Result<Reference, MediaError> {
-        self.resolve_at(projection, "/data/payload/reference", prepared, writer)
-    }
-
-    pub(super) fn resolve_at(
-        &self,
-        projection: &DefinitionProjection<'_, '_>,
-        address: &str,
-        prepared: &mut PreparedRecordOrigins,
-        writer: &mut MediaWriter<'_>,
-    ) -> Result<Reference, MediaError> {
-        let original = OriginalIdentifier::new_with_path(self.authored_path);
-        let address = FieldPath::parse(address).map_err(|cause| origin_error::address(&cause))?;
-        let Some(path) = self.archive_path else {
-            prepared.insert_subtree(&address, self.selector.clone(), writer)?;
-            let original_address = crate::origin_reference::child(&address, "original")?;
-            prepared.insert_subtree(&original_address, self.original.clone(), writer)?;
-            crate::origin_reference::independent(
-                prepared,
-                &crate::origin_reference::child(&original_address, "type")?,
-                writer,
-            )?;
-            return writer.resolve_reference(
-                original,
-                [],
-                CandidateInventory::Unavailable(ReferenceUnavailable::InvalidIdentifier),
-            );
-        };
-        let lookup = projection
-            .context
-            .directory
-            .lookup_input_observed(original, path, self.kind, writer)?;
-        let origins = ReferenceOriginInputs {
-            original: self.original,
-            selector: self.selector,
-            inventory: &lookup.inventory,
-            semantic: self.original,
-            candidates: &lookup.evidence,
-            read_selected: false,
-            identifier: ReferenceIdentifier::Path,
-            subresource: ReferenceSubresource::None,
-        };
-        origins.write(prepared, &address, &lookup.lookup.reference, writer)?;
-        Ok(lookup.lookup.reference)
+        self.resolve_at(
+            projection.context.directory,
+            "/data/payload/reference",
+            prepared,
+            writer,
+        )
     }
 }
 
@@ -359,23 +314,4 @@ pub(super) fn target_path(kind: LinkKind, path: &str) -> Option<String> {
         return None;
     }
     archive_animation_path(path)
-}
-
-pub(super) fn archive_animation_path(path: &str) -> Option<String> {
-    if path.split(['/', '\\']).any(|part| {
-        matches!(part, "" | "." | "..")
-            || part.contains([':', '\0', '!', '*', '?'])
-            || part.ends_with([' ', '.'])
-    }) {
-        return None;
-    }
-    let mut parts = path.split(['/', '\\']);
-    let first = parts.next()?;
-    if first.eq_ignore_ascii_case("data") && parts.next().is_some() {
-        Some(path.replace('\\', "/"))
-    } else if first.eq_ignore_ascii_case("animations") && parts.next().is_some() {
-        Some(format!("Data/{}", path.replace('\\', "/")))
-    } else {
-        None
-    }
 }

@@ -45,6 +45,7 @@ mod bone_map;
 mod bone_match;
 mod build;
 mod build_lod;
+mod caf_image;
 pub mod character_definition;
 mod companion;
 mod controller_binding;
@@ -163,6 +164,7 @@ pub use bone_extend::{
 };
 pub use bone_map::{Influences, MAX_INFLUENCES};
 pub use bone_match::BoneMatch;
+pub use caf_image::{CafImage, CafImageError, CafImagePath, CafImageRecord};
 pub use companion::{
     CompanionError, CompanionPath, CompanionResolver, GREY_PROBE_MIP, MAX_GREY_SATURATION,
     companion_file_names,

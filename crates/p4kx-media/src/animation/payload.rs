@@ -7,34 +7,62 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::binding_payload::{Binding, Skeleton};
+use super::image_payload::{ImageIndex, ImageRecord};
 use crate::{ByteOrder, ChunkReference, OffsetBasis, SourceRange};
 
 pub(crate) const ENTRY: &str = "animation-entry";
 pub(crate) const CHUNK: &str = "animation-chunk";
 pub(crate) const CLIP: &str = "animation-clip";
 pub(crate) const DBA_METADATA: &str = "animation-dba-metadata";
+pub(crate) const IMAGE_INDEX: &str = "animation-image-index";
+pub(crate) const IMAGE_RECORD: &str = "animation-image-record";
 pub(crate) const CONTROLLER: &str = "animation-controller";
 pub(crate) const SKELETON: &str = "animation-skeleton";
 pub(crate) const BINDING: &str = "animation-controller-binding";
 
 #[derive(Clone, Copy, Serialize, JsonSchema)]
-#[serde(rename_all = "lowercase")]
+#[serde(rename_all = "kebab-case")]
 #[schemars(rename = "AnimationFamily")]
 pub(crate) enum Family {
     Caf,
     Dba,
     Aim,
+    CafImage,
+    DirectionalBlendImage,
 }
 
 impl Family {
     pub(crate) fn of(path: &str) -> Option<Self> {
         let (_, extension) = path.rsplit_once('.')?;
+        if extension.eq_ignore_ascii_case("img") {
+            return Self::of_image(path);
+        }
         if extension.eq_ignore_ascii_case("caf") {
             Some(Self::Caf)
         } else if extension.eq_ignore_ascii_case("dba") {
             Some(Self::Dba)
         } else if extension.eq_ignore_ascii_case("aim") {
             Some(Self::Aim)
+        } else {
+            None
+        }
+    }
+
+    fn of_image(path: &str) -> Option<Self> {
+        let mut parts = path.split(['/', '\\']);
+        if !parts.next()?.eq_ignore_ascii_case("data")
+            || !parts.next()?.eq_ignore_ascii_case("animations")
+        {
+            return None;
+        }
+        let name = parts.next()?;
+        if parts.next().is_some() {
+            return None;
+        }
+        if name.eq_ignore_ascii_case("Animations.img") {
+            Some(Self::CafImage)
+        } else if name.eq_ignore_ascii_case("DirectionalBlends.img") {
+            Some(Self::DirectionalBlendImage)
         } else {
             None
         }
@@ -47,6 +75,7 @@ impl Family {
 pub(crate) enum EntryLayout {
     ClipInventory,
     OpaqueAim,
+    ImageIndex,
     InvalidContainer,
 }
 
@@ -62,6 +91,8 @@ pub(crate) enum AnimationPayload<'a> {
     Chunk(AnimationChunk),
     Clip(Clip<'a>),
     DbaMetadata(DbaMetadata<'a>),
+    ImageIndex(ImageIndex),
+    ImageRecord(ImageRecord<'a>),
     Controller(Controller),
     Skeleton(Skeleton<'a>),
     ControllerBinding(Binding),

@@ -1216,6 +1216,7 @@
       "enum": [
         "clip-inventory",
         "opaque-aim",
+        "image-index",
         "invalid-container"
       ],
       "type": "string"
@@ -1224,9 +1225,188 @@
       "enum": [
         "caf",
         "dba",
-        "aim"
+        "aim",
+        "caf-image",
+        "directional-blend-image"
       ],
       "type": "string"
+    },
+    "AnimationImageIndex": {
+      "additionalProperties": false,
+      "properties": {
+        "layout": {
+          "$ref": "#/$defs/AnimationImageLayout"
+        },
+        "range": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "range",
+        "layout"
+      ],
+      "type": "object"
+    },
+    "AnimationImageLayout": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "header": {
+              "$ref": "#/$defs/SourceRange"
+            },
+            "record_count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "const": "caf-records",
+              "type": "string"
+            },
+            "trailer": {
+              "$ref": "#/$defs/SourceRange"
+            }
+          },
+          "required": [
+            "status",
+            "header",
+            "record_count",
+            "trailer"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "directional-opaque",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "unsupported-version",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "unsupported-format",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "invalid-framing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AnimationImagePath": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "archive_path": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "authored": {
+              "type": "string"
+            },
+            "loose_entry": {
+              "$ref": "#/$defs/Reference"
+            },
+            "status": {
+              "const": "valid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "authored",
+            "archive_path",
+            "loose_entry"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "invalid-encoding",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "status": {
+              "const": "unterminated",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AnimationImageRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/AnimationImagePath"
+        },
+        "path_field": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "range": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "range",
+        "path_field",
+        "path"
+      ],
+      "type": "object"
     },
     "AnimationPayload": {
       "oneOf": [
@@ -1289,6 +1469,40 @@
             },
             "record_type": {
               "const": "dba-metadata",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationImageIndex"
+            },
+            "record_type": {
+              "const": "image-index",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationImageRecord"
+            },
+            "record_type": {
+              "const": "image-record",
               "type": "string"
             }
           },
@@ -37667,6 +37881,116 @@
               "indices": {
                 "maxItems": 1,
                 "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-image-index"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "image-index"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-image-record"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "image-record"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
               }
             }
           }
