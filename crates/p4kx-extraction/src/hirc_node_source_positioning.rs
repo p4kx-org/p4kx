@@ -25,6 +25,8 @@ pub(in crate::hirc_view) struct Positioning<Rows> {
     #[serde(skip_serializing_if = "Option::is_none")]
     flags: Option<SourcedValue<u8>>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    modes: Option<PositioningModes>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     spatial_flags: Option<SourcedValue<u8>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     path_mode: Option<SourcedValue<u8>>,
@@ -48,6 +50,7 @@ impl<Rows> Positioning<Rows> {
     ) -> Result<Self, SourceEvidenceError> {
         Ok(Self {
             flags: origins.optional(fields.flags.as_ref(), "nodePositioningFlags")?,
+            modes: PositioningModes::read(origins, fields)?,
             spatial_flags: origins
                 .optional(fields.spatial_flags.as_ref(), "nodePositioningSpatialFlags")?,
             path_mode: origins.optional(fields.path_mode.as_ref(), "nodePositioningPathMode")?,
@@ -67,6 +70,34 @@ impl<Rows> Positioning<Rows> {
                 .transpose()?,
             rows,
         })
+    }
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct PositioningModes {
+    override_parent: SourcedValue<bool>,
+    has_spatial_fields: SourcedValue<bool>,
+    panner_type_code: SourcedValue<u8>,
+    position_type_code: SourcedValue<u8>,
+}
+
+impl PositioningModes {
+    fn read(
+        origins: &ObjectOrigins,
+        fields: &BankNodePositioningFields,
+    ) -> Result<Option<Self>, SourceEvidenceError> {
+        let Some((flags, modes)) = fields.flags.as_ref().zip(fields.modes()) else {
+            return Ok(None);
+        };
+        let boolean = |value| origins.derived(value, &flags.range, "nodePositioningModeBits");
+        let code = |value| origins.derived(value, &flags.range, "nodePositioningModeBits");
+        Ok(Some(Self {
+            override_parent: boolean(modes.override_parent)?,
+            has_spatial_fields: boolean(modes.has_spatial_fields)?,
+            panner_type_code: code(modes.panner_type_code)?,
+            position_type_code: code(modes.position_type_code)?,
+        }))
     }
 }
 

@@ -31,7 +31,10 @@ impl ObjectOrigins {
             bank,
             family.namespace(),
             family.extent_label(),
-            SourceUses::new(),
+            match family {
+                SourceFamily::Action | SourceFamily::State => SourceUses::with_compact_use_refs(),
+                _ => SourceUses::new(),
+            },
         )
     }
 

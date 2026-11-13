@@ -375,8 +375,9 @@ Property row index 2 selects list 0 for scalar properties and list 1 for ranged 
 Index 3 is the property's original position within that list. Each ID retains an individual
 row, including unknown and repeated IDs. Scalar, minimum and maximum words are original
 unsigned 32-bit values with individual ranges and source receipts. Missing words are omitted.
-The list summary carries the coverage status. These fields make no numeric unit or float
-interpretation and use only the original owning bank as their payload source.
+The list summary carries the coverage status. Raw words retain their source type and use
+only the original owning bank as their payload source. Qualified numeric interpretations
+are emitted separately.
 
 Container rows preserve the version 154 Random, Sequence, Switch and Blend layout, original
 parent ID and declared child count. The Random/Sequence row carries the original mode byte.
@@ -486,6 +487,16 @@ class identifies the admitted signature and form used to classify it. A declared
 length identifies its own consulted size word. The raw media range and its originating
 DIDX declaration remain separate fields. Record status, directory metadata and payload
 encryption retain their distinct meanings.
+
+The source coverage depends on the HIRC owner and the observed bank version.
+
+| Owner | Media records | CLI JSON and MCP |
+| --- | --- | --- |
+| v154 Sound, ActorMixer, Random/Sequence, Switch, Blend | Shared properties, priority, effects, Aux, positioning, advanced settings, inline State and RTPC | node_fields plus type-specific source_fields where available |
+| v154 MusicSegment, MusicTrack, MusicSwitch, MusicPlaylist | The same shared groups, alongside music decisions and timing | node_fields plus MusicTrack source_fields |
+| v154 Play Action | Separate property summary and scalar/ranged rows | source_fields with type, target, PlayBank and property declarations |
+| Standalone State v128–145 | Standalone property summary and ordered raw words | source_fields with the original bundle and raw range |
+| Standalone State outside v128–145 | Explicit unsupported disposition and retained object bytes | source_fields with unsupported disposition and raw range |
 
 The opt-in `original_shared_wwise_node_groups_reconcile` test selects one small physical bank
 from a bounded original-source probe. It compares checked shared node groups, ActorMixer children,

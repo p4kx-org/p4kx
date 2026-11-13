@@ -11,6 +11,8 @@ use serde::{Serialize, Serializer};
 
 use crate::bank::Bank;
 
+#[path = "hirc_action_property_source.rs"]
+mod action;
 #[path = "hirc_blend_source.rs"]
 mod blend;
 #[path = "hirc_container_source_layout.rs"]
@@ -27,6 +29,8 @@ mod random_sequence;
 mod rows;
 #[path = "hirc_source_schema.rs"]
 mod schema;
+#[path = "hirc_standalone_state_source.rs"]
+mod standalone_state;
 #[path = "hirc_dialogue_summary.rs"]
 mod summary;
 #[path = "hirc_switch_source.rs"]
@@ -43,6 +47,8 @@ pub(super) use self::schema::ObjectSourceSchema;
 
 #[derive(Debug, Clone, Copy)]
 enum SourceFamily {
+    Action,
+    State,
     Dialogue,
     RandomSequence,
     Switch,
@@ -53,6 +59,8 @@ enum SourceFamily {
 impl SourceFamily {
     const fn kind(self) -> HircKind {
         match self {
+            Self::Action => HircKind::Action,
+            Self::State => HircKind::State,
             Self::Dialogue => HircKind::DialogueEvent,
             Self::RandomSequence => HircKind::RandomSequenceContainer,
             Self::Switch => HircKind::SwitchContainer,
@@ -63,6 +71,8 @@ impl SourceFamily {
 
     const fn namespace(self) -> &'static str {
         match self {
+            Self::Action => "bnkHircActionProperties",
+            Self::State => "bnkHircStandaloneState",
             Self::Dialogue => "bnkDialogueEvent",
             Self::RandomSequence => "bnkHircRandomSequence",
             Self::Switch => "bnkHircSwitchContainer",
@@ -73,6 +83,8 @@ impl SourceFamily {
 
     const fn extent_label(self) -> &'static str {
         match self {
+            Self::Action => "actionObjectExtent",
+            Self::State => "stateObjectExtent",
             Self::Dialogue => "dialogueExtent",
             Self::RandomSequence => "randomSequenceExtent",
             Self::Switch => "switchContainerExtent",
@@ -93,6 +105,8 @@ pub struct ObjectSourceFields<'bank> {
 impl<'bank> ObjectSourceFields<'bank> {
     pub(super) const fn new(bank: &'bank Bank, index: usize, kind: HircKind) -> Option<Self> {
         let family = match kind {
+            HircKind::Action => SourceFamily::Action,
+            HircKind::State => SourceFamily::State,
             HircKind::DialogueEvent => SourceFamily::Dialogue,
             HircKind::RandomSequenceContainer => SourceFamily::RandomSequence,
             HircKind::SwitchContainer => SourceFamily::Switch,
@@ -129,6 +143,19 @@ fn project<R: Read + Seek, S: Serializer>(
     observed: BankHircSemantic<'_, R>,
 ) -> Result<S::Ok, S::Error> {
     match (observed, family) {
+        (BankHircSemantic::ActionWithProperties(action), SourceFamily::Action) => {
+            action::serialize(serializer, origins, header, *action)
+        }
+        (BankHircSemantic::Action(action), SourceFamily::Action) => {
+            action::unobserved(serializer, origins, header, &action)
+        }
+        (BankHircSemantic::State(state), SourceFamily::State) => standalone_state::serialize(
+            serializer,
+            origins,
+            header,
+            &state.object,
+            Some(&state.status),
+        ),
         (BankHircSemantic::DialogueEvent(dialogue), SourceFamily::Dialogue) => {
             serialize_dialogue(serializer, origins, header, *dialogue)
         }
@@ -148,6 +175,10 @@ fn project<R: Read + Seek, S: Serializer>(
             if object.kind(header.header().version) == family.kind() =>
         {
             match family {
+                SourceFamily::Action => action::unsupported(serializer, origins, header, &object),
+                SourceFamily::State => {
+                    standalone_state::serialize(serializer, origins, header, &object, None)
+                }
                 SourceFamily::Dialogue => {
                     serialize_unsupported(serializer, origins, header, &object)
                 }

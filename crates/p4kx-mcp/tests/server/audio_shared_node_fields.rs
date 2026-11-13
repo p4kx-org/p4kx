@@ -61,6 +61,10 @@ fn verify_fields(node: &Value) -> TestResult {
         ("/aux/reflections_bus_id", json!(0)),
         ("/advanced/virtual_queue_behavior", json!(1)),
         ("/positioning/transition_time", json!(1000)),
+        ("/positioning/modes/override_parent", json!(true)),
+        ("/positioning/modes/has_spatial_fields", json!(true)),
+        ("/positioning/modes/panner_type_code", json!(0)),
+        ("/positioning/modes/position_type_code", json!(1)),
         ("/positioning/rows/0/fields/coordinates/x_bits", json!(0)),
         (
             "/inline_state/rows/4/properties/0/value_bits",

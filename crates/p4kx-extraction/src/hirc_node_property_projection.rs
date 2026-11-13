@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_audio::{BankNodePropertyExtent, BankNodePropertyRow, BankNodePropertyValue};
+use std::io::{Read, Seek};
+
+use p4kx_audio::{
+    BankNodePropertyExtent, BankNodePropertyRow, BankNodePropertyRows, BankNodePropertyValue,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -13,6 +17,30 @@ mod interpretation;
 
 pub(super) use self::interpretation::PropertyInterpretation;
 use super::source_fields::origins::ObjectOrigins;
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(super) struct PropertyList<Row> {
+    coverage: PropertyExtent,
+    rows: Vec<Row>,
+}
+
+impl<Row> PropertyList<Row> {
+    pub(super) fn read<R: Read + Seek, E: serde::ser::Error>(
+        origins: &ObjectOrigins,
+        rows: Option<BankNodePropertyRows<'_, R>>,
+        mut project: impl FnMut(BankNodePropertyRow) -> Result<Row, E>,
+    ) -> Result<Option<Self>, E> {
+        rows.map(|rows| {
+            let coverage = PropertyExtent::read(origins, rows.extent()).map_err(E::custom)?;
+            let rows = rows
+                .map(|row| project(row.map_err(E::custom)?))
+                .collect::<Result<_, E>>()?;
+            Ok(Self { coverage, rows })
+        })
+        .transpose()
+    }
+}
 
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

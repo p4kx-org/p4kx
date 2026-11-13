@@ -1776,6 +1776,14 @@ has no complete source value. Each sourced value can be resolved through
 `node_fields.source_inventory` and includes its encryption marker. The same object
 shape is returned by MCP `list_soundbank_objects`.
 
+Standalone State objects include sourced version, layout and raw body range in
+source_fields. A checked bundle adds original count, ordered property IDs and
+binary32 words, finite values, consumed and trailing ranges. Unsupported
+layouts retain the original body range. Action source fields include the
+original type and target when readable. Version-154 Play properties include
+the authored target and fade flags plus both original planar lists. The
+property layout distinguishes absent, unsupported and malformed observations.
+
 Other object details:
 
 - `state`: standalone State versions 128 through 145 expose `property_count`, `count_range`,

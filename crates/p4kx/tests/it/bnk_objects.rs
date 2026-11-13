@@ -135,10 +135,12 @@ fn the_json_has_a_stable_shape() -> TestResult {
     let mut report = json(&[], &file)?;
     report["soundbank"] = "[FILE]".into();
     for object in report["objects"].as_array_mut().ok_or("objects")? {
-        object
-            .as_object_mut()
-            .ok_or("object")?
-            .remove("node_fields");
+        let action = object["type"] == "action";
+        let fields = object.as_object_mut().ok_or("object")?;
+        fields.remove("node_fields");
+        if action {
+            fields.remove("source_fields");
+        }
     }
 
     insta::assert_snapshot!(serde_json::to_string_pretty(&report)?);
