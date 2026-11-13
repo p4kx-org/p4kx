@@ -66,11 +66,10 @@ pub(super) fn kind(
         }
     }
     if matches!(family, DefinitionFamily::Adb)
-        && tag.eq_ignore_ascii_case("SubADB")
-        && name.eq_ignore_ascii_case("File")
+        && let Some(kind) = mannequin_kind(tag, parent, name)
     {
         return Some(LinkSelector {
-            kind: LinkKind::SubDatabase,
+            kind,
             name_position: None,
         });
     }
@@ -84,6 +83,19 @@ pub(super) fn kind(
         });
     }
     None
+}
+
+fn mannequin_kind(tag: &str, parent: Option<&str>, name: &str) -> Option<LinkKind> {
+    if parent.is_none() && tag.eq_ignore_ascii_case("AnimDB") {
+        if name.eq_ignore_ascii_case("TagDef") {
+            return Some(LinkKind::TagDefinition);
+        }
+        if name.eq_ignore_ascii_case("FragDef") {
+            return Some(LinkKind::FragmentDefinition);
+        }
+    }
+    (tag.eq_ignore_ascii_case("SubADB") && name.eq_ignore_ascii_case("File"))
+        .then_some(LinkKind::SubDatabase)
 }
 
 pub(super) fn write(
@@ -136,7 +148,7 @@ pub(super) fn write(
 pub(super) struct ReferenceSelection<'a> {
     pub(super) authored_path: &'a str,
     pub(super) archive_path: Option<&'a str>,
-    pub(super) kind: MediaKind,
+    pub(super) kind: Option<MediaKind>,
     pub(super) original: &'a OriginContributions,
     pub(super) selector: &'a OriginContributions,
 }
@@ -175,12 +187,10 @@ impl ReferenceSelection<'_> {
                 CandidateInventory::Unavailable(ReferenceUnavailable::InvalidIdentifier),
             );
         };
-        let lookup = projection.context.directory.lookup_input_observed(
-            original,
-            path,
-            Some(self.kind),
-            writer,
-        )?;
+        let lookup = projection
+            .context
+            .directory
+            .lookup_input_observed(original, path, self.kind, writer)?;
         let origins = ReferenceOriginInputs {
             original: self.original,
             selector: self.selector,
@@ -218,12 +228,13 @@ impl LinkSelector {
 }
 
 impl LinkKind {
-    const fn target_kind(self) -> MediaKind {
+    const fn target_kind(self) -> Option<MediaKind> {
         match self {
-            Self::TracksDatabase => MediaKind::Animation,
+            Self::TracksDatabase => Some(MediaKind::Animation),
             Self::EventDatabase | Self::SubDatabase | Self::CombinedSpace => {
-                MediaKind::AnimationDefinition
+                Some(MediaKind::AnimationDefinition)
             }
+            Self::TagDefinition | Self::FragmentDefinition => None,
         }
     }
 }
@@ -234,6 +245,9 @@ fn target_path(kind: LinkKind, path: &str) -> Option<String> {
         LinkKind::TracksDatabase => extension.eq_ignore_ascii_case("dba"),
         LinkKind::EventDatabase => extension.eq_ignore_ascii_case("animevents"),
         LinkKind::SubDatabase => extension.eq_ignore_ascii_case("adb"),
+        LinkKind::TagDefinition | LinkKind::FragmentDefinition => {
+            extension.eq_ignore_ascii_case("xml")
+        }
         LinkKind::CombinedSpace => {
             extension.eq_ignore_ascii_case("bspace") || extension.eq_ignore_ascii_case("comb")
         }

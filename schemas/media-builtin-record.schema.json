@@ -9188,6 +9188,8 @@
         "tracks-database",
         "event-database",
         "sub-database",
+        "tag-definition",
+        "fragment-definition",
         "combined-space"
       ],
       "type": "string"

@@ -105,6 +105,8 @@ pub(super) enum LinkKind {
     TracksDatabase,
     EventDatabase,
     SubDatabase,
+    TagDefinition,
+    FragmentDefinition,
     CombinedSpace,
 }
 

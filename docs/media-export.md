@@ -552,7 +552,9 @@ half-open byte ranges. CryXml positions address the original node, attribute or
 content slot. Unknown XML remains available with the same coordinates.
 
 File-link rows interpret authored track and event database paths, Mannequin
-sub-database paths and combined blend-space references. Directory matching is
+sub-database paths, root `AnimDB` tag/fragment definition paths and combined
+blend-space references. The XML tag and fragment definition targets are
+physical directory edges without a typed target provider. Directory matching is
 case-insensitive within the owning Archive and can report every physical match.
 The link keeps the original path and the separately normalized lookup path.
 Missing, unselected, ambiguous and unsupported paths retain explicit outcomes.

@@ -217,7 +217,7 @@ impl Link<'_, '_> {
         let reference = ReferenceSelection {
             authored_path: self.path,
             archive_path: archive_path.as_deref(),
-            kind: MediaKind::Animation,
+            kind: Some(MediaKind::Animation),
             original: &path,
             selector: &full,
         }

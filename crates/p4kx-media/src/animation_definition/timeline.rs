@@ -189,7 +189,7 @@ fn target_reference<'source>(
     let reference = ReferenceSelection {
         authored_path,
         archive_path: archive_path.as_deref(),
-        kind: MediaKind::Animation,
+        kind: Some(MediaKind::Animation),
         original: &proof,
         selector: &proof,
     }
