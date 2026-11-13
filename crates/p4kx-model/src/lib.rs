@@ -52,6 +52,7 @@ mod crch;
 mod crch_mesh;
 mod crch_node;
 mod dba_animation_sources;
+mod dba_metadata_records;
 mod error;
 mod hair_cap;
 mod hierarchy;
@@ -165,6 +166,7 @@ pub use companion::{
 };
 pub use controller_binding::{ControllerBinder, ControllerBinding, ControllerEligibility};
 pub use dba_animation_sources::DbaAnimationSources;
+pub use dba_metadata_records::{DbaMetadataRecord, DbaMetadataRecords};
 pub use error::{CorruptChunk, ModelError, UnsupportedLayout};
 pub use included::{
     IncludedObject, IncludedObjects, IncludedObjectsError, MAX_INCLUDED_MODELS,

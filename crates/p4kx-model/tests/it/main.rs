@@ -12,6 +12,7 @@ mod corrupt;
 mod crch;
 mod crch_corrupt;
 mod cube;
+mod dba_metadata_records;
 mod deep_text;
 mod details;
 mod interior;
