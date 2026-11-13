@@ -176,26 +176,14 @@ fn omission_selects_all_registered_providers() -> TestResult {
             .is_file(),
         "shader stream remains available in the complete default selection"
     );
-    let material = output.join(&index.artifact_base).join("material.jsonl");
-    assert_eq!(
-        fs::read(material)?,
-        b"",
-        "default material provider emits no invented row for a shader-only fixture"
-    );
-    let texture = output.join(&index.artifact_base).join("texture.jsonl");
-    assert_eq!(
-        fs::read(texture)?,
-        b"",
-        "default texture provider emits no invented row for a shader-only fixture"
-    );
-    let audio_control = output
-        .join(&index.artifact_base)
-        .join("audio-control.jsonl");
-    assert_eq!(
-        fs::read(audio_control)?,
-        b"",
-        "default audio control provider emits no invented row for a shader-only fixture"
-    );
+    for name in ["material.jsonl", "texture.jsonl", "audio-control.jsonl"] {
+        let stream = output.join(&index.artifact_base).join(name);
+        assert_eq!(
+            fs::read(stream)?,
+            b"",
+            "{name} has no rows for a shader-only fixture"
+        );
+    }
     let audio = output.join(&index.artifact_base).join("audio.jsonl");
     verify_empty_audio_inventories(&audio)
 }
