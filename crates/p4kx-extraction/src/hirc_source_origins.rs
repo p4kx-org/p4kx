@@ -79,7 +79,7 @@ impl ObjectOrigins {
         Ok(self.value(value, &[used]))
     }
 
-    pub(super) fn range(
+    pub(in crate::hirc_view) fn range(
         &self,
         extent: &Range<u64>,
         label: &'static str,

@@ -4,7 +4,8 @@
 use std::io::{Read, Seek};
 
 use p4kx_audio::{
-    BankHircSemantic, BankNodePropertyKind, BankNodePropertyRows, BankObservedHeader, HircKind,
+    BankHircSemantic, BankNodeFxKind, BankNodePropertyKind, BankNodePropertyRows,
+    BankObservedHeader, HircKind,
 };
 use schemars::JsonSchema;
 use serde::ser::Error as _;
@@ -16,8 +17,11 @@ use crate::source_value::SourcedValue;
 
 #[path = "hirc_node_source_reader.rs"]
 mod reader;
+#[path = "hirc_node_source_routing.rs"]
+mod routing;
 
 use self::reader::NodeReader;
+use self::routing::{NodeAdvancedSettings, NodeAux, NodeFx};
 use super::Status;
 use super::node_property::{PropertyExtent, PropertyWords};
 use super::source_fields::origins::ObjectOrigins;
@@ -90,6 +94,14 @@ pub(super) struct NodeDocument<Inventory> {
     properties: Option<PropertyList>,
     #[serde(skip_serializing_if = "Option::is_none")]
     ranged_modifiers: Option<PropertyList>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    effects: Option<NodeFx>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata_effects: Option<NodeFx>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aux: Option<NodeAux>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    advanced: Option<NodeAdvancedSettings>,
     #[schemars(with = "SourceInventory")]
     source_inventory: Inventory,
 }
@@ -134,6 +146,14 @@ fn read<'source, R: Read + Seek, E: serde::ser::Error>(
             origins,
             node.properties(BankNodePropertyKind::RangedModifiers),
         )?,
+        effects: NodeFx::read(origins, &mut node, BankNodeFxKind::Effects)?,
+        metadata_effects: NodeFx::read(origins, &mut node, BankNodeFxKind::Metadata)?,
+        aux: NodeAux::read(origins, &mut node)?,
+        advanced: NodeAdvancedSettings::read(
+            origins,
+            node.playback().map(|fields| &fields.advanced),
+        )
+        .map_err(E::custom)?,
         source_inventory: origins,
     })
 }

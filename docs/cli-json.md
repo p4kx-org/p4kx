@@ -1761,7 +1761,10 @@ Version-154 Sound, ActorMixer, Random/Sequence, Switch, Blend and music nodes al
 include `node_fields`. The document binds the object status, bank version, original
 parent ID (including zero), override bus ID and packed priority/MIDI byte to the owning
 bank. The ordinary and ranged property lists preserve authored order, original IDs,
-raw words and each list's checked counts. Fields and words are omitted when the reader
+raw words and each list's checked counts. Effect and metadata slots retain their
+physical order, indices, reference IDs and raw flag bytes. Aux routing retains the
+four authored user send slots and reflections ID. Advanced settings preserve the
+original instance limit, behavior codes and flags. Fields and words are omitted when the reader
 has no complete source value. Each sourced value can be resolved through
 `node_fields.source_inventory` and includes its encryption marker. The same object
 shape is returned by MCP `list_soundbank_objects`.

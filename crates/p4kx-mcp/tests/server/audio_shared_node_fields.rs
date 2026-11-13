@@ -37,6 +37,14 @@ fn shared_node_fields_mcp_retains_encrypted_property_words_and_schema() -> TestR
         ("/version", json!(154)),
         ("/object_status", json!("decoded")),
         ("/priority_flags", json!(0)),
+        ("/effects/slots/0/effect_id", json!(0x3ECB_429B_u32)),
+        (
+            "/metadata_effects/slots/0/effect_id",
+            json!(0x0123_4567_u32),
+        ),
+        ("/aux/user_bus_ids/0", json!(0x6300_0001_u32)),
+        ("/aux/reflections_bus_id", json!(0)),
+        ("/advanced/virtual_queue_behavior", json!(1)),
         ("/properties/rows/0/scalar_bits", json!(3.0_f32.to_bits())),
     ] {
         let datum = node.pointer(pointer).ok_or("sourced node field")?;
