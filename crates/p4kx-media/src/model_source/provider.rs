@@ -8,6 +8,7 @@ use std::path::Path;
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::chunks::{ChunkDirectory, ChunkDirectoryError, ChunkError, Container};
 
+use super::companions;
 use super::lod_distances;
 use super::origins::{self, ModelOrigins};
 use super::payload::{
@@ -28,7 +29,7 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.2.0",
+            "1.3.0",
             "Selected original model and geometry Entry bytes with positioned chunk table records.",
         );
         capability.field_groups = vec![
@@ -41,12 +42,16 @@ impl Provider for ModelSourceProvider {
                 "Original StatObjPhysics table slots and validated source-frame geometry.",
             ),
             FieldGroup::new(
+                "companion-candidates",
+                "Same-Archive geometry and LOD sibling identity and selection without target payload reads.",
+            ),
+            FieldGroup::new(
                 "lod-distance-words",
                 "Positioned original words of measured LodDistances chunks.",
             ),
             FieldGroup::new_with_unsupported_projection(
                 "model-semantics",
-                "Render model decoding, companion associations and entity-frame collision transforms are outside this projection.",
+                "Render model decoding, material dependencies and entity-frame collision transforms are outside this projection.",
             ),
         ];
         capability
@@ -85,6 +90,7 @@ impl Provider for ModelSourceProvider {
         match parsed {
             Ok(file) => {
                 entry(family, &file, &origins, writer)?;
+                companions::emit(context, &file, &origins, writer)?;
                 for index in 0..file.chunks().len() {
                     writer.checkpoint()?;
                     chunk(&file, index, &origins, writer)?;

@@ -5553,6 +5553,50 @@
       ],
       "type": "object"
     },
+    "CompanionPayload": {
+      "additionalProperties": false,
+      "properties": {
+        "canonical_reader_candidate": {
+          "type": "boolean"
+        },
+        "level": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "reference": {
+          "$ref": "#/$defs/Reference"
+        },
+        "role": {
+          "$ref": "#/$defs/CompanionRole"
+        },
+        "suffix": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "role",
+        "suffix",
+        "level",
+        "canonical_reader_candidate",
+        "reference"
+      ],
+      "type": "object"
+    },
+    "CompanionRole": {
+      "enum": [
+        "base-geometry",
+        "lod-geometry",
+        "lod-model"
+      ],
+      "type": "string"
+    },
     "ContainerIdentity": {
       "description": "A physical container Entry in the ordered path from the root Archive.",
       "properties": {
@@ -10182,6 +10226,28 @@
         "projection"
       ],
       "type": "object"
+    },
+    "ModelCompanionRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/CompanionPayload"
+            },
+            "record_type": {
+              "const": "companion",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "CompanionRecord"
     },
     "ModelEntryRecord": {
       "additionalProperties": false,
@@ -36602,6 +36668,61 @@
                 "properties": {
                   "record_type": {
                     "const": "lod-distance-words"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-companion"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelCompanionRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "companion"
                   }
                 },
                 "required": [

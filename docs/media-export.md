@@ -100,6 +100,19 @@ The provider reads the original header and table from retained bytes and charges
 row count to the common metadata work budget before allocating the table. A malformed table
 is diagnosed in diagnostic output with its original Entry bytes.
 
+`model-companion` rows link a base model to physical geometry and LOD sibling candidates in
+its immediately owning Archive. Original observed path spelling wins over a derived candidate
+name. A model announcing a geometry companion can report its absence. An observed LOD sibling
+can likewise supply the lookup name for its missing counterpart. Each lookup reports its
+selected, unselected, missing, ambiguous or unavailable state. A resolved identity establishes
+the directory match. Target payload reads and semantic use are separate.
+
+The original decimal LOD suffix survives even when it exceeds the numeric range. The
+`canonical_reader_candidate` flag describes whether the existing model reader would
+construct that name under its supported naming and LOD range. Additional discovered siblings
+remain visible. The directory is indexed once per owning Archive and uses the shared metadata
+work and reference budgets.
+
 Measured IVO LodDistances chunks emit one `model-lod-distance-words` row per physical
 chunk. The v0x900 layout with a 48-byte inferred range carries twelve ordered original
 little-endian words. Each word has its unsigned bits and, when finite, its binary32
@@ -119,8 +132,8 @@ Validated version-2 box, sphere, cylinder and capsule shapes carry original floa
 finite values. Source-node geometry uses metres and a Z-up frame. A triangle mesh adds
 `model-physics-vertex` and `model-physics-triangle` rows keyed by chunk, slot and original element
 ordinal. Their fields carry original float words, u16 vertex indices and per-triangle material
-bytes. The shared per-field origin receipts identify the exact source bytes. Model companion
-resolution, entity-frame collision transforms and converted geometry have separate coverage.
+bytes. The shared per-field origin receipts identify the exact source bytes. Model material dependencies,
+entity-frame collision transforms and converted geometry have separate coverage.
 
 `--kind animation` retains CAF, DBA and AIM sources with chunk and clip inventory, original
 metadata and controller words, and typed decoded frame and key chunks.

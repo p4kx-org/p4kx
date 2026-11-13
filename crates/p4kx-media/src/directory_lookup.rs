@@ -246,6 +246,20 @@ impl<'a> DirectoryLookup<'a> {
         Ok(self.index.inventory())
     }
 
+    pub(crate) fn model_companions(
+        &self,
+        model: &str,
+        writer: &MediaWriter<'_>,
+    ) -> Result<directory_index::model_companions::ModelCompanionMatches<'_>, MediaError> {
+        let work = LookupWork {
+            checkpoint: writer.checkpoint,
+            limits: writer.limits(),
+            current: self.work,
+            source_allowance: self.allowance(writer.limits().sources),
+        };
+        self.index.model_companions(model, &work)
+    }
+
     pub(crate) fn scan_inventory(
         &self,
         writer: &MediaWriter<'_>,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use schemars::JsonSchema;
+use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -63,4 +63,8 @@ pub fn reference_schema() -> Value {
 #[must_use]
 pub fn source_schema() -> Value {
     schemars::schema_for!(crate::Source).to_value()
+}
+
+pub(crate) fn reference_definition(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({"$ref": "#/$defs/Reference"})
 }

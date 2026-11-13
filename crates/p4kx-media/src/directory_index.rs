@@ -4,6 +4,11 @@
 use std::cell::{Cell, OnceCell};
 use std::collections::{HashMap, TryReserveError};
 
+#[path = "directory_model_companions.rs"]
+pub(crate) mod model_companions;
+
+use model_companions::{ModelCompanionKeys, ModelCompanionMatches};
+
 use p4kx_extraction::{
     Archive, Entry, PathIndex, PathIndexBuildError, PathKeys, TextureMemberIndex, TextureMemberKeys,
 };
@@ -20,6 +25,7 @@ pub(crate) struct DirectoryIndex<'a> {
     keys: OnceCell<PathKeys>,
     members: OnceCell<TextureMemberKeys>,
     loose_wems: OnceCell<LooseWemKeys>,
+    model_companions: OnceCell<ModelCompanionKeys>,
     live_entries: &'a Cell<u64>,
     registered_entries: Cell<Option<u64>>,
     inventory: Cell<CandidateInventory>,
@@ -40,6 +46,7 @@ impl<'a> DirectoryIndex<'a> {
             keys: OnceCell::new(),
             members: OnceCell::new(),
             loose_wems: OnceCell::new(),
+            model_companions: OnceCell::new(),
             live_entries,
             registered_entries: Cell::new(None),
             inventory: Cell::new(CandidateInventory::Unavailable(
@@ -94,6 +101,22 @@ impl<'a> DirectoryIndex<'a> {
             positions,
             inventory: self.inventory(),
         })
+    }
+
+    pub(crate) fn model_companions(
+        &self,
+        model: &str,
+        work: &LookupWork<'_>,
+    ) -> Result<ModelCompanionMatches<'_>, MediaError> {
+        self.initialize(&self.model_companions, work, || {
+            ModelCompanionKeys::read(self.archive, work)
+        })?;
+        self.model_companions
+            .get()
+            .ok_or_else(|| {
+                MediaError::Contract("model companion keys were not initialized".into())
+            })?
+            .matching(self.archive, model, work)
     }
 
     pub(crate) fn scan_inventory(

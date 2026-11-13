@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use schemars::{JsonSchema, Schema, SchemaGenerator};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::Reference;
@@ -27,7 +27,7 @@ pub(crate) enum SkeletonDisposition {
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "AnimationSkeleton")]
 pub(crate) struct Skeleton<'a> {
-    #[schemars(schema_with = "reference_schema")]
+    #[schemars(schema_with = "crate::schema::reference_definition")]
     pub(crate) reference: &'a Reference,
     pub(crate) skeleton: SkeletonDisposition,
 }
@@ -64,8 +64,4 @@ pub(crate) struct Binding {
     pub(crate) first_bone_ordinal: Option<usize>,
     pub(crate) matching_bones: usize,
     pub(crate) bound_bone_ordinal: Option<usize>,
-}
-
-fn reference_schema(_: &mut SchemaGenerator) -> Schema {
-    schemars::json_schema!({"$ref": "#/$defs/Reference"})
 }

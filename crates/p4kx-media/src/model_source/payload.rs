@@ -25,6 +25,10 @@ pub(super) enum ModelSourceFamily {
 }
 
 impl ModelSourceFamily {
+    pub(super) const fn is_model(self) -> bool {
+        matches!(self, Self::Cgf | Self::Cga | Self::Chr | Self::Skin)
+    }
+
     pub(super) fn of(path: &str) -> Option<Self> {
         let (_, extension) = path.rsplit_once('.')?;
         [
