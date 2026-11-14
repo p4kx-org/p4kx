@@ -96,6 +96,9 @@ between and after artifact/receipt publication are tested. Missing artifacts, bi
 interrupted receipts and skipped bytes without matching proof cannot acquire trusted origin.
 
 Media Source/InputReceipt/Artifact use existing full physical identities and bounded JSONL writer.
+The verifier parses complete rows from its fixed-size input buffer. Rows crossing the buffer
+boundary keep an incremental decoder. Both paths enforce the same byte policies, terminal
+newline, complete JSON value and digest over original stream bytes.
 Blender packages distinguish per-node/mesh/material/texture/rig/animation contributions. Standalone
 and comparative tools retain old/new provenance independently. Existing independent version rules
 remain binding: additive metadata with old-document defaults-to-unknown is not an automatic v3 bump;

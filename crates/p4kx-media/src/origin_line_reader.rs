@@ -35,7 +35,7 @@ impl<'receipt, 'check> OriginLines<'receipt, 'check> {
         let path = checked_path(root, receipt)?;
         let file = File::open(&path).map_err(|cause| error::io(&path, cause))?;
         Ok(Self {
-            reader: BufReader::new(file),
+            reader: BufReader::with_capacity(IO_BLOCK_BYTES, file),
             path,
             receipt,
             checkpoint,
@@ -51,14 +51,35 @@ impl<'receipt, 'check> OriginLines<'receipt, 'check> {
         seed: impl for<'de> DeserializeSeed<'de, Value = T>,
     ) -> Result<Option<T>, MediaError> {
         self.checkpoint.check()?;
-        if self
+        let buffer = self
             .reader
             .fill_buf()
-            .map_err(|cause| error::io(&self.path, cause))?
-            .is_empty()
-        {
+            .map_err(|cause| error::io(&self.path, cause))?;
+        if buffer.is_empty() {
             return Ok(None);
         }
+        if let Some(newline) = buffer.iter().position(|byte| *byte == b'\n') {
+            let count = newline + 1;
+            let row = buffer
+                .get(..count)
+                .ok_or_else(|| MediaError::Contract("invalid buffered origin row".into()))?;
+            self.bytes = checked_bytes(self.bytes, count, self.receipt.size)?;
+            checked_bytes(0, count, self.line_bytes)?;
+            let mut json = serde_json::Deserializer::from_slice(row);
+            let value = seed.deserialize(&mut json)?;
+            json.end()?;
+            hash_bytes(&mut self.hash, &mut self.hash_buffer, row);
+            self.reader.consume(count);
+            self.checkpoint.check()?;
+            return Ok(Some(value));
+        }
+        self.next_spanning(seed).map(Some)
+    }
+
+    fn next_spanning<T>(
+        &mut self,
+        seed: impl for<'de> DeserializeSeed<'de, Value = T>,
+    ) -> Result<T, MediaError> {
         let mut line = Line {
             reader: &mut self.reader,
             path: &self.path,
@@ -88,7 +109,7 @@ impl<'receipt, 'check> OriginLines<'receipt, 'check> {
             ));
         }
         self.checkpoint.check()?;
-        Ok(Some(value))
+        Ok(value)
     }
 
     pub(crate) fn finish(mut self) -> Result<(), MediaError> {
@@ -179,12 +200,7 @@ impl Line<'_, '_> {
             .fill_buf()
             .map_err(|cause| error::io(self.path, cause))?;
         let available = available
-            .get(
-                ..available
-                    .len()
-                    .min(output.len())
-                    .min(IO_BLOCK_BYTES - self.hash_buffer.len()),
-            )
+            .get(..available.len().min(output.len()))
             .ok_or_else(|| MediaError::Contract("invalid origin read prefix".into()))?;
         let count = available
             .iter()
@@ -206,26 +222,38 @@ impl Line<'_, '_> {
     }
     fn observe(&mut self, bytes: &[u8]) -> Result<(), MediaError> {
         let count = bytes.len();
-        *self.total = self
-            .total
-            .checked_add(count as u64)
-            .ok_or_else(|| MediaError::Destination("origin stream byte count overflow".into()))?;
-        self.row_bytes = self
-            .row_bytes
-            .checked_add(count as u64)
-            .ok_or_else(|| MediaError::Destination("origin row byte count overflow".into()))?;
-        if *self.total > self.maximum || self.row_bytes > self.row_limit {
-            return Err(MediaError::Destination(
-                "origin stream exceeds its reader byte policy".into(),
-            ));
-        }
-        self.hash_buffer.extend_from_slice(bytes);
-        if self.hash_buffer.len() >= IO_BLOCK_BYTES {
-            self.hash.update(self.hash_buffer.as_slice());
-            self.hash_buffer.clear();
-        }
+        *self.total = checked_bytes(*self.total, count, self.maximum)?;
+        self.row_bytes = checked_bytes(self.row_bytes, count, self.row_limit)?;
+        hash_bytes(self.hash, self.hash_buffer, bytes);
         self.newline = bytes.last() == Some(&b'\n');
         self.unchecked = self.unchecked.saturating_add(count);
         Ok(())
     }
 }
+
+fn checked_bytes(previous: u64, count: usize, maximum: u64) -> Result<u64, MediaError> {
+    let total = u64::try_from(count)
+        .ok()
+        .and_then(|count| previous.checked_add(count))
+        .ok_or_else(|| MediaError::Destination("origin stream byte count overflow".into()))?;
+    if total > maximum {
+        return Err(MediaError::Destination(
+            "origin stream exceeds its reader byte policy".into(),
+        ));
+    }
+    Ok(total)
+}
+
+fn hash_bytes(hash: &mut Sha256, buffer: &mut Vec<u8>, bytes: &[u8]) {
+    if bytes.len() >= IO_BLOCK_BYTES - buffer.len() {
+        hash.update(buffer.as_slice());
+        hash.update(bytes);
+        buffer.clear();
+    } else {
+        buffer.extend_from_slice(bytes);
+    }
+}
+
+#[cfg(test)]
+#[path = "origin_line_reader_tests.rs"]
+mod tests;
