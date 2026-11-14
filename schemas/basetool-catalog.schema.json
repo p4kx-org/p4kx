@@ -4720,6 +4720,9 @@
         "quantumInterdiction": {
           "$ref": "#/$defs/CatalogTableOfQuantumInterdictionGenerator"
         },
+        "radarOptions": {
+          "$ref": "#/$defs/CatalogTableOfRadarOptionsConfiguration"
+        },
         "reputationTriggers": {
           "$ref": "#/$defs/CatalogTableOfReputationTriggerConfiguration"
         },
@@ -4779,6 +4782,7 @@
         "missionProperties",
         "quantumDrives",
         "quantumInterdiction",
+        "radarOptions",
         "reputationTriggers",
         "resourceComponents",
         "resourceConnections",
@@ -4916,6 +4920,9 @@
         "locationRegistries": {
           "$ref": "#/$defs/LocationRegistries"
         },
+        "locationResourceSlots": {
+          "$ref": "#/$defs/CatalogTableOfLocationResourceSlot"
+        },
         "locationSizes": {
           "$ref": "#/$defs/CatalogTableOfLocationDictionaryEntry"
         },
@@ -4957,6 +4964,9 @@
         },
         "npcClassPools": {
           "$ref": "#/$defs/CatalogTableOfNpcClassPoolDefinition"
+        },
+        "proceduralPlanetAudio": {
+          "$ref": "#/$defs/CatalogTableOfProceduralPlanetAudio"
         },
         "qualityDistributions": {
           "$ref": "#/$defs/CatalogTableOfQualityDistributionDefinition"
@@ -5051,6 +5061,7 @@
         "locationClasses",
         "locationFunctions",
         "locationRegistries",
+        "locationResourceSlots",
         "locationSizes",
         "lootGenerationGlobalParams",
         "lootPoolFilters",
@@ -5065,6 +5076,7 @@
         "missionScenarios",
         "npcArchetypes",
         "npcClassPools",
+        "proceduralPlanetAudio",
         "qualityDistributions",
         "qualityQuantizations",
         "reputationContexts",
@@ -6356,6 +6368,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfLocationResourceSlot": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/LocationResourceSlot"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfLootDefinition": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -6622,6 +6653,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfProceduralPlanetAudio": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ProceduralPlanetAudio"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfQualityDistributionDefinition": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -6707,6 +6757,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/QuantumInterdictionGenerator"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfRadarOptionsConfiguration": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/RadarOptionsConfiguration"
           },
           "type": "array"
         }
@@ -8447,6 +8516,9 @@
         "locationFunctions": {
           "$ref": "#/$defs/KindCompleteness"
         },
+        "locationResourceSlots": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
         "locationSizeRegistries": {
           "$ref": "#/$defs/KindCompleteness"
         },
@@ -8550,6 +8622,10 @@
         "paints": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `paints`."
+        },
+        "proceduralPlanetAudio": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The filtered physical DataForge procedural planet audio selection."
         },
         "qualityDistributions": {
           "$ref": "#/$defs/KindCompleteness",
@@ -8685,6 +8761,7 @@
         "locationClasses",
         "locationFunctionRegistries",
         "locationFunctions",
+        "locationResourceSlots",
         "locationSizeRegistries",
         "locationSizes",
         "lootArchetypes",
@@ -8712,6 +8789,7 @@
         "npcArchetypes",
         "npcClassPools",
         "paints",
+        "proceduralPlanetAudio",
         "qualityDistributions",
         "qualityQuantizations",
         "refiningProcesses",
@@ -20098,6 +20176,10 @@
           "value": "locationSizes"
         },
         {
+          "description": "Physical location resource slot definitions.",
+          "value": "locationResourceSlots"
+        },
+        {
           "description": "Physical mission location class registries.",
           "value": "locationClassRegistries"
         },
@@ -20136,6 +20218,10 @@
         {
           "description": "Physical shared medical tier and consumption configuration Records.",
           "value": "medicalItemTierConfigs"
+        },
+        {
+          "description": "Physical DataForge procedural planet audio configuration Records.",
+          "value": "proceduralPlanetAudio"
         },
         {
           "description": "Physical starmap object type definitions.",
@@ -21841,6 +21927,58 @@
         "recordIndex",
         "recordName",
         "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "LocationResourceSlot": {
+      "description": "A physical resource slot declaration referenced by mission modules.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "numberOfResourceSlotsPerEntity": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "resourceSlotTag": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "numberOfResourceSlotsPerEntity",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "resourceSlotTag",
         "sourceType"
       ],
       "type": "object"
@@ -27168,6 +27306,22 @@
       ],
       "type": "object"
     },
+    "PlanetAudioRtpc": {
+      "description": "The authored audio RTPC identifier.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "rtpc": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "rtpc"
+      ],
+      "type": "object"
+    },
     "PoolEntry": {
       "description": "One entry of a blueprint pool.",
       "properties": {
@@ -27364,6 +27518,94 @@
       ],
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
+    },
+    "ProceduralPlanetAudio": {
+      "description": "An original DataForge planet audio record and its independently sourced controls.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "breathabilityRtpc": {
+          "$ref": "#/$defs/SourcedValueOfPlanetAudioRtpc"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "disturbanceLists": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "disturbanceVelocityRtpc": {
+          "$ref": "#/$defs/SourcedValueOfPlanetAudioRtpc"
+        },
+        "effectTagMovementRtpcs": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "entries": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "firstRoomIsPlanetRoomNotIncludingShipsRtpc": {
+          "$ref": "#/$defs/SourcedValueOfPlanetAudioRtpc"
+        },
+        "firstRoomIsPlanetRoomOrVehicleRoomRtpc": {
+          "$ref": "#/$defs/SourcedValueOfPlanetAudioRtpc"
+        },
+        "firstRoomIsPlanetRoomRtpc": {
+          "$ref": "#/$defs/SourcedValueOfPlanetAudioRtpc"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "humidityRtpc": {
+          "$ref": "#/$defs/SourcedValueOfPlanetAudioRtpc"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "pressureRtpc": {
+          "$ref": "#/$defs/SourcedValueOfPlanetAudioRtpc"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "temperatureRtpc": {
+          "$ref": "#/$defs/SourcedValueOfPlanetAudioRtpc"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "breathabilityRtpc",
+        "className",
+        "disturbanceLists",
+        "disturbanceVelocityRtpc",
+        "effectTagMovementRtpcs",
+        "entries",
+        "fileName",
+        "firstRoomIsPlanetRoomNotIncludingShipsRtpc",
+        "firstRoomIsPlanetRoomOrVehicleRoomRtpc",
+        "firstRoomIsPlanetRoomRtpc",
+        "guid",
+        "humidityRtpc",
+        "metadataTag",
+        "pressureRtpc",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType",
+        "temperatureRtpc"
+      ],
+      "type": "object"
     },
     "ProjectedMissionText": {
       "description": "One authored key and the derived text of each actually available language.",
@@ -30040,6 +30282,95 @@
         "emissionModifierParams",
         "roomParams",
         "scanBounds"
+      ],
+      "type": "object"
+    },
+    "RadarModeParameters": {
+      "properties": {
+        "radarOptionParams": {
+          "$ref": "#/$defs/SourcedValueOfRadarOptionParameters"
+        },
+        "rawRadarOptionParams": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "radarOptionParams",
+        "rawRadarOptionParams",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "RadarOptionParameters": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "allowDeltaSignature": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "allowEmissionsHUD": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "allowFPSPingWave": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "enableScanMode": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "useExperimentalFeatures": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "useFPSScanMode": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "useFPSTagging": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "allowDeltaSignature",
+        "allowEmissionsHUD",
+        "allowFPSPingWave",
+        "enableScanMode",
+        "sourceType",
+        "useExperimentalFeatures",
+        "useFPSScanMode",
+        "useFPSTagging"
+      ],
+      "type": "object"
+    },
+    "RadarOptionsConfiguration": {
+      "description": "Authored radar options from a physically identified game-mode Record.",
+      "properties": {
+        "gameModeId": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "params": {
+          "$ref": "#/$defs/SourcedValueOfRadarModeParameters"
+        },
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
+        }
+      },
+      "required": [
+        "gameModeId",
+        "params",
+        "source"
       ],
       "type": "object"
     },
@@ -80713,6 +81044,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfPlanetAudioRtpc": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/PlanetAudioRtpc"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfPortItemType": {
       "allOf": [
         {
@@ -86527,6 +86988,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/RadarContact"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRadarModeParameters": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RadarModeParameters"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRadarOptionParameters": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RadarOptionParameters"
               }
             }
           }

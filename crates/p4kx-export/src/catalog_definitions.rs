@@ -19,6 +19,7 @@ use crate::catalog_v3::loot_definition_catalog::LootDefinitionTables;
 use crate::catalog_v3::medical::medical_tier_config::MedicalItemTierConfig;
 use crate::catalog_v3::mission_sources::module_declaration::MissionModuleDeclaration;
 use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsTables;
+use crate::catalog_v3::procedural_planet_audio::ProceduralPlanetAudio;
 use crate::catalog_v3::reputation_context_definition::ContextDefinition;
 use crate::catalog_v3::reputation_faction_definition::FactionReputationDefinition;
 use crate::catalog_v3::reputation_perk_list::ReputationPerkList;
@@ -66,6 +67,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) explosion_definitions: CatalogTable<ExplosionDefinition<'source>>,
     pub(crate) inventory_containers: CatalogTable<InventoryContainerDefinition<'source>>,
     pub(crate) medical_item_tier_configs: CatalogTable<MedicalItemTierConfig<'source>>,
+    pub(crate) procedural_planet_audio: CatalogTable<ProceduralPlanetAudio<'source>>,
     pub(crate) ammo_definitions: CatalogTable<AmmoDefinition<'source>>,
     pub(crate) weapon_action_recoil_definitions:
         CatalogTable<WeaponActionRecoilDefinition<'source>>,

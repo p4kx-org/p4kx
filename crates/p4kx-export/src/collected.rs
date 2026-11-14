@@ -26,6 +26,7 @@ use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 use crate::catalog_v3::medical::medical_tier_config::PreparedMedicalTier;
 use crate::catalog_v3::mission_sources::local_contract_generator_configuration::LocalContractGeneratorConfiguration;
 use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitions;
+use crate::catalog_v3::procedural_planet_audio::PreparedPlanetAudio;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitions;
 use crate::contract::{
     BlueprintPool, Commodity, ContractEntry, Crafter, CraftingGlobal, DismantleProcess,
@@ -91,6 +92,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) explosion_definitions: Vec<PreparedExplosionDefinition<'f>>,
     pub(crate) inventory_containers: Vec<PreparedInventoryContainer<'f>>,
     pub(crate) medical_item_tier_configs: Vec<PreparedMedicalTier<'f>>,
+    pub(crate) procedural_planet_audio: Vec<PreparedPlanetAudio<'f>>,
     pub(crate) ammo_definitions: Vec<PreparedAmmoDefinition<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayPropertyDefinition<'f>>,
     pub(crate) quality: QualityRows<'f>,
@@ -196,6 +198,7 @@ impl<'f> Collected<'f> {
             explosion_definitions: Vec::new(),
             inventory_containers: Vec::new(),
             medical_item_tier_configs: Vec::new(),
+            procedural_planet_audio: Vec::new(),
             ammo_definitions: Vec::new(),
             gameplay_properties: crafting.properties,
             quality: crafting.quality,
@@ -290,6 +293,7 @@ impl<'f> Collected<'f> {
             Picked::AmmoDefinition(entity) => self.ammo_definitions.push(*entity),
             Picked::InventoryContainer(entity) => self.inventory_containers.push(*entity),
             Picked::MedicalItemTierConfig(entity) => self.medical_item_tier_configs.push(*entity),
+            Picked::ProceduralPlanetAudio(entity) => self.procedural_planet_audio.push(*entity),
             Picked::Starmap(read) => {
                 self.starmap_definitions.push_object(read.definition);
                 self.starmap_objects.push(read.object);

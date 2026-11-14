@@ -119,6 +119,9 @@ impl SourceTrace {
                     crate::catalog_v3::medical::medical_tier_config::SOURCE_TYPE => {
                         Some(Kind::MedicalItemTierConfigs)
                     }
+                    crate::catalog_v3::procedural_planet_audio::SOURCE_TYPE => {
+                        Some(Kind::ProceduralPlanetAudio)
+                    }
                     crate::catalog_v3::reputation_perk_list::SOURCE_TYPE => {
                         Some(Kind::ReputationPerks)
                     }

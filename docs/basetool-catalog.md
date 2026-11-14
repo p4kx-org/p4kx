@@ -204,6 +204,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.resourceTypes` | Closed source-family `availability` and canonical `rows`, independently selected and ordered by GUID; every source-backed field uses the typed value carrier ([contract](catalog-resource-types.md)) |
 | `texts.publicNames`, `texts.gameTexts` | Canonical sourced-definition short-name and protected-description rows, each with sourced `id`, `key` and per-language `translations` containing separate source and display forms |
 | `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the sourced definition carriers |
+| `definitions.proceduralPlanetAudio` | Physical planet audio records with separately sourced RTPC identifiers and original declaration collections. [Procedural planet audio](catalog-procedural-planet-audio.md) |
 | `definitions.ammoDefinitions` | Physical `AmmoParams` definitions with original projectile, physics and conversion fields and per-value source origin. [Ammunition definitions](catalog-ammo-definitions.md) |
 | `configurations.ammoContainers`, `declarations.ammoBindings` | Physical container settings and authored ammunition and magazine slots, including ordered secondary conditions. [Ammunition definitions](catalog-ammo-definitions.md) |
 | `projections.weaponMagazineResolutions` | Observed legacy primary selections, original magazine Record and container indices, and distinct target-read outcomes. [Ammunition definitions](catalog-ammo-definitions.md) |
@@ -238,6 +239,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.contractGenerators`, `projections.contracts`, `projections.missionTitles` | Physical Generator definitions, logical contract and sub-contract rows, and their sourced titles and descriptions ([contract](catalog-contract-generators.md)) |
 | `definitions.contractScopes` | Physical `ContractScopeGlobalParams` Records with seven individually sourced labels and icons. [Contract scope vocabulary](catalog-location-vocabulary.md#global-contract-scopes) |
 | `definitions.missionModuleDeclarations` | Physical `ModuleDeclaration` Records and authored location acquisition, spawned entities and variable bindings. [Mission module declarations](catalog-location-configuration.md#physical-module-declarations) |
+| `definitions.locationResourceSlots` | Physical `LocationResourceSlot` Records with independently sourced counts and Tag links. [Resource slot definitions](catalog-location-configuration.md#resource-slot-definitions) |
 | `definitions.missionScenarios` | Physical `MissionScenario` Records with authored variables, cycles, schedule and flags. [Mission scenario definitions](catalog-contract-generators.md#physical-mission-scenario-definitions) |
 | `configurations.missionBoards` | Authored mission-board components with physical Entity and component identity, declared board type, and ordered faction reputation links. [Mission location vocabulary](catalog-location-vocabulary.md) |
 | `configurations.localContractGenerators` | Ordered authored Handler scope and mission-board availability. [Contract generator sources](catalog-contract-generators.md#local-generator-configuration) |
@@ -2802,6 +2804,7 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `missionLocalities` | `libs/foundry/records/missiondata/pu_missionlocality/` | `MissionLocality` |
 | `contractScopes` | Any Record path | `ContractScopeGlobalParams` |
 | `missionModuleDeclarations` | Any Record path | `ModuleDeclaration` |
+| `locationResourceSlots` | Any Record path | `LocationResourceSlot` |
 | `missionScenarios` | `libs/foundry/records/` | `MissionScenario` |
 | `contractScenarios` | `libs/foundry/records/contracts/contractscenarios/` | `ScenarioProgress` |
 | `cargoManifests` | `libs/foundry/records/cargomanifest/` | `CargoManifest` |

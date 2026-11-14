@@ -48,6 +48,22 @@ The `crewInheritsLocationFaction` Bool is owned by a `SpawnDescription_Ship`. It
 with that concrete ship payload in the module property's `authoredFields` arena. Property
 selectors, module names and weak pointer slots preserve the authored binding semantics.
 
+### Resource slot definitions
+
+`definitions.locationResourceSlots` contains selected physical `LocationResourceSlot` Records.
+Follow the sourced GUID and Record index of a mission module's `moduleType.value.requiredResourceSlot`
+to the matching row from the same build. The original link retains its own state and provenance.
+
+| Original field | Catalog field | Stored value |
+| --- | --- | --- |
+| `numberOfResourceSlotsPerEntity` | `numberOfResourceSlotsPerEntity` | Signed Int32 count with its individual origin, including zero. |
+| `resourceSlotTag` | `resourceSlotTag` | Original Tag Reference where declared. |
+
+Each member distinguishes absent, null and unreadable source states independently. Additional fields
+remain in the row's `authoredFields` arena. `completeness.locationResourceSlots` describes selection
+and the table's `availability` describes the source declaration. The rows describe authored slot
+definitions. Locating instances in the world requires placement data.
+
 ### Joining an objective module
 
 Start at the objective's `source` in `configurations.contractTemplates.rows[].objectives[]`.

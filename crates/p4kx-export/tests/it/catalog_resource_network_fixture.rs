@@ -16,16 +16,27 @@ const PARAMS: &str = "SIParamsModule";
 const STANDARD: &str = "SStandardParams";
 const OTHER_PARAMS: &str = "FixtureAlternativeMode";
 const RULES: &str = "ResourceNetworkParams";
+const RADAR: &str = "RadarOptionParams";
+const INVALID_RADAR: &str = "FixtureUnrelatedRadarOption";
+const PING: &str = "allowFPSPingWave";
 
 #[derive(Clone, Copy)]
 pub(super) enum Layout {
     Complete,
     Invalid,
+    HistoricalRadar,
+    WrongRadarType,
+    WrongRadarStorage,
+    WrongPingStorage,
 }
 
 pub(super) fn database(layout: Layout) -> DataForgeBuilder {
     let rules_field = match layout {
-        Layout::Complete => TestType::Class(RULES.to_owned()),
+        Layout::Complete
+        | Layout::HistoricalRadar
+        | Layout::WrongRadarType
+        | Layout::WrongRadarStorage
+        | Layout::WrongPingStorage => TestType::Class(RULES.to_owned()),
         Layout::Invalid => TestType::String,
     };
     DataForgeBuilder::new()
@@ -50,10 +61,13 @@ pub(super) fn database(layout: Layout) -> DataForgeBuilder {
             TestStruct::new(STANDARD)
                 .parent(PARAMS)
                 .field("fixtureUnrelatedParameter", TestType::Single)
-                .field("resourceNetworkParams", rules_field),
+                .field("resourceNetworkParams", rules_field)
+                .field("radarOptionParams", radar_field(layout)),
         )
         .structure(TestStruct::new(OTHER_PARAMS).parent(PARAMS))
         .structure(rules_schema())
+        .structure(radar_schema(layout))
+        .structure(TestStruct::new(INVALID_RADAR).field("unknownFlag", TestType::Bool))
         .record(mode(FIRST, "FixtureFirst", standard(layout, true)))
         .record(mode(SECOND, "FixtureSecond", standard(layout, false)))
         .record(mode(
@@ -101,7 +115,11 @@ fn mode(guid: u128, name: &str, params: TestValue) -> TestRecord {
 
 fn standard(layout: Layout, enabled: bool) -> TestValue {
     let network = match layout {
-        Layout::Complete => TestValue::Struct(rules(enabled)),
+        Layout::Complete
+        | Layout::HistoricalRadar
+        | Layout::WrongRadarType
+        | Layout::WrongRadarStorage
+        | Layout::WrongPingStorage => TestValue::Struct(rules(enabled)),
         Layout::Invalid => TestValue::text("fixture invalid resource rule"),
     };
     TestValue::Struct(
@@ -110,7 +128,8 @@ fn standard(layout: Layout, enabled: bool) -> TestValue {
                 "fixtureUnrelatedParameter",
                 TestValue::Single(f32::NEG_INFINITY),
             )
-            .value("resourceNetworkParams", network),
+            .value("resourceNetworkParams", network)
+            .value("radarOptionParams", radar(layout, enabled)),
     )
 }
 
@@ -139,4 +158,53 @@ fn rules(enabled: bool) -> TestInstance {
             "fixtureRawRule",
             TestValue::Double(f64::from_bits(RAW_BITS)),
         )
+}
+
+fn radar_field(layout: Layout) -> TestType {
+    match layout {
+        Layout::WrongRadarType => TestType::Class(INVALID_RADAR.to_owned()),
+        Layout::WrongRadarStorage => TestType::Bool,
+        _ => TestType::Class(RADAR.to_owned()),
+    }
+}
+
+fn radar_schema(layout: Layout) -> TestStruct {
+    let radar = [
+        "useFPSTagging",
+        "useFPSScanMode",
+        "enableScanMode",
+        "useExperimentalFeatures",
+        "allowDeltaSignature",
+        "allowEmissionsHUD",
+    ]
+    .into_iter()
+    .fold(TestStruct::new(RADAR), |structure, field| {
+        structure.field(field, TestType::Bool)
+    })
+    .field("fixtureRawRadarOption", TestType::Int32);
+    match layout {
+        Layout::HistoricalRadar => radar,
+        Layout::WrongPingStorage => radar.field(PING, TestType::Int32),
+        _ => radar.field(PING, TestType::Bool),
+    }
+}
+
+fn radar(layout: Layout, enabled: bool) -> TestValue {
+    let radar = TestInstance::new(RADAR)
+        .value("useFPSTagging", TestValue::Bool(!enabled))
+        .value("useFPSScanMode", TestValue::Bool(enabled))
+        .value("enableScanMode", TestValue::Bool(true))
+        .value("useExperimentalFeatures", TestValue::Bool(false))
+        .value("allowDeltaSignature", TestValue::Bool(true))
+        .value("allowEmissionsHUD", TestValue::Bool(false))
+        .value("fixtureRawRadarOption", TestValue::Int32(17));
+    match layout {
+        Layout::WrongRadarType => TestValue::Struct(
+            TestInstance::new(INVALID_RADAR).value("unknownFlag", TestValue::Bool(enabled)),
+        ),
+        Layout::WrongRadarStorage => TestValue::Bool(enabled),
+        Layout::HistoricalRadar => TestValue::Struct(radar),
+        Layout::WrongPingStorage => TestValue::Struct(radar.value(PING, TestValue::Int32(3))),
+        _ => TestValue::Struct(radar.value(PING, TestValue::Bool(enabled))),
+    }
 }

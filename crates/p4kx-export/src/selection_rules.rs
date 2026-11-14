@@ -62,6 +62,10 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::location_vocabulary::SIZE,
             },
+            Self::LocationResourceSlots => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::RESOURCE_SLOT,
+            },
             Self::LocationClassRegistries => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::location_vocabulary::CLASS_REGISTRY,
@@ -125,6 +129,10 @@ impl Kind {
             Self::MedicalItemTierConfigs => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::medical::medical_tier_config::SOURCE_TYPE,
+            },
+            Self::ProceduralPlanetAudio => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::procedural_planet_audio::SOURCE_TYPE,
             },
             Self::ExplosionDefinitions => KindRule {
                 prefixes: &[""],

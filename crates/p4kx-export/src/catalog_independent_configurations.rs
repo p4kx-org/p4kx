@@ -9,8 +9,9 @@ use super::catalog_entity_component_read::{
     self as entity_component, ComponentKind, ComponentRead,
 };
 use super::catalog_mission_board::{self, MissionBoard};
+use super::catalog_radar_options::RadarOptionsConfiguration;
 use super::catalog_resource_network_configuration::ResourceNetworkConfiguration;
-use super::catalog_resource_network_read::{self, ResourceNetworkRead};
+use super::catalog_resource_network_read::{self, GameModeRead};
 use super::catalog_weapon_actions::RECOIL_DEFINITION;
 use super::jump_drive_definitions::{self, JumpDriveDefinitions};
 use super::weapon_action_recoil_definitions::{self, WeaponActionRecoilDefinition};
@@ -41,6 +42,7 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     item_recovery_overrides: CatalogTable<ItemRecoveryOverrides>,
     item_recovery_policy: CatalogTable<ItemRecoveryPolicy<'source>>,
     resource_network_parameters: CatalogTable<ResourceNetworkConfiguration<'source>>,
+    radar_options: CatalogTable<RadarOptionsConfiguration<'source>>,
     mission_boards: CatalogTable<MissionBoard<'source>>,
     entity_animation_controllers: CatalogTable<EntityAnimationController<'source>>,
     loot_generation: CatalogTable<LootGenerationComponent<'source>>,
@@ -74,8 +76,9 @@ pub(crate) fn read<'source>(
     } = recovery::read_recovery(forge, projection, options.filter, options.cancel)?;
     collected.ledger.merge(ledger);
     collected.add_failures(failures);
-    let ResourceNetworkRead {
-        table: resource_network_parameters,
+    let GameModeRead {
+        resource_network_parameters,
+        radar_options,
         numbers: mut configuration_numbers,
         failures,
         ledger,
@@ -107,6 +110,7 @@ pub(crate) fn read<'source>(
             item_recovery_overrides,
             item_recovery_policy,
             resource_network_parameters,
+            radar_options,
             mission_boards,
             entity_animation_controllers,
             loot_generation,

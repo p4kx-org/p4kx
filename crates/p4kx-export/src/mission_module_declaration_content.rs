@@ -8,6 +8,7 @@ use serde::Serialize;
 use super::{Observed, OwnedSlots, SOURCE_TYPE};
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
+use crate::catalog_v3::location_vocabulary::RESOURCE_SLOT;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference, SourceWeakReference};
@@ -62,7 +63,7 @@ impl<'source> ModuleType<'source> {
                 )?,
                 required_resource_slot: fields.record_link_to(
                     "requiredResourceSlot",
-                    "LocationResourceSlot",
+                    RESOURCE_SLOT,
                     notes,
                 )?,
                 pauses_location_npc_autospawns: fields

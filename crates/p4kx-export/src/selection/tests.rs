@@ -81,6 +81,7 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::LocationClasses
                 | Kind::LocationFunctions
                 | Kind::LocationSizes
+                | Kind::LocationResourceSlots
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries
@@ -91,6 +92,7 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::EncounterIndices
                 | Kind::InventoryContainers
                 | Kind::MedicalItemTierConfigs
+                | Kind::ProceduralPlanetAudio
                 | Kind::StarmapTypes
                 | Kind::StarmapPresets
                 | Kind::StarmapAmenities => assert_tag_path(by_path),

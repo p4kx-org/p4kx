@@ -9,6 +9,7 @@ use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::{self, LocationVocabularyPick};
 use crate::catalog_v3::medical::medical_tier_config;
 use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsPick;
+use crate::catalog_v3::procedural_planet_audio;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
 use crate::mission_kinds::MissionPick;
 use crate::picked::Picked;
@@ -27,6 +28,7 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::ExplosionDefinitions => self.explosion_definition(admission, tree)?,
             Kind::InventoryContainers => self.inventory_definition(admission, tree)?,
             Kind::MedicalItemTierConfigs => self.medical_definition(admission, tree)?,
+            Kind::ProceduralPlanetAudio => self.planet_audio(admission, tree)?,
             Kind::Factions => self.faction_definition(admission, tree)?,
             Kind::StarmapTypes | Kind::StarmapPresets | Kind::StarmapAmenities => {
                 self.starmap_definition(kind, admission, tree)?
@@ -142,6 +144,16 @@ impl<'f> Scan<'_, '_, 'f> {
             self.options.cancel,
         )?;
         Ok((Picked::NpcSpawnDefinitions(value), notes))
+    }
+
+    fn planet_audio(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (value, notes) =
+            procedural_planet_audio::read(tree, self.projection, admission, self.options.cancel)?;
+        Ok((Picked::ProceduralPlanetAudio(Box::new(value)), notes))
     }
 
     fn medical_definition(

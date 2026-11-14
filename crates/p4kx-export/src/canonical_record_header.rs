@@ -12,7 +12,7 @@ use crate::schema_fields::every_field_required;
 use crate::{CatalogError, source_header};
 
 /// Independently sourced original metadata and stable convenience values of one physical Record.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CanonicalRecordHeader<'source> {

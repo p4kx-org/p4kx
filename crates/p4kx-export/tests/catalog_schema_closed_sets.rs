@@ -42,6 +42,7 @@ const CONTROL_TYPES: &[&str] = &[
     "ObjectiveInterpretation",
     "OwnedReferenceStatus",
     "ProbabilityInterpretation",
+    "ProjectileAmmoRole",
     "PropertyInterpretation",
     "PropertyReferenceStatus",
     "PropertyValueKind",

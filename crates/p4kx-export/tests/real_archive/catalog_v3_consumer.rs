@@ -69,6 +69,7 @@ fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
         Kind::LocationClasses => "/definitions/locationClasses",
         Kind::LocationFunctions => "/definitions/locationFunctions",
         Kind::LocationSizes => "/definitions/locationSizes",
+        Kind::LocationResourceSlots => "/definitions/locationResourceSlots",
         Kind::LocationClassRegistries => "/definitions/locationRegistries/classes",
         Kind::LocationFunctionRegistries => "/definitions/locationRegistries/functions",
         Kind::LocationSizeRegistries => "/definitions/locationRegistries/sizes",
@@ -104,6 +105,7 @@ const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::AutoSpawnSets
             | Kind::EncounterIndices
             | Kind::MissionItems
+            | Kind::ProceduralPlanetAudio
             | Kind::ContractScopes
             | Kind::LootPoolFilters
             | Kind::LootSecondaryChoiceSingleLayers
@@ -154,6 +156,7 @@ fn checked_table<'catalog>(
                     | Kind::LocationClasses
                     | Kind::LocationFunctions
                     | Kind::LocationSizes
+                    | Kind::LocationResourceSlots
                     | Kind::LocationClassRegistries
                     | Kind::LocationFunctionRegistries
                     | Kind::LocationSizeRegistries
@@ -281,6 +284,7 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
                 | Kind::LocationClasses
                 | Kind::LocationFunctions
                 | Kind::LocationSizes
+                | Kind::LocationResourceSlots
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries

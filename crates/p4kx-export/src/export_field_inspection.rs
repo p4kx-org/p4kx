@@ -20,6 +20,7 @@ use crate::{ExportAccountingError, HealthText};
 pub(crate) enum ConfigurationInspection {
     MissionBoard,
     ResourceNetwork,
+    RadarOptions,
     LootGeneration,
     JumpDriveDefinition,
     WeaponActionRecoilDefinition,

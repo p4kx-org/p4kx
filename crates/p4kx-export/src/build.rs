@@ -20,6 +20,7 @@ use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_independent_configurations;
 use crate::catalog_v3::inventory_container_definition::table as inventory_table;
 use crate::catalog_v3::medical::medical_tier_config;
+use crate::catalog_v3::procedural_planet_audio;
 use crate::catalog_v3::weapon_combat_base;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
@@ -28,7 +29,6 @@ use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
 use crate::texts::{TextSources, Texts};
 use crate::{CatalogError, CatalogOptions, CatalogProvenance};
-
 #[path = "build_catalog.rs"]
 mod api;
 pub use api::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
@@ -227,6 +227,10 @@ fn assemble<R>(
             medical_item_tier_configs: medical_tier_config::table(
                 &forge,
                 collected.medical_item_tier_configs,
+            ),
+            procedural_planet_audio: procedural_planet_audio::table(
+                &forge,
+                collected.procedural_planet_audio,
             ),
             explosion_definitions: crate::catalog_v3::explosion_definition::table(
                 &forge,

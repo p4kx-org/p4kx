@@ -172,6 +172,8 @@ mod catalog_mission_board;
 pub(crate) mod catalog_quantum_drive;
 #[path = "catalog_quantum_interdiction.rs"]
 pub(crate) mod catalog_quantum_interdiction;
+#[path = "catalog_radar_options.rs"]
+mod catalog_radar_options;
 #[path = "catalog_resource_component.rs"]
 mod catalog_resource_component;
 #[path = "catalog_resource_connection.rs"]
@@ -208,6 +210,8 @@ mod catalog_seat_ejection;
 pub(crate) mod catalog_shield_generator;
 #[path = "catalog_unit_source.rs"]
 mod catalog_unit_source;
+#[path = "procedural_planet_audio.rs"]
+pub(crate) mod procedural_planet_audio;
 #[path = "weapon_procedural_definitions.rs"]
 pub(crate) mod weapon_procedural_definitions;
 
@@ -379,7 +383,6 @@ pub(crate) mod weapon_combat_base;
 
 #[path = "catalog_table.rs"]
 pub(crate) mod catalog_table;
-
 #[path = "catalog_commodity_modules.rs"]
 mod commodity_modules;
 pub(crate) use commodity_modules::{

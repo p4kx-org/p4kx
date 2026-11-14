@@ -7,6 +7,7 @@ use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_number_health::EmittedNumber;
 use crate::catalog_row::{CatalogRow, CatalogRows};
 use crate::catalog_v3::medical::medical_tier_config;
+use crate::catalog_v3::procedural_planet_audio;
 use crate::collected::Collected;
 use crate::selection::Kind;
 use crate::template_number_capture::TemplateNumbers;
@@ -92,6 +93,9 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
             ))
             .chain(collected.mission_kinds.definition_sources())
             .chain(collected.starmap_definitions.sources())
+            .chain(procedural_planet_audio::sources(
+                &collected.procedural_planet_audio,
+            ))
             .chain(collected.loot_kinds.definitions.sources())
             .map(|(kind, guid, path, _)| CatalogRow {
                 kind,
@@ -324,6 +328,10 @@ fn physical_definition_number_groups<'rows>(
                 .ammo_definitions
                 .iter()
                 .map(|row| (Kind::AmmoDefinitions, row.numbers.as_slice())),
+        )
+        .chain(
+            procedural_planet_audio::sources(&collected.procedural_planet_audio)
+                .map(|(kind, _, _, numbers)| (kind, numbers)),
         )
 }
 

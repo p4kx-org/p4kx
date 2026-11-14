@@ -122,6 +122,9 @@ pub(crate) fn actual_kind(type_name: &str) -> Option<Kind> {
         crate::catalog_v3::medical::medical_tier_config::SOURCE_TYPE => {
             Some(Kind::MedicalItemTierConfigs)
         }
+        crate::catalog_v3::procedural_planet_audio::SOURCE_TYPE => {
+            Some(Kind::ProceduralPlanetAudio)
+        }
         crate::catalog_v3::mission_scenario_definition::SOURCE_TYPE => Some(Kind::MissionScenarios),
         crate::catalog_v3::mission_sources::module_declaration::SOURCE_TYPE => {
             Some(Kind::MissionModuleDeclarations)

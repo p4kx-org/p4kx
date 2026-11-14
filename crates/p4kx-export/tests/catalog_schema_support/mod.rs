@@ -355,6 +355,8 @@ pub(crate) fn minimal_catalog() -> Value {
         "missionModuleDeclarations",
         "missionItems",
         "contractScopes",
+        "locationResourceSlots",
+        "proceduralPlanetAudio",
     ] {
         for (section, value) in [
             ("completeness", json!({"status": "complete"})),
@@ -364,6 +366,12 @@ pub(crate) fn minimal_catalog() -> Value {
                 object.insert(kind.to_owned(), value);
             }
         }
+    }
+    if let Some(configurations) = catalog
+        .get_mut("configurations")
+        .and_then(Value::as_object_mut)
+    {
+        configurations.insert("radarOptions".to_owned(), absent_table());
     }
     loot::add_definition_tables(&mut catalog);
     let export_health = health::fixture(&catalog);

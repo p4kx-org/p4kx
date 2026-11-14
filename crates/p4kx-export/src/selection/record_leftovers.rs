@@ -58,6 +58,7 @@ pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
         | Kind::LocationClasses
         | Kind::LocationFunctions
         | Kind::LocationSizes
+        | Kind::LocationResourceSlots
         | Kind::LocationClassRegistries
         | Kind::LocationFunctionRegistries
         | Kind::LocationSizeRegistries
@@ -72,6 +73,7 @@ pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
         | Kind::MissionItems
         | Kind::InventoryContainers
         | Kind::MedicalItemTierConfigs
+        | Kind::ProceduralPlanetAudio
         | Kind::StarmapTypes
         | Kind::StarmapPresets
         | Kind::StarmapAmenities => false,

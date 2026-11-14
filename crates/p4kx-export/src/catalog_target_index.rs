@@ -187,6 +187,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
             | Kind::LocationClasses
             | Kind::LocationFunctions
             | Kind::LocationSizes
+            | Kind::LocationResourceSlots
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
@@ -211,6 +212,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
             | Kind::ExplosionDefinitions
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
+            | Kind::ProceduralPlanetAudio
             | Kind::AmmoDefinitions
             | Kind::Tags
             | Kind::Commodities

@@ -191,6 +191,8 @@ pub enum Kind {
     LocationFunctions,
     /// Physical mission location size definitions.
     LocationSizes,
+    /// Physical location resource slot definitions.
+    LocationResourceSlots,
     /// Physical mission location class registries.
     LocationClassRegistries,
     /// Physical mission location function registries.
@@ -211,6 +213,8 @@ pub enum Kind {
     InventoryContainers,
     /// Physical shared medical tier and consumption configuration Records.
     MedicalItemTierConfigs,
+    /// Physical DataForge procedural planet audio configuration Records.
+    ProceduralPlanetAudio,
     /// Physical starmap object type definitions.
     StarmapTypes,
     /// Physical starmap preset definitions.
@@ -229,7 +233,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 89] = [
+    pub const ALL: [Self; 91] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -302,6 +306,7 @@ impl Kind {
         Self::LocationClasses,
         Self::LocationFunctions,
         Self::LocationSizes,
+        Self::LocationResourceSlots,
         Self::LocationClassRegistries,
         Self::LocationFunctionRegistries,
         Self::LocationSizeRegistries,
@@ -312,6 +317,7 @@ impl Kind {
         Self::EncounterIndices,
         Self::InventoryContainers,
         Self::MedicalItemTierConfigs,
+        Self::ProceduralPlanetAudio,
         Self::StarmapTypes,
         Self::StarmapPresets,
         Self::StarmapAmenities,

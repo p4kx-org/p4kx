@@ -12,15 +12,16 @@ mod local_generators;
 
 #[path = "catalog_location_configuration.rs"]
 mod location_configuration;
+#[path = "catalog_location_resource_slots.rs"]
+mod location_resource_slots;
 #[path = "catalog_location_vocabulary.rs"]
 mod location_vocabulary;
+#[path = "catalog_mission_boards.rs"]
+mod mission_boards;
 #[path = "catalog_mission_scenario_definitions.rs"]
 mod mission_scenario_definitions;
 #[path = "catalog_npc_spawn_definitions.rs"]
 mod npc_spawn_definitions;
-
-#[path = "catalog_mission_boards.rs"]
-mod mission_boards;
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
@@ -37,7 +38,6 @@ mod scenarios;
 mod success_rewards;
 #[path = "../contract_v3/mod.rs"]
 pub(crate) mod v3;
-
 pub(crate) type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 pub(crate) fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {

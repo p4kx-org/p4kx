@@ -20,14 +20,15 @@ use crate::catalog_v3_consumer as consumer;
 use crate::real_archive_auto_spawns::original::Locations;
 use crate::real_archive_auto_spawns::provenance::Origins;
 
-type TestResult<T = ()> = Result<T, Box<dyn Error>>;
+#[path = "real_archive_location_resource_slots.rs"]
+mod resource_slots;
 
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 struct Family {
     kind: Kind,
     source_type: &'static str,
     field: Option<OriginalArray>,
 }
-
 enum OriginalArray {
     Scopes,
     Members {
@@ -35,7 +36,6 @@ enum OriginalArray {
         target: &'static str,
     },
 }
-
 const FAMILIES: [Family; 6] = [
     Family {
         kind: Kind::LocationClasses,

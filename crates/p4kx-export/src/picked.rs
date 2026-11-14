@@ -16,6 +16,7 @@ use crate::catalog_v3::location_vocabulary::LocationVocabularyPick;
 use crate::catalog_v3::loot_definition_catalog::LootDefinition;
 use crate::catalog_v3::medical::medical_tier_config::PreparedMedicalTier;
 use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsPick;
+use crate::catalog_v3::procedural_planet_audio::PreparedPlanetAudio;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
 use crate::catalog_v3::starmap_object_definition::StarmapObjectRead;
 use crate::contract::{
@@ -67,6 +68,7 @@ pub(crate) enum Picked<'f> {
     AmmoDefinition(Box<PreparedAmmoDefinition<'f>>),
     InventoryContainer(Box<PreparedInventoryContainer<'f>>),
     MedicalItemTierConfig(Box<PreparedMedicalTier<'f>>),
+    ProceduralPlanetAudio(Box<PreparedPlanetAudio<'f>>),
     FactionIdentity(
         Box<crate::catalog_v3::faction_identity_definition::PreparedFactionIdentity<'f>>,
     ),
@@ -163,6 +165,7 @@ impl<'f> Picked<'f> {
             | Kind::AmmoDefinitions
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
+            | Kind::ProceduralPlanetAudio
             | Kind::Factions
             | Kind::FactionIdentities
             | Kind::ReputationPerks
@@ -178,6 +181,7 @@ impl<'f> Picked<'f> {
             | Kind::LocationClasses
             | Kind::LocationFunctions
             | Kind::LocationSizes
+            | Kind::LocationResourceSlots
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries

@@ -7,8 +7,9 @@ use std::ops::Range;
 use p4kx_extraction::{CancelToken, DataForge, Filter, RecordTree, TreeBuilder, Value};
 
 use super::authored_fields::Observed;
+use super::catalog_radar_options::{RADAR, RadarOptionsConfiguration};
 use super::catalog_resource_network_configuration::{
-    GAME_MODE, NETWORK, PARAMS, ResourceNetworkConfiguration,
+    GAME_MODE, GameModeConfigurations, NETWORK, PARAMS, ResourceNetworkConfiguration,
 };
 use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
@@ -27,23 +28,25 @@ use crate::{CatalogError, CatalogReadFailure};
 
 const ROLE: ExportSourceRole = ExportSourceRole::Dependency;
 
-pub(crate) struct ResourceNetworkRead<'source> {
-    pub(crate) table: CatalogTable<ResourceNetworkConfiguration<'source>>,
+pub(super) struct GameModeRead<'source> {
+    pub(super) resource_network_parameters: CatalogTable<ResourceNetworkConfiguration<'source>>,
+    pub(super) radar_options: CatalogTable<RadarOptionsConfiguration<'source>>,
     pub(crate) numbers: Vec<CapturedNumber>,
     pub(crate) failures: Vec<CatalogReadFailure<'source>>,
     pub(crate) ledger: ExportLedger,
 }
 
 /// Reads the original game-mode owners that match the catalog's Record filter.
-pub(crate) fn read<'source>(
+pub(super) fn read<'source>(
     forge: &'source DataForge<'source>,
     input: &OriginalCatalogInput<'_, 'source>,
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
-) -> Result<ResourceNetworkRead<'source>, CatalogError> {
+) -> Result<GameModeRead<'source>, CatalogError> {
     input.check_forge(forge)?;
     let mut trees = TreeBuilder::new();
-    let mut rows = Vec::new();
+    let mut network = Vec::new();
+    let mut radar = Vec::new();
     let mut numbers = Vec::new();
     let mut failures = Vec::new();
     let mut ledger = ExportLedger::default();
@@ -78,7 +81,8 @@ pub(crate) fn read<'source>(
         match trees.build(&record) {
             Ok(tree) => {
                 let projected = project(&tree, input, &admission, cancel, &mut ledger)?;
-                rows.push(projected.row);
+                network.push(projected.rows.network);
+                radar.push(projected.rows.radar);
                 numbers.extend(projected.numbers);
             }
             Err(error) => {
@@ -91,16 +95,17 @@ pub(crate) fn read<'source>(
             }
         }
     }
-    Ok(ResourceNetworkRead {
-        table: CatalogTable::new(forge, &[GAME_MODE], rows),
+    Ok(GameModeRead {
+        resource_network_parameters: CatalogTable::new(forge, &[GAME_MODE], network),
+        radar_options: CatalogTable::new(forge, &[GAME_MODE], radar),
         numbers,
         failures,
         ledger,
     })
 }
 
-struct NetworkProjection<'source> {
-    row: ResourceNetworkConfiguration<'source>,
+struct ModeProjection<'source> {
+    rows: GameModeConfigurations<'source>,
     numbers: Vec<CapturedNumber>,
 }
 
@@ -110,7 +115,7 @@ fn project<'source>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
     ledger: &mut ExportLedger,
-) -> Result<NetworkProjection<'source>, CatalogError> {
+) -> Result<ModeProjection<'source>, CatalogError> {
     let scope = input.record_scope(admission.record(), tree)?;
     let originals = OriginalFlowFields::read(&scope, cancel)?;
     let capture = TemplateFieldCapture::new(&originals, input, admission)?;
@@ -118,30 +123,36 @@ fn project<'source>(
     let source = CanonicalRecordHeader::read(tree, input.origins())?;
     let receiver = Observed::configuration(&originals, input, &capture, &numbers);
     let mut notes = Vec::new();
-    let row = ResourceNetworkConfiguration::read(source, receiver, &mut notes)?;
-    let span = rule_span(&originals)?;
-    ledger.merge(export_field_walk::inspect_configuration(
-        input,
-        tree,
-        admission,
-        span.as_slice(),
-        ConfigurationInspection::ResourceNetwork,
-        cancel,
-    )?);
+    let rows = GameModeConfigurations::read(source, receiver, &mut notes)?;
+    for (field, configuration) in [
+        (NETWORK, ConfigurationInspection::ResourceNetwork),
+        (RADAR, ConfigurationInspection::RadarOptions),
+    ] {
+        let span = rule_span(&originals, field)?;
+        ledger.merge(export_field_walk::inspect_configuration(
+            input,
+            tree,
+            admission,
+            span.as_slice(),
+            configuration,
+            cancel,
+        )?);
+        ledger.observe(
+            admission
+                .source(None, ROLE, SourceDisposition::Projected)?
+                .for_configuration(configuration),
+        );
+    }
     source_projection_notes::record_dependency(admission, tree, notes, ledger)?;
-    ledger.observe(
-        admission
-            .source(None, ROLE, SourceDisposition::Projected)?
-            .for_configuration(ConfigurationInspection::ResourceNetwork),
-    );
-    Ok(NetworkProjection {
-        row,
+    Ok(ModeProjection {
+        rows,
         numbers: numbers.into_inner(),
     })
 }
 
 fn rule_span(
     originals: &OriginalFlowFields<'_, '_, '_>,
+    field: &str,
 ) -> Result<Option<Range<usize>>, CatalogError> {
     let Some((_, params)) = originals.field(None, PARAMS)? else {
         return Ok(None);
@@ -150,7 +161,7 @@ fn rule_span(
         return Ok(None);
     }
     originals
-        .field(Some(params), NETWORK)?
+        .field(Some(params), field)?
         .map(|(_, rules)| originals.span(rules))
         .transpose()
 }

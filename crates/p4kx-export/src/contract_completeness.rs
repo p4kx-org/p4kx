@@ -36,6 +36,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) inventory_containers: KindCompleteness<'a>,
     /// The filtered physical medical tier and consumption configuration selection.
     pub(crate) medical_item_tier_configs: KindCompleteness<'a>,
+    /// The filtered physical DataForge procedural planet audio selection.
+    pub(crate) procedural_planet_audio: KindCompleteness<'a>,
     /// The filtered physical `ExplosionRecord` selection.
     pub(crate) explosion_definitions: KindCompleteness<'a>,
     /// The filtered physical `AmmoParams` selection.
@@ -99,6 +101,7 @@ pub(crate) struct Completeness<'a> {
     pub(crate) location_classes: KindCompleteness<'a>,
     pub(crate) location_functions: KindCompleteness<'a>,
     pub(crate) location_sizes: KindCompleteness<'a>,
+    pub(crate) location_resource_slots: KindCompleteness<'a>,
     pub(crate) location_class_registries: KindCompleteness<'a>,
     pub(crate) location_function_registries: KindCompleteness<'a>,
     pub(crate) location_size_registries: KindCompleteness<'a>,
@@ -201,6 +204,7 @@ impl<'a> Completeness<'a> {
             explosion_definitions: completeness,
             inventory_containers: completeness,
             medical_item_tier_configs: completeness,
+            procedural_planet_audio: completeness,
             ammo_definitions: completeness,
             gameplay_properties: completeness,
             quality_distributions: completeness,
@@ -233,6 +237,7 @@ impl<'a> Completeness<'a> {
             location_classes: completeness,
             location_functions: completeness,
             location_sizes: completeness,
+            location_resource_slots: completeness,
             location_class_registries: completeness,
             location_function_registries: completeness,
             location_size_registries: completeness,

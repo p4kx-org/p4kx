@@ -62,4 +62,10 @@ impl Rtpc {
             rtpc: source.string("rtpc", notes)?,
         })
     }
+
+    pub(super) const fn projected_member(
+        &self,
+    ) -> (&'static str, p4kx_extraction::SourceValueState) {
+        ("rtpc", self.rtpc.state())
+    }
 }

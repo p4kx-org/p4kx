@@ -121,3 +121,34 @@ of the rule Class retain their original storage and source coordinates.
 Health inspection covers the original rule subtree and the required
 selectors. Component and loadout rows retain their independent source
 scope.
+
+## Authored GameMode radar options
+
+`configurations.radarOptions` contains one row per selected physical
+`GameMode` Record. The row carries its sourced `source` header and
+`gameModeId`. The sourced `params` cell follows the same original
+`StrongPointer<SIParamsModule>` as the resource-network table. Its
+`sourceType` identifies the concrete mode parameter declaration.
+
+The authored route is `SStandardParams.radarOptionParams`, a scalar
+Class targeting `RadarOptionParams`. The Catalog fields are under
+`params.value.radarOptionParams.value`.
+
+| Field | Source type |
+|---|---|
+| `useFPSTagging` | Boolean |
+| `useFPSScanMode` | Boolean |
+| `enableScanMode` | Boolean |
+| `useExperimentalFeatures` | Boolean |
+| `allowDeltaSignature` | Boolean |
+| `allowEmissionsHUD` | Boolean |
+| `allowFPSPingWave` | Boolean |
+
+Each field has its own provenance and encryption marker. Older
+declarations without `allowFPSPingWave` export an absent field.
+Additional members retain their authored types and coordinates.
+When an unexpected storage or target makes the branch invalid or
+unsupported, `params.value.rawRadarOptionParams` retains its readable
+original data for diagnostic exports. The regular Catalog Record filter
+selects the physical mode, and the health report covers the radar
+subtree and the required selectors. These flags have no units.

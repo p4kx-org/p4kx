@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_radar_options::{RadarModeParameters, RadarOptionsConfiguration};
 use crate::CatalogError;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::resource_float::ResourceFloat32;
@@ -28,21 +29,34 @@ pub(crate) struct ResourceNetworkConfiguration<'source> {
     params: SourcedValue<ModeParameters<'source>>,
 }
 
-impl<'source> ResourceNetworkConfiguration<'source> {
+pub(super) struct GameModeConfigurations<'source> {
+    pub(super) network: ResourceNetworkConfiguration<'source>,
+    pub(super) radar: RadarOptionsConfiguration<'source>,
+}
+
+impl<'source> GameModeConfigurations<'source> {
     pub(super) fn read(
         source: CanonicalRecordHeader<'source>,
         mode: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
+        let game_mode_id = mode.borrowed_enum_to("id", "EGameModeId", notes)?;
+        let (network, radar) = mode
+            .strong_pointer_family_to(PARAMS, "SIParamsModule", notes, |params, notes| {
+                let source_type = params.source_type_value()?;
+                Ok((
+                    ModeParameters::read(params, source_type.clone(), notes)?,
+                    RadarModeParameters::read(params, source_type, notes)?,
+                ))
+            })?
+            .unzip();
         Ok(Self {
-            source,
-            game_mode_id: mode.borrowed_enum_to("id", "EGameModeId", notes)?,
-            params: mode.strong_pointer_family_to(
-                PARAMS,
-                "SIParamsModule",
-                notes,
-                ModeParameters::read,
-            )?,
+            network: ResourceNetworkConfiguration {
+                source: source.clone(),
+                game_mode_id: game_mode_id.clone(),
+                params: network,
+            },
+            radar: RadarOptionsConfiguration::new(source, game_mode_id, radar),
         })
     }
 }
@@ -58,10 +72,11 @@ struct ModeParameters<'source> {
 impl<'source> ModeParameters<'source> {
     fn read(
         source: Observed<'_, '_, '_, 'source>,
+        source_type: SourcedValue<&'source str>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
-            source_type: source.source_type_value()?,
+            source_type,
             resource_network_params: source.declared_class_to(
                 NETWORK,
                 NETWORK_TYPE,

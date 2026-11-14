@@ -140,3 +140,23 @@ impl<T> SourcedValue<T> {
         })
     }
 }
+
+impl<L, R> SourcedValue<(L, R)> {
+    /// Splits a sourced pair while retaining the same origin and state for both values.
+    #[must_use]
+    pub fn unzip(self) -> (SourcedValue<L>, SourcedValue<R>) {
+        let (left, right) = self.value.unzip();
+        (
+            SourcedValue {
+                state: self.state,
+                value: left,
+                origin: self.origin.clone(),
+            },
+            SourcedValue {
+                state: self.state,
+                value: right,
+                origin: self.origin,
+            },
+        )
+    }
+}

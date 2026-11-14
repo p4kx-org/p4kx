@@ -18,6 +18,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
                 | Kind::InventoryContainers
                 | Kind::MedicalItemTierConfigs
                 | Kind::Factions
+                | Kind::ProceduralPlanetAudio
                 | Kind::FactionIdentities
                 | Kind::FactionReputations
                 | Kind::ReputationScopes
@@ -34,6 +35,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
                 | Kind::LocationClasses
                 | Kind::LocationFunctions
                 | Kind::LocationSizes
+                | Kind::LocationResourceSlots
                 | Kind::LocationClassRegistries
                 | Kind::LocationFunctionRegistries
                 | Kind::LocationSizeRegistries
@@ -107,6 +109,7 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
         Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
             | Kind::Factions
+            | Kind::ProceduralPlanetAudio
             | Kind::FactionIdentities
             | Kind::FactionReputations
             | Kind::ReputationScopes
@@ -123,6 +126,7 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
             | Kind::LocationClasses
             | Kind::LocationFunctions
             | Kind::LocationSizes
+            | Kind::LocationResourceSlots
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries

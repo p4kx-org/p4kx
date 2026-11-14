@@ -23,6 +23,7 @@ impl Collected<'_> {
             Kind::LocationClasses
             | Kind::LocationFunctions
             | Kind::LocationSizes
+            | Kind::LocationResourceSlots
             | Kind::LocationClassRegistries
             | Kind::LocationFunctionRegistries
             | Kind::LocationSizeRegistries
@@ -43,6 +44,7 @@ impl Collected<'_> {
             Kind::ExplosionDefinitions => self.explosion_definitions.len(),
             Kind::InventoryContainers => self.inventory_containers.len(),
             Kind::MedicalItemTierConfigs => self.medical_item_tier_configs.len(),
+            Kind::ProceduralPlanetAudio => self.procedural_planet_audio.len(),
             Kind::AmmoDefinitions => self.ammo_definitions.len(),
             Kind::GameplayProperties => self.gameplay_properties.len(),
             Kind::QualityDistributions => self.quality.distributions.len(),
