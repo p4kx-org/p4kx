@@ -123,3 +123,12 @@ physical declarations stay separate. An incomplete scope cannot establish a uniq
 or missing match. Candidate coordinates point to the original definition. A lookup's
 encryption marker covers its original selector and referenced scope evidence.
 These records describe authored matches and make no runtime selection.
+
+`controllerTopology` describes one physical ControllerDef with its ordered
+scope contexts, scopes, fragment declarations and scoped overrides. The records
+preserve XML node and attribute coordinates, authored attributes and matching
+scope/context declaration indexes. Duplicate definitions stay distinct. A
+`motionControllerTopology` links a component to its selected controller document.
+The component's physical rig owner stays unresolved when the authoring sources
+provide a scope/context relationship without an observed model binding. See
+[CryEngine Mannequin Scope Contexts](https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756816/pages/29450870).

@@ -160,6 +160,31 @@
     },
     "Attribute": {
       "properties": {
+        "name": {
+          "type": "string"
+        },
+        "namespace": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        },
+        "value": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "position",
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "Attribute2": {
+      "properties": {
         "position": {
           "$ref": "#/$defs/SocXmlPosition"
         },
@@ -173,7 +198,7 @@
       ],
       "type": "object"
     },
-    "Attribute2": {
+    "Attribute3": {
       "properties": {
         "occurrences": {
           "items": {
@@ -288,7 +313,7 @@
         },
         "occurrences": {
           "items": {
-            "$ref": "#/$defs/Attribute"
+            "$ref": "#/$defs/Attribute2"
           },
           "type": "array"
         },
@@ -611,6 +636,57 @@
         }
       ]
     },
+    "ControllerRigOwner": {
+      "properties": {
+        "controllerDocument": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "status": {
+          "$ref": "#/$defs/RigOwnerState"
+        }
+      },
+      "required": [
+        "controllerDocument",
+        "status"
+      ],
+      "type": "object"
+    },
+    "ControllerTopology": {
+      "properties": {
+        "contexts": {
+          "items": {
+            "$ref": "#/$defs/Node"
+          },
+          "type": "array"
+        },
+        "document": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fragments": {
+          "items": {
+            "$ref": "#/$defs/Fragment"
+          },
+          "type": "array"
+        },
+        "scopes": {
+          "items": {
+            "$ref": "#/$defs/Scoped"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "document",
+        "contexts",
+        "scopes",
+        "fragments"
+      ],
+      "type": "object"
+    },
     "CycleEdge": {
       "properties": {
         "kind": {
@@ -801,7 +877,7 @@
           "type": "array"
         },
         "version": {
-          "$ref": "#/$defs/Attribute2"
+          "$ref": "#/$defs/Attribute3"
         }
       },
       "required": [
@@ -872,7 +948,7 @@
           "$ref": "#/$defs/Role"
         },
         "selector": {
-          "$ref": "#/$defs/Attribute2"
+          "$ref": "#/$defs/Attribute3"
         },
         "target": {
           "$ref": "#/$defs/SourcedValueOfResource"
@@ -908,6 +984,31 @@
       "type": "object"
     },
     "Fragment": {
+      "properties": {
+        "declaration": {
+          "$ref": "#/$defs/Node"
+        },
+        "overrides": {
+          "items": {
+            "$ref": "#/$defs/ScopeOverride"
+          },
+          "type": "array"
+        },
+        "scopes": {
+          "items": {
+            "$ref": "#/$defs/SourcedValueOfMatch"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "declaration",
+        "scopes",
+        "overrides"
+      ],
+      "type": "object"
+    },
+    "Fragment2": {
       "properties": {
         "groupOrdinal": {
           "format": "uint",
@@ -1204,7 +1305,7 @@
           "type": "boolean"
         },
         "status": {
-          "$ref": "#/$defs/Status"
+          "$ref": "#/$defs/Status2"
         }
       },
       "required": [
@@ -1214,12 +1315,36 @@
       ],
       "type": "object"
     },
+    "Match": {
+      "properties": {
+        "candidates": {
+          "items": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "name": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        }
+      },
+      "required": [
+        "name",
+        "candidates",
+        "status"
+      ],
+      "type": "object"
+    },
     "Member": {
       "oneOf": [
         {
           "properties": {
             "name": {
-              "$ref": "#/$defs/Attribute2"
+              "$ref": "#/$defs/Attribute3"
             },
             "position": {
               "$ref": "#/$defs/SourcedValueOfSocXmlPosition"
@@ -1303,6 +1428,28 @@
         "controllerFragmentFile",
         "databaseFragmentFile",
         "sharedFragmentFile"
+      ],
+      "type": "object"
+    },
+    "Node": {
+      "properties": {
+        "attributes": {
+          "items": {
+            "$ref": "#/$defs/Attribute"
+          },
+          "type": "array"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfSocXmlPosition"
+        }
+      },
+      "required": [
+        "position",
+        "name",
+        "attributes"
       ],
       "type": "object"
     },
@@ -1797,6 +1944,12 @@
         }
       ]
     },
+    "RigOwnerState": {
+      "enum": [
+        "unresolved"
+      ],
+      "type": "string"
+    },
     "Role": {
       "enum": [
         "controllerTags",
@@ -1807,6 +1960,24 @@
         "fragmentTags"
       ],
       "type": "string"
+    },
+    "ScopeOverride": {
+      "properties": {
+        "declaration": {
+          "$ref": "#/$defs/Node"
+        },
+        "scopes": {
+          "items": {
+            "$ref": "#/$defs/SourcedValueOfMatch"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "declaration",
+        "scopes"
+      ],
+      "type": "object"
     },
     "ScopeTarget": {
       "properties": {
@@ -1823,6 +1994,21 @@
       "required": [
         "selector",
         "candidates"
+      ],
+      "type": "object"
+    },
+    "Scoped": {
+      "properties": {
+        "context": {
+          "$ref": "#/$defs/SourcedValueOfMatch"
+        },
+        "declaration": {
+          "$ref": "#/$defs/Node"
+        }
+      },
+      "required": [
+        "declaration",
+        "context"
       ],
       "type": "object"
     },
@@ -3520,6 +3706,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfControllerRigOwner": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ControllerRigOwner"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfDecimalU64": {
       "allOf": [
         {
@@ -3744,6 +4060,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/Loadout"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMatch": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/Match"
               }
             }
           }
@@ -5610,6 +6056,16 @@
     },
     "Status": {
       "enum": [
+        "emptySelector",
+        "missing",
+        "resolved",
+        "ambiguous",
+        "incomplete"
+      ],
+      "type": "string"
+    },
+    "Status2": {
+      "enum": [
         "resolved",
         "missing",
         "ambiguous",
@@ -5624,16 +6080,16 @@
     "Tag": {
       "properties": {
         "name": {
-          "$ref": "#/$defs/Attribute2"
+          "$ref": "#/$defs/Attribute3"
         },
         "position": {
           "$ref": "#/$defs/SourcedValueOfSocXmlPosition"
         },
         "priority": {
-          "$ref": "#/$defs/Attribute2"
+          "$ref": "#/$defs/Attribute3"
         },
         "subTagDef": {
-          "$ref": "#/$defs/Attribute2"
+          "$ref": "#/$defs/Attribute3"
         }
       },
       "required": [
@@ -5782,7 +6238,7 @@
           "type": "string"
         },
         "status": {
-          "$ref": "#/$defs/Status"
+          "$ref": "#/$defs/Status2"
         }
       },
       "required": [
@@ -6071,6 +6527,46 @@
           "type": "integer"
         },
         "type": {
+          "const": "motionControllerTopology",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/SourcedValueOfControllerRigOwner"
+        }
+      },
+      "required": [
+        "type",
+        "component",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "controllerTopology",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/ControllerTopology"
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "component": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
           "const": "motionOptions",
           "type": "string"
         },
@@ -6277,7 +6773,7 @@
           "type": "string"
         },
         "value": {
-          "$ref": "#/$defs/Fragment"
+          "$ref": "#/$defs/Fragment2"
         }
       },
       "required": [

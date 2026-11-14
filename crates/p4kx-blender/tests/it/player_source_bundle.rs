@@ -86,6 +86,8 @@ fn verify_rows(rows: &[Value], manifest: &Value) -> TestResult {
         "motionActor",
         "motionComponents",
         "motionComponent",
+        "motionControllerTopology",
+        "controllerTopology",
         "motionOptions",
         "motionOption",
         "databaseGraph",

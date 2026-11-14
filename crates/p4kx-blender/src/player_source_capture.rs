@@ -15,7 +15,7 @@ use serde::Serialize;
 use crate::player_adb_declarations::AdbDeclarations;
 use crate::player_source_body::{self, Body};
 use crate::player_source_loadout::{self, Loadout};
-use crate::player_source_motion::Motion;
+use crate::player_source_motion::{ControllerTopology, Motion};
 use crate::player_tag_definitions::{AdbTagUses, TagDefinitions};
 use crate::soc_scene_class_resources::Resources;
 use crate::soc_scene_xml::XmlDocuments;
@@ -100,6 +100,7 @@ pub struct PlayerSourceCapture {
     pub(crate) bodies: Vec<CapturedBody>,
     pub(crate) loadouts: Vec<SourcedValue<Loadout>>,
     pub(crate) motion: Motion,
+    pub(crate) controller_topology: Vec<ControllerTopology>,
     pub(crate) adb_declarations: Vec<AdbDeclarations>,
     pub(crate) tag_definitions: TagDefinitions,
     pub(crate) adb_tag_uses: AdbTagUses,
@@ -117,6 +118,7 @@ pub(super) struct PreparedCapture<'sink> {
     pub(super) bodies: Vec<CapturedBody>,
     pub(super) loadouts: Vec<SourcedValue<Loadout>>,
     pub(super) motion: Motion,
+    controller_topology: Vec<ControllerTopology>,
     pub(super) adb_declarations: Vec<AdbDeclarations>,
     pub(super) tag_definitions: TagDefinitions,
     pub(super) documents: XmlDocuments<'sink>,
@@ -140,6 +142,7 @@ impl PlayerSourceCapture {
             bodies: prepared.bodies,
             loadouts: prepared.loadouts,
             motion: prepared.motion,
+            controller_topology: prepared.controller_topology,
             adb_tag_uses: prepared.adb_tag_uses,
             adb_declarations: prepared.adb_declarations,
             tag_definitions: prepared.tag_definitions,
@@ -200,6 +203,7 @@ pub(super) fn prepare<'sink>(
         bodies,
         loadouts,
         motion,
+        controller_topology: documents.bind_controller_topology(&sources, cancel)?,
         adb_declarations,
         tag_definitions,
         documents,

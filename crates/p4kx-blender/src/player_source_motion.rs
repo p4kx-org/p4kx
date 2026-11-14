@@ -16,6 +16,11 @@ use crate::soc_scene_class_resources::{Resource, ResourceCapture, ResourceKind, 
 use crate::soc_scene_origin::XmlOrigin;
 use crate::soc_scene_xml::XmlDocuments;
 
+#[path = "player_controller_topology.rs"]
+mod controller_topology;
+
+pub(crate) use controller_topology::{ControllerTopology, Draft as ControllerDraft};
+
 #[path = "player_motion_options.rs"]
 mod motion_options;
 
@@ -54,6 +59,8 @@ pub(crate) struct MotionComponent {
     authored_options: Option<MotionOptions>,
     #[serde(skip_serializing_if = "Option::is_none")]
     database_graph: Option<DatabaseGraph>,
+    #[serde(skip)]
+    owner: Option<SourcedValue<ControllerRigOwner>>,
 }
 
 impl Motion {
@@ -152,6 +159,19 @@ fn components(
     Ok(rows)
 }
 
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ControllerRigOwner {
+    controller_document: usize,
+    status: RigOwnerState,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+enum RigOwnerState {
+    Unresolved,
+}
+
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MotionComponentFields<'a> {
@@ -179,6 +199,12 @@ impl MotionComponent {
             index,
             value: fields,
         })?;
+        if let Some(value) = &self.owner {
+            push(&Row::MotionControllerTopology {
+                component: index,
+                value,
+            })?;
+        }
         if let Some(options) = &self.authored_options {
             options.bundle_rows(index, push)?;
         }
@@ -231,26 +257,11 @@ impl MotionInput<'_, '_, '_> {
                 Ok(database)
             },
         )?;
-        let database_graph = match (
-            &mut database.observed,
-            database.value.value(),
-            database.path.value(),
-        ) {
-            (Some(observed), Some(Resource::Present { data, .. }), Some(path)) => {
-                Some(DatabaseGraph::read(
-                    self.resources,
-                    DatabaseRoot {
-                        database: &mut observed.data,
-                        document: *data,
-                        authored_path: path,
-                        selector: &observed.selector,
-                        capture: database.capture,
-                    },
-                    documents,
-                )?)
-            }
-            _ => None,
-        };
+        let database_graph = self.database_graph(&mut database, documents)?;
+        let owner = documents
+            .is_streaming()
+            .then(|| self.owner(&controller))
+            .flatten();
         let authored_options = controller
             .observed
             .zip(database.observed)
@@ -272,7 +283,56 @@ impl MotionInput<'_, '_, '_> {
             third_person_database: database.value,
             authored_options,
             database_graph,
+            owner,
         })
+    }
+
+    fn database_graph(
+        &self,
+        database: &mut SelectedResource<Database>,
+        documents: &mut XmlDocuments<'_>,
+    ) -> Result<Option<DatabaseGraph>, PlayerSourceError> {
+        let graph = match (
+            &mut database.observed,
+            database.value.value(),
+            database.path.value(),
+        ) {
+            (Some(observed), Some(Resource::Present { data, .. }), Some(path)) => {
+                Some(DatabaseGraph::read(
+                    self.resources,
+                    DatabaseRoot {
+                        database: &mut observed.data,
+                        document: *data,
+                        authored_path: path,
+                        selector: &observed.selector,
+                        capture: database.capture.clone(),
+                    },
+                    documents,
+                )?)
+            }
+            _ => None,
+        };
+        Ok(graph)
+    }
+
+    fn owner(
+        &self,
+        controller: &SelectedResource<Controller>,
+    ) -> Option<SourcedValue<ControllerRigOwner>> {
+        let Resource::Present { data, .. } = controller.value.value()? else {
+            return None;
+        };
+        let observed = controller.observed.as_ref()?;
+        let mut uses = vec![observed.selector.clone()];
+        uses.extend_from_slice(controller.capture.uses());
+        Some(self.resources.sources.value(
+            SourceValue::Present(ControllerRigOwner {
+                controller_document: *data,
+                status: RigOwnerState::Unresolved,
+            }),
+            &uses,
+            false,
+        ))
     }
 
     fn resource<T>(
@@ -318,6 +378,14 @@ impl MotionInput<'_, '_, '_> {
                 let index = documents.bind(xml, origin)?;
                 if let Some(seeds) = documents.tag_definitions() {
                     seeds.owner(index, root, origin)?;
+                }
+                if expected_root == "ControllerDef" {
+                    documents.retain_controller_topology(
+                        index,
+                        xml,
+                        origin,
+                        self.resources.cancel,
+                    )?;
                 }
                 observed = Some(Observed {
                     selector: selector.clone(),

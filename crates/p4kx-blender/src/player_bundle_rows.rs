@@ -31,6 +31,9 @@ pub(super) fn write(
     for (index, value) in components.value().into_iter().flatten().enumerate() {
         value.bundle_rows(index, &mut push)?;
     }
+    for value in &capture.controller_topology {
+        push(&Row::ControllerTopology { value })?;
+    }
     for adb in &capture.adb_declarations {
         push(&Row::AdbDocument {
             document: adb.document,

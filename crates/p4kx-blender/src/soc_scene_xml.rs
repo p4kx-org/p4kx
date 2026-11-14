@@ -9,6 +9,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::player_adb_declarations::{AdbDeclarations, Draft};
+use crate::player_source_motion::{ControllerDraft, ControllerTopology};
 use crate::player_tag_definitions::{Seeds, TagDefinitions};
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_class_resources::Resources;
@@ -55,6 +56,7 @@ pub(crate) struct XmlDocuments<'sink> {
     rows: Vec<XmlDocument>,
     rejected: BTreeSet<(PhysicalSourceRef, PlayerDocumentRejection)>,
     adb_declarations: BTreeMap<usize, Draft>,
+    controller_topology: BTreeMap<usize, ControllerDraft>,
     tag_definitions: Option<Seeds>,
     sink: Option<&'sink mut dyn PlayerDocumentSink>,
 }
@@ -172,6 +174,37 @@ impl<'sink> XmlDocuments<'sink> {
         std::mem::take(&mut self.adb_declarations)
             .into_iter()
             .map(|(index, draft)| AdbDeclarations::bind(index, draft, sources, cancel))
+            .collect()
+    }
+
+    pub(crate) const fn is_streaming(&self) -> bool {
+        self.sink.is_some()
+    }
+
+    pub(crate) fn retain_controller_topology(
+        &mut self,
+        index: usize,
+        document: &SourceDocument<'_>,
+        origin: &XmlOrigin<'_>,
+        cancel: &CancelToken,
+    ) -> Result<(), SocSceneError> {
+        if self.is_streaming()
+            && let std::collections::btree_map::Entry::Vacant(entry) =
+                self.controller_topology.entry(index)
+        {
+            entry.insert(ControllerDraft::read(document, origin, cancel)?);
+        }
+        Ok(())
+    }
+
+    pub(crate) fn bind_controller_topology(
+        &mut self,
+        sources: &SourceUses,
+        cancel: &CancelToken,
+    ) -> Result<Vec<ControllerTopology>, SocSceneError> {
+        std::mem::take(&mut self.controller_topology)
+            .into_iter()
+            .map(|(index, draft)| ControllerTopology::bind(index, draft, sources, cancel))
             .collect()
     }
 

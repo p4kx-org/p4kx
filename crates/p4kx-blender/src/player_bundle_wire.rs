@@ -14,7 +14,8 @@ use crate::player_source_body::Body;
 use crate::player_source_classes::ClassTarget;
 use crate::player_source_loadout::Loadout;
 use crate::player_source_motion::{
-    BranchFields, BranchOption, DatabaseLink, MotionComponentFields, MotionOptionFields, OptionRow,
+    BranchFields, BranchOption, ControllerRigOwner, ControllerTopology, DatabaseLink,
+    MotionComponentFields, MotionOptionFields, OptionRow,
 };
 use crate::player_tag_definitions::{AdbTagSelectors, CycleEdge, Document, Edge, TagScope};
 use p4kx_extraction::{SourceValueState, SourcedValue};
@@ -100,6 +101,13 @@ pub(crate) enum Row<'a> {
     MotionComponent {
         index: usize,
         value: MotionComponentFields<'a>,
+    },
+    MotionControllerTopology {
+        component: usize,
+        value: &'a SourcedValue<ControllerRigOwner>,
+    },
+    ControllerTopology {
+        value: &'a ControllerTopology,
     },
     MotionOptions {
         component: usize,
