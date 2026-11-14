@@ -54,6 +54,11 @@ Blender package format 1.9 adds `material_libraries`, once per distinct retained
 
 ## Verification boundary
 
+A scoped installed LIVE test verified the library that exceeded the earlier
+single-record limit. With the default 1 MiB record bound, seven Media records
+reconstructed the original logical library and its source-backed fields. The
+exhaustive installed material accounting remains separate.
+
 Independent synthetic cases cover roots, unknown submaterial slots, ordered case-distinct/namespaced attributes, mixed text/CDATA/comments/PI including endtag-like data, layers/TexMod/placeholders, strict UTF8 and true CryXml repair, truncation, original ordinals, raw bytes/digests, cancellation/publication and schemas. The Extraction census compares retained root-Entry fields with the shared wire shape in memory.
 The opt-in Media replay additionally runs the actual material provider and reconciles its JSONL
 records, verified raw artifacts, original container/Entry identities and coverage counts against
