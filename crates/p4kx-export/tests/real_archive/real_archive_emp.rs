@@ -244,7 +244,7 @@ fn compare_particle<'source>(
     }
 }
 
-fn compare_link<'source>(
+pub(super) fn compare_link<'source>(
     cell: &Value,
     raw: Option<&Original<'source>>,
     trace: &Trace<'_, 'source>,

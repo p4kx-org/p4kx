@@ -84,6 +84,7 @@ mod real_archive_playability;
 mod real_archive_property_sets;
 mod real_archive_quantization;
 mod real_archive_quantum_drives;
+mod real_archive_quantum_interdiction;
 mod real_archive_records;
 mod real_archive_reputation;
 mod real_archive_reputation_perks;
