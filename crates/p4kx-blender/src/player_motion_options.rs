@@ -21,6 +21,11 @@ use crate::soc_scene_xml::XmlDocuments;
 #[path = "player_motion_controller.rs"]
 pub(super) mod controller;
 
+#[path = "player_motion_bundle_rows.rs"]
+mod bundle_rows;
+
+pub(crate) use bundle_rows::MotionOptionFields;
+
 use controller::{Controller, Fragment, ScopeTarget};
 
 use super::subadb_graph::SubDatabase;
@@ -36,7 +41,7 @@ pub(super) struct MotionOptions {
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct OptionRow {
+pub(crate) struct OptionRow {
     position: SocXmlPosition,
     fragment: SourcedValue<String>,
     tags: SourcedValue<String>,
@@ -58,7 +63,7 @@ pub(super) struct Database {
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct BranchOption {
+pub(crate) struct BranchOption {
     position: SourcedValue<SocXmlPosition>,
     fragment: SourcedValue<String>,
     tags: SourcedValue<String>,

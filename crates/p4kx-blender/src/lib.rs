@@ -64,6 +64,10 @@ mod palette_fields;
 mod palette_selection;
 mod plan;
 mod player_adb_declarations;
+mod player_bundle;
+mod player_bundle_output;
+mod player_bundle_rows;
+mod player_bundle_wire;
 mod player_source;
 mod player_source_body;
 mod player_source_classes;
@@ -150,6 +154,8 @@ pub use write::{PackageInfo, PackageSummary, write_package, write_package_with_c
 
 pub(crate) type PackageResult<T> = Result<T, PackageError>;
 
+pub use player_bundle::write_player_source_bundle;
+pub use player_bundle_wire::{player_bundle_manifest_schema, player_bundle_record_schema};
 pub use player_source::{
     PlayerDocument, PlayerDocumentRejection, PlayerDocumentSink, PlayerSource, PlayerSourceCapture,
     PlayerSourceError, RejectedPlayerDocument, player_source_schema,

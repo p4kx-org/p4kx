@@ -301,7 +301,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `scene.json` is [schemas/blender-package.schema.json](../schemas/blender-package.schema.json).
 - `p4kx character source <archive> --body <male|female> --out <file>` writes the selected
   default CHF, player loadout declarations and Player actor animation sources. See
-  [the source format](player-source.md).
+  [the source format](player-source.md). Use `--bundle` with one or more distinct `--body` selections
+  and a new output directory to share original data across bodies.
 - `p4kx character package <archive> --out <folder>` writes a Character as a Blender package: the
   head of a CHF file (`--chf`), armour and clothing (`--piece`, `--loadout`) on the default body
   (`--body`, optional when the Loadout has a head), as one skinned GLB with the skeleton, the

@@ -41,11 +41,14 @@ pub(crate) enum CharacterAction {
 pub(crate) struct CharacterSourceArgs {
     /// Path of the Data.p4k Archive.
     pub(crate) archive: PathBuf,
-    /// Body variant whose default CHF is selected.
-    #[arg(long, value_enum, value_name = "VARIANT")]
-    pub(crate) body: BodyArg,
-    /// JSON file to write.
-    #[arg(long, value_name = "FILE")]
+    /// Body variant whose default CHF is selected. Repeat with --bundle.
+    #[arg(long, value_enum, value_name = "VARIANT", required = true)]
+    pub(crate) body: Vec<BodyArg>,
+    /// Writes a source bundle to a new directory.
+    #[arg(long)]
+    pub(crate) bundle: bool,
+    /// JSON file, or a new directory with --bundle.
+    #[arg(long, value_name = "PATH")]
     pub(crate) out: PathBuf,
 }
 

@@ -3,6 +3,7 @@
 
 use std::collections::HashMap;
 use std::collections::hash_map::Entry;
+use std::io;
 
 use p4kx_extraction::{
     PhysicalSourceRef, SourceUse, SourceUses, SourceValue, SourcedValue, archive_animation_path,
@@ -10,6 +11,7 @@ use p4kx_extraction::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::player_bundle_wire::Row;
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_class_resources::{
     Resource, ResourceCapture, ResourceKind, Resources, resource_path,
@@ -22,8 +24,9 @@ use super::motion_options::{BranchOption, Database};
 mod link;
 
 use crate::player_source::{PlayerSourceError, check};
+pub(crate) use link::DatabaseLink;
 pub(super) use link::SubDatabase;
-use link::{DatabaseLink, Visit};
+use link::Visit;
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -42,6 +45,72 @@ struct Branch {
     lossy_xml: SourcedValue<bool>,
     options: Vec<BranchOption>,
     links: Vec<DatabaseLink>,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct BranchFields<'a> {
+    document: &'a SourcedValue<usize>,
+    physical_source: &'a SourcedValue<PhysicalSourceRef>,
+    fragment_definition: &'a SourcedValue<String>,
+    tag_definition: &'a SourcedValue<String>,
+    lossy_xml: &'a SourcedValue<bool>,
+}
+
+impl DatabaseGraph {
+    pub(super) fn bundle_rows(
+        &self,
+        component: usize,
+        push: &mut impl FnMut(&Row<'_>) -> io::Result<()>,
+    ) -> io::Result<()> {
+        push(&Row::DatabaseGraph {
+            component,
+            root: &self.root,
+        })?;
+        for (branch, row) in self.branches.iter().enumerate() {
+            row.bundle_rows(component, branch, push)?;
+        }
+        Ok(())
+    }
+}
+
+impl Branch {
+    fn bundle_rows(
+        &self,
+        component: usize,
+        branch: usize,
+        push: &mut impl FnMut(&Row<'_>) -> io::Result<()>,
+    ) -> io::Result<()> {
+        let fields = BranchFields {
+            document: &self.document,
+            physical_source: &self.physical_source,
+            fragment_definition: &self.fragment_definition,
+            tag_definition: &self.tag_definition,
+            lossy_xml: &self.lossy_xml,
+        };
+        push(&Row::DatabaseBranch {
+            component,
+            branch,
+            value: fields,
+        })?;
+        for (index, value) in self.options.iter().enumerate() {
+            push(&Row::DatabaseOption {
+                component,
+                branch,
+                index,
+                value,
+            })?;
+        }
+        for (index, value) in self.links.iter().enumerate() {
+            push(&Row::DatabaseLink {
+                component,
+                branch,
+                index,
+                value,
+            })?;
+        }
+        Ok(())
+    }
 }
 
 struct Frame {

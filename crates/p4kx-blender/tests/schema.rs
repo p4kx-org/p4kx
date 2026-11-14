@@ -170,3 +170,26 @@ fn the_material_source_sidecar_schema_is_current() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn the_player_bundle_schemas_are_current() -> TestResult {
+    for (file, schema) in [
+        (
+            "player-source-bundle.schema.json",
+            p4kx_blender::player_bundle_manifest_schema(),
+        ),
+        (
+            "player-source-bundle-record.schema.json",
+            p4kx_blender::player_bundle_record_schema(),
+        ),
+    ] {
+        jsonschema::draft202012::meta::validate(&schema).map_err(|error| error.to_string())?;
+        let generated = serde_json::to_string_pretty(&schema)? + "\n";
+        let path = schema_file().with_file_name(file);
+        if std::env::var_os("P4KX_BLESS").is_some_and(|value| value == "1") {
+            std::fs::write(&path, &generated)?;
+        }
+        assert_eq!(std::fs::read_to_string(&path)?, generated, "current {file}");
+    }
+    Ok(())
+}

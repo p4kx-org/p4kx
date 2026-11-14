@@ -5,6 +5,7 @@ use p4kx_extraction::cryxml::SourceElement;
 use p4kx_extraction::{
     CancelToken, SourceScope, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
 };
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
@@ -16,14 +17,14 @@ pub(super) use attribute::{Attribute, PendingAttribute};
 
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 
-#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize)]
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(super) enum Kind {
     Tags,
     Fragments,
 }
 
-#[derive(Clone, Copy, Debug, Serialize)]
+#[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(super) enum Role {
     ControllerTags,
@@ -58,7 +59,7 @@ pub(super) struct PendingEdge {
     pub(super) selector: PendingAttribute,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Definition {
     pub(super) position: SourcedValue<SocXmlPosition>,
@@ -67,14 +68,14 @@ pub(super) struct Definition {
     pub(super) sections: Vec<Section>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Section {
     position: SourcedValue<SocXmlPosition>,
     members: Vec<Member>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 enum Member {
     Group {
@@ -95,7 +96,7 @@ enum PendingMember {
     Tag(PendingTag),
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Tag {
     position: SourcedValue<SocXmlPosition>,

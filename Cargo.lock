@@ -3595,6 +3595,7 @@ dependencies = [
 name = "p4kx-blender"
 version = "0.4.2"
 dependencies = [
+ "crc32c",
  "crc32fast",
  "flate2",
  "jsonschema",

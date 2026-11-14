@@ -3,19 +3,20 @@
 
 use p4kx_extraction::cryxml::SourceElement;
 use p4kx_extraction::{SourceUse, SourceUseRole, SourceValue, SourcedValue};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(in super::super) struct Attribute {
     value: SourcedValue<String>,
     occurrences: Vec<AttributeOccurrence>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 struct AttributeOccurrence {
     position: SocXmlPosition,

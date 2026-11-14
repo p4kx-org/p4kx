@@ -42,7 +42,7 @@ impl PlayerDocumentSink for Documents {
 
 #[test]
 fn explicit_bodies_share_original_motion_and_document_identity() -> TestResult {
-    let (_folder, archive) = super::fixture()?;
+    let (_folder, archive) = super::fixture_with_entries([])?;
     let cancel = CancelToken::new();
     let mut documents = Documents::default();
     let capture = PlayerSourceCapture::read(
@@ -165,7 +165,7 @@ fn verify_documents(archive: &Archive, capture: &Value, documents: Documents) ->
 
 #[test]
 fn a_single_shared_capture_preserves_existing_payload_and_exact_origin_ids() -> TestResult {
-    let (_folder, archive) = super::fixture()?;
+    let (_folder, archive) = super::fixture_with_entries([])?;
     let cancel = CancelToken::new();
     let existing = serde_json::to_value(PlayerSource::read(&archive, BodyVariant::Male, &cancel)?)?;
     let mut documents = Documents::default();
@@ -231,7 +231,7 @@ impl PlayerDocumentSink for Refuse {
 
 #[test]
 fn sink_failures_and_invalid_body_sets_fail_the_capture() -> TestResult {
-    let (_folder, archive) = super::fixture()?;
+    let (_folder, archive) = super::fixture_with_entries([])?;
     let cancel = CancelToken::new();
     let duplicate = PlayerSourceCapture::read(
         &archive,

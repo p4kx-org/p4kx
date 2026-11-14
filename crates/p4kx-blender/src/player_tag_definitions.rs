@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, VecDeque};
 
 use p4kx_extraction::cryxml::SourceElement;
 use p4kx_extraction::{PhysicalSourceRef, SourceUse, SourceUseRole, SourceValue, SourcedValue};
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
@@ -29,17 +30,17 @@ pub(crate) struct Seeds {
     observed: BTreeMap<String, PendingDefinition>,
 }
 
-#[derive(Debug, Default, Serialize)]
+#[derive(Debug, Default, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct TagDefinitions {
-    roots: Vec<Edge>,
-    documents: Vec<Document>,
-    cycle_back_edges: Vec<CycleEdge>,
+    pub(crate) roots: Vec<Edge>,
+    pub(crate) documents: Vec<Document>,
+    pub(crate) cycle_back_edges: Vec<CycleEdge>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct Edge {
+pub(crate) struct Edge {
     role: Role,
     owner: usize,
     owner_kind: Option<Kind>,
@@ -49,9 +50,9 @@ struct Edge {
     target: SourcedValue<Resource<usize>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct Document {
+pub(crate) struct Document {
     #[serde(rename = "document")]
     index: usize,
     source: PhysicalSourceRef,
@@ -60,9 +61,9 @@ struct Document {
     links: Vec<Edge>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct CycleEdge {
+pub(crate) struct CycleEdge {
     owner: usize,
     kind: Kind,
     link: usize,

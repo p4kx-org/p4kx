@@ -9,6 +9,7 @@ use p4kx_extraction::{
     InputScope, PathKeys, PhysicalSourceRef, SourceEvidenceError, SourceInput, SourceInventory,
     SourceScope, SourceUses, SourcedValue,
 };
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::player_adb_declarations::AdbDeclarations;
@@ -42,7 +43,7 @@ pub struct PlayerDocument<'a> {
 }
 
 /// Why a verified Player document could not enter a projected resource.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
 #[non_exhaustive]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum PlayerDocumentRejection {
@@ -96,19 +97,19 @@ pub trait PlayerDocumentSink {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PlayerSourceCapture {
-    bodies: Vec<CapturedBody>,
-    loadouts: Vec<SourcedValue<Loadout>>,
-    motion: Motion,
-    adb_declarations: Vec<AdbDeclarations>,
-    tag_definitions: TagDefinitions,
-    source_inventory: SourceInventory,
+    pub(crate) bodies: Vec<CapturedBody>,
+    pub(crate) loadouts: Vec<SourcedValue<Loadout>>,
+    pub(crate) motion: Motion,
+    pub(crate) adb_declarations: Vec<AdbDeclarations>,
+    pub(crate) tag_definitions: TagDefinitions,
+    pub(crate) source_inventory: SourceInventory,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct CapturedBody {
-    body_variant: &'static str,
-    pub(super) body: SourcedValue<Body>,
+pub(crate) struct CapturedBody {
+    pub(crate) body_variant: &'static str,
+    pub(crate) body: SourcedValue<Body>,
 }
 
 pub(super) struct PreparedCapture<'sink> {

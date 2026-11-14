@@ -5,6 +5,7 @@ use p4kx_extraction::{
     CancelToken, FieldOrigin, PhysicalSourceRef, SourceUse, SourceUseRole, SourceUses, SourceValue,
     SourcedValue,
 };
+use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
@@ -15,17 +16,17 @@ mod pending;
 
 pub(crate) use pending::{Draft, FragmentInput, FragmentSite, ordered_children};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AdbDeclarations {
-    document: usize,
-    source: PhysicalSourceRef,
-    fragments: Vec<Fragment>,
+    pub(crate) document: usize,
+    pub(crate) source: PhysicalSourceRef,
+    pub(crate) fragments: Vec<Fragment>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct Fragment {
+pub(crate) struct Fragment {
     list_ordinal: usize,
     group_ordinal: usize,
     option_ordinal: usize,
@@ -36,7 +37,7 @@ struct Fragment {
     layers: Vec<Layer>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 struct Layer {
     ordinal: usize,
@@ -44,7 +45,7 @@ struct Layer {
     animations: Vec<Animation>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 struct Animation {
     ordinal: usize,
@@ -52,7 +53,7 @@ struct Animation {
     name: AttributeSelection,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 struct AttributeSelection {
     #[serde(flatten)]
@@ -61,7 +62,7 @@ struct AttributeSelection {
     occurrences: Vec<Attribute>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 enum AttributeState {
     Absent,
@@ -69,7 +70,7 @@ enum AttributeState {
     Invalid,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 struct Attribute {
     position: SocXmlPosition,

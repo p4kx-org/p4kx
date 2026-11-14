@@ -25,7 +25,12 @@ mod subadb_graph;
 use subadb_graph::{DatabaseGraph, DatabaseRoot};
 
 use motion_options::controller::Controller;
+pub(crate) use motion_options::{BranchOption, MotionOptionFields, OptionRow};
 use motion_options::{Database, MotionOptions};
+pub(crate) use subadb_graph::{BranchFields, DatabaseLink};
+
+use crate::player_bundle_wire::Row;
+use std::io;
 
 const PLAYER_CLASS: &str = "Player";
 const CHARACTER_COMPONENT: &str = "SAnimatedCharacterComponentParams";
@@ -33,13 +38,13 @@ const CHARACTER_COMPONENT: &str = "SAnimatedCharacterComponentParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Motion {
-    actor: SourcedValue<ClassTarget>,
-    components: SourcedValue<Vec<MotionComponent>>,
+    pub(crate) actor: SourcedValue<ClassTarget>,
+    pub(crate) components: SourcedValue<Vec<MotionComponent>>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct MotionComponent {
+pub(crate) struct MotionComponent {
     ordinal: usize,
     controller_path: SourcedValue<String>,
     third_person_database_path: SourcedValue<String>,
@@ -145,6 +150,43 @@ fn components(
         rows.push(input.project(documents)?);
     }
     Ok(rows)
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct MotionComponentFields<'a> {
+    ordinal: usize,
+    controller_path: &'a SourcedValue<String>,
+    third_person_database_path: &'a SourcedValue<String>,
+    controller: &'a SourcedValue<Resource<usize>>,
+    third_person_database: &'a SourcedValue<Resource<usize>>,
+}
+
+impl MotionComponent {
+    pub(crate) fn bundle_rows(
+        &self,
+        index: usize,
+        push: &mut impl FnMut(&Row<'_>) -> io::Result<()>,
+    ) -> io::Result<()> {
+        let fields = MotionComponentFields {
+            ordinal: self.ordinal,
+            controller_path: &self.controller_path,
+            third_person_database_path: &self.third_person_database_path,
+            controller: &self.controller,
+            third_person_database: &self.third_person_database,
+        };
+        push(&Row::MotionComponent {
+            index,
+            value: fields,
+        })?;
+        if let Some(options) = &self.authored_options {
+            options.bundle_rows(index, push)?;
+        }
+        if let Some(graph) = &self.database_graph {
+            graph.bundle_rows(index, push)?;
+        }
+        Ok(())
+    }
 }
 
 struct MotionInput<'value, 'source, 'archive> {

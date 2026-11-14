@@ -12,6 +12,7 @@ publish.workspace = true
 layer = "service"
 
 [dependencies]
+crc32c.workspace = true
 flate2.workspace = true
 p4kx-extraction.workspace = true
 p4kx-assembly.workspace = true
@@ -23,6 +24,7 @@ rayon.workspace = true
 schemars.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
@@ -31,7 +33,6 @@ jsonschema.workspace = true
 p4kx-chunks.workspace = true
 p4kx-testkit.workspace = true
 png.workspace = true
-tempfile.workspace = true
 
 [lints]
 workspace = true

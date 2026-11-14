@@ -196,7 +196,7 @@ fn missing_ancestors(path: &Path) -> Vec<PathBuf> {
 }
 
 #[cfg(unix)]
-fn sync_folder(folder: &Path) -> io::Result<()> {
+pub(crate) fn sync_folder(folder: &Path) -> io::Result<()> {
     File::open(folder)?.sync_all()
 }
 
@@ -205,6 +205,6 @@ fn sync_folder(folder: &Path) -> io::Result<()> {
     clippy::unnecessary_wraps,
     reason = "Windows cannot flush directories through File"
 )]
-const fn sync_folder(_folder: &Path) -> io::Result<()> {
+pub(crate) const fn sync_folder(_folder: &Path) -> io::Result<()> {
     Ok(())
 }

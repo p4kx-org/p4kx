@@ -70,3 +70,36 @@ preserves authored topology without applying runtime tag-selection rules. See th
 [CryEngine Tag Definition](https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756816/pages/23308473)
 and [FragmentID Definition](https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756816/pages/23308474)
 format references.
+
+## Shared source bundle
+
+`p4kx character source <archive> --body female --body male --bundle --out <new-folder>`
+shares the source inventory and motion across the requested bodies in caller order.
+Each body can be selected once. The output directory must be new. It is complete
+when `manifest.json` appears. A failed write leaves any foreign destination untouched.
+The original single-body command still writes the v1 JSON file.
+
+The [bundle manifest schema](../schemas/player-source-bundle.schema.json) and
+[JSONL record schema](../schemas/player-source-bundle-record.schema.json) describe
+bundle version 1. This version is independent of the single-file schema and the
+catalog schema. The manifest binds all of `records.jsonl` by byte length, SHA-256
+and line count. The first record is a format header. The last record counts the
+preceding lines and repeats the total number and length of distinct raw artifacts.
+
+Each `body` and `loadout` has a capture-local index. `motionComponent` records
+retain their authored component ordinal and a stream index that relates their
+`motionOptions`, `motionOption`, `databaseGraph`, `databaseBranch`,
+`databaseOption` and `databaseLink` records. The branch and child indexes keep
+authored order. `adbFragment` and tag-definition records refer to original document
+indexes from the same capture. `source` and `sourceUse` share one identifier space
+for all field receipts.
+
+A `document` or `documentRejection` links its physical source to an opaque file
+under `originals/`. The file holds the exact decoded Archive payload accepted by
+the verified reader and carries an independent byte length, SHA-256 and CRC-32C.
+Several observations of one physical Entry share one file. A failed read has a
+source disposition and no original file. The consumer can verify references and
+attributes while reading lines. Source preparation still retains the selected typed
+projection in memory. It writes original XML bytes directly instead of building a
+second full XML node table. The bundle contains source data and preserves unresolved
+clip candidates without rendering.

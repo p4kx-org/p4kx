@@ -35,8 +35,10 @@ const BODY: u128 = 0x0101_0101_0101_0101_0101_0101_0101_0101;
 const WEAPON_ONE: u128 = 0x0202_0202_0202_0202_0202_0202_0202_0202;
 const WEAPON_TWO: u128 = 0x0303_0303_0303_0303_0303_0303_0303_0303;
 
-fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
-    fixture_with(subadb_graph_assertions::ROOT_LINKS, [])
+pub(super) fn fixture_with_entries(
+    extra: impl IntoIterator<Item = TestEntry>,
+) -> TestResult<(tempfile::TempDir, Archive)> {
+    fixture_with(subadb_graph_assertions::ROOT_LINKS, extra)
 }
 
 fn fixture_with(
@@ -165,7 +167,7 @@ const fn port(port: u32, item: u8, children: Vec<TestItemPort>) -> TestItemPort 
 
 #[test]
 fn player_source_preserves_body_variant_port_order_and_exact_loadout_targets() -> TestResult {
-    let (_folder, archive) = fixture()?;
+    let (_folder, archive) = fixture_with_entries([])?;
     let cancel = CancelToken::new();
     let male = serde_json::to_value(PlayerSource::read(&archive, BodyVariant::Male, &cancel)?)?;
     let female = serde_json::to_value(PlayerSource::read(&archive, BodyVariant::Female, &cancel)?)?;

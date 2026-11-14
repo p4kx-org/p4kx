@@ -18,7 +18,7 @@ use super::explicit_path;
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct DatabaseLink {
+pub(crate) struct DatabaseLink {
     position: SourcedValue<SocXmlPosition>,
     file: SourcedValue<String>,
     file_occurrences: Vec<SourcedValue<String>>,
