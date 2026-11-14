@@ -15,6 +15,10 @@ mod attribute;
 
 pub(super) use attribute::{Attribute, PendingAttribute};
 
+#[path = "player_tag_xml_origin.rs"]
+mod xml_origin;
+pub(super) use xml_origin::{node, origin};
+
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, JsonSchema)]
@@ -367,28 +371,6 @@ impl PendingEdge {
             position: position(node)?,
             selector: PendingAttribute::read(node, field)?,
         })
-    }
-}
-
-pub(super) fn node(
-    origin: &XmlOrigin<'_>,
-    position: SocXmlPosition,
-) -> Result<(SourcedValue<SocXmlPosition>, SourceUse), SocSceneError> {
-    let used = origin.at(&position, "$element", SourceUseRole::Payload)?;
-    let value = origin.sources.value(
-        SourceValue::Present(position),
-        std::slice::from_ref(&used),
-        true,
-    );
-    Ok((value, used))
-}
-
-pub(super) fn origin<'a>(sources: &'a SourceUses, scope: &SourceScope) -> XmlOrigin<'a> {
-    XmlOrigin {
-        sources,
-        scope: scope.clone(),
-        chunk: None,
-        archive_member: None,
     }
 }
 

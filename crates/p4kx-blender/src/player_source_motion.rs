@@ -26,6 +26,11 @@ mod controller_topology;
 
 pub(crate) use controller_topology::{ControllerTopology, Draft as ControllerDraft};
 
+#[path = "player_motion_component_rows.rs"]
+mod component_rows;
+
+pub(crate) use component_rows::MotionComponentFields;
+
 #[path = "player_motion_options.rs"]
 mod motion_options;
 
@@ -38,9 +43,6 @@ use motion_options::controller::Controller;
 pub(crate) use motion_options::{BranchOption, MotionOptionFields, OptionRow};
 use motion_options::{Database, MotionOptions};
 pub(crate) use subadb_graph::{BranchFields, DatabaseLink};
-
-use crate::player_bundle_wire::Row;
-use std::io;
 
 const PLAYER_CLASS: &str = "Player";
 const CHARACTER_COMPONENT: &str = "SAnimatedCharacterComponentParams";
@@ -175,49 +177,6 @@ pub(crate) struct ControllerRigOwner {
 #[serde(rename_all = "camelCase")]
 enum RigOwnerState {
     Unresolved,
-}
-
-#[derive(Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-pub(crate) struct MotionComponentFields<'a> {
-    ordinal: usize,
-    controller_path: &'a SourcedValue<String>,
-    third_person_database_path: &'a SourcedValue<String>,
-    controller: &'a SourcedValue<Resource<usize>>,
-    third_person_database: &'a SourcedValue<Resource<usize>>,
-}
-
-impl MotionComponent {
-    pub(crate) fn bundle_rows(
-        &self,
-        index: usize,
-        push: &mut impl FnMut(&Row<'_>) -> io::Result<()>,
-    ) -> io::Result<()> {
-        let fields = MotionComponentFields {
-            ordinal: self.ordinal,
-            controller_path: &self.controller_path,
-            third_person_database_path: &self.third_person_database_path,
-            controller: &self.controller,
-            third_person_database: &self.third_person_database,
-        };
-        push(&Row::MotionComponent {
-            index,
-            value: fields,
-        })?;
-        if let Some(value) = &self.owner {
-            push(&Row::MotionControllerTopology {
-                component: index,
-                value,
-            })?;
-        }
-        if let Some(options) = &self.authored_options {
-            options.bundle_rows(index, push)?;
-        }
-        if let Some(graph) = &self.database_graph {
-            graph.bundle_rows(index, push)?;
-        }
-        Ok(())
-    }
 }
 
 struct MotionInput<'value, 'source, 'archive> {
