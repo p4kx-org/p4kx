@@ -84,6 +84,40 @@ fn merged_starbreaker_uses_the_pinned_dataforge_log_contract() -> TestResult {
 }
 
 #[test]
+fn starbreaker_discovers_an_optional_archive_without_hiding_unknown_lines() -> TestResult {
+    for profile in [
+        Profile::Starbreaker450,
+        Profile::Starbreaker7d3,
+        Profile::Starbreaker305,
+    ] {
+        let mut observed = Observed::default();
+        reference_log_scan::scan(
+            profile,
+            Stream::Stderr,
+            b"P4K: C:\\Game installation (test)\\LIVE\\Data.p4k (LIVE)\nDataCore loaded.\nExporting 1 records as json...\nDone.\n",
+            &mut observed,
+        )?;
+        reference_log_scan::finish(profile, &[], 1, &mut observed)?;
+        assert!(
+            observed.review.is_empty(),
+            "known source discovery is optional progress"
+        );
+        reference_log_scan::scan(
+            profile,
+            Stream::Stderr,
+            b"P4K: /some/other/file (LIVE)\nP4K: /some/Data.p4k (unexpected)\n",
+            &mut observed,
+        )?;
+        assert_eq!(
+            observed.review.len(),
+            2,
+            "only the pinned notice shape is accepted"
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn a_forged_empty_error_report_does_not_hide_actual_stdout_failures() -> TestResult {
     let fixture = Fixture::new(vec![TestEntry::stored("Data/a.bin", b"data".to_vec())])?;
     let mut manifest = fixture.raw(b"data")?;

@@ -67,6 +67,22 @@ fn progress_bar(line: &str) -> bool {
         && duration.contains(", ETA ")
 }
 
+fn starbreaker_archive_notice(line: &str) -> bool {
+    let Some((path, source)) = line
+        .strip_prefix("P4K: ")
+        .and_then(|notice| notice.strip_suffix(')'))
+        .and_then(|notice| notice.rsplit_once(" ("))
+    else {
+        return false;
+    };
+    matches!(source, "env" | "LIVE" | "PTU" | "EPTU" | "TECH-PREVIEW")
+        && !path.chars().any(char::is_control)
+        && path
+            .rsplit(['/', '\\'])
+            .next()
+            .is_some_and(|name| name.eq_ignore_ascii_case("Data.p4k"))
+}
+
 fn classify(profile: Profile, stream: Stream, line: &str) -> Line<'_> {
     if known_error(line) {
         return Line::Error;
@@ -104,7 +120,7 @@ fn classify(profile: Profile, stream: Stream, line: &str) -> Line<'_> {
             {
                 return Line::Exports(count);
             }
-            if progress_bar(line) {
+            if progress_bar(line) || starbreaker_archive_notice(line) {
                 return Line::Progress;
             }
         }

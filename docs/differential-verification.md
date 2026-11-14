@@ -163,7 +163,11 @@ The classifiers are pinned to these primary-source contracts:
   and [305215bca](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/cli/src/dcb.rs)
   have separate producer identities. The 305215bca DataCore export entry point is byte-identical
   to 7d3f01e7. Individual export/write/directory errors can appear on stderr with a zero exit
-  status. The verifier checks those errors, completion markers and exported-file counts.
+  status. The verifier checks those errors, completion markers and exported-file counts. The
+  [archive discovery notice](https://github.com/diogotr7/StarBreaker/blob/450fa284d4b1cbed6832675297dfb02579c0abd3/crates/starbreaker-p4k/src/discover.rs)
+  can also appear for an explicitly supplied DCB because the CLI separately looks for the
+  optional Archive. The captured notice is progress; the verified DCB fingerprint binds the
+  actual table input.
 
 Unknown revisions, local patches, unclassified log lines, invalid log encoding or missing completion
 markers produce `review_required`/incomplete verification. They are not silently treated as
