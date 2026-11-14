@@ -5,7 +5,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::fs::File;
-use std::io::{BufRead, BufReader, Read};
+use std::io::{self, BufRead, BufReader, Read, Write as _};
 use std::path::Path;
 
 use p4kx_assembly::audio::AudioIndex;
@@ -40,30 +40,77 @@ struct Census {
     edges: u64,
 }
 
-#[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn original_atl_source_counts_reconcile_with_media_and_assembly()
--> Result<(), privacy::VerificationFailure> {
-    privacy::redact(verify_configured())
+#[derive(Debug)]
+enum Phase {
+    OpenArchive,
+    ReadOriginal,
+    PrepareExport,
+    Export,
+    FindControlStream,
+    ReadControlStream,
+    CompareCensus,
+    ComparePlaybackIndex,
+    CheckArchive,
+    CloseScratch,
 }
 
-fn verify_configured() -> TestResult {
-    verify_archive(&real_archive_path()?)?;
-    if let Some(path) = p4kx_testkit::real_archive_b_path() {
-        verify_archive(&path)?;
+struct Verification {
+    input: Option<usize>,
+    phase: Phase,
+}
+
+impl Verification {
+    fn enter(&mut self, phase: Phase) -> TestResult {
+        self.phase = phase;
+        if let Some(input) = self.input {
+            let mut output = io::stdout().lock();
+            writeln!(
+                output,
+                "Running ATL archive input {input}: {:?}",
+                self.phase
+            )?;
+            output.flush()?;
+        }
+        Ok(())
+    }
+}
+
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn original_atl_source_counts_reconcile_with_media_and_assembly() -> Result<(), String> {
+    let first = real_archive_path().map_err(|_| "missing configured ATL archive".to_owned())?;
+    verify_installed(&first, 1)?;
+    if let Some(second) = p4kx_testkit::real_archive_b_path() {
+        verify_installed(&second, 2)?;
     }
     Ok(())
 }
 
-fn verify_archive(path: &Path) -> TestResult {
-    let archive = Archive::open_with_key(path, Some(real_archive_key()?))?;
-    verify_root(&archive)
+fn verify_installed(path: &Path, input: usize) -> Result<(), String> {
+    let mut verification = Verification {
+        input: Some(input),
+        phase: Phase::OpenArchive,
+    };
+    let result = (|| {
+        verification.enter(Phase::OpenArchive)?;
+        let archive = Archive::open_with_key(path, Some(real_archive_key()?))?;
+        verify_root(&archive, &mut verification)
+    })();
+    privacy::redact(result).map_err(|_| {
+        format!(
+            "ATL archive input {input} failed during {:?}",
+            verification.phase
+        )
+    })
 }
 
-fn verify_root(archive: &Archive) -> TestResult {
+fn verify_root(archive: &Archive, verification: &mut Verification) -> TestResult {
+    verification.enter(Phase::ReadOriginal)?;
     let watch = ArchiveWatch::new(archive);
     let (expected, triggers) = source_counts(archive, &watch)?;
     require(!expected.is_empty(), "root definitions present")?;
+
+    verification.enter(Phase::PrepareExport)?;
     let scratch = tempfile::tempdir()?;
     let options = ExportOptions {
         kinds: vec![MediaKind::AudioControl],
@@ -71,24 +118,33 @@ fn verify_root(archive: &Archive) -> TestResult {
         exclude: Exclusion::parse(["*.pak", "*.socpak"])?,
         ..ExportOptions::default()
     };
+    verification.enter(Phase::Export)?;
     let ExportOutcome::Published { index, .. } =
         p4kx_media::export(archive, scratch.path(), &options)?
     else {
         return Err("root audio-control generation incomplete".into());
     };
+
+    verification.enter(Phase::FindControlStream)?;
     let base = scratch.path().join(&index.artifact_base);
     let stream = index
         .kinds
         .iter()
         .find(|kind| kind.provider.kind == MediaKind::AudioControl)
         .ok_or("root audio control stream")?;
+    verification.enter(Phase::ReadControlStream)?;
     let actual = media_counts(archive, &base, &base.join(&stream.artifact.path))?;
+    verification.enter(Phase::CompareCensus)?;
     require(
         actual == expected,
         "physical ATL occurrence and edge counts agree",
     )?;
+
+    verification.enter(Phase::ComparePlaybackIndex)?;
     triggers.verify(archive, &AudioIndex::build(archive))?;
+    verification.enter(Phase::CheckArchive)?;
     watch.check()?;
+    verification.enter(Phase::CloseScratch)?;
     scratch.close()?;
     Ok(())
 }
@@ -286,5 +342,11 @@ fn root_atl_accounts_for_physical_documents_and_index_precedence() -> TestResult
         .entry(TestEntry::stored("Data/Objects/malformed.socpak", b"excluded nested archive"))
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(test_key()))?;
-    verify_root(&archive)
+    verify_root(
+        &archive,
+        &mut Verification {
+            input: None,
+            phase: Phase::OpenArchive,
+        },
+    )
 }
