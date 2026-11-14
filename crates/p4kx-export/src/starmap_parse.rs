@@ -22,6 +22,9 @@ use crate::{CatalogError, Kind};
 #[path = "starmap_children.rs"]
 mod children;
 
+#[path = "starmap_hcd.rs"]
+pub(crate) mod hcd;
+
 const CHILDREN: &str = "ChildObjectContainers";
 const CHILD: &str = "Child";
 
@@ -77,12 +80,13 @@ pub(crate) enum Body {
 }
 
 /// What bounds the parse: the nesting depth and the number of Children kept in all containers.
-struct Bounds {
+struct Bounds<'a> {
+    cancel: Option<&'a CancelToken>,
     depth: usize,
     children: AtomicUsize,
 }
 
-impl Bounds {
+impl Bounds<'_> {
     fn take(&self) -> bool {
         self.children
             .try_update(Ordering::Relaxed, Ordering::Relaxed, |left| {
@@ -97,7 +101,7 @@ fn parse(
     archive: &Archive,
     index: &Index<'_>,
     entry: usize,
-    bounds: &Bounds,
+    bounds: &Bounds<'_>,
     capture: &EntryCapture<'_>,
 ) -> Result<(Body, ExportLedger), CatalogError> {
     let mut ledger = ExportLedger::default();
@@ -109,7 +113,7 @@ fn parse_body(
     archive: &Archive,
     index: &Index<'_>,
     entry: usize,
-    bounds: &Bounds,
+    bounds: &Bounds<'_>,
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
 ) -> Result<Body, CatalogError> {
@@ -124,7 +128,8 @@ fn parse_body(
             return Ok(Body::Unreadable(reason));
         }
     };
-    let Ok((root, file)) = parsed_root(&main.bytes, bounds, capture)? else {
+    let mut hcd = hcd::HcdReader::new(archive, socpak, &main.container, capture, bounds.cancel);
+    let Ok((root, file)) = parsed_root(&main.bytes, bounds, capture, &mut hcd, ledger)? else {
         ledger.incomplete_inventory(Kind::StarmapObjects);
         main.source.record(
             ledger,
@@ -151,16 +156,18 @@ fn parse_body(
     })
 }
 
-fn parsed_root(
+fn parsed_root<'capture, 'input>(
     read: &EntryRead,
-    bounds: &Bounds,
-    capture: &EntryCapture<'_>,
+    bounds: &Bounds<'_>,
+    capture: &'capture EntryCapture<'input>,
+    hcd: &mut hcd::HcdReader<'_, 'capture, 'input>,
+    ledger: &mut ExportLedger,
 ) -> Result<Result<(Level, ContainerFile), XmlError>, CatalogError> {
     match EntryXml::parse(read, capture)? {
         Ok(xml) => {
             let root = xml.root();
             Ok(Ok((
-                children::level(root, 0, bounds, &xml)?,
+                children::ChildReader::new(bounds, &xml, hcd, ledger).level(root, 0)?,
                 ContainerFile::from_xml(&xml, capture)?,
             )))
         }
@@ -216,6 +223,7 @@ pub(crate) fn read_all(
     capture: &EntryCapture<'_>,
 ) -> Result<Read, CatalogError> {
     let bounds = Bounds {
+        cancel,
         depth,
         children: AtomicUsize::new(children),
     };

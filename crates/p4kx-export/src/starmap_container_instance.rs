@@ -66,6 +66,13 @@ pub(crate) struct ContainerInstanceKey {
 }
 
 impl ContainerInstanceKey {
+    #[cfg(test)]
+    pub(crate) fn matches_route(&self, root: u32, parent: &[u32], child: u32) -> bool {
+        self.root_entry_index == root
+            && self.child_node_indices.starts_with(parent)
+            && self.child_node_indices.last() == Some(&child)
+    }
+
     pub(crate) fn from_route(root_entry_index: u32, route: Option<&PlacementStep>) -> Self {
         let mut child_node_indices: Vec<u32> = route
             .into_iter()

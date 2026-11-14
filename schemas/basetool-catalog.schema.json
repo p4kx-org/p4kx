@@ -7703,6 +7703,16 @@
         "hasHierarchicalContextData": {
           "$ref": "#/$defs/SourcedValueOfboolean"
         },
+        "hierarchicalContext": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/HcdLink"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "instanceMetadata": {
           "$ref": "#/$defs/SourcedValueOfArray_of_LocationMetadataElement"
         },
@@ -7734,6 +7744,7 @@
         "entityName",
         "guid",
         "hasHierarchicalContextData",
+        "hierarchicalContext",
         "instanceMetadata",
         "invalidAttributes",
         "label",
@@ -16264,6 +16275,89 @@
           "value": "brokerObjective"
         }
       ]
+    },
+    "HcdAttribute": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "value": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "HcdDocument": {
+      "properties": {
+        "attributes": {
+          "items": {
+            "$ref": "#/$defs/HcdAttribute"
+          },
+          "type": "array"
+        },
+        "presetGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored key for joining the physical context-preset definition by GUID."
+        },
+        "presetRecordName": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "presetText": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "version": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "attributes",
+        "presetGuid",
+        "presetRecordName",
+        "presetText",
+        "version"
+      ],
+      "type": "object"
+    },
+    "HcdLink": {
+      "description": "Lookup and read results for one authored location context declaration.",
+      "properties": {
+        "candidates": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfPhysicalEntryRef"
+        },
+        "document": {
+          "$ref": "#/$defs/SourcedValueOfHcdDocument"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfHcdSelectionFailure"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "candidates",
+        "document",
+        "failure"
+      ],
+      "type": "object"
+    },
+    "HcdSelectionFailure": {
+      "enum": [
+        "dangling",
+        "ambiguous"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "HealthDamageState": {
       "description": "One authored `HealthLevelStates` occurrence and its original links.",
@@ -67212,6 +67306,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/HardpointLink"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfHcdDocument": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/HcdDocument"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfHcdSelectionFailure": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/HcdSelectionFailure"
               }
             }
           }

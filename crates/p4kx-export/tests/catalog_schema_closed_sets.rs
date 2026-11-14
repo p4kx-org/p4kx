@@ -31,6 +31,7 @@ const CONTROL_TYPES: &[&str] = &[
     "ExportStageStatus",
     "FireRateUnit",
     "FuseEvidence",
+    "HcdSelectionFailure",
     "InputScope",
     "InteriorFindingKind",
     "InventoryMeaning",

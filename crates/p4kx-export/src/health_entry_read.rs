@@ -34,6 +34,12 @@ pub(crate) struct EntryRead {
     decoded_end_checked: bool,
 }
 
+#[derive(Clone, Copy)]
+enum Integrity {
+    Archive,
+    Verified,
+}
+
 impl EntryRead {
     pub(crate) fn from_observed(
         capture: &EntryCapture<'_>,
@@ -57,7 +63,14 @@ impl EntryRead {
         entry: &Entry,
         limit: u64,
     ) -> Result<Result<Self, EntryReadError>, CatalogError> {
-        Self::read_with(receipt, archive, entry, Some(limit), None)
+        Self::read_with(
+            receipt,
+            archive,
+            entry,
+            Some(limit),
+            None,
+            Integrity::Archive,
+        )
     }
 
     pub(crate) fn read_all(
@@ -66,15 +79,24 @@ impl EntryRead {
         entry: &Entry,
         cancel: Option<&CancelToken>,
     ) -> Result<Result<Self, EntryReadError>, CatalogError> {
-        Self::read_with(receipt, archive, entry, None, cancel)
+        Self::read_with(receipt, archive, entry, None, cancel, Integrity::Archive)
     }
 
+    pub(crate) fn read_verified(
+        receipt: EntryReceipt,
+        archive: &Archive,
+        entry: &Entry,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Result<Self, EntryReadError>, CatalogError> {
+        Self::read_with(receipt, archive, entry, None, cancel, Integrity::Verified)
+    }
     fn read_with(
         receipt: EntryReceipt,
         archive: &Archive,
         entry: &Entry,
         limit: Option<u64>,
         cancel: Option<&CancelToken>,
+        integrity: Integrity,
     ) -> Result<Result<Self, EntryReadError>, CatalogError> {
         receipt.check_entry(archive, entry)?;
         if cancel.is_some_and(CancelToken::is_cancelled) {
@@ -86,7 +108,11 @@ impl EntryRead {
             return Ok(Err(EntryReadError::Limit { limit }));
         }
         receipt.attempted_payload()?;
-        let reader = match archive.open_entry(entry) {
+        let opened = match integrity {
+            Integrity::Archive => archive.open_entry(entry),
+            Integrity::Verified => archive.open_entry_verified(entry),
+        };
+        let reader = match opened {
             Ok(reader) => reader,
             Err(error) => return Ok(Err(EntryReadError::Open(error))),
         };

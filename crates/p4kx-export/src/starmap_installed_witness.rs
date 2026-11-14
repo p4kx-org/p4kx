@@ -18,6 +18,9 @@ use crate::{CatalogError, ExportAccountingError};
 #[path = "starmap_installed_oracle.rs"]
 mod oracle;
 
+#[path = "starmap_installed_hcd.rs"]
+mod hcd;
+
 #[path = "starmap_installed_source.rs"]
 mod source;
 

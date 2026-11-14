@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Guid, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue};
+use p4kx_extraction::{
+    Guid, SourceUse, SourceUseRole, SourceUses, SourceValue, SourceValueState, SourcedValue,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::catalog_read::original::{EntryCapture, EntryXml, XmlNodeSource};
+use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::schema_fields::every_field_required;
+use crate::starmap_parse::hcd::{HcdLink, HcdLookup, HcdReader};
 use crate::starmap_xml::{Node, Root, attribute};
 use crate::{CatalogError, ExportAccountingError};
 
@@ -29,6 +33,7 @@ pub(crate) struct ChildLocation {
     tags_text: SourcedValue<String>,
     tags: SourcedValue<Vec<SourcedValue<LocationTag>>>,
     has_hierarchical_context_data: SourcedValue<bool>,
+    hierarchical_context: Option<HcdLink>,
     invalid_attributes: Vec<LocationAttribute>,
     instance_metadata: SourcedValue<Vec<LocationMetadataElement>>,
 }
@@ -66,9 +71,33 @@ impl ChildLocation {
             tags_text: tags.text,
             tags: tags.tokens,
             has_hierarchical_context_data,
+            hierarchical_context: None,
             instance_metadata: read_metadata(xml, child, capture)?,
             invalid_attributes: fields.invalid_attributes,
         })))
+    }
+
+    pub(crate) fn read_context(
+        &mut self,
+        hcd: &mut HcdReader<'_, '_, '_>,
+        xml: &EntryXml<'_, '_, '_>,
+        child: Root<'_>,
+        ledger: &mut ExportLedger,
+    ) -> Result<(), CatalogError> {
+        let flag = &self.has_hierarchical_context_data;
+        let target = match (flag.state(), flag.value()) {
+            (SourceValueState::Invalid, _) => HcdLookup::InvalidFlag,
+            (_, Some(true)) => self.guid.value().map_or(HcdLookup::InvalidGuid, |guid| {
+                if guid.0 == Guid::default() {
+                    HcdLookup::InvalidGuid
+                } else {
+                    HcdLookup::Guid(guid.0)
+                }
+            }),
+            _ => return Ok(()),
+        };
+        self.hierarchical_context = Some(hcd.read(xml, child, target, ledger)?);
+        Ok(())
     }
 }
 

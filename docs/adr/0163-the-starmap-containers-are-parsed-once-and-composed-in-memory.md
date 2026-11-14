@@ -83,3 +83,19 @@ Each external occurrence preserves the declaring Child's `label` and `entityName
 as `declaredLabel` and `declaredEntityName`. Empty attributes remain present.
 The label retains its literal text or localization key and carries `x-gameText`.
 Each name cites its own original attribute or the observed absence at that Child.
+
+## Authored location context
+
+The typed location tree is an owned placement table. Its occurrence key is the
+system Entry and original Child route, and its parent is the nearest typed Child
+on that route. Its component declarations are separate from location templates.
+
+A typed Child can select a Hierarchical Context Data companion through
+`hasHierarchicalContextData` and its own `guid`. Search the opened container's
+directory for the exact GUID basename below an `hcd` segment. The same physical
+container can list zero, one or multiple candidates. Read each unique selected
+companion once. Keep per-occurrence selectors and the companion's own XML proof
+separate so reused Children still have the correct source references. The
+companion's `preset` is an authored Context Preset GUID. Its recorded name and
+the location's component names do not establish a Harvestable Provider Preset
+binding.

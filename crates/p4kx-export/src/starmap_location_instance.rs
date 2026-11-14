@@ -31,6 +31,15 @@ pub(crate) struct LocationInstance {
     declaration: ChildLocation,
 }
 
+impl LocationInstance {
+    #[cfg(test)]
+    pub(crate) fn matches_route(&self, root: u32, parent: &[u32], child: u32) -> bool {
+        self.instance_id
+            .value()
+            .is_some_and(|key| key.matches_route(root, parent, child))
+    }
+}
+
 pub(crate) struct LocationOccurrence<'route> {
     pub(crate) root_entry: u32,
     pub(crate) root_inputs: &'route [SourceUse],

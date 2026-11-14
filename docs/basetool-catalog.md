@@ -1958,6 +1958,23 @@ original text with its source. `instanceMetadata` retains ordered component elem
 occurrences, original node/parent positions and attributes. A component element records its
 authored occurrence. A Harvestable preset link requires a separately authored binding.
 
+The optional `declaration.hierarchicalContext` is emitted for a typed Child with an
+asserted or malformed `hasHierarchicalContextData` flag. A valid asserted flag uses
+the Child's nonzero `guid` to look up an exact GUID filename in an `hcd` directory
+within the same physical SOCpak. False or absent flags leave the lookup null.
+`candidates` cites the original directory and preserves all matching physical
+members in directory order. `failure` distinguishes `dangling` (zero matches) and
+`ambiguous` (multiple matches). An invalid flag or lookup GUID yields an invalid
+`document` without candidates. A unique member is read to completion and checked
+against the Archive's checksums. The `document` distinguishes unreadable bytes,
+invalid XML or root, and a readable context header.
+
+The context header retains `__version`, the original `preset` text, its typed
+`presetGuid`, `presetRecordName` and extra root attributes in source order. A
+consumer can join `presetGuid` to `definitions.hierarchicalContextualDataPresets`.
+That table has its own selection scope. Context field provenance comes from the
+companion Entry. Lookup provenance retains the owning Child and directory sources.
+
 Placement selection follows the existing container inventory scope. An unrestricted catalog
 or any selected Starmap or HarvestableProviderPreset path requests the walk. Other Record
 filters leave this table unavailable. Walk and archive diagnostics report incomplete source

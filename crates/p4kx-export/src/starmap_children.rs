@@ -6,86 +6,113 @@ use std::sync::Arc;
 use p4kx_assembly::is_external_child_value;
 use p4kx_extraction::Guid;
 
-use super::{Bounds, CHILD, CHILDREN, Child, Level, Pose};
+use super::{Bounds, CHILD, CHILDREN, Child, Level, Pose, hcd::HcdReader};
 use crate::CatalogError;
 use crate::catalog_read::original::{AuthoredEntryPath, EntryXml, XmlNodeSource};
+use crate::export_ledger::ExportLedger;
 use crate::starmap_containers::location_declaration::ChildLocation;
 use crate::starmap_containers::proof::ChildOrigins;
 use crate::starmap_report::clip;
 use crate::starmap_xml::{Node, Root, attribute, first_below, pose};
 
-/// Reads direct Child lists in source order, with the legacy wrapped-list fallback.
-pub(super) fn level(
-    node: Root<'_>,
-    depth: usize,
-    bounds: &Bounds,
-    xml: &EntryXml<'_, '_, '_>,
-) -> Result<Level, CatalogError> {
-    let mut direct = node
-        .children()
-        .filter(|section| section.name().eq_ignore_ascii_case(CHILDREN))
-        .peekable();
-    let fallback = if direct.peek().is_none() {
-        first_below(node, CHILDREN)
-    } else {
-        None
-    };
-    let mut lists = direct.chain(fallback);
-    let mut level = Level::default();
-    if depth >= bounds.depth {
-        level.capped = lists.any(|list| {
-            list.children()
-                .any(|child| child.name().eq_ignore_ascii_case(CHILD))
-        });
-        return Ok(level);
-    }
-    for list in lists {
-        let list_source = xml.node_source(list)?;
-        for child in list.children() {
-            let name = xml.name(child)?;
-            if !name.as_str().eq_ignore_ascii_case(CHILD) {
-                continue;
-            }
-            if !bounds.take() {
-                level.truncated = true;
-                return Ok(level);
-            }
-            level
-                .children
-                .push(read_child(child, &name, &list_source, depth, bounds, xml)?);
-        }
-    }
-    Ok(level)
+pub(super) struct ChildReader<'a, 'read, 'capture, 'input, 'archive, 'cancel> {
+    bounds: &'a Bounds<'cancel>,
+    xml: &'a EntryXml<'read, 'capture, 'input>,
+    hcd: &'a mut HcdReader<'archive, 'capture, 'input>,
+    ledger: &'a mut ExportLedger,
 }
 
-fn read_child(
-    child: Root<'_>,
-    name: &AuthoredEntryPath,
-    list: &XmlNodeSource,
-    depth: usize,
-    bounds: &Bounds,
-    xml: &EntryXml<'_, '_, '_>,
-) -> Result<Child, CatalogError> {
-    let record = attribute(child, "starMapRecord")
-        .and_then(|text| text.trim().parse::<Guid>().ok())
-        .filter(|guid| guid.stored() != [0; 16]);
-    let external = external(child, name, xml)?;
-    let pose = child_pose(child);
-    let below = level(child, depth + 1, bounds, xml)?;
-    let location = ChildLocation::read(xml, child, xml.capture())?;
-    let named =
-        record.is_some() || external.is_some() || !below.children.is_empty() || location.is_some();
-    let origins = named
-        .then(|| ChildOrigins::capture(xml, list, child).map(Arc::new))
-        .transpose()?;
-    Ok(Child {
-        pose,
-        record,
-        external,
-        origins,
-        location,
-        below,
-    })
+impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
+    ChildReader<'a, 'read, 'capture, 'input, 'archive, 'cancel>
+{
+    pub(super) const fn new(
+        bounds: &'a Bounds<'cancel>,
+        xml: &'a EntryXml<'read, 'capture, 'input>,
+        hcd: &'a mut HcdReader<'archive, 'capture, 'input>,
+        ledger: &'a mut ExportLedger,
+    ) -> Self {
+        Self {
+            bounds,
+            xml,
+            hcd,
+            ledger,
+        }
+    }
+
+    /// Reads direct Child lists in source order, with the legacy wrapped-list fallback.
+    pub(super) fn level(&mut self, node: Root<'_>, depth: usize) -> Result<Level, CatalogError> {
+        let xml = self.xml;
+        let mut direct = node
+            .children()
+            .filter(|section| section.name().eq_ignore_ascii_case(CHILDREN))
+            .peekable();
+        let fallback = if direct.peek().is_none() {
+            first_below(node, CHILDREN)
+        } else {
+            None
+        };
+        let mut lists = direct.chain(fallback);
+        let mut level = Level::default();
+        if depth >= self.bounds.depth {
+            level.capped = lists.any(|list| {
+                list.children()
+                    .any(|child| child.name().eq_ignore_ascii_case(CHILD))
+            });
+            return Ok(level);
+        }
+        for list in lists {
+            let list_source = xml.node_source(list)?;
+            for child in list.children() {
+                let name = xml.name(child)?;
+                if !name.as_str().eq_ignore_ascii_case(CHILD) {
+                    continue;
+                }
+                if !self.bounds.take() {
+                    level.truncated = true;
+                    return Ok(level);
+                }
+                level
+                    .children
+                    .push(self.read_child(child, &name, &list_source, depth)?);
+            }
+        }
+        Ok(level)
+    }
+
+    fn read_child(
+        &mut self,
+        child: Root<'_>,
+        name: &AuthoredEntryPath,
+        list: &XmlNodeSource,
+        depth: usize,
+    ) -> Result<Child, CatalogError> {
+        let xml = self.xml;
+        let record = attribute(child, "starMapRecord")
+            .and_then(|text| text.trim().parse::<Guid>().ok())
+            .filter(|guid| guid.stored() != [0; 16]);
+        let external = external(child, name, xml)?;
+        let pose = child_pose(child);
+        let below = self.level(child, depth + 1)?;
+        let mut location = ChildLocation::read(xml, child, xml.capture())?;
+        if let Some(location) = &mut location {
+            location.read_context(self.hcd, xml, child, self.ledger)?;
+        }
+        let named = record.is_some()
+            || external.is_some()
+            || !below.children.is_empty()
+            || location.is_some();
+        let origins = named
+            .then(|| ChildOrigins::capture(xml, list, child).map(Arc::new))
+            .transpose()?;
+        Ok(Child {
+            pose,
+            record,
+            external,
+            origins,
+            location,
+            below,
+        })
+    }
 }
 
 fn external(

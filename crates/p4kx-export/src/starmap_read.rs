@@ -17,6 +17,7 @@ const MAX_XML_LEN: u64 = 128 << 20;
 
 /// The main XML paired to its original Entry read.
 pub(crate) struct MainXml {
+    pub(crate) container: Archive,
     pub(crate) source: EntrySource,
     pub(crate) bytes: EntryRead,
     pub(crate) fallback: Option<String>,
@@ -67,18 +68,18 @@ pub(crate) fn main_xml(
     };
     let parent = source.clone().operation(EntryOperation::ContainerXml);
     source.record(ledger, Kind::StarmapObjects, SourceDisposition::Projected);
-    read_main(archive, socpak, &container, capture, parent, ledger)
+    read_main(archive, socpak, container, capture, parent, ledger)
 }
 
 fn read_main(
     archive: &Archive,
     socpak: &Entry,
-    container: &Archive,
+    container: Archive,
     capture: &EntryCapture<'_>,
     parent: EntrySource,
     ledger: &mut ExportLedger,
 ) -> Result<Result<MainXml, String>, CatalogError> {
-    let (xml, fallback) = match selected_xml(container, socpak) {
+    let (xml, fallback) = match selected_xml(&container, socpak) {
         Ok(selected) => selected,
         Err(error) => {
             parent.record(
@@ -89,11 +90,12 @@ fn read_main(
             return Ok(Err(error));
         }
     };
-    let source = EntrySource::inner(capture, archive, socpak, container, xml)?
+    let source = EntrySource::inner(capture, archive, socpak, &container, xml)?
         .dependency()
         .operation(EntryOperation::ContainerXml);
-    match EntryRead::read(source.receipt().clone(), container, xml, MAX_XML_LEN)? {
+    match EntryRead::read(source.receipt().clone(), &container, xml, MAX_XML_LEN)? {
         Ok(bytes) => Ok(Ok(MainXml {
+            container,
             source,
             bytes,
             fallback,
