@@ -19,6 +19,8 @@ mod nested;
 mod number_controls;
 #[path = "catalog_durability_resistance_reference.rs"]
 mod resistance_reference;
+#[path = "catalog_turret_health.rs"]
+mod turret_health;
 
 use p4kx_export::{CatalogError, CatalogPublicationMode, build_catalog};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};

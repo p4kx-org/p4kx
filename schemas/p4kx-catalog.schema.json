@@ -4992,6 +4992,9 @@
         "thrusters": {
           "$ref": "#/$defs/CatalogTableOfThruster"
         },
+        "turretHealth": {
+          "$ref": "#/$defs/CatalogTableOfTurretHealth"
+        },
         "vehicleArmor": {
           "$ref": "#/$defs/CatalogTableOfVehicleArmor"
         },
@@ -5053,6 +5056,7 @@
         "shieldGenerators",
         "suitArmor",
         "thrusters",
+        "turretHealth",
         "vehicleArmor",
         "weaponActions"
       ],
@@ -5340,6 +5344,9 @@
         "tags": {
           "$ref": "#/$defs/CatalogTableOfTagDefinition"
         },
+        "turretHealthModifiers": {
+          "$ref": "#/$defs/CatalogTableOfTurretHealthModifier"
+        },
         "weaponActionRecoilDefinitions": {
           "$ref": "#/$defs/CatalogTableOfWeaponActionRecoilDefinition"
         },
@@ -5428,6 +5435,7 @@
         "subHarvestableConfigs",
         "subHarvestableMultiConfigs",
         "tags",
+        "turretHealthModifiers",
         "weaponActionRecoilDefinitions",
         "weaponProceduralAnimations",
         "weaponProceduralClips"
@@ -8386,6 +8394,44 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/Thruster"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfTurretHealth": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/TurretHealth"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfTurretHealthModifier": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/TurretHealthModifier"
           },
           "type": "array"
         }
@@ -20326,7 +20372,7 @@
           "$ref": "#/$defs/SourcedValueOfboolean"
         },
         "afterburnerAngCapacitorScalingCurve": {
-          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
         },
         "afterburnerCapacitorThresholdRatio": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -20338,7 +20384,7 @@
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
         },
         "afterburnerRampMapping": {
-          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
         },
         "afterburnerRampUpTime": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -20460,30 +20506,6 @@
       ],
       "type": "object"
     },
-    "IfcsCurve": {
-      "description": "Ordered knots and the original lookup table setting of a flight curve.",
-      "properties": {
-        "additionalFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
-        },
-        "points": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInventoryVector2"
-        },
-        "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
-        },
-        "useLUT": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
-        }
-      },
-      "required": [
-        "additionalFields",
-        "points",
-        "sourceType",
-        "useLUT"
-      ],
-      "type": "object"
-    },
     "IfcsDamageHandling": {
       "description": "Concrete source type and the original members outside its typed fields.",
       "properties": {
@@ -20592,7 +20614,7 @@
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
         },
         "atmosphericModifier": {
-          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
         },
         "fuelCostPer10KNewton": {
           "$ref": "#/$defs/SourcedValueOfResourceFlowUnit"
@@ -20783,13 +20805,13 @@
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
         },
         "dragInfluenceMapping": {
-          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
         },
         "liftDecreaseCoefficient": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
         },
         "liftInfluenceMapping": {
-          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
         },
         "rollTorqueCoefficient": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -20822,7 +20844,7 @@
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
         },
         "precisionAccelCurve": {
-          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
         },
         "precisionLandingMultiplier": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -20974,7 +20996,7 @@
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "atmosphericEfficiencyCurve": {
-          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
         },
         "maxSupportedAtmosphericEfficiency": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -20998,7 +21020,7 @@
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "cloudDensityMapping": {
-          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
         },
         "cloudDensityTurbulenceAmplitude": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -21028,7 +21050,7 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "windSpeedMapping": {
-          "$ref": "#/$defs/SourcedValueOfIfcsCurve"
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
         },
         "windSpeedMax": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -31876,6 +31898,30 @@
       "required": [
         "ownerGuid",
         "ownerRecordIndex"
+      ],
+      "type": "object"
+    },
+    "OrderedCurve": {
+      "description": "Ordered knots and the original lookup table setting of an authored curve.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "points": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfInventoryVector2"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "useLUT": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "points",
+        "sourceType",
+        "useLUT"
       ],
       "type": "object"
     },
@@ -81939,136 +81985,6 @@
       ],
       "type": "object"
     },
-    "SourcedValueOfIfcsCurve": {
-      "allOf": [
-        {
-          "allOf": [
-            {
-              "if": {
-                "properties": {
-                  "containsEncryptedSource": {
-                    "const": false
-                  }
-                },
-                "required": [
-                  "containsEncryptedSource"
-                ]
-              },
-              "then": {
-                "properties": {
-                  "sourceSetComplete": {
-                    "const": true
-                  }
-                }
-              }
-            },
-            {
-              "if": {
-                "properties": {
-                  "sourceUsesRefs": {
-                    "maxItems": 0
-                  }
-                },
-                "required": [
-                  "sourceUsesRefs"
-                ]
-              },
-              "then": {
-                "else": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "type": "null"
-                    }
-                  }
-                },
-                "if": {
-                  "properties": {
-                    "sourceSetComplete": {
-                      "const": true
-                    }
-                  },
-                  "required": [
-                    "sourceSetComplete"
-                  ]
-                },
-                "then": {
-                  "properties": {
-                    "containsEncryptedSource": {
-                      "const": false
-                    }
-                  }
-                }
-              }
-            }
-          ],
-          "properties": {
-            "sourceUsesRefs": {
-              "items": {
-                "minLength": 1,
-                "type": "string"
-              },
-              "uniqueItems": true
-            }
-          }
-        },
-        {
-          "else": {
-            "properties": {
-              "value": {
-                "type": "null"
-              }
-            }
-          },
-          "if": {
-            "properties": {
-              "state": {
-                "const": "present"
-              }
-            },
-            "required": [
-              "state"
-            ]
-          },
-          "then": {
-            "properties": {
-              "value": {
-                "$ref": "#/$defs/IfcsCurve"
-              }
-            }
-          }
-        }
-      ],
-      "description": "A typed data value with its immediate, materialized source origin.",
-      "properties": {
-        "containsEncryptedSource": {
-          "type": [
-            "boolean",
-            "null"
-          ]
-        },
-        "sourceSetComplete": {
-          "type": "boolean"
-        },
-        "sourceUsesRefs": {
-          "items": {
-            "$ref": "#/$defs/SourceUseRef"
-          },
-          "type": "array"
-        },
-        "state": {
-          "$ref": "#/$defs/SourceValueState"
-        },
-        "value": true
-      },
-      "required": [
-        "containsEncryptedSource",
-        "sourceSetComplete",
-        "sourceUsesRefs",
-        "state",
-        "value"
-      ],
-      "type": "object"
-    },
     "SourcedValueOfIfcsDamageHandling": {
       "allOf": [
         {
@@ -97186,6 +97102,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/OperatingEntity"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfOrderedCurve": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/OrderedCurve"
               }
             }
           }
@@ -125392,6 +125438,58 @@
         "sourceType",
         "startColor",
         "startGlow"
+      ],
+      "type": "object"
+    },
+    "TurretHealth": {
+      "description": "The authored health modifier Reference of one physical turret component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "healthModifierRecord": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "componentOrdinal",
+        "healthModifierRecord",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "TurretHealthModifier": {
+      "description": "One original health modifier Record and its damage movement curve.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "damageMovementModifier": {
+          "$ref": "#/$defs/SourcedValueOfOrderedCurve"
+        },
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "damageMovementModifier",
+        "source"
       ],
       "type": "object"
     },

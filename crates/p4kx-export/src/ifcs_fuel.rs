@@ -5,7 +5,7 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::ifcs_curve::IfcsCurve;
+use super::OrderedCurve;
 use crate::CatalogError;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_resource_flow_unit::ResourceFlowUnit;
@@ -21,7 +21,7 @@ pub(super) struct IfcsFuelUsage<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     atmospheric_curve_multiplier: SourcedValue<ResourceFloat32>,
-    atmospheric_modifier: SourcedValue<IfcsCurve<'source>>,
+    atmospheric_modifier: SourcedValue<OrderedCurve<'source>>,
     fuel_cost_per10_k_newton: SourcedValue<ResourceFlowUnit<'source>>,
     idle_cost: SourcedValue<ResourceFlowUnit<'source>>,
     no_fuel_threshold_ratio: SourcedValue<ResourceFloat32>,
@@ -34,7 +34,7 @@ impl<'source> IfcsFuelUsage<'source> {
     ) -> Result<Self, CatalogError> {
         let atmospheric_curve_multiplier = fields.single("atmosphericCurveMultiplier", notes)?;
         let atmospheric_modifier =
-            fields.declared_class("atmosphericModifier", notes, IfcsCurve::read)?;
+            fields.declared_class("atmosphericModifier", notes, OrderedCurve::read)?;
         let fuel_cost_per10_k_newton = fields.strong_pointer_family_to(
             "fuelCostPer10KNewton",
             "SBaseResourceUnit",
@@ -124,7 +124,7 @@ impl<'source> IfcsNoFuel<'source> {
 pub(super) struct IfcsThrusterEfficiency<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
-    atmospheric_efficiency_curve: SourcedValue<IfcsCurve<'source>>,
+    atmospheric_efficiency_curve: SourcedValue<OrderedCurve<'source>>,
     max_supported_atmospheric_efficiency: SourcedValue<ResourceFloat32>,
 }
 
@@ -134,7 +134,7 @@ impl<'source> IfcsThrusterEfficiency<'source> {
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         let atmospheric_efficiency_curve =
-            fields.declared_class("atmosphericEfficiencyCurve", notes, IfcsCurve::read)?;
+            fields.declared_class("atmosphericEfficiencyCurve", notes, OrderedCurve::read)?;
         let max_supported_atmospheric_efficiency =
             fields.single("maxSupportedAtmosphericEfficiency", notes)?;
         let source = UnitSource::read(

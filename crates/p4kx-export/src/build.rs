@@ -226,6 +226,7 @@ fn assemble<R>(
             weapon_action_recoil_definitions: independent.weapon_action_recoil_definitions,
             weapon_procedural: independent.weapon_procedural,
             damage_resistance_macros: independent.damage_resistance_macros,
+            turret_health_modifiers: independent.turret_health_modifiers,
             consumables: independent.consumable_definitions,
             mining_laser_globals: independent.mining_laser_globals,
             reputation_contexts: reputation_tables.contexts,

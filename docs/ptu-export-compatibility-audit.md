@@ -42,18 +42,18 @@ The announced PTU reputation multiplier has no evidence in this comparison of st
 The existing Handler export exposes authored scope and default board availability.
 A distinct Contract- or SubContract-level override and the runtime multiplier remain unverified.
 
-The current DataForge declaration exposes the Bool `ContractResult_CompletionTags.splitPointsForParty`
-and the Int32 `LocationResourceSlot.numberOfResourceSlotsPerEntity`. The LIVE declaration of
-the latter holds a `resourceSlotTag` Reference, and the exact type count in the compared DataForges
-changes from 3 to 66. Source controls, target identities and older authored members need coverage
-under [#1145](https://github.com/p4kx-org/p4kx/issues/1145).
-`AmmoParams.impactAIStimulusDistance` already has its own catalog cell.
-The current PTU declaration trace resolves the added `allowFPSPingWave` Bool through the
-owned scalar `SStandardParams.radarOptionParams` Class. Resource slots, Mode radar options
-and completion-tag outcomes have follow-ups in
+The current DataForge declarations expose the Bool
+`ContractResult_CompletionTags.splitPointsForParty`, the Int32
+`LocationResourceSlot.numberOfResourceSlotsPerEntity` and the Bool `allowFPSPingWave` in the
+owned scalar `SStandardParams.radarOptionParams` Class. The LIVE resource-slot layout holds a
+`resourceSlotTag` Reference. The exact type count changes from 3 in LIVE to 66 in PTU.
+The catalog preserves both resource-slot layouts with physical source and target identities,
+GameMode radar options and ordered completion-tag outcomes. Each change passed focused checks
+on both installed Builds.
 [#1146](https://github.com/p4kx-org/p4kx/issues/1146),
-[#1147](https://github.com/p4kx-org/p4kx/issues/1147) and
-[#1148](https://github.com/p4kx-org/p4kx/issues/1148), respectively.
+[#1147](https://github.com/p4kx-org/p4kx/issues/1147),
+[#1148](https://github.com/p4kx-org/p4kx/issues/1148)
+`AmmoParams.impactAIStimulusDistance` already has its own catalog cell.
 
 The changed GFx and SWF Entries each parse successfully in both installations. Both files
 change the container version from 17 to 15 while keeping the same frame count and the same
@@ -147,7 +147,7 @@ The added climate-asset sample has 87 distinct field-path/type pairs, including 
 shading GUIDs and ordered harvestable-related sub-assets. The producing family is tracked in
 [#849](https://github.com/p4kx-org/p4kx/issues/849).
 
-The remaining per-domain source probes and any exporter follow-ups are tracked in
+The per-domain source probes, exporter changes and evidence gaps are tracked in
 [#1145](https://github.com/p4kx-org/p4kx/issues/1145).
 The current tuning test and other patch-note items come from the
 [CIG notes](https://robertsspaceindustries.com/spectrum/community/SC/forum/190048/thread/star-citizen-alpha-5-0-ptu-patch-notes/9230254)
@@ -186,13 +186,16 @@ resource-network rules. Direct comparisons of the selected LIVE and PTU Records 
 modeled values, ordered modifiers and physical source coordinates.
 [Global resource-network definitions](catalog-resource-components.md#original-global-resource-network-definitions)
 
-The standalone `STurretHealthModifierDef` contains
-a `damageMovementModifier` curve. Its nine stored point pairs and LUT flag
-are unchanged in this comparison. All 474 LIVE and 475 PTU
-`SCItemTurretParams.healthModifierRecord` slots are authored null. The curve
-and optional link lack dedicated Catalog paths. A Catalog projection can
-preserve the independent Record and link state without applying the curve
-to an unrelated turret.
+The standalone `STurretHealthModifierDef` contains a `damageMovementModifier` curve.
+Its nine stored point pairs and LUT flag are unchanged in this comparison. All 474 LIVE and
+475 PTU `SCItemTurretParams.healthModifierRecord` slots are authored null.
+`configurations.turretHealth` preserves the individual Reference states and
+`definitions.turretHealthModifiers` preserves the independently owned curve.
+The scoped original-to-catalog test passed for LIVE 13165946 and PTU 13189690. It checked
+one physical turret component and one standalone definition per Build, including all nine
+ordered point pairs, their exact Single bits, the LUT flag and per-value source coordinates.
+A synthetic control proves filtered dependency closure for a resolved Reference.
+[Turret health](catalog-turret-health.md)
 
 The retained older PTU declaration evidence can establish what already
 existed by that earlier 5.0 snapshot. The two current Archive receipts

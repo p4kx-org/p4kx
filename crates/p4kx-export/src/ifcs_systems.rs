@@ -5,7 +5,7 @@ use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::ifcs_curve::IfcsCurve;
+use super::OrderedCurve;
 use super::ifcs_fuel::{IfcsFuelUsage, IfcsNoFuel, IfcsThrusterEfficiency};
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
@@ -175,9 +175,9 @@ struct IfcsPartDamage<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     drag_decrease_coefficient: SourcedValue<ResourceFloat32>,
-    drag_influence_mapping: SourcedValue<IfcsCurve<'source>>,
+    drag_influence_mapping: SourcedValue<OrderedCurve<'source>>,
     lift_decrease_coefficient: SourcedValue<ResourceFloat32>,
-    lift_influence_mapping: SourcedValue<IfcsCurve<'source>>,
+    lift_influence_mapping: SourcedValue<OrderedCurve<'source>>,
     roll_torque_coefficient: SourcedValue<ResourceFloat32>,
     yaw_torque_coefficient: SourcedValue<ResourceFloat32>,
 }
@@ -189,10 +189,10 @@ impl<'source> IfcsPartDamage<'source> {
     ) -> Result<Self, CatalogError> {
         let drag_decrease_coefficient = fields.single("dragDecreaseCoefficient", notes)?;
         let drag_influence_mapping =
-            fields.declared_class("dragInfluenceMapping", notes, IfcsCurve::read)?;
+            fields.declared_class("dragInfluenceMapping", notes, OrderedCurve::read)?;
         let lift_decrease_coefficient = fields.single("liftDecreaseCoefficient", notes)?;
         let lift_influence_mapping =
-            fields.declared_class("liftInfluenceMapping", notes, IfcsCurve::read)?;
+            fields.declared_class("liftInfluenceMapping", notes, OrderedCurve::read)?;
         let roll_torque_coefficient = fields.single("rollTorqueCoefficient", notes)?;
         let yaw_torque_coefficient = fields.single("yawTorqueCoefficient", notes)?;
         let source = UnitSource::read(

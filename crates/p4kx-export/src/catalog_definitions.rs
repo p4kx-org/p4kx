@@ -10,7 +10,7 @@ use crate::build_derived::particle_library::ParticleLibraryTable;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition::AmmoDefinition;
 use crate::catalog_v3::catalog_independent_configurations::{
-    ConsumableDefinitions, DamageResistanceMacro, MiningLaserGlobalDefinition,
+    ConsumableDefinitions, DamageResistanceMacro, MiningLaserGlobalDefinition, TurretHealthModifier,
 };
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global::ResourceNetworkGlobal;
 use crate::catalog_v3::explosion_definition::ExplosionDefinition;
@@ -137,6 +137,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     #[serde(flatten)]
     pub(crate) weapon_procedural: WeaponProceduralTables<'source>,
     pub(crate) damage_resistance_macros: CatalogTable<DamageResistanceMacro<'source>>,
+    pub(crate) turret_health_modifiers: CatalogTable<TurretHealthModifier<'source>>,
     #[serde(flatten)]
     pub(crate) consumables: ConsumableDefinitions<'source>,
     pub(crate) mining_laser_globals: CatalogTable<MiningLaserGlobalDefinition<'source>>,

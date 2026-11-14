@@ -47,6 +47,10 @@ mod jump_point_globals;
 mod loot_generation_component;
 #[path = "mining_configuration_tables.rs"]
 mod mining_configurations;
+#[path = "catalog_ordered_curve.rs"]
+pub(super) mod ordered_curve;
+#[path = "turret_health.rs"]
+mod turret_health;
 #[path = "worn_gear_tables.rs"]
 mod worn_gear;
 pub(crate) use consumables::ConsumableDefinitions;
@@ -58,6 +62,8 @@ use jump_point::JumpPointConfiguration;
 use jump_point_globals::GlobalJumpConfiguration;
 use mining_configurations::MiningConfigurationTables;
 pub(crate) use mining_configurations::MiningLaserGlobalDefinition;
+pub(crate) use turret_health::TurretHealthModifier;
+use turret_health::{TurretHealth, TurretTables};
 pub(crate) use worn_gear::DamageResistanceMacro;
 use worn_gear::WornGearTables;
 
@@ -75,6 +81,7 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     entity_animation_controllers: CatalogTable<EntityAnimationController<'source>>,
     loot_generation: CatalogTable<LootGenerationComponent<'source>>,
     hackable_devices: CatalogTable<HackableConfiguration<'source>>,
+    turret_health: CatalogTable<TurretHealth<'source>>,
     #[serde(flatten)]
     pub(crate) flight: FlightConfigurationTables<'source>,
     #[serde(flatten)]
@@ -95,6 +102,7 @@ pub(crate) struct IndependentConfigurations<'source> {
         CatalogTable<WeaponActionRecoilDefinition<'source>>,
     pub(crate) weapon_procedural: WeaponProceduralTables<'source>,
     pub(crate) damage_resistance_macros: CatalogTable<DamageResistanceMacro<'source>>,
+    pub(crate) turret_health_modifiers: CatalogTable<TurretHealthModifier<'source>>,
     pub(crate) consumable_definitions: ConsumableDefinitions<'source>,
     pub(crate) mining_laser_globals: CatalogTable<MiningLaserGlobalDefinition<'source>>,
     pub(crate) recovery_numbers: Vec<CapturedNumber>,
@@ -129,6 +137,7 @@ pub(crate) fn read<'source>(
     let loot_generation = components.table(LOOT_GENERATION, LootGenerationComponent::read)?;
     let hackable_devices = components.table(HACKABLE_DEVICES, HackableConfiguration::read)?;
     let jump_points = components.jump_points(jump_owners)?;
+    let turret = TurretTables::read(&mut components)?;
     let worn_gear = WornGearTables::read(&mut components)?;
     let damage_resistance_macros = worn_gear.resistance_macros(&mut components)?;
     let consumables = ConsumableTables::read(&mut components)?;
@@ -145,6 +154,7 @@ pub(crate) fn read<'source>(
             entity_animation_controllers,
             loot_generation,
             hackable_devices,
+            turret_health: turret.health,
             flight,
             jump_drive_definitions,
             jump_point_configurations: jump_points.local,
@@ -155,6 +165,7 @@ pub(crate) fn read<'source>(
         },
         weapon_action_recoil_definitions,
         damage_resistance_macros,
+        turret_health_modifiers: turret.modifiers,
         consumable_definitions: consumables.definitions,
         mining_laser_globals,
         weapon_procedural,

@@ -5,7 +5,7 @@ use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::ifcs_curve::IfcsCurve;
+use super::OrderedCurve;
 use crate::CatalogError;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::inventory_dimensions::InventoryVector3;
@@ -109,7 +109,7 @@ impl<'source> IfcsLimits<'source> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(super) struct IfcsPrecision<'source> {
-    precision_accel_curve: SourcedValue<IfcsCurve<'source>>,
+    precision_accel_curve: SourcedValue<OrderedCurve<'source>>,
     precision_landing_multiplier: SourcedValue<ResourceFloat32>,
     precision_max_distance: SourcedValue<ResourceFloat32>,
     precision_min_distance: SourcedValue<ResourceFloat32>,
@@ -127,7 +127,7 @@ impl<'source> IfcsPrecision<'source> {
             precision_accel_curve: fields.declared_class(
                 "precisionAccelCurve",
                 notes,
-                IfcsCurve::read,
+                OrderedCurve::read,
             )?,
             precision_landing_multiplier: fields.single("precisionLandingMultiplier", notes)?,
             precision_max_distance: fields.single("precisionMaxDistance", notes)?,

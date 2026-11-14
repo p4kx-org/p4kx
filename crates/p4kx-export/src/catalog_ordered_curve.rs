@@ -12,11 +12,11 @@ use crate::catalog_v3::inventory_dimensions::InventoryVector2;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
-/// Ordered knots and the original lookup table setting of a flight curve.
+/// Ordered knots and the original lookup table setting of an authored curve.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct IfcsCurve<'source> {
+pub(in crate::catalog_v3) struct OrderedCurve<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(rename = "useLUT")]
@@ -24,13 +24,30 @@ pub(super) struct IfcsCurve<'source> {
     points: SourcedValue<Vec<SourcedValue<InventoryVector2<'source>>>>,
 }
 
-impl<'source> IfcsCurve<'source> {
-    pub(super) fn read(
+impl<'source> OrderedCurve<'source> {
+    pub(in crate::catalog_v3) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         let use_lut = fields.boolean("useLUT", notes)?;
         let points = fields.declared_class_array("points", notes, InventoryVector2::read)?;
+        Self::with_points(fields, use_lut, points)
+    }
+
+    pub(in crate::catalog_v3) fn read_bezier(
+        fields: Observed<'_, '_, '_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<Self, CatalogError> {
+        let use_lut = fields.boolean("useLUT", notes)?;
+        let points = fields.class_array_to("points", "Vec2", notes, InventoryVector2::read)?;
+        Self::with_points(fields, use_lut, points)
+    }
+
+    fn with_points(
+        fields: Observed<'_, '_, '_, 'source>,
+        use_lut: SourcedValue<bool>,
+        points: SourcedValue<Vec<SourcedValue<InventoryVector2<'source>>>>,
+    ) -> Result<Self, CatalogError> {
         let point_state = match points.value() {
             Some(points)
                 if points.iter().any(|point| {

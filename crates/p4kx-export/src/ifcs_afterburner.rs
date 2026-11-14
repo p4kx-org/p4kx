@@ -5,7 +5,7 @@ use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::ifcs_curve::IfcsCurve;
+use super::OrderedCurve;
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_v3::authored_fields::Observed;
@@ -23,7 +23,7 @@ pub(super) struct IfcsBurnTiming<'source> {
     #[serde(rename = "afterburnerAngCapacitorScaling")]
     ang_capacitor_scaling: SourcedValue<bool>,
     #[serde(rename = "afterburnerAngCapacitorScalingCurve")]
-    ang_capacitor_scaling_curve: SourcedValue<IfcsCurve<'source>>,
+    ang_capacitor_scaling_curve: SourcedValue<OrderedCurve<'source>>,
     #[serde(rename = "afterburnerCapacitorThresholdRatio")]
     capacitor_threshold_ratio: SourcedValue<ResourceFloat32>,
     #[serde(rename = "afterburnerPreDelayTime")]
@@ -31,7 +31,7 @@ pub(super) struct IfcsBurnTiming<'source> {
     #[serde(rename = "afterburnerRampDownTime")]
     ramp_down_time: SourcedValue<ResourceFloat32>,
     #[serde(rename = "afterburnerRampMapping")]
-    ramp_mapping: SourcedValue<IfcsCurve<'source>>,
+    ramp_mapping: SourcedValue<OrderedCurve<'source>>,
     #[serde(rename = "afterburnerRampUpTime")]
     ramp_up_time: SourcedValue<ResourceFloat32>,
 }
@@ -46,7 +46,7 @@ impl<'source> IfcsBurnTiming<'source> {
             ang_capacitor_scaling_curve: fields.declared_class(
                 "afterburnerAngCapacitorScalingCurve",
                 notes,
-                IfcsCurve::read,
+                OrderedCurve::read,
             )?,
             capacitor_threshold_ratio: fields
                 .single("afterburnerCapacitorThresholdRatio", notes)?,
@@ -55,7 +55,7 @@ impl<'source> IfcsBurnTiming<'source> {
             ramp_mapping: fields.declared_class(
                 "afterburnerRampMapping",
                 notes,
-                IfcsCurve::read,
+                OrderedCurve::read,
             )?,
             ramp_up_time: fields.single("afterburnerRampUpTime", notes)?,
         })

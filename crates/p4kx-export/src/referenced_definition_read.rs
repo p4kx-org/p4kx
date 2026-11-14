@@ -41,7 +41,7 @@ pub(super) type Projection<'source, Row> = fn(
 ) -> Result<Row, CatalogError>;
 
 pub(super) struct Selection<'selection> {
-    pub(super) source_types: &'selection [&'static str],
+    pub(super) source_types: &'selection [&'selection str],
     pub(super) linked: &'selection BTreeSet<u32>,
     pub(super) filter: Option<&'selection Filter>,
     pub(super) inspection: ConfigurationInspection,

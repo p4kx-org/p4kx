@@ -5,8 +5,8 @@ use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::OrderedCurve;
 use super::ifcs_aero_surface::IfcsAeroSurface;
-use super::ifcs_curve::IfcsCurve;
 use crate::CatalogError;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
@@ -111,7 +111,7 @@ impl<'source> IfcsAtmosphericFlight<'source> {
 struct IfcsTurbulence<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
-    cloud_density_mapping: SourcedValue<IfcsCurve<'source>>,
+    cloud_density_mapping: SourcedValue<OrderedCurve<'source>>,
     cloud_density_turbulence_amplitude: SourcedValue<ResourceFloat32>,
     ground_turbulence_altitude_max: SourcedValue<ResourceFloat32>,
     ground_turbulence_altitude_min: SourcedValue<ResourceFloat32>,
@@ -120,7 +120,7 @@ struct IfcsTurbulence<'source> {
     ground_turbulence_noise: SourcedValue<SourceArenaOutput<'source>>,
     ground_turbulence_speed_max: SourcedValue<ResourceFloat32>,
     ground_turbulence_speed_min: SourcedValue<ResourceFloat32>,
-    wind_speed_mapping: SourcedValue<IfcsCurve<'source>>,
+    wind_speed_mapping: SourcedValue<OrderedCurve<'source>>,
     wind_speed_max: SourcedValue<ResourceFloat32>,
     wind_speed_min: SourcedValue<ResourceFloat32>,
     wind_speed_turbulence_amplitude: SourcedValue<ResourceFloat32>,
@@ -137,7 +137,7 @@ impl<'source> IfcsTurbulence<'source> {
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         let cloud_density_mapping =
-            fields.declared_class("cloudDensityMapping", notes, IfcsCurve::read)?;
+            fields.declared_class("cloudDensityMapping", notes, OrderedCurve::read)?;
         let cloud_density_turbulence_amplitude =
             fields.single("cloudDensityTurbulenceAmplitude", notes)?;
         let ground_turbulence_altitude_max = fields.single("groundTurbulenceAltitudeMax", notes)?;
@@ -149,7 +149,7 @@ impl<'source> IfcsTurbulence<'source> {
         let ground_turbulence_speed_max = fields.single("groundTurbulenceSpeedMax", notes)?;
         let ground_turbulence_speed_min = fields.single("groundTurbulenceSpeedMin", notes)?;
         let wind_speed_mapping =
-            fields.declared_class("windSpeedMapping", notes, IfcsCurve::read)?;
+            fields.declared_class("windSpeedMapping", notes, OrderedCurve::read)?;
         let wind_speed_max = fields.single("windSpeedMax", notes)?;
         let wind_speed_min = fields.single("windSpeedMin", notes)?;
         let wind_speed_turbulence_amplitude =

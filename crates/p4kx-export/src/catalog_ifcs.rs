@@ -6,6 +6,7 @@ use serde::Serialize;
 
 use crate::CatalogError;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_independent_configurations::ordered_curve::OrderedCurve;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::schema_fields::every_field_required;
@@ -31,9 +32,6 @@ mod ifcs_systems;
 
 #[path = "ifcs_fuel.rs"]
 mod ifcs_fuel;
-
-#[path = "ifcs_curve.rs"]
-mod ifcs_curve;
 
 use ifcs_dynamics::IfcsDynamics;
 use ifcs_environment::IfcsEnvironment;
