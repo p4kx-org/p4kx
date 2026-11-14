@@ -94,6 +94,8 @@ pub struct MaterialSource {
     pub root: Option<RawElement>,
     /// Actual structured-projection boundaries, empty when none was reached.
     pub losses: Vec<MaterialSourceLoss>,
+    /// Original position of the selected `SubMaterials` list among the root's element children.
+    pub submaterial_list_ordinal: Option<usize>,
     /// Original submaterial positions; empty for a single-material library.
     pub entries: Vec<MaterialSourceEntry>,
 }

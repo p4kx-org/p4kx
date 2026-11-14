@@ -32,6 +32,7 @@ pub(crate) fn capture<'input, Interrupted>(
         encoding,
         root,
         losses: capture.losses,
+        submaterial_list_ordinal: None,
         entries: Vec::new(),
     })
 }

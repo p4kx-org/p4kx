@@ -2376,6 +2376,8 @@ For a loaded library, `materialFieldOrigins` maps JSON Pointers in this result t
 encryption marker, source-set completeness and use references. Covered fields include the library
 mode and palette name, material slots and their scalar and colour fields, texture map and file
 tokens, public parameter names and values, and all raw layer attribute names and values.
+Under /library/authored, origins also reference canonical XML names, declared attributes,
+mixed content, child positions and original submaterial slots.
 `materialProvenance` resolves those references to the selected material Entry and the original model chunk
 that selected the library. XML coordinates count original element children and parsed attributes
 from zero. The marker includes the selector's encryption. Layer targets and textures named by

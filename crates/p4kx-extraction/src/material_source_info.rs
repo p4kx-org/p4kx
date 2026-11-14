@@ -12,6 +12,10 @@ use serde::{Deserialize, Serialize};
 mod site;
 pub use self::site::MaterialSourceSite;
 
+#[path = "material_source_field_origins.rs"]
+mod field_origins;
+pub use self::field_origins::{MaterialSourceEvidence, MaterialSourceOriginError};
+
 use crate::material_xml_info::{MaterialElementInfo, MaterialParameterInfo};
 
 /// Actual source encoding, separate from generated XML or rendering output.

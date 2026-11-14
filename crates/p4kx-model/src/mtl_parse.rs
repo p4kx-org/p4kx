@@ -39,6 +39,7 @@ pub(crate) fn library<'a, Interrupted>(
     let Some(sub_materials) = sub_materials else {
         return single(path, root, authored, default_palette, checkpoint, observer);
     };
+    authored.submaterial_list_ordinal = Some(sub_materials.0);
     let (materials, unknown_entries) = submaterials(
         sub_materials.0,
         sub_materials.1,

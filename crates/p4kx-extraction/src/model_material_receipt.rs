@@ -12,7 +12,9 @@ use p4kx_model::{
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::material_source_info::MaterialSourceSite;
+use crate::material_source_info::{
+    MaterialSourceEvidence, MaterialSourceOriginError, MaterialSourceSite,
+};
 use crate::{
     ConversionError, FieldOrigins, FieldOriginsError, FieldPath, FieldPathError, InputScope,
     SourceEvidenceError, SourceInput, SourceInventory, SourceLocation, SourceScope, SourceUse,
@@ -34,6 +36,8 @@ pub(crate) enum ReceiptError {
     Path(#[from] FieldPathError),
     #[error(transparent)]
     Duplicate(#[from] FieldOriginsError),
+    #[error(transparent)]
+    Authored(#[from] MaterialSourceOriginError),
 }
 
 type Sites = BTreeMap<(usize, MaterialReadField), Vec<MaterialSourceSite>>;
@@ -111,6 +115,16 @@ impl Observations {
         for (index, material) in library.materials.iter().enumerate() {
             writer.material(index, material)?;
         }
+        let selected = uses.shared_origin(
+            writer.selector.as_slice(),
+            library_entry.is_some_and(complete)
+                && locator.is_some_and(|(entry, _)| complete(entry)),
+        );
+        MaterialSourceEvidence::new(&uses, writer.scope.as_ref(), &selected).project(
+            &library.authored,
+            &FieldPath::parse("/library/authored")?,
+            &mut writer.fields,
+        )?;
         Ok(MaterialFieldReceipt {
             material_field_origins: writer.fields,
             material_provenance: uses.freeze()?,

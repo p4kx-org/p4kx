@@ -13,8 +13,8 @@ const GEOMETRY: &str = "Data\\Objects\\Test\\cube.cgfm";
 const MATERIAL: &str = "Data\\Objects\\Test\\cube.mtl";
 const LAYER: &str = "Data\\Objects\\Test\\external.mtl";
 const LAYER_SELECTOR: &str = "/materials/1/authored/layers/0/attributes/2/value";
-const MATERIAL_XML: &str = r#"<Material DefaultPalette="">
-    <Unknown/>
+const MATERIAL_XML: &str = r#"<Material xmlns:m="urn:fixture" DefaultPalette="">
+    <Unknown m:Original="A&amp;B">lead<?fixture instruction?><!--sentinel--><![CDATA[tail]]><Child/></Unknown>
     <SubMaterials>
         <Empty/>
         <Material Name="caps" Diffuse="0.5,0.25,0.125">
@@ -240,6 +240,109 @@ fn model_info_disk_material_fields_have_unknown_archive_lineage() -> TestResult 
         info.get("materialProvenance"),
         Some(&json!({"sources": [], "uses": []})),
         "no physical Archive source was observed"
+    );
+    Ok(())
+}
+
+fn assert_original_position(
+    info: &Value,
+    pointer: &str,
+    namespace: &str,
+    indices: &Value,
+) -> TestResult {
+    let references = reference_uses(info, pointer)?;
+    assert!(
+        references.iter().any(|reference| {
+            reference
+                .pointer("/location/namespace")
+                .and_then(Value::as_str)
+                == Some(namespace)
+                && reference.pointer("/location/indices") == Some(indices)
+        }),
+        "authored XML coordinate for {pointer}"
+    );
+    assert_eq!(
+        field_origin(info, pointer)?
+            .get("sourceSetComplete")
+            .and_then(Value::as_bool),
+        Some(true),
+        "authored XML origin completeness for {pointer}"
+    );
+    Ok(())
+}
+
+fn canonical_material_positions(node: &str) -> [(String, &'static str, Value); 7] {
+    [
+        (
+            format!("{node}/syntax/attributes/0/lexeme"),
+            "materialXmlDeclaration",
+            json!(["0", "0"]),
+        ),
+        (
+            format!("{node}/attributes/0/value"),
+            "materialXmlAttribute",
+            json!(["0", "0"]),
+        ),
+        (
+            format!("{node}/syntax/content/1/target"),
+            "materialXmlContent",
+            json!(["0", "1"]),
+        ),
+        (
+            format!("{node}/syntax/content/2/value"),
+            "materialXmlContent",
+            json!(["0", "2"]),
+        ),
+        (
+            format!("{node}/children/0/name"),
+            "materialXmlElement",
+            json!(["0", "0"]),
+        ),
+        (
+            "/library/authored/root/syntax/attributes/1/value".into(),
+            "materialXmlDeclaration",
+            json!(["1"]),
+        ),
+        (
+            "/library/authored/entries/1/disposition".into(),
+            "materialXmlElement",
+            json!(["1", "1"]),
+        ),
+    ]
+}
+
+#[test]
+fn model_info_preserves_origins_for_the_canonical_material_tree() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("Data.p4k");
+    archive(&path, false, true)?;
+    let info = listing(&path, Some(MODEL))?;
+    let node = "/library/authored/root/children/0";
+    for (pointer, namespace, indices) in canonical_material_positions(node) {
+        assert_original_position(&info, &pointer, namespace, &indices)?;
+        assert_eq!(
+            field_origin(&info, &pointer)?
+                .get("containsEncryptedSource")
+                .and_then(Value::as_bool),
+            Some(true),
+            "encrypted original material value at {pointer}"
+        );
+        assert!(
+            info.pointer(&pointer).is_some(),
+            "origin addresses an actual value at {pointer}"
+        );
+    }
+    assert_eq!(
+        info.pointer(&format!("{node}/syntax/attributes/0/lexeme"))
+            .and_then(Value::as_str),
+        Some("A&amp;B"),
+        "authored token stays escaped in the canonical tree"
+    );
+    assert_eq!(
+        info.pointer(&format!("{node}/attributes/0/value"))
+            .and_then(Value::as_str),
+        Some("A&B"),
+        "decoded value stays separate from its authored token"
     );
     Ok(())
 }
