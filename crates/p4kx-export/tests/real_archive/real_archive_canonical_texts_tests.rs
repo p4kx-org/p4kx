@@ -6,6 +6,9 @@ mod forms_mutations;
 #[path = "real_archive_mission_locale_tests.rs"]
 mod mission_locales;
 
+#[path = "real_archive_text_baseline_migrations.rs"]
+mod baseline_migrations;
+
 use std::collections::BTreeSet;
 use std::error::Error;
 

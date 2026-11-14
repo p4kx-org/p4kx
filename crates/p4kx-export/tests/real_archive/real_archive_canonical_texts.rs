@@ -12,6 +12,14 @@ use crate::real_archive_contract_templates::mission_graph::{self as graph, Famil
 use crate::real_archive_text_oracle::Oracle;
 use crate::real_archive_texts::{Coverage, keyed_texts};
 
+#[path = "real_archive_canonical_extra_texts.rs"]
+mod extras;
+
+#[path = "real_archive_text_counters.rs"]
+mod counters;
+
+use counters::CoverageCounters;
+
 type TestResult<T> = Result<T, Box<dyn Error>>;
 
 /// Canonical protection domain of an owning text reference.
@@ -33,6 +41,8 @@ const FIELDS: [(&str, TextDomain); 2] = [
     ("description", TextDomain::GameText),
 ];
 
+const NAME: [(&str, TextDomain); 1] = [("name", TextDomain::PublicName)];
+const PROPERTY_NAME: [(&str, TextDomain); 1] = [("propertyName", TextDomain::PublicName)];
 const REPUTATION_DISPLAY_FIELDS: [(&str, TextDomain); 1] = [("displayName", TextDomain::GameText)];
 const STARMAP_NAME: [(&str, TextDomain); 1] = [("name", TextDomain::GameText)];
 
@@ -206,50 +216,6 @@ pub(crate) fn manufacturer_text<'catalog>(
         .map(TextTarget::source))
 }
 
-struct CoverageCounters<'oracle> {
-    english: Coverage,
-    german: Coverage,
-    english_oracle: &'oracle Oracle,
-    german_oracle: &'oracle Oracle,
-}
-
-impl<'oracle> CoverageCounters<'oracle> {
-    fn new(english: &'oracle Oracle, german: &'oracle Oracle) -> Self {
-        Self {
-            english: Coverage::default(),
-            german: Coverage::default(),
-            english_oracle: english,
-            german_oracle: german,
-        }
-    }
-
-    fn count(&mut self, target: Option<&TextTarget<'_>>) -> TestResult<()> {
-        let Some(target) = target else {
-            return Ok(());
-        };
-        if p4kx_extraction::is_placeholder_key(target.key) {
-            return Ok(());
-        }
-        self.english.count_forms(
-            self.english_oracle,
-            target.key,
-            target.raw("en")?,
-            target.shown("en")?,
-        );
-        self.german.count_forms(
-            self.german_oracle,
-            target.key,
-            target.raw("de")?,
-            target.shown("de")?,
-        );
-        Ok(())
-    }
-
-    fn finish(self) -> (Coverage, Coverage) {
-        (self.english, self.german)
-    }
-}
-
 pub(crate) fn kind_coverage(
     catalog: &Value,
     kind: Kind,
@@ -270,6 +236,8 @@ pub(crate) fn kind_coverage(
         Kind::Manufacturers
             | Kind::Commodities
             | Kind::ResourceTypes
+            | Kind::ResourceGroups
+            | Kind::GameplayProperties
             | Kind::Blueprints
             | Kind::ReputationScopes
             | Kind::ReputationStandings
@@ -374,6 +342,8 @@ fn canonical_coverage(
                 REPUTATION_DISPLAY_FIELDS.as_slice(),
                 TextReferenceShape::Required,
             ),
+            Kind::ResourceGroups => (NAME.as_slice(), TextReferenceShape::Required),
+            Kind::GameplayProperties => (PROPERTY_NAME.as_slice(), TextReferenceShape::Required),
             Kind::Commodities => (PRESENTATION_FIELDS.as_slice(), TextReferenceShape::Nullable),
             Kind::StarmapObjects => (STARMAP_NAME.as_slice(), TextReferenceShape::Required),
             _ => (FIELDS.as_slice(), TextReferenceShape::Required),
@@ -385,6 +355,7 @@ fn canonical_coverage(
                 shape,
             )?)?;
         }
+        extras::compare(&mut counters, &index, kind, row)?;
     }
     Ok(counters.finish())
 }

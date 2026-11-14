@@ -41,3 +41,25 @@ The baseline reproduction and source-line concordance establish the cause of #10
 They do not establish completeness of unrelated domain projections or validate a PTU Build.
 The final milestone gate still runs the full current real-Archive suite after the remaining
 catalog adaptations land.
+
+## Canonical text verification
+
+The ResourceGroup, gameplay-property, reputation scope and reputation standing name references
+contribute to the same per-kind denominators. The new group and scope descriptions, standing perk
+description, gameplay-property unit formats and name overrides have independent contradiction
+checks. A source translation gap in an added field leaves the existing denominator unchanged.
+
+The ignored LIVE text check runs a single unfiltered catalog writer before comparing the current
+Build identity and English and German source lines:
+
+~~~powershell
+cargo test --locked -p p4kx-export --test real_archive -- installed_live_catalog_texts_match_the_independent_source_oracle --ignored --nocapture
+~~~
+
+Set the installed LIVE Archive through `P4KX_DATA_P4K` and use the configured testkit key source
+and task-local `TMP` and `TEMP`. The test streams into a temporary file bounded by the catalog's
+decompressed limit, then parses the JSON for the existing consumer oracle. The DOM and the
+canonical producer can each need several gigabytes on a large Build. This targeted check
+requires complete reads and projections for the text families with baselines. It allows
+unrelated diagnostic partial publication. Keep raw output private. The final milestone's
+full installed-Archive suite is a separate run.

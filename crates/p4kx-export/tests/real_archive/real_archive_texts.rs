@@ -25,6 +25,9 @@ mod tests;
 #[path = "real_archive_canonical_texts_tests.rs"]
 mod canonical_tests;
 
+#[path = "real_archive_live_texts.rs"]
+mod live;
+
 /// The baseline of a kind: the largest share of its keyed texts the English and the German
 /// `global.ini` may lack, as measured on LIVE and rounded up to the hundredth. A kind with keyed
 /// texts that is not listed has a baseline of zero, so a new kind with untranslated keys names
@@ -86,6 +89,7 @@ pub(crate) struct Coverage {
     fallback: usize,
     /// Texts where the catalog contradicts the file: the exporter is wrong.
     contradictions: usize,
+    supplemental_contradictions: usize,
     /// The first keys of the contradictions and of the fallbacks.
     contradicted: Vec<String>,
     lacking: Vec<String>,
@@ -161,6 +165,14 @@ impl Coverage {
                 ));
             }
         }
+    }
+
+    pub(super) fn with_supplemental(mut self, extra: Self) -> Self {
+        self.supplemental_contradictions = extra.contradictions;
+        let available = SAMPLE.saturating_sub(self.contradicted.len());
+        self.contradicted
+            .extend(extra.contradicted.into_iter().take(available));
+        self
     }
 
     const fn total(&self) -> usize {
@@ -286,10 +298,11 @@ fn verdict(
     ceiling: Option<f64>,
     failures: &mut Vec<String>,
 ) {
-    if coverage.contradictions > 0 {
+    let contradictions = coverage.contradictions + coverage.supplemental_contradictions;
+    if contradictions > 0 {
         failures.push(format!(
             "{kind}: {} {language} texts contradict the global.ini, e.g. {:?}",
-            coverage.contradictions, coverage.contradicted
+            contradictions, coverage.contradicted
         ));
     }
     let fallback = share(coverage.fallback, coverage.total());
@@ -318,6 +331,8 @@ fn check_coverage(
                 kind,
                 Kind::Manufacturers
                     | Kind::ResourceTypes
+                    | Kind::ResourceGroups
+                    | Kind::GameplayProperties
                     | Kind::Commodities
                     | Kind::ContractTemplates
                     | Kind::MissionBrokerEntries
@@ -330,6 +345,8 @@ fn check_coverage(
                 "{kind}: positive baseline rows have no verifiable canonical texts"
             ));
         }
+        verdict(kind, "en", english, None, failures);
+        verdict(kind, "de", german, None, failures);
         return;
     }
     let baseline = baseline(kind);
