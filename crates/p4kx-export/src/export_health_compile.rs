@@ -237,8 +237,20 @@ pub(crate) fn prepare_report(
     warnings: &[CraftingWarning],
     mode: CatalogPublicationMode,
 ) -> Result<PreparedHealth, ExportAccountingError> {
+    prepare_report_for(ledger, rows, failures, warnings, mode, Kind::ALL)
+}
+
+/// Resolves accounting for the requested kind inventories.
+pub(crate) fn prepare_report_for(
+    ledger: ExportLedger,
+    rows: &[KindSummary],
+    failures: impl IntoIterator<Item = p4kx_extraction::Guid>,
+    warnings: &[CraftingWarning],
+    mode: CatalogPublicationMode,
+    scope: impl IntoIterator<Item = Kind>,
+) -> Result<PreparedHealth, ExportAccountingError> {
     let evidence = Evidence::read(ledger, failures, warnings)?;
-    let kinds = Kind::ALL
+    let kinds = scope
         .into_iter()
         .map(|kind| evidence.kind(kind, rows))
         .collect::<Result<Vec<_>, _>>()?;

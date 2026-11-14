@@ -8,6 +8,13 @@ use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 use crate::catalog_output::{Compression, emit};
 use crate::{BuiltCatalog, CatalogError, CatalogOptions, CatalogSummary};
 
+#[cfg(test)]
+#[path = "../tests/real_archive/real_archive_resource_oracles.rs"]
+mod resource_oracle;
+#[cfg(test)]
+#[path = "build_resource_oracle.rs"]
+mod resource_projection;
+
 /// Builds a deterministic P4KX catalog from the DataForge and available localization inputs.
 ///
 /// Resource definitions retain per-value source origins and canonical text references.

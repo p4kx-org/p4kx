@@ -227,7 +227,7 @@ fn project_tree<'f>(
     let gameplay = mode.property(selected, admission, tree, &mut ledger, cancel)?;
     let piece = if input.is_some() || gameplay.is_some() {
         None
-    } else if let ReadMode::Catalog(projection) = mode
+    } else if let Some(projection) = mode.projection()
         && selected.action == Action::Blueprint
     {
         Some(read_blueprint(
@@ -329,7 +329,10 @@ fn read_scoped<'f>(
         .collect::<Result<Vec<_>, _>>()?;
     let mut result = super::assemble::assemble(tracked, mode.origins(), cancel)?;
     inventories(&mut result.ledger);
-    if !result.data.pools.is_empty() {
+    let search_rewards = !result.data.pools.is_empty();
+    #[cfg(test)]
+    let search_rewards = search_rewards && mode.searches_reward_sources();
+    if search_rewards {
         let found = crafting_scan::reward_sources(
             records,
             &result.data.pools,

@@ -3,9 +3,9 @@
 
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
-use crate::resource_fixture_values as values;
-use crate::resource_quality_schema_fixture::OverrideEntryTarget;
-use crate::resource_schema_fixture;
+use super::resource_fixture_values as values;
+use super::resource_quality_schema_fixture::OverrideEntryTarget;
+use super::resource_schema_fixture;
 
 pub(crate) const RESOURCE_ALPHA: u128 = 0x7001;
 pub(crate) const RESOURCE_BETA: u128 = 0x7002;

@@ -3,8 +3,8 @@
 
 use p4kx_testkit::{DataForgeBuilder, TestStruct, TestType};
 
-use crate::resource_density_schema_fixture;
-use crate::resource_quality_schema_fixture::{self, OverrideEntryTarget};
+use super::resource_density_schema_fixture;
+use super::resource_quality_schema_fixture::{self, OverrideEntryTarget};
 
 /// Adds the synthetic resource declarations; the caller supplies external Reference targets.
 pub(crate) fn declarations(

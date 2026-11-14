@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use p4kx_export::{Kind, is_kind_leftover};
+use crate::{Kind, is_kind_leftover};
 use p4kx_extraction::{
     ArchiveWatch, DataForge, DataForgeOrigin, Guid, Record, RecordTree, TreeBuilder, Value as Raw,
 };

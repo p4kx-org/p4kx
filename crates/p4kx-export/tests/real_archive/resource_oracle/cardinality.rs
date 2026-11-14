@@ -9,8 +9,6 @@ use serde_json::Value;
 
 use super::{Failure, Result};
 
-pub(super) const MAX_ROWS: usize = 16_384;
-
 #[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(super) struct Counts {
@@ -67,8 +65,8 @@ fn rows<'catalog>(catalog: &'catalog Value, path: &str) -> Result<&'catalog [Val
         .get("rows")
         .and_then(Value::as_array)
         .ok_or_else(|| Failure::check("commodity-dataset-rows"))?;
-    if rows.is_empty() || rows.len() > MAX_ROWS {
-        return Err(Failure::check("commodity-row-budget"));
+    if rows.is_empty() {
+        return Err(Failure::check("commodity-rows-empty"));
     }
     Ok(rows)
 }
@@ -127,7 +125,7 @@ mod tests {
     use p4kx_extraction::Guid;
     use serde_json::{Value, json};
 
-    use super::{Counts, MAX_ROWS, Result, check};
+    use super::{Counts, Result, check};
 
     #[must_use]
     fn id(byte: u8) -> String {
@@ -307,7 +305,7 @@ mod tests {
         assert!(!format!("{error:?}").contains("private-record-identity"));
     }
     #[test]
-    fn both_canonical_datasets_must_be_available_bounded_nonempty_arrays() {
+    fn both_canonical_datasets_must_be_available_nonempty_arrays() {
         for path in [
             "/definitions/commodities",
             "/projections/commodityPresentation",
@@ -326,17 +324,12 @@ mod tests {
                     "unavailable data is not zero cardinality"
                 );
             }
-            for rows in [
-                Value::Null,
-                json!({}),
-                json!([]),
-                Value::Array(vec![Value::Null; MAX_ROWS + 1]),
-            ] {
+            for rows in [Value::Null, json!({}), json!([]), json!([null])] {
                 let mut catalog = catalog();
                 catalog.pointer_mut(path).expect("synthetic dataset")["rows"] = rows;
                 assert!(
                     check(&catalog).is_err(),
-                    "both row inventories obey the existing budget"
+                    "both inventories require valid nonempty row arrays"
                 );
             }
             let mut missing = catalog();

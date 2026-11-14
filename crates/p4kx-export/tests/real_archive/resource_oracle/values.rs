@@ -12,11 +12,8 @@ use serde_json::Value;
 
 use super::carriers::{Carriers, Uses};
 use super::{Failure, Result, compare};
+use crate::Kind;
 
-const MAX_SAMPLE_ROWS: usize = 64;
-const MAX_RESOURCE_ROWS: usize = 16_384;
-const MAX_RAW_VALUES: usize = 65_536;
-const MAX_RAW_DEPTH: usize = 32;
 const ROOT_FIELDS: &[&str] = &[
     "validateDefaultCargoBox",
     "defaultCargoContainers",
@@ -26,7 +23,7 @@ const ROOT_FIELDS: &[&str] = &[
 #[derive(Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Coverage {
-    sampled_rows: usize,
+    checked_rows: usize,
     checked_values: usize,
     owned_fields: usize,
     packaging_slots: usize,
@@ -35,19 +32,6 @@ pub(super) struct Coverage {
     quality_values: usize,
     null_box_slots: usize,
     unresolved_boxes: BTreeMap<&'static str, usize>,
-}
-
-impl Coverage {
-    const fn require_capabilities(&self) -> Result<()> {
-        if self.packaging_slots == 0
-            || self.volatility_properties == 0
-            || self.quality_properties == 0
-            || self.quality_values == 0
-        {
-            return Err(Failure::check("bounded-sample-missing-required-capability"));
-        }
-        Ok(())
-    }
 }
 
 pub(super) fn check(
@@ -67,18 +51,19 @@ pub(super) fn check(
         .pointer("/definitions/resourceTypes/rows")
         .and_then(Value::as_array)
         .ok_or_else(|| Failure::check("canonical-resource-table"))?;
-    if rows.is_empty() || rows.len() > MAX_RESOURCE_ROWS {
-        return Err(Failure::check("resource-row-budget"));
-    }
     let uses = Uses::new(catalog, origin)?;
+    let mut owners = source_owners(forge)?;
     let mut coverage = Coverage::default();
     let mut fields = BTreeSet::new();
     let mut builder = TreeBuilder::new();
-    for row in rows.iter().take(MAX_SAMPLE_ROWS) {
+    for row in rows {
         watch
             .poll()
             .map_err(|error| Failure::source("archive-source-changed", error))?;
         let index = uses.record_index(row)?;
+        if !owners.remove(&index) {
+            return Err(Failure::check("duplicate-or-outside-resource-owner"));
+        }
         let record = forge
             .record(index)
             .ok_or_else(|| Failure::check("physical-resource-record"))?;
@@ -87,15 +72,41 @@ pub(super) fn check(
             .map_err(|error| Failure::source("raw-resource-tree", error))?;
         identity(&tree, row)?;
         super::record_header::check(&tree, row, &uses)?;
-        sample(&tree, row, &uses, &mut coverage, &mut fields)?;
-        coverage.sampled_rows += 1;
+        check_owned_fields(&tree, row, &uses, &mut coverage, &mut fields)?;
+        coverage.checked_rows += 1;
+    }
+    if !owners.is_empty() {
+        return Err(Failure::check("missing-resource-owner"));
     }
     coverage.owned_fields = fields.len();
-    coverage.require_capabilities()?;
     Ok(coverage)
 }
 
-fn sample<'catalog>(
+fn source_owners(forge: &DataForge<'_>) -> Result<BTreeSet<u32>> {
+    let mut owners = BTreeSet::new();
+    for record in forge.records() {
+        let kind = record
+            .type_name()
+            .map_err(|error| Failure::source("resource-source-type", error))?;
+        if kind != "ResourceType" {
+            continue;
+        }
+        let path = record
+            .record_path()
+            .map_err(|error| Failure::source("resource-source-path", error))?;
+        let name = record
+            .name()
+            .map_err(|error| Failure::source("resource-source-name", error))?;
+        if Kind::by_record(path, kind) == Some(Kind::ResourceTypes)
+            && !crate::selection::is_kind_leftover(Kind::ResourceTypes, path, name)
+        {
+            owners.insert(record.index());
+        }
+    }
+    Ok(owners)
+}
+
+fn check_owned_fields<'catalog>(
     tree: &RecordTree<'_>,
     row: &'catalog Value,
     uses: &Uses<'catalog>,
@@ -112,7 +123,7 @@ fn sample<'catalog>(
         walker
             .fields
             .insert((tree.type_name().to_owned(), (*name).to_owned()));
-        walker.walk(tree.field(name), name, 0)?;
+        walker.walk(tree.field(name), name)?;
     }
     Ok(())
 }
@@ -133,51 +144,55 @@ struct Walker<'walk, 'catalog> {
     fields: &'walk mut BTreeSet<(String, String)>,
 }
 
+struct Comparison<'tree, 'source, 'catalog> {
+    raw: Option<&'tree Raw<'source>>,
+    path: String,
+    carrier: &'catalog Value,
+    cargo_slot: Option<u64>,
+}
+
 impl<'catalog> Walker<'_, 'catalog> {
-    fn walk(&mut self, raw: Option<&Raw<'_>>, path: &str, depth: usize) -> Result<()> {
+    fn walk(&mut self, raw: Option<&Raw<'_>>, path: &str) -> Result<()> {
         let carrier = self.carriers.root(path)?;
-        self.bound(raw, path, carrier, depth)
-    }
-
-    fn bound(
-        &mut self,
-        raw: Option<&Raw<'_>>,
-        path: &str,
-        carrier: &'catalog Value,
-        depth: usize,
-    ) -> Result<()> {
-        self.bound_at(raw, path, carrier, depth, None)
-    }
-
-    fn bound_at(
-        &mut self,
-        raw: Option<&Raw<'_>>,
-        path: &str,
-        carrier: &'catalog Value,
-        depth: usize,
-        slot: Option<u64>,
-    ) -> Result<()> {
-        if depth > MAX_RAW_DEPTH || self.coverage.checked_values >= MAX_RAW_VALUES {
-            return Err(Failure::check("raw-source-walk-budget"));
+        let mut remaining = vec![Comparison {
+            raw,
+            path: path.to_owned(),
+            carrier,
+            cargo_slot: None,
+        }];
+        while let Some(value) = remaining.pop() {
+            self.compare(value, &mut remaining)?;
         }
+        Ok(())
+    }
+
+    fn compare<'tree, 'source>(
+        &mut self,
+        value: Comparison<'tree, 'source, 'catalog>,
+        remaining: &mut Vec<Comparison<'tree, 'source, 'catalog>>,
+    ) -> Result<()> {
+        let Comparison {
+            raw,
+            path,
+            carrier,
+            cargo_slot,
+        } = value;
         self.coverage.checked_values += 1;
-        self.require_origin(carrier, path, slot)?;
+        self.require_origin(carrier, &path, cargo_slot)?;
         match raw {
             None => Self::require_state(carrier, "absent"),
             Some(Raw::Null) => Self::require_state(carrier, "null"),
-            Some(Raw::Struct(source)) => self.structure(source, path, carrier, depth),
-            Some(Raw::Array(values)) => self.array(values, path, carrier, depth),
+            Some(Raw::Struct(source)) => self.structure(source, &path, carrier, remaining),
+            Some(Raw::Array(values)) => Self::array(values, &path, carrier, remaining),
             Some(raw) if compare::is_reference(raw) => {
-                self.reference(raw, path, carrier, slot)?;
-                self.checked_quality(path);
+                self.reference(raw, &path, carrier, cargo_slot)?;
+                self.checked_quality(&path);
                 Ok(())
             }
-            Some(Raw::Error(error)) => {
-                Err(Failure::source("sampled-source-field-unreadable", *error))
-            }
+            Some(Raw::Error(error)) => Err(Failure::source("source-field-unreadable", *error)),
             Some(raw) => {
-                Self::scalar(raw, path, carrier)?;
-                self.checked_quality(path);
+                Self::scalar(raw, &path, carrier)?;
+                self.checked_quality(&path);
                 Ok(())
             }
         }
@@ -209,15 +224,15 @@ impl<'catalog> Walker<'_, 'catalog> {
         Err(Failure::check("raw-source-state-mismatch"))
     }
 
-    fn structure(
+    fn structure<'tree, 'source>(
         &mut self,
-        source: &StructValue<'_>,
+        source: &'tree StructValue<'source>,
         path: &str,
         carrier: &'catalog Value,
-        depth: usize,
+        remaining: &mut Vec<Comparison<'tree, 'source, 'catalog>>,
     ) -> Result<()> {
         if path == "defaultCargoContainers" {
-            return self.cargo(source, path, carrier, depth);
+            return self.cargo(source, path, carrier, remaining);
         }
         if !compare::present(carrier).is_some_and(Value::is_object) {
             return Err(Failure::check("owned-structure-missing"));
@@ -231,40 +246,44 @@ impl<'catalog> Walker<'_, 'catalog> {
             "ResourceTypeCraftingData" => self.coverage.quality_properties += 1,
             _ => {}
         }
-        for field in source.fields() {
+        for field in source.fields().iter().rev() {
             self.fields
                 .insert((source.type_name().to_owned(), field.name().to_owned()));
             let child = self.carriers.child(carrier, path, field.name())?;
-            self.bound(
-                Some(field.value()),
-                &format!("{path}.{}", field.name()),
-                child,
-                depth + 1,
-            )?;
+            remaining.push(Comparison {
+                raw: Some(field.value()),
+                path: format!("{path}.{}", field.name()),
+                carrier: child,
+                cargo_slot: None,
+            });
         }
         Ok(())
     }
 
-    fn array(
-        &mut self,
-        source: &[Raw<'_>],
+    fn array<'tree, 'source>(
+        source: &'tree [Raw<'source>],
         path: &str,
         carrier: &'catalog Value,
-        depth: usize,
+        remaining: &mut Vec<Comparison<'tree, 'source, 'catalog>>,
     ) -> Result<()> {
         let output = array_value(carrier, source.len(), "owned-array-length-or-order")?;
-        for (index, (value, emitted)) in source.iter().zip(output).enumerate() {
-            self.bound(Some(value), &format!("{path}[{index}]"), emitted, depth + 1)?;
+        for (index, (value, emitted)) in source.iter().zip(output).enumerate().rev() {
+            remaining.push(Comparison {
+                raw: Some(value),
+                path: format!("{path}[{index}]"),
+                carrier: emitted,
+                cargo_slot: None,
+            });
         }
         Ok(())
     }
 
-    fn cargo(
+    fn cargo<'tree, 'source>(
         &mut self,
-        source: &StructValue<'_>,
+        source: &'tree StructValue<'source>,
         path: &str,
         carrier: &'catalog Value,
-        depth: usize,
+        remaining: &mut Vec<Comparison<'tree, 'source, 'catalog>>,
     ) -> Result<()> {
         let output = array_value(carrier, source.fields().len(), "cargo-slot-cardinality")?;
         for ((field, emitted), ordinal) in source.fields().iter().zip(output).zip(0_u64..) {
@@ -287,7 +306,12 @@ impl<'catalog> Walker<'_, 'catalog> {
                 .insert((source.type_name().to_owned(), field.name().to_owned()));
             self.coverage.packaging_slots += 1;
             self.box_status(field.value());
-            self.bound_at(Some(field.value()), &item, entity, depth + 1, Some(ordinal))?;
+            remaining.push(Comparison {
+                raw: Some(field.value()),
+                path: item,
+                carrier: entity,
+                cargo_slot: Some(ordinal),
+            });
         }
         Ok(())
     }

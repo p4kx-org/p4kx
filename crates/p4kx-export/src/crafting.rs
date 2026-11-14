@@ -102,7 +102,7 @@ pub(crate) fn read_with_progress<'f>(
         filter,
         cancel,
         progress,
-        ledger::ReadMode::Catalog(projection),
+        ledger::ReadMode::catalog(projection),
     )
 }
 

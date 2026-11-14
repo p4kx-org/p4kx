@@ -28,7 +28,6 @@ use crate::scan_health::{RecordEntityRows, RecordScan, ScanError, ScanRead, Sour
 use crate::scan_signature::SignatureSlot;
 use crate::ship_pool::ShipPool;
 use crate::starmap::TypeNames;
-use crate::starmap_containers::Placements;
 use crate::texts::Texts;
 use crate::{CatalogError, CatalogOptions, CatalogPhase, CatalogProgress, Kind};
 
@@ -41,6 +40,9 @@ const CRAFTER_STRUCT: &str = "CrafterComponentParams";
 mod ammo;
 #[path = "scan_definition_projection.rs"]
 mod definition_projection;
+#[path = "scan_domain.rs"]
+mod domain;
+pub(crate) use domain::ScanDomain;
 #[path = "scan_groups.rs"]
 mod groups;
 #[path = "scan_projection.rs"]
@@ -65,7 +67,7 @@ pub(crate) struct Scan<'o, 'a, 'f> {
     options: &'o CatalogOptions<'a>,
     texts: &'o Texts<'f>,
     projection: &'f CatalogProjection<'f, 'f>,
-    placements: &'o Placements,
+    domain: ScanDomain<'o>,
     types: TypeNames<'f>,
     links: Links<'f>,
     crafters: Option<PointerProbe<'f>>,
@@ -87,10 +89,10 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         options: &'o CatalogOptions<'a>,
         projection: &'f CatalogProjection<'f, 'f>,
         crafting: &CraftingKinds<'f>,
-        placements: &'o Placements,
+        domain: ScanDomain<'o>,
     ) -> Result<ScanRead<'f>, CatalogError> {
         projection.original().check_forge(forge)?;
-        let records: Vec<Record<'f>> = forge.records().collect();
+        let records = domain.records(forge);
         let groups::GroupRead {
             groups,
             members,
@@ -113,7 +115,7 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
             options,
             texts: projection.legacy_texts(),
             projection,
-            placements,
+            domain,
             types: TypeNames::default(),
             links: Links::default(),
             crafters: forge.pointer_probe(CRAFTER_FIELD, CRAFTER_STRUCT),
@@ -175,9 +177,9 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         if self.options.filter.is_none() && has_signatures {
             picked.extend(slot_problem.map(|problem| Picked::Warned(problem.warning())));
         }
-        let inventories = Kind::ALL
-            .into_iter()
-            .filter(|kind| !kind.has_dedicated_reader() && !kind.is_derived());
+        let inventories = Kind::ALL.into_iter().filter(|kind| {
+            !kind.has_dedicated_reader() && !kind.is_derived() && self.domain.includes(*kind)
+        });
         for kind in inventories {
             ledger.inventory(kind);
         }

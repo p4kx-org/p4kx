@@ -21,14 +21,56 @@ use super::selection::{self, Action, ReadPolicy, Selection};
 #[derive(Clone, Copy)]
 pub(crate) enum ReadMode<'context, 'source> {
     Interpreted,
-    Catalog(&'context CatalogProjection<'context, 'source>),
+    Catalog {
+        projection: &'context CatalogProjection<'context, 'source>,
+        #[cfg(test)]
+        search_reward_sources: bool,
+    },
 }
 
 impl<'context, 'source> ReadMode<'context, 'source> {
-    pub(super) const fn input(self) -> Option<&'context OriginalCatalogInput<'context, 'source>> {
+    pub(crate) const fn catalog(
+        projection: &'context CatalogProjection<'context, 'source>,
+    ) -> Self {
+        Self::Catalog {
+            projection,
+            #[cfg(test)]
+            search_reward_sources: true,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn resource_oracle(
+        projection: &'context CatalogProjection<'context, 'source>,
+    ) -> Self {
+        Self::Catalog {
+            projection,
+            search_reward_sources: false,
+        }
+    }
+
+    pub(super) const fn projection(self) -> Option<&'context CatalogProjection<'context, 'source>> {
         match self {
             Self::Interpreted => None,
-            Self::Catalog(projection) => Some(projection.original()),
+            Self::Catalog { projection, .. } => Some(projection),
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) const fn searches_reward_sources(self) -> bool {
+        match self {
+            Self::Interpreted => true,
+            Self::Catalog {
+                search_reward_sources,
+                ..
+            } => search_reward_sources,
+        }
+    }
+
+    pub(super) const fn input(self) -> Option<&'context OriginalCatalogInput<'context, 'source>> {
+        match self.projection() {
+            Some(projection) => Some(projection.original()),
+            None => None,
         }
     }
 
@@ -37,14 +79,17 @@ impl<'context, 'source> ReadMode<'context, 'source> {
         record: &'read Record<'record>,
     ) -> Result<RecordObservation<'read, 'record>, CatalogError> {
         match self {
+            Self::Catalog { projection, .. } => {
+                RecordObservation::capture(projection.original(), record)
+            }
             Self::Interpreted => Ok(RecordObservation::accounting(record)),
-            Self::Catalog(projection) => RecordObservation::capture(projection.original(), record),
         }
     }
+
     pub(super) const fn origins(self) -> Option<&'context CatalogOrigins> {
-        match self {
-            Self::Interpreted => None,
-            Self::Catalog(projection) => Some(projection.origins()),
+        match self.projection() {
+            Some(projection) => Some(projection.origins()),
+            None => None,
         }
     }
 
@@ -125,7 +170,7 @@ impl<'context, 'source> ReadMode<'context, 'source> {
         ledger: &mut ExportLedger,
         cancel: Option<&CancelToken>,
     ) -> Result<Option<GameplayPropertyInput<'source>>, CatalogError> {
-        let Self::Catalog(projection) = self else {
+        let Some(projection) = self.projection() else {
             return Ok(None);
         };
         if selected.action != Action::Property {

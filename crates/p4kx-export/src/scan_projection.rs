@@ -92,7 +92,7 @@ impl<'f> Scan<'_, '_, 'f> {
             self.texts,
             self.forge,
             &self.types,
-            self.placements,
+            self.domain.placements,
         );
         let (read, notes) = starmap_object_definition::read(
             tree,

@@ -39,7 +39,7 @@ impl Fixture {
         let origin = archive
             .entry_origin(entry)
             .ok_or_else(|| Failure::check("synthetic-origin"))?;
-        let sources = SourceUses::new();
+        let sources = SourceUses::with_compact_coordinates();
         let scope = sources
             .observe(SourceInput::Archive(&origin), InputScope::Payload)
             .map_err(|error| Failure::source("synthetic-scope", error))?;
@@ -92,7 +92,7 @@ impl Fixture {
             coverage: &mut coverage,
             fields: &mut fields,
         }
-        .walk(Some(raw), path, 0)
+        .walk(Some(raw), path)
     }
 }
 

@@ -32,7 +32,7 @@ impl Fixture {
         let origin = archive
             .entry_origin(entry)
             .ok_or_else(|| Failure::check("synthetic-origin"))?;
-        let sources = SourceUses::new();
+        let sources = SourceUses::with_compact_coordinates();
         let _scope = sources
             .observe(SourceInput::Archive(&origin), InputScope::Payload)
             .map_err(|error| Failure::source("synthetic-observation", error))?;

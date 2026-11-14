@@ -14,12 +14,26 @@ mod cardinality;
 mod carriers;
 #[path = "resource_oracle/compare.rs"]
 mod compare;
+#[path = "../it/crafting_fixture/mod.rs"]
+mod crafting_fixture;
 #[path = "resource_oracle/fixture.rs"]
 mod fixture;
 #[path = "resource_oracle/groups.rs"]
 mod groups;
+#[path = "resource_oracle/projection_tests.rs"]
+mod projection_tests;
 #[path = "resource_oracle/record_header.rs"]
 mod record_header;
+#[path = "../it/resource_density_schema_fixture.rs"]
+mod resource_density_schema_fixture;
+#[path = "../it/resource_fixture.rs"]
+mod resource_fixture;
+#[path = "../it/resource_fixture_values.rs"]
+mod resource_fixture_values;
+#[path = "../it/resource_quality_schema_fixture.rs"]
+mod resource_quality_schema_fixture;
+#[path = "../it/resource_schema_fixture.rs"]
+mod resource_schema_fixture;
 #[path = "resource_oracle/values.rs"]
 mod values;
 

@@ -1,43 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{self, Write};
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::{
-    CatalogOptions, CatalogPublicationMode, CatalogSummary, Compression, DECOMPRESSED_LIMIT, Kind,
-    write_catalog_from,
-};
 use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry};
 use serde::Serialize;
 use serde_json::Value;
 
+use super::super::resource_projection;
 use super::{Failure, Result, build, cardinality, groups, values};
-
-const MAX_RECORDS: usize = 2_000_000;
-
-struct Limited(Vec<u8>);
-
-impl Write for Limited {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        let next = self
-            .0
-            .len()
-            .checked_add(bytes.len())
-            .ok_or_else(|| io::Error::other("catalog byte budget"))?;
-        if u64::try_from(next).map_or(true, |next| next > DECOMPRESSED_LIMIT) {
-            return Err(io::Error::other("catalog byte budget"));
-        }
-        self.0.try_reserve(bytes.len()).map_err(io::Error::other)?;
-        self.0.extend_from_slice(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
+use crate::ExportHealth;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -68,9 +41,6 @@ pub(super) fn verify(path: &Path, channel: &'static str) -> Result<()> {
     let forge = entry
         .open()
         .map_err(|error| Failure::source("dcb-open", error))?;
-    if forge.records().len() > MAX_RECORDS {
-        return Err(Failure::check("record-inventory-budget"));
-    }
     let catalog = production_catalog(&archive, &entry)?;
     identity.check_catalog(&catalog)?;
     let counts = cardinality::check(&catalog)?;
@@ -91,23 +61,15 @@ pub(super) fn verify(path: &Path, channel: &'static str) -> Result<()> {
 }
 
 fn production_catalog(archive: &Archive, entry: &DataForgeEntry) -> Result<Value> {
-    let options = CatalogOptions {
-        publication_mode: CatalogPublicationMode::DiagnosticPartial,
-        ..CatalogOptions::new(UNIX_EPOCH)
-    };
-    let (summary, written) =
-        write_catalog_from(archive, entry, &options, Compression::None, || {
-            Ok(Limited(Vec::new()))
-        })
-        .map_err(|error| Failure::source("production-catalog", error))?;
-    complete_sources(&summary)?;
-    serde_json::from_slice(&written.0).map_err(|error| Failure::source("catalog-json", error))
+    let (catalog, health) = resource_projection::read(archive, entry, UNIX_EPOCH)
+        .map_err(|error| Failure::source("resource-projection", error))?;
+    complete_sources(&health)?;
+    Ok(catalog)
 }
 
-fn complete_sources(summary: &CatalogSummary) -> Result<()> {
-    for kind in [Kind::Commodities, Kind::ResourceTypes, Kind::ResourceGroups] {
-        let health = summary
-            .export_health()
+pub(super) fn complete_sources(health: &ExportHealth) -> Result<()> {
+    for kind in resource_projection::COVERED {
+        let health = health
             .kind(kind)
             .ok_or_else(|| Failure::check("affected-kind-health"))?;
         let sources = health.source_records;

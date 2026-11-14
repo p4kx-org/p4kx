@@ -1,24 +1,24 @@
 # Resource source verification
 
-The resource oracle compares the production catalog with the raw DataForge from the same
-retained DataForgeEntry. It checks commodity identity and nullable shared resource links,
-then samples canonical ResourceType packaging, validation, volatility and owned quality values.
-It does not use a reconstructed resource DTO as its expected output.
+The resource oracle compares production table output with the raw DataForge from the same
+retained DataForgeEntry. It checks commodity identity and nullable shared resource links, then
+compares packaging, validation, volatility and owned quality values for every admitted ResourceType.
 
 ## Synthetic checks
 
 Run the oracle's pure and generated-Archive tests without game data:
 
 ~~~powershell
-cargo nextest run --locked -p p4kx-export --test real_archive -E 'test(real_archive_resource_oracles)'
+cargo nextest run --locked -p p4kx-export --lib -E 'test(resource_oracle)'
 ~~~
 
-The generated-Archive cases call write_catalog_from and then compare its actual JSON with the
-same raw DataForge. They cover concrete and base override-entry declarations. Mutation checks
-reject a wrong canonical value even when an additive sibling carries the correct value, wrong
-nested quality values, invalid immediate encryption markers, incomplete source sets and altered
-physical source metadata. Other synthetic resource tests cover absent, null, empty, dangling,
-unreadable and non-finite owned values.
+The generated-Archive cases compare the full catalog output with the same raw DataForge.
+They cover concrete and base override-entry declarations. Parity checks compare the scoped and
+normal catalog tables, including Blueprint-cost fallback, quality-quantization fallback and a
+catalog with a discovered BlueprintPool reward. Mutation checks reject wrong canonical and nested
+quality values, missing and duplicated physical owners, invalid immediate encryption markers,
+incomplete source sets and altered physical source metadata. Other synthetic tests cover absent,
+null, empty, dangling, unreadable and non-finite owned values.
 
 ## Installed Archive check
 
@@ -29,13 +29,18 @@ and optionally P4KX_DATA_P4K_B to a second Archive. The existing real_archive_ke
 the configured key; do not put a key in the command, fixture or report.
 
 ~~~powershell
-cargo nextest run --locked -p p4kx-export --test real_archive --run-ignored ignored-only -E 'test(commodity_identity_and_resource_owned_values_match_the_observed_build)'
+cargo nextest run --locked -p p4kx-export --lib --run-ignored ignored-only -E 'test(commodity_identity_and_resource_owned_values_match_the_observed_build)'
 ~~~
 
-Each Archive must retain complete commodity and ResourceType source inventories. The oracle
-checks that the catalog's branch, version, changeNumber and buildId match the observed Build.
-It emits only a SHA-256 Build tag, aggregate cardinalities, aggregate resource coverage and
-the exact-cardinality pin state. It emits no Record names, paths, GUIDs or gameplay values.
+The installed oracle builds a private view of the commodity, ResourceType and ResourceTypeGroup
+catalog tables through the production scanner. It reads every admitted resource Record and keeps
+unreadable selection candidates. The unfiltered Blueprint costs and quality quantizations supply
+fallback evidence. BlueprintPool reward discovery is outside the resource proof. Authored
+quality-location links retain their referenced StarmapObject records. The same archive supplies
+source locale keys and original provenance. The full catalog transport has its own verification.
+The oracle requires complete resource inventories and checks branch, version,
+changeNumber and buildId. Its report contains a SHA-256 Build tag, aggregate cardinalities and
+resource coverage, and the exact-cardinality pin state.
 
 The source comparison uses the common frozen provenance contract to check all observed DCB
 source and metadata-use fields, including ancestor sources. Unknown additive object members
@@ -44,18 +49,13 @@ path. Attempted reads cannot contribute to a retained value. The immediately mat
 containsEncryptedSource, sourceSetComplete and sourceUsesRefs must agree with the observed
 input and contributing uses.
 
-## Bounds and evidence limits
+## Coverage and evidence limits
 
-The oracle accepts at most 2,000,000 DataForge Records, 16,384 commodity rows and 16,384 resource
-rows. It checks at most the first 64 canonical resource rows in output order, 65,536 raw values
-and 32 owned-value nesting levels. Source-use inventories are limited to 262,144 rows; the
-physical source contract comparison also has a 65,536-node and 32-level budget. Budget
-exhaustion fails rather than silently claiming coverage.
-
-A successful sample must include declared cargo slots, volatility properties, crafting
-properties and genuinely compared quality scalar or reference values. An empty crafting tag
-does not provide quality-value coverage. Unresolved sampled boxes are reported by status.
-The finite sample does not establish the completeness of every ResourceType field in an Archive.
+The original Record inventory determines the expected physical owners. Every owner must match
+one emitted row. The check walks the original packaging, validation and property trees, reporting
+the declared slots, observed volatility and crafting properties, and compared quality scalars and
+references. An empty crafting tag contributes zero compared quality values. Unresolved boxes are
+reported by status. The comparison covers these named fields and the original Record header.
 
 Portable wire metadata cannot distinguish different opaque Archive-input handles when every
 serialized observation is identical. The production matches_archive guard owns that live
@@ -74,9 +74,20 @@ An exact matching Build must have exactly matching counts. A different complete 
 reported as differentBuild, and a missing baseline as unavailable; neither is an exact pin.
 A version prefix or an incomplete identity is never accepted as matching Build evidence.
 
+The installed comparison independently measured the following Builds. It verified each full
+manifest identity and retained its SHA-256 tag in the private receipt.
+
+| Build | Commodity rows and unique GUIDs | Distinct subtype values including null | Null links | Shared subtype groups | ResourceType rows | Compared resource values | Resource groups |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13165946` | 170 | 167 | 1 | 2 | 207 | 2,919 | 19 |
+| PTU `13189690` | 170 | 167 | 1 | 2 | 209 | 2,925 | 19 |
+
+In each Build, five commodities share the two subtype groups. The oracle checked 1,950 declared
+cargo slots, 559 null slots, one volatility property and 44 crafting properties with 122 owned
+quality values. The unresolved cargo references were seven dangling links in LIVE and fourteen
+in PTU. These states are reported from the original references.
+
 The historical LIVE 4.10.2 observation in #1044 recorded 170 commodity rows and 167 distinct
-subtypeGuid values. Its original export and complete Build identity are no longer available.
-Those numbers remain an unpinned historical observation. They must not be assigned to a current
-Build, regenerated from another Build or presented as a passed historical cardinality test.
-Current-Build evidence replaces the lost historical cardinality pin for #1044. The installed
-current-Build acceptance remains required; synthetic or compile-only success does not replace it.
+subtypeGuid values. Its original export and complete Build identity are unavailable. The table
+above records new measurements for the two named Builds. The historical observation remains
+unpinned.

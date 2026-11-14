@@ -3,7 +3,7 @@
 
 use serde_json::{Value, json};
 
-use crate::resource_quality_schema_fixture::OverrideEntryTarget;
+use super::super::super::resource_quality_schema_fixture::OverrideEntryTarget;
 
 use super::super::super::carriers::Uses;
 use super::super::super::{Failure, Result};

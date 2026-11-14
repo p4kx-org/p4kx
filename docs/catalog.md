@@ -853,8 +853,8 @@ Independent resource facts join `definitions.resourceTypes.rows[].guid.value`.
 The [Commodity contract](catalog-commodity-types.md) defines the authored bindings, canonical
 text domains, exact first-resource/first-group/name/density/refinement recipes and reconstruction
 of old nullable values. Each fallback records the actual contributing selection uses.
-The [source verification guide](resource-source-verification.md) records the unavailable historical
-Build baseline and the independently deferred real-Archive acceptance.
+The source verification guide records Build-bound LIVE and PTU cardinalities and physical source
+checks. [Installed resource verification](resource-source-verification.md#exact-cardinality-baselines)
 A Blueprint (`CraftingBlueprintRecord`) uses the [Blueprint v3 contract](catalog-blueprints.md).
 Its independently sourced Record header and complete original `blueprint` body are in
 `definitions.blueprints`. `configurations.blueprintTiers` interprets the tiers and costs by

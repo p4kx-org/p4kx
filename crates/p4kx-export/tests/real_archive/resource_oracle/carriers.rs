@@ -15,10 +15,6 @@ use self::dcb_binding::dcb_source;
 use self::source_coordinate::Coordinate;
 use super::{Failure, Result};
 
-const MAX_USES: usize = 262_144;
-const MAX_VALUE_NODES: usize = 65_536;
-const MAX_DEPTH: usize = 32;
-
 pub(super) struct Uses<'catalog> {
     rows: HashMap<&'catalog str, &'catalog Value>,
     dcb: &'catalog str,
@@ -33,9 +29,6 @@ impl<'catalog> Uses<'catalog> {
             .pointer("/provenance/uses")
             .and_then(Value::as_array)
             .ok_or_else(|| Failure::check("use-inventory"))?;
-        if rows.len() > MAX_USES {
-            return Err(Failure::check("use-inventory-budget"));
-        }
         let mut mapped = HashMap::new();
         for row in rows {
             let id = row["id"].as_str().ok_or_else(|| Failure::check("use-id"))?;
@@ -148,34 +141,19 @@ impl<'catalog> Carriers<'catalog> {
             owner,
             fields: HashMap::new(),
         };
-        index.walk(row, uses, 0, &mut 0)?;
+        index.walk(row, uses)?;
         Ok(index)
     }
 
-    fn walk(
-        &mut self,
-        value: &'catalog Value,
-        uses: &Uses<'catalog>,
-        depth: usize,
-        visited: &mut usize,
-    ) -> Result<()> {
-        if depth > MAX_DEPTH || *visited >= MAX_VALUE_NODES {
-            return Err(Failure::check("carrier-walk-budget"));
-        }
-        *visited += 1;
-        self.register(value, uses)?;
-        match value {
-            Value::Object(object) => {
-                for child in object.values() {
-                    self.walk(child, uses, depth + 1, visited)?;
-                }
+    fn walk(&mut self, value: &'catalog Value, uses: &Uses<'catalog>) -> Result<()> {
+        let mut pending = vec![value];
+        while let Some(value) = pending.pop() {
+            self.register(value, uses)?;
+            match value {
+                Value::Object(object) => pending.extend(object.values()),
+                Value::Array(array) => pending.extend(array),
+                _ => {}
             }
-            Value::Array(array) => {
-                for child in array {
-                    self.walk(child, uses, depth + 1, visited)?;
-                }
-            }
-            _ => {}
         }
         Ok(())
     }
@@ -261,7 +239,7 @@ impl<'catalog> Carriers<'catalog> {
         let wanted = format!("{path}.{name}");
         let mut object =
             super::compare::present(parent).ok_or_else(|| Failure::check("owned-parent-state"))?;
-        for _ in 0..=MAX_DEPTH {
+        loop {
             if let Some(carrier) = object.get(name) {
                 self.require(carrier, &wanted)?;
                 return Ok(carrier);
@@ -281,7 +259,6 @@ impl<'catalog> Carriers<'catalog> {
                 return Err(Failure::check("canonical-child-field"));
             }
         }
-        Err(Failure::check("canonical-child-depth"))
     }
 
     pub(super) fn source_type(

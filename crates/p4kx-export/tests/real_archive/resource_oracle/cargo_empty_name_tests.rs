@@ -5,8 +5,8 @@ use p4kx_extraction::{DataForgeEntry, Value as Raw};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 use serde_json::{Value, json};
 
-use crate::resource_fixture;
-use crate::resource_quality_schema_fixture::OverrideEntryTarget;
+use super::super::super::resource_fixture;
+use super::super::super::resource_quality_schema_fixture::OverrideEntryTarget;
 
 use super::super::super::{Failure, Result};
 use super::Written;

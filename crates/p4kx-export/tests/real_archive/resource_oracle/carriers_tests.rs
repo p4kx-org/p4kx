@@ -5,8 +5,8 @@ use std::collections::HashMap;
 
 use serde_json::{Value, json};
 
+use super::super::Result;
 use super::{Carriers, Uses, contributing_roles};
-use crate::real_archive_resource_oracles::Result;
 
 fn uses(rows: &[Value]) -> Uses<'_> {
     Uses {

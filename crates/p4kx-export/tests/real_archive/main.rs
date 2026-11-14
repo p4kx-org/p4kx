@@ -101,7 +101,6 @@ mod real_archive_reputation_standings;
 mod real_archive_resource_components;
 mod real_archive_resource_network;
 mod real_archive_resource_network_global;
-mod real_archive_resource_oracles;
 mod real_archive_security_manifests;
 mod real_archive_ship_base;
 mod real_archive_ship_matrix;
@@ -125,21 +124,6 @@ mod real_archive_weapon_combat;
 mod real_archive_worn_gear;
 mod shield_generators;
 mod ship_matrix_compare;
-
-#[path = "../it/resource_density_schema_fixture.rs"]
-mod resource_density_schema_fixture;
-
-#[path = "../it/resource_fixture.rs"]
-mod resource_fixture;
-
-#[path = "../it/resource_fixture_values.rs"]
-mod resource_fixture_values;
-
-#[path = "../it/resource_quality_schema_fixture.rs"]
-mod resource_quality_schema_fixture;
-
-#[path = "../it/resource_schema_fixture.rs"]
-mod resource_schema_fixture;
 
 mod catalog_v3_consumer_origins_tests;
 mod catalog_v3_consumer_tests;

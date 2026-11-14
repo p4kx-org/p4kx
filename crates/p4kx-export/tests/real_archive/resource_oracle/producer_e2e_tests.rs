@@ -3,13 +3,13 @@
 
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, Compression, write_catalog_from};
+use crate::{CatalogOptions, CatalogPublicationMode, Compression, write_catalog_from};
 use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry};
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry};
 use serde_json::{Value, json};
 
-use crate::resource_fixture;
-use crate::resource_quality_schema_fixture::OverrideEntryTarget;
+use super::super::resource_fixture;
+use super::super::resource_quality_schema_fixture::OverrideEntryTarget;
 
 use super::super::carriers::{Carriers, Uses};
 use super::super::{Failure, Result};
@@ -373,6 +373,12 @@ fn original_filename_and_metadata_tag_states_are_checked_independently_of_normal
     }
     Ok(())
 }
+
+#[path = "projection_quality_tests.rs"]
+mod projection_quality_tests;
+
+#[path = "owner_tests.rs"]
+mod owner_tests;
 
 #[path = "cargo_origin_tests.rs"]
 mod cargo_origins;
