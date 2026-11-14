@@ -25,10 +25,9 @@ pub(crate) struct MainXml {
 /// Returns the normalized path of a main placement XML candidate.
 fn placement_xml_path(entry: &Entry) -> Option<String> {
     let path = key(entry.path());
-    let root = path
-        .split('\\')
-        .find(|component| !matches!(*component, "" | "."));
-    (root != Some("hcd")).then_some(path)
+    let mut components = path.rsplit('\\');
+    let _file = components.next();
+    (!components.any(|component| component == "hcd")).then_some(path)
 }
 
 /// Returns the first eligible fallback XML Entry.

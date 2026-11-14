@@ -95,6 +95,24 @@ establish placement declarations and physical container reads. Full placement-ex
 individual EntXML or HCD bindings and source-backed AI, loot and harvestable joins remain with
 [#844](https://github.com/p4kx-org/p4kx/issues/844) and
 [#845](https://github.com/p4kx-org/p4kx/issues/845).
+
+The filtered diagnostic Catalog preserves all 2,248 occurrences of one independently
+selected Tile, including distinct occurrence identities, system and planet parent links,
+authored labels and local and composed world transforms. The sampled transform's 32 distinct
+source-use references resolve in the inventory. The source uses state unknown effective
+encryption for the XML payload on this input, so the transforms carry null markers.
+This scoped Catalog has incomplete overall export health.
+
+CRC-verified weather and lightning ParticleLibrary Entries are readable in both installed
+builds. The weather library has 62 elements on each Build and adds eight lexical Boolean
+`RainOcclusion` attributes in PTU. The lightning sample has 30 Lightning elements in LIVE and
+31 in PTU. The catalog preserves existing particle reference paths. Original library definitions
+and field origins require a separate producer tracked in
+[#1150](https://github.com/p4kx-org/p4kx/issues/1150).
+The added climate-asset sample has 87 distinct field-path/type pairs, including climate limits,
+shading GUIDs and ordered harvestable-related sub-assets. The producing family is tracked in
+[#849](https://github.com/p4kx-org/p4kx/issues/849).
+
 The remaining per-domain source probes and any exporter follow-ups are tracked in
 [#1145](https://github.com/p4kx-org/p4kx/issues/1145).
 The current tuning test and other patch-note items come from the

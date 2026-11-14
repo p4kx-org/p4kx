@@ -53,7 +53,7 @@ fn a_container_with_only_hcd_xml_has_no_placement_body() {
 fn an_hcd_basename_cannot_displace_the_eligible_fallback_xml() {
     let dir = tempfile::tempdir().expect("a directory");
     let tile = text_of(23);
-    let hcd = format!("hCd\\{tile}.xml");
+    let hcd = format!("body/subfolder/hCd\\{tile}.xml");
     let decoy = root(vec![child("9,8,7", 1)]);
     let actual = root(vec![child("1,2,3", 2)]);
     let tile_entry = TestEntry::stored(
