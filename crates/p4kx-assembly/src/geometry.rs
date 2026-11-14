@@ -7,6 +7,11 @@ use p4kx_extraction::SourceLocation;
 use crate::character_path::is_rigged_path_outside_human_rigs;
 use crate::read::{indexed_struct_items, struct_field, text};
 
+#[path = "geometry_source.rs"]
+mod source;
+
+pub use source::{GeometrySource, visit_geometry_sources};
+
 #[path = "geometry_origins.rs"]
 mod origins;
 

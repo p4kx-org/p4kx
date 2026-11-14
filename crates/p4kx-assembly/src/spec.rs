@@ -26,7 +26,7 @@ use crate::{
     ObjectContainerRef,
 };
 
-const GEOMETRY_RESOURCE: &str = "SGeometryResourceParams";
+pub(crate) const GEOMETRY_RESOURCE: &str = "SGeometryResourceParams";
 const DEFAULT_LOADOUT: &str = "SEntityComponentDefaultLoadoutParams";
 const PORT_CONTAINER: &str = "SItemPortContainerComponentParams";
 const OUTFIT_LOADOUT: &str = "SItemPortLoadoutOutfitParams";

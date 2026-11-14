@@ -16,6 +16,11 @@ use crate::soc_scene_class_resources::{Resource, ResourceCapture, ResourceKind, 
 use crate::soc_scene_origin::XmlOrigin;
 use crate::soc_scene_xml::XmlDocuments;
 
+#[path = "player_actor_rig_candidates.rs"]
+mod rig_candidates;
+
+pub(crate) use rig_candidates::{RigCandidate, read as read_rig_candidates};
+
 #[path = "player_controller_topology.rs"]
 mod controller_topology;
 

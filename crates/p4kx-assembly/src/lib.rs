@@ -232,7 +232,7 @@ pub use gear_placement_source::GearPlacementSource;
 pub use gear_pose_sources::{
     DeployedGear, GearAnimationKey, GearKeyChannel, GearPoseInput, GearPoseSources,
 };
-pub use geometry::{Geometry, GeometryVariant, PaletteRef};
+pub use geometry::{Geometry, GeometrySource, GeometryVariant, PaletteRef, visit_geometry_sources};
 pub use hologram::{HologramCamera, HologramCameraField, ObservedHologramCamera};
 pub use interior::{
     ChildContainerPath, Interior, InteriorForge, InteriorLightHelper, InteriorLightHelperError,

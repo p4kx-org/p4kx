@@ -139,3 +139,11 @@ ADB document and local `databaseLink` index. Its global tags use that document's
 Each usable name compares against the owning `FragDef`, with the matching
 definition positions and source origin. Matches record authored narrowing rules.
 The archive graph still retains every explicitly referenced branch.
+
+`actorRigCandidates` reports availability of the original actor geometry inventory.
+The ordered `actorRigCandidate` records retain every original geometry declaration,
+its owning component, its stored SubGeometry positions, and its local Tags and
+model path with source receipts. Original tag hints and exact matches for the
+standard body skeleton paths are separate values, so contradictory hints and
+repeated paths remain visible. These candidates do not establish which rig is
+assigned to any controller context.

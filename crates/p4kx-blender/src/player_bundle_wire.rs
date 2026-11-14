@@ -15,7 +15,7 @@ use crate::player_source_classes::ClassTarget;
 use crate::player_source_loadout::Loadout;
 use crate::player_source_motion::{
     BranchFields, BranchOption, ControllerRigOwner, ControllerTopology, DatabaseLink,
-    MotionComponentFields, MotionOptionFields, OptionRow,
+    MotionComponentFields, MotionOptionFields, OptionRow, RigCandidate,
 };
 use crate::player_tag_definitions::{
     AdbBranchSelectors, AdbTagSelectors, CycleEdge, Document, Edge, TagScope,
@@ -110,6 +110,15 @@ pub(crate) enum Row<'a> {
     },
     ControllerTopology {
         value: &'a ControllerTopology,
+    },
+    ActorRigCandidates {
+        state: SourceValueState,
+        #[serde(flatten)]
+        origin: &'a FieldOrigin,
+    },
+    ActorRigCandidate {
+        index: usize,
+        value: &'a RigCandidate,
     },
     MotionOptions {
         component: usize,

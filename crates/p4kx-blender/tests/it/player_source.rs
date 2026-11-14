@@ -25,6 +25,9 @@ mod tag_definition_assertions;
 #[path = "player_adb_tag_selectors.rs"]
 mod adb_tag_selectors;
 
+#[path = "player_actor_rig_candidates.rs"]
+mod actor_rig_candidates;
+
 #[path = "player_controller_contexts.rs"]
 mod controller_contexts;
 
@@ -60,6 +63,14 @@ fn fixture_with(
 fn fixture_with_motion(
     motion: [TestEntry; 3],
     extra: impl IntoIterator<Item = TestEntry>,
+) -> TestResult<(tempfile::TempDir, Archive)> {
+    fixture_with_forge(motion, extra, forge(|actor| actor))
+}
+
+fn fixture_with_forge(
+    motion: [TestEntry; 3],
+    extra: impl IntoIterator<Item = TestEntry>,
+    forge: Vec<u8>,
 ) -> TestResult<(tempfile::TempDir, Archive)> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("player.p4k");
@@ -98,7 +109,7 @@ fn fixture_with_motion(
             "Data/Libs/CharacterCustomizer/femininedefault.chf",
             female.to_bytes(),
         ))
-        .entry(TestEntry::stored("Data/Game2.dcb", forge()).encrypted())
+        .entry(TestEntry::stored("Data/Game2.dcb", forge).encrypted())
         .entry(TestEntry::stored(
             "Data/Scripts/Loadouts/Player/DefaultLoadouts/sample.xml",
             loadout,
@@ -113,7 +124,7 @@ fn fixture_with_motion(
     Ok((folder, archive))
 }
 
-fn forge() -> Vec<u8> {
+fn forge(tune: impl FnOnce(TestEntity) -> TestEntity) -> Vec<u8> {
     let animated = TestInstance::new("SAnimatedCharacterComponentParams")
         .value(
             "actionController",
@@ -132,7 +143,7 @@ fn forge() -> Vec<u8> {
                 .field("actionController", TestType::String)
                 .field("animDatabase3P", TestType::String),
         )
-        .record(actor.record())
+        .record(tune(actor).record())
         .record(
             TestEntity::new(
                 BODY,

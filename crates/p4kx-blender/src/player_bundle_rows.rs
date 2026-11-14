@@ -34,6 +34,7 @@ pub(super) fn write(
     for value in &capture.controller_topology {
         push(&Row::ControllerTopology { value })?;
     }
+    rig_rows(capture, &mut push)?;
     for adb in &capture.adb_declarations {
         push(&Row::AdbDocument {
             document: adb.document,
@@ -78,6 +79,22 @@ fn tag_rows(
     }
     for value in &capture.tag_definitions.cycle_back_edges {
         push(&Row::TagCycleBackEdge { value })?;
+    }
+    Ok(())
+}
+
+fn rig_rows(
+    capture: &PlayerSourceCapture,
+    push: &mut impl FnMut(&Row<'_>) -> io::Result<()>,
+) -> io::Result<()> {
+    if let Some(candidates) = &capture.actor_rig_candidates {
+        push(&Row::ActorRigCandidates {
+            state: candidates.state(),
+            origin: candidates.origin(),
+        })?;
+        for (index, value) in candidates.value().into_iter().flatten().enumerate() {
+            push(&Row::ActorRigCandidate { index, value })?;
+        }
     }
     Ok(())
 }

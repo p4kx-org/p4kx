@@ -15,7 +15,7 @@ use serde::Serialize;
 use crate::player_adb_declarations::AdbDeclarations;
 use crate::player_source_body::{self, Body};
 use crate::player_source_loadout::{self, Loadout};
-use crate::player_source_motion::{ControllerTopology, Motion};
+use crate::player_source_motion::{ControllerTopology, Motion, RigCandidate, read_rig_candidates};
 use crate::player_tag_definitions::{AdbTagUses, TagDefinitions};
 use crate::soc_scene_class_resources::Resources;
 use crate::soc_scene_xml::XmlDocuments;
@@ -101,6 +101,7 @@ pub struct PlayerSourceCapture {
     pub(crate) loadouts: Vec<SourcedValue<Loadout>>,
     pub(crate) motion: Motion,
     pub(crate) controller_topology: Vec<ControllerTopology>,
+    pub(crate) actor_rig_candidates: Option<SourcedValue<Vec<RigCandidate>>>,
     pub(crate) adb_declarations: Vec<AdbDeclarations>,
     pub(crate) tag_definitions: TagDefinitions,
     pub(crate) adb_tag_uses: AdbTagUses,
@@ -119,6 +120,7 @@ pub(super) struct PreparedCapture<'sink> {
     pub(super) loadouts: Vec<SourcedValue<Loadout>>,
     pub(super) motion: Motion,
     controller_topology: Vec<ControllerTopology>,
+    actor_rig_candidates: Option<SourcedValue<Vec<RigCandidate>>>,
     pub(super) adb_declarations: Vec<AdbDeclarations>,
     pub(super) tag_definitions: TagDefinitions,
     pub(super) documents: XmlDocuments<'sink>,
@@ -143,6 +145,7 @@ impl PlayerSourceCapture {
             loadouts: prepared.loadouts,
             motion: prepared.motion,
             controller_topology: prepared.controller_topology,
+            actor_rig_candidates: prepared.actor_rig_candidates,
             adb_tag_uses: prepared.adb_tag_uses,
             adb_declarations: prepared.adb_declarations,
             tag_definitions: prepared.tag_definitions,
@@ -198,12 +201,17 @@ pub(super) fn prepare<'sink>(
     let adb_declarations = documents.bind_adb_declarations(&sources, cancel)?;
     let tag_definitions = documents.bind_tag_definitions(&resources)?;
     let adb_tag_uses = AdbTagUses::read(&adb_declarations, &tag_definitions, &sources, cancel)?;
+    let actor_rig_candidates = documents
+        .is_streaming()
+        .then(|| read_rig_candidates(classes, &directory, &sources, cancel))
+        .transpose()?;
     watch.check()?;
     Ok(PreparedCapture {
         bodies,
         loadouts,
         motion,
         controller_topology: documents.bind_controller_topology(&sources, cancel)?,
+        actor_rig_candidates,
         adb_declarations,
         tag_definitions,
         documents,
