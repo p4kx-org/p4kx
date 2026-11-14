@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DecimalU64, FieldOrigin};
+use p4kx_extraction::{DecimalU64, FieldOrigin, SourceUseRef};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 
 use crate::{Artifact, MediaKind};
 
@@ -165,7 +166,7 @@ pub(crate) enum OriginRow<'a> {
         scope: &'a OriginScope,
         field: &'a str,
         #[serde(flatten)]
-        origin: &'a FieldOrigin,
+        origin: OriginField<'a>,
         cuts: &'a [crate::origin_contributions::OriginCut],
     },
     End {
@@ -175,4 +176,32 @@ pub(crate) enum OriginRow<'a> {
     Eof {
         streams: &'a [OriginStreamSummary],
     },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct OriginField<'a> {
+    contains_encrypted_source: Option<bool>,
+    source_uses_refs: OriginReferences<'a>,
+    source_set_complete: bool,
+}
+
+#[derive(Serialize)]
+#[serde(untagged)]
+enum OriginReferences<'a> {
+    Uses(&'a [SourceUseRef]),
+    Encoded(&'a RawValue),
+}
+
+impl<'a> OriginField<'a> {
+    pub(crate) fn new(origin: &'a FieldOrigin, references: Option<&'a RawValue>) -> Self {
+        Self {
+            contains_encrypted_source: origin.contains_encrypted_source(),
+            source_uses_refs: references.map_or_else(
+                || OriginReferences::Uses(origin.source_uses_refs()),
+                OriginReferences::Encoded,
+            ),
+            source_set_complete: origin.source_set_complete(),
+        }
+    }
 }

@@ -27,7 +27,10 @@ impl<W: Write> Write for ObservedWrite<'_, '_, W> {
             self.checkpoint.check().map_err(io::Error::other)?;
             self.until_poll = IO_BLOCK_BYTES;
         }
-        let written = self.writer.write(bytes)?;
+        let prefix = bytes
+            .get(..bytes.len().min(self.until_poll))
+            .ok_or_else(|| io::Error::other("invalid guarded write prefix"))?;
+        let written = self.writer.write(prefix)?;
         self.until_poll = self.until_poll.saturating_sub(written);
         Ok(written)
     }
@@ -36,3 +39,7 @@ impl<W: Write> Write for ObservedWrite<'_, '_, W> {
         self.writer.flush()
     }
 }
+
+#[cfg(test)]
+#[path = "observed_write_tests.rs"]
+mod tests;

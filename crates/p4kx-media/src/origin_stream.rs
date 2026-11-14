@@ -13,12 +13,15 @@ use sha2::{Digest as _, Sha256};
 use crate::artifact::Stream;
 use crate::checkpoint::Checkpoint;
 use crate::origin_contract::{
-    OriginCoverage, OriginProfile, OriginProtocol, OriginReceipts, OriginRow, OriginScope,
-    OriginStream, OriginStreamSummary,
+    OriginCoverage, OriginField, OriginProfile, OriginProtocol, OriginReceipts, OriginRow,
+    OriginScope, OriginStream, OriginStreamSummary,
 };
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::origin_resolver::OriginResolver;
 use crate::{Artifact, MediaError, error, hashing, origin_error, origin_json};
+
+#[path = "origin_stream_reference_cache.rs"]
+mod reference_cache;
 
 /// Streaming provenance files with unchanged payload-stream admission budgets.
 pub(crate) struct OriginTransport<'a> {
@@ -78,6 +81,7 @@ impl<'a> OriginTransport<'a> {
             payload_sha256: &payload_sha256,
         })?;
         let mut coverage = empty_coverage();
+        let mut references = reference_cache::Cache::default();
         origin_json::visit(
             payload,
             payload_depth(stream, self.max_depth),
@@ -86,13 +90,14 @@ impl<'a> OriginTransport<'a> {
                 let address = address(stream, field);
                 let field = address.as_ref();
                 let contribution = resolver.resolve(field, prepared)?;
-                let origin = contribution.field_origin();
-                observe(&mut coverage, &origin)?;
-                self.write(&OriginRow::Field {
-                    scope: &scope,
-                    field,
-                    origin: &origin,
-                    cuts: &contribution.cuts,
+                references.with_origin(&contribution, |origin, encoded| {
+                    observe(&mut coverage, origin)?;
+                    self.write(&OriginRow::Field {
+                        scope: &scope,
+                        field,
+                        origin: OriginField::new(origin, encoded),
+                        cuts: &contribution.cuts,
+                    })
                 })
             },
         )?;
