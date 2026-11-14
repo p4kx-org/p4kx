@@ -29,8 +29,12 @@ declarations in their original order. When both XML roots are readable, the comp
 identify one physically observed shared definition document before an option links to same-name
 controller fragment candidates. Each unambiguous controller fragment retains its original
 scope tokens and their candidate XML coordinates. An empty candidate list is an observed miss.
-The original documents retain the nested ADB selectors. Physical clips and gameplay variant
-selection require additional source context.
+When the selected ADB is readable, its component includes `databaseGraph`, with the root document
+and reachable physical branch documents in first-visit order. Each branch keeps its original root
+definition selectors, fragment options and SubADB declarations. `links` retain ordered File and
+Tags values and explicit lookup outcomes. `traversal` marks a link to an active ancestor as a cycle.
+Several authored links may reference the same completed physical branch. Physical clips and gameplay
+variant selection require additional source context.
 
 Source-backed values expose `containsEncryptedSource`, `sourceSetComplete` and
 `sourceUsesRefs`. A join preserves both the original selector and observed target source.

@@ -31,7 +31,7 @@ pub(crate) enum ResourceKind {
     DataRelative,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub(crate) enum Resource<T> {
     EmptySelector,
@@ -50,6 +50,51 @@ pub(crate) enum Resource<T> {
         source: p4kx_extraction::PhysicalSourceRef,
         data: T,
     },
+}
+
+pub(crate) struct ResourceCapture<T> {
+    value: SourceValue<Resource<T>>,
+    uses: Vec<SourceUse>,
+}
+
+impl<T: Clone> ResourceCapture<T> {
+    pub(crate) fn uses(&self) -> &[SourceUse] {
+        &self.uses
+    }
+
+    pub(crate) fn bind(
+        &self,
+        sources: &SourceUses,
+        selectors: &[SourceUse],
+    ) -> SourcedValue<Resource<T>> {
+        let mut uses = selectors.to_vec();
+        uses.extend(self.uses.iter().cloned());
+        Self::bind_parts(sources, self.value.clone(), &uses)
+    }
+}
+
+impl<T> ResourceCapture<T> {
+    fn bind_parts(
+        sources: &SourceUses,
+        value: SourceValue<Resource<T>>,
+        uses: &[SourceUse],
+    ) -> SourcedValue<Resource<T>> {
+        let complete = !matches!(
+            value,
+            SourceValue::Unreadable | SourceValue::Present(Resource::Unreadable { .. })
+        );
+        sources.value(value, uses, complete)
+    }
+
+    fn into_bound(
+        self,
+        sources: &SourceUses,
+        selectors: &[SourceUse],
+    ) -> SourcedValue<Resource<T>> {
+        let mut uses = selectors.to_vec();
+        uses.extend(self.uses);
+        Self::bind_parts(sources, self.value, &uses)
+    }
 }
 
 impl<'a> Resources<'a> {
@@ -83,8 +128,19 @@ impl<'a> Resources<'a> {
         kind: ResourceKind,
         project: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
     ) -> Result<SourcedValue<Resource<T>>, SocSceneError> {
-        let mut uses = selectors.to_vec();
-        let state = match value {
+        Ok(self
+            .capture(value, kind, project)?
+            .into_bound(self.sources, selectors))
+    }
+
+    pub(crate) fn capture<T>(
+        &self,
+        value: SourceValue<String>,
+        kind: ResourceKind,
+        project: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
+    ) -> Result<ResourceCapture<T>, SocSceneError> {
+        let mut uses = Vec::new();
+        let value = match value {
             SourceValue::Present(path) => {
                 SourceValue::Present(self.project(&path, kind, &mut uses, project)?)
             }
@@ -94,11 +150,7 @@ impl<'a> Resources<'a> {
             SourceValue::Unsupported => SourceValue::Unsupported,
             _ => SourceValue::Invalid,
         };
-        let complete = !matches!(
-            state,
-            SourceValue::Unreadable | SourceValue::Present(Resource::Unreadable { .. })
-        );
-        Ok(self.sources.value(state, &uses, complete))
+        Ok(ResourceCapture { value, uses })
     }
 
     fn project<T>(

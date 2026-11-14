@@ -227,6 +227,70 @@
       ],
       "type": "object"
     },
+    "Branch": {
+      "properties": {
+        "document": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "fragmentDefinition": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/DatabaseLink"
+          },
+          "type": "array"
+        },
+        "lossyXml": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "options": {
+          "items": {
+            "$ref": "#/$defs/BranchOption"
+          },
+          "type": "array"
+        },
+        "physicalSource": {
+          "$ref": "#/$defs/SourcedValueOfPhysicalSourceRef"
+        },
+        "tagDefinition": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "document",
+        "physicalSource",
+        "fragmentDefinition",
+        "tagDefinition",
+        "lossyXml",
+        "options",
+        "links"
+      ],
+      "type": "object"
+    },
+    "BranchOption": {
+      "properties": {
+        "fragment": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fragmentTags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfSocXmlPosition"
+        },
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "position",
+        "fragment",
+        "tags",
+        "fragmentTags"
+      ],
+      "type": "object"
+    },
     "ClassRecord": {
       "properties": {
         "guid": {
@@ -326,6 +390,58 @@
           "type": "object"
         }
       ]
+    },
+    "DatabaseGraph": {
+      "properties": {
+        "branches": {
+          "items": {
+            "$ref": "#/$defs/Branch"
+          },
+          "type": "array"
+        },
+        "root": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        }
+      },
+      "required": [
+        "root",
+        "branches"
+      ],
+      "type": "object"
+    },
+    "DatabaseLink": {
+      "properties": {
+        "file": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileOccurrences": {
+          "items": {
+            "$ref": "#/$defs/SourcedValueOfstring"
+          },
+          "type": "array"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfSocXmlPosition"
+        },
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "target": {
+          "$ref": "#/$defs/SourcedValueOfResource"
+        },
+        "traversal": {
+          "$ref": "#/$defs/SourcedValueOfVisit"
+        }
+      },
+      "required": [
+        "position",
+        "file",
+        "fileOccurrences",
+        "tags",
+        "target",
+        "traversal"
+      ],
+      "type": "object"
     },
     "DecimalU64": {
       "description": "Canonical unsigned 64-bit decimal text, from 0 through 18446744073709551615.",
@@ -628,6 +744,16 @@
         },
         "controllerPath": {
           "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "databaseGraph": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DatabaseGraph"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "ordinal": {
           "format": "uint",
@@ -3199,6 +3325,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfPhysicalSourceRef": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/PhysicalSourceRef"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfPortBinding": {
       "allOf": [
         {
@@ -3943,6 +4199,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/Vector"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfVisit": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/Visit"
               }
             }
           }
@@ -4785,6 +5171,14 @@
         "z"
       ],
       "type": "object"
+    },
+    "Visit": {
+      "enum": [
+        "reachable",
+        "cycle",
+        "unresolved"
+      ],
+      "type": "string"
     },
     "XmlAttribute": {
       "properties": {

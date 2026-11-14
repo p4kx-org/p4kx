@@ -16,6 +16,9 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 #[path = "player_motion_option_assertions.rs"]
 mod motion_option_assertions;
 
+#[path = "player_subadb_graph_assertions.rs"]
+mod subadb_graph_assertions;
+
 const BODY: u128 = 0x0101_0101_0101_0101_0101_0101_0101_0101;
 const WEAPON_ONE: u128 = 0x0202_0202_0202_0202_0202_0202_0202_0202;
 const WEAPON_TWO: u128 = 0x0303_0303_0303_0303_0303_0303_0303_0303;
@@ -65,6 +68,7 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
         ));
     motion_option_assertions::entries()
         .into_iter()
+        .chain(subadb_graph_assertions::entries())
         .fold(archive, ArchiveBuilder::entry)
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
@@ -158,6 +162,7 @@ fn player_source_preserves_body_variant_port_order_and_exact_loadout_targets() -
     verify_xml_port_definitions(&male);
     verify_motion(&male);
     motion_option_assertions::verify(&male)?;
+    subadb_graph_assertions::verify(&male)?;
     Ok(())
 }
 

@@ -12,12 +12,17 @@ use serde::Serialize;
 use crate::player_source::{PlayerSourceError, check};
 use crate::player_source_classes::{self, ClassTarget, Classes};
 use crate::soc_scene::SocSceneError;
-use crate::soc_scene_class_resources::{Resource, ResourceKind, Resources};
+use crate::soc_scene_class_resources::{Resource, ResourceCapture, ResourceKind, Resources};
 use crate::soc_scene_origin::XmlOrigin;
 use crate::soc_scene_xml::XmlDocuments;
 
 #[path = "player_motion_options.rs"]
 mod motion_options;
+
+#[path = "player_subadb_graph.rs"]
+mod subadb_graph;
+
+use subadb_graph::{DatabaseGraph, DatabaseRoot};
 
 use motion_options::controller::Controller;
 use motion_options::{Database, MotionOptions};
@@ -42,6 +47,8 @@ struct MotionComponent {
     third_person_database: SourcedValue<Resource<usize>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     authored_options: Option<MotionOptions>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    database_graph: Option<DatabaseGraph>,
 }
 
 impl Motion {
@@ -135,34 +142,7 @@ fn components(
             scope,
             resources,
         };
-        let controller = input.resource(
-            "actionController",
-            "ControllerDef",
-            documents,
-            Controller::read,
-        )?;
-        let database = input.resource("animDatabase3P", "AnimDB", documents, Database::read)?;
-        let authored_options = controller
-            .observed
-            .zip(database.observed)
-            .map(|(controller, database)| {
-                MotionOptions::read(
-                    resources,
-                    controller.data,
-                    database.data,
-                    [&controller.selector, &database.selector],
-                    documents,
-                )
-            })
-            .transpose()?;
-        rows.push(MotionComponent {
-            ordinal,
-            controller_path: controller.path,
-            third_person_database_path: database.path,
-            controller: controller.value,
-            third_person_database: database.value,
-            authored_options,
-        });
+        rows.push(input.project(documents)?);
     }
     Ok(rows)
 }
@@ -183,10 +163,63 @@ struct Observed<T> {
 struct SelectedResource<T> {
     path: SourcedValue<String>,
     value: SourcedValue<Resource<usize>>,
+    capture: ResourceCapture<usize>,
     observed: Option<Observed<T>>,
 }
 
 impl MotionInput<'_, '_, '_> {
+    fn project(&self, documents: &mut XmlDocuments) -> Result<MotionComponent, PlayerSourceError> {
+        let controller = self.resource(
+            "actionController",
+            "ControllerDef",
+            documents,
+            Controller::read,
+        )?;
+        let mut database = self.resource("animDatabase3P", "AnimDB", documents, Database::read)?;
+        let database_graph = match (
+            &mut database.observed,
+            database.value.value(),
+            database.path.value(),
+        ) {
+            (Some(observed), Some(Resource::Present { data, .. }), Some(path)) => {
+                Some(DatabaseGraph::read(
+                    self.resources,
+                    DatabaseRoot {
+                        database: &mut observed.data,
+                        document: *data,
+                        authored_path: path,
+                        selector: &observed.selector,
+                        capture: database.capture,
+                    },
+                    documents,
+                )?)
+            }
+            _ => None,
+        };
+        let authored_options = controller
+            .observed
+            .zip(database.observed)
+            .map(|(controller, database)| {
+                MotionOptions::read(
+                    self.resources,
+                    controller.data,
+                    database.data,
+                    [&controller.selector, &database.selector],
+                    documents,
+                )
+            })
+            .transpose()?;
+        Ok(MotionComponent {
+            ordinal: self.ordinal,
+            controller_path: controller.path,
+            third_person_database_path: database.path,
+            controller: controller.value,
+            third_person_database: database.value,
+            authored_options,
+            database_graph,
+        })
+    }
+
     fn resource<T>(
         &self,
         name: &str,
@@ -212,9 +245,8 @@ impl MotionInput<'_, '_, '_> {
             .sources
             .value(value.clone(), &[payload], complete);
         let mut observed = None;
-        let value = self.resources.read(
+        let capture = self.resources.capture(
             value,
-            &selector,
             ResourceKind::DataRelative,
             |xml: &SourceDocument<'_>, origin| {
                 let root = xml.root();
@@ -229,9 +261,11 @@ impl MotionInput<'_, '_, '_> {
                 Ok(Some(index))
             },
         )?;
+        let value = capture.bind(self.resources.sources, std::slice::from_ref(&selector));
         Ok(SelectedResource {
             path,
             value,
+            capture,
             observed,
         })
     }

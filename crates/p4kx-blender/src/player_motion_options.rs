@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use p4kx_extraction::cryxml::{SourceDocument, SourceElement};
 use p4kx_extraction::{
-    CancelToken, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
+    CancelToken, PhysicalSourceRef, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -21,6 +21,8 @@ use crate::soc_scene_xml::XmlDocuments;
 pub(super) mod controller;
 
 use controller::{Controller, Fragment, ScopeTarget};
+
+use super::subadb_graph::SubDatabase;
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -43,8 +45,22 @@ struct OptionRow {
 }
 
 pub(super) struct Database {
-    file: AuthoredFile,
+    pub(super) source: PhysicalSourceRef,
+    pub(super) root_use: SourceUse,
+    pub(super) links: Vec<SubDatabase>,
+    pub(super) lossy: bool,
+    pub(super) tag_file: SourcedValue<String>,
+    pub(super) file: AuthoredFile,
     options: Vec<OptionInput>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct BranchOption {
+    position: SourcedValue<SocXmlPosition>,
+    fragment: SourcedValue<String>,
+    tags: SourcedValue<String>,
+    fragment_tags: SourcedValue<String>,
 }
 
 struct OptionInput {
@@ -57,7 +73,7 @@ struct OptionInput {
 }
 
 pub(super) struct AuthoredFile {
-    value: SourcedValue<String>,
+    pub(super) value: SourcedValue<String>,
     uses: Vec<SourceUse>,
 }
 
@@ -106,6 +122,8 @@ impl Database {
     ) -> Result<Self, SocSceneError> {
         let root = document.root();
         let file = AuthoredFile::at([root], root, "FragDef", origin)?;
+        let tag_file = string_attribute(root, "TagDef", origin)?;
+        let links = SubDatabase::read_all(root, origin, cancel)?;
         let mut options = Vec::new();
         for list in children(root, "FragmentList") {
             for group in list.elements().filter(|node| node.namespace().is_none()) {
@@ -124,7 +142,21 @@ impl Database {
                 }
             }
         }
-        Ok(Self { file, options })
+        Ok(Self {
+            source: origin.source(),
+            root_use: origin.node(root, SourceUseRole::Payload)?,
+            links,
+            lossy: document.is_lossy(),
+            file,
+            tag_file,
+            options,
+        })
+    }
+    pub(super) fn branch_options(&self, sources: &SourceUses) -> Vec<BranchOption> {
+        self.options
+            .iter()
+            .map(|option| option.branch(sources))
+            .collect()
     }
 }
 
@@ -175,6 +207,23 @@ impl MotionOptions {
 }
 
 impl OptionInput {
+    fn branch(&self, sources: &SourceUses) -> BranchOption {
+        BranchOption {
+            position: sources.value(
+                SourceValue::Present(self.position.clone()),
+                std::slice::from_ref(&self.node_use),
+                true,
+            ),
+            fragment: sources.value(
+                SourceValue::Present(self.name.clone()),
+                std::slice::from_ref(&self.group_use),
+                true,
+            ),
+            tags: self.tags.clone(),
+            fragment_tags: self.fragment_tags.clone(),
+        }
+    }
+
     fn project(
         self,
         resources: &Resources<'_>,

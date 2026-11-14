@@ -10,15 +10,18 @@ pub(super) fn entries() -> [TestEntry; 3] {
     let controller = br#"<ControllerDef><Fragments filename="Animations/Test/fragments.xml"/>
         <FragmentDefs><Walk/><Walk/><Idle scopes="Body+Head"/></FragmentDefs>
         <ScopeDefs><Head/><Body/></ScopeDefs></ControllerDef>"#;
-    let database = br#"<AnimDB FragDef="animations\test\fragments.xml"><FragmentList>
+    let database = format!(
+        r#"<AnimDB FragDef="animations\test\fragments.xml"><FragmentList>
         <Walk><Fragment Tags="one"/><Fragment Tags="two"/></Walk>
         <Idle><Fragment FragTags="rest"/></Idle>
         <Missing><Fragment/></Missing>
-    </FragmentList></AnimDB>"#;
+    </FragmentList>{}</AnimDB>"#,
+        super::subadb_graph_assertions::ROOT_LINKS
+    );
     let fragment_definitions = br"<FragmentDefinition><Walk/><Idle/></FragmentDefinition>";
     [
         TestEntry::stored("Data/Animations/test/controller.xml", controller),
-        TestEntry::stored("Data/Animations/test/player.adb", database),
+        TestEntry::stored("Data/Animations/test/player.adb", database.into_bytes()),
         TestEntry::stored("Data/Animations/test/fragments.xml", fragment_definitions).encrypted(),
     ]
 }
