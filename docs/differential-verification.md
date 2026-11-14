@@ -292,3 +292,25 @@ equal and 574 allowed.
 - The first comparison run found one error of the test itself, not of P4KX: StarBreaker embeds
   the Record of the same file where it is referenced, which the comparison now reads and
   compares by content.
+
+## Manifest-bound installed LIVE samples
+
+The LIVE Archive was measured on 2026-11-14 before producing the selected outputs. The
+standalone producer and captured logs were verified against each frozen plan.
+
+| Adapter | Declaration | Standalone results | Verified artifacts |
+| --- | --- | --- | --- |
+| unforge 4.0.87 | Two binary CDF and two binary CHRPARAMS sources in isolated directories | 4 equal, 0 differences or allowances | 11 |
+| StarBreaker 0.3.2 | Eight exact stored paths with distinct Record and output identities | 8 equal, 0 differences or allowances | 11 |
+| unp4k 4.0.87 | Two encrypted and two plain Zstandard Entries with unique producer filters | 4 equal, 0 differences or allowances | 7 |
+
+The StarBreaker input was an exact verified copy of the selected DCB. Its normal
+optional Archive discovery did not supply the DCB. The separate internal P4KX
+check built all 118,499 original Record trees from this source with no failures.
+The independent comparison covered the eight declared Records.
+
+The unmodified published unp4k Linux assembly ran in an isolated WSL network namespace
+with the official .NET 10.0.15 runtime. Its native Zstandard library was supplied under
+the loader name it declares. The earlier Linux attempt lacked that library. The result
+compares two encrypted and two plain Zstandard sources. Synthetic tests exercise the
+trim boundaries, including cases that fail after real decompression.
