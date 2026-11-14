@@ -45,7 +45,6 @@ def load_case(folder: Path, count: int):
     shared.require(result.objects == len(loaded.nodes) == count, "a package node is absent")
     shared.require(result.armatures == result.actions == result.shape_keys == 0, "the static fixture gained a rig")
     shared.require(len(bpy.data.meshes) == count, "mesh datablock count differs")
-    shared.require(not [image for image in bpy.data.images if image.source == "FILE"], "the fixture gained an external image")
     return loaded, result
 
 
@@ -66,6 +65,40 @@ def verify_colour(material, expected: tuple[float, float, float]) -> None:
     shared.require(len(surfaces) == 1, "expected one Principled surface")
     colours = shared.colour_constants(surfaces[0].inputs["Base Color"], set())
     shared.require(expected in colours, f"wrong source colour for {material.name}")
+
+
+def input_uses_image(socket, image, seen: set[int]) -> bool:
+    """Tests whether a loaded image contributes to a shader input."""
+    for link in socket.links:
+        node = link.from_node
+        identity = node.as_pointer()
+        if identity in seen:
+            continue
+        seen.add(identity)
+        if node.type == "TEX_IMAGE" and node.image == image:
+            return True
+        if any(input_uses_image(item, image, seen) for item in node.inputs if item.enabled):
+            return True
+    return False
+
+
+def verify_image(folder: Path, loaded, mesh) -> dict[str, object]:
+    """Checks the source texture's package file, decoded pixels and shader binding."""
+    shared.require(len(loaded.textures) == 1, "the selected material's texture is missing")
+    texture = next(iter(loaded.textures.values()))
+    images = [image for image in bpy.data.images if image.source == "FILE"]
+    shared.require(len(images) == 1, "the fixture must load one package image")
+    image = images[0]
+    shared.require(Path(bpy.path.abspath(image.filepath)).resolve() == (folder / texture.file).resolve(),
+                   "Blender loaded a different image")
+    pixels = tuple(image.pixels[:4])
+    shared.require(image.has_data and tuple(image.size) == (8, 8) and len(pixels) == 4,
+                   "the authored diffuse mip did not decode")
+    for material in mesh.materials:
+        surface = next(node for node in material.node_tree.nodes if node.type == "BSDF_PRINCIPLED")
+        uses_image = input_uses_image(surface.inputs["Base Color"], image, set())
+        shared.require(uses_image == (material.name.split(".")[0] == "caps"), "wrong diffuse texture binding")
+    return {"file": texture.file, "dimensions": list(image.size), "sample_rgba": list(pixels)}
 
 
 def hierarchy(collection) -> list[dict[str, object]]:
@@ -89,7 +122,8 @@ def finish(folder: Path, case: str, result, bindings, high_bound) -> dict[str, o
         "case": case, "warnings": list(result.warnings), "hierarchy": hierarchy(result.root),
         "mesh_bindings": bindings, "mesh_assets": result.meshes, "instances": result.instances,
         "armatures": result.armatures, "actions": result.actions, "shape_keys": result.shape_keys,
-        "images": 0, "bounds_min": list(low), "bounds_max": list(high),
+        "images": sum(image.source == "FILE" for image in bpy.data.images),
+        "bounds_min": list(low), "bounds_max": list(high),
         "package_sha256": hashes(folder),
     }
     shared.render(folder.parent / f"{case}-consumer.png", low, high)
@@ -98,7 +132,7 @@ def finish(folder: Path, case: str, result, bindings, high_bound) -> dict[str, o
 
 def verify(folder: Path, case: str) -> dict[str, object]:
     """Checks the original two-material cube fixture."""
-    _loaded, result = load_case(folder, 1)
+    loaded, result = load_case(folder, 1)
     root = shared.scene_node(result.root, "TEST_MaterialReference")
     shared.require(root.parent is None and root.instance_collection is not None, "root hierarchy differs")
     shared.require(shared.close_vector(root.matrix_world.translation, (0.0, 0.0, 0.0)), "root moved")
@@ -108,12 +142,14 @@ def verify(folder: Path, case: str) -> dict[str, object]:
     expected = {"caps": (0.8, 0.1, 0.1), "sides": (0.2, 0.4, 0.6)}
     for material in mesh.materials:
         verify_colour(material, expected[material.name.split(".")[0]])
+    image = verify_image(folder, loaded, mesh)
     facts = finish(
         folder, case, result,
         [{"material_triangles": dict(assignments), "template_hierarchy": hierarchy(root.instance_collection)}],
         (12.0, 2.0, 4.0),
     )
     facts["material_triangles"] = dict(assignments)
+    facts["diffuse_image"] = image
     return facts
 
 
@@ -157,6 +193,8 @@ def collision_binding(loaded, result, raw, expected) -> dict[str, object]:
 def verify_collision(folder: Path, case: str, rooted: str) -> dict[str, object]:
     """Checks two distinct material-zero descriptions with equal bare library names."""
     loaded, result = load_case(folder, 2)
+    shared.require(not loaded.textures and not any(image.source == "FILE" for image in bpy.data.images),
+                   "the untextured fixture loaded an external image")
     raw = json.loads((folder / "scene.json").read_text(encoding="utf-8"))
     shared.require(len(raw["materials"]) == 2 and len(raw["material_libraries"]) == 2, "two source libraries must survive")
     root = shared.scene_node(result.root, "TEST_RootMaterial")
@@ -184,7 +222,7 @@ def main() -> None:
     shared.require(len(args) == 2, "provide absolute package root and source commit")
     root = Path(args[0])
     shared.require(root.is_absolute() and root.is_dir(), "package root must exist and be absolute")
-    shared.require(bpy.app.version[:2] == (5, 2), "Blender 5.2 LTS is required")
+    shared.require(bpy.app.version[:2] in {(5, 2), (5, 3)}, "verify with Blender 5.2 LTS or 5.3")
     importer_root = (HERE.parent / "p4kx_importer").resolve()
     for module in (importer, package):
         shared.require(Path(module.__file__).resolve().parent == importer_root, "the loaded importer is not the reviewed source")

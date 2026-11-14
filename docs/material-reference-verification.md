@@ -57,7 +57,7 @@ foreach ($case in @('virtual-root', 'authoring', 'collision-virtual', 'collision
 
 Stop after any nonzero exit; do not run the consumer against a stale package. Use the actual
 reviewed source commit as the second script argument; on Linux use `debug/p4kx` and local
-absolute paths. Invoke Blender 5.2 LTS in a new background process with a 180-second watchdog:
+absolute paths. Invoke Blender 5.2 LTS or 5.3 in a new background process with a 180-second watchdog:
 
 ```powershell
 & 'C:/Program Files/Blender Foundation/Blender 5.2/blender.exe' --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 1 --python blender_addon/tests/verify_material_references.py -- $packages '<reviewed-source-commit>'
@@ -65,13 +65,15 @@ absolute paths. Invoke Blender 5.2 LTS in a new background process with a 180-se
 
 The script imports all four actual production packages using the repository importer and checks
 the loaded importer module paths before hashing that source. The original two cases require four
-caps and eight sides triangles and one mesh instance. The collision cases share the same Testkit
+caps and eight sides triangles and one mesh instance. Their mapped material library assigns a
+split diffuse texture to the caps. The consumer verifies the package image path, 8-by-8 decoded
+mip and its connection to the caps' Base Color. The collision cases share the same Testkit
 builder as the Rust regression: two models in one folder each use source/material index zero and
 library name paint, but resolve to different physical libraries. Their description IDs, actual
 Blender materials, colours and 12-triangle bindings must stay distinct. The child is attached to
 the root at a six-metre X offset; parent links, local/world positions, separate templates and
-authored bounds are checked. Every case requires no rig, image or source/import warning and
-writes its own controlled render. The report
+authored bounds are checked. The collision cases load no file-backed images. Every case checks
+for an absent rig and source/import warnings and writes its own controlled render. The report
 records Blender/build, importer tree hashes, the supplied source commit and each package's exact
 file hashes. Preserve CLI JSON, stdout/stderr and source/build identity beside the report.
 Independently inspect source metadata and raw hashes; a successful render does not establish
