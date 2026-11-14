@@ -31,6 +31,16 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             "image-directional-record",
             2,
         ),
+        (
+            wire::IMAGE_DIRECTIONAL_POSE_INDEX,
+            "image-directional-pose-index",
+            2,
+        ),
+        (
+            wire::IMAGE_DIRECTIONAL_POSE_BLOCK,
+            "image-directional-pose-block",
+            3,
+        ),
         (wire::CONTROLLER, "controller", 2),
         (wire::SKELETON, "skeleton", 0),
         (wire::BINDING, "controller-binding", 2),

@@ -85,6 +85,24 @@ independent aligned path scan agreed at all 551 records and the final chunk end.
 The original CRC words agree with IEEE CRC32 of the ASCII-lowercased path. The
 common byte image supplies one distinct observed layout.
 
+A record with a fully reconciled counted pose section also has an
+`animation-image-directional-pose-index` row at `[chunk, record]`. Its three
+four-byte words are the pose count, extension count and an uninterpreted
+header word. The header starts 2,156 bytes after the path field begins. Each
+`animation-image-directional-pose-block` row at `[chunk, record, pose]` gives
+two byte-addressed arrays, `entries4` and `entries3`, including each original
+little-endian count word and its value range. The packed value strides are
+four and three little-endian `f32` lanes. Consumers can read those lanes from
+the retained original Entry, preserving component order and exact bits.
+Zero-count arrays keep an empty value range and their count word.
+
+The range named `extensions` holds the trailing 552-byte units as original
+bytes. If the counts, boundaries and extension size do not exhaust the
+physical record, the exporter retains the outer record and its `opaque_tail`.
+The installed common byte image reconciles 8,835 pose blocks across 551 records,
+including six opaque units in five records. Coordinate conventions, channel
+ownership, header flags and extension semantics are unconfirmed.
+
 CAF and AIM path lookups describe a physical loose Entry in the owning Archive.
 They distinguish missing, ambiguous and filtered identities. A successful lookup
 needs no target payload read. The path depends on the image payload. A resolved

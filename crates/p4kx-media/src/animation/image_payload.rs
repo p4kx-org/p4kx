@@ -111,3 +111,31 @@ pub(super) struct ImageDirectionalRecord {
     pub(super) aim_path_crc32: u32,
     pub(super) opaque_tail: SourceRange,
 }
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "AnimationDirectionalPoseIndex")]
+pub(super) struct ImageDirectionalPoseIndex {
+    pub(super) header: SourceRange,
+    pub(super) pose_count: u32,
+    pub(super) extension_count: u32,
+    pub(super) header_word: u32,
+    pub(super) extensions: SourceRange,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "AnimationDirectionalPoseBlock")]
+pub(super) struct ImageDirectionalPoseBlock {
+    pub(super) entries4: ImageDirectionalPoseArray,
+    pub(super) entries3: ImageDirectionalPoseArray,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "AnimationDirectionalPoseArray")]
+pub(super) struct ImageDirectionalPoseArray {
+    pub(super) count: u32,
+    pub(super) count_range: SourceRange,
+    pub(super) values: SourceRange,
+}

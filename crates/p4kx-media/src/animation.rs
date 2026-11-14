@@ -7,6 +7,7 @@ mod controller_projection;
 pub(crate) mod dba_metadata_lookup;
 mod dba_projection;
 mod directional_paths;
+mod directional_pose_blocks;
 mod directional_records;
 mod entity_catalogue;
 mod image_payload;

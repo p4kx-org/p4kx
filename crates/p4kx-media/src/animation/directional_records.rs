@@ -18,6 +18,7 @@ pub(super) struct DirectionalRecords<'a> {
 }
 
 pub(super) struct DirectionalRecord<'a> {
+    pub(super) bytes: &'a [u8],
     pub(super) range: Range<u64>,
     pub(super) byte_length: u32,
     pub(super) header_word: u32,
@@ -81,6 +82,7 @@ impl<'a> DirectionalRecords<'a> {
         self.bytes = remaining;
         self.start = end;
         Some(DirectionalRecord {
+            bytes: record,
             range: start..end,
             byte_length,
             header_word: word(record, WORD)?,

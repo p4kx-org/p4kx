@@ -4,6 +4,9 @@
 use p4kx_testkit::TestChunkFile;
 use serde_json::{Value, json};
 
+#[path = "animation_directional_pose_blocks.rs"]
+mod directional_pose_tests;
+
 use super::{
     CAF_CHUNK, DIRECTIONAL_CHUNK, TestResult, archive, field, image, options, support,
     validate_rows,

@@ -1247,6 +1247,78 @@
       ],
       "type": "object"
     },
+    "AnimationDirectionalPoseArray": {
+      "additionalProperties": false,
+      "properties": {
+        "count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "count_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "values": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "count",
+        "count_range",
+        "values"
+      ],
+      "type": "object"
+    },
+    "AnimationDirectionalPoseBlock": {
+      "additionalProperties": false,
+      "properties": {
+        "entries3": {
+          "$ref": "#/$defs/AnimationDirectionalPoseArray"
+        },
+        "entries4": {
+          "$ref": "#/$defs/AnimationDirectionalPoseArray"
+        }
+      },
+      "required": [
+        "entries4",
+        "entries3"
+      ],
+      "type": "object"
+    },
+    "AnimationDirectionalPoseIndex": {
+      "additionalProperties": false,
+      "properties": {
+        "extension_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "extensions": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "header": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "header_word": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pose_count": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "header",
+        "pose_count",
+        "extension_count",
+        "header_word",
+        "extensions"
+      ],
+      "type": "object"
+    },
     "AnimationDirectionalRecord": {
       "additionalProperties": false,
       "properties": {
@@ -2553,6 +2625,40 @@
             },
             "record_type": {
               "const": "image-directional-record",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationDirectionalPoseIndex"
+            },
+            "record_type": {
+              "const": "image-directional-pose-index",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationDirectionalPoseBlock"
+            },
+            "record_type": {
+              "const": "image-directional-pose-block",
               "type": "string"
             }
           },
@@ -41389,6 +41495,116 @@
               "indices": {
                 "maxItems": 2,
                 "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-image-directional-pose-index"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "image-directional-pose-index"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-image-directional-pose-block"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "image-directional-pose-block"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
               }
             }
           }

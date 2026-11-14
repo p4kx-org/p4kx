@@ -7,7 +7,10 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::binding_payload::{Binding, Skeleton};
-use super::image_payload::{ImageDirectionalPath, ImageDirectionalRecord, ImageIndex, ImageRecord};
+use super::image_payload::{
+    ImageDirectionalPath, ImageDirectionalPoseBlock, ImageDirectionalPoseIndex,
+    ImageDirectionalRecord, ImageIndex, ImageRecord,
+};
 use crate::{ByteOrder, ChunkReference, OffsetBasis, SourceRange};
 
 pub(crate) const ENTRY: &str = "animation-entry";
@@ -17,6 +20,8 @@ pub(crate) const DBA_METADATA: &str = "animation-dba-metadata";
 pub(crate) const IMAGE_INDEX: &str = "animation-image-index";
 pub(crate) const IMAGE_DIRECTIONAL_PATH: &str = "animation-image-directional-path";
 pub(crate) const IMAGE_DIRECTIONAL_RECORD: &str = "animation-image-directional-record";
+pub(crate) const IMAGE_DIRECTIONAL_POSE_INDEX: &str = "animation-image-directional-pose-index";
+pub(crate) const IMAGE_DIRECTIONAL_POSE_BLOCK: &str = "animation-image-directional-pose-block";
 pub(crate) const IMAGE_RECORD: &str = "animation-image-record";
 pub(crate) const CONTROLLER: &str = "animation-controller";
 pub(crate) const SKELETON: &str = "animation-skeleton";
@@ -96,6 +101,8 @@ pub(crate) enum AnimationPayload<'a> {
     ImageIndex(ImageIndex),
     ImageDirectionalPath(ImageDirectionalPath<'a>),
     ImageDirectionalRecord(ImageDirectionalRecord),
+    ImageDirectionalPoseIndex(ImageDirectionalPoseIndex),
+    ImageDirectionalPoseBlock(ImageDirectionalPoseBlock),
     ImageRecord(ImageRecord<'a>),
     Controller(Controller),
     Skeleton(Skeleton<'a>),

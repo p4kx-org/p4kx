@@ -12,6 +12,9 @@ use super::super::payload::{self as wire, AnimationPayload};
 use super::{ImageSource, Layout};
 use crate::{MediaError, MediaWriter, Status, Subresource};
 
+#[path = "directional_pose_projection.rs"]
+mod pose_projection;
+
 impl ImageSource<'_, '_> {
     pub(super) fn directional<'a>(
         &self,
@@ -109,6 +112,7 @@ impl ImageSource<'_, '_> {
             budget.metadata(0, 1, writer.limits(), writer.checkpoint)?;
             let identity = [chunk as u64, ordinal as u64];
             self.write_directional_record(identity, &record, writer)?;
+            self.write_directional_poses(identity, &record, writer)?;
             if let Some(path) = record.path {
                 self.write_directional(identity, records.header().start, path, writer)?;
             }
