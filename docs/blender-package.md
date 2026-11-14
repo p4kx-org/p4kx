@@ -81,8 +81,11 @@ ordinary `nodes` hierarchy and transforms.
   meshes/m0001.glb      one GLB per distinct mesh
   meshes/m0002.glb
   textures/t0001.png    one PNG or DDS file per distinct texture
+  material-sources/s0000.jsonl.gz    optional authored companion for each retained material library
 ```
 
+- When an Entity package retains authored material libraries, the manifest links each library to
+  its [material-source companion](#materials). The receipt covers the compressed companion files.
 - The mesh and texture file names are ids made by the writer (`m` or `t` and
   at least four digits); a name from the Archive never becomes a file name, so no name can lead
   out of the package. Mesh ids number the meshes from 1 in the order of their first node. Texture

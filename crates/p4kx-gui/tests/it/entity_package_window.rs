@@ -18,7 +18,7 @@ use p4kx_gui::{
     AssemblyExport, AssemblyExportForm, AssemblyExportStatus, AssemblyExportSummary, Language,
     Model, PackageProblem,
 };
-use p4kx_testkit::{ENTITY_INTERIOR_CLASS, entity_interior_entries};
+use p4kx_testkit::{ENTITY_INTERIOR_CLASS, check_entity_package_sources, entity_interior_entries};
 
 #[path = "entity_package_window/failure.rs"]
 mod failure;
@@ -138,9 +138,18 @@ fn the_export_writes_the_package_folder_reports_it_and_remembers_the_choices() -
     let summary = summary(&harness)?;
     let package = summary.package().ok_or("no package in the summary")?;
     assert_eq!(summary.parts(), 3, "the ship, the gun and the relay");
-    assert_eq!(package.files, package.meshes + package.textures + 2);
+    let manifest = manifest(&folder)?;
+    let libraries = [
+        "Data/objects/test/ship.mtl",
+        "Data/Objects/Test/cube.mtl",
+    ];
+    let written = check_entity_package_sources(&folder, &manifest, &libraries)?;
+    assert_eq!(
+        package.files, written,
+        "the package summary includes both material companions and the receipt"
+    );
     assert!(package.meshes > 0, "{package:?}");
-    assert_eq!(manifest(&folder)?["format"], "p4kx-blender-package");
+    assert_eq!(manifest["format"], "p4kx-blender-package");
     assert!(folder.join("meshes").is_dir());
     assert!(folder.join("textures").is_dir());
     assert!(

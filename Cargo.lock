@@ -4009,6 +4009,7 @@ dependencies = [
  "png",
  "ruzstd",
  "same-file",
+ "serde_json",
  "sha2",
  "tempfile",
 ]

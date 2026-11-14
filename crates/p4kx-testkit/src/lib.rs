@@ -54,6 +54,7 @@ mod entity_npc;
 mod entity_npc_face;
 mod entity_npc_generic;
 mod entity_npc_zones;
+mod entity_package;
 mod entity_painted;
 mod entity_port;
 mod entity_prop_rig;
@@ -214,6 +215,7 @@ pub use entity_npc_generic::{
 pub use entity_npc_zones::{
     NPC_ZONE_CLASS, NpcExtra, NpcZoneOptions, npc_jacketed_entries, npc_zone_entries,
 };
+pub use entity_package::check_entity_package_sources;
 pub use entity_painted::{
     PAINTED_FEMALE_PALETTE_GUID, PAINTED_LIBRARY_PALETTE, PAINTED_PALETTE_GUID, PAINTED_SUIT,
     painted_entries,

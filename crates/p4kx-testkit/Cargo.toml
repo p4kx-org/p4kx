@@ -25,6 +25,7 @@ opus-pure.workspace = true
 p4kx-foundation = { workspace = true, features = ["platform-folders"] }
 png.workspace = true
 ruzstd.workspace = true
+serde_json.workspace = true
 sha2.workspace = true
 same-file.workspace = true
 
