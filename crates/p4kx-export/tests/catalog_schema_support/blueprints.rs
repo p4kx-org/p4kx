@@ -87,9 +87,11 @@ pub(super) fn tiers() -> Value {
         "blueprint": owner(),
         "source": {"valueIndex": "1"},
         "craftTimeSeconds": present(json!("93784")),
+        "tierIndex": present(json!(0)),
         "mandatory": {"valueIndex": "3"},
         "optional": [],
         "costs": [{
+            "position": present(json!({"type": "mandatory"})),
             "source": {"valueIndex": "3"},
             "context": {"source": null, "quantityMultiplier": null,
                         "compositionInclusion": null, "modifiers": []},

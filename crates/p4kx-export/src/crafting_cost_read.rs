@@ -12,7 +12,7 @@ use crate::record_fields::{
     elements, integer, locale_key, number, reference, single, structure, text,
 };
 
-const SELECT: &str = "CraftingCost_Select";
+pub(super) const SELECT: &str = "CraftingCost_Select";
 const RESOURCE: &str = "CraftingCost_Resource";
 const ITEM: &str = "CraftingCost_Item";
 const MULTIPLIER: &str = "CraftingCostContext_QuantityMultiplier";

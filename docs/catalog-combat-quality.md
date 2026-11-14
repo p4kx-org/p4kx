@@ -1,154 +1,188 @@
-# Crafting quality calculation
+# Values by Crafting quality
 
-This client contract defines `conservativeV1` quality evaluation against [Catalog v3
-Blueprint data](catalog-blueprints.md). The
-[shared conformance vectors](examples/catalog-combat-quality-v1.json) exercise arithmetic and
-failure states with synthetic inputs for Basetool and VerseKit.
+`formulaVersion: 1` governs Basetool and VerseKit calculations against Catalog
+`schemaVersion: 3`. P4KX supplies authored inputs, Blueprint positions and derived factory
+weapon values. Consumers select equipment, modes, branches and qualities, apply the formula
+and aggregate their selected loadouts. The versioned fixtures describe synthetic builds.
+The formula follows the [Basetool Exchange amendment](https://github.com/krt-profit/basetool/issues/2821#issuecomment-6878138700)
+and is a client contract subject to revision when measured Crafting results warrant a new version.
 
-## Original identity and client selection
+## Quality key and the active recipe
 
-Start with the physical equipment Record and component ordinal. A weapon result also needs its
-original action occurrence and selected physical ammunition Record. Use
-`configurations.weaponActions.rows[].actionNodes[].sourceValueOrdinal.value` within the owning
-Record. Match it with `actionSourceValueOrdinal.value` in
-`projections.weaponProjectileAmmoSelections.rows[]` on the same `ownerRecordIndex.value` and
-`componentOrdinal.value`. A present selection with `selection.value.type = "selected"` supplies
-`selection.value.ammoRecordIndex.value`, which joins
-`definitions.ammoDefinitions.rows[].recordIndex.value`. A filtered target can have a selected
-index and no emitted definition body. Use these fields within their owning input and Build.
-[Projectile ammunition selection](catalog-ammo-definitions.md#projectile-ammunition-selection)
-defines the admitted routes and evidence states.
+For one crafted placement, use an array of quality entries. Each entry has this shape:
 
-A factory evaluation uses the original input. A crafted evaluation requires a selected recipe
-tier and its active cost occurrences. The tier's `blueprint.inputRef` and
-`blueprint.recordIndex` identify the physical `definitions.blueprints.rows[]` owner.
-The tier's `source.valueIndex` and a selection cost's `source.valueIndex` distinguish the
-original tier and slot occurrences in that owner's `source.values` arena. Retain each active
-option cost's own source position. The `mandatory`, `optional` and `meaning.options`
-references describe available costs. A selected branch must satisfy its declared constraints.
+```json
+{
+  "blueprintGuid": "00000000-0000-4000-8000-000000000101",
+  "tierIndex": 2,
+  "slotPath": [
+    {"type": "optional", "index": 0},
+    {"type": "option", "index": 2}
+  ],
+  "quality": 750
+}
+```
 
-For a named slot, read the exact string through `costs[].meaning.debugName.valueIndex`.
-The referenced original `debugName` field is under `nameInfo` on that selection. Read
-the exact `sourceText` from the original String payload. Match
-override keys case-sensitively. An omitted override uses 500 for each active slot. An explicit
-quality must be a JSON number with integer value in the inclusive 0–1000 domain. A null, string,
-Boolean, fraction or out-of-range number returns `invalidQuality`. An override with no active
-matching slot returns `unknownSlotKey`. An override matching multiple active slots with the
-same `debugName` returns `ambiguousSlotKey`. Distinct original slots still receive their defaults
-independently when the duplicated key is omitted. A selected slot without a readable name can use
-the default. Exact original identity allows the caller to expose the unresolved key to its user.
+Join the selected Blueprint via `definitions.blueprints.rows[]`; the tier's
+`blueprint.inputRef` and `blueprint.recordIndex` identify the physical owner. If the external
+Blueprint GUID has multiple eligible physical targets, require an explicit resolution against
+the current Catalog. Treat Build, selected Blueprint, tier and path as the identity.
+`tierIndex` and every path `index` are zero-based unsigned 32-bit integers from the
+original source arrays. The indices survive a skipped sibling in diagnostic output. A first
+step is `{"type":"mandatory"}` or `{"type":"optional","index":N}`. Each further step is
+`{"type":"option","index":N}`. Read the original tier index from `tierIndex.value`. Catalog cost rows publish a sourced
+`position` cell with `value.type`, optional or option `value.index`, and for options a
+`value.parent` reference. Find that parent by
+matching its `source.valueIndex` within the same tier and Blueprint. Walk to the root and
+reverse to obtain the exchange path. Arena `valueIndex` strings are Catalog-local references.
+Quality paths are independent of language and duplicate or missing debug names.
+Reload and resolve the path against the new Blueprint when the Build changes.
 
-## Eligibility and source evidence
+Use the declared mandatory cost and the active optional and option branches. Validate the
+branch against the authored selection constraints. Every active position with a modifier
+context owns its input quality, including a parent with its own context and a chosen alternative
+with a distinct context. Omitted quality means 500 per active position. A supplied quality is
+an integer from 0 through 1000. Invalid values return `invalidQuality`, duplicate entries return `duplicateSlot`, and
+unknown, malformed or inactive positions return `unknownSlot`. Preserve repeated occurrences of properties and
+slots. Use `selectionRequired` for an unresolved branch that can affect the requested result.
+Factory equipment uses the unmodified base inputs and evaluates without a recipe.
 
-Read each active `costs[].context.modifiers[]`. The modifier's `source.valueIndex` points to
-the original occurrence with `gameplayPropertyRecord` and `valueRanges`. Resolve the Reference
-target by its physical `targetRecordIndex.value` from the original arena and join
-`definitions.gameplayProperties.rows[].recordIndex.value`. Keep the nominal `propertyGuid`
-and exact original property identity. An unavailable physical binding returns `unresolvedProperty`.
+## Modifier inputs and deterministic arithmetic
 
-The Archive describes the gameplay property and its display transformation. Use the bound
-`className.value` with the reviewed [client mapping](basetool-catalog.md#item-stats). The mapping
-assigns property identities to applicable scalar inputs as described in
-[ADR-0072](adr/0072-gameplay-properties-have-no-archive-link-to-a-stat-and-armour-stats-follow-the-components.md). Any client
-`betterWhen` metadata is presentation information. It does not affect which range or operation
-applies. An unverified identity or input mapping yields `unresolvedProperty` or
-`unsupportedTarget`, as appropriate.
+Resolve each active `costs[].context.modifiers[]` through its original
+`gameplayPropertyRecord` Reference. Join the physical `targetRecordIndex.value` from its source
+arena to `definitions.gameplayProperties.rows[].recordIndex.value`. Use the reviewed
+[property mapping](basetool-catalog.md#item-stats) and its item applicability. In particular,
+shield max health maps to the selected shield generator, projectile damage follows selected
+direct-hit `DamageInfo` channels, and the reviewed weapon fire-rate map currently demonstrates
+personal weapon applicability. A consumer needs evidence to extend that map to other equipment.
+`betterWhen` controls presentation. Each original cost and modifier contributes once.
 
-For each scalar, count eligible original modifier occurrences across the selected tier, including
-parent and active option contexts. If the active branch can affect the target and remains unknown,
-return `selectionRequired` for that target. Two or more eligible modifier occurrences targeting
-the same scalar return `unsupportedOverlap`, including one slot with multiple matching
-modifiers and a pair with identical or neutral effects. The original order and occurrences stay
-available for diagnosis. There is no verified inter-slot aggregation or mixed-kind ordering
-rule in this policy. A single admitted modifier may affect several scalars when the mapping
-identifies each input. Return `unchanged` after establishing that no eligible modifier applies.
-Unsupported or incompletely inspected relevant inputs keep their explicit states. Factory
-and independently available crafted metrics remain usable.
+Read all original `valueRanges` occurrences in order. The typed ranges use `kind`, two
+signed decimal quality bounds and binary32 endpoint projections. Recover finite authored
+Single endpoints before promoting them to binary64. For an integer endpoint, read its
+exact original word in the Blueprint arena and convert it to binary64 only when the
+conversion is exact. This preserves additive endpoints such as 16,777,217 when the typed
+binary32 projection rounds them. Map recognized linear ranges to ordered linear segments.
+A stepped consumer segment has explicit step shape. An unfamiliar source shape or an
+incomplete enumeration of the modifier or its ranges yields an unavailable result.
+A modifier that cannot be bound to an applicable scalar retains its unresolved state.
+Use the segment or band parameters only after resolving the original modifier's operation.
 
-## Curves and numeric operations
+For a modifier with segments, examine them in their provided order. Skip a segment with either
+quality bound missing. Choose the first segment whose upper bound is at least q, or the final
+entry if reached with readable bounds. At a shared endpoint the earlier segment wins. For a
+step take the first available value, preferring start over end. For a linear segment both
+endpoints are required. Compute `t = clamp((q - a) / (b - a), 0, 1)`, with t = 0 when
+a equals b, then calculate `start + (end - start) * t`. A gap selects the next eligible segment
+and clamps its interpolation. When there are no segments, apply the same linear rule to the
+explicit band and require both bounds and both endpoints. A selected segment missing a required
+value, an exhausted list, or an incomplete band produces `unsupportedRange`.
 
-Reconcile all original ordered `valueRanges` occurrences with the typed
-`ranges[].source.valueIndex` cells before evaluating a modifier. Typed rows cover two concrete
-range classes. Keep the position of every other original range. An unknown or skipped
-range yields `unsupportedRange`. Invalid source bounds, unavailable or nonfinite endpoints
-yield `invalidRange`. Decode `startQuality.value` and `endQuality.value` from signed
-decimal integer text. Decode each finite `atStart.value` and `atEnd.value` as an authored
-IEEE 754 Single before promoting it to binary64. When available, the exact original
-arena numeric word is the input. A shortest-decimal Single projection can recover the
-same binary32 by rounding to nearest, ties-to-even before promotion.
+Group eligible modifiers by bound physical Property. Visit active costs in their original
+depth-first order and modifiers in authored order. Use ordinary binary64 operations without
+fused multiply-add or display rounding.
 
-Use closed integer intervals `[lo, hi]` within 0–1000, in authored order. Zero matching ranges
-gives `missingRange`. More than one match gives `ambiguousRange`, including a shared inclusive
-endpoint. Preserve the exact selected endpoint value at either boundary. A zero-width range
-with conflicting endpoint values gives `ambiguousEndpoint`. Equal endpoint values define
-a constant band. Adjacent integer bands can change abruptly at the next integer, such as
-499 to 500. The separate [resource quality quantization](basetool-catalog.md#quality-quantizations)
-table describes input mapping bands.
+- For `MULTIPLIER` start at 1. For each contribution v add `(v - 1)` to the running
+  factor and apply `base * factor` once. Two factors of 1.10 produce 1.20.
+- For `ADDITIVE` round each v to the nearest integer with ties to even, then sum with exact
+  integer arithmetic. Convert the final sum to binary64 only if exactly representable and
+  add it to the base once. For example, two contributions of 0.5 sum to 0, two of 1.5
+  sum to 4, and two of -1.5 sum to -4. Keep explicit zero values.
+- Mixed kinds on the same Property and different Properties targeting the same scalar have
+  explicit unsupported results. An unresolved branch, binding or unknown modifier keeps
+  its affected target unavailable. An unaffected scalar keeps its original value. Reject
+  nonfinite inputs and arithmetic and results outside the metric's domain.
 
-- `CraftingGameplayPropertyModifierValueRange_Linear` uses
-  `f = atStart + ((q - lo) / (hi - lo)) × (atEnd - atStart)` for an interior point.
-  Apply `original × f` using ordinary binary64 operations, with no display rounding or
-  fused multiply-add. The original type identifies the operation even for zero or negative factors.
-- `CraftingGameplayPropertyModifierValueRange_LinearIntegerAdditive` uses endpoints with
-  exact integer value. For an interior point compute the exact integer numerator
-  `atStart × (hi - lo) + (q - lo) × (atEnd - atStart)` and require zero remainder on division
-  by `hi - lo`. Use arbitrary-precision integers for that intermediate calculation where needed.
-  The interpolated integer must convert exactly to binary64. A conversion that changes the
-  integer returns `unsupportedNumeric`. A fractional endpoint or fractional interior result
-  returns `unsupportedIntegerRounding`. Apply `original + summand` when supported.
-  Any separate estimate that chooses a rounding or stacking policy needs its own policy identifier.
+For every adjusted result retain its actual source uses for the base input, eligible recipe
+positions, original modifiers and ranges. Use the per-value provenance rules in
+[ADR-0357](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md). A caller's
+quality and the contract constants are calculation parameters. A default quality of 500
+still evaluates the modifier. Factory and crafted profiles can give different values at Q500.
 
-## Inputs for combat evaluation
+## Weapon projection
 
-| Reviewed property mapping | Source-backed calculation input |
-| --- | --- |
-| `GPP_Weapon_Damage`, applicable simple projectile | `definitions.ammoDefinitions.rows[].projectileParams.value.kind.value.damage.value.value.<channel>.value.finite`, with `kind.type = "bullet"` and `damage.value.type = "info"` |
-| `GPP_Weapon_FireRate`, applicable direct shot action | `configurations.weaponActions.rows[].actionNodes[].kind.value.fireRate.value` for a supported single or rapid action |
-| `GPP_Shield_MaxHealth`, applicable shield generator | `configurations.shieldGenerators.rows[].maxHealth.value.finite` |
+`projections.weaponCombatBases.rows[]` has one row per top-level
+`configurations.weaponActions.rows[].fireActions.value[]` slot. Join by `ownerRecordIndex`
+and `componentOrdinal`, then original `modeIndex.value`. `actionSourceValueOrdinal`
+and `actionSourceType` identify the readable original action node.
+`ammunitionRecordIndex.value` identifies a proved physical selection. Read its body from
+`definitions.ammoDefinitions.rows[].recordIndex.value`. The ammo selection and its reason
+are in `projections.weaponProjectileAmmoSelections` joined by component and action ordinal.
+A filtered Catalog can keep the selected coordinate without its body. See the
+[ammunition selection contract](catalog-ammo-definitions.md#projectile-ammunition-selection).
 
-The reviewed fire-rate mapping covers personal weapons. The vectors supply synthetic,
-explicitly admitted mappings to exercise rate, damage and shielding arithmetic.
-An actual ship rate or beam property mapping requires applicable source evidence.
+Each row specifies `formulaVersion` and `units`. The model is a sourced tagged outcome.
+`nominalBullet` covers direct single and rapid projectile actions with unambiguous selected
+Bullet ammunition. The model's `values` retains fire rate in discharges per minute,
+projectiles per discharge, and the launcher multiplier. `nominalFlightDistance` in metres
+is original ammo `speed` in metres per second times `lifetime` in seconds. Inspect these
+two original fields on the selected Ammo definition. This metric represents the nominal
+constant-speed flight distance. Its calculation is independent of the damage payload and RPM.
 
-For a supported simple projectile action, adjust the mapped original inputs first. Calculate
-each channel's nominal direct-hit alpha as
-`(adjustedDamagePerProjectile × pelletCount) × launcherDamageMultiplier`, using
-`kind.value.launchParams.value.pelletCount.value` and
-`kind.value.launchParams.value.damageMultiplier.value.finite`. Nominal DPS for that channel
-is `alpha × (adjustedRPM / 60)`. Retain `ammoCost` as a separate consumption input.
-Use complete declared channel coverage for a total. `DamageBase` supplies no explicit channel
-vector. `DamageParams` supplies a macro and `damageTotal` that needs its own channel model.
-Keep unavailable channels distinguishable from a measured zero. The supported model needs
-finite nonnegative channels and launcher multiplier, a positive integral projectile count and a
-positive finite rate. A result outside its input's supported domain gives `invalidTargetValue`.
-A non-selected ammo status supplies no eligible ammunition inputs and the fixture reports
-`unresolvedAmmo`.
+With a readable explicit `DamageInfo` payload, `model.value.values.damage.value` contains sourced
+per-channel `alpha` and `nominalDps`. The raw direct channel inputs are under
+`projectileParams.value.kind.value.damage.value.value` on the linked Ammo definition, where
+`kind.type` is `bullet` and the damage type is `info`. Apply quality to the mapped original
+inputs first for the crafted calculation. Per channel, with direct-hit damage d, projectile
+count n, launcher multiplier m and rate r in discharges per minute, use:
 
-Shield max health is independently evaluated from its own base value. The additive shield
-vectors exercise the generic integer operation. The projectile policy marks a beam or
-charged wrapper as `unsupportedAction`. Preserve independently sourced beam fields such as
-damage per second and full- and zero-damage ranges. Projectile travel distance, burst cycle,
-charge, reload and sustained DPS use separate models with their own source evidence.
+```text
+alpha = (d * n) * m
+nominalDps = (alpha * r) / 60
+nominalFlightDistance = speed * lifetime
+```
 
-For an adjusted result retain the actual source uses of its input, selection and modifier
-occurrences, including evidence that establishes eligibility. Keep encryption and completeness
-per datum as described by the
-[provenance contract](adr/0357-source-encryption-provenance-is-explicit-per-data-value.md).
-The client quality override and algorithm constants are client calculation parameters.
+Each channel and m requires a finite nonnegative value. The projectile count is a positive
+integer and RPM is positive. Speed and lifetime are finite and nonnegative. An RPM error
+leaves supported alpha and distance available. Keep absent, null, unreadable, unsupported and
+invalid states, and explicit zero, distinct. A complete total requires the declared channels
+to be available. `DamageBase` and macro-backed `DamageParams` leave the direct channel
+result unsupported. Ammo cost is a separate input from the owned launcher.
+Nominal firing DPS excludes reload and transient timing such as spin-up, cooldown and charge.
 
-## Shared fixture
+The projection records Burst, Charge, Beam, Conditional and other unsupported actions and
+unavailable action or ammo selection states. Join a readable Beam mode back to its authored
+`kind.value.damagePerSecond`, `kind.value.fullDamageRange` and `kind.value.zeroDamageRange`. These fields remain
+independently usable. Projectile `damageDropParams` likewise remains on the Ammo definition.
+These authored values stay distinct from modeled nominal flight distance. A mode with
+conditional ammunition or without a unique selection yields no assumed alpha or DPS.
+Its result carries the source evidence for the diagnostic outcome. A present array retains
+slots with unavailable actions. An unavailable whole action array has no addressable modes.
 
-`fixtureVersion: 1` defines the JSON layout independently of Catalog schema versions.
-`policy: "conservativeV1"` identifies the client rules tested. Each case has `profile`,
-`input`, `slots`, `qualityOverrides` and `expected`. These are prepared inputs after Catalog
-joins. `slots[].slotId` is an opaque synthetic occurrence identity. `propertyMappings` supplies
-an explicit synthetic scalar for each property and example presentation direction.
-`selectionStatus: "required"` marks an unresolved branch for the candidate targets in that case.
-Expected nulls accompany explicit request, action, or per-target statuses. The fixture uses a
-complete synthetic damage vector for its two channels.
+## Ship scenario
 
-Compare statuses, identities, integers and exact stored endpoints by equality. Other scalars
-permit absolute error up to `max(tolerance.absolute, tolerance.relative × abs(expected))`.
-Fixture endpoint decimals are exactly representable Singles. The dataset tests client
-arithmetic. Source identity joins, original receipts and actual game property applicability
-are separate Catalog validations.
+Each equipment comparison has a factory and a crafted loadout. Use the resolved
+`loadouts[].ports` tree and the authored port path for the factory loadout. Use the physical
+attachment target at `sourceConstraints.attachedItem.targetRecordIndex.value` when available. Each occupied
+physical port contributes independently, including identical items installed in two ports.
+Specify one selected action per weapon placement and an explicit control group, either
+`pilot` or an identified turret. Sum pilot attack values under simultaneous trigger and
+continuous nominal fire. Sum each turret separately by its own identifier. Group assignments
+are scenario inputs. Sum compatible modeled alpha and DPS per damage channel and as
+complete totals when declared channel coverage permits it. Accumulate contributions in
+the scenario placement order and sum each complete channel vector in channel-name order. Ship shield capacity is the sum
+of `maxHealth` for installed shield generator placements. Treat each placement independently
+and use its own qualities. Range is a per-mode metric. Separate factory and crafted
+configurations can select different parts. Expose missing contributions as partial or
+unavailable; a known subtotal can still be displayed with its state.
+
+## Fixtures and importer changes
+
+[Catalog combat quality v1 fixtures](examples/catalog-combat-quality-v1.json) have independent
+`fixtureVersion`, `formulaVersion` and `catalogSchemaVersion`. Each case carries Build identity
+(`branch`, `version`, `changeNumber`, `buildId`), synthetic part and Blueprint GUIDs, tier
+and slot positions, qualities and expected factory/crafted values. The fixtures use
+normalized input objects after the Catalog joins. A crafted placement's explicit `qualities`
+array replaces that part's fixture-level array. Comparisons require equal statuses and exact
+integers. Numeric comparisons use the fixture's absolute or relative tolerance, whichever
+limit is larger. The P4KX reference parity test reads the published fixture unchanged.
+
+For a v2 importer, replace nested Blueprint recipe data with the physical
+`definitions.blueprints` and `configurations.blueprintTiers` joins. Read costs and modifiers
+from the tier and source arena. Derive saved quality keys from original positions.
+The new weapon factory projection is an additional v3 dataset. Join its physical owner and
+mode to the typed action and ammo rows for authored inputs and definitive source uses.
+v3 uses per-value encryption and completeness markers so each result can be filtered
+independently. See the [v3 catalog layout](basetool-catalog.md), [Blueprint contract](catalog-blueprints.md)
+and [formula and projection ADR](adr/0388-versioned-crafting-quality-and-weapon-base-values.md).

@@ -38,19 +38,7 @@ impl<'source> AmmoBinding<'source> {
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         Ok(Self::ContainerSlots {
-            value: Box::new(ContainerAmmoSlots {
-                owner,
-                primary_ammo: source.record_link_to(
-                    "ammoParamsRecord",
-                    ammo_definition::SOURCE_TYPE,
-                    notes,
-                )?,
-                secondary_ammo: source.record_link_to(
-                    "secondaryAmmoParamsRecord",
-                    ammo_definition::SOURCE_TYPE,
-                    notes,
-                )?,
-            }),
+            value: Box::new(ContainerAmmoSlots::read(owner, source, notes)?),
         })
     }
 
@@ -76,6 +64,26 @@ pub(crate) struct ContainerAmmoSlots<'source> {
 }
 
 impl<'source> ContainerAmmoSlots<'source> {
+    pub(super) fn read(
+        owner: ComponentOwner,
+        source: Observed<'_, '_, '_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self {
+            owner,
+            primary_ammo: source.record_link_to(
+                "ammoParamsRecord",
+                ammo_definition::SOURCE_TYPE,
+                notes,
+            )?,
+            secondary_ammo: source.record_link_to(
+                "secondaryAmmoParamsRecord",
+                ammo_definition::SOURCE_TYPE,
+                notes,
+            )?,
+        })
+    }
+
     pub(super) const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }

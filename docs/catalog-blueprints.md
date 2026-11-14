@@ -24,9 +24,12 @@ arena. A valid deeply nested recipe uses flat links throughout the output.
 
 Each `configurations.blueprintTiers.rows[]` points to its Blueprint and original tier occurrence.
 `craftTimeSeconds` rounds the readable stored time parts to whole seconds. `mandatory` and
-`optional` navigate the selected interpreted cost occurrences. The `costs` array holds the
-recognized costs in original depth-first order. Each cost has a `source` reference, `meaning`
-and `context`.
+`optional` navigate the selected interpreted cost occurrences. The sourced `tierIndex.value` records the
+zero-based original position in `blueprint.tiers`. The `costs` array holds recognized costs in
+original depth-first order. Each cost has a `source` reference, `position`, `meaning` and
+`context`. `position.value` identifies the original mandatory cost, optional array position, or
+option position with a link to its original parent. These indices retain gaps in diagnostic
+output and support the [quality exchange key](catalog-combat-quality.md#quality-key-and-the-active-recipe).
 
 - `select` retains count, original debug-name reference, protected display-name reference and
   ordered option references.

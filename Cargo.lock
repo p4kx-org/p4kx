@@ -3704,6 +3704,8 @@ version = "0.4.2"
 dependencies = [
  "crc32c",
  "jsonschema",
+ "num-bigint",
+ "num-traits",
  "p4kx-assembly",
  "p4kx-channels",
  "p4kx-extraction",

@@ -216,7 +216,7 @@ pub(crate) mod catalog_weapon_actions;
 #[path = "catalog_weapon_magazine_slots.rs"]
 mod catalog_weapon_magazine_slots;
 #[path = "catalog_weapon_projectile_ammo.rs"]
-mod catalog_weapon_projectile_ammo;
+pub(crate) mod catalog_weapon_projectile_ammo;
 #[path = "interactable_configuration.rs"]
 mod interactable_configuration;
 #[path = "interaction_conditions.rs"]
@@ -374,6 +374,8 @@ pub(crate) mod source_value_catalog;
 
 #[path = "catalog_projections.rs"]
 pub(crate) mod catalog_projections;
+#[path = "weapon_combat_base.rs"]
+pub(crate) mod weapon_combat_base;
 
 #[path = "catalog_table.rs"]
 pub(crate) mod catalog_table;

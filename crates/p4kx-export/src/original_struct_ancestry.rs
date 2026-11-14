@@ -43,10 +43,61 @@ impl OriginalValueFact<'_, '_, '_> {
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         self.observe_ancestry(
             current,
-            |index| expected.contains(&index),
+            |index, _| Ok(expected.contains(&index)),
             selectors,
             check_cancel,
         )
+    }
+
+    pub(crate) fn descends_from_any_named(
+        &self,
+        input: &OriginalCatalogInput<'_, '_>,
+        names: &[&str],
+        selectors: &mut Vec<SourceUse>,
+        check_cancel: impl Fn() -> Result<(), CatalogError>,
+    ) -> Result<Option<bool>, CatalogError> {
+        self.check_input(input)?;
+        let Value::Struct(source) = self.value() else {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        };
+        let index = source.struct_index();
+        let current = self
+            .scope()
+            .struct_at(index)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let mut readable = true;
+        let found = self.observe_ancestry(
+            current,
+            |index, selectors| {
+                let Some(structure) = self.scope().struct_at(index) else {
+                    return Err(ExportAccountingError::ConflictingSourceDatum.into());
+                };
+                let name = structure.name();
+                let role = if name.is_ok() {
+                    SourceUseRole::Selector
+                } else {
+                    SourceUseRole::Attempted
+                };
+                selectors.push(self.scope().dataforge().at(
+                    SourceLocation::Subresource {
+                        namespace: "dataforgeStruct".to_owned(),
+                        indices: vec![u64::from(index)],
+                        field: "name".to_owned(),
+                    },
+                    role,
+                )?);
+                Ok(name.map_or_else(
+                    |_| {
+                        readable = false;
+                        true
+                    },
+                    |name| names.contains(&name),
+                ))
+            },
+            selectors,
+            check_cancel,
+        )?;
+        Ok(readable.then_some(found))
     }
 
     pub(super) fn observe_struct_ancestry(
@@ -56,13 +107,18 @@ impl OriginalValueFact<'_, '_, '_> {
         selectors: &mut Vec<SourceUse>,
         check_cancel: impl Fn() -> Result<(), CatalogError>,
     ) -> Result<bool, CatalogError> {
-        self.observe_ancestry(current, |index| index == expected, selectors, check_cancel)
+        self.observe_ancestry(
+            current,
+            |index, _| Ok(index == expected),
+            selectors,
+            check_cancel,
+        )
     }
 
     fn observe_ancestry(
         &self,
         mut current: Struct<'_>,
-        matches: impl Fn(u32) -> bool,
+        mut matches: impl FnMut(u32, &mut Vec<SourceUse>) -> Result<bool, CatalogError>,
         selectors: &mut Vec<SourceUse>,
         check_cancel: impl Fn() -> Result<(), CatalogError>,
     ) -> Result<bool, CatalogError> {
@@ -72,7 +128,7 @@ impl OriginalValueFact<'_, '_, '_> {
         loop {
             check_cancel()?;
             let index = current.index();
-            if matches(index) {
+            if matches(index, selectors)? {
                 return Ok(true);
             }
             if !seen.insert(index) {

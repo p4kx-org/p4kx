@@ -15,6 +15,8 @@ use crate::health_reference_origins as origins;
 mod action_selectors;
 #[path = "catalog_weapon_magazine_condition_assertions.rs"]
 mod condition;
+#[path = "catalog_weapon_linked_ammo.rs"]
+mod linked_projectile;
 #[path = "catalog_weapon_magazine_condition_numbers.rs"]
 mod numbers;
 #[path = "catalog_weapon_projectile_ammo.rs"]

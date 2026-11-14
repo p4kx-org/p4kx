@@ -17,10 +17,10 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
-use crate::catalog_v3::ammo_definition;
 use crate::catalog_v3::catalog_independent_configurations;
 use crate::catalog_v3::inventory_container_definition::table as inventory_table;
 use crate::catalog_v3::medical::medical_tier_config;
+use crate::catalog_v3::weapon_combat_base;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::crafting::read_with_progress;
 use crate::mission_data::link_scenario_factions;
@@ -174,12 +174,24 @@ fn assemble<R>(
         collected.resource_group_members,
     );
     let reputation_tables = collected.mission_kinds.take_reputation_tables(&forge);
+    let quality = collected.quality.take_tables(&forge);
     let law_tables = collected.law.into_tables(&forge);
     let components = collected.item_components.into_tables(&forge);
-    let patches = options.public_patches;
+    let weapon_tables = weapon_combat_base::CatalogWeaponTables::build(
+        &forge,
+        &input,
+        &components,
+        collected.ammo_definitions,
+        options.cancel,
+    )?;
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
-        source: source(archive, options.exported_at, patches, key_use),
+        source: source(
+            archive,
+            options.exported_at,
+            options.public_patches,
+            key_use,
+        ),
         completeness: Completeness::of_every_kind(KindCompleteness::for_filter(options.filter)),
         export_health: health.clone(),
         items: collected.items,
@@ -220,7 +232,7 @@ fn assemble<R>(
                 &forge,
                 collected.explosion_definitions,
             ),
-            ammo_definitions: ammo_definition::table(&forge, collected.ammo_definitions),
+            ammo_definitions: weapon_tables.ammunition,
             weapon_action_recoil_definitions: independent.weapon_action_recoil_definitions,
             weapon_procedural: independent.weapon_procedural,
             reputation_contexts: reputation_tables.contexts,
@@ -254,19 +266,8 @@ fn assemble<R>(
                 &forge,
                 collected.blueprint_categories,
             ),
-            quality_distributions: CatalogTable::new(
-                &forge,
-                &[
-                    "CraftingQualityDistributionRecord",
-                    "CraftingQualityLocationOverrideRecord",
-                ],
-                collected.quality.distributions,
-            ),
-            quality_quantizations: CatalogTable::new(
-                &forge,
-                &["CraftingQualityQuantizationRecord"],
-                collected.quality.quantizations,
-            ),
+            quality_distributions: quality.distributions,
+            quality_quantizations: quality.quantizations,
             resource_groups: group_tables.definitions,
             tags: CatalogTable::new(&forge, &["Tag"], collected.tags.definitions),
             resource_types: CatalogTable::new(&forge, &["ResourceType"], collected.resource_types),
@@ -290,13 +291,10 @@ fn assemble<R>(
                 collected.mission_titles,
             ),
             blueprint_presentation: blueprints.presentation,
-            quality_quantization_resources: CatalogTable::new(
-                &forge,
-                &["CraftingQualityQuantizationRecord"],
-                collected.quality.inverse,
-            ),
+            quality_quantization_resources: quality.resources,
             resource_group_parents: group_tables.parents,
             weapon_magazine_resolutions: components.magazine_resolutions,
+            weapon_combat_bases: weapon_tables.combat,
             weapon_projectile_ammo_selections: components.projectile_ammo_selections,
             tag_paths: CatalogTable::new(&forge, &["Tag"], collected.tags.paths),
             commodity_presentation: commodity_tables.presentation,

@@ -34,6 +34,7 @@ pub(super) enum Case {
     MissingAmmo,
     DerivedAmmo,
     InvalidAction,
+    MixedModes,
     RepeatedAction,
 }
 
@@ -48,13 +49,30 @@ pub(super) fn build(case: Case) -> DataForgeBuilder {
         .structure(
             TestStruct::new(RAPID)
                 .parent(ACTION)
+                .field("fireRate", TestType::Int32)
                 .field("launchParams", pointer(LAUNCHER)),
         )
-        .structure(TestStruct::new(PROJECTILE).parent(LAUNCHER).field(
-            "projectileType",
-            TestType::Enum("EProjectileType".to_owned()),
-        ))
-        .structure(TestStruct::new("AmmoParams").field("speed", TestType::Single))
+        .structure(
+            TestStruct::new(PROJECTILE)
+                .parent(LAUNCHER)
+                .field(
+                    "projectileType",
+                    TestType::Enum("EProjectileType".to_owned()),
+                )
+                .field("pelletCount", TestType::Int32)
+                .field("damageMultiplier", TestType::Single),
+        );
+    let builder = [
+        "SWeaponActionFireBurstParams",
+        "SWeaponActionFireBeamParams",
+        "SWeaponActionFireChargedParams",
+        "SWeaponActionConditionParams",
+    ]
+    .into_iter()
+    .fold(builder, |builder, name| {
+        builder.structure(TestStruct::new(name).parent(ACTION))
+    });
+    let builder = projectile_types(builder)
         .structure(TestStruct::new(AMMO_EXTENSION).parent("AmmoParams"))
         .record(ammo(PRIMARY, "Primary", 10.0))
         .record(ammo(SECONDARY, "Secondary", 20.0))
@@ -65,6 +83,30 @@ pub(super) fn build(case: Case) -> DataForgeBuilder {
             "fixture/ammo/unsupported.xml",
         ));
     builder.record(weapon(case))
+}
+
+fn projectile_types(builder: DataForgeBuilder) -> DataForgeBuilder {
+    builder
+        .structure(
+            TestStruct::new("AmmoParams")
+                .field("speed", TestType::Single)
+                .field("lifetime", TestType::Single)
+                .field("projectileParams", pointer("ProjectileParams")),
+        )
+        .structure(TestStruct::new("ProjectileParams"))
+        .structure(
+            TestStruct::new("BulletProjectileParams")
+                .parent("ProjectileParams")
+                .field("damage", pointer("DamageBase")),
+        )
+        .structure(TestStruct::new("DamageBase"))
+        .structure(
+            TestStruct::new("DamageInfo")
+                .parent("DamageBase")
+                .field("DamagePhysical", TestType::Single)
+                .field("DamageEnergy", TestType::Single)
+                .field("DamageDistortion", TestType::Single),
+        )
 }
 
 fn common_types(builder: DataForgeBuilder) -> DataForgeBuilder {
@@ -144,6 +186,18 @@ fn weapon_component(case: Case) -> TestInstance {
         Case::UnsupportedRole => TestValue::Struct(fire("FixtureFutureRole")),
         _ => TestValue::Struct(fire("Secondary")),
     };
+    let mut actions = vec![TestValue::Struct(primary), second];
+    if case == Case::MixedModes {
+        actions.push(invalid_pointer());
+        for kind in [
+            "SWeaponActionFireBurstParams",
+            "SWeaponActionFireBeamParams",
+            "SWeaponActionFireChargedParams",
+            "SWeaponActionConditionParams",
+        ] {
+            actions.push(TestValue::Struct(TestInstance::new(kind)));
+        }
+    }
     let magazine = if case == Case::LinkedMagazine {
         TestValue::Reference(WEAPON)
     } else {
@@ -158,10 +212,7 @@ fn weapon_component(case: Case) -> TestInstance {
         Vec::new()
     };
     TestInstance::new(WEAPON_COMPONENT)
-        .value(
-            "fireActions",
-            TestValue::Array(vec![TestValue::Struct(primary), second]),
-        )
+        .value("fireActions", TestValue::Array(actions))
         .value("ammoContainerRecord", magazine)
         .value("secondaryAmmoContainers", TestValue::Array(secondary))
         .value(
@@ -171,12 +222,20 @@ fn weapon_component(case: Case) -> TestInstance {
 }
 
 fn fire(role: &str) -> TestInstance {
-    TestInstance::new(RAPID).value(
-        "launchParams",
-        TestValue::Struct(
-            TestInstance::new(PROJECTILE).value("projectileType", TestValue::text(role)),
-        ),
-    )
+    TestInstance::new(RAPID)
+        .value(
+            "fireRate",
+            TestValue::Int32(if role == "Secondary" { 0 } else { 120 }),
+        )
+        .value(
+            "launchParams",
+            TestValue::Struct(
+                TestInstance::new(PROJECTILE)
+                    .value("projectileType", TestValue::text(role))
+                    .value("pelletCount", TestValue::Int32(3))
+                    .value("damageMultiplier", TestValue::Single(0.5)),
+            ),
+        )
 }
 
 fn container(case: Case, source_type: &str) -> TestInstance {
@@ -196,9 +255,24 @@ fn ammo(guid: u128, name: &str, speed: f32) -> TestRecord {
         guid,
         "AmmoParams",
         format!("AmmoParams.{name}"),
-        format!("fixture/ammo/{name}.xml"),
+        format!("libs/foundry/records/ammoparams/fixture/{name}.xml"),
     )
     .value("speed", TestValue::Single(speed))
+    .value("lifetime", TestValue::Single(2.5))
+    .value(
+        "projectileParams",
+        TestValue::Struct(
+            TestInstance::new("BulletProjectileParams").value(
+                "damage",
+                TestValue::Struct(
+                    TestInstance::new("DamageInfo")
+                        .value("DamagePhysical", TestValue::Single(speed / 5.0))
+                        .value("DamageEnergy", TestValue::Single(6.0))
+                        .value("DamageDistortion", TestValue::Single(0.0)),
+                ),
+            ),
+        ),
+    )
 }
 
 fn invalid_pointer() -> TestValue {

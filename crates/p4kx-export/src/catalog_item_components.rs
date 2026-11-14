@@ -316,12 +316,6 @@ pub(crate) fn read<'source, T>(
         let observed = Observed::new(&originals, input, component, &capture, &numbers);
         result.push(kind, owner, observed)?;
     }
-    result.rows.projectile_ammo_selections = catalog_weapon_projectile_ammo::read(
-        &originals,
-        input,
-        &result.rows.weapon_actions,
-        &result.rows.ammo_bindings,
-    )?;
     result.rows.numbers = numbers.into_inner();
     let projected = project(Some(&originals), &mut result)?;
     Ok((result, projected))

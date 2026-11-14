@@ -21,8 +21,10 @@ mod operating;
 #[path = "weapon_action_recoil.rs"]
 mod recoil;
 
-pub(super) use action::ProjectileAction;
-use action::WeaponAction;
+pub(super) use action::WeaponAction;
+pub(super) use action::{
+    ProjectileAction, ProjectileCombatInputs, ProjectileSelector, WeaponModeKind,
+};
 use operating::WeaponOperatingConfiguration;
 
 const ACTION_BASE: &str = "SWeaponActionParams";
@@ -52,6 +54,10 @@ impl<'source> WeaponActions<'source> {
     pub(super) fn action(&self, index: u32) -> Option<ProjectileAction<'_, 'source>> {
         let index = usize::try_from(index).ok()?;
         self.action_nodes.get(index).map(WeaponAction::selection)
+    }
+
+    pub(super) fn mode(&self, node: u32) -> Option<&WeaponAction<'source>> {
+        self.action_nodes.get(usize::try_from(node).ok()?)
     }
 
     pub(super) fn read(

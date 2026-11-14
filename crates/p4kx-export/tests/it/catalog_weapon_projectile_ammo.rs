@@ -14,6 +14,7 @@ mod fixture;
 use fixture::Case;
 
 const ROWS: &str = "/projections/weaponProjectileAmmoSelections/rows";
+const COMBAT_ROWS: &str = "/projections/weaponCombatBases/rows";
 
 #[test]
 fn projectile_ammo_selects_each_original_role_with_complete_physical_evidence() -> TestResult {
@@ -38,12 +39,154 @@ fn projectile_ammo_selects_each_original_role_with_complete_physical_evidence() 
         ] {
             assert_selected(&catalog, row, &forge, role, guid, marker(origin))?;
         }
+        let combat = proof::rows(&catalog, COMBAT_ROWS)?;
+        assert_eq!(combat.len(), 2);
+        for row in combat {
+            assert_eq!(
+                proof::at(row, "/model/value/type")?,
+                "ammoDefinitionUnavailable"
+            );
+        }
         let schema = p4kx_export::catalog_schema();
         jsonschema::validator_for(&schema)?
             .validate(&catalog)
             .map_err(|error| error.to_string())?;
         proof::closure(&catalog)?;
     }
+    Ok(())
+}
+
+#[test]
+fn projectile_combat_keeps_alpha_and_rate_independent_with_exact_origins() -> TestResult {
+    let catalog = build(Case::Unique, DcbOrigin::Encrypted, None)?;
+    let [primary, secondary] = proof::rows(&catalog, COMBAT_ROWS)? else {
+        return Err("two distinct nominal projectile actions".into());
+    };
+    for (row, role, rate) in [(primary, "primary", 120), (secondary, "secondary", 0)] {
+        assert_original_action(&catalog, row, role)?;
+        let model = proof::at(row, "/model/value")?;
+        assert_eq!(proof::at(model, "/type")?, "nominalBullet");
+        proof::present(
+            proof::at(model, "/values")?,
+            "fireRateRpm",
+            &json!(rate),
+            Some(true),
+        )?;
+        proof::present(
+            proof::at(model, "/values")?,
+            "projectilesPerDischarge",
+            &json!(3),
+            Some(true),
+        )?;
+        proof::present(
+            proof::at(model, "/values/damage/value/alpha")?,
+            "energy",
+            &json!(9.0),
+            Some(true),
+        )?;
+    }
+    let alpha = proof::at(primary, "/model/value/values/damage/value/alpha")?;
+    let dps = proof::at(primary, "/model/value/values/damage/value/nominalDps")?;
+    proof::present(alpha, "physical", &json!(3.0), Some(true))?;
+    proof::present(dps, "physical", &json!(6.0), Some(true))?;
+    proof::present(dps, "energy", &json!(18.0), Some(true))?;
+    proof::present(dps, "distortion", &json!(0.0), Some(true))?;
+    proof::cell(dps, "thermal", "absent")?;
+    proof::present(
+        proof::at(secondary, "/model/value/values/damage/value/alpha")?,
+        "physical",
+        &json!(6.0),
+        Some(true),
+    )?;
+    proof::cell(
+        proof::at(secondary, "/model/value/values/damage/value/nominalDps")?,
+        "physical",
+        "invalid",
+    )?;
+    assert_eq!(proof::at(primary, "/formulaVersion")?, &json!(1));
+    proof::present(primary, "modeIndex", &json!(0), Some(true))?;
+    proof::present(secondary, "modeIndex", &json!(1), Some(true))?;
+    assert_eq!(
+        proof::at(primary, "/units/nominalFlightDistance")?,
+        "metres"
+    );
+    assert_combat_origins(&catalog, primary, dps)?;
+    proof::closure(&catalog)?;
+    jsonschema::validator_for(&p4kx_export::catalog_schema())?
+        .validate(&catalog)
+        .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+#[test]
+fn projectile_combat_keeps_original_mode_positions_for_unsupported_and_unreadable_slots()
+-> TestResult {
+    let catalog = build(Case::MixedModes, DcbOrigin::Encrypted, None)?;
+    let rows = proof::rows(&catalog, COMBAT_ROWS)?;
+    let expected = [
+        "ammoSelectionUnavailable",
+        "ammoSelectionUnavailable",
+        "actionUnavailable",
+        "burst",
+        "beam",
+        "charge",
+        "conditional",
+    ];
+    assert_eq!(rows.len(), expected.len());
+    for (index, (row, kind)) in rows.iter().zip(expected).enumerate() {
+        let mode = proof::cell(row, "modeIndex", "present")?;
+        assert_eq!(proof::at(mode, "/value")?, &json!(index));
+        assert_eq!(proof::at(mode, "/containsEncryptedSource")?, &json!(true));
+        assert_eq!(proof::at(row, "/model/value/type")?, kind);
+        assert_eq!(proof::at(row, "/ammunitionRecordIndex")?, &Value::Null);
+    }
+    assert_eq!(proof::at(&rows[2], "/actionSourceType")?, &Value::Null);
+    proof::closure(&catalog)
+}
+
+fn assert_combat_origins(catalog: &Value, primary: &Value, dps: &Value) -> TestResult {
+    let distance = proof::at(primary, "/model/value/values")?;
+    proof::present(distance, "nominalFlightDistance", &json!(25.0), Some(true))?;
+    let metric = proof::cell(distance, "nominalFlightDistance", "present")?;
+    let ammo_index = proof::at(primary, "/ammunitionRecordIndex/value")?;
+    let ammo = proof::rows(catalog, "/definitions/ammoDefinitions/rows")?
+        .iter()
+        .find(|row| row.pointer("/recordIndex/value") == Some(ammo_index))
+        .ok_or("selected ammo definition")?;
+    for field in ["speed", "lifetime"] {
+        assert_uses(metric, proof::cell(ammo, field, "present")?)?;
+    }
+    let physical = proof::cell(dps, "physical", "present")?;
+    let channels = proof::at(
+        ammo,
+        "/projectileParams/value/kind/value/damage/value/value",
+    )?;
+    assert_uses(physical, proof::cell(channels, "physical", "present")?)?;
+    let energy = proof::cell(channels, "energy", "present")?;
+    let physical_sources = proof::rows(physical, "/sourceUsesRefs")?;
+    assert!(
+        proof::rows(energy, "/sourceUsesRefs")?
+            .iter()
+            .any(|source| !physical_sources.contains(source)),
+        "the damage cell retains independent channel evidence"
+    );
+    for field in [
+        "projectilesPerDischarge",
+        "launcherDamageMultiplier",
+        "fireRateRpm",
+    ] {
+        assert_uses(physical, proof::cell(distance, field, "present")?)?;
+    }
+    Ok(())
+}
+
+fn assert_uses(derived: &Value, input: &Value) -> TestResult {
+    let derived = proof::rows(derived, "/sourceUsesRefs")?;
+    let input = proof::rows(input, "/sourceUsesRefs")?;
+    assert!(
+        !input.is_empty() && input.iter().all(|source| derived.contains(source)),
+        "derived metric retains the exact source uses of its input"
+    );
     Ok(())
 }
 

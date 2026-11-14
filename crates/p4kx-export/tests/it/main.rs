@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! Integration tests of `p4kx-export`, built as one test binary.
-
 #![recursion_limit = "256"]
 
 mod blueprint_category_v3_contract;
@@ -114,6 +113,11 @@ mod category_lists_v3_schema;
 mod category_lists_v3_selection;
 mod category_lists_v3_source;
 mod category_lists_v3_states;
+mod combat_quality_math;
+mod combat_quality_parity;
+mod combat_quality_part;
+mod combat_quality_ship;
+mod combat_quality_vectors;
 mod commodity_v3;
 mod commodity_v3_fixture;
 mod commodity_v3_fixture_records;

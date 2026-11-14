@@ -101,6 +101,62 @@ impl<'source> WeaponAction<'source> {
     }
 }
 
+#[derive(Clone, Copy)]
+pub(in crate::catalog_v3) enum WeaponModeKind {
+    SimpleShot,
+    Burst,
+    Beam,
+    Charge,
+    Conditional,
+    Other,
+}
+
+/// The stored launcher and rate that drive nominal single-discharge metrics.
+pub(in crate::catalog_v3) struct ProjectileCombatInputs<'action> {
+    pub(in crate::catalog_v3) fire_rate: &'action SourcedValue<i32>,
+    pub(in crate::catalog_v3) pellet_count: &'action SourcedValue<i32>,
+    pub(in crate::catalog_v3) damage_multiplier: &'action SourcedValue<ResourceFloat32>,
+}
+
+impl<'source> WeaponAction<'source> {
+    pub(in crate::catalog_v3) const fn source_ordinal(&self) -> &SourcedValue<DecimalU64> {
+        &self.source_value_ordinal
+    }
+
+    pub(in crate::catalog_v3) const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    pub(in crate::catalog_v3) const fn mode_kind(&self) -> WeaponModeKind {
+        match self.kind {
+            WeaponActionKind::Single(_) | WeaponActionKind::Rapid(_) => WeaponModeKind::SimpleShot,
+            WeaponActionKind::Burst(_) => WeaponModeKind::Burst,
+            WeaponActionKind::Beam(_) => WeaponModeKind::Beam,
+            WeaponActionKind::Charged(_) => WeaponModeKind::Charge,
+            WeaponActionKind::Conditional(_) | WeaponActionKind::DynamicConditional(_) => {
+                WeaponModeKind::Conditional
+            }
+            _ => WeaponModeKind::Other,
+        }
+    }
+
+    pub(in crate::catalog_v3) fn combat_inputs(&self) -> Option<ProjectileCombatInputs<'_>> {
+        let shot = match &self.kind {
+            WeaponActionKind::Single(shot) => shot.as_ref(),
+            WeaponActionKind::Rapid(rapid) => &rapid.shot,
+            _ => return None,
+        };
+        let WeaponLauncher::Projectile { settings } = shot.launch_params.value()? else {
+            return None;
+        };
+        Some(ProjectileCombatInputs {
+            fire_rate: &shot.fire_rate,
+            pellet_count: settings.pellet_count(),
+            damage_multiplier: settings.damage_multiplier(),
+        })
+    }
+}
+
 /// Typed action inputs and the original bodies of other admitted action declarations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]

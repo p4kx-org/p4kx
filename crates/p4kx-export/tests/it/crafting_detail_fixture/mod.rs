@@ -337,3 +337,39 @@ pub(crate) fn database() -> DataForgeBuilder {
     ));
     records::dismantle_and_global(records::quality(records::rewards(blueprints(builder))))
 }
+
+const QUALITY_POSITION: u128 = 0xa114_4000_0000_4000_8000_0000_0000_0001;
+
+pub(super) fn position_database() -> DataForgeBuilder {
+    let selection = select(
+        1,
+        "",
+        vec![
+            TestValue::Null,
+            select(
+                1,
+                "",
+                vec![TestValue::Null, resource(IRON, 1.0, vec![modifiers()])],
+            ),
+        ],
+    );
+    let ordinal_tier = tier(
+        time(1, 0.0),
+        TestValue::Null,
+        vec![TestValue::Null, selection],
+    );
+    database().record(blueprint(
+        QUALITY_POSITION,
+        "FixtureQualityPosition",
+        "bp_craft_quality_position",
+        PRODUCT_A,
+        vec![
+            tier(time(0, 0.0), TestValue::Null, Vec::new()),
+            ordinal_tier,
+        ],
+    ))
+}
+
+pub(super) const fn quality_position_guid() -> u128 {
+    QUALITY_POSITION
+}

@@ -7,6 +7,8 @@
 
 #[path = "catalog_crafting_quality.rs"]
 mod quality;
+#[path = "catalog_crafting_quality_positions.rs"]
+mod quality_positions;
 #[path = "catalog_crafting_tier_selection.rs"]
 mod selection;
 

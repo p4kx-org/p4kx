@@ -13,6 +13,7 @@ use crate::schema_fields::every_field_required;
 
 use super::catalog_item_components::resolution::WeaponMagazineResolution;
 use super::catalog_weapon_projectile_ammo::WeaponProjectileAmmoSelection;
+use super::weapon_combat_base::WeaponCombatBase;
 
 /// Explicit choices and derived values, separate from authored definitions.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -31,6 +32,7 @@ pub(crate) struct CatalogProjections<'source> {
     pub(crate) commodity_presentation: CatalogTable<CommodityPresentation>,
     pub(crate) weapon_magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
     pub(crate) weapon_projectile_ammo_selections: CatalogTable<WeaponProjectileAmmoSelection>,
+    pub(crate) weapon_combat_bases: CatalogTable<WeaponCombatBase<'source>>,
     pub(crate) resource_group_parents:
         CatalogTable<super::resource_group_catalog::ResourceGroupParent>,
 }

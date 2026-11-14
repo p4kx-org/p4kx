@@ -41,6 +41,7 @@ pub(crate) const WEAPON_COMPONENT: &str = "SCItemWeaponComponentParams";
 pub(crate) const PRIMARY_MAGAZINE_FIELD: &str = "ammoContainerRecord";
 
 /// The original occurrences and read result used by the legacy primary selection.
+#[derive(Clone, Copy)]
 pub(crate) struct MagazineRead<'read, 'source> {
     weapon: &'read Value<'source>,
     route: MagazineRoute<'read, 'source>,
@@ -53,6 +54,7 @@ impl<'read, 'source> MagazineRead<'read, 'source> {
 }
 
 /// The actual on-weapon container or the one attempted target body.
+#[derive(Clone, Copy)]
 pub(crate) enum MagazineRoute<'read, 'source> {
     Own(&'read Value<'source>),
     Linked {

@@ -48,6 +48,15 @@ pub(crate) struct AuthoredProjectile<'source> {
 }
 
 impl<'source> AuthoredProjectile<'source> {
+    pub(super) fn bullet_damage(
+        &self,
+    ) -> Option<&SourcedValue<super::authored_damage::AuthoredDamage<'source>>> {
+        match &self.kind {
+            ProjectileKind::Bullet { value } => Some(value.damage()),
+            _ => None,
+        }
+    }
+
     pub(super) fn read_ammo(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

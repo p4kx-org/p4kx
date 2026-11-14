@@ -64,6 +64,26 @@ pub(crate) struct DamageInfo {
 }
 
 impl DamageInfo {
+    pub(super) fn from_authored<'damage>(
+        damage: &'damage AuthoredDamage<'_>,
+    ) -> Option<&'damage Self> {
+        match damage {
+            AuthoredDamage::Info { value } => Some(value),
+            _ => None,
+        }
+    }
+
+    pub(super) const fn channels(&self) -> DamageChannels<&SourcedValue<ResourceFloat32>> {
+        DamageChannels {
+            physical: &self.physical,
+            energy: &self.energy,
+            distortion: &self.distortion,
+            thermal: &self.thermal,
+            biochemical: &self.biochemical,
+            stun: &self.stun,
+        }
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -87,6 +107,45 @@ impl DamageInfo {
             ("DamageBiochemical", self.biochemical.state()),
             ("DamageStun", self.stun.state()),
         ]
+    }
+}
+
+/// A fixed vector keyed by the original damage channels.
+#[derive(Debug, Serialize, JsonSchema)]
+#[schemars(transform = every_field_required)]
+pub(super) struct DamageChannels<T> {
+    physical: T,
+    energy: T,
+    distortion: T,
+    thermal: T,
+    biochemical: T,
+    stun: T,
+}
+
+impl<T> DamageChannels<T> {
+    pub(super) const fn as_ref(&self) -> DamageChannels<&T> {
+        DamageChannels {
+            physical: &self.physical,
+            energy: &self.energy,
+            distortion: &self.distortion,
+            thermal: &self.thermal,
+            biochemical: &self.biochemical,
+            stun: &self.stun,
+        }
+    }
+
+    pub(super) fn try_map<U, E>(
+        self,
+        mut apply: impl FnMut(T) -> Result<U, E>,
+    ) -> Result<DamageChannels<U>, E> {
+        Ok(DamageChannels {
+            physical: apply(self.physical)?,
+            energy: apply(self.energy)?,
+            distortion: apply(self.distortion)?,
+            thermal: apply(self.thermal)?,
+            biochemical: apply(self.biochemical)?,
+            stun: apply(self.stun)?,
+        })
     }
 }
 

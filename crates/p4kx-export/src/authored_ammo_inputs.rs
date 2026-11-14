@@ -53,6 +53,18 @@ pub(crate) struct AuthoredAmmoInputs<'source> {
 }
 
 impl<'source> AuthoredAmmoInputs<'source> {
+    pub(super) const fn projectile(&self) -> &SourcedValue<AuthoredProjectile<'source>> {
+        &self.projectile_params
+    }
+
+    pub(super) const fn speed(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.speed
+    }
+
+    pub(super) const fn lifetime(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.lifetime
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

@@ -5,6 +5,7 @@ use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
 use super::Scan;
 use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
+use crate::catalog_v3::catalog_weapon_projectile_ammo::{self, LinkedAmmunitionReader};
 use crate::catalog_v3::loot_definition_catalog::{self, LootDefinitionKind};
 use crate::catalog_v3::starmap_object_definition;
 use crate::commodity_resource::{self, CommodityResource};
@@ -118,39 +119,81 @@ impl<'f> Scan<'_, '_, 'f> {
             admission,
             cancel,
             |originals, read| {
-                crate::source_projection_notes::record(
-                    Kind::Items,
-                    ExportSourceRole::Selected,
-                    admission,
-                    tree,
-                    std::mem::take(&mut read.notes),
-                    ledger,
-                )?;
-                let health = read.legacy_health;
-                item_stats::read_with_sources(
-                    tree,
-                    self.forge,
-                    trees,
-                    || health,
-                    |record, _| self.ammo.dependency(record, ledger),
-                    |observed| {
-                        let fields =
-                            originals.ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-                        if let Some(row) = resolution::read(
-                            self.projection.original(),
-                            admission.record(),
-                            tree,
-                            fields,
-                            observed,
-                            cancel,
-                        )? {
-                            read.rows.magazine_resolutions.push(row);
-                        }
-                        Ok(())
-                    },
-                )
+                let stats = self
+                    .item_stats_with_magazines(tree, trees, admission, originals, read, ledger)?;
+                Ok(stats)
             },
         )
+    }
+
+    fn item_stats_with_magazines(
+        &self,
+        tree: &RecordTree<'f>,
+        trees: &mut TreeBuilder<'f>,
+        admission: &RecordObservation<'_, 'f>,
+        originals: Option<&crate::catalog_read::original::OriginalFlowFields<'_, '_, 'f>>,
+        read: &mut ItemComponentsRead<'f>,
+        ledger: &mut ExportLedger,
+    ) -> Result<Option<ItemStats<'f>>, CatalogError> {
+        let cancel = self.options.cancel;
+        crate::source_projection_notes::record(
+            Kind::Items,
+            ExportSourceRole::Selected,
+            admission,
+            tree,
+            std::mem::take(&mut read.notes),
+            ledger,
+        )?;
+        let health = read.legacy_health;
+        let reader = LinkedAmmunitionReader {
+            projection: self.projection,
+            forge: self.forge,
+            cancel,
+        };
+        let mut projectile_ledger = ExportLedger::default();
+        let mut observed_magazine = false;
+        let stats = item_stats::read_with_sources(
+            tree,
+            self.forge,
+            trees,
+            || health,
+            |record, _| self.ammo.dependency(record, ledger),
+            |observed| {
+                let fields = originals.ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+                observed_magazine = true;
+                if let Some(row) = resolution::read(
+                    self.projection.original(),
+                    admission.record(),
+                    tree,
+                    fields,
+                    observed,
+                    cancel,
+                )? {
+                    read.rows.magazine_resolutions.push(row);
+                }
+                read.rows.projectile_ammo_selections = catalog_weapon_projectile_ammo::read(
+                    fields,
+                    &reader,
+                    &read.rows.weapon_actions,
+                    &read.rows.ammo_bindings,
+                    Some(observed),
+                    &mut projectile_ledger,
+                )?;
+                Ok(())
+            },
+        )?;
+        if !observed_magazine && let Some(fields) = originals {
+            read.rows.projectile_ammo_selections = catalog_weapon_projectile_ammo::read(
+                fields,
+                &reader,
+                &read.rows.weapon_actions,
+                &read.rows.ammo_bindings,
+                None,
+                &mut projectile_ledger,
+            )?;
+        }
+        ledger.merge(projectile_ledger);
+        Ok(stats)
     }
 
     fn definition_kind(

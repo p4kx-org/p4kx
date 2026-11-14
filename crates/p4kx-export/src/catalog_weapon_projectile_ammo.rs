@@ -2,28 +2,37 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    DataForge, DecimalU64, FieldOrigin, SourceUseRole, SourceValue, SourceValueState, SourcedValue,
-    Value, ValueError,
+    DataForge, DecimalU64, FieldOrigin, SourceValue, SourceValueState, SourcedValue,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::catalog_ammo_bindings::{AmmoBinding, ContainerAmmoSlots};
-use super::catalog_weapon_actions::{ProjectileAction, WeaponActions};
+use super::catalog_weapon_actions::{ProjectileAction, ProjectileSelector, WeaponActions};
 use super::catalog_weapon_magazine_slots::WeaponMagazineSlots;
 use super::item_component_owner::ComponentOwner;
-use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_read::original::{OriginalFlowFields, OriginalValuePart};
+use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition;
 use crate::definition_reference::DefinitionStatus;
-use crate::item_stats::WEAPON_COMPONENT;
+use crate::export_ledger::ExportLedger;
+use crate::item_stats::{MagazineRead, WEAPON_COMPONENT};
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "weapon_projectile_action_slots.rs"]
+mod action_slots;
+#[path = "weapon_linked_magazine.rs"]
+mod linked_reader;
+#[path = "weapon_magazine_choice.rs"]
+mod linked_selection;
 #[path = "weapon_projectile_ammo_route.rs"]
 mod route;
 
+use action_slots::ActionSlots;
+pub(crate) use linked_reader::LinkedAmmunitionReader;
+use linked_reader::LinkedMagazineRead;
+use linked_selection::MagazineChoice;
 use route::OwnRoute;
 
 /// An authored launcher selection tied to one original weapon action occurrence.
@@ -35,6 +44,34 @@ pub(crate) struct WeaponProjectileAmmoSelection {
     owner: ComponentOwner,
     action_source_value_ordinal: SourcedValue<DecimalU64>,
     selection: SourcedValue<Selection>,
+}
+
+impl WeaponProjectileAmmoSelection {
+    pub(super) const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    pub(super) const fn action_source_value_ordinal(&self) -> &SourcedValue<DecimalU64> {
+        &self.action_source_value_ordinal
+    }
+
+    pub(super) const fn origin(&self) -> &FieldOrigin {
+        self.selection.origin()
+    }
+
+    pub(super) const fn selected_ammo_index(&self) -> Option<&SourcedValue<u32>> {
+        match self.selection.value() {
+            Some(
+                Selection::Selected {
+                    ammo_record_index, ..
+                }
+                | Selection::SelectedLinkedMagazine {
+                    ammo_record_index, ..
+                },
+            ) => Some(ammo_record_index),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -50,6 +87,20 @@ enum Selection {
         container_component_ordinal: SourcedValue<u32>,
         ammo_record_index: SourcedValue<u32>,
     },
+    SelectedLinkedMagazine {
+        role: SourcedValue<ProjectileAmmoRole>,
+        magazine_record_index: SourcedValue<u32>,
+        container_component_ordinal: SourcedValue<u32>,
+        ammo_record_index: SourcedValue<u32>,
+    },
+    DanglingMagazine,
+    UnsupportedMagazineTarget,
+    SelfLinkedMagazine,
+    AmbiguousMagazineReference,
+    UnreadableMagazine,
+    LinkedMagazineWithoutContainer,
+    AmbiguousLinkedMagazineContainer,
+    IncompleteLinkedMagazineComponents,
     AmbiguousAction,
     IncompleteActions,
     AmbiguousComponents,
@@ -74,16 +125,28 @@ pub(super) enum ProjectileAmmoRole {
     Secondary,
 }
 
-pub(super) fn read<'source>(
+impl ProjectileAmmoRole {
+    const fn field_name(self) -> &'static str {
+        match self {
+            Self::Primary => "ammoParamsRecord",
+            Self::Secondary => "secondaryAmmoParamsRecord",
+        }
+    }
+}
+
+pub(crate) fn read<'source>(
     fields: &OriginalFlowFields<'_, '_, 'source>,
-    input: &OriginalCatalogInput<'_, 'source>,
+    reader: &LinkedAmmunitionReader<'_, 'source>,
     weapons: &[WeaponActions<'source>],
     bindings: &[AmmoBinding<'source>],
+    observed: Option<MagazineRead<'_, 'source>>,
+    ledger: &mut ExportLedger,
 ) -> Result<Vec<WeaponProjectileAmmoSelection>, CatalogError> {
     if weapons.is_empty() {
         return Ok(Vec::new());
     }
-    let route = OwnRoute::read(fields, input, weapons, bindings)?;
+    let route = OwnRoute::read(fields, reader.projection.original(), weapons, bindings)?;
+    let linked = observed.and_then(|observed| LinkedMagazineRead::capture(observed.into_parts().1));
     let mut rows = Vec::new();
     for weapon in weapons {
         let Some(slots) = weapon.fire_actions().value() else {
@@ -91,6 +154,7 @@ pub(super) fn read<'source>(
         };
         let magazine = magazine_for(weapon, bindings)?;
         let actions = ActionSlots::read(fields, weapon, slots)?;
+        let mut choice = None;
         for slot in slots {
             fields.check_cancel()?;
             let Some(&index) = slot.value() else {
@@ -102,25 +166,30 @@ pub(super) fn read<'source>(
             let Some(ref projectile) = original.selector else {
                 continue;
             };
-            let mut origins = vec![
-                actions.origin(),
-                weapon.fire_actions().origin(),
-                slot.origin(),
-                original.source_ordinal.origin(),
-                projectile.launcher_origin,
-                projectile.label.origin(),
-            ];
+            let mut origins = projectile_origins(&actions, weapon, slot, &original, projectile);
             let selection = match &actions {
                 ActionSlots::Repeated(_) => Selection::AmbiguousAction,
                 ActionSlots::Incomplete(_) => Selection::IncompleteActions,
-                ActionSlots::Complete(_) => select(
-                    fields,
-                    &route,
-                    magazine,
-                    &original,
-                    projectile.label,
-                    &mut origins,
-                )?,
+                ActionSlots::Complete(_) => {
+                    let choice = magazine_choice(
+                        &mut choice,
+                        reader,
+                        fields,
+                        &route,
+                        magazine,
+                        linked,
+                        ledger,
+                    )?;
+                    select(
+                        fields,
+                        &route,
+                        magazine,
+                        choice,
+                        &original,
+                        projectile.label,
+                        &mut origins,
+                    )?
+                }
             };
             rows.push(WeaponProjectileAmmoSelection {
                 owner: weapon.owner().clone(),
@@ -134,77 +203,40 @@ pub(super) fn read<'source>(
     Ok(rows)
 }
 
-enum ActionSlots {
-    Complete(FieldOrigin),
-    Repeated(FieldOrigin),
-    Incomplete(FieldOrigin),
+fn projectile_origins<'origin>(
+    actions: &'origin ActionSlots,
+    weapon: &'origin WeaponActions<'_>,
+    slot: &'origin SourcedValue<u32>,
+    action: &ProjectileAction<'origin, '_>,
+    projectile: &ProjectileSelector<'origin, '_>,
+) -> Vec<&'origin FieldOrigin> {
+    vec![
+        actions.origin(),
+        weapon.fire_actions().origin(),
+        slot.origin(),
+        action.source_ordinal.origin(),
+        projectile.launcher_origin,
+        projectile.label.origin(),
+    ]
 }
 
-impl ActionSlots {
-    fn read(
-        fields: &OriginalFlowFields<'_, '_, '_>,
-        weapon: &WeaponActions<'_>,
-        slots: &[SourcedValue<u32>],
-    ) -> Result<Self, CatalogError> {
-        use crate::catalog_read::original::OriginalValueEdge;
-
-        let (record, slot) = weapon.owner().key();
-        if record != Some(fields.record_index()) {
-            return Err(p4kx_extraction::SourceEvidenceError::ForeignEvidence.into());
-        }
-        let (_, components) = fields
-            .field(None, "Components")?
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        let ordinal = slot.ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        let owner = fields.child(
-            Some(components.ordinal()),
-            OriginalValueEdge::Element {
-                ordinal: u64::from(ordinal),
-            },
-        )?;
-        let Value::Struct(source) = owner.value() else {
-            return Err(ExportAccountingError::ConflictingSourceDatum.into());
-        };
-        let (_, field) = fields
-            .field(Some(owner), "fireActions")?
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        let Value::Array(original) = field.value() else {
-            return Err(ExportAccountingError::ConflictingSourceDatum.into());
-        };
-        if original.len() != slots.len() {
-            return Err(ExportAccountingError::ConflictingSourceDatum.into());
-        }
-        let mut uses = vec![fields.survey(Some(owner))?];
-        let mut repeated = false;
-        let mut complete = route::at_most_one_declaration(source, "fireActions");
-        for (raw, slot) in original.iter().zip(slots) {
-            if !matches!(
-                slot.state(),
-                SourceValueState::Present | SourceValueState::Null
-            ) {
-                let evidence = fields
-                    .fact(raw)?
-                    .observe(OriginalValuePart::Value, SourceUseRole::Attempted)?;
-                uses.push(evidence);
-                complete = false;
-                repeated |= matches!(raw, Value::Error(ValueError::OwnedTwice { .. }));
-            }
-        }
-        let origin = fields.sources().origin(&uses, complete);
-        if repeated {
-            return Ok(Self::Repeated(origin));
-        }
-        if !complete {
-            return Ok(Self::Incomplete(origin));
-        }
-        Ok(Self::Complete(origin))
+fn magazine_choice<'choice, 'source>(
+    choice: &'choice mut Option<MagazineChoice<'source>>,
+    reader: &LinkedAmmunitionReader<'_, 'source>,
+    fields: &OriginalFlowFields<'_, '_, 'source>,
+    route: &OwnRoute<'_, 'source>,
+    magazine: &WeaponMagazineSlots<'source>,
+    linked: Option<LinkedMagazineRead<'_, 'source>>,
+    ledger: &mut ExportLedger,
+) -> Result<&'choice MagazineChoice<'source>, CatalogError> {
+    if choice.is_none() {
+        *choice = Some(MagazineChoice::read(
+            reader, fields, route, magazine, linked, ledger,
+        )?);
     }
-
-    const fn origin(&self) -> &FieldOrigin {
-        match self {
-            Self::Complete(origin) | Self::Repeated(origin) | Self::Incomplete(origin) => origin,
-        }
-    }
+    choice
+        .as_ref()
+        .ok_or_else(|| ExportAccountingError::ConflictingSourceDatum.into())
 }
 
 fn magazine_for<'rows, 'source>(
@@ -228,6 +260,7 @@ fn select<'origin, 'source>(
     fields: &OriginalFlowFields<'_, '_, 'source>,
     route: &'origin OwnRoute<'_, 'source>,
     magazine: &'origin WeaponMagazineSlots<'source>,
+    choice: &'origin MagazineChoice<'source>,
     action: &ProjectileAction<'origin, 'source>,
     selector: &'origin SourcedValue<&'source str>,
     origins: &mut Vec<&'origin FieldOrigin>,
@@ -258,28 +291,34 @@ fn select<'origin, 'source>(
         None => return Ok(Selection::IndeterminateProjectileType),
     };
     origins.push(route.origin());
-    let selected = match route {
+    match route {
         OwnRoute::Incomplete(_) => return Ok(Selection::IncompleteComponents),
         OwnRoute::Competing(_) => return Ok(Selection::AmbiguousComponents),
-        OwnRoute::NoContainer(_) => return Ok(Selection::NoAdmittedOwnContainer),
-        OwnRoute::Unique { container, .. } => *container,
-    };
+        OwnRoute::NoContainer(_) | OwnRoute::Unique { .. } => {}
+    }
     let inputs = magazine.route_inputs();
     origins.extend(inputs.origins());
-    let surveys = route::route_surveys(fields, selected, magazine, role)?;
-    if !surveys.magazines_unique {
-        return Ok(Selection::IndeterminateMagazineRoute);
+    if let Some(reference) = inputs.primary().value() {
+        origins.extend([
+            reference.target_type.origin(),
+            reference.target_record_index.origin(),
+        ]);
     }
-    if inputs.other_route() {
-        return Ok(Selection::OtherMagazineRoute);
+    match choice.selected(role, origins) {
+        Err(status) => Ok(status),
+        Ok(Some(container)) => {
+            select_ammo(fields, role, container, selector.origin(), true, origins)
+        }
+        Ok(None) => {
+            let OwnRoute::Unique { container, .. } = route else {
+                return Err(ExportAccountingError::ConflictingSourceDatum.into());
+            };
+            if !route::ammo_slot_is_unique(fields, container, role)? {
+                return Ok(Selection::IndeterminateAmmo);
+            }
+            select_ammo(fields, role, container, selector.origin(), false, origins)
+        }
     }
-    if !inputs.permits_own_route() {
-        return Ok(Selection::IndeterminateMagazineRoute);
-    }
-    if !surveys.ammo_unique {
-        return Ok(Selection::IndeterminateAmmo);
-    }
-    select_ammo(fields, role, selected, selector.origin(), origins)
 }
 
 fn select_ammo<'origin, 'source>(
@@ -287,6 +326,7 @@ fn select_ammo<'origin, 'source>(
     role: ProjectileAmmoRole,
     container: &'origin ContainerAmmoSlots<'source>,
     selector_origin: &FieldOrigin,
+    linked: bool,
     origins: &mut Vec<&'origin FieldOrigin>,
 ) -> Result<Selection, CatalogError> {
     let ammo = container.slot(role);
@@ -319,16 +359,31 @@ fn select_ammo<'origin, 'source>(
         return Ok(Selection::IndeterminateAmmo);
     };
     origins.push(container.owner().component_ordinal().origin());
+    let sources = fields.sources();
+    let role = sources.value_with_origins(SourceValue::Present(role), &[selector_origin])?;
+    let container_component_ordinal =
+        sources.value_with_origins(SourceValue::Present(ordinal), origins)?;
+    let ammo_record_index =
+        sources.value_with_origins(SourceValue::Present(ammo_index), origins)?;
+    if linked {
+        let magazine_index = container
+            .owner()
+            .key()
+            .0
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        let magazine_record_index =
+            sources.value_with_origins(SourceValue::Present(magazine_index), origins)?;
+        return Ok(Selection::SelectedLinkedMagazine {
+            role,
+            magazine_record_index,
+            container_component_ordinal,
+            ammo_record_index,
+        });
+    }
     Ok(Selection::Selected {
-        role: fields
-            .sources()
-            .value_with_origins(SourceValue::Present(role), &[selector_origin])?,
-        container_component_ordinal: fields
-            .sources()
-            .value_with_origins(SourceValue::Present(ordinal), origins)?,
-        ammo_record_index: fields
-            .sources()
-            .value_with_origins(SourceValue::Present(ammo_index), origins)?,
+        role,
+        container_component_ordinal,
+        ammo_record_index,
     })
 }
 

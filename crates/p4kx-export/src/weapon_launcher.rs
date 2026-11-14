@@ -98,6 +98,14 @@ pub(crate) struct ProjectileLauncher<'source> {
 }
 
 impl<'source> ProjectileLauncher<'source> {
+    pub(super) const fn pellet_count(&self) -> &SourcedValue<i32> {
+        &self.pellet_count
+    }
+
+    pub(super) const fn damage_multiplier(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.damage_multiplier
+    }
+
     pub(super) const fn projectile_type(&self) -> &SourcedValue<&'source str> {
         &self.projectile_type
     }

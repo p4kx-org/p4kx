@@ -15,7 +15,7 @@ use crate::source_fields::FieldError;
 use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 
 pub(super) use crate::item_stats::WEAPON_COMPONENT as SOURCE_TYPE;
-const MAGAZINE_TARGET: &str = "EntityClassDefinition";
+pub(super) const MAGAZINE_TARGET: &str = "EntityClassDefinition";
 const SECONDARY_SLOT: &str = "SSecondaryAmmoContainerParams";
 const CONDITION_BASE: &str = "SWeaponConditionBase";
 
@@ -69,7 +69,7 @@ pub(super) struct MagazineRouteInputs<'rows, 'source> {
     slots: &'rows WeaponMagazineSlots<'source>,
 }
 
-impl<'rows> MagazineRouteInputs<'rows, '_> {
+impl<'rows, 'source> MagazineRouteInputs<'rows, 'source> {
     pub(super) const fn origins(&self) -> [&'rows FieldOrigin; 3] {
         [
             self.slots.ammo_container_record.origin(),
@@ -78,21 +78,31 @@ impl<'rows> MagazineRouteInputs<'rows, '_> {
         ]
     }
 
-    pub(super) fn other_route(&self) -> bool {
-        self.slots.ammo_container_record.value().is_some()
-            || self
-                .slots
-                .secondary_ammo_containers
-                .value()
-                .is_some_and(|values| !values.is_empty())
+    pub(super) const fn primary(&self) -> &'rows SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.slots.ammo_container_record
+    }
+
+    pub(super) fn has_other_linked_route(&self) -> bool {
+        self.slots
+            .secondary_ammo_containers
+            .value()
+            .is_some_and(|values| !values.is_empty())
             || self.slots.should_ignore_primary_ammo_container.value() == Some(&true)
+    }
+
+    pub(super) fn other_route(&self) -> bool {
+        self.primary().value().is_some() || self.has_other_linked_route()
     }
 
     pub(super) fn permits_own_route(&self) -> bool {
         matches!(
             self.slots.ammo_container_record.state(),
             SourceValueState::Absent | SourceValueState::Null
-        ) && (matches!(
+        ) && self.permits_linked_route()
+    }
+
+    pub(super) fn permits_linked_route(&self) -> bool {
+        (matches!(
             self.slots.secondary_ammo_containers.state(),
             SourceValueState::Absent | SourceValueState::Null
         ) || self

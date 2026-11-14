@@ -44,6 +44,12 @@ pub(crate) struct PreparedAmmoDefinition<'source> {
     pub(crate) numbers: Vec<CapturedNumber>,
 }
 
+impl<'source> PreparedAmmoDefinition<'source> {
+    pub(super) const fn inputs(&self) -> &AuthoredAmmoInputs<'source> {
+        &self.definition.inputs
+    }
+}
+
 /// Projects typed inputs from the same admitted tree used by the legacy view.
 pub(crate) fn read<'source>(
     projection: &CatalogProjection<'_, 'source>,

@@ -235,7 +235,7 @@ fn target_with_unreadable_instance<'source>(
     Ok(target)
 }
 
-fn diagnostic(bytes: &[u8], filter: &Filter) -> TestResult<Value> {
+pub(super) fn diagnostic(bytes: &[u8], filter: &Filter) -> TestResult<Value> {
     let fixture = Fixture::open(
         bytes,
         Input::Encrypted,
@@ -253,7 +253,7 @@ fn diagnostic(bytes: &[u8], filter: &Filter) -> TestResult<Value> {
     Ok(serde_json::from_slice(built.json())?)
 }
 
-fn break_instance(bytes: &mut [u8], record_index: u32) -> TestResult {
+pub(super) fn break_instance(bytes: &mut [u8], record_index: u32) -> TestResult {
     let (words, _) = bytes.as_chunks::<4>();
     assert_eq!(
         words.get(1).copied().map(u32::from_le_bytes),

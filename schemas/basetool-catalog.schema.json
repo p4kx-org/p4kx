@@ -594,6 +594,12 @@
       ],
       "type": "object"
     },
+    "AlphaUnit": {
+      "enum": [
+        "damagePoints"
+      ],
+      "type": "string"
+    },
     "AmmoBinding": {
       "description": "The original ammunition links authored on a physical Item component.",
       "oneOf": [
@@ -2952,6 +2958,9 @@
         "meaning": {
           "$ref": "#/$defs/BlueprintCostMeaning"
         },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfBlueprintCostPosition"
+        },
         "source": {
           "$ref": "#/$defs/SourceValueRef"
         }
@@ -2959,6 +2968,7 @@
       "required": [
         "context",
         "meaning",
+        "position",
         "source"
       ],
       "type": "object"
@@ -3098,6 +3108,66 @@
             "itemGuid",
             "quantityUnits",
             "minQuality"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "BlueprintCostPosition": {
+      "description": "The actual cost edge in the physical recipe tier.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "mandatory",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "index": {
+              "format": "uint32",
+              "maximum": 4294967295,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "optional",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "index"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "index": {
+              "format": "uint32",
+              "maximum": 4294967295,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "parent": {
+              "$ref": "#/$defs/SourceValueRef"
+            },
+            "type": {
+              "const": "option",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "parent",
+            "index"
           ],
           "type": "object"
         }
@@ -3502,6 +3572,9 @@
         },
         "source": {
           "$ref": "#/$defs/SourceValueRef"
+        },
+        "tierIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
         }
       },
       "required": [
@@ -3511,7 +3584,8 @@
         "mandatory",
         "optional",
         "research",
-        "source"
+        "source",
+        "tierIndex"
       ],
       "type": "object"
     },
@@ -5111,6 +5185,9 @@
         "tagPaths": {
           "$ref": "#/$defs/CatalogTableOfTagPath"
         },
+        "weaponCombatBases": {
+          "$ref": "#/$defs/CatalogTableOfWeaponCombatBase"
+        },
         "weaponMagazineResolutions": {
           "$ref": "#/$defs/CatalogTableOfWeaponMagazineResolution"
         },
@@ -5126,6 +5203,7 @@
         "qualityQuantizationResources",
         "resourceGroupParents",
         "tagPaths",
+        "weaponCombatBases",
         "weaponMagazineResolutions",
         "weaponProjectileAmmoSelections"
       ],
@@ -7303,6 +7381,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfWeaponCombatBase": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/WeaponCombatBase"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfWeaponMagazineResolution": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -7799,6 +7896,170 @@
           "type": "object"
         }
       ]
+    },
+    "CombatModel": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "nominalBullet",
+              "type": "string"
+            },
+            "values": {
+              "$ref": "#/$defs/NominalBullet"
+            }
+          },
+          "required": [
+            "type",
+            "values"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "ammoSelectionUnavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "ammoDefinitionUnavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "actionUnavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "unsupportedAction",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "burst",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "beam",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "charge",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "conditional",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "projectileUnavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "unsupportedProjectile",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "CombatUnits": {
+      "properties": {
+        "alpha": {
+          "$ref": "#/$defs/AlphaUnit"
+        },
+        "fireRate": {
+          "$ref": "#/$defs/FireRateUnit"
+        },
+        "nominalDps": {
+          "$ref": "#/$defs/DpsUnit"
+        },
+        "nominalFlightDistance": {
+          "$ref": "#/$defs/DistanceUnit"
+        }
+      },
+      "required": [
+        "alpha",
+        "fireRate",
+        "nominalDps",
+        "nominalFlightDistance"
+      ],
+      "type": "object"
     },
     "CommodityAuthoring": {
       "description": "Ordered commodity-owned bindings without presentation fallback.",
@@ -10161,6 +10422,38 @@
       ],
       "type": "object"
     },
+    "DamageChannels": {
+      "description": "A fixed vector keyed by the original damage channels.",
+      "properties": {
+        "biochemical": {
+          "$ref": "#/$defs/SourcedValueOfdouble"
+        },
+        "distortion": {
+          "$ref": "#/$defs/SourcedValueOfdouble"
+        },
+        "energy": {
+          "$ref": "#/$defs/SourcedValueOfdouble"
+        },
+        "physical": {
+          "$ref": "#/$defs/SourcedValueOfdouble"
+        },
+        "stun": {
+          "$ref": "#/$defs/SourcedValueOfdouble"
+        },
+        "thermal": {
+          "$ref": "#/$defs/SourcedValueOfdouble"
+        }
+      },
+      "required": [
+        "biochemical",
+        "distortion",
+        "energy",
+        "physical",
+        "stun",
+        "thermal"
+      ],
+      "type": "object"
+    },
     "DamageInfo": {
       "description": "Exact original damage words by declared type.",
       "properties": {
@@ -10966,6 +11259,12 @@
       ],
       "type": "object"
     },
+    "DistanceUnit": {
+      "enum": [
+        "metres"
+      ],
+      "type": "string"
+    },
     "Distortion": {
       "description": "One original distortion component on a selected item.",
       "properties": {
@@ -11013,6 +11312,12 @@
         "warningRatio"
       ],
       "type": "object"
+    },
+    "DpsUnit": {
+      "enum": [
+        "damagePointsPerSecond"
+      ],
+      "type": "string"
     },
     "Durability": {
       "description": "One original Health component on a selected item.",
@@ -13852,6 +14157,12 @@
         "lifetime"
       ],
       "type": "object"
+    },
+    "FireRateUnit": {
+      "enum": [
+        "dischargesPerMinute"
+      ],
+      "type": "string"
     },
     "FixedDamage": {
       "properties": {
@@ -25117,6 +25428,48 @@
       ],
       "required": []
     },
+    "NominalBullet": {
+      "properties": {
+        "damage": {
+          "$ref": "#/$defs/SourcedValueOfNominalBulletDamage"
+        },
+        "fireRateRpm": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "launcherDamageMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "nominalFlightDistance": {
+          "$ref": "#/$defs/SourcedValueOfdouble"
+        },
+        "projectilesPerDischarge": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        }
+      },
+      "required": [
+        "damage",
+        "fireRateRpm",
+        "launcherDamageMultiplier",
+        "nominalFlightDistance",
+        "projectilesPerDischarge"
+      ],
+      "type": "object"
+    },
+    "NominalBulletDamage": {
+      "properties": {
+        "alpha": {
+          "$ref": "#/$defs/DamageChannels"
+        },
+        "nominalDps": {
+          "$ref": "#/$defs/DamageChannels"
+        }
+      },
+      "required": [
+        "alpha",
+        "nominalDps"
+      ],
+      "type": "object"
+    },
     "NoteInterpretation": {
       "description": "The original note's interpretation without copying or expanding its source text.",
       "enum": [
@@ -34500,6 +34853,130 @@
             "role",
             "containerComponentOrdinal",
             "ammoRecordIndex"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "ammoRecordIndex": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "containerComponentOrdinal": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "magazineRecordIndex": {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            "role": {
+              "$ref": "#/$defs/SourcedValueOfProjectileAmmoRole"
+            },
+            "type": {
+              "const": "selectedLinkedMagazine",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "role",
+            "magazineRecordIndex",
+            "containerComponentOrdinal",
+            "ammoRecordIndex"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "danglingMagazine",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "unsupportedMagazineTarget",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "selfLinkedMagazine",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "ambiguousMagazineReference",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "unreadableMagazine",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "linkedMagazineWithoutContainer",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "ambiguousLinkedMagazineContainer",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "incompleteLinkedMagazineComponents",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
           ],
           "type": "object"
         },
@@ -56996,6 +57473,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfBlueprintCostPosition": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/BlueprintCostPosition"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfBlueprintDismantle": {
       "allOf": [
         {
@@ -58000,6 +58607,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/CatalogRecordReference"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCombatModel": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CombatModel"
               }
             }
           }
@@ -76983,6 +77720,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/NetworkEndpoint"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfNominalBulletDamage": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/NominalBulletDamage"
               }
             }
           }
@@ -99449,6 +100316,137 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfdouble": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "format": "double",
+                "type": "number"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOffloat": {
       "allOf": [
         {
@@ -104429,6 +105427,78 @@
         "operatingConfiguration",
         "ownerGuid",
         "ownerRecordIndex"
+      ],
+      "type": "object"
+    },
+    "WeaponCombatBase": {
+      "description": "Nominal combat base values keyed to a physical weapon component and fire mode.",
+      "properties": {
+        "actionSourceType": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "actionSourceValueOrdinal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfDecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "ammunitionRecordIndex": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfuint32"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "formulaVersion": {
+          "format": "uint8",
+          "maximum": 1,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "modeIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "model": {
+          "$ref": "#/$defs/SourcedValueOfCombatModel"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "units": {
+          "$ref": "#/$defs/CombatUnits"
+        }
+      },
+      "required": [
+        "actionSourceType",
+        "actionSourceValueOrdinal",
+        "ammunitionRecordIndex",
+        "componentOrdinal",
+        "formulaVersion",
+        "modeIndex",
+        "model",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "units"
       ],
       "type": "object"
     },

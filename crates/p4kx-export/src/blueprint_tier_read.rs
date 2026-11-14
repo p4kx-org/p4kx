@@ -5,7 +5,9 @@ use p4kx_extraction::{SourceUseRole, SourceValue, SourcedValue, StructValue, Val
 
 use crate::blueprint_definition::PhysicalBlueprintRef;
 use crate::blueprint_field_source::{BlueprintField, normalize, value_ref};
-use crate::blueprint_tier_contract::{BlueprintCost, BlueprintCostMeaning, BlueprintTier};
+use crate::blueprint_tier_contract::{
+    BlueprintCost, BlueprintCostMeaning, BlueprintCostPosition, BlueprintTier,
+};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact, OriginalValuePart};
 use crate::catalog_text_contract::GameTextRef;
@@ -16,6 +18,9 @@ use crate::source_fields::{FieldCapture, FieldError};
 use crate::source_value_catalog::SourceValueRef;
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "blueprint_cost_position.rs"]
+mod position;
+
 pub(super) fn read<'source>(
     tier: &InterpretedTier<'_, 'source>,
     owner: PhysicalBlueprintRef,
@@ -25,6 +30,7 @@ pub(super) fn read<'source>(
     notes: &mut Vec<FieldError>,
 ) -> Result<BlueprintTier, CatalogError> {
     let source = original_struct(tier.original)?;
+    let original_tier = fields.fact(tier.original)?;
     let costs = tier
         .tier
         .costs()
@@ -41,7 +47,8 @@ pub(super) fn read<'source>(
     )?;
     Ok(BlueprintTier {
         blueprint: owner,
-        source: value_ref(fields.fact(tier.original)?),
+        tier_index: position::tier_index(original_tier, fields)?,
+        source: value_ref(original_tier),
         craft_time_seconds: craft_time(tier, source, fields)?,
         mandatory: tier
             .tier
@@ -96,8 +103,10 @@ fn cost_row<'source>(
             min_quality: integer(&field("minQuality")?, item.min_quality)?,
         },
     };
+    let original = fields.fact(original)?;
     Ok(BlueprintCost {
-        source: value_ref(fields.fact(original)?),
+        source: value_ref(original),
+        position: position::cost_position(original, fields)?,
         context: crate::blueprint_context_read::read(source, fields)?,
         meaning,
     })

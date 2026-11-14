@@ -232,3 +232,20 @@ component survey and the selected role. Repeated ownership, unreadable
 components or action slots, a competing magazine route, and missing or
 dangling ammo retain distinct outcomes. The authored declarations and
 action tree carry those source values and their independent states.
+
+## Linked primary magazines
+
+A direct projectile launcher can also select ammo through the weapon's
+original primary magazine Reference. The caller needs one admitted physical
+weapon, no own ammo-container family member, an explicit false ignore flag and
+no secondary magazine slots. The exact Reference must identify one other
+`EntityClassDefinition` header, whose complete Components array has one
+admitted ammo container. `selectedLinkedMagazine` retains the magazine Record
+index, container component ordinal, ammo role, and Ammo Record index. Target
+selection and source evidence remain available when the export filter excludes
+the magazine or the Ammo definition.
+
+An unreadable target body, incomplete component survey, competing magazine
+or container, duplicate target GUID, self link, dangling Reference and
+wrong target type each keep an explicit outcome. The linkage is one hop.
+Conditions and competing routes remain available in the authored declarations.
