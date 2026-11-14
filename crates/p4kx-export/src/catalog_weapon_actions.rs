@@ -21,6 +21,7 @@ mod operating;
 #[path = "weapon_action_recoil.rs"]
 mod recoil;
 
+pub(super) use action::ProjectileAction;
 use action::WeaponAction;
 use operating::WeaponOperatingConfiguration;
 
@@ -40,6 +41,19 @@ pub(crate) struct WeaponActions<'source> {
 }
 
 impl<'source> WeaponActions<'source> {
+    pub(super) const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    pub(super) const fn fire_actions(&self) -> &SourcedValue<Vec<SourcedValue<u32>>> {
+        &self.fire_actions
+    }
+
+    pub(super) fn action(&self, index: u32) -> Option<ProjectileAction<'_, 'source>> {
+        let index = usize::try_from(index).ok()?;
+        self.action_nodes.get(index).map(WeaponAction::selection)
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,

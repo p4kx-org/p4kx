@@ -9,6 +9,7 @@ use super::ammo_definition;
 use super::authored_fields::Observed;
 use super::catalog_ammo_containers;
 use super::catalog_weapon_magazine_slots::{self, WeaponMagazineSlots};
+use super::catalog_weapon_projectile_ammo::ProjectileAmmoRole;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
@@ -72,6 +73,22 @@ pub(crate) struct ContainerAmmoSlots<'source> {
     primary_ammo: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     secondary_ammo: SourcedValue<Box<SourceRecordReference<'source>>>,
+}
+
+impl<'source> ContainerAmmoSlots<'source> {
+    pub(super) const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    pub(super) const fn slot(
+        &self,
+        role: ProjectileAmmoRole,
+    ) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        match role {
+            ProjectileAmmoRole::Primary => &self.primary_ammo,
+            ProjectileAmmoRole::Secondary => &self.secondary_ammo,
+        }
+    }
 }
 
 pub(super) fn table<'source>(

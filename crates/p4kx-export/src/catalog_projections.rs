@@ -12,6 +12,7 @@ use crate::quality_catalog::contract::QualityQuantizationResources;
 use crate::schema_fields::every_field_required;
 
 use super::catalog_item_components::resolution::WeaponMagazineResolution;
+use super::catalog_weapon_projectile_ammo::WeaponProjectileAmmoSelection;
 
 /// Explicit choices and derived values, separate from authored definitions.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -29,6 +30,7 @@ pub(crate) struct CatalogProjections<'source> {
     pub(crate) tag_paths: CatalogTable<super::tag_catalog::TagPath>,
     pub(crate) commodity_presentation: CatalogTable<CommodityPresentation>,
     pub(crate) weapon_magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
+    pub(crate) weapon_projectile_ammo_selections: CatalogTable<WeaponProjectileAmmoSelection>,
     pub(crate) resource_group_parents:
         CatalogTable<super::resource_group_catalog::ResourceGroupParent>,
 }

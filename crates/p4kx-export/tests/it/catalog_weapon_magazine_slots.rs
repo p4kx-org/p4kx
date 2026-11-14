@@ -17,6 +17,8 @@ mod action_selectors;
 mod condition;
 #[path = "catalog_weapon_magazine_condition_numbers.rs"]
 mod numbers;
+#[path = "catalog_weapon_projectile_ammo.rs"]
+mod projectile;
 #[path = "catalog_weapon_magazine_resolution.rs"]
 mod resolution;
 #[path = "catalog_weapon_magazine_slots_source.rs"]

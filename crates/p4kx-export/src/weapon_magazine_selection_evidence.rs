@@ -1,23 +1,33 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue, Value};
+use p4kx_extraction::{
+    FieldOrigin, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue, Value,
+};
 
 use super::{Fields, OriginalValuePart};
 use crate::{CatalogError, ExportAccountingError};
 
 #[derive(Default)]
-pub(super) struct SelectionEvidence {
+pub(in crate::catalog_v3) struct SelectionEvidence {
     uses: Vec<SourceUse>,
     missing: bool,
 }
 
 impl SelectionEvidence {
-    pub(super) fn add(&mut self, contribution: SourceUse) {
+    pub(in crate::catalog_v3) fn add(&mut self, contribution: SourceUse) {
         self.uses.push(contribution);
     }
 
-    pub(super) fn attempt(&mut self, attempt: SourceUse) {
+    pub(in crate::catalog_v3) fn extend(&mut self, uses: impl IntoIterator<Item = SourceUse>) {
+        self.uses.extend(uses);
+    }
+
+    pub(in crate::catalog_v3) fn append(&mut self, uses: &mut Vec<SourceUse>) {
+        self.uses.append(uses);
+    }
+
+    pub(in crate::catalog_v3) fn attempt(&mut self, attempt: SourceUse) {
         self.add(attempt);
         self.missing = true;
     }
@@ -26,7 +36,11 @@ impl SelectionEvidence {
         sources.value(SourceValue::Present(value), &self.uses, !self.missing)
     }
 
-    pub(super) fn retain(
+    pub(in crate::catalog_v3) fn into_origin(self, sources: &SourceUses) -> FieldOrigin {
+        sources.origin(&self.uses, !self.missing)
+    }
+
+    pub(in crate::catalog_v3) fn retain(
         &mut self,
         fields: &Fields<'_, '_, '_>,
         selected: Option<&Value<'_>>,

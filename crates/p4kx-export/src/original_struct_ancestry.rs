@@ -20,21 +20,30 @@ impl OriginalValueFact<'_, '_, '_> {
         check_cancel: impl Fn() -> Result<(), CatalogError>,
     ) -> Result<bool, CatalogError> {
         let storage = self.field().storage();
-        let Value::Struct(source) = self.value() else {
-            return Err(ExportAccountingError::ConflictingSourceDatum.into());
-        };
         if storage.data_type() != DataType::StrongPointer {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
         let (_, declaration) = self.observe_declared_target(input)?;
         selectors.extend(declaration);
+        self.descends_from_any(&[u32::from(storage.target())], selectors, check_cancel)
+    }
+
+    pub(crate) fn descends_from_any(
+        &self,
+        expected: &[u32],
+        selectors: &mut Vec<SourceUse>,
+        check_cancel: impl Fn() -> Result<(), CatalogError>,
+    ) -> Result<bool, CatalogError> {
+        let Value::Struct(source) = self.value() else {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        };
         let current = self
             .scope()
             .struct_at(source.struct_index())
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        self.observe_struct_ancestry(
+        self.observe_ancestry(
             current,
-            u32::from(storage.target()),
+            |index| expected.contains(&index),
             selectors,
             check_cancel,
         )
@@ -42,8 +51,18 @@ impl OriginalValueFact<'_, '_, '_> {
 
     pub(super) fn observe_struct_ancestry(
         &self,
-        mut current: Struct<'_>,
+        current: Struct<'_>,
         expected: u32,
+        selectors: &mut Vec<SourceUse>,
+        check_cancel: impl Fn() -> Result<(), CatalogError>,
+    ) -> Result<bool, CatalogError> {
+        self.observe_ancestry(current, |index| index == expected, selectors, check_cancel)
+    }
+
+    fn observe_ancestry(
+        &self,
+        mut current: Struct<'_>,
+        matches: impl Fn(u32) -> bool,
         selectors: &mut Vec<SourceUse>,
         check_cancel: impl Fn() -> Result<(), CatalogError>,
     ) -> Result<bool, CatalogError> {
@@ -53,7 +72,7 @@ impl OriginalValueFact<'_, '_, '_> {
         loop {
             check_cancel()?;
             let index = current.index();
-            if index == expected {
+            if matches(index) {
                 return Ok(true);
             }
             if !seen.insert(index) {

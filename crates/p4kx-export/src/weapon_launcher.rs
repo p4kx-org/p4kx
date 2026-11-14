@@ -98,6 +98,10 @@ pub(crate) struct ProjectileLauncher<'source> {
 }
 
 impl<'source> ProjectileLauncher<'source> {
+    pub(super) const fn projectile_type(&self) -> &SourcedValue<&'source str> {
+        &self.projectile_type
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

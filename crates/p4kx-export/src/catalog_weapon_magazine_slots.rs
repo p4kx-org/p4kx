@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{FieldOrigin, SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -58,6 +58,49 @@ impl<'source> WeaponMagazineSlots<'source> {
 
     pub(super) const fn owner(&self) -> &ComponentOwner {
         &self.owner
+    }
+
+    pub(super) const fn route_inputs(&self) -> MagazineRouteInputs<'_, 'source> {
+        MagazineRouteInputs { slots: self }
+    }
+}
+
+pub(super) struct MagazineRouteInputs<'rows, 'source> {
+    slots: &'rows WeaponMagazineSlots<'source>,
+}
+
+impl<'rows> MagazineRouteInputs<'rows, '_> {
+    pub(super) const fn origins(&self) -> [&'rows FieldOrigin; 3] {
+        [
+            self.slots.ammo_container_record.origin(),
+            self.slots.secondary_ammo_containers.origin(),
+            self.slots.should_ignore_primary_ammo_container.origin(),
+        ]
+    }
+
+    pub(super) fn other_route(&self) -> bool {
+        self.slots.ammo_container_record.value().is_some()
+            || self
+                .slots
+                .secondary_ammo_containers
+                .value()
+                .is_some_and(|values| !values.is_empty())
+            || self.slots.should_ignore_primary_ammo_container.value() == Some(&true)
+    }
+
+    pub(super) fn permits_own_route(&self) -> bool {
+        matches!(
+            self.slots.ammo_container_record.state(),
+            SourceValueState::Absent | SourceValueState::Null
+        ) && (matches!(
+            self.slots.secondary_ammo_containers.state(),
+            SourceValueState::Absent | SourceValueState::Null
+        ) || self
+            .slots
+            .secondary_ammo_containers
+            .value()
+            .is_some_and(Vec::is_empty))
+            && self.slots.should_ignore_primary_ammo_container.value() == Some(&false)
     }
 }
 

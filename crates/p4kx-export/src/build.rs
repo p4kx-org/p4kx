@@ -297,6 +297,7 @@ fn assemble<R>(
             ),
             resource_group_parents: group_tables.parents,
             weapon_magazine_resolutions: components.magazine_resolutions,
+            weapon_projectile_ammo_selections: components.projectile_ammo_selections,
             tag_paths: CatalogTable::new(&forge, &["Tag"], collected.tags.paths),
             commodity_presentation: commodity_tables.presentation,
         },

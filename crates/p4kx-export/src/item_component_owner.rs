@@ -63,6 +63,10 @@ impl ComponentOwner {
             .into_cell(original.sources()))
     }
 
+    pub(super) const fn component_ordinal(&self) -> &SourcedValue<u32> {
+        &self.component_ordinal
+    }
+
     pub(super) const fn key(&self) -> (Option<u32>, Option<u32>) {
         (
             self.owner_record_index.value().copied(),

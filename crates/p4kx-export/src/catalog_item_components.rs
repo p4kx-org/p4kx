@@ -19,6 +19,7 @@ use super::catalog_quantum_interdiction::{self, QuantumInterdictionGenerator};
 use super::catalog_shield_generator::{self, ShieldGenerator};
 use super::catalog_weapon_actions::{self, WeaponActions};
 use super::catalog_weapon_magazine_slots::{self, WeaponMagazineSlots};
+use super::catalog_weapon_projectile_ammo::{self, WeaponProjectileAmmoSelection};
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_number_capture::CapturedNumber;
@@ -49,6 +50,7 @@ pub(crate) struct ItemComponentRows<'source> {
     pub(crate) quantum_interdiction: Vec<QuantumInterdictionGenerator<'source>>,
     pub(crate) shield_generators: Vec<ShieldGenerator<'source>>,
     pub(crate) magazine_resolutions: Vec<WeaponMagazineResolution>,
+    pub(crate) projectile_ammo_selections: Vec<WeaponProjectileAmmoSelection>,
     pub(crate) numbers: Vec<CapturedNumber>,
 }
 
@@ -68,6 +70,8 @@ impl<'source> ItemComponentRows<'source> {
         self.quantum_interdiction.extend(other.quantum_interdiction);
         self.shield_generators.extend(other.shield_generators);
         self.magazine_resolutions.extend(other.magazine_resolutions);
+        self.projectile_ammo_selections
+            .extend(other.projectile_ammo_selections);
         self.numbers.extend(other.numbers);
     }
 
@@ -92,6 +96,10 @@ impl<'source> ItemComponentRows<'source> {
             ),
             shield_generators: catalog_shield_generator::table(forge, self.shield_generators),
             magazine_resolutions: resolution::table(forge, self.magazine_resolutions),
+            projectile_ammo_selections: catalog_weapon_projectile_ammo::table(
+                forge,
+                self.projectile_ammo_selections,
+            ),
         }
     }
 }
@@ -110,6 +118,7 @@ pub(crate) struct ItemComponentTables<'source> {
     pub(crate) quantum_interdiction: CatalogTable<QuantumInterdictionGenerator<'source>>,
     pub(crate) shield_generators: CatalogTable<ShieldGenerator<'source>>,
     pub(crate) magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
+    pub(crate) projectile_ammo_selections: CatalogTable<WeaponProjectileAmmoSelection>,
 }
 
 #[derive(Default)]
@@ -307,6 +316,12 @@ pub(crate) fn read<'source, T>(
         let observed = Observed::new(&originals, input, component, &capture, &numbers);
         result.push(kind, owner, observed)?;
     }
+    result.rows.projectile_ammo_selections = catalog_weapon_projectile_ammo::read(
+        &originals,
+        input,
+        &result.rows.weapon_actions,
+        &result.rows.ammo_bindings,
+    )?;
     result.rows.numbers = numbers.into_inner();
     let projected = project(Some(&originals), &mut result)?;
     Ok((result, projected))

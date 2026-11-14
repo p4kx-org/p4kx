@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DecimalU64, SourceValueState, SourcedValue};
+use p4kx_extraction::{DecimalU64, FieldOrigin, SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -64,6 +64,40 @@ impl<'source> WeaponAction<'source> {
 
     pub(super) fn linked_recoil_definitions(&self) -> impl Iterator<Item = u32> + '_ {
         self.recoil.linked_definitions()
+    }
+}
+
+/// An original action and the launcher evidence admitted for projectile selection.
+pub(in crate::catalog_v3) struct ProjectileAction<'action, 'source> {
+    pub(in crate::catalog_v3) source_ordinal: &'action SourcedValue<DecimalU64>,
+    pub(in crate::catalog_v3) selector: Option<ProjectileSelector<'action, 'source>>,
+}
+
+/// The nominal projectile selector and its owning launcher.
+pub(in crate::catalog_v3) struct ProjectileSelector<'action, 'source> {
+    pub(in crate::catalog_v3) label: &'action SourcedValue<&'source str>,
+    pub(in crate::catalog_v3) launcher_origin: &'action FieldOrigin,
+}
+
+impl<'source> WeaponAction<'source> {
+    pub(super) fn selection(&self) -> ProjectileAction<'_, 'source> {
+        let shot = match &self.kind {
+            WeaponActionKind::Single(shot) => Some(shot.as_ref()),
+            WeaponActionKind::Rapid(rapid) => Some(&rapid.shot),
+            WeaponActionKind::Burst(burst) => Some(&burst.shot),
+            _ => None,
+        };
+        let selector = shot.and_then(|shot| match shot.launch_params.value()? {
+            WeaponLauncher::Projectile { settings } => Some(ProjectileSelector {
+                label: settings.projectile_type(),
+                launcher_origin: shot.launch_params.origin(),
+            }),
+            _ => None,
+        });
+        ProjectileAction {
+            source_ordinal: &self.source_value_ordinal,
+            selector,
+        }
     }
 }
 

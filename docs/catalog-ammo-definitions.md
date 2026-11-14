@@ -213,3 +213,22 @@ Reference receipts stay in the authored container slots. Use their physical
 target indices to join selected Ammo definitions. The launcher label and
 the owning component relationship provide source inputs for selection. The
 existing legacy primary resolution remains a separate projection.
+
+## Projectile ammunition selection
+
+`projections.weaponProjectileAmmoSelections` keys each readable direct
+projectile launcher by physical owner Record, original weapon component
+ordinal, and the action's original `sourceValueOrdinal`. The projection
+accepts single, rapid, and burst actions in the weapon's own `fireActions`.
+`Primary` and `Secondary` from `EProjectileType` select the corresponding
+`AmmoParams` Reference in the on-item container. A selected result requires
+one physical weapon and one compatible on-item container, a complete
+component survey, an explicit false ignore flag, and no declared external
+or conditional magazine candidate. The target physical Record index survives
+an export filter on the ammunition definitions.
+
+Use the `selection` source uses for the whole decision, including the
+component survey and the selected role. Repeated ownership, unreadable
+components or action slots, a competing magazine route, and missing or
+dangling ammo retain distinct outcomes. The authored declarations and
+action tree carry those source values and their independent states.

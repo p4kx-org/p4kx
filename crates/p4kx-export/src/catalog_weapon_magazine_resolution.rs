@@ -21,7 +21,7 @@ use crate::{CatalogError, ExportAccountingError};
 #[path = "weapon_magazine_selection_evidence.rs"]
 mod evidence;
 
-use self::evidence::SelectionEvidence;
+pub(in crate::catalog_v3) use self::evidence::SelectionEvidence;
 
 type Fields<'scope, 'read, 'source> = OriginalFlowFields<'scope, 'read, 'source>;
 
