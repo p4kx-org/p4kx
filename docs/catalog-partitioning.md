@@ -41,16 +41,22 @@ selected domain. Protected `gameTexts` use independent parts and retain the `x-g
   separate `bundleVersion` describes packaging. `schemaVersion` describes the logical Catalog.
 - The manifest binds one generation to the source Build tuple, archive receipt, export options and
   each part's relative path, table or row range, row count, stored and decoded length and SHA-256.
-  Include publication mode, `exportHealth`, source and selection coverage per dataset, and the table
+  Bind each table to its total row count and assign nonoverlapping half-open row ranges that
+  cover that total. Validate unique part IDs and physical row keys while preserving repeated
+  authored values at distinct positions. Include publication mode, `exportHealth`, source and
+  selection coverage per dataset, and the table
   dependency index. Validate parts against their manifest before combining them.
 - Keep GUIDs, physical Record/component ordinals, tier/slot and Loadout paths, and container
   occurrence keys. Source-use IDs are opaque and valid within their generation. Follow
-  `sourceUsesRefs` to use rows, physical sources, ancestors and nested selector uses. Preserve
+  `sourceUsesRefs` from selected rows, texts and retained inventories until no additional use,
+  selector, source or ancestor remains. Physical source metadata and TextForms carry their
+  own evidence. Keep health metadata with its atom table. Preserve
   `containsEncryptedSource` and `sourceSetComplete` on each datum.
 - Track download state separately from source state. An unfetched part, a Filter-excluded target,
   a dangling link and unreadable source have distinct meanings. Resolve staged parts and cyclic
-  links before applying records. Deletion requires complete coverage and healthy publication for
-  the affected scope.
+  links before applying records. Stage identities in their own generation. A physical Record index
+  can only resolve in that generation. Deletion requires the intended build, unfiltered selection,
+  every expected part, complete source inventory and Catalog-wide health, including global blockers.
 - Stage the component files and publish the manifest last. Verify digests and reference closure
   before making an imported scope visible. Failure preserves the previous usable snapshot.
 
@@ -65,7 +71,8 @@ selected domain. Protected `gameTexts` use independent parts and retain the `x-g
 Use manifest and parts for selective imports. Measure the current complete export first. Prototype
 the world domain with shared inventories and one equipment-to-crafting join. Compare reconstructed
 logical Catalog v3 with the single-file export, including row order and source closure. Test
-wrong-generation parts, missing dependencies, dangling and cyclic links, protected text, cancelled
+wrong-generation parts, missing dependencies and nested evidence, overlapping or missing row ranges,
+dangling and cyclic links, protected text, a global health blocker alongside a healthy domain, cancelled
 publication and partial replacement. Measure stored and decoded bytes, generation time and peak
 producer and consumer memory. The current writer streams serialization from a prepared catalog.
 Smaller files alone leave that producer preparation cost in place.
