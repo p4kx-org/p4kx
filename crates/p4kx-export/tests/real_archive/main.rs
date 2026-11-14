@@ -112,6 +112,7 @@ mod real_archive_variants;
 mod real_archive_vehicle_armor;
 mod real_archive_verification;
 mod real_archive_weapon_actions;
+mod real_archive_weapon_combat;
 mod shield_generators;
 mod ship_matrix_compare;
 
