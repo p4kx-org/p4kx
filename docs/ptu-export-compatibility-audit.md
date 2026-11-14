@@ -74,6 +74,15 @@ with two exact Records in each Build. They qualify the original room controls
 Their DataForge owner is tracked separately in
 [#1149](https://github.com/p4kx-org/p4kx/issues/1149).
 
+The scoped Starchitect probe admitted all three system roots matching its original
+`system/<folder>/*system.socpak` rule. They are readable ObjectContainer v14 XML and
+carry 847 Child positions and 847 Child rotations. This root rule found no direct
+Tile edges. An independent directory search found 722 Starchitect Tile SOCPAKs,
+all added relative to current LIVE. The smallest selected Tile opened successfully.
+Its two XML files are a v14 descriptor containing Health and a layer list containing
+15 Layer elements. This proves the Tile can be read directly. An authored path from
+a system or location root to a Tile, and in-Tile HCD or EntXML binding, remain outside
+this sample. The earlier retained Starchitect reports came from a non-5.0 input.
 The remaining per-domain source probes and any exporter follow-ups are tracked in
 [#1145](https://github.com/p4kx-org/p4kx/issues/1145).
 The current tuning test and other patch-note items come from the
