@@ -476,12 +476,11 @@ those parts too. No value is below 1 or above 7.
 
 #### Item stats
 
-`stats` holds raw facts of the Archive and no derived value (ADR-0065): every number is the stored
-field in the stored unit, `p4kx` computes no damage per second, no cycle time, no acceleration and
-no fuel rate in this block. `stats` is present for items with any block below
-and for shield generators and quantum drives with health or resource states. Absent blocks and
-unstated fields are `null`. The physical device rows live in [`configurations.shieldGenerators`](catalog-shield-generators.md)
-and [`configurations.quantumDrives`](catalog-quantum-drives.md).
+`stats` is a compact view of the authored fields below (ADR-0065). Absent blocks and unstated
+fields are `null`. Derived weapon metrics belong to `projections.weaponCombatBases`. Shield,
+quantum drive and resource parameters use their physical component tables.
+[Weapon values](catalog-combat-quality.md) · [Shield generators](catalog-shield-generators.md) ·
+[Quantum drives](catalog-quantum-drives.md) · [Resource components](catalog-resource-components.md)
 The `kind` of a fire mode and
 `trackingSignalType` are closed sets that the schema keeps as strings. The blocks `armor`,
 `clothing`, `radar`, `tractorBeam` and `weaponModifier` and the fire-mode field `damagePerSecond`
@@ -497,8 +496,7 @@ proof that an unexamined source field is absent.
 | Block | Present when | Fields and sources |
 |-------|--------------|--------------------|
 | `weapon` | the item has `Components[SCItemWeaponComponentParams]` (ship weapons and FPS weapons) | `fireActions`: per element of `fireActions`, in stored order, with a sequence (`sequenceEntries`) flattened to its entries: `kind` (the struct, e.g. `SWeaponActionFireRapidParams`), `name`, `fireRate` (rounds per minute), `pelletCount` (as `pellets`; `pellets` where a Record states that instead) and `ammoCost` of `launchParams`, `heatPerShot`, `chargeTime`, `overchargeTime`, `cooldownTime` (each of the fire mode, when stated), and `damagePerSecond` (the damage types of the beam's `damagePerSecond`, the power of a mining laser; `null` for a mode without one), and `spread` (see below); a beam also has `hitType`, `fullDamageRange` and `zeroDamageRange` (the two ranges in metres); a parallel mode (`weaponActions`) is listed as its entries; a charged or wrapped mode reads `fireRate`, `launchParams` and `name` from its `weaponAction` when it has none of its own. `ammoCapacity`: `maxAmmoCount` of the ammo container, the magazine's capacity (see below). `ammo`: the `AmmoParams` Record that the container's `ammoParamsRecord` links to, `null` without a readable one: `speed`, `lifetime`, `damage` (the damage types of `projectileParams.damage`), `detonationDamage`, `detonationMinRadius` and `detonationMaxRadius` (from `explosionParams`) |
-| `powerPlant` | `AttachDef.Type` is `PowerPlant`, ignoring case | `powerOutput`: the `amount` of the first `generation` flow of `resourceStates` whose resource is `Power`, and `unit`: the `unit` of that flow |
-| `cooler` | `AttachDef.Type` is `Cooler`, ignoring case | `coolingRate` and `unit`: as for the power plant, for the resource `Coolant` (a cooler's flow is an `ItemResourceDeltaConversion`) |
+| `health` | the first `Components[SHealthComponentParams]` has a readable `Health` value | the stored `Health` scalar. `configurations.durability` preserves all physical occurrences. |
 | `missile` | `Components[SCItemMissileParams]` | `damage` (the damage types of `explosionParams.damage`), `explosionMinRadius`, `explosionMaxRadius`, `trackingSignalType`, `lockTime`, `lockingAngle`, `lockRangeMin`, `lockRangeMax` (of `targetingParams`) and `linearSpeed` (of `GCSParams`) |
 | `armor` | `Components[SCItemSuitArmorParams]` (armour pieces, 2,388 items on LIVE 4.10.2 out of 2,391 Records; the rest are development leftovers) | `integrityMilestoneToBreak`; `damageResistance`: the `damageResistance` struct of the `DamageResistanceMacro` Record that `damageResistance` links to, `null` without a readable one (a Record that is missing, has another struct or cannot be built): `ignoreMeleeDamage` (`IgnoreMeleeDamage`) and per damage type `physical`, `energy`, `distortion`, `thermal`, `biochemical`, `stun` (`PhysicalResistance` and so on) the entry `multiplier`, `threshold`, `damageCap`, `damageCapLimit` (`Multiplier`, `Threshold`, `DamageCap`, `DamageCapLimit`) |
 | `clothing` | `Components[SCItemClothingParams]` (4,423 items on LIVE 4.10.2 out of 4,426 Records; armour carries this component too) | `temperatureResistanceMin` and `temperatureResistanceMax` (`TemperatureResistance.MinResistance` and `.MaxResistance`), `radiationCapacity` (`RadiationResistance.MaximumRadiationCapacity`), `radiationDissipationRate` (`RadiationResistance.RadiationDissipationRate`), `gForceResistance` (`Flight.gForceResistance`) |
@@ -519,14 +517,14 @@ as the key into the stat-field table below. The table covers the 29 properties o
 `real_archive_gear_stats` checks that every catalogued `className.value` has a row. A multiplier-kind
 modifier scales the base value of the field; an additive one adds to it.
 
-| `className` | Catalog field the modifier changes | Items |
+| `className` | Catalog base input | Items |
 |-------------|------------------------------------|-------|
 | `GPP_Armor_DamageMitigation` | `armor.damageResistance.<type>.multiplier` for all six types; the SC Wiki's physical value is `physical.multiplier` | armour |
 | `GPP_Armor_TemperatureMin` | `clothing.temperatureResistanceMin` | armour, clothing |
 | `GPP_Armor_TemperatureMax` | `clothing.temperatureResistanceMax` | armour, clothing |
 | `GPP_Armor_RadiationCapacity` | `clothing.radiationCapacity` | armour, clothing |
 | `GPP_Armor_RadiationDissipation` | `clothing.radiationDissipationRate` | armour, clothing |
-| `GPP_Health_MaxHealth` | `health` | ship components, weapons |
+| `GPP_Health_MaxHealth` | `configurations.durability.rows[].health` | ship components, weapons |
 | `GPP_Weapon_Damage` | `weapon.ammo.damage` (guns), `weapon.fireActions[].damagePerSecond` (mining lasers) | weapons |
 | `GPP_Weapon_FireRate` | `weapon.fireActions[].fireRate` | personal weapons |
 | `GPP_Weapon_Recoil_Kick` | none: see below | personal weapons |
@@ -534,8 +532,8 @@ modifier scales the base value of the field; an additive one adds to it.
 | `GPP_Weapon_Recoil_Smoothness` | none: see below | personal weapons |
 | `GPP_Weapon_ReloadSpeed` | none: see below | personal weapons |
 | `GPP_Weapon_Spread` | `weapon.fireActions[].spread` | personal weapons |
-| `GPP_ItemResource_PowerGeneration` | `powerPlant.powerOutput` | power plants |
-| `GPP_ItemResource_CoolantGeneration` | `cooler.coolingRate` | coolers |
+| `GPP_ItemResource_PowerGeneration` | Authored `Power` generation amount in `configurations.resourceComponents` | power plants |
+| `GPP_ItemResource_CoolantGeneration` | Authored `Coolant` generation amount in `configurations.resourceComponents` | coolers |
 | `GPP_Shield_MaxHealth` | `configurations.shieldGenerators.rows[].maxHealth` | shields |
 | `GPP_Radar_MinAimAssistDistance` | `radar.aimAssistDistanceMin` | radars |
 | `GPP_Radar_MaxAimAssistDistance` | `radar.aimAssistDistanceMax` | radars |
@@ -550,6 +548,11 @@ modifier scales the base value of the field; an additive one adds to it.
 | `GPP_Weapon_HullScraping_Efficiency` | `weaponModifier.salvage.extractionEfficiency` | salvage modifiers |
 | `GPP_Crafter_CraftSpeed` | none: a property of a crafting station, not of an item | crafting stations |
 | `GPP_Crafter_DismantleEfficiency` | none: a property of a crafting station, not of an item | crafting stations |
+
+The resource component rows retain the physical component, state and delta order, the amount
+type and its original unit. Select the base flow for the fitted component. To reproduce the
+compact scalar, select the first authored generation side for the requested resource. Use its
+stored amount and unit. [Resource flow selection](catalog-resource-components.md#previous-convenience-values)
 
 Properties with none: the three recoil properties and the reload speed have no single stat field.
 A personal weapon's recoil is the weapon's `actorProceduralRecoilConfig` and the `recoil` of its

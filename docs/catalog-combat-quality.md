@@ -52,7 +52,7 @@ Factory equipment uses the unmodified base inputs and evaluates without a recipe
 Resolve each active `costs[].context.modifiers[]` through its original
 `gameplayPropertyRecord` Reference. Join the physical `targetRecordIndex.value` from its source
 arena to `definitions.gameplayProperties.rows[].recordIndex.value`. Use the reviewed
-[property mapping](catalog.md#item-stats) and its item applicability. In particular,
+[property mapping](catalog.md#from-a-gameplay-property-to-a-stat-field) and its item applicability. In particular,
 shield max health maps to the selected shield generator, projectile damage follows selected
 direct-hit `DamageInfo` channels, and the reviewed weapon fire-rate map currently demonstrates
 personal weapon applicability. A consumer needs evidence to extend that map to other equipment.
