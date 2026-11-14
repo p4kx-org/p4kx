@@ -36,3 +36,26 @@ its child configurations to the host. Missing or ambiguous selected port
 targets do not fabricate placements. Positions are scoped to the exported
 Loadout and Build. The stored values support inspection of configuration,
 and movement predictions require independent runtime evaluation.
+
+## Checking an installed archive
+
+Set `P4KX_DATA_P4K` to the installed archive and use the usual real-archive
+key configuration. Set `P4KX_FLIGHT_CONFIGURATION_WITNESS` to a private
+UTF-8 selector file with seven lines in this order.
+
+1. Spacecraft Record path.
+2. Record path of the flight-controller item installed on that spacecraft.
+3. Ground vehicle Record path.
+4. Record path of an installed main thruster.
+5. Authored role enum label of that thruster.
+6. Record path of an installed maneuvering thruster.
+7. Authored role enum label of that thruster.
+
+Omit `.xml` from Record paths. Choose the parts from the spacecraft's default
+Loadout. The test checks the original component fields and their provenance
+and compares both vehicles' exported Loadouts to the original resolutions.
+The synthetic placement tests exercise repeated, invisible and docked ports.
+
+```powershell
+cargo test -p p4kx-export --test real_archive --locked installed_flight_configurations_match_original_components_and_loadouts -- --ignored
+```

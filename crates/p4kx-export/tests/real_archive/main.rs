@@ -46,6 +46,7 @@ mod real_archive_facility_seats;
 mod real_archive_faction_identity_definitions;
 mod real_archive_faction_reputation_source;
 mod real_archive_factions;
+mod real_archive_flight_configuration;
 mod real_archive_flow_action_wrappers;
 mod real_archive_gear_stats;
 mod real_archive_gear_trace;
