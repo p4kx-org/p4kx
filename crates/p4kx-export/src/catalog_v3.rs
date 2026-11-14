@@ -369,36 +369,14 @@ pub(crate) mod catalog_projections;
 #[path = "catalog_table.rs"]
 pub(crate) mod catalog_table;
 
-#[path = "commodity.rs"]
-pub(crate) mod commodity;
-#[path = "commodity_authoring_contract.rs"]
-pub(crate) mod commodity_authoring_contract;
-#[path = "commodity_authoring_inputs.rs"]
-pub(crate) mod commodity_authoring_inputs;
-#[path = "commodity_authoring_read.rs"]
-pub(crate) mod commodity_authoring_read;
-#[path = "commodity_backfill.rs"]
-pub(crate) mod commodity_backfill;
-#[path = "commodity_binding_read.rs"]
-pub(crate) mod commodity_binding_read;
-#[path = "commodity_contract.rs"]
-pub(crate) mod commodity_contract;
-#[path = "commodity_inputs.rs"]
-pub(crate) mod commodity_inputs;
-
-#[path = "commodity_presentation.rs"]
-pub(crate) mod commodity_presentation;
-
-#[path = "commodity_resource.rs"]
-pub(crate) mod commodity_resource;
-#[path = "commodity_resource_presentation.rs"]
-pub(crate) mod commodity_resource_presentation;
-#[path = "commodity_source.rs"]
-pub(crate) mod commodity_source;
-#[path = "commodity_text_choice.rs"]
-pub(crate) mod commodity_text_choice;
-#[path = "commodity_text_input.rs"]
-pub(crate) mod commodity_text_input;
+#[path = "catalog_commodity_modules.rs"]
+mod commodity_modules;
+pub(crate) use commodity_modules::{
+    commodity, commodity_authoring_contract, commodity_authoring_inputs, commodity_authoring_read,
+    commodity_backfill, commodity_binding_read, commodity_contract, commodity_inputs,
+    commodity_presentation, commodity_resource, commodity_resource_presentation, commodity_source,
+    commodity_text_choice, commodity_text_input,
+};
 
 #[path = "canonical_record_header.rs"]
 pub(crate) mod canonical_record_header;
