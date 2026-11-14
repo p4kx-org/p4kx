@@ -500,3 +500,51 @@ require independent source evidence before changing the projection.
 [StarBreaker palette read](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/pipeline/palette.rs#L510-L523)
 · [StarBreaker layer inputs](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/blender_addon/starbreaker_addon/runtime/importer/layers.py#L282-L320)
 · [P4KX material graph](../blender_addon/p4kx_importer/material_graph.py).
+
+### Current P4KX integration recheck
+
+The merged StarBreaker tree `305215bca` still matches the audited PR head.
+The P4KX integration at `d63dcee78` contains two changes that address the
+older open findings above. Material companion generation polls cancellation
+while projecting the authored library and origins, freezing evidence, and
+serialising the compressed rows. The Entity animation Media catalogue
+preserves independent Loadout rigs, failed reads, physical clips and their
+per-field origins. Its synthetic integration tests include a missing root
+rig, a readable child, and physically distinct same-name clips.
+[Material cancellation](https://github.com/p4kx-org/p4kx/commit/1a8ea3a68)
+· [Entity catalogue](https://github.com/p4kx-org/p4kx/commit/e76350c2a).
+
+An Entity named CAF selector still resolves only the loose Archive Entry.
+When the file is missing, the link reports a missing selection even when
+the exact full path exists in a DBA declared in the same `AnimationList`.
+The Animation Definitions provider already indexes those physical DBA clip
+ordinals with their original name and metadata spans. Reuse that matching
+and evidence in the Entity catalogue. Preserve each declaration occurrence,
+loose lookup, duplicate bank candidate and incomplete bank disposition.
+[#1093 acceptance](https://github.com/p4kx-org/p4kx/issues/1093)
+· [Entity lookup](../crates/p4kx-assembly/src/entity_clip_catalogue.rs)
+· [DBA metadata lookup](../crates/p4kx-media/src/animation/dba_metadata_lookup.rs)
+· [StarBreaker matching](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/animation/matching.rs#L72).
+
+The current package preflight accepted an in-memory synthetic GLB with exactly
+16,777,216 bytes of valid JSON and refused the same shape at 16,777,220 bytes
+with `GLB has no usable JSON chunk.` The test used Blender 5.3's bundled Python.
+The Rust GLB writer enforces the file format lengths. The package producer
+and importer currently use different limits for the padded JSON chunk.
+[#1142](https://github.com/p4kx-org/p4kx/issues/1142) tracks the normal
+package-entry-point reproduction, a measured budget and an explicit size
+error before publication. The synthetic probe used an `extras` string to vary
+size. No installed package failure was measured.
+[Add-on GLB preflight](../blender_addon/p4kx_importer/glb_preflight.py)
+· [Rust GLB writer](../crates/p4kx-gltf/src/glb.rs)
+· [ADR-0093](adr/0093-the-blender-add-on-is-an-extension-that-reads-and-validates-a-package-without-blender.md).
+
+For forward-card materials, compare authored absent, zero and positive `Glow`
+with the exact forward flag, diffuse or emittance texture slot, and coverage
+control. StarBreaker can project tinted emission on `Illum` with no `Glow`.
+The corresponding P4KX Blender path requires an eligible emittance texture
+and finite positive `Glow`. Installed source evidence and a controlled Blender
+check under [#1133](https://github.com/p4kx-org/p4kx/issues/1133) can establish
+which additional combinations merit a projection.
+[StarBreaker material classification](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/material_semantics.rs)
+· [P4KX Blender policy](blender-package.md).
