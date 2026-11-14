@@ -78,6 +78,11 @@ fn rig_clip_candidates_use_original_folder_and_same_list_physical_bank_only() ->
         Some(&json!("found")),
         "the loose archive Entry has an exact path match"
     );
+    assert_unsupported_alias(unsupported_alias);
+    assert_rules(&rows)
+}
+
+fn assert_unsupported_alias(unsupported_alias: &Value) {
     assert_eq!(
         unsupported_alias.pointer("/value/record"),
         Some(&json!(4)),
@@ -93,7 +98,6 @@ fn rig_clip_candidates_use_original_folder_and_same_list_physical_bank_only() ->
         Some(&json!("Animations/Fixture/sub/🟣.caf")),
         "the raw path survives independently of its key"
     );
-    assert_rules(&rows)
 }
 
 fn assert_exact_metadata(clips: [&Value; 2]) {
