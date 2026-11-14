@@ -21,6 +21,7 @@ pub(crate) enum ConfigurationInspection {
     MissionBoard,
     ResourceNetwork,
     LootGeneration,
+    JumpDriveDefinition,
 }
 
 /// Inspection of the canonical values relevant to one source scope.

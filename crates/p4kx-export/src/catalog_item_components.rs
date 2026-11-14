@@ -9,9 +9,11 @@ use super::authored_fields::Observed;
 use super::catalog_ammo_bindings::{self, AmmoBinding};
 use super::catalog_ammo_containers::{self, AmmoContainer};
 use super::catalog_durability::{self, DurabilityComponent, DurabilityRows, DurabilityTables};
+use super::catalog_emp::{self, Emp};
 use super::catalog_explosives::catalog_missile_configuration::{self, MissileConfiguration};
 use super::catalog_explosives::{self, Explosive, ExplosiveComponent};
 use super::catalog_hacking_chips::{self, HackingChip, HackingComponent};
+use super::catalog_jump_drive::{self, JumpDrive};
 use super::catalog_quantum_drive::{self, QuantumDrive};
 use super::catalog_shield_generator::{self, ShieldGenerator};
 use super::catalog_weapon_actions::{self, WeaponActions};
@@ -34,12 +36,14 @@ use self::resolution::WeaponMagazineResolution;
 #[derive(Default)]
 pub(crate) struct ItemComponentRows<'source> {
     pub(crate) durability: DurabilityRows<'source>,
+    pub(crate) emp: Vec<Emp<'source>>,
     pub(crate) explosives: Vec<Explosive<'source>>,
     pub(crate) hacking_chips: Vec<HackingChip<'source>>,
     pub(crate) ammo_containers: Vec<AmmoContainer<'source>>,
     pub(crate) ammo_bindings: Vec<AmmoBinding<'source>>,
     pub(crate) weapon_actions: Vec<WeaponActions<'source>>,
     pub(crate) missile_configurations: Vec<MissileConfiguration<'source>>,
+    pub(crate) jump_drives: Vec<JumpDrive<'source>>,
     pub(crate) quantum_drives: Vec<QuantumDrive<'source>>,
     pub(crate) shield_generators: Vec<ShieldGenerator<'source>>,
     pub(crate) magazine_resolutions: Vec<WeaponMagazineResolution>,
@@ -49,6 +53,7 @@ pub(crate) struct ItemComponentRows<'source> {
 impl<'source> ItemComponentRows<'source> {
     pub(crate) fn extend(&mut self, other: Self) {
         self.durability.extend(other.durability);
+        self.emp.extend(other.emp);
         self.explosives.extend(other.explosives);
         self.hacking_chips.extend(other.hacking_chips);
         self.ammo_containers.extend(other.ammo_containers);
@@ -56,6 +61,7 @@ impl<'source> ItemComponentRows<'source> {
         self.weapon_actions.extend(other.weapon_actions);
         self.missile_configurations
             .extend(other.missile_configurations);
+        self.jump_drives.extend(other.jump_drives);
         self.quantum_drives.extend(other.quantum_drives);
         self.shield_generators.extend(other.shield_generators);
         self.magazine_resolutions.extend(other.magazine_resolutions);
@@ -65,6 +71,7 @@ impl<'source> ItemComponentRows<'source> {
     pub(crate) fn into_tables(self, forge: &DataForge<'_>) -> ItemComponentTables<'source> {
         ItemComponentTables {
             durability: catalog_durability::tables(forge, self.durability),
+            emp: catalog_emp::table(forge, self.emp),
             explosives: catalog_explosives::table(forge, self.explosives),
             hacking_chips: catalog_hacking_chips::table(forge, self.hacking_chips),
             ammo_containers: catalog_ammo_containers::table(forge, self.ammo_containers),
@@ -74,6 +81,7 @@ impl<'source> ItemComponentRows<'source> {
                 forge,
                 self.missile_configurations,
             ),
+            jump_drives: catalog_jump_drive::table(forge, self.jump_drives),
             quantum_drives: catalog_quantum_drive::table(forge, self.quantum_drives),
             shield_generators: catalog_shield_generator::table(forge, self.shield_generators),
             magazine_resolutions: resolution::table(forge, self.magazine_resolutions),
@@ -83,12 +91,14 @@ impl<'source> ItemComponentRows<'source> {
 
 pub(crate) struct ItemComponentTables<'source> {
     pub(crate) durability: DurabilityTables<'source>,
+    pub(crate) emp: CatalogTable<Emp<'source>>,
     pub(crate) explosives: CatalogTable<Explosive<'source>>,
     pub(crate) hacking_chips: CatalogTable<HackingChip<'source>>,
     pub(crate) ammo_containers: CatalogTable<AmmoContainer<'source>>,
     pub(crate) ammo_bindings: CatalogTable<AmmoBinding<'source>>,
     pub(crate) weapon_actions: CatalogTable<WeaponActions<'source>>,
     pub(crate) missile_configurations: CatalogTable<MissileConfiguration<'source>>,
+    pub(crate) jump_drives: CatalogTable<JumpDrive<'source>>,
     pub(crate) quantum_drives: CatalogTable<QuantumDrive<'source>>,
     pub(crate) shield_generators: CatalogTable<ShieldGenerator<'source>>,
     pub(crate) magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
@@ -118,6 +128,11 @@ impl<'source> ItemComponentsRead<'source> {
                     self.legacy_health = Some(legacy);
                 }
             }
+            Component::Emp => {
+                self.rows
+                    .emp
+                    .push(Emp::read(owner, observed, &mut self.notes)?);
+            }
             Component::Explosive(kind) => self.push_explosive(kind, owner, observed)?,
             Component::AmmoContainer => {
                 self.rows.ammo_containers.push(AmmoContainer::read(
@@ -132,6 +147,11 @@ impl<'source> ItemComponentsRead<'source> {
                 )?);
             }
             Component::Weapon => self.push_weapon(owner, observed)?,
+            Component::JumpDrive => {
+                self.rows
+                    .jump_drives
+                    .push(JumpDrive::read(owner, observed, &mut self.notes)?);
+            }
             Component::QuantumDrive => {
                 self.rows.quantum_drives.push(QuantumDrive::read(
                     owner,
@@ -139,21 +159,17 @@ impl<'source> ItemComponentsRead<'source> {
                     &mut self.notes,
                 )?);
             }
-            Component::ShieldGenerator => {
-                self.rows.shield_generators.push(ShieldGenerator::read(
-                    owner,
-                    observed,
-                    &mut self.notes,
-                )?);
-            }
-            Component::Hacking(kind) => {
-                self.rows.hacking_chips.push(HackingChip::read(
-                    kind,
-                    owner,
-                    observed,
-                    &mut self.notes,
-                )?);
-            }
+            Component::ShieldGenerator => self.rows.shield_generators.push(ShieldGenerator::read(
+                owner,
+                observed,
+                &mut self.notes,
+            )?),
+            Component::Hacking(kind) => self.rows.hacking_chips.push(HackingChip::read(
+                kind,
+                owner,
+                observed,
+                &mut self.notes,
+            )?),
         }
         Ok(())
     }
@@ -205,10 +221,12 @@ impl<'source> ItemComponentsRead<'source> {
 #[derive(Clone, Copy)]
 enum Component {
     Durability(DurabilityComponent),
+    Emp,
     Explosive(ExplosiveComponent),
     Hacking(HackingComponent),
     AmmoContainer,
     Weapon,
+    JumpDrive,
     QuantumDrive,
     ShieldGenerator,
 }
@@ -221,6 +239,8 @@ impl Component {
         let name = source.type_name();
         match name {
             catalog_ammo_containers::SOURCE_TYPE => return Some((value, Self::AmmoContainer)),
+            catalog_emp::SOURCE_TYPE => return Some((value, Self::Emp)),
+            catalog_jump_drive::SOURCE_TYPE => return Some((value, Self::JumpDrive)),
             catalog_quantum_drive::SOURCE_TYPE => return Some((value, Self::QuantumDrive)),
             catalog_shield_generator::SOURCE_TYPE => return Some((value, Self::ShieldGenerator)),
             catalog_weapon_magazine_slots::SOURCE_TYPE => {

@@ -140,6 +140,8 @@ pub(crate) mod catalog_ammo_containers;
 mod catalog_capacity;
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
+#[path = "catalog_emp.rs"]
+pub(crate) mod catalog_emp;
 #[path = "catalog_entity_component_read.rs"]
 mod catalog_entity_component_read;
 #[path = "catalog_entity_configurations.rs"]
@@ -162,6 +164,8 @@ mod catalog_interactions;
 pub(crate) mod catalog_item_alignment;
 #[path = "catalog_item_components.rs"]
 pub(crate) mod catalog_item_components;
+#[path = "catalog_jump_drive.rs"]
+pub(crate) mod catalog_jump_drive;
 #[path = "catalog_mission_board.rs"]
 mod catalog_mission_board;
 #[path = "catalog_quantum_drive.rs"]
@@ -246,6 +250,8 @@ mod inventory_owner_storage;
 mod item_alignment_options;
 #[path = "item_component_owner.rs"]
 mod item_component_owner;
+#[path = "jump_drive_definitions.rs"]
+mod jump_drive_definitions;
 #[path = "medical/mod.rs"]
 pub(crate) mod medical;
 #[path = "mission_sources.rs"]

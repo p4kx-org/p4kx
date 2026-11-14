@@ -4342,6 +4342,9 @@
         "durability": {
           "$ref": "#/$defs/CatalogTableOfDurability"
         },
+        "emp": {
+          "$ref": "#/$defs/CatalogTableOfEmp"
+        },
         "explosives": {
           "$ref": "#/$defs/CatalogTableOfExplosive"
         },
@@ -4380,6 +4383,15 @@
         },
         "itemRecoveryPolicy": {
           "$ref": "#/$defs/CatalogTableOfItemRecoveryPolicy"
+        },
+        "jumpDriveFlightTuning": {
+          "$ref": "#/$defs/CatalogTableOfJumpDriveDefinition"
+        },
+        "jumpDrives": {
+          "$ref": "#/$defs/CatalogTableOfJumpDrive"
+        },
+        "jumpTunnelForces": {
+          "$ref": "#/$defs/CatalogTableOfJumpDriveDefinition"
         },
         "localContractGenerators": {
           "$ref": "#/$defs/CatalogTableOfLocalContractGeneratorConfiguration"
@@ -4437,6 +4449,7 @@
         "degradation",
         "distortion",
         "durability",
+        "emp",
         "explosives",
         "facilities",
         "fuelIntakes",
@@ -4450,6 +4463,9 @@
         "itemRecoveryEconomy",
         "itemRecoveryOverrides",
         "itemRecoveryPolicy",
+        "jumpDriveFlightTuning",
+        "jumpDrives",
+        "jumpTunnelForces",
         "localContractGenerators",
         "lootGeneration",
         "missileConfigurations",
@@ -5323,6 +5339,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfEmp": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/Emp"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfEncounterIndex": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -5807,6 +5842,44 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ItemRoomAssociation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfJumpDrive": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/JumpDrive"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfJumpDriveDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/JumpDriveDefinition"
           },
           "type": "array"
         }
@@ -10842,6 +10915,146 @@
         }
       ],
       "required": []
+    },
+    "Emp": {
+      "description": "The stored configuration of one physical EMP component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "chargeTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "chargedParticle": {
+          "$ref": "#/$defs/SourcedValueOfEmpParticle"
+        },
+        "chargedState": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "chargedTag": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "chargingParticle": {
+          "$ref": "#/$defs/SourcedValueOfEmpParticle"
+        },
+        "chargingState": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "chargingTag": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "cooldownTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "distortionDamage": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "empRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "idleState": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "minEmpRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minPhysRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "physRadius": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "pressure": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "releasingState": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "startChargedTrigger": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "startChargingTrigger": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "startUnleashTrigger": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "stopChargedTrigger": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "stopChargingTrigger": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "stopUnleashTrigger": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "unleashTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "chargeTime",
+        "chargedParticle",
+        "chargedState",
+        "chargedTag",
+        "chargingParticle",
+        "chargingState",
+        "chargingTag",
+        "componentOrdinal",
+        "cooldownTime",
+        "distortionDamage",
+        "empRadius",
+        "idleState",
+        "minEmpRadius",
+        "minPhysRadius",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "physRadius",
+        "pressure",
+        "releasingState",
+        "sourceType",
+        "startChargedTrigger",
+        "startChargingTrigger",
+        "startUnleashTrigger",
+        "stopChargedTrigger",
+        "stopChargingTrigger",
+        "stopUnleashTrigger",
+        "unleashTime"
+      ],
+      "type": "object"
+    },
+    "EmpParticle": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "path": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "path",
+        "sourceType"
+      ],
+      "type": "object"
     },
     "EncounterIndex": {
       "description": "A physical encounter index and its ordered links to spawn sets.",
@@ -18501,6 +18714,224 @@
           "type": "object"
         }
       ]
+    },
+    "JumpDrive": {
+      "description": "Stored settings of one item-side jump drive component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "alignmentDecayRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "alignmentRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "effects": {
+          "$ref": "#/$defs/SourcedValueOfJumpDriveEffects"
+        },
+        "flightTuning": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "fuelUsageEfficiencyMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "idleState": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "transitingState": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "tuningDecayRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "tuningRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "tunnelForces": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "alignmentDecayRate",
+        "alignmentRate",
+        "componentOrdinal",
+        "effects",
+        "flightTuning",
+        "fuelUsageEfficiencyMultiplier",
+        "idleState",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType",
+        "transitingState",
+        "tuningDecayRate",
+        "tuningRate",
+        "tunnelForces"
+      ],
+      "type": "object"
+    },
+    "JumpDriveDefinition": {
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
+        }
+      },
+      "required": [
+        "fields",
+        "source"
+      ],
+      "type": "object"
+    },
+    "JumpDriveEffectRange": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "maximum": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "minimum": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "maximum",
+        "minimum"
+      ],
+      "type": "object"
+    },
+    "JumpDriveEffects": {
+      "description": "Original jump-drive presentation parameters grouped by travel phase.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "exit": {
+          "$ref": "#/$defs/SourcedValueOfJumpDriveExit"
+        },
+        "jumpDriveParticles": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "opening": {
+          "$ref": "#/$defs/SourcedValueOfJumpDriveOpening"
+        },
+        "projectileEffect": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "travel": {
+          "$ref": "#/$defs/SourcedValueOfJumpDriveTravel"
+        },
+        "tunnelResponseEffect": {
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+        },
+        "wake": {
+          "$ref": "#/$defs/SourcedValueOfJumpDriveWake"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "exit",
+        "jumpDriveParticles",
+        "opening",
+        "projectileEffect",
+        "sourceType",
+        "travel",
+        "tunnelResponseEffect",
+        "wake"
+      ],
+      "type": "object"
+    },
+    "JumpDriveExit": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "exitSpeedRange": {
+          "$ref": "#/$defs/SourcedValueOfJumpDriveEffectRange"
+        },
+        "exitTrailTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "exitSpeedRange",
+        "exitTrailTime"
+      ],
+      "type": "object"
+    },
+    "JumpDriveOpening": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "shieldPulseMaxTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "shieldPulseMaxTime"
+      ],
+      "type": "object"
+    },
+    "JumpDriveTravel": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "interactionStartDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "reactionBurstTriggerDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "tunnelResponseDistanceAheadRange": {
+          "$ref": "#/$defs/SourcedValueOfJumpDriveEffectRange"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "interactionStartDistance",
+        "reactionBurstTriggerDistance",
+        "tunnelResponseDistanceAheadRange"
+      ],
+      "type": "object"
+    },
+    "JumpDriveWake": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "maxPenetration": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "maxPenetration"
+      ],
+      "type": "object"
     },
     "JurisdictionDefinition": {
       "description": "A physical jurisdiction and the law facts authored directly on it.",
@@ -59834,6 +60265,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfEmpParticle": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/EmpParticle"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfEncounterIndexEntry": {
       "allOf": [
         {
@@ -68898,6 +69459,786 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/JsonValue"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfJumpDriveEffectRange": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/JumpDriveEffectRange"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfJumpDriveEffects": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/JumpDriveEffects"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfJumpDriveExit": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/JumpDriveExit"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfJumpDriveOpening": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/JumpDriveOpening"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfJumpDriveTravel": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/JumpDriveTravel"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfJumpDriveWake": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/JumpDriveWake"
               }
             }
           }

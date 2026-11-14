@@ -55,6 +55,7 @@ mod catalog_crafting_followups;
 mod catalog_crafting_property;
 mod catalog_crafting_support;
 mod catalog_crafting_tiers;
+mod catalog_emp;
 mod catalog_failures;
 mod catalog_file;
 mod catalog_fixture;

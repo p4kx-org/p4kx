@@ -211,6 +211,8 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.blueprints` | Physical Blueprint Records and their complete original value arenas in GUID order |
 | `configurations.durability`, `configurations.degradation`, `configurations.distortion` | Original item component occurrences, raw values and provenance. [Item durability](catalog-durability.md) |
 | `configurations.missileConfigurations` | Authored missile guidance, targeting and shake. Join inherited settings by physical slot in `configurations.explosives`. [Missile configurations](catalog-missiles.md) |
+| `configurations.emp` | Original EMP timings, radii, effects and state links per physical component. [EMP configurations](catalog-emp.md) |
+| `configurations.jumpDrives`, `configurations.jumpDriveFlightTuning`, `configurations.jumpTunnelForces` | Original jump-drive item components with linked tuning and tunnel-force Records, device states and presentation parameters. [Jump drives](catalog-jump-drives.md) |
 | `configurations.quantumDrives` | Original quantum drive components with independent standard, spline, thermal and boost values. [Quantum drives](catalog-quantum-drives.md) |
 | `configurations.lootGeneration` | Original Entity loot components, ordered constraints, theme references and secondary-choice wrappers. [Loot source](catalog-loot-source.md) |
 | `configurations.shieldGenerators` | Original shield generator component occurrences, typed values and provenance. [Shield generators](catalog-shield-generators.md) |

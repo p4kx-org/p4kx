@@ -8,10 +8,12 @@ use crate::broker_entry::BrokerProjection;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_ammo_containers::AmmoContainer;
 use crate::catalog_v3::catalog_durability::{Degradation, Distortion, Durability};
+use crate::catalog_v3::catalog_emp::Emp;
 use crate::catalog_v3::catalog_explosives::Explosive;
 use crate::catalog_v3::catalog_explosives::catalog_missile_configuration::MissileConfiguration;
 use crate::catalog_v3::catalog_hacking_chips::HackingChip;
 use crate::catalog_v3::catalog_independent_configurations::IndependentConfigurationTables;
+use crate::catalog_v3::catalog_jump_drive::JumpDrive;
 use crate::catalog_v3::catalog_quantum_drive::QuantumDrive;
 use crate::catalog_v3::catalog_shield_generator::ShieldGenerator;
 use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
@@ -31,11 +33,13 @@ pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) durability: CatalogTable<Durability<'source>>,
     pub(crate) degradation: CatalogTable<Degradation>,
     pub(crate) distortion: CatalogTable<Distortion>,
+    pub(crate) emp: CatalogTable<Emp<'source>>,
     pub(crate) explosives: CatalogTable<Explosive<'source>>,
     pub(crate) hacking_chips: CatalogTable<HackingChip<'source>>,
     pub(crate) ammo_containers: CatalogTable<AmmoContainer<'source>>,
     pub(crate) weapon_actions: CatalogTable<WeaponActions<'source>>,
     pub(crate) missile_configurations: CatalogTable<MissileConfiguration<'source>>,
+    pub(crate) jump_drives: CatalogTable<JumpDrive<'source>>,
     pub(crate) quantum_drives: CatalogTable<QuantumDrive<'source>>,
     pub(crate) shield_generators: CatalogTable<ShieldGenerator<'source>>,
     #[serde(flatten)]

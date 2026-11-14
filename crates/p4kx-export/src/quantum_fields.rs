@@ -4,10 +4,11 @@
 use p4kx_extraction::{SourceValueState, SourcedValue};
 
 use super::authored_fields::Observed;
+
 use crate::CatalogError;
 use crate::resource_number::ResourceNumber;
 use crate::source_fields::FieldError;
-use crate::source_value_catalog::SourceArenaOutput;
+use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference, SourceWeakReference};
 
 pub(super) struct QuantumFields<'reader, 'scope, 'read, 'source, 'notes> {
     source: Observed<'reader, 'scope, 'read, 'source>,
@@ -47,6 +48,26 @@ impl<'reader, 'scope, 'read, 'source, 'notes>
         name: &'static str,
     ) -> Result<SourcedValue<SourceArenaOutput<'source>>, CatalogError> {
         let cell = self.source.authored_member(name, self.notes)?;
+        self.projected.push((name, cell.state()));
+        Ok(cell)
+    }
+
+    pub(super) fn record_link_to(
+        &mut self,
+        name: &'static str,
+        target: &'static str,
+    ) -> Result<SourcedValue<Box<SourceRecordReference<'source>>>, CatalogError> {
+        let cell = self.source.record_link_to(name, target, self.notes)?;
+        self.projected.push((name, cell.state()));
+        Ok(cell)
+    }
+
+    pub(super) fn weak_link_to(
+        &mut self,
+        name: &'static str,
+        target: &'static str,
+    ) -> Result<SourcedValue<Box<SourceWeakReference<'source>>>, CatalogError> {
+        let cell = self.source.weak_link_to(name, target, self.notes)?;
         self.projected.push((name, cell.state()));
         Ok(cell)
     }

@@ -11,6 +11,7 @@ use super::catalog_entity_component_read::{
 use super::catalog_mission_board::{self, MissionBoard};
 use super::catalog_resource_network_configuration::ResourceNetworkConfiguration;
 use super::catalog_resource_network_read::{self, ResourceNetworkRead};
+use super::jump_drive_definitions::{self, JumpDriveDefinitions};
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_table::CatalogTable;
@@ -36,6 +37,8 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     resource_network_parameters: CatalogTable<ResourceNetworkConfiguration<'source>>,
     mission_boards: CatalogTable<MissionBoard<'source>>,
     loot_generation: CatalogTable<LootGenerationComponent<'source>>,
+    #[serde(flatten)]
+    jump_drive_definitions: JumpDriveDefinitions<'source>,
 }
 
 pub(crate) struct IndependentConfigurations<'source> {
@@ -74,6 +77,17 @@ pub(crate) fn read<'source>(
     )?;
     collected.ledger.merge(ledger);
     collected.add_failures(failures);
+    let mut jump = jump_drive_definitions::read(
+        forge,
+        projection.original(),
+        options.filter,
+        options.cancel,
+        &collected.item_components.jump_drives,
+    )?;
+    let jump_drive_definitions = jump.take_tables(forge);
+    configuration_numbers.extend(jump.numbers);
+    collected.ledger.merge(jump.ledger);
+    collected.add_failures(jump.failures);
     let mut components = PhysicalComponents {
         forge,
         projection,
@@ -91,6 +105,7 @@ pub(crate) fn read<'source>(
             resource_network_parameters,
             mission_boards,
             loot_generation,
+            jump_drive_definitions,
         },
         recovery_numbers,
         configuration_numbers,
