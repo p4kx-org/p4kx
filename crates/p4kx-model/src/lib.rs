@@ -58,6 +58,8 @@ mod error;
 mod hair_cap;
 mod hierarchy;
 mod included;
+mod included_object_row;
+mod included_objects_chunk;
 mod index_stream;
 mod lod_skeleton_origin;
 mod material;
@@ -183,6 +185,10 @@ pub use included::{
     IncludedObject, IncludedObjects, IncludedObjectsError, MAX_INCLUDED_MODELS,
     MAX_INCLUDED_OBJECTS,
 };
+pub use included_object_row::{
+    IncludedObjectKind, IncludedObjectRow, IncludedObjectRows, IncludedPlacement,
+};
+pub use included_objects_chunk::{IncludedObjectTables, IncludedObjectsChunk, IncludedPathSlot};
 pub use lod_skeleton_origin::LodSkeletonOrigin;
 pub use material_companion::{MaterialCompanion, MaterialCompanionUse, MaterialReadOrigin};
 pub use material_emission::{

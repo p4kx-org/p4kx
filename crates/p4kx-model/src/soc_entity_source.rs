@@ -8,6 +8,7 @@ use p4kx_cryxml::{
 use thiserror::Error;
 
 use crate::Transform;
+use crate::included_objects_chunk::{self, IncludedObjectsChunk};
 use crate::soc_area_component::SocAreaComponent;
 use crate::soc_entities::{self, ENTITIES};
 use crate::soc_entity_component::SocEntityComponent;
@@ -81,6 +82,11 @@ impl<'input> SocEntityFile<'input> {
         self.chunks
             .chunks_of(ENTITIES)
             .map(|(index, header)| self.read_chunk(index, header))
+    }
+
+    /// Visits binary `IncludedObjects` chunks in physical table order.
+    pub fn included_objects_chunks(&self) -> impl Iterator<Item = IncludedObjectsChunk<'_>> {
+        included_objects_chunk::chunks(&self.chunks)
     }
 
     fn read_chunk<'file>(

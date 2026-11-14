@@ -15,6 +15,8 @@ mod cube;
 mod dba_metadata_records;
 mod deep_text;
 mod details;
+mod included_object_source_errors;
+mod included_object_sources;
 mod interior;
 mod layer_cache;
 mod layer_library;
