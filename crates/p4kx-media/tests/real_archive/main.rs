@@ -12,6 +12,7 @@ use sha2::Sha256;
 
 mod animation_accounting;
 mod animation_event_accounting;
+mod animation_graph_accounting;
 mod animation_image_accounting;
 mod animation_image_export;
 mod animation_samples;
