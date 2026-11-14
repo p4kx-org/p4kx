@@ -103,6 +103,12 @@ source-use references resolve in the inventory. The source uses state unknown ef
 encryption for the XML payload on this input, so the transforms carry null markers.
 This scoped Catalog has incomplete overall export health.
 
+A filtered LIVE control produces 2,094 physical Starmap rows in each of the two tested
+integration builds. Their placement field states and values are identical. Each export has
+1,189 positioned rows, three missing containers and zero unreadable containers or malformed
+children. This compares the retained placement-origin build to the updated catalog on the
+same Archive. Both wrote diagnostic catalogs.
+
 CRC-verified weather and lightning ParticleLibrary Entries are readable in both installed
 builds. The weather library has 62 elements on each Build and adds eight lexical Boolean
 `RainOcclusion` attributes in PTU. The lightning sample has 30 Lightning elements in LIVE and

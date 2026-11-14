@@ -24,8 +24,9 @@ container on the chain (up to 128 MiB each) was held at once. Only the systems r
   while one container is parsed, so the peak is the kept Children plus, per rayon thread, one
   XML of up to 128 MiB and its DOM.
 - **A container whose XML is not named like it is reported.** When no `<stem>.xml` exists and the
-  first eligible XML entry is taken, the report names it. The companion `hcd/`
-  directory is outside both the main XML lookup and its fallback. A container with
+  first eligible XML entry is taken, the report names it. Any directory segment
+  named `hcd` marks a companion and excludes it from both main XML selection and fallback.
+  A container with
   no eligible main XML reports an unreadable placement body.
 - **Resolve authored external Child paths with the shared grammar.** The external flag
   accepts `1` and `true`. Existing exact root Archive matches take priority. For
