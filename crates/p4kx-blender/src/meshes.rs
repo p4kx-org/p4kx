@@ -19,6 +19,7 @@ use crate::mesh_options::package_mesh_options;
 use crate::mesh_vertex_map;
 use crate::package_receipt::PackageFile;
 use crate::plan::{MeshPlan, mesh_id};
+use crate::stoppable::Stoppable;
 use crate::{PackageError, PackageResult, PackageWriteContext};
 
 pub(crate) struct WrittenMesh {
@@ -93,7 +94,7 @@ fn write_files(
         .transpose()?;
     let (file, ownership) = context.create_file(&path)?.into_parts();
     let mut sink = BufWriter::new(file);
-    let mut writer = OriginDigestWriter::new(&mut sink);
+    let mut writer = Stoppable::new(OriginDigestWriter::new(&mut sink), context);
     let options = package_mesh_options(options).with_material_indices();
     let summary = if let (Some(map), Some(drawn)) = (&mut vertex_map, drawn) {
         write_scene_glb_observed(scene, &options, None, &mut writer, &mut |row| {
@@ -105,6 +106,7 @@ fn write_files(
     context.check()?;
     let summary = summary.map_err(|source| mesh_error(id, name, source))?;
     let digest = writer
+        .into_inner()
         .finish()
         .map_err(|source| PackageError::write(&path, source))?;
     ownership.ensure_writable(&path, context.cancel_flag())?;

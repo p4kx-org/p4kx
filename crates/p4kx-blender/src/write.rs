@@ -143,8 +143,8 @@ impl PackageSummary {
 ///
 /// Everything is written into a temporary folder next to `out`, which replaces `out` once the
 /// package is complete. `out` must not exist, or be an empty folder, or hold a package an earlier
-/// run wrote; an earlier package stays when the new one fails. `cancelled` is polled between the
-/// files and stops the run with [`PackageError::Cancelled`].
+/// run wrote; an earlier package stays when the new one fails. `cancelled` is polled between
+/// files and during GLB output. Cancellation returns [`PackageError::Cancelled`].
 ///
 /// A texture that cannot be loaded does not fail the package: its materials keep their plain
 /// colours and the manifest lists it among the issues.

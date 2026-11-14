@@ -607,3 +607,12 @@ integration `2889c5bd2`.
   formula does not establish a game default when `Glow` is absent.
   [P4KX GLB factors](../crates/p4kx-gltf/tests/it/material_emission.rs) ·
   [StarBreaker material classification](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/material_semantics.rs).
+- **Static package cancellation.** StarBreaker polls cancellation while
+  emitting decomposed assets. P4KX now reuses its rigged package writer's
+  cancellation checks during static GLB writes. The regression stops after
+  some staged mesh bytes have been written. It checks the typed cancellation
+  result, removal of owned staging, and byte equality for the previous mesh,
+  manifest and receipt. Layout and encoding before bytes reach the writer
+  can still delay cancellation.
+  [P4KX package regression](../crates/p4kx-blender/tests/it/package_write_context.rs) ·
+  [StarBreaker checkpoints](https://github.com/diogotr7/StarBreaker/commit/94c8fba3b).
