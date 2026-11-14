@@ -63,6 +63,7 @@ mod package_write_context;
 mod palette_fields;
 mod palette_selection;
 mod plan;
+mod player_adb_declarations;
 mod player_source;
 mod player_source_body;
 mod player_source_classes;

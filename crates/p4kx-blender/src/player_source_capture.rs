@@ -11,6 +11,7 @@ use p4kx_extraction::{
 };
 use serde::Serialize;
 
+use crate::player_adb_declarations::AdbDeclarations;
 use crate::player_source_body::{self, Body};
 use crate::player_source_loadout::{self, Loadout};
 use crate::player_source_motion::Motion;
@@ -97,6 +98,7 @@ pub struct PlayerSourceCapture {
     bodies: Vec<CapturedBody>,
     loadouts: Vec<SourcedValue<Loadout>>,
     motion: Motion,
+    adb_declarations: Vec<AdbDeclarations>,
     source_inventory: SourceInventory,
 }
 
@@ -111,6 +113,7 @@ pub(super) struct PreparedCapture<'sink> {
     pub(super) bodies: Vec<CapturedBody>,
     pub(super) loadouts: Vec<SourcedValue<Loadout>>,
     pub(super) motion: Motion,
+    pub(super) adb_declarations: Vec<AdbDeclarations>,
     pub(super) documents: XmlDocuments<'sink>,
     pub(super) source_inventory: SourceInventory,
 }
@@ -131,6 +134,7 @@ impl PlayerSourceCapture {
             bodies: prepared.bodies,
             loadouts: prepared.loadouts,
             motion: prepared.motion,
+            adb_declarations: prepared.adb_declarations,
             source_inventory: prepared.source_inventory,
         })
     }
@@ -142,16 +146,7 @@ pub(super) fn prepare<'sink>(
     cancel: &CancelToken,
     mut documents: XmlDocuments<'sink>,
 ) -> Result<PreparedCapture<'sink>, PlayerSourceError> {
-    if variants.is_empty()
-        || variants.iter().enumerate().any(|(index, variant)| {
-            variants
-                .iter()
-                .take(index)
-                .any(|previous| previous == variant)
-        })
-    {
-        return Err(PlayerSourceError::BodySelection);
-    }
+    validate_body_selection(variants)?;
     let watch = ArchiveWatch::new(archive);
     watch.check()?;
     let sources = SourceUses::with_compact_use_refs();
@@ -193,14 +188,30 @@ pub(super) fn prepare<'sink>(
         classes,
         &mut documents,
     )?;
+    let adb_declarations = documents.bind_adb_declarations(&sources, cancel)?;
     watch.check()?;
     Ok(PreparedCapture {
         bodies,
         loadouts,
         motion,
+        adb_declarations,
         documents,
         source_inventory: sources.freeze()?,
     })
+}
+
+fn validate_body_selection(variants: &[BodyVariant]) -> Result<(), PlayerSourceError> {
+    if variants.is_empty()
+        || variants.iter().enumerate().any(|(index, variant)| {
+            variants
+                .iter()
+                .take(index)
+                .any(|previous| previous == variant)
+        })
+    {
+        return Err(PlayerSourceError::BodySelection);
+    }
+    Ok(())
 }
 
 fn scope(
@@ -214,3 +225,7 @@ fn scope(
         _ => Ok(None),
     }
 }
+
+#[cfg(test)]
+#[path = "player_adb_installed_witness.rs"]
+mod installed_witness;

@@ -176,9 +176,19 @@ impl MotionInput<'_, '_, '_> {
             "actionController",
             "ControllerDef",
             documents,
-            Controller::read,
+            |xml, origin, cancel, _, _| Controller::read(xml, origin, cancel),
         )?;
-        let mut database = self.resource("animDatabase3P", "AnimDB", documents, Database::read)?;
+        let mut database = self.resource(
+            "animDatabase3P",
+            "AnimDB",
+            documents,
+            |xml, origin, cancel, documents, index| {
+                let draft = documents.adb_declaration(origin);
+                let mut database = Database::read(xml, origin, cancel, draft)?;
+                database.retain_declarations(documents, index);
+                Ok(database)
+            },
+        )?;
         let database_graph = match (
             &mut database.observed,
             database.value.value(),
@@ -228,7 +238,13 @@ impl MotionInput<'_, '_, '_> {
         name: &str,
         expected_root: &'static str,
         documents: &mut XmlDocuments<'_>,
-        read: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>, &CancelToken) -> Result<T, SocSceneError>,
+        read: impl FnOnce(
+            &SourceDocument<'_>,
+            &XmlOrigin<'_>,
+            &CancelToken,
+            &mut XmlDocuments<'_>,
+            usize,
+        ) -> Result<T, SocSceneError>,
     ) -> Result<SelectedResource<T>, PlayerSourceError> {
         let value = crate::soc_scene_classes::string(self.component.field(name));
         let source = |role| {
@@ -260,7 +276,7 @@ impl MotionInput<'_, '_, '_> {
                 let index = documents.bind(xml, origin)?;
                 observed = Some(Observed {
                     selector: selector.clone(),
-                    data: read(xml, origin, self.resources.cancel)?,
+                    data: read(xml, origin, self.resources.cancel, documents, index)?,
                 });
                 Ok(Some(index))
             },

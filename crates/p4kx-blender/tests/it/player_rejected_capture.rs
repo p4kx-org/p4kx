@@ -84,13 +84,14 @@ fn verified_rejections_share_physical_originals_without_admitting_failed_reads()
     let mut sink = Documents::default();
     let readers = PlayerSourceCapture::read(&archive, &[body], &cancel, &mut sink)?;
     let captured = serde_json::to_value(readers)?;
-    for key in ["loadouts", "motion", "sourceInventory"] {
+    for key in ["loadouts", "motion"] {
         assert_eq!(
             captured.get(key),
             ordinary.get(key),
             "unchanged rows and refs"
         );
     }
+    super::shared_capture::same_legacy_inventory(&ordinary, &captured)?;
     verify_rejections(&sink, &archive, &captured)?;
     verify_graph(&captured, &sink, &archive)?;
     verify_loadouts(&captured, &sink, &archive)?;

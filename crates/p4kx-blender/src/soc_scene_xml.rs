@@ -4,10 +4,11 @@
 use p4kx_extraction::cryxml::{Format, SourceDocument, SourceElement};
 use std::collections::{BTreeMap, BTreeSet};
 
-use p4kx_extraction::{FieldOrigin, PhysicalSourceRef, SourceUse};
+use p4kx_extraction::{CancelToken, FieldOrigin, PhysicalSourceRef, SourceUse, SourceUses};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::player_adb_declarations::{AdbDeclarations, Draft};
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 use crate::{PlayerDocument, PlayerDocumentRejection, PlayerDocumentSink, RejectedPlayerDocument};
@@ -51,6 +52,7 @@ pub(crate) struct XmlDocuments<'sink> {
     indices: BTreeMap<(PhysicalSourceRef, Option<usize>), usize>,
     rows: Vec<XmlDocument>,
     rejected: BTreeSet<(PhysicalSourceRef, PlayerDocumentRejection)>,
+    adb_declarations: BTreeMap<usize, Draft>,
     sink: Option<&'sink mut dyn PlayerDocumentSink>,
 }
 
@@ -139,6 +141,34 @@ impl<'sink> XmlDocuments<'sink> {
             bytes,
         })
         .map_err(SocSceneError::DocumentSink)
+    }
+
+    pub(crate) fn adb_declaration(&self, origin: &XmlOrigin<'_>) -> Option<Draft> {
+        self.sink.as_ref()?;
+        let key = (origin.source(), origin.chunk);
+        if self
+            .indices
+            .get(&key)
+            .is_some_and(|id| self.adb_declarations.contains_key(id))
+        {
+            return None;
+        }
+        Some(Draft::new(origin.scope.clone()))
+    }
+
+    pub(crate) fn retain_adb_declaration(&mut self, index: usize, draft: Draft) {
+        self.adb_declarations.insert(index, draft);
+    }
+
+    pub(crate) fn bind_adb_declarations(
+        &mut self,
+        sources: &SourceUses,
+        cancel: &CancelToken,
+    ) -> Result<Vec<AdbDeclarations>, SocSceneError> {
+        std::mem::take(&mut self.adb_declarations)
+            .into_iter()
+            .map(|(index, draft)| AdbDeclarations::bind(index, draft, sources, cancel))
+            .collect()
     }
 
     pub(crate) fn finish(self) -> Vec<XmlDocument> {

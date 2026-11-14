@@ -13,6 +13,9 @@ use serde_json::Value;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+#[path = "player_adb_declaration_assertions.rs"]
+mod adb_declaration_assertions;
+
 #[path = "player_motion_option_assertions.rs"]
 mod motion_option_assertions;
 

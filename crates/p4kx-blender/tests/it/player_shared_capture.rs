@@ -175,17 +175,39 @@ fn a_single_shared_capture_preserves_existing_payload_and_exact_origin_ids() -> 
         &cancel,
         &mut documents,
     )?)?;
-    for field in ["loadouts", "motion", "sourceInventory"] {
+    for field in ["loadouts", "motion"] {
         assert_eq!(
             existing.get(field),
             shared.get(field),
             "{field} keeps its original data and use IDs"
         );
     }
+    same_legacy_inventory(&existing, &shared)?;
     assert_eq!(
         existing.pointer("/body"),
         shared.pointer("/bodies/0/body"),
         "a single body still has identical original data and use IDs"
+    );
+    Ok(())
+}
+
+pub(super) fn same_legacy_inventory(existing: &Value, shared: &Value) -> TestResult {
+    assert_eq!(
+        existing.pointer("/sourceInventory/sources"),
+        shared.pointer("/sourceInventory/sources"),
+        "same physical source identities",
+    );
+    let existing_uses = existing
+        .pointer("/sourceInventory/uses")
+        .and_then(Value::as_array)
+        .ok_or("v1 uses")?;
+    let new_uses = shared
+        .pointer("/sourceInventory/uses")
+        .and_then(Value::as_array)
+        .ok_or("shared uses")?;
+    assert!(
+        existing_uses.iter().all(|used| new_uses.contains(used)),
+        "all v1 source use rows keep identical references and coordinates"
     );
     Ok(())
 }

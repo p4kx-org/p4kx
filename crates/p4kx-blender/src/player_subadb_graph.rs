@@ -188,8 +188,11 @@ impl Graph<'_, '_, '_> {
                     if document.root().name() != "AnimDB" || document.root().namespace().is_some() {
                         return Ok(None);
                     }
-                    let database = Database::read(document, origin, self.resources.cancel)?;
+                    let draft = documents.adb_declaration(origin);
+                    let mut database =
+                        Database::read(document, origin, self.resources.cancel, draft)?;
                     let index = documents.bind(document, origin)?;
+                    database.retain_declarations(documents, index);
                     loaded = Some((index, database));
                     Ok(Some(index))
                 },

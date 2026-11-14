@@ -51,3 +51,11 @@ to the same retained bytes. The same physical source can be observed both as a p
 document and as a rejected resource selection. An unreadable or unresolved source remains
 represented by its disposition. Its bytes are unavailable to the sink. The CLI document's
 schema and projected source identifiers are unchanged.
+
+The shared capture's `adbDeclarations` retains each selected root or reachable branch
+document once. Each fragment option keeps its original list, group and option positions,
+GUID occurrences and ordered `AnimLayer` and `Animation` declarations. Each animation
+name keeps its attribute position and source origin. Omitted names, empty names and
+duplicates have separate states. Document indexes refer to this capture; physical
+source identities and XML coordinates identify the original declarations. A declared
+animation name can be retained before a physical clip candidate is resolved.
