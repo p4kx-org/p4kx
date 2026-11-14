@@ -4,14 +4,18 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use p4kx_extraction::{EntryOrigin, MaterialLibrarySourceInfo, ObservedEntryBinding};
+use p4kx_extraction::material_source_info::MaterialSourceEvidence;
+use p4kx_extraction::{
+    EntryOrigin, FieldOrigins, FieldPath, InputScope, MaterialLibrarySourceInfo,
+    ObservedEntryBinding, SourceInput, SourceUses,
+};
 use p4kx_gltf::DrawnMaterial;
 use p4kx_model::{MaterialLibrary, MaterialSource};
 
 use crate::manifest::{Issue, IssueOrigin};
-use crate::manifest_materials::MaterialLibrarySourceDescription;
+use crate::manifest_materials::{AuthoredMaterialOrigin, MaterialLibrarySourceDescription};
 use crate::material_emission_origins::EmissionEvidence;
-use crate::{PackageResult, PackageWriteContext};
+use crate::{PackageError, PackageResult, PackageWriteContext};
 
 /// Source roots retained by their reader path, authored data and physical Entry.
 #[derive(Debug, Default)]
@@ -24,6 +28,7 @@ pub(crate) struct MaterialLibrarySources {
 struct RetainedLibrary {
     owner: Arc<MaterialSource>,
     binding: Option<ObservedEntryBinding>,
+    original: Option<EntryOrigin>,
     evidence: Option<EmissionEvidence>,
     description: MaterialLibrarySourceDescription,
 }
@@ -75,10 +80,12 @@ impl MaterialLibrarySources {
         self.entries.push(RetainedLibrary {
             owner: Arc::clone(&library.authored),
             binding,
+            original: entry.cloned(),
             evidence: None,
             description: MaterialLibrarySourceDescription {
                 path: library.path.clone(),
                 authored,
+                authored_origin: None,
                 emission_provenance: None,
             },
         });
@@ -104,6 +111,9 @@ impl MaterialLibrarySources {
 
     pub(crate) fn finish(&mut self, context: &PackageWriteContext<'_>) -> PackageResult<()> {
         for entry in &mut self.entries {
+            context.check()?;
+            entry.description.authored_origin =
+                Some(authored_origin(&entry.owner, entry.original.as_ref())?);
             context.check()?;
             if let Some(evidence) = entry.evidence.take() {
                 entry.description.emission_provenance = Some(evidence.finish()?);
@@ -135,6 +145,34 @@ impl MaterialLibrarySources {
             reason: "Distinct authored library roots share a normalized material name; each actual description is retained.".into(),
         })
     }
+}
+
+fn authored_origin(
+    owner: &MaterialSource,
+    entry: Option<&EntryOrigin>,
+) -> PackageResult<AuthoredMaterialOrigin> {
+    let uses = SourceUses::with_compact_use_refs();
+    let scope = entry
+        .map(|entry| uses.observe(SourceInput::Archive(entry), InputScope::Payload))
+        .transpose()
+        .map_err(authored_error)?;
+    let complete = entry.is_some_and(|entry| entry.ancestors().all(|step| step.is_some()));
+    let selection = uses.shared_origin(&[], complete);
+    let mut field_origins = FieldOrigins::new();
+    let root = FieldPath::parse("/authored").map_err(authored_error)?;
+    MaterialSourceEvidence::new(&uses, scope.as_ref(), &selection)
+        .project(owner, &root, &mut field_origins)
+        .map_err(authored_error)?;
+    let provenance =
+        serde_json::to_value(uses.freeze().map_err(authored_error)?).map_err(authored_error)?;
+    Ok(AuthoredMaterialOrigin {
+        field_origins,
+        provenance,
+    })
+}
+
+fn authored_error(error: impl std::error::Error + Send + Sync + 'static) -> PackageError {
+    PackageError::MaterialSourceEvidence(Box::new(error))
 }
 
 #[cfg(test)]

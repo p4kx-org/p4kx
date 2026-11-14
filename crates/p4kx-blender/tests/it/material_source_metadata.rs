@@ -93,3 +93,27 @@ fn older_scene_descriptions_without_source_roots_and_links_remain_readable() -> 
     );
     Ok(())
 }
+
+#[test]
+fn older_source_rows_without_the_optional_receipt_remain_readable() -> TestResult {
+    let written = package_materials::write()?;
+    let mut value = serde_json::to_value(&written.manifest)?;
+    let libraries = value
+        .get_mut("material_libraries")
+        .and_then(serde_json::Value::as_array_mut)
+        .ok_or("authored library rows")?;
+    for library in libraries {
+        library
+            .as_object_mut()
+            .ok_or("library object")?
+            .remove("authored_origin");
+    }
+    let old: Manifest = serde_json::from_value(value)?;
+    assert!(
+        old.material_libraries
+            .iter()
+            .all(|library| library.authored_origin.is_none()),
+        "older producers can leave out the authored material companion"
+    );
+    Ok(())
+}

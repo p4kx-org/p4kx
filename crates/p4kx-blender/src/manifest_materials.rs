@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::MaterialLibrarySourceInfo;
+use p4kx_extraction::{FieldOrigins, MaterialLibrarySourceInfo, SourceInventory};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -332,8 +332,24 @@ pub struct MaterialLibrarySourceDescription {
     pub path: String,
     /// Bounded source root, namespaces/content and actual projection boundaries.
     pub authored: MaterialLibrarySourceInfo<'static>,
+    /// Exact original evidence of the values within the authored material library.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authored_origin: Option<AuthoredMaterialOrigin>,
     /// Physical sources and exact use references for this library's emission fields.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[schemars(with = "Option<p4kx_extraction::SourceInventory>")]
     pub emission_provenance: Option<serde_json::Value>,
+}
+
+/// Source-local evidence for the retained authored library fields.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[non_exhaustive]
+pub struct AuthoredMaterialOrigin {
+    /// Origins addressed by JSON Pointers relative to the enclosing material-library row.
+    #[serde(deserialize_with = "crate::material_emission_origins::read")]
+    pub field_origins: FieldOrigins,
+    /// Physical inputs and observed source uses of the authored library values.
+    #[schemars(with = "SourceInventory")]
+    pub provenance: serde_json::Value,
 }

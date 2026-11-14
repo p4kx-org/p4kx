@@ -289,6 +289,25 @@
         }
       ]
     },
+    "AuthoredMaterialOrigin": {
+      "additionalProperties": false,
+      "description": "Source-local evidence for the retained authored library fields.",
+      "properties": {
+        "field_origins": {
+          "$ref": "#/$defs/FieldOrigins",
+          "description": "Origins addressed by JSON Pointers relative to the enclosing material-library row."
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory",
+          "description": "Physical inputs and observed source uses of the authored library values."
+        }
+      },
+      "required": [
+        "field_origins",
+        "provenance"
+      ],
+      "type": "object"
+    },
     "Basis": {
       "description": "The axes of every transform and of the GLB meshes.",
       "oneOf": [
@@ -3123,6 +3142,17 @@
         "authored": {
           "$ref": "#/$defs/MaterialLibrarySourceInfo",
           "description": "Bounded source root, namespaces/content and actual projection boundaries."
+        },
+        "authored_origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuthoredMaterialOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exact original evidence of the values within the authored material library."
         },
         "emission_provenance": {
           "anyOf": [

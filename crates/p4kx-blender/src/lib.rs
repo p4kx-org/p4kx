@@ -115,8 +115,9 @@ pub use manifest::{
 };
 pub use manifest_light::{Light, LightKind};
 pub use manifest_materials::{
-    AlphaMode, Element, MaterialDescription, MaterialLayer, MaterialLibrarySourceDescription,
-    MaterialStencil, MaterialTexture, Palette, PaletteColours, PaletteEntry, Parameter, TextureUse,
+    AlphaMode, AuthoredMaterialOrigin, Element, MaterialDescription, MaterialLayer,
+    MaterialLibrarySourceDescription, MaterialStencil, MaterialTexture, Palette, PaletteColours,
+    PaletteEntry, Parameter, TextureUse,
 };
 pub use manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
 pub use mesh_vertex_map_wire::mesh_vertex_map_schema;

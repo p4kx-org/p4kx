@@ -566,6 +566,14 @@ material with the shader `MeshDecal` (its stencil colours in `parameters`, the p
 `$TintPaletteDecal` in a slot), wear is `wear` textures, `WearTint`/`WearGloss` on layers and
 `Wear*` parameters.
 
+The optional `material_libraries[].authored_origin` companion describes the retained source.
+Its `field_origins` addresses values within the same library row, including
+`/authored` and its child declarations. The accompanying `provenance` resolves each
+`sourceUsesRefs` reference to the original library input. Original positions are
+logical XML or CryXml coordinates. Libraries without a verified physical binding
+carry an unknown encryption marker for their authored values. Material selection,
+rendered values and emission evidence have their own source relationships.
+
 ### Palettes
 
 `palettes` (1.1) lists each tint palette once. A mesh's `palette_id` references it. A palette has

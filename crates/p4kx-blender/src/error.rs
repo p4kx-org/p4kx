@@ -126,6 +126,9 @@ pub enum PackageError {
     /// Original DDS metadata or package field evidence could not be recorded.
     #[error("cannot record package texture metadata")]
     TextureEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original authored material source evidence could not be recorded.
+    #[error("cannot record package authored material source evidence")]
+    MaterialSourceEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
     /// Original physical inputs for an emitted material control could not be recorded.
     #[error("cannot record package material emission evidence")]
     MaterialEmissionEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
