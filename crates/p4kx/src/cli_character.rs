@@ -94,6 +94,9 @@ pub(crate) struct CharacterPackageArgs {
     /// Leaves the vertex colours out of the meshes.
     #[arg(long)]
     pub(crate) no_vertex_colours: bool,
+    /// Writes a source vertex map for the rigged GLB.
+    #[arg(long)]
+    pub(crate) vertex_maps: bool,
     /// Writes only the expression with this name as a morph target, as for `chf glb
     /// --expression`; repeat the option for more.
     #[arg(

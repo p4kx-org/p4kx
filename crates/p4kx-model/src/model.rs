@@ -139,6 +139,7 @@ pub struct Mesh {
     pub source: Vec<u32>,
     pub(crate) origin: Option<MeshOrigin>,
     pub(crate) index_width: Option<u32>,
+    pub(crate) original_vertex_order_changed: bool,
     /// The unit vertex normals: the stored ones, or the computed smooth ones when the mesh
     /// stores none, see [`Self::normals_computed`]. `None` only for a mesh without triangles.
     pub normals: Option<Vec<[f32; 3]>>,

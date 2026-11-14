@@ -10,7 +10,7 @@ use p4kx_gltf::{GlbOptions, GlbSummary, TextureLoader};
 use crate::build::assembly_issue;
 use crate::manifest::{CharacterSource, EntityRef, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
-use crate::rig_package::{RigPackageKind, RigScene, rig_manifest, write_rig_package};
+use crate::rig_package::{RigScene, rig_manifest, write_rig_package};
 use crate::{PackageInfo, PackageResult, PackageSummary};
 
 /// A Character ready to be written as a package: its [`Armour`] with the body, head and pieces it
@@ -110,14 +110,25 @@ pub fn write_character_package_with_context(
         character.name,
         options,
         context,
-        RigPackageKind::Character,
-        |options, writer, _| {
-            character.armour.write_glb_animated_with(
-                character.animations,
-                options,
-                textures,
-                writer,
-            )
+        |options, writer, map| {
+            if let Some(map) = map {
+                character.armour.write_glb_with_vertex_origins(
+                    character.animations,
+                    options,
+                    textures,
+                    writer,
+                    &mut |row, part| {
+                        map.observe(&row, part.model(), part.model_archive_sources(), context)
+                    },
+                )
+            } else {
+                character.armour.write_glb_animated_with(
+                    character.animations,
+                    options,
+                    textures,
+                    writer,
+                )
+            }
         },
         |written| manifest(character, info, options, written),
     )

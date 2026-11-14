@@ -27,6 +27,8 @@ use crate::support::{TestResult, fixture, names_in, never};
 
 #[path = "package_character_default_material.rs"]
 mod default_material;
+#[path = "package_character_vertex_map.rs"]
+mod vertex_map;
 use default_material::write;
 
 fn head_path() -> String {

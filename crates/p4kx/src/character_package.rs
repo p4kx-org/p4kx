@@ -65,6 +65,7 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
     let cancel = cancel_on_interrupt()?;
     let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     let context = PackageWriteContext::new(&protection, cancel.flag());
+
     check_output_with_context(&args.out, &context)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
@@ -175,13 +176,18 @@ fn store(
     context: &PackageWriteContext<'_>,
 ) -> Result<PackageSummary> {
     let info = PackageInfo::new(channel_name(archive.path()), build_info(archive)?);
+    let context = if args.vertex_maps {
+        context.with_vertex_maps()
+    } else {
+        *context
+    };
     Ok(write_character_package_with_context(
         scene,
         &models.textures(),
         &glb_options(args),
         &info,
         &args.out,
-        context,
+        &context,
     )?)
 }
 

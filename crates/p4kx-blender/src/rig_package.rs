@@ -119,12 +119,6 @@ impl<W: Write> Write for Stoppable<'_, W> {
 pub(crate) type RigWriter<'a, 'sink> =
     Stoppable<'a, OriginDigestWriter<&'sink mut BufWriter<File>>>;
 
-#[derive(Clone, Copy)]
-pub(crate) enum RigPackageKind {
-    Character,
-    Creature,
-}
-
 type OptionalMap<'a> = Option<&'a mut Writer>;
 
 /// Writes a package into the folder `out` whose only mesh, `meshes/m0001.glb`, `write_glb` writes
@@ -138,7 +132,7 @@ pub(crate) fn write_rig_package(
     name: &str,
     options: &GlbOptions,
     cancelled: &PackageWriteContext<'_>,
-    kind: RigPackageKind,
+
     write_glb: impl FnOnce(
         &GlbOptions,
         &mut RigWriter<'_, '_>,
@@ -152,7 +146,6 @@ pub(crate) fn write_rig_package(
         name,
         options,
         cancelled,
-        kind,
         write_glb,
         manifest_of,
     );
@@ -164,7 +157,7 @@ fn write_rig_files(
     name: &str,
     options: &GlbOptions,
     cancelled: &PackageWriteContext<'_>,
-    kind: RigPackageKind,
+
     write_glb: impl FnOnce(
         &GlbOptions,
         &mut RigWriter<'_, '_>,
@@ -178,7 +171,8 @@ fn write_rig_files(
     let path = staging.join(&relative);
     let map_name = format!("{id}.vertex-map.jsonl");
     let map_path = staging.join(MESHES_FOLDER).join(&map_name);
-    let mut map = (matches!(kind, RigPackageKind::Creature) && cancelled.vertex_maps)
+    let mut map = cancelled
+        .vertex_maps
         .then(|| Writer::new(&map_path, cancelled))
         .transpose()?;
     let (file, ownership) = cancelled.create_file(&path)?.into_parts();

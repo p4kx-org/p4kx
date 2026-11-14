@@ -63,7 +63,7 @@ impl<'a> PackageWriteContext<'a> {
         self
     }
 
-    /// Includes original vertex maps for the package's assembly or interior GLBs.
+    /// Includes original vertex mappings for the package's GLBs.
     #[must_use]
     pub const fn with_vertex_maps(mut self) -> Self {
         self.vertex_maps = true;

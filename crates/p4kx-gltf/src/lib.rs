@@ -91,7 +91,7 @@ pub use package_support::{
 };
 pub use rig::{
     RigPiece, write_rigged_glb, write_rigged_glb_animated, write_rigged_glb_animated_observed,
-    write_rigged_glb_animated_with, write_rigged_glb_with,
+    write_rigged_glb_animated_with, write_rigged_glb_with, write_rigged_glb_with_vertex_maps,
 };
 pub use rig_addresses::{RiggedBufferSource, RiggedBufferView, RiggedJsonAddress};
 pub use rig_animation::{RigAnimation, SampledAnimation, SampledBone, SampledWeights};

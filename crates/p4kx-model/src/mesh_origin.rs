@@ -76,13 +76,27 @@ impl MeshVertexOrigin {
 }
 
 impl crate::Mesh {
+    /// Returns whether the decoded ordering retains its original first-use index coordinates.
+    #[must_use]
+    pub const fn has_vertex_origin_order(&self) -> bool {
+        self.origin.is_some() && self.index_width.is_some() && !self.original_vertex_order_changed
+    }
+
+    /// Clears first-use coordinates when the authored index traversal changes.
+    pub const fn invalidate_vertex_origin_order(&mut self) {
+        self.original_vertex_order_changed = true;
+    }
+
     /// Returns first-use coordinates in emitted vertex order for a decoded IVO mesh.
     pub fn vertex_origins(&self) -> impl Iterator<Item = MeshVertexOrigin> + '_ {
         let mut next = 0_u32;
         self.submeshes
             .iter()
             .flat_map(move |submesh| {
-                let source = self.index_width.zip(submesh.origin);
+                let source = self
+                    .index_width
+                    .zip(submesh.origin)
+                    .filter(|_| !self.original_vertex_order_changed);
                 let indices = self.submesh_indices(submesh).unwrap_or_default();
                 indices
                     .iter()

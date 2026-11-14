@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::Write;
+use std::io::{self, Write};
 
 use gltf_json as json;
 use p4kx_model::{Bone, Influences};
@@ -12,6 +12,7 @@ use crate::animations::push_animations;
 use crate::glb::{GlbOptions, GlbSummary, MaterialMode, write_file};
 use crate::glb_plan::{summarise, texture_set};
 use crate::layout::{Layout, Rigging};
+use crate::mesh_vertex_map::{self, MeshVertexMap, ObserveMesh};
 use crate::rig_addresses::Addresses;
 use crate::rig_animation::RigAnimation;
 use crate::rig_emission::RiggedGlbEmission;
@@ -39,7 +40,15 @@ pub fn write_rigged_glb_animated_with<'m>(
     textures: &dyn TextureLoader,
     out: &mut impl Write,
 ) -> Result<GlbSummary, GltfError> {
-    write_rigged(skeleton, pieces, animations, options, textures, out, None)
+    write_rigged(
+        skeleton,
+        pieces,
+        animations,
+        options,
+        textures,
+        out,
+        Observation::None,
+    )
 }
 
 /// Writes the rigged GLB and returns which part geometry and material slots it used.
@@ -62,9 +71,39 @@ pub fn write_rigged_glb_animated_observed<'m>(
         options,
         textures,
         out,
-        Some(&mut emission),
+        Observation::Emission(&mut emission),
     )?;
     Ok((summary, emission))
+}
+
+/// Writes the rigged GLB and visits each emitted mesh with its source vertex mapping.
+///
+/// # Errors
+/// Returns the ordinary rigged write errors or an error from the visitor.
+pub fn write_rigged_glb_with_vertex_maps<'m>(
+    skeleton: &'m [Bone],
+    pieces: &'m [RigPiece<'m>],
+    animations: &[RigAnimation<'m>],
+    options: &GlbOptions,
+    textures: &dyn TextureLoader,
+    out: &mut impl Write,
+    visitor: &mut impl FnMut(MeshVertexMap<'_>) -> io::Result<()>,
+) -> Result<GlbSummary, GltfError> {
+    write_rigged(
+        skeleton,
+        pieces,
+        animations,
+        options,
+        textures,
+        out,
+        Observation::VertexMap(visitor),
+    )
+}
+
+enum Observation<'a> {
+    None,
+    Emission(&'a mut RiggedGlbEmission),
+    VertexMap(&'a mut ObserveMesh<'a>),
 }
 
 fn write_rigged<'m>(
@@ -74,7 +113,7 @@ fn write_rigged<'m>(
     options: &GlbOptions,
     textures: &dyn TextureLoader,
     out: &mut impl Write,
-    emission: Option<&mut RiggedGlbEmission>,
+    observe: Observation<'_>,
 ) -> Result<GlbSummary, GltfError> {
     let (instances, fallbacks) = instances_of(pieces, options);
     let binds = inverse_binds(skeleton);
@@ -108,9 +147,15 @@ fn write_rigged<'m>(
         push_animations(&mut root, buffer, &layout, &plans);
     }
     let total = write_file(&root, &layout, &images, out)?;
-    if let Some(emission) = emission {
-        let addresses = Addresses::of(&root, &layout, &instances, &materials, &plans, &total);
-        *emission = RiggedGlbEmission::of(&instances, &layout, &mut images, addresses);
+    match observe {
+        Observation::None => {}
+        Observation::Emission(emission) => {
+            let addresses = Addresses::of(&root, &layout, &instances, &materials, &plans, &total);
+            *emission = RiggedGlbEmission::of(&instances, &layout, &mut images, addresses);
+        }
+        Observation::VertexMap(visitor) => {
+            mesh_vertex_map::observe(&root, &layout, &instances, options.lod, visitor)?;
+        }
     }
     let defaulted = instances
         .iter()

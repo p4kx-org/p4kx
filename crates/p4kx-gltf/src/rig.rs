@@ -24,7 +24,10 @@ use crate::texture_plan::TextureSet;
 #[path = "rig_write.rs"]
 mod write;
 
-pub use write::{write_rigged_glb_animated_observed, write_rigged_glb_animated_with};
+pub use write::{
+    write_rigged_glb_animated_observed, write_rigged_glb_animated_with,
+    write_rigged_glb_with_vertex_maps,
+};
 
 /// A skinned model worn on a shared skeleton, with the material library it is drawn with.
 ///

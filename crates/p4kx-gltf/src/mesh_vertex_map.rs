@@ -110,9 +110,9 @@ pub(crate) fn observe(
             model_lod: lod.level,
             origin,
             mesh_source: source,
-            source_vertices: origin
-                .filter(|_| source.source.len() as u64 == accessor.count.0)
-                .map(|_| source.source.as_slice()),
+            source_vertices: (source.has_vertex_origin_order()
+                && source.source.len() as u64 == accessor.count.0)
+                .then_some(source.source.as_slice()),
         })?;
     }
     Ok(())

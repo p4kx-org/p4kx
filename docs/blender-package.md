@@ -807,12 +807,12 @@ material emission. Dynamic Entity links and shader-specific coverage controls su
 
 ### Source vertex maps
 
-Use `entity package --vertex-maps` or `interior package --vertex-maps` to include
+Use `--vertex-maps` with `entity package`, `interior package` or `character package` to include
 `meshes/mNNNN.vertex-map.jsonl` alongside each emitted GLB. In Rust, enable this
 option with `PackageWriteContext::with_vertex_maps`. The package declares each file
 as `mesh.vertex_map`, and `receipt.json` records its SHA-256. The package uses minor
-version 1.19 when it contains a map. A creature's single rigged GLB has one map with
-a row for each emitted mesh, linked to the part or attachment that supplied it.
+version 1.19 when it contains a map. A rigged GLB has one map with a row for each emitted mesh,
+linked to the Character part, creature part, or attachment that supplied it.
 When two instances share one GLB mesh, the source is the writer's first producer
 instance.
 
@@ -822,7 +822,10 @@ level, and the original geometry level and chunk when observed. A `vertex` row l
 output POSITION ordinal to its source-stream vertex ordinal. It includes original source
 uses for the first little-endian index word, its page base and the original submesh
 selectors. The GLB writer retains the POSITION order of the decoded mesh even when it
-omits individual material primitives.
+omits individual material primitives. DNA shaping can move Character vertices while keeping this
+ordinal mapping. The map positions identify original index words and establish the mapping.
+After clothing removes body zones, that mesh's first-use mapping is unknown. Its original
+geometry identity and emitted accessor still appear in the mesh row.
 
 A `mapping` of `unknown` records a GLB mesh without a proved IVO mapping. A mapping can be
 present when the source file's physical Archive identity is unavailable. In that case

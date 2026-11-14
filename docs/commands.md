@@ -307,7 +307,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   (`--body`, optional when the Loadout has a head), as one skinned GLB with the skeleton, the
   head's expressions as morph targets and the animations (`--anim`, `--anim-from`,
   `--anim-folder`), listed in `scene.json`; `--materials` and `--texture-mip` pick plain colours or
-  textures. A `--loadout` of a story character such as Miles Eckhart exports his outfit and his
+  textures. The optional `--vertex-maps` records the GLB's source-stream vertex ordinals.
+  A `--loadout` of a story character such as Miles Eckhart exports his outfit and his
   own head, hair and eyes; with `--chf` the CHF's head is kept instead. The Blender add-on imports
   it as an armature with shape keys and actions.
 - `p4kx interior glb <archive> <container>... --out <file>` exports the Interior of a socpak

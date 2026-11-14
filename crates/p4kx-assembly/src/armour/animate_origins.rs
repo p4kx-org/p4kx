@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::Write;
+use std::io::{self, Write};
 
 use p4kx_gltf::{
-    GlbOptions, GlbSummary, GltfError, RigAnimation, RiggedGlbEmission, TextureLoader,
-    write_rigged_glb_animated_observed,
+    GlbOptions, GlbSummary, GltfError, MeshVertexMap, RigAnimation, RiggedGlbEmission,
+    TextureLoader, write_rigged_glb_animated_observed, write_rigged_glb_with_vertex_maps,
 };
 
-use super::{Armour, CharacterAnimations, RigArchiveRead};
+use super::{Armour, ArmourPart, CharacterAnimations, RigArchiveRead};
 
 impl CharacterAnimations<'_> {
     /// Returns the original input positions of animations passed to the GLB writer, in its order.
@@ -36,6 +36,36 @@ impl CharacterAnimations<'_> {
 }
 
 impl Armour {
+    /// Writes the rigged GLB and visits output vertex mappings with their exact producing part.
+    ///
+    /// # Errors
+    /// Returns ordinary rigged write failures or an error from the visitor.
+    pub fn write_glb_with_vertex_origins(
+        &self,
+        animations: &CharacterAnimations<'_>,
+        options: &GlbOptions,
+        textures: &dyn TextureLoader,
+        out: &mut impl Write,
+        visitor: &mut impl FnMut(MeshVertexMap<'_>, &ArmourPart) -> io::Result<()>,
+    ) -> Result<GlbSummary, GltfError> {
+        let pieces = self.rig_pieces();
+        write_rigged_glb_with_vertex_maps(
+            &self.skeleton.bones,
+            &pieces,
+            &animations.rig_animations(),
+            options,
+            textures,
+            out,
+            &mut |map| {
+                let part = self
+                    .parts
+                    .get(map.part)
+                    .ok_or_else(|| io::Error::other("rigged mesh lost its producing part"))?;
+                visitor(map, part)
+            },
+        )
+    }
+
     /// Writes the rigged GLB with the emitted geometry and material slots of each part.
     ///
     /// # Errors

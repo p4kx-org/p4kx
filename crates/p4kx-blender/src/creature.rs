@@ -13,7 +13,7 @@ use crate::entity_classification::EntityClassifications;
 use crate::items::entity_ref;
 use crate::manifest::{Issue, IssueOrigin, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigPart, RigPartOrigin};
-use crate::rig_package::{RigPackageKind, RigScene, rig_manifest, write_rig_package};
+use crate::rig_package::{RigScene, rig_manifest, write_rig_package};
 use crate::{PackageInfo, PackageResult, PackageSummary, PackageWriteContext};
 
 /// Writes the creature `assembly` as a package: `meshes/m0001.glb` is the Assembly as
@@ -46,7 +46,6 @@ pub(crate) fn write_creature_package(
         name,
         &options,
         context,
-        RigPackageKind::Creature,
         |options, writer, map| {
             if let Some(map) = map {
                 assembly.write_glb_with_vertex_origins(

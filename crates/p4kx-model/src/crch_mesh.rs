@@ -129,6 +129,7 @@ fn bare_mesh(node: usize, positions: Vec<[f32; 3]>, indices: Vec<u32>) -> Mesh {
     Mesh {
         origin: None,
         index_width: None,
+        original_vertex_order_changed: false,
         node,
         source: (0..u32::try_from(positions.len()).unwrap_or(u32::MAX)).collect(),
         submeshes: vec![Submesh {
