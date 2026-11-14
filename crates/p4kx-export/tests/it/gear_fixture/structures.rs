@@ -115,7 +115,10 @@ fn weapons() -> Vec<TestStruct> {
         TestStruct::new("DamageBase"),
         singles("DamageInfo", &["DamagePhysical", "DamageEnergy"]).parent("DamageBase"),
         component("EntityComponentAttachableModifierParams")
-            .field("activationMethod", TestType::String)
+            .field(
+                "activationMethod",
+                TestType::Enum("EFixtureModifierActivation".to_owned()),
+            )
             .field("charges", TestType::Int32)
             .field("canInterrupt", TestType::Bool)
             .field("isInterruptible", TestType::Bool)
@@ -125,13 +128,13 @@ fn weapons() -> Vec<TestStruct> {
             .parent("ItemModifiersParams")
             .field("fireActionIndex", TestType::Int32)
             .field("modifierLifetime", pointer("ItemModifierTimedLife"))
-            .field("weaponModifier", pointer("SWeaponModifierParams")),
+            .field("weaponModifier", class("SWeaponModifierParams")),
         TestStruct::new("SWeaponModifierParams").field("weaponStats", class("SWeaponStats")),
         TestStruct::new("SWeaponStats")
             .field("fireRateMultiplier", TestType::Single)
             .field("damageMultiplier", TestType::Single)
-            .field("salvageModifier", pointer("SSalvageModifier"))
-            .field("tractorModifier", pointer("STractorModifier")),
+            .field("salvageModifier", class("SSalvageModifier"))
+            .field("tractorModifier", class("STractorModifier")),
     ]
 }
 
@@ -169,39 +172,36 @@ fn mining() -> Vec<TestStruct> {
             .field("throttleLerpSpeed", TestType::Single)
             .field("throttleMinimum", TestType::Single)
             .field("usesPowerThrottle", TestType::Bool)
-            .field("globalParams", TestType::Reference)
+            .field(
+                "globalParams",
+                TestType::ReferenceTo("MiningLaserGlobalParams".to_owned()),
+            )
             .field("miningLaserModifiers", class("MiningLaserModifiers"))
             .field("filterParams", class("MiningFilterParams")),
+        TestStruct::new("MiningLaserGlobalParams")
+            .field("throttleChangePerAction", TestType::Single)
+            .field("blockThrottleChangeWhenNotFiring", TestType::Bool),
         TestStruct::new("MiningLaserModifiers")
             .field("isOptimalRateGood", TestType::Bool)
-            .field("laserInstability", pointer("FloatModifierMultiplicative"))
-            .field(
-                "optimalChargeWindowSizeModifier",
-                pointer("FloatModifierMultiplicative"),
-            )
-            .field("resistanceModifier", pointer("FloatModifierMultiplicative"))
-            .field(
-                "shatterdamageModifier",
-                pointer("FloatModifierMultiplicative"),
-            )
-            .field(
-                "clusterFactorModifier",
-                pointer("FloatModifierMultiplicative"),
-            )
-            .field(
-                "optimalChargeWindowRateModifier",
-                pointer("FloatModifierMultiplicative"),
-            )
+            .field("laserInstability", pointer("FloatModifier"))
+            .field("optimalChargeWindowSizeModifier", pointer("FloatModifier"))
+            .field("resistanceModifier", pointer("FloatModifier"))
+            .field("shatterdamageModifier", pointer("FloatModifier"))
+            .field("clusterFactorModifier", pointer("FloatModifier"))
+            .field("optimalChargeWindowRateModifier", pointer("FloatModifier"))
             .field(
                 "catastrophicChargeWindowRateModifier",
-                pointer("FloatModifierMultiplicative"),
+                pointer("FloatModifier"),
             ),
-        singles("FloatModifierMultiplicative", &["value"]),
-        TestStruct::new("MiningFilterParams")
-            .field("filterModifier", pointer("FloatModifierMultiplicative")),
+        TestStruct::new("FloatModifier"),
+        singles("FloatModifierMultiplicative", &["value"]).parent("FloatModifier"),
+        TestStruct::new("MiningFilterParams").field("filterModifier", pointer("FloatModifier")),
         singles("ItemModifierTimedLife", &["lifetime"]),
         modifier("ItemMiningModifierParams", "MiningLaserModifier"),
         modifier("ItemMineableRockModifierParams", "MiningLaserModifier"),
+        TestStruct::new("ItemMiningBoosterParams")
+            .parent("ItemModifiersParams")
+            .field("powerLevelChange", TestType::Single),
         TestStruct::new("MiningFilterItemModifierParams")
             .parent("ItemModifiersParams")
             .field("modifierLifetime", pointer("ItemModifierTimedLife"))
@@ -216,19 +216,25 @@ pub(super) fn database() -> DataForgeBuilder {
         .chain(multipliers())
         .chain(mining())
         .fold(
-            DataForgeBuilder::new().version(8).enumeration(
-                "EItemType",
-                [
-                    "Char_Armor_Torso",
-                    "Char_Clothing_Hat",
-                    "Radar",
-                    "TractorBeam",
-                    "SalvageModifier",
-                    "WeaponGun",
-                    "WeaponMining",
-                    "MiningModifier",
-                ],
-            ),
+            DataForgeBuilder::new()
+                .version(8)
+                .enumeration(
+                    "EFixtureModifierActivation",
+                    ["ActivateOnAttach", "ActivateOnDemand"],
+                )
+                .enumeration(
+                    "EItemType",
+                    [
+                        "Char_Armor_Torso",
+                        "Char_Clothing_Hat",
+                        "Radar",
+                        "TractorBeam",
+                        "SalvageModifier",
+                        "WeaponGun",
+                        "WeaponMining",
+                        "MiningModifier",
+                    ],
+                ),
             DataForgeBuilder::structure,
         )
 }

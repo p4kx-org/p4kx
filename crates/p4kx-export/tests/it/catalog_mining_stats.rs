@@ -3,12 +3,17 @@
 
 //! The mining laser, module and gadget stat blocks of the P4KX catalog.
 
+#[path = "catalog_mining_configurations.rs"]
+mod configurations;
+
 use crate::gear_fixture;
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use gear_fixture::{ARMOR, GADGET, LASER, LASER_RANGE, LASER_TWIN, MODULE, MODULE_INSTABILITY};
+use gear_fixture::{
+    ARMOR, GADGET, GLOBALS, LASER, LASER_RANGE, LASER_TWIN, MODULE, MODULE_INSTABILITY,
+};
 use p4kx_export::{CatalogOptions, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
@@ -69,7 +74,7 @@ fn a_laser_carries_its_throttle_and_modifiers_as_stored() -> TestResult {
             "throttleLerpSpeed": 7.0,
             "throttleMinimum": 0.2,
             "usesPowerThrottle": false,
-            "globalParamsGuid": "20000000-0000-4000-8000-000000000001",
+            "globalParamsGuid": guid_text(GLOBALS),
             "modifiers": {
                 "instability": 35.0,
                 "optimalChargeWindowSize": 40.0,

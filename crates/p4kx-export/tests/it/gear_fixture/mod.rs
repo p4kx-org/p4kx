@@ -15,7 +15,9 @@ use p4kx_testkit::{
     TestValue,
 };
 
-pub(crate) use mining::{GADGET, LASER, LASER_RANGE, LASER_TWIN, MODULE, MODULE_INSTABILITY};
+pub(crate) use mining::{
+    GADGET, GLOBALS, LASER, LASER_RANGE, LASER_TWIN, MODULE, MODULE_INSTABILITY,
+};
 use structures::database;
 
 pub(crate) const ARMOR: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0001;
@@ -263,10 +265,10 @@ fn beam() -> TestValue {
     )
 }
 
-fn modifiers(salvage: bool) -> TestValue {
-    let mut stats = vec![single("fireRateMultiplier", 1.0)];
-    if salvage {
-        stats.push((
+fn weapon_modifier() -> TestValue {
+    let stats = vec![
+        single("fireRateMultiplier", 1.0),
+        (
             "salvageModifier".to_owned(),
             singles_of(
                 "SSalvageModifier",
@@ -276,8 +278,8 @@ fn modifiers(salvage: bool) -> TestValue {
                     ("extractionEfficiency", 0.9),
                 ],
             ),
-        ));
-        stats.push((
+        ),
+        (
             "tractorModifier".to_owned(),
             singles_of(
                 "STractorModifier",
@@ -288,8 +290,8 @@ fn modifiers(salvage: bool) -> TestValue {
                     ("maxVolumeMultiplier", 1.0),
                 ],
             ),
-        ));
-    }
+        ),
+    ];
     instance(
         "EntityComponentAttachableModifierParams",
         vec![(
@@ -333,13 +335,16 @@ fn records() -> Vec<TestRecord> {
             SALVAGE_MODIFIER,
             "salvage_modifier",
             "SalvageModifier",
-            vec![modifiers(true)],
+            vec![weapon_modifier()],
         ),
         entity(
             PLAIN_MODIFIER,
             "plain_modifier",
             "SalvageModifier",
-            vec![modifiers(false)],
+            vec![instance(
+                "EntityComponentAttachableModifierParams",
+                Vec::new(),
+            )],
         ),
     ];
     records.extend(mining::records());

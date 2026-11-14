@@ -1872,6 +1872,91 @@
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
+    "AttachableEffect": {
+      "description": "The concrete authored effect of one attachable modifier slot.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "miningLaser",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/MiningEffect2"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "mineableRock",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/MiningEffect2"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "miningFilter",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/FilterEffect2"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "weapon",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/WeaponEffect"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "authored",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/UnitSource"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "AttachableEntity": {
       "properties": {
         "entityClassName": {
@@ -1888,6 +1973,54 @@
         "entityClassName",
         "sourcePort",
         "targetPort"
+      ],
+      "type": "object"
+    },
+    "AttachableModifier": {
+      "description": "One original attachable modifier component and its ordered effect slots.",
+      "properties": {
+        "activationMethod": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "canInterrupt": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "charges": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "isInterruptible": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "modifiers": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfAttachableEffect"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "activationMethod",
+        "additionalFields",
+        "canInterrupt",
+        "charges",
+        "componentOrdinal",
+        "isInterruptible",
+        "modifiers",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -4703,6 +4836,9 @@
         "ammoContainers": {
           "$ref": "#/$defs/CatalogTableOfAmmoContainer"
         },
+        "attachableModifiers": {
+          "$ref": "#/$defs/CatalogTableOfAttachableModifier"
+        },
         "blueprintTiers": {
           "$ref": "#/$defs/CatalogTableOfBlueprintTier"
         },
@@ -4805,6 +4941,9 @@
         "lootGeneration": {
           "$ref": "#/$defs/CatalogTableOfLootGenerationComponent"
         },
+        "miningLasers": {
+          "$ref": "#/$defs/CatalogTableOfMiningLaser"
+        },
         "missileConfigurations": {
           "$ref": "#/$defs/CatalogTableOfMissileConfiguration"
         },
@@ -4862,6 +5001,7 @@
       },
       "required": [
         "ammoContainers",
+        "attachableModifiers",
         "blueprintTiers",
         "clothing",
         "consumables",
@@ -4896,6 +5036,7 @@
         "jumpTunnelForces",
         "localContractGenerators",
         "lootGeneration",
+        "miningLasers",
         "missileConfigurations",
         "missionBoards",
         "missionBrokerEntries",
@@ -5097,6 +5238,9 @@
         "medicalItemTierConfigs": {
           "$ref": "#/$defs/CatalogTableOfMedicalItemTierConfig"
         },
+        "miningLaserGlobals": {
+          "$ref": "#/$defs/CatalogTableOfMiningLaserGlobalDefinition"
+        },
         "missionBrokerEntries": {
           "$ref": "#/$defs/CatalogTableOfBrokerDefinition"
         },
@@ -5244,6 +5388,7 @@
         "lootThemes",
         "manufacturers",
         "medicalItemTierConfigs",
+        "miningLaserGlobals",
         "missionBrokerEntries",
         "missionItems",
         "missionModuleDeclarations",
@@ -5535,6 +5680,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/AmmoDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfAttachableModifier": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/AttachableModifier"
           },
           "type": "array"
         }
@@ -7017,6 +7181,44 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/MedicalItemTierConfig"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfMiningLaser": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/MiningLaser"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfMiningLaserGlobalDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/MiningLaserGlobalDefinition"
           },
           "type": "array"
         }
@@ -16361,6 +16563,30 @@
       ],
       "type": "object"
     },
+    "FilterEffect2": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "filterParams": {
+          "$ref": "#/$defs/SourcedValueOfMiningFilter"
+        },
+        "modifierLifetime": {
+          "$ref": "#/$defs/SourcedValueOfModifierLifetime"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "filterParams",
+        "modifierLifetime",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "FireAction": {
       "description": "One fire mode of a weapon.",
       "properties": {
@@ -16769,6 +16995,26 @@
         "retractTransformInteraction",
         "sourceType",
         "vehicleHudParamsOverride"
+      ],
+      "type": "object"
+    },
+    "FloatModifier": {
+      "description": "The exact nominal `FloatModifier` variant and its authored fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "value": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "sourceType",
+        "value"
       ],
       "type": "object"
     },
@@ -28217,6 +28463,50 @@
       ],
       "type": "object"
     },
+    "MiningEffect2": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "miningLaserModifier": {
+          "$ref": "#/$defs/SourcedValueOfMiningModifiers"
+        },
+        "modifierLifetime": {
+          "$ref": "#/$defs/SourcedValueOfModifierLifetime"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "miningLaserModifier",
+        "modifierLifetime",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "MiningFilter": {
+      "description": "The original mining filter and its authored float modifier.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "filterModifier": {
+          "$ref": "#/$defs/SourcedValueOfFloatModifier"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "filterModifier",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "MiningGlobalParams": {
       "description": "The mining parameters of one kind of miner: a `MiningGlobalParams` Record under `mining`. Each\nnumber is that of the Record, unchanged, and `null` when the Record states none. The effects,\nsounds and the default explosion of the Record are not exported.",
       "properties": {
@@ -28501,6 +28791,110 @@
       ],
       "type": "object"
     },
+    "MiningLaser": {
+      "description": "Original throttle, filtering and modifiers on one physical mining laser component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "filterParams": {
+          "$ref": "#/$defs/SourcedValueOfMiningFilter"
+        },
+        "globalParams": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "miningLaserModifiers": {
+          "$ref": "#/$defs/SourcedValueOfMiningModifiers"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "throttleLerpSpeed": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "throttleMinimum": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "usesPowerThrottle": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "componentOrdinal",
+        "filterParams",
+        "globalParams",
+        "miningLaserModifiers",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType",
+        "throttleLerpSpeed",
+        "throttleMinimum",
+        "usesPowerThrottle"
+      ],
+      "type": "object"
+    },
+    "MiningLaserGlobalDefinition": {
+      "description": "One physical global configuration addressed by a mining laser's authored Reference.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "blockThrottleChangeWhenNotFiring": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "mineableGlowStrengthRtpc": {
+          "$ref": "#/$defs/SourcedValueOfRtpc"
+        },
+        "mineableOptimalBreakZoneRtpc": {
+          "$ref": "#/$defs/SourcedValueOfRtpc"
+        },
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
+        },
+        "throttleAccFactor": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "throttleAccPeriod": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "throttleChangePerAction": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "throttleHoldAccFactor": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "throttleResetOnStopFire": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "throttleRtpc": {
+          "$ref": "#/$defs/SourcedValueOfRtpc"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "blockThrottleChangeWhenNotFiring",
+        "mineableGlowStrengthRtpc",
+        "mineableOptimalBreakZoneRtpc",
+        "source",
+        "throttleAccFactor",
+        "throttleAccPeriod",
+        "throttleChangePerAction",
+        "throttleHoldAccFactor",
+        "throttleResetOnStopFire",
+        "throttleRtpc"
+      ],
+      "type": "object"
+    },
     "MiningLaserStats": {
       "description": "A mining laser, raw facts of `SEntityComponentMiningLaserParams` (ADR-0262).\n\nThe beams are fire modes of `weapon.fireActions`: their `hitType`, `fullDamageRange`,\n`zeroDamageRange` and `damagePerSecond`.",
       "properties": {
@@ -28729,6 +29123,54 @@
         "optimalChargeWindowSize",
         "resistance",
         "shatterDamage"
+      ],
+      "type": "object"
+    },
+    "MiningModifiers": {
+      "description": "The authored float modifiers used by a mining laser or attachable modifier.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "catastrophicChargeWindowRateModifier": {
+          "$ref": "#/$defs/SourcedValueOfFloatModifier"
+        },
+        "clusterFactorModifier": {
+          "$ref": "#/$defs/SourcedValueOfFloatModifier"
+        },
+        "isOptimalRateGood": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "laserInstability": {
+          "$ref": "#/$defs/SourcedValueOfFloatModifier"
+        },
+        "optimalChargeWindowRateModifier": {
+          "$ref": "#/$defs/SourcedValueOfFloatModifier"
+        },
+        "optimalChargeWindowSizeModifier": {
+          "$ref": "#/$defs/SourcedValueOfFloatModifier"
+        },
+        "resistanceModifier": {
+          "$ref": "#/$defs/SourcedValueOfFloatModifier"
+        },
+        "shatterdamageModifier": {
+          "$ref": "#/$defs/SourcedValueOfFloatModifier"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "catastrophicChargeWindowRateModifier",
+        "clusterFactorModifier",
+        "isOptimalRateGood",
+        "laserInstability",
+        "optimalChargeWindowRateModifier",
+        "optimalChargeWindowSizeModifier",
+        "resistanceModifier",
+        "shatterdamageModifier",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -30097,6 +30539,26 @@
       "required": [
         "modifierType",
         "value"
+      ],
+      "type": "object"
+    },
+    "ModifierLifetime": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "lifetime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "lifetime",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -39543,6 +40005,34 @@
       ],
       "type": "object"
     },
+    "SalvageModifier2": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "extractionEfficiency": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "radiusMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "salvageSpeedMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "extractionEfficiency",
+        "radiusMultiplier",
+        "salvageSpeedMultiplier",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "SandboxTrigger": {
       "description": "An authored sandbox trigger occurrence.",
       "oneOf": [
@@ -48251,6 +48741,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfAnimatedPrimeState"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfAttachableEffect": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfAttachableEffect"
                 },
                 "type": "array"
               }
@@ -64532,6 +65155,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfAttachableEffect": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AttachableEffect"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfAttachableEntity": {
       "allOf": [
         {
@@ -74896,6 +75649,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/Flight"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfFloatModifier": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/FloatModifier"
               }
             }
           }
@@ -90015,6 +90898,266 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfMiningFilter": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MiningFilter"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfMiningModifiers": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MiningModifiers"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfMissileAxes": {
       "allOf": [
         {
@@ -91669,6 +92812,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ModifierEntry"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfModifierLifetime": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ModifierLifetime"
               }
             }
           }
@@ -108285,6 +109558,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfSalvageModifier": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SalvageModifier2"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfSandboxTrigger": {
       "allOf": [
         {
@@ -115955,6 +117358,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfTractorModifier": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/TractorModifier2"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfTunnelTinting": {
       "allOf": [
         {
@@ -116829,6 +118362,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/WeaponModifier"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfWeaponModifier2": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/WeaponModifier2"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfWeaponModifierStats": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/WeaponModifierStats2"
               }
             }
           }
@@ -121972,6 +123765,38 @@
       ],
       "type": "object"
     },
+    "TractorModifier2": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "forceMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "fullStrengthDistMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxDistMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxVolumeMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "forceMultiplier",
+        "fullStrengthDistMultiplier",
+        "maxDistMultiplier",
+        "maxVolumeMultiplier",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "TriggerMeaning": {
       "description": "A trigger's selections into the same original owner arena.",
       "properties": {
@@ -122722,6 +124547,34 @@
       ],
       "type": "object"
     },
+    "WeaponEffect": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "fireActionIndex": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "modifierLifetime": {
+          "$ref": "#/$defs/SourcedValueOfModifierLifetime"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "weaponModifier": {
+          "$ref": "#/$defs/SourcedValueOfWeaponModifier2"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "fireActionIndex",
+        "modifierLifetime",
+        "sourceType",
+        "weaponModifier"
+      ],
+      "type": "object"
+    },
     "WeaponLauncher": {
       "description": "The original launcher alternative and its authored settings.",
       "oneOf": [
@@ -122983,6 +124836,26 @@
       ],
       "type": "object"
     },
+    "WeaponModifier2": {
+      "description": "Original weapon changes carried by one attachable modifier.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "weaponStats": {
+          "$ref": "#/$defs/SourcedValueOfWeaponModifierStats"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "sourceType",
+        "weaponStats"
+      ],
+      "type": "object"
+    },
     "WeaponModifierStats": {
       "description": "The tractor and salvage multipliers an attachment applies, from the `weaponStats` of its\n`EntityComponentAttachableModifierParams`.",
       "properties": {
@@ -123012,6 +124885,34 @@
       "required": [
         "salvage",
         "tractor"
+      ],
+      "type": "object"
+    },
+    "WeaponModifierStats2": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "damageMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "salvageModifier": {
+          "$ref": "#/$defs/SourcedValueOfSalvageModifier"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "tractorModifier": {
+          "$ref": "#/$defs/SourcedValueOfTractorModifier"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "damageMultiplier",
+        "salvageModifier",
+        "sourceType",
+        "tractorModifier"
       ],
       "type": "object"
     },

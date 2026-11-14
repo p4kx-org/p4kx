@@ -45,6 +45,8 @@ mod jump_point;
 mod jump_point_globals;
 #[path = "loot_generation_component.rs"]
 mod loot_generation_component;
+#[path = "mining_configuration_tables.rs"]
+mod mining_configurations;
 #[path = "worn_gear_tables.rs"]
 mod worn_gear;
 pub(crate) use consumables::ConsumableDefinitions;
@@ -54,6 +56,8 @@ use flight_configuration_tables::FlightConfigurationTables;
 use hackable_configuration::HackableConfiguration;
 use jump_point::JumpPointConfiguration;
 use jump_point_globals::GlobalJumpConfiguration;
+use mining_configurations::MiningConfigurationTables;
+pub(crate) use mining_configurations::MiningLaserGlobalDefinition;
 pub(crate) use worn_gear::DamageResistanceMacro;
 use worn_gear::WornGearTables;
 
@@ -81,6 +85,8 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     worn_gear: WornGearTables<'source>,
     #[serde(flatten)]
     consumables: ConsumableConfigurations<'source>,
+    #[serde(flatten)]
+    mining_configurations: MiningConfigurationTables<'source>,
 }
 
 pub(crate) struct IndependentConfigurations<'source> {
@@ -90,6 +96,7 @@ pub(crate) struct IndependentConfigurations<'source> {
     pub(crate) weapon_procedural: WeaponProceduralTables<'source>,
     pub(crate) damage_resistance_macros: CatalogTable<DamageResistanceMacro<'source>>,
     pub(crate) consumable_definitions: ConsumableDefinitions<'source>,
+    pub(crate) mining_laser_globals: CatalogTable<MiningLaserGlobalDefinition<'source>>,
     pub(crate) recovery_numbers: Vec<CapturedNumber>,
     pub(crate) configuration_numbers: Vec<CapturedNumber>,
 }
@@ -102,16 +109,7 @@ pub(crate) fn read<'source>(
     collected: &mut Collected<'source>,
     jump_owners: &HashSet<u32>,
 ) -> Result<IndependentConfigurations<'source>, CatalogError> {
-    let Recovery {
-        economy: item_recovery_economy,
-        overrides: item_recovery_overrides,
-        policy: item_recovery_policy,
-        numbers: recovery_numbers,
-        failures,
-        ledger,
-    } = recovery::read_recovery(forge, projection, options.filter, options.cancel)?;
-    collected.ledger.merge(ledger);
-    collected.add_failures(failures);
+    let (recovery, recovery_numbers) = read_recovery(forge, projection, options, collected)?;
     let (game_mode, mut configuration_numbers) =
         read_game_mode(forge, projection, options, collected)?;
     let mut components = PhysicalComponents {
@@ -134,11 +132,13 @@ pub(crate) fn read<'source>(
     let worn_gear = WornGearTables::read(&mut components)?;
     let damage_resistance_macros = worn_gear.resistance_macros(&mut components)?;
     let consumables = ConsumableTables::read(&mut components)?;
+    let mining_configurations = MiningConfigurationTables::read(&mut components)?;
+    let mining_laser_globals = mining_configurations.globals(&mut components)?;
     Ok(IndependentConfigurations {
         tables: IndependentConfigurationTables {
-            item_recovery_economy,
-            item_recovery_overrides,
-            item_recovery_policy,
+            item_recovery_economy: recovery.economy,
+            item_recovery_overrides: recovery.overrides,
+            item_recovery_policy: recovery.policy,
             resource_network_parameters: game_mode.resource_network_parameters,
             radar_options: game_mode.radar_options,
             mission_boards,
@@ -151,14 +151,48 @@ pub(crate) fn read<'source>(
             global_jump_point_configurations: jump_points.global,
             worn_gear,
             consumables: consumables.configurations,
+            mining_configurations,
         },
         weapon_action_recoil_definitions,
         damage_resistance_macros,
         consumable_definitions: consumables.definitions,
+        mining_laser_globals,
         weapon_procedural,
         recovery_numbers,
         configuration_numbers,
     })
+}
+
+struct RecoveryTables<'source> {
+    economy: CatalogTable<ItemRecoveryEconomy<'source>>,
+    overrides: CatalogTable<ItemRecoveryOverrides>,
+    policy: CatalogTable<ItemRecoveryPolicy<'source>>,
+}
+
+fn read_recovery<'source>(
+    forge: &'source DataForge<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    options: &CatalogOptions<'_>,
+    collected: &mut Collected<'source>,
+) -> Result<(RecoveryTables<'source>, Vec<CapturedNumber>), CatalogError> {
+    let Recovery {
+        economy,
+        overrides,
+        policy,
+        numbers,
+        failures,
+        ledger,
+    } = recovery::read_recovery(forge, projection, options.filter, options.cancel)?;
+    collected.ledger.merge(ledger);
+    collected.add_failures(failures);
+    Ok((
+        RecoveryTables {
+            economy,
+            overrides,
+            policy,
+        },
+        numbers,
+    ))
 }
 
 struct GameModeTables<'source> {

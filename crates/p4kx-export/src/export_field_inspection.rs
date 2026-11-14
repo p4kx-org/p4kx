@@ -38,6 +38,9 @@ pub(crate) enum ConfigurationInspection {
     DamageResistanceMacro,
     ConsumableComponent,
     ConsumableDefinition,
+    MiningLaser,
+    MiningLaserGlobal,
+    AttachableModifier,
 }
 
 /// Inspection of the canonical values relevant to one source scope.

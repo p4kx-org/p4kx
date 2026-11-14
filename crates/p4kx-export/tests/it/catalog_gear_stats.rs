@@ -156,7 +156,22 @@ fn a_salvage_modifier_carries_its_multipliers() -> TestResult {
 
 #[test]
 fn an_attachment_without_salvage_or_tractor_modifier_has_no_stats() -> TestResult {
-    assert!(stats(&catalog()?, PLAIN_MODIFIER)?.is_null());
+    let catalog = catalog()?;
+    assert!(stats(&catalog, PLAIN_MODIFIER)?.is_null());
+    let guid = crate::commodity_v3_fixture::guid(PLAIN_MODIFIER);
+    let rows = crate::health_origin_assertions::rows(
+        &catalog,
+        "/configurations/attachableModifiers/rows",
+    )?;
+    let row = rows
+        .iter()
+        .find(|row| row.pointer("/ownerGuid/value").and_then(Value::as_str) == Some(guid.as_str()))
+        .ok_or("authored attachment component")?;
+    assert_eq!(
+        row.pointer("/modifiers/value"),
+        Some(&json!([])),
+        "the authored empty modifier array survives independent of specialist stats",
+    );
     Ok(())
 }
 

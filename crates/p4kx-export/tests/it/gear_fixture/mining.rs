@@ -5,7 +5,7 @@
 
 use p4kx_testkit::{TestRecord, TestValue};
 
-use super::{RESISTANCE, entity, instance, single, singles_of};
+use super::{entity, instance, single, singles_of};
 
 pub(crate) const LASER: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0010;
 pub(crate) const MODULE: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0011;
@@ -16,8 +16,7 @@ pub(crate) const LASER_TWIN: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0013;
 pub(crate) const LASER_RANGE: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0014;
 /// A module that differs from `MODULE` only in the laser instability it applies.
 pub(crate) const MODULE_INSTABILITY: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0015;
-/// The Record the laser's `globalParams` links to; any Record of the fixture serves.
-pub(crate) const GLOBALS: u128 = RESISTANCE;
+pub(crate) const GLOBALS: u128 = 0x2000_0000_0000_4000_8000_0000_0000_0002;
 
 const MODIFIERS: [&str; 7] = [
     "laserInstability",
@@ -174,6 +173,7 @@ fn module(instability: f32) -> TestValue {
                     ("filterParams".to_owned(), filter(None)),
                 ],
             ),
+            singles_of("ItemMiningBoosterParams", &[("powerLevelChange", 2.0)]),
         ],
     )
 }
@@ -222,5 +222,13 @@ pub(super) fn records() -> Vec<TestRecord> {
             vec![module(-12.0)],
         ),
         entity(GADGET, "mining_gadget", "MiningModifier", vec![gadget()]),
+        TestRecord::new(
+            GLOBALS,
+            "MiningLaserGlobalParams",
+            "MiningLaserGlobalParams.Test",
+            "libs/foundry/records/mining/test_laser_globals.xml",
+        )
+        .value("throttleChangePerAction", TestValue::Single(0.25))
+        .value("blockThrottleChangeWhenNotFiring", TestValue::Bool(true)),
     ]
 }

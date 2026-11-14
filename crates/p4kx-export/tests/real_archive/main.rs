@@ -75,6 +75,7 @@ mod real_archive_loot;
 mod real_archive_loot_generation_components;
 mod real_archive_loot_source_shapes;
 mod real_archive_mining;
+mod real_archive_mining_configurations;
 mod real_archive_mining_stats;
 mod real_archive_missile_configuration;
 mod real_archive_mission_boards;
