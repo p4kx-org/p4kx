@@ -28,6 +28,7 @@ pub(super) enum GraphRole {
     LayerBlend,
     SubDatabases,
     SubDatabase,
+    SubDatabaseFragment,
     BlendSpace,
     CombinedSpace,
     Dimensions,
@@ -85,6 +86,7 @@ impl GraphRole {
             (Self::ProceduralLayer, "Procedural") => Self::Procedural,
             (Self::AnimationLayer | Self::ProceduralLayer, "Blend") => Self::LayerBlend,
             (Self::SubDatabases, "SubADB") => Self::SubDatabase,
+            (Self::SubDatabase, "FragmentID") => Self::SubDatabaseFragment,
             _ => return None,
         })
     }

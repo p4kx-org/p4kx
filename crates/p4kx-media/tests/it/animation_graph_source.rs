@@ -20,7 +20,11 @@ fn mannequin_roles_retain_original_alternatives_transitions_and_attributes() -> 
       <FragmentBlendList><Blend from="A" to="B"><OptionA selectTime="0.1">
         <Fragment TransitionTags="B"><AnimLayer><Blend StartTime="-1"/></AnimLayer></Fragment>
       </OptionA></Blend></FragmentBlendList>
-      <SubADBs><SubADB File="Animations/graph.adb" Tags="A"/></SubADBs>
+      <SubADBs><SubADB File="Animations/graph.adb" Tags="A">
+        <FragmentID Name="FixtureGroup"/><FragmentID Name="Other"/>
+        <FragmentID Name="FixtureGroup"/><FragmentID Name=""/>
+        <fixture:FragmentID Name="foreign"/><FragmentID/>
+      </SubADB></SubADBs>
     </AnimDB>"#;
     let rows = export([TestEntry::stored("Data/Animations/graph.adb", bytes)])?;
     assert_eq!(
@@ -35,6 +39,12 @@ fn mannequin_roles_retain_original_alternatives_transitions_and_attributes() -> 
     );
     assert_eq!(fields(&rows, "duration"), ["0.10"], "original precision");
     assert_eq!(fields(&rows, "from"), ["A"], "transition selector");
+    assert_eq!(
+        fields(&rows, "name"),
+        ["FixtureGroup", "Other", "FixtureGroup", ""],
+        "fragment selectors preserve spelling, repetition and an explicit empty name"
+    );
+    assert_sub_database_fragments(&rows)?;
     assert_eq!(fields(&rows, "start-time"), ["-1"], "no timing conversion");
     assert_eq!(
         fields(&rows, "unknown"),
@@ -56,6 +66,47 @@ fn mannequin_roles_retain_original_alternatives_transitions_and_attributes() -> 
             .and_then(Value::as_str)
             == Some("opacity")),
         "arbitrary procedural subtree remains in the raw ordered row stream"
+    );
+    Ok(())
+}
+
+fn assert_sub_database_fragments(rows: &[MediaRecord]) -> TestResult {
+    let parent = role(rows, "sub-database").ok_or("SubADB row")?;
+    let ordinal = parent
+        .subresource
+        .indices
+        .first()
+        .ok_or("SubADB source identity")?
+        .to_string();
+    let selectors: Vec<_> = rows
+        .iter()
+        .filter(|row| {
+            row.data.pointer("/payload/role").and_then(Value::as_str)
+                == Some("sub-database-fragment")
+        })
+        .collect();
+    assert_eq!(selectors.len(), 5, "an absent Name still has an owned node");
+    assert!(selectors.iter().all(|selector| {
+        selector
+            .data
+            .pointer("/payload/location/parent")
+            .and_then(Value::as_str)
+            == Some(ordinal.as_str())
+    }));
+    let named = rows
+        .iter()
+        .find(|row| row.data.pointer("/payload/field").and_then(Value::as_str) == Some("name"))
+        .ok_or("sourced selector Name")?;
+    assert_eq!(
+        named.subresource.indices.first(),
+        selectors[0].subresource.indices.first()
+    );
+    assert_eq!(
+        named
+            .data
+            .pointer("/payload/declaration/value")
+            .and_then(Value::as_str),
+        Some("FixtureGroup")
     );
     Ok(())
 }

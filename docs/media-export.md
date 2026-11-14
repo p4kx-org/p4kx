@@ -659,7 +659,11 @@ nodes and parent links. Duplicate names and attribute occurrences retain
 their positions. Attribute roles describe known declarations and preserve the
 original values. Unknown procedural subtrees remain in the ordered XML
 stream. Alias names remain declarations until a separately observed reference
-establishes a target.
+establishes a target. Direct `SubADB/FragmentID` children have the
+`sub-database-fragment` role and each authored `Name` has the `name` field
+role. Follow the source parent ordinal to the owning `SubADB`. Repeated
+declarations and an empty `Name` remain visible. An element with an absent
+`Name` still has a node row.
 
 Mannequin SubADB edges join a direct `AnimDB/SubADBs/SubADB` declaration with
 a unique selected, readable database in the same owning archive. The closing

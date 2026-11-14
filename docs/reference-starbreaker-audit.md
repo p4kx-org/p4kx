@@ -458,3 +458,45 @@ producer identities for [#1104](https://github.com/p4kx-org/p4kx/issues/1104).
   manifest under [#1104](https://github.com/p4kx-org/p4kx/issues/1104).
   [Upstream DataForge command](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/cli/src/dcb.rs)
   · [Reference procedure](differential-verification.md)
+
+### Follow-up on the merged implementation
+
+The Mannequin Media graph now exposes direct `SubADB/FragmentID` children as
+`sub-database-fragment` nodes and their authored `Name` attributes as `name`
+fields. The parent and declaration coordinates preserve repeated, missing and
+empty selectors. The synthetic fixture distinguishes these declarations from
+fragment names in other scopes. [#1095](https://github.com/p4kx-org/p4kx/issues/1095)
+owns definition scope and target candidates. [#1131](https://github.com/p4kx-org/p4kx/issues/1131)
+owns their consumption by Player source export and preserves alternatives when
+the same database is reached through different selector branches.
+[StarBreaker branch traversal](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/character/player/motion.rs#L70-L110)
+· [Media regression fixture](../crates/p4kx-media/tests/it/animation_graph_source.rs).
+
+StarBreaker searches for a DataForge controller on the same normalized CGA
+path when an interior object has no controller. It compares candidate ADB
+and controller paths. P4KX already preserves controllers reached through a
+SOC entity's explicit class GUID. A geometry match is weaker evidence. For
+geometry-only placements, collect every exact archive-qualified candidate
+and retain its source class and component. Keep candidate and verified
+binding distinct, with explicit missing and ambiguous states. [#1093](https://github.com/p4kx-org/p4kx/issues/1093)
+owns rig and clip inventory. [#1095](https://github.com/p4kx-org/p4kx/issues/1095)
+owns controller and definition edges. Test an explicit class alongside one
+matching geometry candidate, two conflicting candidates, and repeated
+placements. Use installed source evidence before claiming a controller
+belongs to the geometry-only placement.
+[StarBreaker controller lookup](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/pipeline/animation_sources.rs#L209-L272)
+· [P4KX SOC class fields](../crates/p4kx-blender/src/soc_scene_class_components.rs).
+
+Both tools normalize the source palette glossiness byte once. A different
+consumer choice remains with a sampled gloss map or packed normal alpha.
+P4KX Blender scales that sample by the layer's `GlossMult`, and the
+palette factor supplies the textureless constant. StarBreaker connects the
+sample and palette factor as separate inputs to its layer shader. Use a
+constant texture, explicit palette bytes 0, 1, 128 and 255, and an authored
+multiplier to compare both P4KX GLB and Blender paths under
+[#1133](https://github.com/p4kx-org/p4kx/issues/1133). The test can establish
+consumer arithmetic. Actual shader applicability and operation order
+require independent source evidence before changing the projection.
+[StarBreaker palette read](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/pipeline/palette.rs#L510-L523)
+· [StarBreaker layer inputs](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/blender_addon/starbreaker_addon/runtime/importer/layers.py#L282-L320)
+· [P4KX material graph](../blender_addon/p4kx_importer/material_graph.py).

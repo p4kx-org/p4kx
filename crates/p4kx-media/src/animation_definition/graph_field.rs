@@ -80,15 +80,16 @@ impl GraphField {
             | GraphRole::Animation
             | GraphRole::Procedural
             | GraphRole::Database
-            | GraphRole::SubDatabase => Self::mannequin(role, name),
+            | GraphRole::SubDatabase
+            | GraphRole::SubDatabaseFragment => Self::mannequin(role, name),
             _ => Self::space(role, name),
         }
     }
 
     fn mannequin(role: GraphRole, name: &str) -> Self {
         use super::graph_source::GraphRole::{
-            Animation, Database, Fragment, LayerBlend, Procedural, SubDatabase, Transition,
-            TransitionOption,
+            Animation, Database, Fragment, LayerBlend, Procedural, SubDatabase,
+            SubDatabaseFragment, Transition, TransitionOption,
         };
         match (role, name) {
             (Database, "TagDef") => Self::TagDefinition,
@@ -119,6 +120,7 @@ impl GraphField {
             (Procedural, "string2") => Self::ProcedureString2,
             (Procedural, "crcString") => Self::ProcedureCrcString,
             (SubDatabase, "File") => Self::File,
+            (SubDatabaseFragment, "Name") => Self::Name,
             _ => Self::Unknown,
         }
     }
