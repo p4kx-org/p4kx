@@ -54,6 +54,7 @@ mod audio_bank_stid_provider;
 mod audio_bank_switch_container_provider;
 mod audio_control_coverage;
 mod audio_control_graph;
+mod audio_control_graph_origins;
 mod audio_control_path;
 mod audio_control_provider;
 mod audio_foreign_bank_provider;

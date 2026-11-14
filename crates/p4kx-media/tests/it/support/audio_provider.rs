@@ -36,6 +36,23 @@ impl Origins {
         path: &str,
         encrypted: bool,
     ) -> TestResult<&Value> {
+        self.field_in(
+            stream,
+            (stream == "records").then_some("audio"),
+            ordinal,
+            path,
+            encrypted,
+        )
+    }
+
+    pub(crate) fn field_in(
+        &self,
+        stream: &str,
+        kind: Option<&str>,
+        ordinal: usize,
+        path: &str,
+        encrypted: bool,
+    ) -> TestResult<&Value> {
         let ordinal = ordinal.to_string();
         let field = self
             .fields
@@ -43,14 +60,12 @@ impl Origins {
             .find(|row| {
                 row.get("type").and_then(Value::as_str) == Some("field")
                     && row.pointer("/scope/stream/type").and_then(Value::as_str) == Some(stream)
-                    && (stream != "records"
-                        || row.pointer("/scope/stream/kind").and_then(Value::as_str)
-                            == Some("audio"))
+                    && row.pointer("/scope/stream/kind").and_then(Value::as_str) == kind
                     && row.pointer("/scope/ordinal").and_then(Value::as_str)
                         == Some(ordinal.as_str())
                     && row.get("field").and_then(Value::as_str) == Some(path)
             })
-            .ok_or_else(|| format!("immediate Audio origin {stream} {ordinal} {path}"))?;
+            .ok_or_else(|| format!("immediate origin {stream} {ordinal} {path}"))?;
         assert_eq!(
             field.get("sourceSetComplete"),
             Some(&Value::Bool(true)),

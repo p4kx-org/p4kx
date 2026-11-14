@@ -141,7 +141,7 @@ fn project_query(
         .and_then(|names| names.get(query.name.as_str()))
         .map_or(&[][..], Vec::as_slice);
     let coverage = query_coverage(inventory, directory, query.key.scope)?;
-    let prepared = query_origins(owner, query, &coverage, writer)?;
+    let prepared = query_origins(owner, query, &coverage, targets, writer)?;
     let observed = targets.len() as u64;
     let [element, declaration] = query.source.indices;
     prepared.write(
@@ -201,6 +201,7 @@ fn query_origins(
     owner: &MediaOriginInput,
     query: &Query,
     coverage: &QueryCoverage<'_>,
+    targets: &[Target],
     writer: &MediaWriter<'_>,
 ) -> Result<PreparedRecordOrigins, MediaError> {
     let mut capture = writer.capture_origins();
@@ -208,6 +209,17 @@ fn query_origins(
     capture.include(coverage.evidence, writer)?;
     let known = capture.finish();
     let mut prepared = origins::prepared(owner, known.clone(), writer)?;
+    let mut observed = writer.capture_origins();
+    observed.include(&query.evidence, writer)?;
+    for target in targets {
+        observed.include(&target_declaration_origin(target, writer)?, writer)?;
+    }
+    records::field(
+        &mut prepared,
+        "/data/payload/observed_candidates",
+        observed.finish(),
+        writer,
+    )?;
     for path in [
         "/data/payload/owner_element_index",
         "/data/payload/owner_declaration_ordinal",
@@ -250,15 +262,9 @@ fn candidate(
     let Site {
         entry,
         indices: [element, declaration],
-        position,
+        ..
     } = target.site;
-    let proof = origins::capture(
-        &target.input,
-        position,
-        "declaration",
-        SourceUseRole::Selector,
-        writer,
-    )?;
+    let proof = target_declaration_origin(target, writer)?;
     let mut link = writer.capture_origins();
     link.include(&query.evidence, writer)?;
     link.include(&proof, writer)?;
@@ -285,6 +291,19 @@ fn candidate(
             declaration_ordinal: DecimalU64::new(declaration),
         }),
         &[],
+    )
+}
+
+fn target_declaration_origin(
+    target: &Target,
+    writer: &MediaWriter<'_>,
+) -> Result<OriginContributions, MediaError> {
+    origins::capture(
+        &target.input,
+        target.site.position,
+        "declaration",
+        SourceUseRole::Selector,
+        writer,
     )
 }
 

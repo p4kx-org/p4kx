@@ -25,7 +25,9 @@ constraints in `p4kx media schema --record`.
 ## Physical loose WEM inventory
 
 Every opened Archive directory has an `audio-loose-wem-inventory` closure. Its
-`data.payload.observed_candidates` is an unsigned decimal string. Each recognized numeric
+`data.payload.observed_candidates` is an unsigned decimal string. Its origin carries the
+query selector and the original name of each observed matching declaration. The resolution
+fields retain their separate evidence for the searched scope and its coverage. Each recognized numeric
 loose WEM path emits one `audio-loose-wem-candidate` row in directory order. The row is
 keyed by the owning `source.root` and `source.identity`, and by the numeric
 `data.payload.media_id`. Its only subresource index is the candidate's physical leaf
