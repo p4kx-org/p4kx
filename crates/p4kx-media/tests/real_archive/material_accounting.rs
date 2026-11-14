@@ -7,7 +7,7 @@ use p4kx_extraction::model::{MaterialLibrary, MaterialReadError, MaterialSourceL
 use p4kx_extraction::{Archive, ArchiveWatch, Entry, Filter};
 use p4kx_media::{
     Artifact, ContainerIdentity, Digest, ExportOptions, Identity, Index, MediaKind, MediaRecord,
-    Source, Tally,
+    Source, Tally, reconstruct_material_library,
 };
 use serde_json::Value;
 
@@ -27,6 +27,7 @@ struct Counts {
     partial: u64,
     failed: u64,
     materials: usize,
+    records: u64,
 }
 
 #[test]
@@ -120,7 +121,11 @@ fn reconcile(
         "material provider callback counts differ",
     )?;
     require(
-        records_match(&kind.counts.records, &counts),
+        kind.counts.records.enumerated == counts.records
+            && kind.counts.records.written == counts.records - counts.partial - counts.failed
+            && kind.counts.records.partial == counts.partial
+            && kind.counts.records.failed == counts.failed
+            && kind.counts.records.skipped == 0,
         "material record counts differ",
     )?;
     require(
@@ -204,16 +209,7 @@ impl Census<'_> {
             source.root == *self.root,
             "source belongs to the verified Archive",
         )?;
-        let wire: Value = self
-            .records
-            .next()?
-            .ok_or("missing material library record")?;
-        require(
-            self.schema.is_valid(&wire),
-            "actual material record failed schema validation",
-        )?;
-        let row: MediaRecord = serde_json::from_value(wire)?;
-        check_row_source(&row, &source)?;
+        let row = self.library_rows(&source)?;
         let raw = source
             .raw
             .as_ref()
@@ -239,6 +235,32 @@ impl Census<'_> {
         self.counts.selected += 1;
         self.counts.nested += u64::from(!chain.is_empty());
         Ok(())
+    }
+
+    fn library_rows(&mut self, source: &Source) -> Result<MediaRecord, Box<dyn std::error::Error>> {
+        let mut rows = Vec::new();
+        loop {
+            self.watch.poll()?;
+            let wire: Value = self
+                .records
+                .next()?
+                .ok_or("missing material library record")?;
+            require(
+                self.schema.is_valid(&wire),
+                "actual material record failed schema validation",
+            )?;
+            let row: MediaRecord = serde_json::from_value(wire)?;
+            check_row_source(&row, source)?;
+            let end = matches!(
+                row.subresource.namespace.as_str(),
+                "material-library" | "material-library-failure" | "material-library-end"
+            );
+            rows.push(row);
+            self.counts.records += 1;
+            if end {
+                return Ok(reconstruct_material_library(&rows)?);
+            }
+        }
     }
 
     fn check_fields(

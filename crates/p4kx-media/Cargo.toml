@@ -19,7 +19,7 @@ p4kx-shader.workspace = true
 schemars.workspace = true
 semver.workspace = true
 serde.workspace = true
-serde_json = { workspace = true, features = ["unbounded_depth"] }
+serde_json = { workspace = true, features = ["raw_value", "unbounded_depth"] }
 sha2.workspace = true
 tempfile.workspace = true
 

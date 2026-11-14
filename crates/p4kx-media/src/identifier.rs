@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::MediaError;
 
 /// Source integer width, independent of JSON or JavaScript numeric precision.
-#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 #[non_exhaustive]
 pub enum IntegerWidth {
@@ -21,7 +21,7 @@ pub enum IntegerWidth {
     Bits64,
 }
 
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 enum IdentifierValue {
     Path {
@@ -47,7 +47,7 @@ enum IdentifierValue {
 }
 
 /// An unmodified source identifier with a distinct domain and integer width.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(transparent)]
 pub struct OriginalIdentifier(IdentifierValue);
 

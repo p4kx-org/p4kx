@@ -104,6 +104,18 @@ impl PreparedRecordOrigins {
         self.builtin.as_ref()
     }
 
+    pub(crate) fn mount_payload(
+        &mut self,
+        item: Self,
+        from: &FieldPath,
+        here: &FieldPath,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        self.require_writer(writer)?;
+        item.require_writer(writer)?;
+        self.addresses.mount(item.addresses, from, here)
+    }
+
     pub(crate) fn visit(&self, path: &str) -> Option<&OriginContributions> {
         self.addresses.visit(path)
     }

@@ -10,13 +10,23 @@ use serde::{Deserialize, Serialize};
 
 #[path = "material_source_site.rs"]
 mod site;
+
+#[path = "material_source_rows.rs"]
+mod rows;
 pub use self::site::MaterialSourceSite;
+pub use rows::{
+    MaterialElementParent, MaterialElementPart, MaterialElementRow, MaterialElementRowsError,
+    MaterialElementWriteError,
+};
 
 #[path = "material_source_field_origins.rs"]
 mod field_origins;
 pub use self::field_origins::{MaterialSourceEvidence, MaterialSourceOriginError};
 
-use crate::material_xml_info::{MaterialElementInfo, MaterialParameterInfo};
+pub use crate::material_xml_info::{
+    MaterialAttributeInfo, MaterialAttributeKindInfo, MaterialContentInfo, MaterialElementInfo,
+    MaterialElementSyntaxInfo, MaterialParameterInfo,
+};
 
 /// Actual source encoding, separate from generated XML or rendering output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

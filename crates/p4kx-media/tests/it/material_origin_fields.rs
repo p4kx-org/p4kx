@@ -146,7 +146,7 @@ fn chosen_layer_palette_does_not_claim_unused_glass_or_later_layer_inputs() -> T
             .any(|used| used
                 .pointer("/location/indices")
                 .and_then(Value::as_array)
-                .and_then(|indices| indices.last())
+                .and_then(|indices| indices.get(1))
                 .and_then(Value::as_str)
                 == Some("2")),
         "the later layer was never used after the winner"
@@ -190,8 +190,7 @@ fn binary_material_null_lexeme_retains_its_actual_encoding_selector() -> TestRes
             .get("role")
             .and_then(Value::as_str)
             == Some("selector")
-            && used.pointer("/location/field").and_then(Value::as_str)
-                == Some("/authored/encoding")),
+            && used.pointer("/location/field").and_then(Value::as_str) == Some("encoding")),
         "the original encoding predicate is named explicitly"
     );
     assert!(

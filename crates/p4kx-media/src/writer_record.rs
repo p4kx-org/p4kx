@@ -88,6 +88,19 @@ impl MediaWriter<'_> {
             .ok_or_else(|| MediaError::Contract("record outside provider callback".into()))
     }
 
+    pub(crate) fn measure_record<T: Serialize>(
+        &self,
+        subresource: &Subresource,
+        data: &T,
+    ) -> Result<u64, MediaError> {
+        let active = self.admit_record(subresource, Status::Complete, &[])?;
+        let bytes = self
+            .record_line(active, subresource, Status::Complete, data, &[])?
+            .len();
+        u64::try_from(bytes)
+            .map_err(|_| MediaError::Contract("record length exceeds byte counter".into()))
+    }
+
     fn record_line<T: Serialize>(
         &self,
         active: usize,

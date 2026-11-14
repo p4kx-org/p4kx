@@ -3,14 +3,16 @@
 
 use serde_json::Value;
 
-use crate::material_payload::MaterialPayload;
+use crate::material_part_batch::{PART, REFERENCE, SHADER_REFERENCE};
+use crate::material_parts_write::{END, HEADER};
+use crate::material_payload::AnyMaterialPayload;
 use crate::material_projection::{FAILURE_NAMESPACE, LIBRARY_NAMESPACE};
 use crate::{MediaError, schema_merge};
 
 /// Returns the precise built-in material-library and failure payload schema.
 #[must_use]
 pub fn material_payload_schema() -> Value {
-    schemars::schema_for!(MaterialPayload<'static>).to_value()
+    schemars::schema_for!(AnyMaterialPayload<'static>).to_value()
 }
 
 /// Returns the common record schema constrained only for owned material namespaces.
@@ -34,6 +36,11 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
     for (namespace, record_type) in [
         (LIBRARY_NAMESPACE, "library"),
         (FAILURE_NAMESPACE, "failure"),
+        (HEADER, "library-header"),
+        (PART, "part"),
+        (REFERENCE, "reference"),
+        (SHADER_REFERENCE, "shader-reference"),
+        (END, "library-end"),
     ] {
         constraints.push(serde_json::json!({
             "if": {"properties":{"kind":{"const":"material"},"subresource":{"properties":{"namespace":{"const":namespace}},"required":["namespace"]}},"required":["kind","subresource"]},
@@ -45,7 +52,11 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         "then":{"properties":{"status":{"const":"failed"},"issues":{"contains":{"properties":{"severity":{"const":"error"}},"required":["severity"]}}}}
     }));
     constraints.push(serde_json::json!({
-        "if":{"properties":{"kind":{"const":"material"},"subresource":{"properties":{"namespace":{"const":LIBRARY_NAMESPACE}},"required":["namespace"]}},"required":["kind","subresource"]},
+        "if":{"properties":{"kind":{"const":"material"},"subresource":{"properties":{"namespace":{"enum":[PART, REFERENCE, SHADER_REFERENCE, END]}},"required":["namespace"]}},"required":["kind","subresource"]},
+        "then":{"properties":{"status":{"const":"complete"},"issues":{"maxItems":0}}}
+    }));
+    constraints.push(serde_json::json!({
+        "if":{"properties":{"kind":{"const":"material"},"subresource":{"properties":{"namespace":{"enum":[LIBRARY_NAMESPACE, HEADER]}},"required":["namespace"]}},"required":["kind","subresource"]},
         "then":{"if":{"properties":{"data":{"properties":{"payload":{"properties":{"projection_complete":{"const":true}},"required":["projection_complete"]}},"required":["payload"]}},"required":["data"]},
             "then":{"properties":{"status":{"const":"complete"},"issues":{"items":{"properties":{"severity":{"const":"info"}},"required":["severity"]}}}},
             "else":{"properties":{"status":{"const":"partial"},"issues":{"contains":{"properties":{"severity":{"enum":["warning","error"]}},"required":["severity"]}}}}}

@@ -148,15 +148,36 @@ impl OriginCapture {
         writer: &MediaWriter<'_>,
     ) -> Result<(), MediaError> {
         self.require_owner(&input.owner, writer)?;
-        self.complete = false;
         self.cut(cut);
+        self.retain_opaque(input, scope, role, SourceCoordinateOmission::CaptureLimit)
+    }
+
+    pub(crate) fn add_unavailable(
+        &mut self,
+        input: &MediaOriginInput,
+        scope: InputScope,
+        role: SourceUseRole,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        self.require_owner(&input.owner, writer)?;
+        self.retain_opaque(input, scope, role, SourceCoordinateOmission::Unavailable)
+    }
+
+    fn retain_opaque(
+        &mut self,
+        input: &MediaOriginInput,
+        scope: InputScope,
+        role: SourceUseRole,
+        reason: SourceCoordinateOmission,
+    ) -> Result<(), MediaError> {
+        self.complete = false;
         if input.details_limited {
             self.cut(OriginCut::InputMetadata);
         }
         let actual = input
             .scope
             .for_scope(scope)
-            .at_opaque(role, SourceCoordinateOmission::CaptureLimit)
+            .at_opaque(role, reason)
             .map_err(origin_error::evidence)?;
         self.retain(actual, self.limit)
     }

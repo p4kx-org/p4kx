@@ -9,8 +9,8 @@ use crate::mtl_read_site::{FieldToken, ReadSite};
 use crate::mtl_source_error::MaterialReadError;
 use crate::mtl_xml::XmlElement;
 use crate::{
-    Material, MaterialLayer, MaterialReadObservation, MaterialReadUse, PaletteSlot, RawElement,
-    TextureSlot,
+    Material, MaterialLayer, MaterialReadField, MaterialReadObservation, MaterialReadUse,
+    PaletteSlot, RawElement, TextureSlot,
 };
 
 const TYPED_ATTRIBUTES: [&str; 12] = [
@@ -30,6 +30,7 @@ const TYPED_ATTRIBUTES: [&str; 12] = [
 
 struct Inputs {
     identity: Identity,
+    other_attributes: Attributes,
     lighting: Lighting,
     palette: Option<PaletteSlot>,
     textures: Vec<TextureSlot>,
@@ -60,10 +61,12 @@ pub(crate) fn material<'source, Interrupted>(
         .map_err(MaterialReadError::Interrupted)?;
     let public_params =
         mtl_material_inputs::public_params(element, &mut sites, site, read.observer)?;
+    let other_attributes =
+        other_attributes(element, site, read.observer).map_err(MaterialReadError::Interrupted)?;
     let mut built = build(
-        element,
         Inputs {
             identity,
+            other_attributes,
             lighting,
             palette,
             textures,
@@ -80,7 +83,7 @@ pub(crate) fn material<'source, Interrupted>(
     Ok(built)
 }
 
-fn build<'source>(element: impl XmlElement<'source>, inputs: Inputs, budget: &Budget) -> Material {
+fn build(inputs: Inputs, budget: &Budget) -> Material {
     Material {
         name: inputs.identity.name,
         flags: inputs.identity.flags,
@@ -98,7 +101,7 @@ fn build<'source>(element: impl XmlElement<'source>, inputs: Inputs, budget: &Bu
         palette: inputs.palette,
         tinted: false,
         decal_colours: None,
-        other_attributes: other_attributes(element),
+        other_attributes: inputs.other_attributes,
         public_params: inputs.public_params,
         layers: inputs.layers,
         elements: inputs.elements,
@@ -107,13 +110,32 @@ fn build<'source>(element: impl XmlElement<'source>, inputs: Inputs, budget: &Bu
     }
 }
 
-fn other_attributes<'source>(element: impl XmlElement<'source>) -> Attributes {
-    mtl_raw::attributes(element)
-        .into_iter()
-        .filter(|(name, _)| {
-            !TYPED_ATTRIBUTES
-                .iter()
-                .any(|typed| typed.eq_ignore_ascii_case(name))
-        })
-        .collect()
+fn other_attributes<'source, Interrupted>(
+    element: impl XmlElement<'source>,
+    site: ReadSite,
+    observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
+) -> Result<Attributes, Interrupted> {
+    let mut attributes = Vec::new();
+    for (ordinal, (name, value)) in element.attributes().enumerate() {
+        if TYPED_ATTRIBUTES
+            .iter()
+            .any(|typed| typed.eq_ignore_ascii_case(name))
+        {
+            continue;
+        }
+        site.token(
+            crate::mtl_read_site::FieldElement::Material,
+            MaterialReadField::OtherAttribute {
+                index: attributes.len(),
+            },
+            FieldToken {
+                name,
+                ordinal: Some(ordinal),
+                use_kind: MaterialReadUse::Authored,
+            },
+            observer,
+        )?;
+        attributes.push((name.to_owned(), value.to_owned()));
+    }
+    Ok(attributes)
 }

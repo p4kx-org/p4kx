@@ -16,6 +16,7 @@ pub(super) struct Exported {
     pub(super) output: PathBuf,
     pub(super) index: Index,
     pub(super) materials: Vec<MediaRecord>,
+    pub(super) material_rows: Vec<MediaRecord>,
     pub(super) shaders: Vec<MediaRecord>,
 }
 
@@ -60,13 +61,15 @@ pub(super) fn run(
         ),
         _ => return Err("unexpected media result".into()),
     };
-    let materials = rows(&base.join("material.jsonl"))?;
+    let material_rows = rows(&base.join("material.jsonl"))?;
+    let materials = super::material_support::libraries(&material_rows)?;
     let shaders = rows(&base.join("shader.jsonl"))?;
     Ok(Exported {
         _directory: directory,
         output,
         index,
         materials,
+        material_rows,
         shaders,
     })
 }

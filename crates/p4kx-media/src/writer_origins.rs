@@ -104,6 +104,7 @@ impl MediaWriter<'_> {
             | OriginProfile::TextureFamily
             | OriginProfile::TextureConversion
             | OriginProfile::MaterialLibrary
+            | OriginProfile::MaterialPart
             | OriginProfile::MaterialFailure
             | OriginProfile::MaterialSourceLimit
             | OriginProfile::MaterialConfigurationFailure

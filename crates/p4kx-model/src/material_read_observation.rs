@@ -60,6 +60,18 @@ pub enum MaterialReadField {
     },
     /// The material's authored public parameters.
     PublicParams,
+    /// One retained material attribute outside the interpreted fields.
+    OtherAttribute {
+        /// Position in the retained attribute collection.
+        index: usize,
+    },
+    /// One retained texture attribute outside Map and File.
+    TextureAttribute {
+        /// Position in the retained texture collection.
+        index: usize,
+        /// Position in the retained attribute collection.
+        attribute: usize,
+    },
     /// The retained parameter's name and value.
     PublicParam {
         /// Position in the retained output collection.

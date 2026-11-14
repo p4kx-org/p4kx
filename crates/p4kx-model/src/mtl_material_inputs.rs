@@ -6,9 +6,12 @@ use crate::mtl_read_site::{FieldElement, FieldToken, ReadSite};
 use crate::mtl_source_error::MaterialReadError;
 use crate::mtl_xml::{PositionedAttribute, XmlElement};
 use crate::{
-    MaterialError, MaterialLayer, MaterialReadField, MaterialReadObservation, MaterialReadUse,
-    TextureSlot,
+    MaterialError, MaterialReadField, MaterialReadObservation, MaterialReadUse, TextureSlot,
 };
+
+#[path = "mtl_layer_inputs.rs"]
+mod layer;
+pub(crate) use layer::layers;
 
 #[derive(Clone, Copy)]
 pub(crate) struct TextureSite {
@@ -62,42 +65,67 @@ pub(crate) fn textures<'source, Interrupted>(
             "textureFileAdmission",
             observer,
         )?;
+        let mut output = ParsedTextures {
+            slots: &mut slots,
+            sites: &mut sites,
+        };
         for (ordinal, texture) in textures
             .children()
             .enumerate()
             .filter(|(_, child)| child.name().eq_ignore_ascii_case("Texture"))
         {
-            let Some(file) = texture
-                .positioned_attribute("File")
-                .filter(|file| !file.value.is_empty())
-            else {
-                continue;
-            };
-            let map = texture.positioned_attribute("Map");
-            let parsed = slot(
-                texture,
-                file.value,
-                map.as_ref().map(|map| map.value),
-                budget,
-            )?;
-            let input = FieldElement::Grandchild {
-                parent: list,
-                ordinal,
-            };
-            let index = slots.len();
-            observe_texture(site, input, index, &file, map.as_ref(), observer)?;
-            let map_attribute = map.as_ref().map(|map| map.ordinal);
-            slots.push(parsed.value);
-            sites.textures.push(TextureSite {
-                list,
-                ordinal,
-                map_use: parsed.map_use,
-                map_attribute,
-                file_attribute: file.ordinal,
-            });
+            output.push(texture, budget, site, (list, ordinal), observer)?;
         }
     }
     Ok((slots, sites))
+}
+
+struct ParsedTextures<'output, 'source> {
+    slots: &'output mut Vec<TextureSlot>,
+    sites: &'output mut MaterialSites<'source>,
+}
+
+impl<'source> ParsedTextures<'_, 'source> {
+    fn push<Interrupted>(
+        &mut self,
+        texture: impl XmlElement<'source>,
+        budget: &mut Budget,
+        site: ReadSite,
+        (list, ordinal): (usize, usize),
+        observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
+    ) -> Result<(), MaterialReadError<Interrupted>> {
+        let Some(file) = texture
+            .positioned_attribute("File")
+            .filter(|file| !file.value.is_empty())
+        else {
+            return Ok(());
+        };
+        let map = texture.positioned_attribute("Map");
+        let index = self.slots.len();
+        let input = FieldElement::Grandchild {
+            parent: list,
+            ordinal,
+        };
+        let attributes = texture_attributes(texture, site, input, index, observer)?;
+        let parsed = slot(
+            texture,
+            file.value,
+            map.as_ref().map(|map| map.value),
+            attributes,
+            budget,
+        )?;
+        observe_texture(site, input, index, &file, map.as_ref(), observer)?;
+        let map_attribute = map.as_ref().map(|map| map.ordinal);
+        self.slots.push(parsed.value);
+        self.sites.textures.push(TextureSite {
+            list,
+            ordinal,
+            map_use: parsed.map_use,
+            map_attribute,
+            file_attribute: file.ordinal,
+        });
+        Ok(())
+    }
 }
 
 fn observe_texture<Interrupted>(
@@ -164,6 +192,7 @@ fn slot<'source>(
     element: impl XmlElement<'source>,
     file: &str,
     map: Option<&str>,
+    attributes: Attributes,
     budget: &mut Budget,
 ) -> Result<ParsedTexture, MaterialError> {
     let map_use = if map.is_some() {
@@ -176,12 +205,7 @@ fn slot<'source>(
         value: TextureSlot {
             map: map.unwrap_or_default().to_owned(),
             file: file.to_owned(),
-            attributes: mtl_raw::attributes(element)
-                .into_iter()
-                .filter(|(name, _)| {
-                    !name.eq_ignore_ascii_case("Map") && !name.eq_ignore_ascii_case("File")
-                })
-                .collect(),
+            attributes,
             children: {
                 let mut children = Vec::new();
                 for (ordinal, child) in element.children().enumerate() {
@@ -193,6 +217,34 @@ fn slot<'source>(
             },
         },
     })
+}
+
+fn texture_attributes<'source, Interrupted>(
+    element: impl XmlElement<'source>,
+    site: ReadSite,
+    input: FieldElement,
+    index: usize,
+    observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
+) -> Result<Attributes, MaterialReadError<Interrupted>> {
+    let mut attributes = Vec::new();
+    for (ordinal, (name, value)) in element.attributes().enumerate() {
+        if name.eq_ignore_ascii_case("Map") || name.eq_ignore_ascii_case("File") {
+            continue;
+        }
+        token_site(
+            site,
+            input,
+            MaterialReadField::TextureAttribute {
+                index,
+                attribute: attributes.len(),
+            },
+            name,
+            ordinal,
+            observer,
+        )?;
+        attributes.push((name.to_owned(), value.to_owned()));
+    }
+    Ok(attributes)
 }
 
 pub(crate) fn public_params<'source, Interrupted>(
@@ -246,97 +298,6 @@ pub(crate) fn public_params<'source, Interrupted>(
     Ok(values)
 }
 
-pub(crate) fn layers<'source, Interrupted>(
-    element: impl XmlElement<'source>,
-    site: ReadSite,
-    observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
-) -> Result<Vec<MaterialLayer>, MaterialReadError<Interrupted>> {
-    collect_site(
-        site,
-        FieldElement::Material,
-        MaterialReadField::Layers,
-        "MatLayers",
-        observer,
-    )?;
-    let mut layers = Vec::new();
-    let lists = element
-        .children()
-        .enumerate()
-        .filter(|(_, child)| child.name().eq_ignore_ascii_case("MatLayers"));
-    for (parent, list) in lists {
-        collect_site(
-            site,
-            FieldElement::Child { ordinal: parent },
-            MaterialReadField::Layers,
-            "layerElements",
-            observer,
-        )?;
-        for (ordinal, layer) in list
-            .children()
-            .enumerate()
-            .filter(|(_, child)| child.name().eq_ignore_ascii_case("Layer"))
-        {
-            let index = layers.len();
-            let input = FieldElement::Grandchild { parent, ordinal };
-            collect_site(
-                site,
-                input,
-                MaterialReadField::Layer { index },
-                "Layer",
-                observer,
-            )?;
-            observe_layer_attributes(layer, site, input, index, observer)?;
-            let layer = MaterialLayer {
-                attributes: mtl_raw::attributes(layer),
-                surface: None,
-                palette_entry: None,
-            };
-            for (name, field) in [
-                ("Name", MaterialReadField::LayerName { index }),
-                ("Path", MaterialReadField::LayerPath { index }),
-                ("PaletteTint", MaterialReadField::LayerPaletteTint { index }),
-            ] {
-                if let Some((attribute, name, _)) = layer.positioned_attribute(name) {
-                    token_site(site, input, field, name, attribute, observer)?;
-                }
-            }
-            layers.push(layer);
-        }
-    }
-    Ok(layers)
-}
-
-fn observe_layer_attributes<'source, Interrupted>(
-    layer: impl XmlElement<'source>,
-    site: ReadSite,
-    input: FieldElement,
-    index: usize,
-    observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
-) -> Result<(), MaterialReadError<Interrupted>> {
-    for (attribute, (name, _)) in layer.attributes().enumerate() {
-        token_site(
-            site,
-            input,
-            MaterialReadField::LayerAttribute { index, attribute },
-            name,
-            attribute,
-            observer,
-        )?;
-    }
-    Ok(())
-}
-
-fn collect_site<Interrupted>(
-    site: ReadSite,
-    input: FieldElement,
-    field: MaterialReadField,
-    name: &str,
-    observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
-) -> Result<(), MaterialReadError<Interrupted>> {
-    site.at(input, field, name, MaterialReadUse::Selected, observer)
-        .map_err(MaterialReadError::Interrupted)
-}
-
 fn token_site<Interrupted>(
     site: ReadSite,
     input: FieldElement,
@@ -356,4 +317,15 @@ fn token_site<Interrupted>(
         observer,
     )
     .map_err(MaterialReadError::Interrupted)
+}
+
+fn collect_site<Interrupted>(
+    site: ReadSite,
+    input: FieldElement,
+    field: MaterialReadField,
+    name: &str,
+    observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
+) -> Result<(), MaterialReadError<Interrupted>> {
+    site.at(input, field, name, MaterialReadUse::Selected, observer)
+        .map_err(MaterialReadError::Interrupted)
 }

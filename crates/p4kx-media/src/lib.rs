@@ -174,21 +174,17 @@ mod kind;
 mod limits;
 mod lock_namespace;
 mod lookup_work;
+mod material_domain;
 #[cfg(test)]
 mod material_observer_support;
 #[cfg(test)]
 mod material_observer_tests;
-mod material_payload;
-mod material_projection;
-mod material_provider;
-mod material_read_origins;
-mod material_reference;
-mod material_reference_origins;
-mod material_schema;
-mod material_shader_origins;
-mod material_shader_reference;
-mod material_shader_tokens;
-mod material_surface;
+use material_domain::{
+    material_part_batch, material_parts, material_parts_origins, material_parts_read,
+    material_parts_write, material_payload, material_projection, material_provider,
+    material_read_origins, material_reference, material_reference_origins, material_schema,
+    material_shader_origins, material_shader_reference, material_shader_tokens, material_surface,
+};
 mod media_record;
 mod media_writer;
 mod metadata_input;
@@ -352,6 +348,7 @@ pub use input_receipt::{InputOmission, InputReceipt};
 pub use integrity::{Algorithm, ByteScope, Verification};
 pub use kind::MediaKind;
 pub use limits::Limits;
+pub use material_parts_read::reconstruct_material_library;
 pub use material_payload::{
     MaterialFailureReason, MaterialLibraryMetadata, MaterialMetadata, MaterialPayload,
     MaterialProjectionFailure,

@@ -46,6 +46,7 @@ pub(crate) fn scope(profile: OriginProfile, pointer: &str) -> ScopeMapping {
         | OriginProfile::Animation
         | OriginProfile::AnimationDefinition
         | OriginProfile::Model
+        | OriginProfile::MaterialPart
         | OriginProfile::TextureHeader
         | OriginProfile::TextureFamily
         | OriginProfile::TextureConversion => ScopeMapping::Unmapped,
@@ -135,6 +136,10 @@ pub(crate) fn independent(profile: OriginProfile, pointer: &str) -> bool {
         | OriginProfile::TextureFamily
         | OriginProfile::TextureConversion => {
             matches!(pointer, "/data/record_type" | "/issues")
+        }
+        OriginProfile::MaterialPart => {
+            matches!(pointer, "/data/record_type" | "/issues")
+                || origin_resolver::within(pointer, "/subresource")
         }
         OriginProfile::ArchiveEntry
         | OriginProfile::Unmigrated

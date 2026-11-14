@@ -12,7 +12,7 @@ use crate::origin_reference::{
     self, ReferenceIdentifier, ReferenceOriginInputs, ReferenceSubresource,
 };
 use crate::reference_resolve::ReferenceObservations;
-use crate::{MediaError, MediaWriter, Reference, SourceContext, origin_error};
+use crate::{MediaError, MediaWriter, Reference, SourceContext};
 
 pub(crate) struct MaterialResolution {
     pub(crate) reference: Reference,
@@ -25,7 +25,7 @@ pub(crate) struct MaterialReferenceProof {
 }
 
 pub(crate) fn write(
-    position: usize,
+    prefix: &FieldPath,
     reference: &MaterialReference,
     resolution: &MaterialReferenceProof,
     context: &SourceContext<'_>,
@@ -33,11 +33,7 @@ pub(crate) fn write(
     writer: &MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let declaration = DeclarationOrigins::capture(reference, context, writer)?;
-    let mut prefix = FieldPath::parse("/data/payload/references")
-        .map_err(|cause| origin_error::address(&cause))?;
-    prefix
-        .push_index(position)
-        .map_err(|cause| origin_error::address(&cause))?;
+
     let semantic = OriginContributions::independent(&writer.origins.owner);
     let inputs = ReferenceOriginInputs {
         original: &declaration.original,
@@ -53,11 +49,11 @@ pub(crate) fn write(
         },
         subresource: ReferenceSubresource::None,
     };
-    prepared.insert(&prefix, inputs.resolution(writer)?, writer)?;
-    declaration.scalars(reference, prepared, &prefix, writer)?;
+    prepared.insert(prefix, inputs.resolution(writer)?, writer)?;
+    declaration.scalars(reference, prepared, prefix, writer)?;
     inputs.write(
         prepared,
-        &origin_reference::child(&prefix, "reference")?,
+        &origin_reference::child(prefix, "reference")?,
         &reference.reference,
         writer,
     )

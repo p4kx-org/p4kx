@@ -11,7 +11,12 @@ use p4kx_media::{
     ShaderProvider,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
+use serde::Deserialize as _;
 use serde_json::Value;
+
+#[path = "material_origin_datum.rs"]
+mod datum;
+use datum::{DatumLocation, datum};
 
 pub(super) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 pub(super) const MTL: &str = "Data/source.mtl";
@@ -25,7 +30,8 @@ pub(super) struct Fixture {
     pub(super) base: PathBuf,
     pub(super) index: Index,
     pub(super) options: ExportOptions,
-    pub(super) records: Vec<Value>,
+    records: Vec<Value>,
+    logical: Vec<Value>,
     origins: Vec<Value>,
     uses: Vec<Value>,
     sources: Vec<Value>,
@@ -63,6 +69,14 @@ impl Fixture {
         let output = folder.path().join("media");
         let (index, base) = export_at(&archive, &output, &options, limits)?;
         let records = rows(base.join("material.jsonl"))?;
+        let wire: Vec<p4kx_media::MediaRecord> = records
+            .iter()
+            .map(p4kx_media::MediaRecord::deserialize)
+            .collect::<Result<_, _>>()?;
+        let logical = super::material_support::libraries(&wire)?
+            .iter()
+            .map(serde_json::to_value)
+            .collect::<Result<_, _>>()?;
         let origins = rows(base.join("field-origins.jsonl"))?;
         let uses = rows(base.join("origin-uses.jsonl"))?;
         let sources = rows(base.join("origin-sources.jsonl"))?;
@@ -74,6 +88,7 @@ impl Fixture {
             index,
             options,
             records,
+            logical,
             origins,
             uses,
             sources,
@@ -81,7 +96,7 @@ impl Fixture {
     }
 
     pub(super) fn record(&self, path: &str) -> TestResult<(usize, &Value)> {
-        self.records
+        self.logical
             .iter()
             .enumerate()
             .find(|(_, row)| {
@@ -93,7 +108,8 @@ impl Fixture {
     }
 
     pub(super) fn field(&self, path: &str, pointer: &str) -> TestResult<&Value> {
-        let ordinal = self.record(path)?.0.to_string();
+        let (position, pointer) = self.locate(path, pointer)?;
+        let ordinal = position.to_string();
         self.origins
             .iter()
             .find(|row| {
@@ -102,9 +118,35 @@ impl Fixture {
                     && row.pointer("/scope/stream/kind").and_then(Value::as_str) == Some("material")
                     && row.pointer("/scope/ordinal").and_then(Value::as_str)
                         == Some(ordinal.as_str())
-                    && row.get("field").and_then(Value::as_str) == Some(pointer)
+                    && row.get("field").and_then(Value::as_str) == Some(pointer.as_str())
             })
             .ok_or_else(|| format!("original Material field {path}:{pointer}").into())
+    }
+
+    fn locate(&self, source: &str, path: &str) -> TestResult<(usize, String)> {
+        let (selector, pointer) = datum(path)?;
+        let matching = |row: &Value| {
+            row.pointer("/source/identity/entry/path")
+                .and_then(Value::as_str)
+                == Some(source)
+        };
+        for (position, row) in self.records.iter().enumerate() {
+            if !matching(row) {
+                continue;
+            }
+            if let Some(item) = selector.matched_index(row)? {
+                let actual = if let DatumLocation::Item(item) = item {
+                    let rest = pointer
+                        .strip_prefix("/data/payload")
+                        .ok_or("item field path")?;
+                    format!("/data/payload/items/{item}{rest}")
+                } else {
+                    pointer
+                };
+                return Ok((position, actual));
+            }
+        }
+        Err(format!("material row for {source}:{path}").into())
     }
 
     pub(super) fn marker(&self, path: &str, pointer: &str, expected: Option<bool>) -> TestResult {

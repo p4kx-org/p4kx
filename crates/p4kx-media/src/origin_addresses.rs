@@ -63,6 +63,44 @@ impl OriginAddresses {
         Ok(node)
     }
 
+    pub(crate) fn mount(
+        &mut self,
+        from: Self,
+        source: &FieldPath,
+        destination: &FieldPath,
+    ) -> Result<(), MediaError> {
+        let mut original = from.root;
+        for name in segments(source.as_str()) {
+            if original.contribution.is_some() || original.children.len() != 1 {
+                return Err(MediaError::Contract(
+                    "packed origin has unexpected addresses".into(),
+                ));
+            }
+            original = original.children.remove(name).ok_or_else(|| {
+                MediaError::Contract("packed origin has no requested source subtree".into())
+            })?;
+        }
+        let mut names = segments(destination.as_str()).peekable();
+        let mut node = &mut self.root;
+        while let Some(name) = names.next() {
+            if names.peek().is_none() {
+                return match node.children.entry(name.to_owned()) {
+                    std::collections::btree_map::Entry::Vacant(entry) => {
+                        entry.insert(original);
+                        Ok(())
+                    }
+                    std::collections::btree_map::Entry::Occupied(_) => Err(MediaError::Contract(
+                        "duplicate packed media origin address".into(),
+                    )),
+                };
+            }
+            node = node.children.entry(name.to_owned()).or_default();
+        }
+        Err(MediaError::Contract(
+            "packed origin requires a nested destination".into(),
+        ))
+    }
+
     pub(crate) fn visit(&self, path: &str) -> Option<&OriginContributions> {
         let mut node = &self.root;
         let mut inherited = node.subtree.then_some(node);

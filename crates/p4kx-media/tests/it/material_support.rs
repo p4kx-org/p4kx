@@ -7,7 +7,7 @@ use std::path::Path;
 use p4kx_extraction::Archive;
 use p4kx_media::{
     ExportOptions, ExportOutcome, Index, MaterialProvider, MediaError, MediaKind, MediaRecord,
-    ProviderRegistry,
+    ProviderRegistry, reconstruct_material_library,
 };
 use p4kx_testkit::TestEntry;
 
@@ -39,7 +39,18 @@ pub(super) fn records(
     output: &Path,
     index: &Index,
 ) -> Result<Vec<MediaRecord>, Box<dyn std::error::Error>> {
-    super::support::records(output, index, "material.jsonl")
+    let rows = super::support::records(output, index, "material.jsonl")?;
+    libraries(&rows)
+}
+
+pub(super) fn libraries(
+    rows: &[MediaRecord],
+) -> Result<Vec<MediaRecord>, Box<dyn std::error::Error>> {
+    rows.chunk_by(|left, right| {
+        left.source.root == right.source.root && left.source.identity == right.source.identity
+    })
+    .map(|rows| reconstruct_material_library(rows).map_err(Into::into))
+    .collect()
 }
 
 pub(super) fn diagnostic_records(
@@ -49,10 +60,11 @@ pub(super) fn diagnostic_records(
         return Err("expected incomplete material generation".into());
     };
     let directory = diagnostic.parent().ok_or("diagnostic directory")?;
-    fs::read_to_string(directory.join("material.jsonl"))?
+    let rows: Vec<MediaRecord> = fs::read_to_string(directory.join("material.jsonl"))?
         .lines()
-        .map(|line| serde_json::from_str(line).map_err(Into::into))
-        .collect()
+        .map(serde_json::from_str)
+        .collect::<Result<_, _>>()?;
+    libraries(&rows)
 }
 
 pub(super) fn projection_loss(error: &MediaError) -> bool {

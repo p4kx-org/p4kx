@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{Digest, Identity, MediaKind, OriginalIdentifier, Source, Subresource};
 
 /// A reader-proven target identity without a projection or preservation claim.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
 pub struct ReferenceTarget {
     /// Root Archive cryptographic identity.
@@ -49,7 +49,7 @@ impl ReferenceTarget {
 }
 
 /// Why an existing target was outside the selected projection scope.
-#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum NotSelectedReason {
@@ -60,7 +60,7 @@ pub enum NotSelectedReason {
 }
 
 /// Why target resolution could not establish a usable answer.
-#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum ReferenceUnavailable {
@@ -89,7 +89,7 @@ pub enum ReferenceUnavailable {
 }
 
 /// A reader's known selection or availability state of a proven candidate.
-#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum CandidateState {
@@ -108,7 +108,7 @@ pub enum CandidateState {
 }
 
 /// One actual domain-reader match, retaining order and duplicate declarations.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
 pub struct ReferenceCandidate {
     /// Proven physical and optional subresource identity.
@@ -135,7 +135,7 @@ pub enum CandidateInventory {
 }
 
 /// Central reference classification, separate from source preservation and typed coverage.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "status", rename_all = "kebab-case")]
 pub enum ReferenceResolution {
     /// Exactly one selected target identity was proved.
@@ -167,7 +167,7 @@ pub enum ReferenceResolution {
 }
 
 /// Original source identifier and an honestly bounded resolution result.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Reference {
     pub(crate) original: OriginalIdentifier,
     pub(crate) resolution: ReferenceResolution,

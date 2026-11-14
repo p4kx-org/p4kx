@@ -6415,6 +6415,51 @@
       ],
       "type": "object"
     },
+    "BatchItems": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/MaterialPart"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    },
+    "BatchItems2": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/MaterialReference"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    },
+    "BatchItems3": {
+      "properties": {
+        "items": {
+          "items": {
+            "$ref": "#/$defs/MaterialShaderReference"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "type": "object"
+    },
     "Binding": {
       "additionalProperties": false,
       "properties": {
@@ -10789,6 +10834,45 @@
       ],
       "type": "object"
     },
+    "LegacyMaterialPayload": {
+      "description": "Built-in material payloads, separate from the common physical-source envelope.",
+      "oneOf": [
+        {
+          "description": "One source-library record including unused libraries and all original material slots.",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MaterialLibraryMetadata"
+            },
+            "record_type": {
+              "const": "library",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Exact raw bytes survive a failed structured projection.",
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MaterialProjectionFailure"
+            },
+            "record_type": {
+              "const": "failure",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "LinkKind": {
       "enum": [
         "tracks-database",
@@ -11159,6 +11243,79 @@
       ],
       "type": "object"
     },
+    "MaterialAttributeGroup": {
+      "description": "Group whose own attribute positions are kept in source order.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Attributes outside the existing interpreted surface fields.",
+          "properties": {
+            "type": {
+              "const": "other",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Original parameter attributes.",
+          "properties": {
+            "type": {
+              "const": "public-param",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Attributes of one selected layer.",
+          "properties": {
+            "position": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "layer",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "position"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "Attributes of one selected texture slot.",
+          "properties": {
+            "position": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "texture",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "position"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "MaterialAttributeInfo": {
       "description": "One original attribute and its independent semantic/lexical values.",
       "properties": {
@@ -11249,6 +11406,50 @@
           "type": "object"
         }
       ]
+    },
+    "MaterialAuthoredCounts": {
+      "description": "Cardinalities of the source data retained by the existing surface reader.",
+      "properties": {
+        "elements": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "layers": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "other_attributes": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "public_params": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "textures": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "truncated": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "other_attributes",
+        "public_params",
+        "layers",
+        "elements",
+        "truncated",
+        "textures"
+      ],
+      "type": "object"
     },
     "MaterialAuthoredInfo": {
       "description": "Raw source fields for one interpreted material, independent of derived surface decisions.",
@@ -11444,6 +11645,219 @@
         "syntax"
       ],
       "type": "object"
+    },
+    "MaterialElementParent": {
+      "additionalProperties": false,
+      "description": "An authored element's placement among the retained children of its parent.",
+      "properties": {
+        "element": {
+          "description": "The earlier preorder ID of the owning parent.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "position": {
+          "description": "The zero-based retained child position.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "element",
+        "position"
+      ],
+      "type": "object"
+    },
+    "MaterialElementPart": {
+      "additionalProperties": false,
+      "description": "One tree row and the retained element which owns it.",
+      "properties": {
+        "element": {
+          "description": "The deterministic preorder number of the owning element.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "row": {
+          "$ref": "#/$defs/MaterialElementRow",
+          "description": "The original value and its local structure."
+        }
+      },
+      "required": [
+        "element",
+        "row"
+      ],
+      "type": "object"
+    },
+    "MaterialElementRow": {
+      "description": "One ordered part of an authored material XML tree.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "Element header without its lists or children.",
+          "properties": {
+            "attributes": {
+              "description": "Number of retained decoded attributes.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "binary_text": {
+              "description": "Independently ordered binary node text.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "children": {
+              "description": "Number of retained own children.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "contents": {
+              "description": "Number of retained mixed content items.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "declarations": {
+              "description": "Number of retained qualified declarations.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "name": {
+              "description": "Existing reader name.",
+              "type": "string"
+            },
+            "namespace": {
+              "description": "Proved expanded namespace URI, when available.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "ordinal": {
+              "description": "Original position in the parent, absent at an independently retained root.",
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "parent": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/MaterialElementParent"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Owning parent and retained position, absent at the root."
+            },
+            "qualified_name": {
+              "description": "Original qualified name.",
+              "type": "string"
+            },
+            "type": {
+              "const": "element",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "name",
+            "qualified_name",
+            "attributes",
+            "declarations",
+            "contents",
+            "children"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One decoded attribute in reader order.",
+          "properties": {
+            "position": {
+              "description": "Stable zero-based position among decoded attributes.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "decodedAttribute",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/MaterialParameterInfo",
+              "description": "Decoded name and value."
+            }
+          },
+          "required": [
+            "type",
+            "position",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One authored attribute or namespace declaration.",
+          "properties": {
+            "position": {
+              "description": "Stable zero-based position among authored declarations.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "declaration",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/MaterialAttributeInfo",
+              "description": "Original qualified name, tokens and known namespace semantics."
+            }
+          },
+          "required": [
+            "type",
+            "position",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One authored content item.",
+          "properties": {
+            "position": {
+              "description": "Stable zero-based position in the retained content list.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "content",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/MaterialContentInfo",
+              "description": "Original text, element position or independent syntax item."
+            }
+          },
+          "required": [
+            "type",
+            "position",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "MaterialElementSyntaxInfo": {
       "description": "Authored syntax supplementing the existing material element view.",
@@ -11725,6 +12139,82 @@
       ],
       "type": "object"
     },
+    "MaterialLibraryEnd": {
+      "description": "Exact record counts for the arrays in one streamed material library.",
+      "properties": {
+        "parts": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "references": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "shader_references": {
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "parts",
+        "references",
+        "shader_references"
+      ],
+      "type": "object"
+    },
+    "MaterialLibraryHeader": {
+      "description": "Library metadata preceding the ordered material rows for one physical source.",
+      "properties": {
+        "authored_root": {
+          "type": "boolean"
+        },
+        "default_palette": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "encoding": {
+          "$ref": "#/$defs/MaterialEncodingInfo"
+        },
+        "materials": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        },
+        "projection_complete": {
+          "type": "boolean"
+        },
+        "single": {
+          "type": "boolean"
+        },
+        "source_entries": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_losses": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unknown_entries": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "default_palette"
+      ],
+      "type": "object"
+    },
     "MaterialLibraryMetadata": {
       "allOf": [
         {
@@ -11922,45 +12412,265 @@
       ],
       "type": "object"
     },
-    "MaterialPayload": {
-      "description": "Built-in material payloads, separate from the common physical-source envelope.",
+    "MaterialPart": {
+      "description": "An individual bounded projection from the material source.",
       "oneOf": [
         {
-          "description": "One source-library record including unused libraries and all original material slots.",
+          "additionalProperties": false,
+          "description": "One original submaterial disposition.",
           "properties": {
-            "payload": {
-              "$ref": "#/$defs/MaterialLibraryMetadata"
+            "entry": {
+              "$ref": "#/$defs/MaterialSourceEntryInfo"
             },
-            "record_type": {
-              "const": "library",
+            "position": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "source-entry",
               "type": "string"
             }
           },
           "required": [
-            "record_type",
-            "payload"
+            "type",
+            "position",
+            "entry"
           ],
           "type": "object"
         },
         {
-          "description": "Exact raw bytes survive a failed structured projection.",
+          "additionalProperties": false,
+          "description": "One diagnosed authored-tree capture boundary.",
           "properties": {
-            "payload": {
-              "$ref": "#/$defs/MaterialProjectionFailure"
+            "loss": {
+              "$ref": "#/$defs/MaterialSourceLossInfo"
             },
-            "record_type": {
-              "const": "failure",
+            "position": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "source-loss",
               "type": "string"
             }
           },
           "required": [
-            "record_type",
-            "payload"
+            "type",
+            "position",
+            "loss"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One element, declaration, attribute or mixed-content value.",
+          "properties": {
+            "part": {
+              "$ref": "#/$defs/MaterialElementPart"
+            },
+            "tree": {
+              "$ref": "#/$defs/MaterialTree"
+            },
+            "type": {
+              "const": "element",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "tree",
+            "part"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One retained material slot and its independent interpreted surface.",
+          "properties": {
+            "authored": {
+              "$ref": "#/$defs/MaterialAuthoredCounts"
+            },
+            "index": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "interpreted_surface": {
+              "$ref": "#/$defs/MaterialSurface"
+            },
+            "name": {
+              "type": "string"
+            },
+            "type": {
+              "const": "surface",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "index",
+            "name",
+            "interpreted_surface",
+            "authored"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One typed, ordered raw attribute of a material or one of its children.",
+          "properties": {
+            "group": {
+              "$ref": "#/$defs/MaterialAttributeGroup"
+            },
+            "material": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "position": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "attribute",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/MaterialParameterInfo"
+            }
+          },
+          "required": [
+            "type",
+            "material",
+            "group",
+            "position",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One layer slot, including an empty declaration.",
+          "properties": {
+            "attributes": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "material": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "position": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "layer",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "material",
+            "position",
+            "attributes"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One texture slot, including its original map and file tokens.",
+          "properties": {
+            "attributes": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "children": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "file": {
+              "type": "string"
+            },
+            "map": {
+              "type": "string"
+            },
+            "material": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "position": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "texture",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "material",
+            "position",
+            "map",
+            "file",
+            "attributes",
+            "children"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One explicit typed-reader truncation.",
+          "properties": {
+            "material": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "position": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "truncation",
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "material",
+            "position",
+            "value"
           ],
           "type": "object"
         }
+      ]
+    },
+    "MaterialPayload": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LegacyMaterialPayload"
+        },
+        {
+          "$ref": "#/$defs/StreamMaterialPayload"
+        }
       ],
-      "title": "MaterialPayload"
+      "title": "AnyMaterialPayload"
     },
     "MaterialProjectionFailure": {
       "description": "Stable structured-read failure without replacing its exact raw source artifact.",
@@ -12431,6 +13141,83 @@
         "children"
       ],
       "type": "object"
+    },
+    "MaterialTree": {
+      "description": "Original output group in which the raw element tree is retained.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "description": "The original document root.",
+          "properties": {
+            "type": {
+              "const": "library",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One unknown block retained by the surface reader.",
+          "properties": {
+            "material": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "position": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "material",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "material",
+            "position"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One separate tree retained under the original texture slot.",
+          "properties": {
+            "material": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "position": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "texture": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "texture",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "material",
+            "texture",
+            "position"
+          ],
+          "type": "object"
+        }
+      ]
     },
     "MediaIssue": {
       "description": "A source-local issue with an unambiguous location.",
@@ -20599,6 +21386,90 @@
       ],
       "type": "string"
     },
+    "StreamMaterialPayload": {
+      "oneOf": [
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MaterialLibraryHeader"
+            },
+            "record_type": {
+              "const": "library-header",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BatchItems"
+            },
+            "record_type": {
+              "const": "part",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BatchItems2"
+            },
+            "record_type": {
+              "const": "reference",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/BatchItems3"
+            },
+            "record_type": {
+              "const": "shader-reference",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/MaterialLibraryEnd"
+            },
+            "record_type": {
+              "const": "library-end",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "SubDatabaseCycle": {
       "additionalProperties": false,
       "properties": {
@@ -26584,6 +27455,241 @@
           "subresource": {
             "properties": {
               "namespace": {
+                "const": "material-library-header"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/MaterialPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "library-header"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "material"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "material-library-part"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/MaterialPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "part"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "material"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "material-reference"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/MaterialPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "reference"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "material"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "material-shader-reference"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/MaterialPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "shader-reference"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "material"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "material-library-end"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/MaterialPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "library-end"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "material"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
                 "const": "material-library-failure"
               }
             },
@@ -26626,7 +27732,48 @@
           "subresource": {
             "properties": {
               "namespace": {
-                "const": "material-library"
+                "enum": [
+                  "material-library-part",
+                  "material-reference",
+                  "material-shader-reference",
+                  "material-library-end"
+                ]
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "issues": {
+            "maxItems": 0
+          },
+          "status": {
+            "const": "complete"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "material"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "enum": [
+                  "material-library",
+                  "material-library-header"
+                ]
               }
             },
             "required": [

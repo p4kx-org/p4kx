@@ -24,8 +24,8 @@ fn material_container_origins_union_only_their_actual_retained_children() -> Tes
     let surface = "/data/payload/materials/0/interpreted_surface";
     fixture.marker(MTL, surface, Some(false))?;
     fixture.no_payload(MTL, surface, support::SHADER)?;
-    fixture.marker(MTL, "/data/payload/shader_references", Some(true))?;
-    fixture.marker(MTL, "/data/payload", Some(true))?;
+    fixture.marker(MTL, "/data/payload/shader_references/0", Some(true))?;
+    fixture.marker(MTL, "/data/payload", Some(false))?;
     assert_eq!(
         fixture.field(MTL, surface)?.get("sourceSetComplete"),
         Some(&Value::Bool(true)),

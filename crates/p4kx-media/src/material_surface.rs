@@ -5,12 +5,12 @@ use std::borrow::Cow;
 
 use p4kx_extraction::model::{Material, PaletteSlot};
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::Float32;
 
 /// Numeric material values interpreted by the existing surface reader, including its defaults.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[schemars(extend("allOf" = [{"required": ["palette", "decal_colours", "diffuse_map_is_grey"]}]))]
 #[non_exhaustive]
 pub struct MaterialSurface<'source> {
@@ -49,7 +49,7 @@ pub struct MaterialSurface<'source> {
 }
 
 /// Origin of interpreted surface values, independent of exact raw source tokens.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum MaterialSurfaceBasis {
@@ -58,7 +58,7 @@ pub enum MaterialSurfaceBasis {
 }
 
 /// Existing derived palette entry, without changing rendering rules.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum MaterialPalette {

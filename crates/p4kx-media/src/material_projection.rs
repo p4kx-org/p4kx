@@ -1,23 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::borrow::Cow;
-
 use p4kx_extraction::model::{
     MaterialError, MaterialLibrary, MaterialReadError, MaterialReadObservation,
     MaterialSourceLimits,
 };
 use p4kx_extraction::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
 
-use crate::material_payload::{
-    MaterialFailureReason, MaterialLibraryMetadata, MaterialMetadata, MaterialPayload,
-    MaterialProjectionFailure,
-};
-use crate::material_surface::MaterialSurface;
+use crate::material_payload::{MaterialFailureReason, MaterialPayload, MaterialProjectionFailure};
+
+use crate::retained_payload;
 use crate::{
     MediaError, MediaIssue, MediaWriter, Projection, Severity, SourceContext, Status, Subresource,
 };
-use crate::{material_reference, retained_payload};
 
 pub(crate) const LIBRARY_NAMESPACE: &str = "material-library";
 pub(crate) const FAILURE_NAMESPACE: &str = "material-library-failure";
@@ -73,54 +68,16 @@ fn write_library(
     reads: crate::material_read_origins::MaterialReadOrigins,
     writer: &mut MediaWriter<'_>,
 ) -> Result<Projection, MediaError> {
-    writer.checkpoint()?;
-    let authored = MaterialLibrarySourceInfo::of(library);
-    let materials: Vec<_> = library
-        .materials
-        .iter()
-        .enumerate()
-        .map(|(index, material)| MaterialMetadata {
-            index,
-            name: Cow::Borrowed(&material.name),
-            authored: MaterialAuthoredInfo::of(material),
-            interpreted_surface: MaterialSurface::of(material),
-        })
-        .collect();
-    let complete = authored.is_complete()
-        && materials
-            .iter()
-            .all(|material| material.authored.is_complete());
+    let mut check = || writer.checkpoint();
+    let mut complete =
+        MaterialLibrarySourceInfo::source_is_complete_with(&library.authored, &mut check)?;
+    for material in &library.materials {
+        complete &= MaterialAuthoredInfo::material_is_complete_with(material, &mut check)?;
+    }
     let issues = diagnoses(library, complete);
-    let mut origins = crate::origin_material::library(context, library, reads, writer)?;
-    let references = material_reference::project(library, context, &mut origins, writer)?;
-    let shader_references =
-        crate::material_shader_reference::project(library, context, &mut origins, writer)?;
-    let metadata = MaterialLibraryMetadata {
-        path: Cow::Borrowed(&library.path),
-        single: library.single,
-        default_palette: library.default_palette.as_deref().map(Cow::Borrowed),
-        unknown_entries: library.unknown_entries,
-        authored,
-        materials,
-        references,
-        shader_references,
-        projection_complete: complete,
-    };
-    let payload = MaterialPayload::Library(&metadata);
-    writer.record_with_origins(
-        &Subresource::new(LIBRARY_NAMESPACE, Vec::new()),
-        if complete {
-            Status::Complete
-        } else {
-            Status::Partial
-        },
-        &payload,
-        &issues,
-        origins,
-    )?;
+    crate::material_parts_write::write(context, library, reads, complete, &issues, writer)?;
     Ok(Projection::Written)
 }
-
 fn diagnoses(library: &MaterialLibrary, complete: bool) -> Vec<MediaIssue> {
     let mut issues = Vec::new();
     for loss in &library.authored.losses {

@@ -5,7 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// A source float whose raw word survives non-finite values and signed zero.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct Float32 {
     /// Finite JSON value; non-finite values are explicitly absent.
     value: Option<f32>,

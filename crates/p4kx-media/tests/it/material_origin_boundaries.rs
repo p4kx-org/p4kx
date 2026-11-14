@@ -56,12 +56,17 @@ fn material_origin_site_cut_retains_encryption_and_does_not_starve_other_fields(
 }
 
 #[test]
-fn unchanged_material_payload_admits_its_exact_original_record_bound() -> TestResult {
+fn a_small_batch_budget_repacks_without_changing_logical_material_data() -> TestResult {
     const NAME_BYTES: usize = 16 << 10;
     let source = format!("<Material Name='{}'/>", "x".repeat(NAME_BYTES));
     let fixture = Fixture::new([support::material(MTL, source.as_bytes(), Storage::Plain)])?;
     let original = fs::read(fixture.base.join("material.jsonl"))?;
-    let bound = u64::try_from(original.len())?;
+    let max = original
+        .split_inclusive(|byte| *byte == b'\n')
+        .map(<[u8]>::len)
+        .max()
+        .ok_or("material rows")?;
+    let bound = u64::try_from(max)?;
     let below = bound.checked_sub(1).ok_or("nonempty original record")?;
     assert_index_fits(&fixture, below)?;
     let mut options = support::options();
@@ -71,28 +76,45 @@ fn unchanged_material_payload_admits_its_exact_original_record_bound() -> TestRe
         options.clone(),
         MaterialSourceLimits::default(),
     )?;
-    assert_index_fits(&exact, below)?;
-    assert_eq!(
-        fs::read(exact.base.join("material.jsonl"))?,
-        original,
-        "additive origin transport does not consume the admitted payload bound or alter its bytes"
-    );
+    assert_eq!(fs::read(exact.base.join("material.jsonl"))?, original);
     options.limits.record_bytes = below;
-    let failure = Fixture::with(
+    let repacked = Fixture::with(
         [support::material(MTL, source.as_bytes(), Storage::Plain)],
         options,
         MaterialSourceLimits::default(),
+    )?;
+    assert_ne!(fs::read(repacked.base.join("material.jsonl"))?, original);
+    assert_eq!(repacked.record(MTL)?.1, fixture.record(MTL)?.1);
+    for pointer in [
+        "/data/payload/materials/0/name",
+        "/data/payload/authored/root/name",
+    ] {
+        assert_eq!(
+            support::references(repacked.field(MTL, pointer)?)?,
+            support::references(fixture.field(MTL, pointer)?)?,
+            "original contribution sets survive actual row changes",
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn indivisible_material_item_bound_remains_an_explicit_record_limit() -> TestResult {
+    let source = format!("<Material Name='{}'/>", "x".repeat(16 << 10));
+    let mut options = support::options();
+    options.limits.record_bytes = 16 << 10;
+    let failure = Fixture::with(
+        [support::material(MTL, source.as_bytes(), Storage::Plain)],
+        options.clone(),
+        MaterialSourceLimits::default(),
     )
     .err()
-    .ok_or("record one byte above its bound was admitted")?;
-    assert!(
-        super::converted_artifact_support::contains(
-            failure.as_ref(),
-            |cause| matches!(cause, p4kx_media::MediaError::Limit { budget, limit }
-                if *budget == "record_bytes" && *limit == below)
-        ),
-        "one byte below the exact record size fails specifically at record_bytes: {failure}"
-    );
+    .ok_or("a single field already requires the full budget")?;
+    assert!(super::converted_artifact_support::contains(
+        failure.as_ref(),
+        |cause| matches!(cause, p4kx_media::MediaError::Limit { budget, limit }
+              if *budget == "record_bytes" && *limit == options.limits.record_bytes)
+    ));
     Ok(())
 }
 

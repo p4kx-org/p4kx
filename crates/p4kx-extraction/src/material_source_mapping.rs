@@ -7,7 +7,7 @@ use std::convert::Infallible;
 use p4kx_model::{
     Attributes, AuthoredAttribute, AuthoredAttributeKind, AuthoredContent, Material,
     MaterialEncoding, MaterialEntryDisposition, MaterialLibrary, MaterialSource,
-    MaterialSourceLossKind, RawElement,
+    MaterialSourceEntry, MaterialSourceLoss, MaterialSourceLossKind, RawElement,
 };
 
 use crate::material_source_info::{
@@ -43,33 +43,14 @@ impl<'source> MaterialLibrarySourceInfo<'source> {
     ) -> Result<Self, E> {
         check()?;
         Ok(Self {
-            encoding: encoding(source.encoding),
+            encoding: source.encoding.into(),
             root: source
                 .root
                 .as_ref()
                 .map(|element| MaterialElementInfo::of_with(element, check))
                 .transpose()?,
-            losses: map_with(&source.losses, check, |loss, _| {
-                Ok(MaterialSourceLossInfo {
-                    kind: match loss.kind {
-                        MaterialSourceLossKind::RepairedEncoding => {
-                            MaterialSourceLossInfoKind::RepairedEncoding
-                        }
-                        MaterialSourceLossKind::Elements => MaterialSourceLossInfoKind::Elements,
-                        MaterialSourceLossKind::TextBytes => MaterialSourceLossInfoKind::TextBytes,
-                        MaterialSourceLossKind::Depth => MaterialSourceLossInfoKind::Depth,
-                        _ => MaterialSourceLossInfoKind::Unsupported,
-                    },
-                    indices: loss.indices.clone(),
-                })
-            })?,
-            entries: map_with(&source.entries, check, |entry, _| {
-                Ok(MaterialSourceEntryInfo {
-                    ordinal: entry.ordinal,
-                    element_name: Cow::Borrowed(&entry.element_name),
-                    disposition: disposition(entry.disposition),
-                })
-            })?,
+            losses: map_with(&source.losses, check, |loss, _| Ok(loss.into()))?,
+            entries: map_with(&source.entries, check, |entry, _| Ok(entry.into()))?,
         })
     }
 
@@ -83,7 +64,7 @@ impl<'source> MaterialLibrarySourceInfo<'source> {
     ) -> Result<bool, E> {
         check()?;
         if !source.losses.is_empty()
-            || encoding(source.encoding) == MaterialEncodingInfo::Unsupported
+            || MaterialEncodingInfo::from(source.encoding) == MaterialEncodingInfo::Unsupported
         {
             return Ok(false);
         }
@@ -153,6 +134,30 @@ impl<'source> MaterialAuthoredInfo<'source> {
                 })
                 .collect(),
         }
+    }
+
+    /// Checks retained raw fields for actual loss without copying the source tree.
+    ///
+    /// # Errors
+    /// Returns the caller's checkpoint error.
+    pub fn material_is_complete_with<E>(
+        material: &Material,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<bool, E> {
+        check()?;
+        if !material.truncated.is_empty() {
+            return Ok(false);
+        }
+        for element in material
+            .elements
+            .iter()
+            .chain(material.textures.iter().flat_map(|slot| &slot.children))
+        {
+            if !element_is_complete(element, check)? {
+                return Ok(false);
+            }
+        }
+        Ok(true)
     }
 
     /// Returns whether the existing bounded field projections contain no diagnosed loss.
@@ -240,11 +245,40 @@ fn element_is_complete<E>(
     Ok(true)
 }
 
-const fn encoding(value: MaterialEncoding) -> MaterialEncodingInfo {
-    match value {
-        MaterialEncoding::Text => MaterialEncodingInfo::Text,
-        MaterialEncoding::CryXml => MaterialEncodingInfo::CryXml,
-        _ => MaterialEncodingInfo::Unsupported,
+impl From<MaterialEncoding> for MaterialEncodingInfo {
+    fn from(value: MaterialEncoding) -> Self {
+        match value {
+            MaterialEncoding::Text => Self::Text,
+            MaterialEncoding::CryXml => Self::CryXml,
+            _ => Self::Unsupported,
+        }
+    }
+}
+
+impl<'source> From<&'source MaterialSourceEntry> for MaterialSourceEntryInfo<'source> {
+    fn from(entry: &'source MaterialSourceEntry) -> Self {
+        Self {
+            ordinal: entry.ordinal,
+            element_name: Cow::Borrowed(&entry.element_name),
+            disposition: disposition(entry.disposition),
+        }
+    }
+}
+
+impl From<&MaterialSourceLoss> for MaterialSourceLossInfo {
+    fn from(loss: &MaterialSourceLoss) -> Self {
+        Self {
+            kind: match loss.kind {
+                MaterialSourceLossKind::RepairedEncoding => {
+                    MaterialSourceLossInfoKind::RepairedEncoding
+                }
+                MaterialSourceLossKind::Elements => MaterialSourceLossInfoKind::Elements,
+                MaterialSourceLossKind::TextBytes => MaterialSourceLossInfoKind::TextBytes,
+                MaterialSourceLossKind::Depth => MaterialSourceLossInfoKind::Depth,
+                _ => MaterialSourceLossInfoKind::Unsupported,
+            },
+            indices: loss.indices.clone(),
+        }
     }
 }
 
@@ -256,7 +290,7 @@ const fn disposition(value: MaterialEntryDisposition) -> MaterialEntryDispositio
     }
 }
 
-fn attribute_info(attribute: &AuthoredAttribute) -> MaterialAttributeInfo<'_> {
+pub(crate) fn attribute_info(attribute: &AuthoredAttribute) -> MaterialAttributeInfo<'_> {
     MaterialAttributeInfo {
         name: Cow::Borrowed(&attribute.name),
         value: Cow::Borrowed(&attribute.value),
@@ -275,7 +309,7 @@ fn attribute_info(attribute: &AuthoredAttribute) -> MaterialAttributeInfo<'_> {
     }
 }
 
-fn content_info(content: &AuthoredContent) -> MaterialContentInfo<'_> {
+pub(crate) fn content_info(content: &AuthoredContent) -> MaterialContentInfo<'_> {
     match content {
         AuthoredContent::Text { value, lexeme } => MaterialContentInfo::Text {
             value: Cow::Borrowed(value),
@@ -299,10 +333,16 @@ fn parameters(attributes: &Attributes) -> Vec<MaterialParameterInfo<'_>> {
     attributes.iter().map(parameter).collect()
 }
 
-fn parameter((name, value): &(String, String)) -> MaterialParameterInfo<'_> {
-    MaterialParameterInfo {
-        name: Cow::Borrowed(name),
-        value: Cow::Borrowed(value),
+pub(crate) fn parameter((name, value): &(String, String)) -> MaterialParameterInfo<'_> {
+    (name.as_str(), value.as_str()).into()
+}
+
+impl<'source> From<(&'source str, &'source str)> for MaterialParameterInfo<'source> {
+    fn from((name, value): (&'source str, &'source str)) -> Self {
+        Self {
+            name: Cow::Borrowed(name),
+            value: Cow::Borrowed(value),
+        }
     }
 }
 

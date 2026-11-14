@@ -12,10 +12,10 @@ use crate::origin_reference::{
     self, ReferenceIdentifier, ReferenceOriginInputs, ReferenceSubresource,
 };
 use crate::shader_origins::{ShaderCandidateInput, ShaderReferenceOrigins};
-use crate::{InputReceipt, MediaError, MediaWriter, SourceContext, origin_error};
+use crate::{InputReceipt, MediaError, MediaWriter, SourceContext};
 
 pub(crate) fn write(
-    position: usize,
+    prefix: &FieldPath,
     reference: &MaterialShaderReference,
     shader_attribute: Option<usize>,
     origins: &ShaderReferenceOrigins,
@@ -24,23 +24,19 @@ pub(crate) fn write(
     writer: &MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let usage = Usage::capture(reference, shader_attribute, context, writer)?;
-    let mut prefix = FieldPath::parse("/data/payload/shader_references")
-        .map_err(|cause| origin_error::address(&cause))?;
-    prefix
-        .push_index(position)
-        .map_err(|cause| origin_error::address(&cause))?;
+
     let inputs = usage.reference_inputs(reference, origins);
-    prepared.insert(&prefix, inputs.resolution(writer)?, writer)?;
-    usage.scalars(prepared, &prefix, reference, writer)?;
+    prepared.insert(prefix, inputs.resolution(writer)?, writer)?;
+    usage.scalars(prepared, prefix, reference, writer)?;
     inputs.write(
         prepared,
-        &origin_reference::child(&prefix, "reference")?,
+        &origin_reference::child(prefix, "reference")?,
         &reference.reference,
         writer,
     )?;
     receipt(
         prepared,
-        &origin_reference::child(&prefix, "input")?,
+        &origin_reference::child(prefix, "input")?,
         reference,
         origins,
         &usage,

@@ -28,7 +28,27 @@ Cached path-index work shares the generation-wide metadata_work bound with metad
 
 ## Consumers and versions
 
-The material provider is version 1.1.0 within the existing media 1.0 envelope. Its owned library/failure namespaces have typed schema constraints; custom provider namespaces retain their generic contract. `model info --json` keeps all existing fields and adds shared authored metadata under library/material descriptions.
+The material provider is version 1.2.0 within the existing media 1.0 envelope. Each successfully
+parsed physical source starts with a `material-library-header` record and ends with a
+`material-library-end` record. Between them, `material-library-part` carries authored XML trees,
+material surfaces and other original fields. `material-reference` carries layer, texture and
+palette declarations. `material-shader-reference` carries shader and flag lookups. A structured
+parse failure remains one `material-library-failure` record.
+
+A batch carries ordered `data.payload.items`. Its sole `subresource.indices` value is the starting
+item ordinal in that namespace for the same physical source. Source identity consists of the root
+archive digest and the ordered physical container and Entry identities. The completion record
+counts items in each batch family. A source tree uses local preorder element IDs with an explicit
+parent ID and retained child position. Original XML ordinals remain separate. Source coverage and
+projection status are on the header. Each actually serialized value keeps its field-origin row,
+addressed against its own occurrence and actual item path. Grouping may change with the caller's
+record budget. A single still-oversized item fails with the existing typed budget error.
+
+The current schema and `p4kx_media::reconstruct_material_library` also accept the legacy
+`material-library` record. Reconstruction checks ordering, counts, source identity and typed
+positions before restoring the earlier logical record shape. Field-origin pointers belong to the
+original transport records. Custom provider namespaces retain their generic contract.
+`model info --json` keeps its separate material description.
 
 Blender package format 1.9 adds `material_libraries`, once per distinct retained reader path/authored root, and each material's `source_library` link. Existing material index/single semantics, graph inputs, palettes, GLB values and older raw fields keep their meaning. Equal source-object pointers are only a private deduplication shortcut backed by retained ownership; separate objects require complete path/content equality. Different authored roots with one renderer identity both survive and are diagnosed as ambiguous. These are source descriptions, not physical Archive identity proofs; media records carry physical provenance. Older manifests omit the new fields and remain readable. The repository importer recognises minor 1.9 and leaves rendering behavior on the established fields.
 
@@ -48,8 +68,8 @@ Blender import/render success alone does not prove source completeness or game s
 
 ## Shader-name and selected-flag references
 
-`shader_references` is an additive material-library field. Its shader and flag roles are separate
-from existing layer/texture/palette references. Original authored attribute positions and selected
+Shader and flag lookups appear in `material-shader-reference` batches and reconstruct into
+`shader_references`. They retain their own roles alongside layer, texture and palette references. Original authored attribute positions and selected
 token positions survive, including duplicates, empty Shader attributes and unresolved names. No
 reference is fabricated from an absent Shader attribute or an engine-default material slot.
 Each reference retains a common explicit resolution plus an optional actual `InputReceipt`.

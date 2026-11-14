@@ -27,8 +27,8 @@ impl Provider for MaterialProvider {
         let mut capability = Capability::new(
             MediaKind::Material,
             "p4kx.material.library",
-            "1.1.0",
-            "Exact original decoded MTL bytes remain solely in the common RawReference; bounded UTF8/CryXml authored root syntax and existing interpreted surfaces are separate projections, without geometry conversion; selected shader-reference inputs are read explicitly with their own receipts.",
+            "1.2.0",
+            "Exact original decoded MTL bytes remain solely in the common RawReference; ordered UTF8/CryXml authored root parts and interpreted surfaces are streamed separately, without geometry conversion; selected shader-reference inputs are read explicitly with their own receipts.",
         );
         capability.field_groups = vec![
             FieldGroup::new(

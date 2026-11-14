@@ -76,7 +76,7 @@ the [generic record schema](../schemas/media-record.schema.json) remains availab
 
 ## Material declaration links
 
-With `--kind material --kind shader`, each material-library payload adds `shader_references`.
+With `--kind material --kind shader`, material libraries emit `material-shader-reference` batches.
 The ordinary layer/texture/palette `references` array remains unchanged. Each new reference retains
 its original material index, authored attribute position, optional selected-token position, role,
 original shader name and original token. Absent Shader attributes and engine-default placeholder

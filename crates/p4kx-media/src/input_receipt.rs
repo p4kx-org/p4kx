@@ -2,13 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::origin_input::MediaOriginInput;
 use crate::{Digest, Source, Subresource};
 
 /// Why required input bytes have no published raw reference.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum InputOmission {
@@ -19,7 +19,7 @@ pub enum InputOmission {
 }
 
 /// Verified physical input evidence, independent of callback selection.
-#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[schemars(extend("required" = ["source", "digest", "omission", "use_at"]))]
 #[non_exhaustive]
 pub struct InputReceipt {

@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 use p4kx_extraction::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::material_reference::MaterialReference;
 use crate::material_surface::MaterialSurface;
@@ -13,6 +13,7 @@ use crate::material_surface::MaterialSurface;
 /// Built-in material payloads, separate from the common physical-source envelope.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "record_type", content = "payload", rename_all = "kebab-case")]
+#[schemars(rename = "LegacyMaterialPayload")]
 #[non_exhaustive]
 pub enum MaterialPayload<'source> {
     /// One source-library record including unused libraries and all original material slots.
@@ -21,8 +22,39 @@ pub enum MaterialPayload<'source> {
     Failure(MaterialProjectionFailure),
 }
 
-/// One physical material source with explicit shader-input receipts and no geometry conversion.
 #[derive(Debug, Serialize, JsonSchema)]
+#[serde(tag = "record_type", content = "payload", rename_all = "kebab-case")]
+pub(crate) enum StreamMaterialPayload<'wire, 'source, Part, Reference, Shader> {
+    LibraryHeader(crate::material_parts::MaterialLibraryHeader<'source>),
+    Part(crate::material_part_batch::BatchItems<'wire, Part>),
+    Reference(crate::material_part_batch::BatchItems<'wire, Reference>),
+    ShaderReference(crate::material_part_batch::BatchItems<'wire, Shader>),
+    LibraryEnd(crate::material_parts::MaterialLibraryEnd),
+}
+
+type RawItem = Box<serde_json::value::RawValue>;
+
+pub(crate) type StreamMaterialWire<'wire, 'source> =
+    StreamMaterialPayload<'wire, 'source, RawItem, RawItem, RawItem>;
+
+type StreamMaterialSchema<'source> = StreamMaterialPayload<
+    'source,
+    'source,
+    crate::material_parts::MaterialPart<'source>,
+    MaterialReference,
+    crate::material_shader_reference::MaterialShaderReference,
+>;
+
+#[expect(dead_code, reason = "schema unifies the concrete writer variants")]
+#[derive(JsonSchema)]
+#[serde(untagged)]
+pub(crate) enum AnyMaterialPayload<'source> {
+    Legacy(MaterialPayload<'source>),
+    Streamed(StreamMaterialSchema<'source>),
+}
+
+/// One physical material source with explicit shader-input receipts and no geometry conversion.
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[schemars(extend("allOf" = [{"required": ["default_palette"]}]))]
 #[non_exhaustive]
 pub struct MaterialLibraryMetadata<'source> {
@@ -47,7 +79,7 @@ pub struct MaterialLibraryMetadata<'source> {
 }
 
 /// One original material position with raw source and interpreted values kept distinct.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
 pub struct MaterialMetadata<'source> {
     /// Original library material index, also zero for a single-material source.
@@ -61,7 +93,7 @@ pub struct MaterialMetadata<'source> {
 }
 
 /// Stable structured-read failure without replacing its exact raw source artifact.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[non_exhaustive]
 pub struct MaterialProjectionFailure {
     /// Actual reader failure category.
@@ -69,7 +101,7 @@ pub struct MaterialProjectionFailure {
 }
 
 /// Material reader failure category, independent of Archive I/O or cancellation.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum MaterialFailureReason {

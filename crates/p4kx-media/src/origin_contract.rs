@@ -88,6 +88,8 @@ pub enum OriginProfile {
     TextureConversion,
     /// Successfully parsed material library and its actually used companions.
     MaterialLibrary,
+    /// One header or typed row from an original material library.
+    MaterialPart,
     /// Material parser failure after actual source-content inspection.
     MaterialFailure,
     /// Material source-size refusal before content inspection.

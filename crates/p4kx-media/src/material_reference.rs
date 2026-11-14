@@ -3,7 +3,7 @@
 
 use p4kx_extraction::model::{Material, MaterialLibrary};
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::{
     CandidateInventory, MediaError, MediaKind, MediaWriter, OriginalIdentifier, Reference,
@@ -11,7 +11,7 @@ use crate::{
 };
 
 /// Role of an original material declaration, without inferred target existence.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]
 #[non_exhaustive]
 pub enum MaterialReferenceRole {
@@ -26,7 +26,7 @@ pub enum MaterialReferenceRole {
 }
 
 /// One ordered declaration with separate original tokens and central resolution.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, Deserialize, JsonSchema)]
 #[schemars(extend("allOf" = [{"required": ["material", "slot", "submaterial"]}]))]
 #[non_exhaustive]
 pub struct MaterialReference {
@@ -45,13 +45,15 @@ pub struct MaterialReference {
 pub(crate) fn project(
     library: &MaterialLibrary,
     context: &SourceContext<'_>,
-    origins: &mut crate::origin_prepared::PreparedRecordOrigins,
     writer: &mut MediaWriter<'_>,
-) -> Result<Vec<MaterialReference>, MediaError> {
-    let mut references = Vec::new();
+) -> Result<u64, MediaError> {
+    let mut output = crate::material_part_batch::Batch::new(
+        context,
+        crate::material_part_batch::Band::Reference,
+    );
     if let Some(palette) = &library.default_palette {
         append(
-            &mut references,
+            &mut output,
             Declaration {
                 role: MaterialReferenceRole::DefaultPalette,
                 material: None,
@@ -60,36 +62,27 @@ pub(crate) fn project(
                 token: palette,
             },
             context,
-            origins,
             writer,
         )?;
     }
     for (material_index, material) in library.materials.iter().enumerate() {
-        append_material(
-            &mut references,
-            material_index,
-            material,
-            context,
-            origins,
-            writer,
-        )?;
+        append_material(&mut output, material_index, material, context, writer)?;
     }
-    Ok(references)
+    output.finish(writer)
 }
 
 fn append_material(
-    references: &mut Vec<MaterialReference>,
+    output: &mut crate::material_part_batch::Batch<'_, '_>,
     material_index: usize,
     material: &Material,
     context: &SourceContext<'_>,
-    origins: &mut crate::origin_prepared::PreparedRecordOrigins,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     for (layer_index, layer) in material.layers.iter().enumerate() {
         writer.checkpoint()?;
         if let Some(path) = layer.attribute("Path") {
             append(
-                references,
+                output,
                 Declaration {
                     role: MaterialReferenceRole::LayerLibrary,
                     material: Some(material_index),
@@ -98,7 +91,6 @@ fn append_material(
                     token: path,
                 },
                 context,
-                origins,
                 writer,
             )?;
         }
@@ -111,7 +103,7 @@ fn append_material(
             MaterialReferenceRole::Texture
         };
         append(
-            references,
+            output,
             Declaration {
                 role,
                 material: Some(material_index),
@@ -120,7 +112,6 @@ fn append_material(
                 token: &texture.file,
             },
             context,
-            origins,
             writer,
         )?;
     }
@@ -136,10 +127,9 @@ struct Declaration<'a> {
 }
 
 fn append(
-    references: &mut Vec<MaterialReference>,
+    output: &mut crate::material_part_batch::Batch<'_, '_>,
     declaration: Declaration<'_>,
     context: &SourceContext<'_>,
-    origins: &mut crate::origin_prepared::PreparedRecordOrigins,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let original = if matches!(declaration.role, MaterialReferenceRole::EnginePlaceholder) {
@@ -164,16 +154,16 @@ fn append(
         submaterial: declaration.submaterial.map(str::to_owned),
         reference: resolution.reference,
     };
+    let mut prepared = crate::material_parts_origins::prepared(context, writer)?;
     crate::material_reference_origins::write(
-        references.len(),
+        &crate::material_parts_origins::payload()?,
         &reference,
         &resolution.origins,
         context,
-        origins,
+        &mut prepared,
         writer,
     )?;
-    references.push(reference);
-    Ok(())
+    output.push(&reference, prepared, writer)
 }
 
 fn resolve(

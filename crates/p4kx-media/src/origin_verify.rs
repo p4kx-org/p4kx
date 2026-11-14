@@ -173,6 +173,7 @@ fn record_profile(kind: MediaKind, profile: OriginProfile) -> bool {
         MediaKind::Material => matches!(
             profile,
             OriginProfile::MaterialLibrary
+                | OriginProfile::MaterialPart
                 | OriginProfile::MaterialFailure
                 | OriginProfile::MaterialSourceLimit
                 | OriginProfile::MaterialConfigurationFailure

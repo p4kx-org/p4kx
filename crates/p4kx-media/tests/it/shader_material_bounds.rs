@@ -138,7 +138,7 @@ fn material_shader_references_validate_in_the_actual_builtin_schema() -> TestRes
         &support::options(),
     )?;
     let validator = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
-    for row in &result.materials {
+    for row in &result.material_rows {
         assert!(validator.is_valid(&serde_json::to_value(row)?));
     }
     Ok(())
