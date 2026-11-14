@@ -11,6 +11,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::model_info_animations::{AnimationInfo, UnreadInfo};
+use crate::model_info_materials::receipt::MaterialFieldReceipt;
 use crate::model_info_materials::{DefaultMaterialInfo, LibraryInfo, MaterialInfo};
 use crate::{AnimationListing, AnimationSet, ModelSource};
 
@@ -36,6 +37,8 @@ pub struct ModelInfo<'a> {
     pub default_material: Option<DefaultMaterialInfo<'a>>,
     /// The materials of the library.
     pub materials: Vec<MaterialInfo<'a>>,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    material_receipt: Option<&'a MaterialFieldReceipt>,
     /// The list of material indices of the node table.
     pub node_material_indices: &'a [u16],
     /// What a lenient read worked around, as sentences.
@@ -89,6 +92,7 @@ impl<'a> ModelInfo<'a> {
             library: LibraryInfo::of(model),
             default_material: source.default_material().map(DefaultMaterialInfo::of),
             materials: MaterialInfo::of_model(model),
+            material_receipt: source.material_receipt(),
             node_material_indices: &model.material_indices,
             issues: model.issues.iter().map(ToString::to_string).collect(),
             nodes: NodeInfo::of_model(model),

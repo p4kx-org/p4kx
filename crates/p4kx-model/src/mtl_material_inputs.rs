@@ -285,6 +285,7 @@ pub(crate) fn layers<'source, Interrupted>(
                 "Layer",
                 observer,
             )?;
+            observe_layer_attributes(layer, site, input, index, observer)?;
             let layer = MaterialLayer {
                 attributes: mtl_raw::attributes(layer),
                 surface: None,
@@ -303,6 +304,26 @@ pub(crate) fn layers<'source, Interrupted>(
         }
     }
     Ok(layers)
+}
+
+fn observe_layer_attributes<'source, Interrupted>(
+    layer: impl XmlElement<'source>,
+    site: ReadSite,
+    input: FieldElement,
+    index: usize,
+    observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
+) -> Result<(), MaterialReadError<Interrupted>> {
+    for (attribute, (name, _)) in layer.attributes().enumerate() {
+        token_site(
+            site,
+            input,
+            MaterialReadField::LayerAttribute { index, attribute },
+            name,
+            attribute,
+            observer,
+        )?;
+    }
+    Ok(())
 }
 
 fn collect_site<Interrupted>(

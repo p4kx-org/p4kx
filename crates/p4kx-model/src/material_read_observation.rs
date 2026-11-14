@@ -33,7 +33,7 @@ pub enum MaterialReadField {
     Palette,
     /// Whether the selected library is a single material.
     LibrarySingle,
-    /// The admitted nonempty default palette attribute.
+    /// The authored default palette attribute or its observed absence.
     LibraryDefaultPalette,
     /// The selected material list's cardinality.
     LibraryTotal,
@@ -71,6 +71,13 @@ pub enum MaterialReadField {
     Layer {
         /// Position in the retained output collection.
         index: usize,
+    },
+    /// One original authored layer attribute, in the retained order.
+    LayerAttribute {
+        /// Position in the retained layer list.
+        index: usize,
+        /// Position in the retained attribute list.
+        attribute: usize,
     },
     /// The layer's selected authored name.
     LayerName {

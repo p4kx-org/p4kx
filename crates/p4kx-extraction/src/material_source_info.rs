@@ -1,10 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+//! Positional authored material XML and interpreted material source descriptions.
+
 use std::borrow::Cow;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+#[path = "material_source_site.rs"]
+mod site;
+pub use self::site::MaterialSourceSite;
 
 use crate::material_xml_info::{MaterialElementInfo, MaterialParameterInfo};
 

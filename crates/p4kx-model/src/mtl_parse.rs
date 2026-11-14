@@ -63,21 +63,20 @@ fn default_palette<'source, Interrupted>(
     observer: &mut impl FnMut(MaterialReadObservation<'_>) -> Result<(), Interrupted>,
 ) -> Result<Option<String>, Interrupted> {
     let palette = root.positioned_attribute("DefaultPalette");
-    if let Some(palette) = palette.filter(|palette| !palette.value.is_empty()) {
-        ReadSite::ROOT.token(
-            FieldElement::Material,
-            MaterialReadField::LibraryDefaultPalette,
-            FieldToken {
-                name: palette.name,
-                ordinal: Some(palette.ordinal),
-                use_kind: MaterialReadUse::Authored,
-            },
-            observer,
-        )?;
-        Ok(Some(palette.value.to_owned()))
+    let use_kind = if palette.is_some() {
+        MaterialReadUse::Authored
     } else {
-        Ok(None)
-    }
+        MaterialReadUse::Selected
+    };
+    ReadSite::ROOT.token(
+        FieldElement::Material,
+        MaterialReadField::LibraryDefaultPalette,
+        FieldToken::attribute("DefaultPalette", palette.as_ref(), use_kind),
+        observer,
+    )?;
+    Ok(palette
+        .filter(|attribute| !attribute.value.is_empty())
+        .map(|attribute| attribute.value.to_owned()))
 }
 
 fn observe_selection<Interrupted>(

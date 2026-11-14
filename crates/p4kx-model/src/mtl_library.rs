@@ -39,7 +39,11 @@ impl MaterialLibrary {
         reading: MaterialReading,
         cache: &LayerCache,
     ) -> Result<Self, MaterialError> {
-        let mut library = Self::parse(path, bytes)?;
+        let mut library = if let Some(observer) = resolver.observe_material_fields() {
+            mtl_source_read::parse_observed(path, bytes, observer)?
+        } else {
+            Self::parse(path, bytes)?
+        };
         library.target = target;
         if reading == MaterialReading::Drawn {
             crate::mtl_layers::resolve(&mut library, resolver, cache);

@@ -14,6 +14,7 @@ pub use crate::archive_material_reference::{ArchiveDefaultMaterial, ArchiveDefau
 use crate::chunk_source::ChunkSource;
 use crate::disk_case::CaseIndex;
 use crate::model_companions::{ArchiveCompanions, DiskCompanions};
+use crate::model_info_materials::receipt::{MaterialFieldReceipt, Observations};
 use crate::path_index::PathIndex;
 use crate::source_protection::SourceProtection;
 use crate::source_provenance::model_material_origins::MaterialObservation;
@@ -36,6 +37,7 @@ pub struct ModelSource {
     model: Model,
     archive_sources: Vec<ModelArchiveSource>,
     default_material: Option<Arc<ArchiveDefaultMaterial>>,
+    material_receipt: Option<MaterialFieldReceipt>,
 }
 
 impl ModelSource {
@@ -151,6 +153,7 @@ impl ModelSource {
             verdicts,
             model_sources: None,
             material_observation,
+            material_fields: None,
         };
         MaterialStatus::load_with(
             Some(library),
@@ -215,6 +218,7 @@ impl ModelSource {
             verdicts,
             model_sources: None,
             material_observation,
+            material_fields: None,
         };
         cache.library_with_read_origin(path, &mut companions, budget)
     }
@@ -327,7 +331,22 @@ impl ModelSource {
             model,
             archive_sources: Vec::new(),
             default_material: None,
+            material_receipt: None,
         })
+    }
+
+    /// Adds unknown archive lineage to the material fields of a model read from disk.
+    ///
+    /// # Errors
+    /// Returns an error if field origins could not be recorded.
+    pub fn from_file_with_material_receipt(path: &Path) -> Result<Self, ConversionError> {
+        let mut source = Self::from_file_reading(path, LodSelection::All, MaterialReading::Plain)?;
+        source.material_receipt = Observations::default().project(&source.model, None, None)?;
+        Ok(source)
+    }
+
+    pub(crate) const fn material_receipt(&self) -> Option<&MaterialFieldReceipt> {
+        self.material_receipt.as_ref()
     }
 
     /// Returns the name of the model: its Entry path or its path on disk.

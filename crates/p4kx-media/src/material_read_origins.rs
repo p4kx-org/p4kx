@@ -182,6 +182,7 @@ const fn surface_field(field: MaterialReadField) -> SurfaceField {
         | MaterialReadField::PublicParam { .. }
         | MaterialReadField::Layers
         | MaterialReadField::Layer { .. }
+        | MaterialReadField::LayerAttribute { .. }
         | MaterialReadField::LayerName { .. }
         | MaterialReadField::LayerPath { .. }
         | MaterialReadField::LayerPaletteTint { .. } => SurfaceField::Other,

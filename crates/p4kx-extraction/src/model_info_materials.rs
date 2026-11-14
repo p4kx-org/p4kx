@@ -4,6 +4,9 @@
 use p4kx_model::{Material, MaterialStatus, Model};
 use serde::Serialize;
 
+#[path = "model_material_receipt.rs"]
+pub(crate) mod receipt;
+
 use crate::material_source_info::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
 use crate::{ArchiveDefaultMaterial, DefaultMaterialReceipt};
 

@@ -17,7 +17,7 @@ use crate::model_info::info;
 /// Runs `p4kx model info` or `p4kx model glb`.
 pub(crate) fn run(args: &ModelArgs, as_json: bool) -> Result<()> {
     match &args.action {
-        ModelAction::Info(source) => info(&open_listing(source)?, as_json),
+        ModelAction::Info(source) => info(&open_listing(source, as_json)?, as_json),
         action @ ModelAction::Glb { .. } => model_glb::run(action, as_json),
     }
 }
@@ -50,23 +50,34 @@ pub(crate) fn disk_animations(
 }
 
 /// Opens the model `source` names and lists its animations from their headers.
-fn open_listing(source: &ModelFileSource) -> Result<(ModelSource, AnimationListing)> {
+fn open_listing(
+    source: &ModelFileSource,
+    with_material_receipt: bool,
+) -> Result<(ModelSource, AnimationListing)> {
     if let Some(entry) = &source.entry {
         let archive = crate::key::open(&source.path)?;
         let index = PathIndex::new(&archive);
-        let model = ModelSource::from_index_reading(
-            &index,
-            entry,
-            LodSelection::All,
-            PositionBox::default(),
-            MaterialReading::Plain,
-            &TextureVerdicts::new(),
-        )?;
+        let verdicts = TextureVerdicts::new();
+        let model = if with_material_receipt {
+            ModelSource::from_index_with_material_receipt(&index, entry, &verdicts)?
+        } else {
+            ModelSource::from_index_reading(
+                &index,
+                entry,
+                LodSelection::All,
+                PositionBox::default(),
+                MaterialReading::Plain,
+                &verdicts,
+            )?
+        };
         let listing = AnimationListing::from_archive(&index, entry, &source.animation_sources)?;
         return Ok((model, listing));
     }
-    let model =
-        ModelSource::from_file_reading(&source.path, LodSelection::All, MaterialReading::Plain)?;
+    let model = if with_material_receipt {
+        ModelSource::from_file_with_material_receipt(&source.path)?
+    } else {
+        ModelSource::from_file_reading(&source.path, LodSelection::All, MaterialReading::Plain)?
+    };
     let extra: Vec<PathBuf> = source.animation_sources.iter().map(PathBuf::from).collect();
     let listing = AnimationListing::from_disk(&source.path, &extra)?;
     Ok((model, listing))

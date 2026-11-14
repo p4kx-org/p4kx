@@ -5,7 +5,8 @@ use std::error::Error;
 
 use crate::build::MAX_LOD;
 use crate::{
-    MaterialCompanion, MaterialCompanionUse, MaterialReadOrigin, MaterialRequest, ModelFile,
+    MaterialCompanion, MaterialCompanionUse, MaterialReadObservation, MaterialReadOrigin,
+    MaterialRequest, ModelFile,
 };
 
 /// Returns the names of the files next to the model file `name` that reading it can fetch: the
@@ -94,6 +95,11 @@ pub trait CompanionResolver {
         _usage: MaterialCompanionUse,
         _origin: Option<&MaterialReadOrigin>,
     ) {
+    }
+
+    /// Returns the observer for original fields consumed while parsing the main material library.
+    fn observe_material_fields(&mut self) -> Option<&mut dyn FnMut(MaterialReadObservation<'_>)> {
+        None
     }
 
     /// Returns whether the texture `file`, as a material file names it, holds no colour of its own,

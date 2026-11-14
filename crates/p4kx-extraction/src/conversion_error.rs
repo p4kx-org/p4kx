@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::error::Error as StdError;
 use std::io;
 use std::path::PathBuf;
 
@@ -22,6 +23,9 @@ pub enum ConversionError {
     /// Original source evidence could not be represented.
     #[error(transparent)]
     SourceEvidence(#[from] SourceEvidenceError),
+    /// A model listing could not record material field origins.
+    #[error("cannot record original material field origins")]
+    MaterialSourceEvidence(#[source] Box<dyn StdError + Send + Sync>),
     /// The Archive holds no Entry with the requested path.
     #[error(transparent)]
     UnknownEntry(#[from] UnknownEntries),

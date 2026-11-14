@@ -206,6 +206,7 @@ fn parse_observed(
         folder: "",
         verdicts,
         model_sources: None,
+        material_fields: None,
         material_observation: Some(MaterialObservation {
             reads: &reads,
             used: Some(&mut origins),

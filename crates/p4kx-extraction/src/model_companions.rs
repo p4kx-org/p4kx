@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use p4kx_archive::{Archive, Entry};
 use p4kx_model::{
     CompanionError, CompanionPath, CompanionResolver, MaterialCompanion, MaterialCompanionUse,
-    MaterialReadOrigin, MaterialRequest, ModelFile,
+    MaterialReadObservation, MaterialReadOrigin, MaterialRequest, ModelFile,
 };
 use thiserror::Error;
 
@@ -42,6 +42,7 @@ pub(crate) struct ArchiveCompanions<'i, 'a> {
     pub(crate) verdicts: &'i TextureVerdicts,
     pub(crate) model_sources: Option<&'i mut Vec<ModelArchiveSource>>,
     pub(crate) material_observation: Option<MaterialObservation<'i>>,
+    pub(crate) material_fields: Option<&'i mut dyn FnMut(MaterialReadObservation<'_>)>,
 }
 
 impl CompanionResolver for ArchiveCompanions<'_, '_> {
@@ -92,6 +93,12 @@ impl CompanionResolver for ArchiveCompanions<'_, '_> {
         {
             used.record(usage, entry);
         }
+    }
+
+    fn observe_material_fields(&mut self) -> Option<&mut dyn FnMut(MaterialReadObservation<'_>)> {
+        self.material_fields
+            .as_mut()
+            .map(|observer| &mut **observer as _)
     }
 
     fn texture_is_grey(&mut self, file: &str) -> Option<bool> {

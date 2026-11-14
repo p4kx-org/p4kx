@@ -3,13 +3,12 @@
 
 use std::collections::BTreeMap;
 
-use p4kx_extraction::model::{
-    MaterialReadError, MaterialReadField, MaterialReadObservation, MaterialReadUse,
-};
+use p4kx_extraction::material_source_info::MaterialSourceSite;
+use p4kx_extraction::model::{MaterialReadError, MaterialReadField, MaterialReadObservation};
 
 use p4kx_extraction::{
     Archive, Entry, FieldOrigin, FieldOrigins, FieldOriginsError, FieldPath, FieldPathError,
-    SourceEvidenceError, SourceInventory, SourceLocation, SourceUse, SourceUseRole,
+    SourceEvidenceError, SourceInventory, SourceUse,
 };
 use thiserror::Error;
 
@@ -33,12 +32,7 @@ pub(crate) enum EvidenceError {
     UnknownRole,
 }
 
-type Sites = BTreeMap<MaterialReadField, Vec<Site>>;
-
-struct Site {
-    location: SourceLocation,
-    role: SourceUseRole,
-}
+type Sites = BTreeMap<MaterialReadField, Vec<MaterialSourceSite>>;
 
 #[derive(Default)]
 pub(crate) struct Observations {
@@ -53,6 +47,9 @@ impl Observations {
         observation: MaterialReadObservation<'_>,
     ) -> Result<(), EvidenceError> {
         let field = observation.field;
+        if matches!(field, MaterialReadField::LayerAttribute { .. }) {
+            return Ok(());
+        }
         let library = matches!(
             field,
             MaterialReadField::LibrarySingle
@@ -67,31 +64,9 @@ impl Observations {
         } else {
             return Ok(());
         };
-        let mut indices = observation
-            .indices
-            .iter()
-            .map(|&index| index as u64)
-            .collect::<Vec<_>>();
-        let namespace = observation
-            .attribute_ordinal
-            .map_or("materialXmlElement", |attribute| {
-                indices.push(attribute as u64);
-                "materialXmlAttribute"
-            });
-        let role = match observation.use_kind {
-            MaterialReadUse::Authored => SourceUseRole::Payload,
-            MaterialReadUse::Selected => SourceUseRole::Selector,
-            MaterialReadUse::Interpreted => SourceUseRole::Conversion,
-            _ => return Err(EvidenceError::UnknownRole),
-        };
-        sites.entry(field).or_default().push(Site {
-            location: SourceLocation::Subresource {
-                namespace: namespace.into(),
-                indices,
-                field: observation.source_field.into(),
-            },
-            role,
-        });
+        let site =
+            MaterialSourceSite::from_observation(observation).ok_or(EvidenceError::UnknownRole)?;
+        sites.entry(field).or_default().push(site);
         Ok(())
     }
 
@@ -162,7 +137,10 @@ impl Writer<'_> {
         for field in fields {
             let observed = sites.get(&field).ok_or(EvidenceError::Missing { field })?;
             for site in observed {
-                uses.push(self.sources.subresource(site.location.clone(), site.role)?);
+                uses.push(
+                    self.sources
+                        .subresource(site.location().clone(), site.role())?,
+                );
             }
         }
         Ok(self.sources.origin(&uses))

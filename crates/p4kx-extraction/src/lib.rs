@@ -76,7 +76,7 @@ pub mod hirc_view;
 mod loaded_dataforge;
 mod localization;
 mod localization_set;
-mod material_source_info;
+pub mod material_source_info;
 mod material_source_mapping;
 mod material_source_owned;
 mod material_xml_info;

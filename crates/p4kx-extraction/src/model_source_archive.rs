@@ -3,23 +3,43 @@
 
 use p4kx_chunks::ChunkFile;
 use p4kx_model::{
-    CompanionResolver, LodSelection, MaterialReading, Model, ModelError, ModelFile,
-    ModelNodeSources, ModelReadSources, PositionBox,
+    CompanionResolver, LodSelection, MaterialReadObservation, MaterialReading, Model, ModelError,
+    ModelFile, ModelNodeSources, ModelReadSources, PositionBox,
 };
 
 use super::{ModelSource, split_entry_path};
-use crate::ConversionError;
 use crate::chunk_source::ChunkSource;
 use crate::model_companions::ArchiveCompanions;
+use crate::model_info_materials::receipt::Observations;
 use crate::path_index::PathIndex;
 use crate::source_provenance::ModelArchiveSource;
+use crate::source_provenance::model_material_origins::MaterialObservation;
 use crate::texture_grey::TextureVerdicts;
+use crate::{ArchiveMaterialReads, ConversionError, MaterialArchiveOrigins};
 
 #[derive(Clone, Copy)]
 enum Coordinates {
     Skip,
     Nodes,
     NodesAndBones,
+    MaterialListing,
+}
+
+impl Coordinates {
+    const fn capture<'a>(
+        self,
+        source: &ChunkSource,
+        observed: &'a mut ModelReadSources,
+    ) -> Capture<'a> {
+        if source.archive_origin().is_none() {
+            return Capture::Skip;
+        }
+        match self {
+            Self::Skip | Self::MaterialListing => Capture::Skip,
+            Self::Nodes => Capture::Nodes(&mut observed.nodes),
+            Self::NodesAndBones => Capture::NodesAndBones(observed),
+        }
+    }
 }
 
 enum Capture<'a> {
@@ -93,6 +113,26 @@ impl ModelSource {
         )
     }
 
+    /// Reads an Archive model listing with exact origins for supported material fields.
+    ///
+    /// # Errors
+    /// Returns the original model-read or receipt-recording error.
+    pub fn from_index_with_material_receipt(
+        index: &PathIndex<'_>,
+        path: &str,
+        verdicts: &TextureVerdicts,
+    ) -> Result<Self, ConversionError> {
+        Self::read_archive(
+            index,
+            path,
+            LodSelection::All,
+            PositionBox::default(),
+            MaterialReading::Plain,
+            verdicts,
+            Coordinates::MaterialListing,
+        )
+    }
+
     /// Reads the model with original node coordinates in its observed primary Entry.
     ///
     /// # Errors
@@ -157,24 +197,24 @@ impl ModelSource {
             ModelFile::Model,
             source.archive_origin().cloned(),
         )];
+        let keep_materials = matches!(coordinates, Coordinates::MaterialListing);
+        let reads = ArchiveMaterialReads::default();
+        let mut material_origins = MaterialArchiveOrigins::default();
+        let mut material_fields = Observations::default();
+        let mut retain_field = |field: MaterialReadObservation<'_>| material_fields.retain(field);
         let mut companions = ArchiveCompanions {
             index,
             folder,
             verdicts,
             model_sources: Some(&mut archive_sources),
-            material_observation: None,
+            material_observation: keep_materials.then_some(MaterialObservation {
+                reads: &reads,
+                used: Some(&mut material_origins),
+            }),
+            material_fields: keep_materials.then_some(&mut retain_field as _),
         };
         let mut observed = ModelReadSources::default();
-        let coordinates = if source.archive_origin().is_some() {
-            coordinates
-        } else {
-            Coordinates::Skip
-        };
-        let capture = match coordinates {
-            Coordinates::Skip => Capture::Skip,
-            Coordinates::Nodes => Capture::Nodes(&mut observed.nodes),
-            Coordinates::NodesAndBones => Capture::NodesAndBones(&mut observed),
-        };
+        let capture = coordinates.capture(&source, &mut observed);
         let read = capture.read(
             file_name,
             source.file(),
@@ -187,7 +227,14 @@ impl ModelSource {
             file: name.clone(),
             source,
         })?;
-        bind_sources(coordinates, observed, &mut archive_sources);
+        if source.archive_origin().is_some() {
+            bind_sources(coordinates, observed, &mut archive_sources);
+        }
+        let material_receipt = if keep_materials {
+            material_fields.project(&model, source.archive_origin(), material_origins.library())?
+        } else {
+            None
+        };
         Ok(Self {
             protection: source.into_protection(),
             name,
@@ -200,6 +247,7 @@ impl ModelSource {
             .then(|| Self::archive_default_material(index, verdicts)),
             model,
             archive_sources,
+            material_receipt,
         })
     }
 }
@@ -209,7 +257,7 @@ fn bind_sources(
     observed: ModelReadSources,
     archive_sources: &mut [ModelArchiveSource],
 ) {
-    if !matches!(coordinates, Coordinates::Skip) {
+    if matches!(coordinates, Coordinates::Nodes | Coordinates::NodesAndBones) {
         if let Some(primary) = archive_sources.first_mut() {
             primary.set_node_sources(observed.nodes);
             if let Some(selection) = observed.primary_skeleton {

@@ -2370,7 +2370,20 @@ a read model requires it. Its state distinguishes a resolved material from missi
 ambiguous, unreadable, malformed or unsupported sources. An observed source includes
 its physical Entry and container coordinates and an encryption marker. The decoded
 SHA-256 is present when the candidate's original bytes were verified. An unreadable
-candidate is evidence of the attempted source. `nodes` keeps the order of the file;
+candidate is evidence of the attempted source.
+
+For a loaded library, `materialFieldOrigins` maps JSON Pointers in this result to the immediate
+encryption marker, source-set completeness and use references. Covered fields include the library
+mode and palette name, material slots and their scalar and colour fields, texture map and file
+tokens, public parameter names and values, and all raw layer attribute names and values.
+`materialProvenance` resolves those references to the selected material Entry and the original model chunk
+that selected the library. XML coordinates count original element children and parsed attributes
+from zero. The marker includes the selector's encryption. Layer targets and textures named by
+these fields are references that the listing leaves untouched. With a standalone model, the
+covered values have a null marker and incomplete source sets. The library status reports
+a missing or unreadable library.
+
+`nodes` keeps the order of the file;
 `parent` is the index of the parent node or `null` for a root, and `transform` the 3×4 row-major
 matrix from the node's space to its parent's, translation last, in CryEngine axes (Z up) and
 metres. A model without a `NodeMeshCombo` chunk has one root node named after the file. `scale` is

@@ -15,24 +15,32 @@ use crate::{
 const MAX_SOURCE_DEPTH: usize = 64;
 
 pub(crate) fn parse(path: &str, bytes: &[u8]) -> Result<MaterialLibrary, MaterialError> {
+    parse_observed(path, bytes, |_| {})
+}
+
+pub(crate) fn parse_observed(
+    path: &str,
+    bytes: &[u8],
+    mut observer: impl FnMut(MaterialReadObservation<'_>),
+) -> Result<MaterialLibrary, MaterialError> {
     let limits = MaterialSourceLimits {
         source_bytes: bytes.len().max(1),
         ..MaterialSourceLimits::default()
     };
-    match read(path, bytes, limits, || Ok::<(), Infallible>(())) {
+    match read_observed(
+        path,
+        bytes,
+        limits,
+        || Ok::<(), Infallible>(()),
+        |site| {
+            observer(site);
+            Ok(())
+        },
+    ) {
         Ok(library) => Ok(library),
         Err(MaterialReadError::Material(error)) => Err(error),
         Err(MaterialReadError::Interrupted(never)) => match never {},
     }
-}
-
-pub(crate) fn read<Interrupted>(
-    path: &str,
-    bytes: &[u8],
-    limits: MaterialSourceLimits,
-    checkpoint: impl FnMut() -> Result<(), Interrupted>,
-) -> Result<MaterialLibrary, MaterialReadError<Interrupted>> {
-    read_observed(path, bytes, limits, checkpoint, |_| Ok(()))
 }
 
 pub(crate) fn read_observed<Interrupted>(
