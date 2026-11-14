@@ -418,3 +418,43 @@ collision fidelity and typed emission remain in #1128 and #1133. The merge
 introduced no additional archive, audio or DataForge format change beyond the
 previously reviewed tree. The release and source revision remain separate
 producer identities for [#1104](https://github.com/p4kx-org/p4kx/issues/1104).
+
+### P4KX status after the merge
+
+- P4KX carries the original submesh row and material identity through static
+  and rigged GLB output. The Blender package companion links each emitted
+  primitive to the physical source row and records the dense draw slot
+  separately. Repeated and fallback slots can therefore be traced without
+  relying on the material name.
+  [Layout mapping](../crates/p4kx-gltf/src/mesh_primitive_map.rs)
+  · [Package mapping](../crates/p4kx-blender/src/mesh_vertex_map.rs)
+  · [Synthetic coverage](../crates/p4kx-blender/tests/it/package_primitive_map.rs)
+- Entity animation clips can survive a broken neighbouring rig. StarBreaker continues
+  child-rig discovery when root geometry cannot resolve and tests a missing DBA
+  alongside a readable rig. P4KX's single-model listing is still model-adjacent
+  plus explicitly selected extras. The entity catalogue in
+  [#1093](https://github.com/p4kx-org/p4kx/issues/1093) should preserve the
+  attempted owner, source and disposition alongside the usable clips and their
+  scopes. An explicitly requested unavailable source remains an error in
+  single-model conversion.
+  [StarBreaker catalogue](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/pipeline/clip_catalogue.rs)
+  · [P4KX listing](../crates/p4kx-extraction/src/animation_listing.rs)
+  · [Explicit source selection](../crates/p4kx-extraction/src/animation_select.rs)
+- P4KX's package receipt covers every declared output and retains exporter
+  source revision and archive Build when available. Cancellation at a texture
+  leaf already preserves the previous package. A large authored material
+  library can still delay cancellation while serializing its single compressed
+  row or constructing the field origin map. Add checkpoints within those two
+  operations under [#1097](https://github.com/p4kx-org/p4kx/issues/1097).
+  [StarBreaker stamp](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/export_stamp.rs)
+  · [P4KX receipt](../crates/p4kx-blender/src/package_receipt.rs)
+  · [Cancellation test](../crates/p4kx-blender/tests/it/package_write_context.rs)
+  · [Material sidecar writer](../crates/p4kx-blender/src/material_source_sidecar.rs)
+- The reference test recognizes completion, count and error evidence from the
+  exact unmodified merge revision, separately from the v0.3.2 release. Its
+  DataForge entry point is byte-identical to the previously reviewed source
+  revision. The reference suite exercises the log contract with synthetic input.
+  An installed same-build comparison still requires a finalized reference
+  manifest under [#1104](https://github.com/p4kx-org/p4kx/issues/1104).
+  [Upstream DataForge command](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/cli/src/dcb.rs)
+  · [Reference procedure](differential-verification.md)

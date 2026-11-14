@@ -10,7 +10,7 @@ use super::manifest_fixtures::{Fixture, freeze, selected, selection};
 use super::reference_error::Code;
 use super::reference_log_report::{Capability, Profile, Report, Stream};
 use super::reference_log_scan::{self, Observed};
-use super::reference_manifest::{PatchScope, SelectionMode, Tool};
+use super::reference_manifest::{PatchScope, Producer, SelectionMode, Tool};
 use super::unp4k;
 
 #[test]
@@ -45,6 +45,41 @@ fn every_pinned_tool_error_format_is_detected_in_its_captured_stream() -> TestRe
             "caught producer errors are not exit-code success"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn merged_starbreaker_uses_the_pinned_dataforge_log_contract() -> TestResult {
+    let mut producer = Producer {
+        tool: Tool::Starbreaker,
+        version: "0.3.2".to_owned(),
+        revision: "305215bca75350013c221bdfbcb2f8180fe09dbe".to_owned(),
+        binary: super::reference_digest::reader(b"synthetic".as_slice(), 9)?,
+        patch_scope: PatchScope::Unmodified,
+    };
+    let profile = Profile::of(&producer).ok_or("unknown merged StarBreaker revision")?;
+    assert_eq!(profile, Profile::Starbreaker305, "separate source identity");
+
+    let mut observed = Observed::default();
+    let progress = b"DataCore loaded.\nExporting 1 records as json...\nDone.\n";
+    reference_log_scan::scan(profile, Stream::Stderr, progress, &mut observed)?;
+    reference_log_scan::finish(profile, &[], 1, &mut observed)?;
+    assert!(observed.review.is_empty(), "matching completion and count");
+    reference_log_scan::finish(profile, &[], 2, &mut observed)?;
+    assert_eq!(observed.review.len(), 1, "a mismatched count needs review");
+    reference_log_scan::scan(
+        profile,
+        Stream::Stderr,
+        b"Error exporting synthetic.json: failed",
+        &mut observed,
+    )?;
+    assert_eq!(observed.errors.len(), 1, "completion cannot hide an error");
+
+    producer.patch_scope = PatchScope::Local {
+        description: "synthetic local patch".to_owned(),
+        digest: producer.binary.digest.clone(),
+    };
+    assert_eq!(Profile::of(&producer), None, "local changes require review");
     Ok(())
 }
 

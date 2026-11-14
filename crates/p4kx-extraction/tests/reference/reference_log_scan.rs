@@ -87,7 +87,10 @@ fn classify(profile: Profile, stream: Stream, line: &str) -> Line<'_> {
         {
             return Line::Progress;
         }
-        (Profile::Starbreaker450 | Profile::Starbreaker7d3, Stream::Stderr) => {
+        (
+            Profile::Starbreaker450 | Profile::Starbreaker7d3 | Profile::Starbreaker305,
+            Stream::Stderr,
+        ) => {
             if line == "DataCore loaded." {
                 return Line::Started;
             }
@@ -209,7 +212,7 @@ pub(crate) fn finish(
     let complete = match profile {
         Profile::Unp4kB492 => raw_selection(selected, observed),
         Profile::UnforgeB492 => true,
-        Profile::Starbreaker450 | Profile::Starbreaker7d3 => {
+        Profile::Starbreaker450 | Profile::Starbreaker7d3 | Profile::Starbreaker305 => {
             observed.loaded == observed.exports.len()
                 && observed.done == observed.exports.len()
                 && !observed.exports.is_empty()

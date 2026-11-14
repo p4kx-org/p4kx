@@ -31,7 +31,7 @@ execution. Source and payload SHA-256 values are independently recomputed locall
 from claims. Error-report capability means a classifier for a pinned source contract, not attested
 binary authenticity.
 
-Known log contracts are unmodified unp4k/unforge b492ab14 and StarBreaker 450fa284/7d3f01e7.
+Known log contracts are unmodified unp4k/unforge b492ab14 and StarBreaker 450fa284/7d3f01e7/305215bca.
 Caught failures can appear on stdout/stderr despite exit zero. Healthy StarBreaker progress on
 stderr is valid. A typed report is recomputed from both captured streams, so fabricating an empty
 report cannot hide failures. Unknown revisions, local patch scopes, unexpected lines/encoding or
@@ -64,6 +64,7 @@ checks, and never resolve foreign Record links as host filesystem paths.
 - [unp4k/unforge entrypoints at b492ab14](https://github.com/dolkensp/unp4k/tree/b492ab14d26280c6ec91c4365ff0faf5f3e24a6b/src)
 - [StarBreaker release extraction](https://github.com/diogotr7/StarBreaker/blob/450fa284d4b1cbed6832675297dfb02579c0abd3/cli/src/dcb.rs)
 - [StarBreaker current-source extraction](https://github.com/diogotr7/StarBreaker/blob/7d3f01e76307354bbc56a64a70eb5167b1189b64/cli/src/dcb.rs)
+- [StarBreaker merged extraction](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/cli/src/dcb.rs)
 
 Synthetic fixtures exercise real preparation/finalization and every adapter, known log failures,
 unknown reporting capabilities, source/producer mutations, inventory collisions/omissions, empty

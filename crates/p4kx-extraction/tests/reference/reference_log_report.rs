@@ -13,6 +13,7 @@ pub(crate) enum Profile {
     UnforgeB492,
     Starbreaker450,
     Starbreaker7d3,
+    Starbreaker305,
 }
 
 impl Profile {
@@ -28,6 +29,9 @@ impl Profile {
             }
             (Tool::Starbreaker, "7d3f01e76307354bbc56a64a70eb5167b1189b64") => {
                 Some(Self::Starbreaker7d3)
+            }
+            (Tool::Starbreaker, "305215bca75350013c221bdfbcb2f8180fe09dbe") => {
+                Some(Self::Starbreaker305)
             }
             _ => None,
         }
