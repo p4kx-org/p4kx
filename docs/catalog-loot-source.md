@@ -116,3 +116,28 @@ A field name is its own Payload datum; storage declarations and concrete types a
 The physical namespace is dataforgeValue for every actual original occurrence. There is no second
 namespace or compatibility interpretation. All references, source states and creator-sensitive
 error parameters retain the same original operations and exact wire values.
+
+
+## Loot source variants by Build
+
+The exact Record types `LootV3SecondaryChoicesSingleLayerRecord` and
+`LootV3SecondaryChoicesMultiLayerRecord` can exist independently. The single
+layer owns ordered `choices` Class entries. The multi layer owns ordered
+`layers` references to those Records. `LootConstraints.secondaryChoices`
+stores a selector wrapper with its own declared target. A theme can also
+contain inline secondary-choice layers with separate source identities.
+
+When declared, `LootThemeRecord` supplies theme definitions.
+`SubHarvestableConfig.lootThemes`, `SubHarvestableMultiConfig.lootThemes`
+and `LootConstraints.themes` refer to those definitions.
+`LootGenerationGlobalParams.themeCategoryOrdering` stores source tag order.
+`HierarchicalContextualDataPresetRecord.HCDs` can contain
+`LocationLootGenerationContextData` with ordered themes and an authored
+`parentThemesToIgnore` selector. These declarations describe possible
+inputs to loot generation.
+
+The ignored `loot_source_declarations_resolve_to_their_physical_schema`
+test checks stored type and target, array shape and the physical Record
+census on a configured Archive with complete Build identity. A declared
+type can have zero physical Records. The source census is independent of
+catalogue export and runtime selection.

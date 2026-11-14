@@ -65,6 +65,7 @@ mod real_archive_loadouts;
 mod real_archive_location_configuration;
 mod real_archive_location_vocabulary;
 mod real_archive_loot;
+mod real_archive_loot_source_shapes;
 mod real_archive_mining;
 mod real_archive_mining_stats;
 mod real_archive_missile_configuration;
