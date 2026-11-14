@@ -454,8 +454,12 @@ producer identities for [#1104](https://github.com/p4kx-org/p4kx/issues/1104).
   exact unmodified merge revision, separately from the v0.3.2 release. Its
   DataForge entry point is byte-identical to the previously reviewed source
   revision. The reference suite exercises the log contract with synthetic input.
-  An installed same-build comparison still requires a finalized reference
-  manifest under [#1104](https://github.com/p4kx-org/p4kx/issues/1104).
+  The installed LIVE comparison for the official v0.3.2 release matched all
+  eight selected records against the same original DataForge. Its plan and
+  artifact checks completed [#1104](https://github.com/p4kx-org/p4kx/issues/1104).
+  An installed comparison of the merge revision requires a plan from that
+  specific producer build.
+  [Installed comparison record](https://github.com/p4kx-org/p4kx/issues/1104#issuecomment-6870540198).
   [Upstream DataForge command](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/cli/src/dcb.rs)
   · [Reference procedure](differential-verification.md)
 
