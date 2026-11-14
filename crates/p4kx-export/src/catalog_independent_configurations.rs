@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashSet;
+
 use p4kx_extraction::DataForge;
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::catalog_entity_component_read::{
-    self as entity_component, ComponentKind, ComponentRead,
+    self as entity_component, ComponentKind, ComponentRead, ComponentSelection,
 };
 use super::catalog_mission_board::{self, MissionBoard};
 use super::catalog_radar_options::RadarOptionsConfiguration;
@@ -83,6 +85,7 @@ pub(crate) fn read<'source>(
     projection: &CatalogProjection<'_, 'source>,
     options: &CatalogOptions<'_>,
     collected: &mut Collected<'source>,
+    jump_owners: &HashSet<u32>,
 ) -> Result<IndependentConfigurations<'source>, CatalogError> {
     let Recovery {
         economy: item_recovery_economy,
@@ -112,7 +115,7 @@ pub(crate) fn read<'source>(
         components.table(ANIMATION_CONTROLLERS, EntityAnimationController::read)?;
     let loot_generation = components.table(LOOT_GENERATION, LootGenerationComponent::read)?;
     let hackable_devices = components.table(HACKABLE_DEVICES, HackableConfiguration::read)?;
-    let jump_points = components.jump_points()?;
+    let jump_points = components.jump_points(jump_owners)?;
     Ok(IndependentConfigurations {
         tables: IndependentConfigurationTables {
             item_recovery_economy,
@@ -205,8 +208,11 @@ struct PhysicalComponents<'options, 'input, 'source> {
 }
 
 impl<'source> PhysicalComponents<'_, '_, 'source> {
-    fn jump_points(&mut self) -> Result<JumpPointTables<'source>, CatalogError> {
-        let local = self.table(JUMP_POINTS, JumpPointConfiguration::read)?;
+    fn jump_points(
+        &mut self,
+        owners: &HashSet<u32>,
+    ) -> Result<JumpPointTables<'source>, CatalogError> {
+        let local = self.selected_table(JUMP_POINTS, JumpPointConfiguration::read, Some(owners))?;
         let global = jump_point_globals::read(
             self.forge,
             self.projection.original(),
@@ -275,6 +281,15 @@ impl<'source> PhysicalComponents<'_, '_, 'source> {
         component: ComponentKind,
         project: entity_component::Projection<'source, Row>,
     ) -> Result<CatalogTable<Row>, CatalogError> {
+        self.selected_table(component, project, None)
+    }
+
+    fn selected_table<Row>(
+        &mut self,
+        component: ComponentKind,
+        project: entity_component::Projection<'source, Row>,
+        dependencies: Option<&HashSet<u32>>,
+    ) -> Result<CatalogTable<Row>, CatalogError> {
         let ComponentRead {
             rows,
             numbers,
@@ -283,7 +298,10 @@ impl<'source> PhysicalComponents<'_, '_, 'source> {
         } = entity_component::read(
             self.forge,
             self.projection.original(),
-            self.options.filter,
+            &ComponentSelection {
+                filter: self.options.filter,
+                dependencies,
+            },
             self.options.cancel,
             &component,
             project,

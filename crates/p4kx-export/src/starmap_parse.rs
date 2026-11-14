@@ -394,3 +394,7 @@ fn record_unread(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "starmap_parse/installed.rs"]
+pub(crate) mod installed;

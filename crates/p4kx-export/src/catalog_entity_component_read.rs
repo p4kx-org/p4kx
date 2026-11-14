@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::cell::RefCell;
+use std::collections::HashSet;
 
 use p4kx_extraction::{
     CancelToken, DataForge, DataForgeError, Filter, PointerProbe, Record, RecordTree, TreeBuilder,
@@ -47,11 +48,16 @@ pub(super) type Projection<'source, Row> = fn(
     &mut Vec<FieldError>,
 ) -> Result<Row, CatalogError>;
 
-/// Reads an independent component family from physical Entity owners admitted by the Record filter.
+pub(super) struct ComponentSelection<'a> {
+    pub(super) filter: Option<&'a Filter>,
+    pub(super) dependencies: Option<&'a HashSet<u32>>,
+}
+
+/// Reads an independent component family from selected and linked physical Entity owners.
 pub(super) fn read<'source, Row>(
     forge: &'source DataForge<'source>,
     input: &OriginalCatalogInput<'_, 'source>,
-    filter: Option<&Filter>,
+    selection: &ComponentSelection<'_>,
     cancel: Option<&CancelToken>,
     kind: &ComponentKind,
     project: Projection<'source, Row>,
@@ -74,7 +80,7 @@ pub(super) fn read<'source, Row>(
         if record.type_name().ok() != Some(ENTITY) {
             continue;
         }
-        match select(&mut trees, &probe, &record, filter) {
+        match select(&mut trees, &probe, &record, selection) {
             Ok(false) => continue,
             Err(error) => {
                 let admission = RecordObservation::capture(input, &record)?;
@@ -101,9 +107,18 @@ fn select<'source>(
     trees: &mut TreeBuilder<'source>,
     probe: &PointerProbe<'source>,
     record: &Record<'source>,
-    filter: Option<&Filter>,
+    selection: &ComponentSelection<'_>,
 ) -> Result<bool, DataForgeError> {
-    let accepted = filter.map(|filter| record.record_path().map(|path| filter.matches(path)));
+    let accepted = if selection
+        .dependencies
+        .is_some_and(|indices| indices.contains(&record.index()))
+    {
+        None
+    } else {
+        selection
+            .filter
+            .map(|filter| record.record_path().map(|path| filter.matches(path)))
+    };
     if matches!(accepted, Some(Ok(false))) || !trees.holds(probe, record)? {
         return Ok(false);
     }

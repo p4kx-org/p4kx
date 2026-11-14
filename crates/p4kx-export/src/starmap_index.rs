@@ -15,29 +15,56 @@ const SYSTEM_SUFFIX: &str = "system.socpak";
 pub(crate) struct Index<'a> {
     pub(crate) entries: &'a [Entry],
     pub(crate) by_path: HashMap<String, usize>,
+    duplicates: HashMap<String, Vec<usize>>,
 }
 
 impl<'a> Index<'a> {
     pub(crate) fn new(archive: &'a Archive) -> Self {
         let entries = archive.entries();
-        let by_path = entries
+        let mut by_path = HashMap::new();
+        let mut duplicates = HashMap::new();
+        for (at, entry) in entries
             .iter()
             .enumerate()
-            .filter(|(_, entry)| is_socpak(entry.path()))
-            .map(|(at, entry)| (key(entry.path()), at))
-            .collect();
-        Self { entries, by_path }
+            .filter(|(_, e)| is_socpak(e.path()))
+        {
+            let path = key(entry.path());
+            if let Some(previous) = by_path.insert(path.clone(), at) {
+                duplicates
+                    .entry(path)
+                    .or_insert_with(|| vec![previous])
+                    .push(at);
+            }
+        }
+        Self {
+            entries,
+            by_path,
+            duplicates,
+        }
     }
 
     pub(crate) fn find(&self, path: &str) -> Option<usize> {
+        self.selected_key(path).map(|(_, index)| *index)
+    }
+
+    pub(crate) fn endpoint_candidates(&self, path: &str) -> &[usize] {
+        let Some((key, selected)) = self.selected_key(path) else {
+            return &[];
+        };
+        self.duplicates
+            .get(key)
+            .map_or_else(|| std::slice::from_ref(selected), Vec::as_slice)
+    }
+
+    fn selected_key(&self, path: &str) -> Option<(&String, &usize)> {
         let mut wanted = key(path);
         if !wanted.starts_with("data\\") {
             wanted.insert_str(0, "data\\");
         }
-        self.by_path.get(&wanted).copied().or_else(|| {
+        self.by_path.get_key_value(&wanted).or_else(|| {
             ChildContainerPath::new(path)?
                 .root_candidates()
-                .find_map(|candidate| self.by_path.get(&key(&candidate)).copied())
+                .find_map(|candidate| self.by_path.get_key_value(&key(&candidate)))
         })
     }
 

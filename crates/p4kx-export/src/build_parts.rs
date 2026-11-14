@@ -79,3 +79,29 @@ pub(super) fn capture_rows(
         collected.ledger.conflicting_catalog_rows = true;
     }
 }
+
+pub(super) fn require_publishable(
+    collected: &mut crate::collected::Collected<'_>,
+    kinds: &[crate::KindSummary],
+    input: &super::original_input::OriginalCatalogInput<'_, '_>,
+    options: &crate::CatalogOptions<'_>,
+) -> Result<crate::ExportHealth, crate::CatalogError> {
+    let health = crate::export_health_prepare::compile_captured(
+        std::mem::take(&mut collected.ledger),
+        kinds,
+        &collected.failures,
+        &collected.warnings,
+        options.publication_mode,
+        input,
+        options.cancel,
+    )?;
+    if health.permits_publication(options.publication_mode) {
+        return Ok(health);
+    }
+    Err(crate::CatalogError::IncompleteExport(
+        super::refusal::CatalogRefusal::new(
+            Box::new(health),
+            CatalogProvenance::new(input.origins().uses.freeze()?),
+        ),
+    ))
+}

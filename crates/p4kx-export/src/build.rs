@@ -32,11 +32,10 @@ use crate::{CatalogError, CatalogOptions, CatalogProvenance};
 #[path = "build_catalog.rs"]
 mod api;
 pub use api::{build_catalog, build_catalog_from, write_catalog, write_catalog_from};
-#[path = "catalog_refusal.rs"]
-pub(crate) mod refusal;
-use refusal::CatalogRefusal;
 #[path = "original_catalog_inputs.rs"]
 pub(crate) mod original_input;
+#[path = "catalog_refusal.rs"]
+pub(crate) mod refusal;
 use crate::catalog_read::original::EntryCapture;
 #[path = "build_parts.rs"]
 mod parts;
@@ -115,8 +114,15 @@ fn assemble<R>(
         options.cancel,
     )?);
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
-    let independent =
-        catalog_independent_configurations::read(&forge, &projection, options, &mut collected)?;
+    let jump_owners = placements.join_jump_operators(&entities, &input, options.cancel)?;
+    let jump_connections = CatalogTable::empty(placements.jump_connection_availability());
+    let independent = catalog_independent_configurations::read(
+        &forge,
+        &projection,
+        options,
+        &mut collected,
+        &jump_owners,
+    )?;
     particle_library::collect(archive, &entry_capture, options, &mut collected)?;
     let kinds = collected.summary(options.filter.is_none());
     parts::capture_rows(
@@ -140,21 +146,7 @@ fn assemble<R>(
         &independent.tables.flight,
         options.cancel,
     )?;
-    let health = crate::export_health_prepare::compile_captured(
-        std::mem::take(&mut collected.ledger),
-        &kinds,
-        &collected.failures,
-        &collected.warnings,
-        options.publication_mode,
-        &input,
-        options.cancel,
-    )?;
-    if !health.permits_publication(options.publication_mode) {
-        return Err(CatalogError::IncompleteExport(CatalogRefusal::new(
-            Box::new(health),
-            CatalogProvenance::new(origins.uses.freeze()?),
-        )));
-    }
+    let health = parts::require_publishable(&mut collected, &kinds, &input, options)?;
     let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
     let resolved = store_slugs.resolve(
@@ -301,6 +293,7 @@ fn assemble<R>(
             weapon_projectile_ammo_selections: components.projectile_ammo_selections,
             tag_paths: CatalogTable::new(&forge, &["Tag"], collected.tags.paths),
             commodity_presentation: commodity_tables.presentation,
+            jump_connections,
         },
         configurations: crate::catalog_configurations::CatalogConfigurations {
             blueprint_tiers: blueprints.tiers,

@@ -15,6 +15,7 @@ use crate::starmap;
 use crate::starmap_containers::instance::{ContainerFile, ContainerInstanceKey};
 use crate::starmap_containers::jump_class::EndpointClass;
 use crate::starmap_containers::jump_gate::JumpGate;
+use crate::starmap_containers::jump_operating::OperatingResolver;
 use crate::starmap_containers::proof::{ChildOrigins, PlacementStep};
 use crate::starmap_transform::Transform;
 use crate::starmap_xml::AuthoredPose;
@@ -28,6 +29,7 @@ pub(crate) struct JumpEndpoint {
     #[serde(flatten)]
     pose: EndpointPose,
     gate: SourcedValue<JumpGate>,
+    target_candidates: SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>>,
     declared_partner: SourcedValue<CatalogGuid>,
 }
 
@@ -79,14 +81,38 @@ pub(crate) struct JumpOccurrence<'route> {
     pub(crate) target: Option<&'route AuthoredEntryPath>,
 }
 
+pub(crate) struct GateResolution {
+    pub(crate) gate: SourceValue<JumpGate>,
+    pub(crate) candidates: SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>>,
+    pub(crate) proof: Vec<SourceUse>,
+}
+
+impl JumpEndpoint {
+    pub(super) fn with_operating(
+        mut self,
+        resolver: &mut OperatingResolver<'_, '_, '_>,
+    ) -> Result<Self, CatalogError> {
+        self.gate = self.gate.try_map(|gate| gate.with_operating(resolver))?;
+        Ok(self)
+    }
+
+    pub(super) fn partner_scope_complete(&self) -> bool {
+        self.declared_partner.origin().source_set_complete()
+    }
+}
+
 impl JumpOccurrence<'_> {
     pub(crate) fn project(
         self,
         capture: &EntryCapture<'_>,
         file: &ContainerFile,
-        gate: SourceValue<JumpGate>,
-        target_proof: &[SourceUse],
+        GateResolution {
+            gate,
+            candidates,
+            proof,
+        }: GateResolution,
     ) -> Result<JumpEndpoint, CatalogError> {
+        let target_proof = proof.as_slice();
         let sources = capture.source_uses();
         let mut inputs = self.root_inputs.to_vec();
         let mut complete = true;
@@ -103,7 +129,7 @@ impl JumpOccurrence<'_> {
                 .collect(),
             _ => target_proof.to_vec(),
         };
-        let readable = !matches!(gate, SourceValue::Unreadable);
+        let readable = !matches!(gate, SourceValue::Unreadable | SourceValue::Invalid);
         let partner_complete = match &gate {
             SourceValue::Present(gate) => gate.partner_scope_complete(),
             SourceValue::Absent => true,
@@ -118,6 +144,7 @@ impl JumpOccurrence<'_> {
             route: self.route_fields(capture, file, &shared, &inputs, complete)?,
             pose: self.pose_fields(sources, &shared)?,
             gate: sources.value_with_shared_origin(gate, &shared, target_proof, readable)?,
+            target_candidates: candidates,
             declared_partner: sources.value_with_shared_origin(
                 partner,
                 &shared,

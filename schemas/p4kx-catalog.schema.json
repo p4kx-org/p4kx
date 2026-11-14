@@ -5329,6 +5329,9 @@
         "contracts": {
           "$ref": "#/$defs/CatalogTableOfContractEntry"
         },
+        "jumpConnections": {
+          "$ref": "#/$defs/CatalogTableOfJumpConnection"
+        },
         "missionTitles": {
           "$ref": "#/$defs/CatalogTableOfMissionTitles"
         },
@@ -5355,6 +5358,7 @@
         "blueprintPresentation",
         "commodityPresentation",
         "contracts",
+        "jumpConnections",
         "missionTitles",
         "qualityQuantizationResources",
         "resourceGroupParents",
@@ -6539,6 +6543,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ItemRoomAssociation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfJumpConnection": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/JumpConnection"
           },
           "type": "array"
         }
@@ -23240,6 +23263,7 @@
       ],
       "type": "object"
     },
+    "JumpConnection": false,
     "JumpDrive": {
       "description": "Stored settings of one item-side jump drive component.",
       "properties": {
@@ -23496,6 +23520,9 @@
         "system": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
+        "targetCandidates": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfPhysicalEntryRef"
+        },
         "targetPath": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
@@ -23519,6 +23546,7 @@
         "starmapRecordIndex",
         "starmapType",
         "system",
+        "targetCandidates",
         "targetPath",
         "worldPosition",
         "worldRotation"
@@ -23570,6 +23598,12 @@
         },
         "offsetFromPivot": {
           "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "operatingConfigurations": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_OperatingConfiguration"
+        },
+        "operatingEntity": {
+          "$ref": "#/$defs/SourcedValueOfOperatingEntity"
         }
       },
       "required": [
@@ -23578,7 +23612,9 @@
         "matches",
         "nodeIndex",
         "object",
-        "offsetFromPivot"
+        "offsetFromPivot",
+        "operatingConfigurations",
+        "operatingEntity"
       ],
       "type": "object"
     },
@@ -30323,6 +30359,42 @@
         "brokerFallback",
         "localityGuids",
         "locations"
+      ],
+      "type": "object"
+    },
+    "OperatingConfiguration": {
+      "properties": {
+        "componentOrdinal": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "ownerRecordIndex": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "componentOrdinal",
+        "ownerRecordIndex"
+      ],
+      "type": "object"
+    },
+    "OperatingEntity": {
+      "properties": {
+        "ownerGuid": {
+          "$ref": "#/$defs/Guid"
+        },
+        "ownerRecordIndex": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ownerGuid",
+        "ownerRecordIndex"
       ],
       "type": "object"
     },
@@ -46330,6 +46402,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/LocationMetadataElement"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_OperatingConfiguration": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/OperatingConfiguration"
                 },
                 "type": "array"
               }
@@ -92560,6 +92765,136 @@
                   "string",
                   "null"
                 ]
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfOperatingEntity": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/OperatingEntity"
               }
             }
           }

@@ -120,6 +120,7 @@ impl WalkPath {
 
 /// The walk through one star system, over containers that are already parsed.
 pub(crate) struct System<'a> {
+    archive: &'a Archive,
     index: &'a Index<'a>,
     bodies: &'a HashMap<usize, Body>,
     cancel: Option<&'a CancelToken>,
@@ -144,7 +145,7 @@ impl<'a> System<'a> {
         cancel: Option<&'a CancelToken>,
         limits: Limits,
         (archive, capture, endpoints): (
-            &Archive,
+            &'a Archive,
             &'a EntryCapture<'a>,
             Option<&'a JumpEndpointRecords>,
         ),
@@ -159,6 +160,7 @@ impl<'a> System<'a> {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         };
         let mut system = Self {
+            archive,
             index,
             bodies,
             cancel,

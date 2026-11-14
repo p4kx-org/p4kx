@@ -26,7 +26,9 @@ placements of the same Record. The editor geometry can remain unknown independen
 the endpoint's authored placement.
 
 The `gate` row checks the original `EntityComponentJumpPoint` marker, its companion
-metadata and the editor document inside the same SOCPAK. `Entity/@CryGUID` selects an
+metadata and the editor document inside the same SOCPAK. The metadata member is either at
+the container root or under its exact basename directory. If both entries exist, the
+metadata is ambiguous. `Entity/@CryGUID` selects an
 `Object/@guid` in the editor document. The candidates retain exact authored type, name
 and other stored attributes. A duplicate keeps its candidates and has no selected object.
 Unreadable entries carry their own state and report the failed read separately. A readable
@@ -36,3 +38,18 @@ logical placement can have no original gate marker.
 that grammar without a partner records absence. Missing or unreadable evidence leaves this
 field incomplete. The governing evidence is the original declaration, with no pairing by
 endpoint names. All source-backed fields retain their immediate origin.
+
+The endpoint’s `targetCandidates` retains the physical directory Entry identities for its
+authored target path. Multiple matching Entries make the gate invalid without electing
+one. Incomplete Anomaly gate evidence keeps the occurrence visible with its state.
+
+For each selected editor Object, its exact authored `type` can select one original
+`EntityClassDefinition`. `operatingEntity` then points to its physical Record and
+`operatingConfigurations` links the original `SJumpPointParams` values by owning
+Record index and component ordinal. These selected components are retained as
+dependencies of the placement. Competing source candidates record invalid resolution.
+
+`projections.jumpConnections` reports absence for the admitted and readable endpoint
+grammar. Unresolved source coverage makes it unavailable. Both states currently carry
+empty rows. The inspected grammar establishes endpoint facts, while route pairing needs
+an authored target relation and direction.

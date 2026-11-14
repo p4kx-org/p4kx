@@ -15,6 +15,13 @@ use super::catalog_item_components::resolution::WeaponMagazineResolution;
 use super::catalog_weapon_projectile_ammo::WeaponProjectileAmmoSelection;
 use super::weapon_combat_base::WeaponCombatBase;
 
+#[derive(Debug, Serialize, JsonSchema)]
+#[expect(
+    clippy::empty_enums,
+    reason = "the scoped relationship inventory has no proven authored row format"
+)]
+pub(crate) enum JumpConnection {}
+
 /// Explicit choices and derived values, separate from authored definitions.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -30,6 +37,7 @@ pub(crate) struct CatalogProjections<'source> {
     pub(crate) quality_quantization_resources: CatalogTable<QualityQuantizationResources>,
     pub(crate) tag_paths: CatalogTable<super::tag_catalog::TagPath>,
     pub(crate) commodity_presentation: CatalogTable<CommodityPresentation>,
+    pub(crate) jump_connections: CatalogTable<JumpConnection>,
     pub(crate) weapon_magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
     pub(crate) weapon_projectile_ammo_selections: CatalogTable<WeaponProjectileAmmoSelection>,
     pub(crate) weapon_combat_bases: CatalogTable<WeaponCombatBase<'source>>,

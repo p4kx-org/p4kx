@@ -243,6 +243,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.starmapObjects` | Authored starmap objects with original links, presentation and navigation settings, ordered by GUID and physical Record index |
 | `placements.starmapPlacements` | The selected world placement of each physical starmap object |
 | `placements.jumpEndpoints` | Each evidenced jump endpoint occurrence, its local and world poses and the physical SOCPAK gate declarations. [Jump points](catalog-jump-points.md) |
+| `projections.jumpConnections` | Availability of authoritative endpoint relationships in the admitted declaration scope. [Jump points](catalog-jump-points.md) |
 | `definitions.contractGenerators`, `projections.contracts`, `projections.missionTitles` | Physical Generator definitions, logical contract and sub-contract rows, and their sourced titles and descriptions ([contract](catalog-contract-generators.md)) |
 | `definitions.contractScopes` | Physical `ContractScopeGlobalParams` Records with seven individually sourced labels and icons. [Contract scope vocabulary](catalog-location-vocabulary.md#global-contract-scopes) |
 | `definitions.missionModuleDeclarations` | Physical `ModuleDeclaration` Records and authored location acquisition, spawned entities and variable bindings. [Mission module declarations](catalog-location-configuration.md#physical-module-declarations) |

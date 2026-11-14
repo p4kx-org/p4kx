@@ -21,6 +21,7 @@ use crate::starmap_walk::{Opened, System, SystemRead};
 
 use jump_class::JumpEndpointRecords;
 use jump_endpoint::JumpEndpoint;
+use jump_operating::OperatingResolver;
 
 use self::instance::ContainerInstance;
 use self::location_instance::LocationInstance;
@@ -32,6 +33,8 @@ pub(crate) mod jump_class;
 pub(crate) mod jump_endpoint;
 #[path = "starmap_jump_gate.rs"]
 pub(crate) mod jump_gate;
+#[path = "starmap_jump_operating.rs"]
+pub(crate) mod jump_operating;
 
 #[path = "starmap_container_instance.rs"]
 pub(crate) mod instance;
@@ -47,6 +50,10 @@ pub(crate) mod location_instance;
 #[cfg(test)]
 #[path = "starmap_installed_witness.rs"]
 mod installed_witness;
+
+#[cfg(test)]
+#[path = "starmap_installed_jump_endpoints.rs"]
+mod installed_jump_endpoints;
 
 /// What bounds the walk through a star system.
 #[derive(Debug, Clone, Copy)]
@@ -110,6 +117,33 @@ impl Placements {
                 .instance_availability
                 .unwrap_or(DatasetAvailability::Unavailable),
             rows: std::mem::take(&mut self.locations),
+        }
+    }
+
+    pub(crate) fn join_jump_operators(
+        &mut self,
+        entities: &p4kx_assembly::Entities<'_>,
+        input: &crate::build::original_input::OriginalCatalogInput<'_, '_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<HashSet<u32>, CatalogError> {
+        let mut resolver = OperatingResolver::new(entities, input, cancel);
+        self.jump_endpoints = std::mem::take(&mut self.jump_endpoints)
+            .into_iter()
+            .map(|row| row.with_operating(&mut resolver))
+            .collect::<Result<_, _>>()?;
+        Ok(resolver.into_selected())
+    }
+
+    pub(crate) fn jump_connection_availability(&self) -> DatasetAvailability {
+        if self.endpoint_inventory_complete
+            && self
+                .jump_endpoints
+                .iter()
+                .all(JumpEndpoint::partner_scope_complete)
+        {
+            DatasetAvailability::Absent
+        } else {
+            DatasetAvailability::Unavailable
         }
     }
 

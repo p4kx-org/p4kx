@@ -23,6 +23,7 @@ use crate::{CatalogError, ExportAccountingError, Kind};
 #[path = "starmap_jump_gate_objects.rs"]
 mod objects;
 
+use super::jump_operating::{OperatingConfiguration, OperatingEntity, OperatingResolver};
 use objects::{entities, objects};
 
 const COMPONENT: &str = "EntityComponentJumpPoint";
@@ -42,8 +43,37 @@ pub(crate) struct JumpGate {
 }
 
 impl JumpGate {
-    pub(crate) fn has_marker(&self) -> bool {
-        self.marker.value() == Some(&true)
+    pub(super) fn with_operating(
+        mut self,
+        resolver: &mut OperatingResolver<'_, '_, '_>,
+    ) -> Result<Self, CatalogError> {
+        for entity in &mut self.entities {
+            let selected = entity.object.value().and_then(|ordinal| {
+                entity
+                    .matches
+                    .value()?
+                    .iter()
+                    .find(|row| row.node_index.value() == Some(ordinal))
+            });
+            let state = selected.map_or_else(|| entity.object.state(), |row| row.class.state());
+            let class = selected.and_then(|row| row.class.value().map(String::as_str));
+            let mut uses = std::mem::take(&mut entity.object_uses);
+            if let Some(selected) = selected {
+                uses.push(selected.class_use.clone());
+            }
+            let joined = resolver.resolve(
+                state,
+                entity.object.origin().source_set_complete(),
+                class,
+                &uses,
+            )?;
+            entity.operating_entity = joined.entity;
+            entity.operating_configurations = joined.configurations;
+        }
+        Ok(self)
+    }
+    pub(crate) fn marker_definitively_absent(&self) -> bool {
+        self.marker.value() == Some(&false)
     }
 
     pub(crate) fn partner_evidence(&self) -> &[SourceUse] {
@@ -69,6 +99,11 @@ struct JumpGateEntity {
     offset_from_pivot: SourcedValue<String>,
     matches: SourcedValue<Vec<JumpGateObject>>,
     object: SourcedValue<u32>,
+    operating_entity: SourcedValue<OperatingEntity>,
+    operating_configurations: SourcedValue<Vec<OperatingConfiguration>>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    object_uses: Vec<SourceUse>,
 }
 
 #[derive(Clone, Debug, Serialize, JsonSchema)]
@@ -78,6 +113,9 @@ struct JumpGateObject {
     node_index: SourcedValue<u32>,
     guid: SourcedValue<CatalogGuid>,
     class: SourcedValue<String>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    class_use: SourceUse,
     name: SourcedValue<String>,
     tags: SourcedValue<String>,
 }
@@ -116,11 +154,14 @@ impl GateFiles<'_, '_> {
             });
         }
 
-        let editor_path = editor_path(self.outer)?;
-        let (metadata, occurrences) =
-            self.member(META_PATH, ledger, |xml| entities(xml, self.cancel))?;
+        let stem = container_stem(self.outer)?;
+        let nested_meta = format!("{stem}\\{META_PATH}");
+        let editor_path = format!("{stem}_editor.xml");
+        let (metadata, occurrences) = self.member(&[META_PATH, &nested_meta], ledger, |xml| {
+            entities(xml, self.cancel)
+        })?;
         let (editor, document) =
-            self.member(&editor_path, ledger, |xml| objects(xml, self.cancel))?;
+            self.member(&[&editor_path], ledger, |xml| objects(xml, self.cancel))?;
         let mut partner_inputs = marker_uses;
         partner_inputs.extend(metadata.uses.iter().chain(&editor.uses).cloned());
         let editor = sources.value(editor.state, &editor.uses, editor.complete);
@@ -141,7 +182,7 @@ impl GateFiles<'_, '_> {
 
     fn member<T>(
         &self,
-        path: &str,
+        paths: &[&str],
         ledger: &mut ExportLedger,
         read: impl FnOnce(&EntryXml<'_, '_, '_>) -> Result<Option<T>, CatalogError>,
     ) -> Result<(Member, Option<T>), CatalogError> {
@@ -149,9 +190,8 @@ impl GateFiles<'_, '_> {
             .container
             .entries()
             .iter()
-            .filter(|entry| starmap_index::key(entry.path()) == path);
+            .filter(|entry| paths.contains(&starmap_index::key(entry.path()).as_str()));
         let first = directory.next();
-        let multiple = directory.next().is_some();
         let proof = self.directory()?;
         let mut outcome = Member {
             state: SourceValue::Absent,
@@ -161,30 +201,38 @@ impl GateFiles<'_, '_> {
         let Some(entry) = first else {
             return Ok((outcome, None));
         };
-        let source = EntrySource::inner(
+        if let Some(second) = directory.next() {
+            outcome.state = SourceValue::Invalid;
+            for candidate in [entry, second].into_iter().chain(directory) {
+                let source = self.member_source(candidate)?;
+                let reference = source.receipt().payload_reference(self.capture)?;
+                outcome.uses.extend_from_slice(reference.contributions().0);
+                source.diagnosed(
+                    ledger,
+                    Kind::StarmapObjects,
+                    SourceDisposition::ProjectionFailed,
+                    EntryDiagnosis::technical(
+                        ExportDiagnosticCode::AmbiguousIdentity,
+                        COMPONENT,
+                        "XML member path",
+                    ),
+                );
+            }
+            ledger.incomplete_inventory(Kind::StarmapObjects);
+            return Ok((outcome, None));
+        }
+        self.read_member(entry, self.member_source(entry)?, outcome, ledger, read)
+    }
+
+    fn member_source(&self, entry: &Entry) -> Result<EntrySource, CatalogError> {
+        Ok(EntrySource::inner(
             self.capture,
             self.archive,
             self.outer,
             self.container,
             entry,
         )?
-        .dependency();
-        if multiple {
-            outcome.state = SourceValue::Invalid;
-            source.diagnosed(
-                ledger,
-                Kind::StarmapObjects,
-                SourceDisposition::ProjectionFailed,
-                EntryDiagnosis::technical(
-                    ExportDiagnosticCode::AmbiguousIdentity,
-                    COMPONENT,
-                    "XML member path",
-                ),
-            );
-            ledger.incomplete_inventory(Kind::StarmapObjects);
-            return Ok((outcome, None));
-        }
-        self.read_member(entry, source, outcome, ledger, read)
+        .dependency())
     }
 
     fn read_member<T>(
@@ -260,14 +308,13 @@ struct Member {
     complete: bool,
 }
 
-fn editor_path(entry: &Entry) -> Result<String, CatalogError> {
-    let key = starmap_index::key(entry.path());
-    let stem = key
+fn container_stem(entry: &Entry) -> Result<String, CatalogError> {
+    starmap_index::key(entry.path())
         .rsplit('\\')
         .next()
         .and_then(|name| name.strip_suffix(SOCPAK))
-        .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-    Ok(format!("{stem}_editor.xml"))
+        .map(str::to_owned)
+        .ok_or_else(|| ExportAccountingError::ConflictingSourceDatum.into())
 }
 
 fn marker(

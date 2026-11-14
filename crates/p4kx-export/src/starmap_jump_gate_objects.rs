@@ -62,6 +62,9 @@ impl Entity {
             offset_from_pivot: self.offset,
             matches: sources.value(SourceValue::Present(matches), &uses, complete),
             object: sources.value(state, &uses, complete),
+            operating_entity: sources.value(SourceValue::Absent, &uses, false),
+            operating_configurations: sources.value(SourceValue::Absent, &uses, false),
+            object_uses: uses,
         }
     }
 }
@@ -122,6 +125,7 @@ pub(super) fn objects(
                         node_index: fields.index()?,
                         guid,
                         class: fields.text("type")?,
+                        class_use: fields.selector("type")?,
                         name: fields.text("name")?,
                         tags: fields.text("tags")?,
                     },
