@@ -4,11 +4,12 @@
 use std::fs;
 use std::path::Path;
 
-use p4kx_media::{ExportOptions, ExportOutcome, MediaRecord, Status};
+use p4kx_extraction::ConflictPolicy;
+use p4kx_media::{ExportOptions, ExportOutcome, MediaError, MediaRecord, Status};
 use p4kx_testkit::TestChunkFile;
 use serde_json::Value;
 
-use super::{TestResult, archive, options, validate_rows};
+use super::{CAF_CHUNK, DIRECTIONAL_CHUNK, TestResult, archive, image, options, validate_rows};
 
 #[test]
 fn an_unrecognized_global_image_stays_diagnostic_and_preserves_its_chunk() -> TestResult {
@@ -45,6 +46,55 @@ fn an_unrecognized_global_image_stays_diagnostic_and_preserves_its_chunk() -> Te
     ] {
         check_image(base, &rows, family, original, reason)?;
     }
+    Ok(())
+}
+
+#[test]
+fn global_images_preserve_the_published_generation_on_interruptions() -> TestResult {
+    let temporary = tempfile::tempdir()?;
+    let caf = TestChunkFile::ivo()
+        .chunk(CAF_CHUNK, 0x902, image(&[])?)
+        .bytes();
+    let directional = TestChunkFile::ivo()
+        .chunk(DIRECTIONAL_CHUNK, 0x901, 0_u32.to_le_bytes())
+        .bytes();
+    let archive = archive(temporary.path(), &caf, &directional)?;
+    let root = temporary.path().join("out");
+    let mut options = options();
+    let first = p4kx_media::export(&archive, &root, &options)?;
+    assert!(matches!(first, ExportOutcome::Published { .. }));
+    let index = root.join("media-index.json");
+    let previous = fs::read(&index)?;
+
+    options.conflict = ConflictPolicy::Overwrite;
+    let saved_budget = options.limits.records;
+    options.limits.records = 1;
+    let Err(failure) = p4kx_media::export(&archive, &root, &options) else {
+        return Err("the image record budget must exhaust".into());
+    };
+    let cause = match &failure {
+        MediaError::Source { cause, .. } => cause.as_ref(),
+        cause => cause,
+    };
+    assert!(
+        matches!(
+            cause,
+            MediaError::Limit {
+                budget: "records",
+                limit: 1
+            }
+        ),
+        "expected original record limit, got {failure:?}"
+    );
+    assert_eq!(fs::read(&index)?, previous);
+
+    options.limits.records = saved_budget;
+    options.cancel.cancel();
+    assert!(matches!(
+        p4kx_media::export(&archive, &root, &options),
+        Err(MediaError::Cancelled)
+    ));
+    assert_eq!(fs::read(&index)?, previous);
     Ok(())
 }
 
