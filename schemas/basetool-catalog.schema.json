@@ -7571,7 +7571,7 @@
         },
         "subtypeGuid": {
           "$ref": "#/$defs/SourcedValueOfNullable_Guid",
-          "description": "The nullable ResourceType link shared by zero, one or several commodities per target."
+          "description": "The nullable `ResourceType` link shared by zero, one or several commodities per target."
         },
         "typeGuid": {
           "$ref": "#/$defs/SourcedValueOfNullable_Guid"

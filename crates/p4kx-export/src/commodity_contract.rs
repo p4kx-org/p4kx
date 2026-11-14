@@ -44,7 +44,7 @@ pub(crate) struct CommodityPresentation {
     #[schemars(extend("x-gameText" = true))]
     pub(crate) display_type: SourcedValue<Option<GameTextRef>>,
     pub(crate) type_guid: SourcedValue<Option<CatalogGuid>>,
-    /// The nullable ResourceType link shared by zero, one or several commodities per target.
+    /// The nullable `ResourceType` link shared by zero, one or several commodities per target.
     pub(crate) subtype_guid: SourcedValue<Option<CatalogGuid>>,
     pub(crate) density_grams_per_cubic_centimetre: SourcedValue<Option<f32>>,
     pub(crate) refined_subtype_guid: SourcedValue<Option<CatalogGuid>>,
