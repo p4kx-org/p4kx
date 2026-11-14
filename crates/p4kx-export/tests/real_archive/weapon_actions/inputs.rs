@@ -4,7 +4,8 @@
 use p4kx_extraction::{StructValue, Value as Original};
 use serde_json::Value;
 
-use super::TestResult;
+use super::{TestResult, inventory};
+use crate::original_item_arena;
 use crate::real_archive_emp::compare_link;
 use crate::real_archive_item_components::{cell, require_state};
 use crate::real_archive_item_durability::{self as proof, Trace};
@@ -85,14 +86,25 @@ pub(super) fn action<'source>(
         "aim" => {
             fields(trace, original, data, &["hasReloadModesOnUI"])?
                 + owned_input(trace, original, data, "aimModifier")?
-                + owned_input(trace, original, data, "aimGeometryTags")?
+                + aim_members(trace, original, data)?
         }
         "charged" => fields(trace, original, data, CHARGED)? + modifier(trace, original, data)?,
         "sequence" => fields(trace, original, data, &["mode"])?,
-        "authored" => authored_roots_except_recoil(trace, original, data, node)?,
         _ => 0,
     };
-    Ok(count + recoil_count)
+    let arena = if kind == "authored" {
+        data
+    } else {
+        cell(data, "authored")?
+    };
+    let residual_count = inventory::remaining(trace, original, arena, |name| {
+        if matches!(name, "recoil" | "recoilGrappling" | "recoilInterval") {
+            node.get(name)
+        } else {
+            data.get(name)
+        }
+    })?;
+    Ok(count + recoil_count + residual_count)
 }
 
 fn recoil<'source>(
@@ -140,16 +152,25 @@ fn beam_damage<'source>(
             ("DamageStun", "stun"),
         ],
         "parameters" => &[("damageTotal", "damageTotal")],
-        "base" => return Ok(count),
-        "authored" => {
-            return Ok(count + authored_roots(trace, damage, cell(projected, "authored")?)?);
-        }
+        "base" | "authored" => &[],
         _ => return Err("unrecognized original beam damage alternative".into()),
     };
-    let cells = projected
-        .pointer("/value")
-        .ok_or("original beam damage inputs")?;
-    let mut checked = count;
+    let cells = projected.get("value").unwrap_or(&Value::Null);
+    let mut checked = count
+        + inventory::remaining(trace, damage, cell(projected, "authored")?, |name| {
+            fields
+                .iter()
+                .find(|(original, _)| *original == name)
+                .and_then(|(_, wire)| cells.get(wire))
+                .or_else(|| cells.get(name))
+        })?;
+    if alternative == "parameters" {
+        checked += inventory::damage_macro(
+            trace,
+            damage.field("damageMacro"),
+            cell(cells, "damageMacro")?,
+        )?;
+    }
     for &(name, wire) in fields {
         let raw = damage.field(name);
         let output = cell(cells, wire)?;
@@ -194,18 +215,77 @@ fn launcher<'source>(
         proof::text(data, "/type")? == expected,
         "original launcher kind"
     );
-    Ok(1 + match expected {
-        "projectile" => fields(trace, launcher, data, PROJECTILE)?,
-        "missile" => fields(trace, launcher, data, MISSILE)?,
-        "throwable" => fields(trace, launcher, data, &["throwMode", "soundRadius"])?,
-        "authored" => authored_roots(
+    let (typed, arena) = match expected {
+        "projectile" => (PROJECTILE, "authored"),
+        "missile" => (MISSILE, "authored"),
+        "throwable" => (&["throwMode", "soundRadius"][..], "authored"),
+        "authored" => (&[][..], "original"),
+        _ => (&[][..], "authored"),
+    };
+    Ok(1 + fields(trace, launcher, data, typed)?
+        + inventory::remaining(trace, launcher, cell(data, arena)?, |name| data.get(name))?
+        + launcher_spread(trace, launcher, data)?)
+}
+
+fn aim_members<'source>(
+    trace: &Trace<'_, 'source>,
+    original: &StructValue<'source>,
+    data: &Value,
+) -> TestResult<usize> {
+    let mut checked = unit_source(trace, original, data, "aimGeometryTags")?;
+    if let Some(Original::Struct(modifier)) = original.field("aimModifier")
+        && let Some(value) = data
+            .pointer("/aimModifier/value")
+            .filter(|value| value.is_object())
+    {
+        checked += unit_source(trace, modifier, value, "weaponStats")?;
+        checked +=
+            inventory::remaining(trace, modifier, cell(value, "additionalFields")?, |name| {
+                value.get(name)
+            })?;
+    }
+    Ok(checked)
+}
+
+fn unit_source<'source>(
+    trace: &Trace<'_, 'source>,
+    source: &StructValue<'source>,
+    data: &Value,
+    name: &str,
+) -> TestResult<usize> {
+    let count = owned_input(trace, source, data, name)?;
+    let Some(Original::Struct(source)) = source.field(name) else {
+        return Ok(count);
+    };
+    let value = cell(cell(data, name)?, "value")?;
+    Ok(count
+        + original_item_arena::compare(
             trace,
-            launcher,
-            data.get("original")
-                .ok_or("unlisted launcher source arena")?,
-        )?,
-        _ => 0,
-    })
+            source.fields().iter(),
+            cell(value, "additionalFields")?,
+        )?
+        .nodes)
+}
+
+fn launcher_spread<'source>(
+    trace: &Trace<'_, 'source>,
+    launcher: &StructValue<'source>,
+    data: &Value,
+) -> TestResult<usize> {
+    if let Some(Original::Struct(spread)) = launcher.field("spreadParams")
+        && let Some(value) = data
+            .pointer("/spreadParams/value")
+            .filter(|value| value.is_object())
+    {
+        let count = fields(
+            trace,
+            spread,
+            value,
+            &["min", "max", "firstAttack", "attack", "decay"],
+        )?;
+        return Ok(count + inventory::authored(trace, spread, value)?);
+    }
+    Ok(0)
 }
 
 fn modifier<'source>(
@@ -221,7 +301,7 @@ fn modifier<'source>(
     let arena = cell(data, name)?
         .pointer("/value")
         .ok_or("original charge modifier arena")?;
-    Ok(count + authored_roots(trace, modifier, arena)?)
+    Ok(count + original_item_arena::compare(trace, modifier.fields().iter(), arena)?.nodes)
 }
 
 pub(super) fn fields<'source>(
@@ -276,59 +356,6 @@ pub(super) fn owned_input<'source>(
     require_state(selected, "present")?;
     trace.part(selected, value, "$type", "selector")?;
     Ok(1)
-}
-
-fn authored_roots<'source>(
-    trace: &Trace<'_, 'source>,
-    original: &StructValue<'source>,
-    arena: &Value,
-) -> TestResult<usize> {
-    check_roots(trace, original, arena, |_| true)
-}
-
-fn authored_roots_except_recoil<'source>(
-    trace: &Trace<'_, 'source>,
-    original: &StructValue<'source>,
-    arena: &Value,
-    node: &Value,
-) -> TestResult<usize> {
-    check_roots(trace, original, arena, |name| {
-        !matches!(name, "recoil" | "recoilGrappling" | "recoilInterval")
-            || !matches!(
-                node.get(name)
-                    .and_then(|value| value.get("state"))
-                    .and_then(Value::as_str),
-                Some("present" | "null")
-            )
-    })
-}
-
-fn check_roots<'source>(
-    trace: &Trace<'_, 'source>,
-    original: &StructValue<'source>,
-    arena: &Value,
-    keep: impl Fn(&str) -> bool,
-) -> TestResult<usize> {
-    let roots = proof::rows(arena, "/roots")?;
-    let mut fields = original.fields().iter().filter(|field| keep(field.name()));
-    for projected in roots {
-        let source = fields.next().ok_or("unexpected original field root")?;
-        assert!(
-            proof::text(projected, "/name/value")? == source.name(),
-            "original authored field order"
-        );
-        trace.part(
-            cell(projected, "name")?,
-            source.value(),
-            "$fieldName",
-            "payload",
-        )?;
-    }
-    assert!(
-        fields.next().is_none(),
-        "complete original authored field roots"
-    );
-    Ok(roots.len())
 }
 
 pub(super) fn other_state<'source>(

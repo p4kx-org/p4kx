@@ -21,10 +21,15 @@ use crate::real_archive_verification;
 mod graph;
 #[path = "weapon_actions/inputs.rs"]
 mod inputs;
+#[path = "weapon_actions/inventory.rs"]
+mod inventory;
+#[path = "../it/catalog_weapon_action_wrapper_fixture.rs"]
+mod synthetic;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const COMPONENT: &str = "SCItemWeaponComponentParams";
+const AUDITED_PTU_CHANGE: &str = "13189690";
 const WITNESSES: &[(&str, &str)] = &[
     ("P8-SC", "behr_smg_ballistic_01"),
     ("Volt", "volt_sniper_energy_01"),
@@ -46,6 +51,19 @@ fn representative_weapon_actions_match_original_slots_and_inputs() -> TestResult
     let watch = ArchiveWatch::new(&archive);
     let entry = DataForgeEntry::read(&archive).map_err(|_| "read configured DataForge")?;
     let forge = entry.open().map_err(|_| "open original DataForge")?;
+    let required = archive
+        .build()
+        .is_some_and(|build| build.change_number() == AUDITED_PTU_CHANGE)
+        || std::env::var_os("P4KX_EXPECT_ALL_WEAPON_ACTION_WITNESSES").is_some();
+    if let Some(build) = archive.build() {
+        real_archive_verification::print_line(&format!(
+            "weapon action Build: {} {} {} {}",
+            build.branch(),
+            build.version(),
+            build.change_number(),
+            build.build_id(),
+        ));
+    }
     let mut coverage = BTreeMap::new();
     for (label, basename) in WITNESSES {
         let mut owners = 0;
@@ -62,6 +80,7 @@ fn representative_weapon_actions_match_original_slots_and_inputs() -> TestResult
         real_archive_verification::print_line(&format!(
             "weapon action witness {label}: {owners} original owners"
         ));
+        assert!(!required || owners > 0, "expected {label} on this Build");
     }
     watch
         .check()
@@ -72,7 +91,7 @@ fn representative_weapon_actions_match_original_slots_and_inputs() -> TestResult
     );
     for (kind, measured) in coverage {
         real_archive_verification::print_line(&format!(
-            "weapon action {kind}: {} original nodes, {} original input fields checked",
+            "weapon action {kind}: {} original nodes, {} original input fields and authored values checked",
             measured.nodes, measured.inputs
         ));
     }
@@ -160,6 +179,41 @@ fn compare_owner(
         weapons > 0 && rows.is_empty(),
         "every exported weapon for this owner has its physical source slot (original={weapons}, unmatched={})",
         rows.len()
+    );
+    Ok(())
+}
+#[test]
+fn weapon_action_inventory_detects_an_omitted_authored_occurrence() -> TestResult {
+    use crate::commodity_v3_fixture::{self as fixture, DcbOrigin};
+
+    let (_folder, archive) = fixture::open(&synthetic::database(), DcbOrigin::Encrypted)?;
+    let entry = DataForgeEntry::read(&archive).map_err(|_| "read synthetic DataForge")?;
+    let forge = entry.open().map_err(|_| "open synthetic DataForge")?;
+    let record = forge
+        .record(synthetic::OWNER)
+        .ok_or("synthetic weapon owner")?;
+    let tree = record.tree().map_err(|_| "read synthetic weapon owner")?;
+    let catalog = build_catalog_from(&archive, &entry, &fixture::options())?;
+    let mut catalog: Value = serde_json::from_slice(catalog.json())?;
+    compare_owner(&tree, entry.origin(), &catalog, &mut BTreeMap::new())?;
+
+    let roots = catalog
+        .pointer_mut("/configurations/weaponActions/rows/0/actionNodes/0/kind/value/authored/roots")
+        .and_then(Value::as_array_mut)
+        .ok_or("synthetic sequence authored roots")?;
+    assert_eq!(
+        roots.len(),
+        1,
+        "the synthetic sequence has one inherited field"
+    );
+    roots.clear();
+    let result = compare_owner(&tree, entry.origin(), &catalog, &mut BTreeMap::new());
+    assert_eq!(
+        result
+            .err()
+            .ok_or("omitted authored occurrence went undetected")?
+            .to_string(),
+        "one authored root for each physical field",
     );
     Ok(())
 }

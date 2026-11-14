@@ -232,7 +232,7 @@ fn compare_multiplier(source: &StructValue<'_>, row: &Value) -> TestResult {
     }
 }
 
-fn compare_macro(original: Option<&Original<'_>>, cell: &Value) -> TestResult {
+pub(super) fn compare_macro(original: Option<&Original<'_>>, cell: &Value) -> TestResult {
     let (guid, status) = match original {
         None => return require_state(cell, "absent"),
         Some(Original::Null) => return require_state(cell, "null"),

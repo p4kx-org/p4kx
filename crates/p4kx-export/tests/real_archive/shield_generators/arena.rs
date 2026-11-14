@@ -29,7 +29,7 @@ pub(super) fn source_type<'source>(
 
 pub(crate) struct Coverage {
     pub(super) roots: usize,
-    pub(super) nodes: usize,
+    pub(crate) nodes: usize,
 }
 
 pub(super) fn additional<'source>(

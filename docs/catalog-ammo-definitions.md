@@ -156,6 +156,66 @@ declarations retain their original fields and local value links under the
 legacy `items[].stats.weapon.fireActions` list
 retains its existing flattening and precedence.
 
+### Original action field inventory
+
+Paths below start at each `actionNodes[]` element of the physical
+`weaponActions` row. Sourced cells carry a value, its state and its
+own provenance. Where present, read their payload through `.value`.
+
+- Across action families, `recoil`, `recoilGrappling` and
+  `recoilInterval` are siblings of `kind`. The first two retain
+  their referenced Record identities. Join the target definitions
+  through their original Record indices.
+- `kind.value` keeps the direct fields of single, rapid and burst
+  actions. All three retain `fireRate`, `heatPerShot`, `wearPerShot`
+  and `launchParams`,
+  plus `shotCount` and `cooldownTime` for burst or `fireDuringSpinUp`,
+  `spinUpTime`, `spinDownTime`, `spinParam` and
+  `audioLoopTimeBetweenFirstShots` for rapid.
+- `kind.value.launchParams.value.type` identifies the launcher variant.
+  Projectile inputs keep `fireHelper`, `muzzleHelper`,
+  `ammoCost`, `heatCost`, `pelletCount`, `damageMultiplier`, `soundRadius`,
+  `projectileType` and `spreadParams`. Its typed spread exposes `min`,
+  `max`, `firstAttack`, `attack` and `decay`. Missile inputs keep
+  `soundRadius`, `detachVelocityRight`, `detachVelocityForward`,
+  `detachVelocityUp`, `detachVelocityRoll`, `canFireWithoutLock`,
+  `showHitIndicator` and `igniteOnPylon`. Throwable inputs keep
+  `throwMode` and `soundRadius`. The base and dummy variants keep their
+  original fields in `authored`. Other concrete launchers retain their
+  `sourceType` and use `original`.
+- Beam inputs in `kind.value` also keep `wearPerSecond`,
+  `minEnergyDraw`, `maxEnergyDraw`, `chargeUpTime`, `chargeDownTime` and
+  `fireDuringChargeUp`. Under `damagePerSecond.value.value`, channel
+  fields such as `DamageEnergy` use the labels `physical`, `energy`,
+  `distortion`, `thermal`, `biochemical` and `stun`. The parameter
+  alternative uses `damageMacro` and `damageTotal`.
+- `kind.value` keeps `mode` and `sequenceEntries` for sequences,
+  `weaponActions` for parallel actions, `conditionalWeaponActions`
+  and `defaultWeaponAction` for both conditional kinds, and
+  `weaponAction` for toggle and charged actions. Each sequence entry
+  keeps `delay`, `unit`, `repetitions` and `weaponAction`. Each conditional
+  entry keeps `weaponAction` and the complete original `condition.value`
+  arena. The charged action exposes `chargeTime`, `overchargeTime`,
+  `overchargedTime`, `cooldownTime`, `maxGlow`, `interpolateChargeBonus`,
+  `fireAutomaticallyOnFullCharge`, `fireOnlyOnFullCharge`,
+  `chargeAutomatically` and the complete `maxChargeModifier.value` arena.
+- Aim inputs expose `hasReloadModesOnUI`, `aimGeometryTags` and
+  `aimModifier`. The latter retains its nested `weaponStats`. Each of these
+  original bodies records remaining members in its own `additionalFields`.
+
+For each admitted body, a direct typed cell covers its first original
+occurrence when its state is `present` or `null`. Remaining occurrences,
+including duplicate names, inherited fields, and values rejected by a
+typed cell, have explicit roots under the body's `authored`,
+`additionalFields` or `original` arena. When `kind.type` is `authored`,
+`kind.value` is the arena itself. Read its `roots[].name` and follow the
+local `valueIndex` into `values` for declaration, state, value and provenance.
+Original arrays keep their slot order. References carry their identity,
+while owned structs retain their descendant fields. A rejected action or
+launcher slot declares its source state and does not produce a typed node.
+
+### Component operating configuration
+
 The row's `operatingConfiguration` keeps the component's original
 `proceduralAnimationRecord` and `actorProceduralRecoilConfig` References.
 `connectionParams` distinguishes the no-power, underpower, overpower,
@@ -262,4 +322,15 @@ covers every `AmmoParams` Record in the configured build.
 
 ~~~powershell
 cargo test -p p4kx-export --test real_archive ammunition_definitions_match_original_physical_records_and_sampled_variant_values -- --ignored --nocapture
+~~~
+
+The weapon-action check verifies the ordered original slots, typed values,
+and complete authored value trees of the P8-SC, Volt and Revenant. It requires
+all three in PTU change `13189690` and checks the named owners found in other
+builds. Set `P4KX_EXPECT_ALL_WEAPON_ACTION_WITNESSES=1` to require all three
+on another build. The receipt identifies the Build and counts original
+owners, nodes and compared values.
+
+~~~powershell
+cargo test -p p4kx-export --test real_archive representative_weapon_actions_match_original_slots_and_inputs -- --ignored --nocapture
 ~~~

@@ -6,7 +6,8 @@ use std::collections::{BTreeMap, VecDeque};
 use p4kx_extraction::{StructValue, Value as Original};
 use serde_json::Value;
 
-use super::{Coverage, TestResult, inputs};
+use super::{Coverage, TestResult, inputs, inventory};
+use crate::original_item_arena;
 use crate::real_archive_item_components::{cell, require_state};
 use crate::real_archive_item_durability::{self as proof, Trace};
 
@@ -207,8 +208,9 @@ fn entries<'tree, 'source>(
             Entries::Sequence => {
                 inputs::fields(trace, entry, data, &["delay", "unit", "repetitions"])?
             }
-            Entries::Conditional => inputs::owned_input(trace, entry, data, "condition")?,
+            Entries::Conditional => condition(trace, entry, data)?,
         };
+        count += inventory::authored(trace, entry, data)?;
         slot(
             trace,
             entry.field("weaponAction"),
@@ -217,6 +219,23 @@ fn entries<'tree, 'source>(
         )?;
     }
     Ok(count)
+}
+
+fn condition<'source>(
+    trace: &Trace<'_, 'source>,
+    entry: &StructValue<'source>,
+    data: &Value,
+) -> TestResult<usize> {
+    let count = inputs::owned_input(trace, entry, data, "condition")?;
+    if count == 0 {
+        return Ok(0);
+    }
+    let source = entry
+        .fields()
+        .iter()
+        .find(|field| field.name() == "condition");
+    let arena = cell(cell(data, "condition")?, "value")?;
+    Ok(count + original_item_arena::compare(trace, source.into_iter(), arena)?.nodes)
 }
 
 fn array<'tree, 'source, 'catalog>(
