@@ -248,10 +248,11 @@ impl MotionInput<'_, '_, '_> {
             .sources
             .value(value.clone(), &[payload], complete);
         let mut observed = None;
-        let capture = self.resources.capture(
+        let capture = self.resources.capture_with_documents(
             value,
             ResourceKind::DataRelative,
-            |xml: &SourceDocument<'_>, origin| {
+            documents,
+            |xml, origin, documents| {
                 let root = xml.root();
                 if root.namespace().is_some() || root.name() != expected_root {
                     return Ok(None);

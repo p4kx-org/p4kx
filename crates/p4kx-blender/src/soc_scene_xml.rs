@@ -2,15 +2,15 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::cryxml::{Format, SourceDocument, SourceElement};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use p4kx_extraction::{FieldOrigin, PhysicalSourceRef};
+use p4kx_extraction::{FieldOrigin, PhysicalSourceRef, SourceUse};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
-use crate::{PlayerDocument, PlayerDocumentSink};
+use crate::{PlayerDocument, PlayerDocumentRejection, PlayerDocumentSink, RejectedPlayerDocument};
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -50,6 +50,7 @@ struct XmlAttribute {
 pub(crate) struct XmlDocuments<'sink> {
     indices: BTreeMap<(PhysicalSourceRef, Option<usize>), usize>,
     rows: Vec<XmlDocument>,
+    rejected: BTreeSet<(PhysicalSourceRef, PlayerDocumentRejection)>,
     sink: Option<&'sink mut dyn PlayerDocumentSink>,
 }
 
@@ -89,6 +90,55 @@ impl<'sink> XmlDocuments<'sink> {
         }
         self.indices.insert(key, index);
         Ok(index)
+    }
+
+    pub(crate) fn reject_malformed(
+        &mut self,
+        origin: &XmlOrigin<'_>,
+        payload: &SourceUse,
+    ) -> Result<(), SocSceneError> {
+        self.reject(origin, payload, PlayerDocumentRejection::MalformedXml)
+    }
+
+    pub(crate) fn reject_root(
+        &mut self,
+        document: &SourceDocument<'_>,
+        origin: &XmlOrigin<'_>,
+        root: &SourceUse,
+    ) -> Result<(), SocSceneError> {
+        self.reject(
+            origin,
+            root,
+            PlayerDocumentRejection::UnexpectedRoot {
+                format: source_format(document),
+                lossy: document.is_lossy(),
+            },
+        )
+    }
+
+    fn reject(
+        &mut self,
+        origin: &XmlOrigin<'_>,
+        evidence: &SourceUse,
+        rejection: PlayerDocumentRejection,
+    ) -> Result<(), SocSceneError> {
+        let Some(sink) = self.sink.as_mut() else {
+            return Ok(());
+        };
+        let source = origin.source();
+        if !self.rejected.insert((source.clone(), rejection)) {
+            return Ok(());
+        }
+        let member = origin.archive_member.ok_or(SocSceneError::Position)?;
+        let bytes = member.payload().map_err(|_| SocSceneError::Position)?;
+        sink.rejected_document(RejectedPlayerDocument {
+            source,
+            original: member.origin(),
+            origin: origin.sources.origin(std::slice::from_ref(evidence), true),
+            rejection,
+            bytes,
+        })
+        .map_err(SocSceneError::DocumentSink)
     }
 
     pub(crate) fn finish(self) -> Vec<XmlDocument> {

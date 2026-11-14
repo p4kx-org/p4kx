@@ -39,13 +39,55 @@ pub struct PlayerDocument<'a> {
     pub bytes: &'a [u8],
 }
 
-/// Receives the verified original XML before its parse is released.
+/// Why a verified Player document could not enter a projected resource.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[non_exhaustive]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum PlayerDocumentRejection {
+    /// The XML parser rejected the verified bytes.
+    MalformedXml,
+    /// The parsed root did not match the selected resource kind.
+    UnexpectedRoot {
+        /// Original XML encoding interpreted by the source reader.
+        format: &'static str,
+        /// Whether source string repair occurred during decoding.
+        lossy: bool,
+    },
+}
+
+/// Verified original bytes for a rejected Player resource.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct RejectedPlayerDocument<'a> {
+    /// Physical identity shared with the rejected resource and other observations.
+    pub source: PhysicalSourceRef,
+    /// Exact original archive Entry and containing context.
+    pub original: &'a EntryOrigin,
+    /// Evidence of the observed member payload or of its rejected root.
+    pub origin: FieldOrigin,
+    /// The observed parser or root rejection.
+    pub rejection: PlayerDocumentRejection,
+    /// Exact decoded bytes of the physical Archive member.
+    pub bytes: &'a [u8],
+}
+
+/// Receives CRC-verified Player originals.
 pub trait PlayerDocumentSink {
     /// Retains one bound source document and its original bytes.
     ///
     /// # Errors
     /// Returns the caller's failure to retain the document.
     fn document(&mut self, document: PlayerDocument<'_>) -> io::Result<()>;
+
+    /// Retains a verified original whose XML or root was rejected.
+    ///
+    /// A source can occur both here and in [`Self::document`].
+    ///
+    /// # Errors
+    /// Returns the caller's failure to retain the rejected document.
+    fn rejected_document(&mut self, _document: RejectedPlayerDocument<'_>) -> io::Result<()> {
+        Ok(())
+    }
 }
 
 /// Shared preparation of explicit Player bodies and their common authored definitions.

@@ -15,6 +15,7 @@ use serde::Serialize;
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_classes::check;
 use crate::soc_scene_origin::XmlOrigin;
+use crate::soc_scene_xml::XmlDocuments;
 
 const MANNEQUIN_ROOT: &str = "Data/Animations/Mannequin/ADB/";
 
@@ -52,6 +53,14 @@ pub(crate) enum Resource<T> {
     },
 }
 
+enum XmlRead<'document, 'input> {
+    Malformed(&'document SourceUse),
+    Parsed {
+        document: &'document SourceDocument<'input>,
+        root: &'document SourceUse,
+    },
+}
+
 pub(crate) struct ResourceCapture<T> {
     value: SourceValue<Resource<T>>,
     uses: Vec<SourceUse>,
@@ -86,7 +95,7 @@ impl<T> ResourceCapture<T> {
         sources.value(value, uses, complete)
     }
 
-    fn into_bound(
+    pub(crate) fn into_bound(
         self,
         sources: &SourceUses,
         selectors: &[SourceUse],
@@ -118,26 +127,45 @@ impl<'a> Resources<'a> {
         kind: ResourceKind,
         project: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
     ) -> Result<SourcedValue<Resource<T>>, SocSceneError> {
-        self.read_with_selectors(value, std::slice::from_ref(selector), kind, project)
-    }
-
-    pub(crate) fn read_with_selectors<T>(
-        &self,
-        value: SourceValue<String>,
-        selectors: &[SourceUse],
-        kind: ResourceKind,
-        project: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
-    ) -> Result<SourcedValue<Resource<T>>, SocSceneError> {
         Ok(self
-            .capture(value, kind, project)?
-            .into_bound(self.sources, selectors))
+            .capture(value, kind, |status, origin| match status {
+                XmlRead::Malformed(_) => Ok(None),
+                XmlRead::Parsed { document, .. } => project(document, origin),
+            })?
+            .into_bound(self.sources, std::slice::from_ref(selector)))
     }
 
-    pub(crate) fn capture<T>(
+    pub(crate) fn capture_with_documents<T>(
         &self,
         value: SourceValue<String>,
         kind: ResourceKind,
-        project: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
+        documents: &mut XmlDocuments<'_>,
+        project: impl FnOnce(
+            &SourceDocument<'_>,
+            &XmlOrigin<'_>,
+            &mut XmlDocuments<'_>,
+        ) -> Result<Option<T>, SocSceneError>,
+    ) -> Result<ResourceCapture<T>, SocSceneError> {
+        self.capture(value, kind, |status, origin| match status {
+            XmlRead::Malformed(payload) => {
+                documents.reject_malformed(origin, payload)?;
+                Ok(None)
+            }
+            XmlRead::Parsed { document, root } => {
+                let value = project(document, origin, documents)?;
+                if value.is_none() {
+                    documents.reject_root(document, origin, root)?;
+                }
+                Ok(value)
+            }
+        })
+    }
+
+    fn capture<T>(
+        &self,
+        value: SourceValue<String>,
+        kind: ResourceKind,
+        project: impl FnOnce(XmlRead<'_, '_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
     ) -> Result<ResourceCapture<T>, SocSceneError> {
         let mut uses = Vec::new();
         let value = match value {
@@ -158,7 +186,7 @@ impl<'a> Resources<'a> {
         authored: &str,
         kind: ResourceKind,
         uses: &mut Vec<SourceUse>,
-        project: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
+        project: impl FnOnce(XmlRead<'_, '_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
     ) -> Result<Resource<T>, SocSceneError> {
         check(self.cancel)?;
         if authored.is_empty() {
@@ -199,7 +227,7 @@ impl<'a> Resources<'a> {
         &self,
         entry: &Entry,
         uses: &mut Vec<SourceUse>,
-        project: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
+        project: impl FnOnce(XmlRead<'_, '_>, &XmlOrigin<'_>) -> Result<Option<T>, SocSceneError>,
     ) -> Result<Resource<T>, SocSceneError> {
         let member = SocArchiveMember::read(self.archive, entry, || {
             if self.cancel.is_cancelled() {
@@ -228,14 +256,24 @@ impl<'a> Resources<'a> {
             return Ok(Resource::Unreadable { source });
         };
         let Ok(document) = SourceDocument::parse(bytes, SourceReadOptions::default()) else {
-            uses.push(payload()?);
+            let payload = payload()?;
+            project(XmlRead::Malformed(&payload), &origin)?;
+            uses.push(payload);
             return Ok(Resource::InvalidXml { source });
         };
-        uses.push(origin.node(document.root(), SourceUseRole::Payload)?);
-        match project(&document, &origin)? {
-            Some(data) => Ok(Resource::Present { source, data }),
-            None => Ok(Resource::InvalidXml { source }),
-        }
+        let root = origin.node(document.root(), SourceUseRole::Payload)?;
+        let value = project(
+            XmlRead::Parsed {
+                document: &document,
+                root: &root,
+            },
+            &origin,
+        )?;
+        uses.push(root);
+        Ok(match value {
+            Some(data) => Resource::Present { source, data },
+            None => Resource::InvalidXml { source },
+        })
     }
 
     fn entry_origin(&self, entry: &Entry) -> Result<EntryOrigin, SocSceneError> {

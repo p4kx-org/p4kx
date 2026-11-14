@@ -145,6 +145,6 @@ pub use write::{PackageInfo, PackageSummary, write_package, write_package_with_c
 pub(crate) type PackageResult<T> = Result<T, PackageError>;
 
 pub use player_source::{
-    PlayerDocument, PlayerDocumentSink, PlayerSource, PlayerSourceCapture, PlayerSourceError,
-    player_source_schema,
+    PlayerDocument, PlayerDocumentRejection, PlayerDocumentSink, PlayerSource, PlayerSourceCapture,
+    PlayerSourceError, RejectedPlayerDocument, player_source_schema,
 };

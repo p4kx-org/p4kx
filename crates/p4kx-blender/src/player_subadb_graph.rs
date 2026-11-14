@@ -180,15 +180,16 @@ impl Graph<'_, '_, '_> {
         let mut next = None;
         if let Entry::Vacant(slot) = self.captures.entry(key.clone()) {
             let mut loaded = None;
-            let capture = self.resources.capture(
+            let capture = self.resources.capture_with_documents(
                 SourceValue::Present(path.to_owned()),
                 ResourceKind::DataRelative,
-                |document, origin| {
+                self.documents,
+                |document, origin, documents| {
                     if document.root().name() != "AnimDB" || document.root().namespace().is_some() {
                         return Ok(None);
                     }
                     let database = Database::read(document, origin, self.resources.cancel)?;
-                    let index = self.documents.bind(document, origin)?;
+                    let index = documents.bind(document, origin)?;
                     loaded = Some((index, database));
                     Ok(Some(index))
                 },

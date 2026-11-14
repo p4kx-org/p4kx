@@ -39,3 +39,15 @@ variant selection require additional source context.
 Source-backed values expose `containsEncryptedSource`, `sourceSetComplete` and
 `sourceUsesRefs`. A join preserves both the original selector and observed target source.
 Raw XML values use their document's physical identity and their original local position.
+
+## Shared Player source capture
+
+Library callers can prepare several explicitly requested bodies with a shared source
+inventory and a `PlayerDocumentSink`. The sink receives CRC-verified original XML bytes
+while they are available. It can also retain verified bytes when XML parsing fails or
+when the selected resource requires a different root. These observations carry the
+physical source identity and the rejection evidence, so repeated declarations can refer
+to the same retained bytes. The same physical source can be observed both as a parsed
+document and as a rejected resource selection. An unreadable or unresolved source remains
+represented by its disposition. Its bytes are unavailable to the sink. The CLI document's
+schema and projected source identifiers are unchanged.

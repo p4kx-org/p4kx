@@ -315,15 +315,17 @@ fn shared_fragment_file(
         return Ok(resources.sources.value(SourceValue::Invalid, uses, true));
     }
     let mut target = None;
-    let value = resources.read_with_selectors(
-        SourceValue::Present(controller_path),
-        uses,
-        ResourceKind::DataRelative,
-        |document, origin| {
-            target = Some(origin.node(document.root(), SourceUseRole::Selector)?);
-            documents.bind(document, origin).map(Some)
-        },
-    )?;
+    let value = resources
+        .capture_with_documents(
+            SourceValue::Present(controller_path),
+            ResourceKind::DataRelative,
+            documents,
+            |document, origin, documents| {
+                target = Some(origin.node(document.root(), SourceUseRole::Selector)?);
+                documents.bind(document, origin).map(Some)
+            },
+        )?
+        .into_bound(resources.sources, uses);
     uses.extend(target);
     Ok(value)
 }

@@ -123,15 +123,22 @@ fn project(
         return Ok(Loadout::Unreadable { source });
     };
     let Ok(xml) = SourceDocument::parse(bytes, SourceReadOptions::default()) else {
-        uses.push(payload(SourceUseRole::Payload)?);
+        let payload = payload(SourceUseRole::Payload)?;
+        documents.reject_malformed(&origin, &payload)?;
+        uses.push(payload);
         return Ok(Loadout::InvalidXml {
             source,
             document: None,
         });
     };
-    uses.push(origin.node(xml.root(), SourceUseRole::Payload)?);
+    let root = origin.node(xml.root(), SourceUseRole::Payload)?;
     let document = documents.bind(&xml, &origin)?;
-    let Some(loadout) = PositionedLoadout::read(&xml) else {
+    let loadout = PositionedLoadout::read(&xml);
+    if loadout.is_none() {
+        documents.reject_root(&xml, &origin, &root)?;
+    }
+    uses.push(root);
+    let Some(loadout) = loadout else {
         return Ok(Loadout::InvalidXml {
             source,
             document: Some(document),

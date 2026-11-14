@@ -20,7 +20,10 @@ use crate::soc_scene_xml::{XmlDocument, XmlDocuments};
 mod capture;
 
 use capture::prepare;
-pub use capture::{PlayerDocument, PlayerDocumentSink, PlayerSourceCapture};
+pub use capture::{
+    PlayerDocument, PlayerDocumentRejection, PlayerDocumentSink, PlayerSourceCapture,
+    RejectedPlayerDocument,
+};
 
 /// Original character defaults and player loadout declarations.
 #[derive(Debug, Serialize, JsonSchema)]

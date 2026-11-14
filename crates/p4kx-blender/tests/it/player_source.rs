@@ -22,11 +22,21 @@ mod subadb_graph_assertions;
 #[path = "player_shared_capture.rs"]
 mod shared_capture;
 
+#[path = "player_rejected_capture.rs"]
+mod rejected_capture;
+
 const BODY: u128 = 0x0101_0101_0101_0101_0101_0101_0101_0101;
 const WEAPON_ONE: u128 = 0x0202_0202_0202_0202_0202_0202_0202_0202;
 const WEAPON_TWO: u128 = 0x0303_0303_0303_0303_0303_0303_0303_0303;
 
 fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
+    fixture_with(subadb_graph_assertions::ROOT_LINKS, [])
+}
+
+fn fixture_with(
+    root_links: &str,
+    extra: impl IntoIterator<Item = TestEntry>,
+) -> TestResult<(tempfile::TempDir, Archive)> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("player.p4k");
     let mut male = TestChf::v7();
@@ -69,9 +79,10 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
             "Data/Scripts/Loadouts/Player/DefaultLoadouts/sample.xml",
             loadout,
         ));
-    motion_option_assertions::entries()
+    motion_option_assertions::entries(root_links)
         .into_iter()
         .chain(subadb_graph_assertions::entries())
+        .chain(extra)
         .fold(archive, ArchiveBuilder::entry)
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;

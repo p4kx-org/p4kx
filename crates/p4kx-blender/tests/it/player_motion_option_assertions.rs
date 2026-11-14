@@ -6,7 +6,7 @@ use serde_json::Value;
 
 use super::TestResult;
 
-pub(super) fn entries() -> [TestEntry; 3] {
+pub(super) fn entries(root_links: &str) -> [TestEntry; 3] {
     let controller = br#"<ControllerDef><Fragments filename="Animations/Test/fragments.xml"/>
         <FragmentDefs><Walk/><Walk/><Idle scopes="Body+Head"/></FragmentDefs>
         <ScopeDefs><Head/><Body/></ScopeDefs></ControllerDef>"#;
@@ -15,8 +15,7 @@ pub(super) fn entries() -> [TestEntry; 3] {
         <Walk><Fragment Tags="one"/><Fragment Tags="two"/></Walk>
         <Idle><Fragment FragTags="rest"/></Idle>
         <Missing><Fragment/></Missing>
-    </FragmentList>{}</AnimDB>"#,
-        super::subadb_graph_assertions::ROOT_LINKS
+    </FragmentList>{root_links}</AnimDB>"#
     );
     let fragment_definitions = br"<FragmentDefinition><Walk/><Idle/></FragmentDefinition>";
     [
