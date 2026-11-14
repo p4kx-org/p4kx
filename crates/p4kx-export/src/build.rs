@@ -7,7 +7,7 @@ use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
 use crate::archive_key_use::ArchiveKeyUse;
-use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags};
+use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags, particle_library};
 use crate::build_harvest::add_harvest_locations;
 use crate::build_loot::add_loot_containers;
 use crate::build_starmap::add_starmap;
@@ -46,7 +46,6 @@ mod metadata;
 pub(crate) use metadata::source;
 #[path = "build_scan.rs"]
 mod scanning;
-/// Builds the catalog and hands it to `emit`, which serialises it.
 #[expect(
     clippy::too_many_lines,
     reason = "one step and one field per kind of the catalog"
@@ -119,6 +118,7 @@ fn assemble<R>(
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
     let independent =
         catalog_independent_configurations::read(&forge, &projection, options, &mut collected)?;
+    particle_library::collect(archive, &entry_capture, options, &mut collected)?;
     let kinds = collected.summary(options.filter.is_none());
     let mut catalog_rows = crate::catalog_rows::snapshot(&mut collected, options.filter);
     catalog_rows.recovery_numbers = independent.recovery_numbers;
@@ -222,6 +222,7 @@ fn assemble<R>(
         definitions: CatalogDefinitions {
             blueprints: blueprints.definitions,
             shop_inventories: collected.shop_inventories,
+            particle_libraries: collected.particle_libraries,
             inventory_containers: inventory_table(&forge, collected.inventory_containers),
             medical_item_tier_configs: medical_tier_config::table(
                 &forge,

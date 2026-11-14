@@ -278,7 +278,21 @@ impl EntryReceipt {
         &self,
         normalize: impl FnOnce(&str) -> String,
     ) -> Result<PhysicalEntryIdentity, CatalogError> {
-        let origin = self.outer_directory()?;
+        self.describe_file(self.outer_directory()?, normalize)
+    }
+
+    pub(crate) fn physical_payload_file(
+        &self,
+        normalize: impl FnOnce(&str) -> String,
+    ) -> Result<PhysicalEntryIdentity, CatalogError> {
+        self.describe_file(self.payload_entry()?, normalize)
+    }
+
+    fn describe_file(
+        &self,
+        origin: &EntryMetadata,
+        normalize: impl FnOnce(&str) -> String,
+    ) -> Result<PhysicalEntryIdentity, CatalogError> {
         let sources = self.source_uses();
         let path = origin.path().as_str();
         let raw = origin.metadata("path", SourceUseRole::Payload)?;

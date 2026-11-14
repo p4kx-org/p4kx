@@ -103,6 +103,7 @@ const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::NpcClassPools
             | Kind::AutoSpawns
             | Kind::AutoSpawnSets
+            | Kind::ParticleLibraries
             | Kind::EncounterIndices
             | Kind::MissionItems
             | Kind::ProceduralPlanetAudio

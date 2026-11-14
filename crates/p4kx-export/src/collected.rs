@@ -9,6 +9,7 @@ use crate::blueprint_catalog_rows::BlueprintRow;
 use crate::blueprint_category::BlueprintCategory;
 use crate::broker_definition::BrokerDefinition;
 use crate::broker_entry::BrokerProjection;
+use crate::build_derived::particle_library::ParticleLibraryTable;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
@@ -131,6 +132,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) loot_containers: Vec<LootContainer>,
     pub(crate) shops: Vec<Shop>,
     pub(crate) shop_inventories: ShopInventoryTable,
+    pub(crate) particle_libraries: ParticleLibraryTable,
     pub(crate) shop_inventory_resolution: CatalogTable<ShopInventoryResolution>,
     pub(crate) crafters: Vec<Crafter<'f>>,
     pub(crate) mission_kinds: MissionKinds<'f>,
@@ -236,6 +238,7 @@ impl<'f> Collected<'f> {
             loot_containers: Vec::new(),
             shops: Vec::new(),
             shop_inventories: ShopInventoryTable::default(),
+            particle_libraries: ParticleLibraryTable::empty(DatasetAvailability::Absent),
             shop_inventory_resolution: CatalogTable::empty(DatasetAvailability::Absent),
             crafters: Vec::new(),
             mission_kinds: MissionKinds::default(),

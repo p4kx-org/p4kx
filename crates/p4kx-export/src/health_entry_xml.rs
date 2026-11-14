@@ -4,7 +4,9 @@
 use std::borrow::Cow;
 use std::sync::Arc;
 
-use p4kx_extraction::{SourceLocation, SourceUse, SourceUseRole};
+use p4kx_extraction::{SourceLocation, SourceUse, SourceUseRole, SourceValue, SourcedValue};
+use schemars::JsonSchema;
+use serde::Serialize;
 
 use super::entry_selection_input::{EntrySelectionUse, SelectionSource};
 use super::health_entry_frame::EntryCapture;
@@ -12,8 +14,18 @@ use super::health_entry_metadata::EntryMetadata;
 use super::health_entry_read::EntryRead;
 use super::health_entry_receipt::EntryReceipt;
 use super::health_entry_selection::AuthoredEntryPath;
+use crate::schema_fields::every_field_required;
 use crate::starmap_xml::{Document, Node, Root, XmlError};
 use crate::{CatalogError, ExportAccountingError};
+
+/// One original XML attribute occurrence.
+#[derive(Debug, Clone, Serialize, JsonSchema)]
+#[schemars(transform = every_field_required)]
+pub(crate) struct SourcedXmlAttribute {
+    pub(crate) name: SourcedValue<String>,
+    #[schemars(extend("x-gameText" = true))]
+    pub(crate) value: SourcedValue<String>,
+}
 
 /// One actual parse borrowing only bytes from its sealed original Entry read.
 pub(crate) struct EntryXml<'read, 'capture, 'input> {
@@ -112,6 +124,73 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
             field: format!("@{name}"),
         };
         self.capture_at(location, value).map(Some)
+    }
+
+    /// Returns all attribute occurrences in original order with exact source coordinates.
+    pub(crate) fn sourced_attributes<'node>(
+        &self,
+        node: impl Node<'node>,
+    ) -> Result<Vec<SourcedXmlAttribute>, CatalogError> {
+        let source = self.node_source(node)?;
+        let sources = self.capture.source_uses();
+        let complete = !self.is_lossy();
+        node.attributes()
+            .enumerate()
+            .map(|(ordinal, (name, value))| {
+                let ordinal = u64::try_from(ordinal)
+                    .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;
+                let indices = vec![u64::from(source.index()), ordinal];
+                let field = format!("@{name}");
+                let name_use =
+                    source.observe(indices.clone(), field.clone(), SourceUseRole::Selector)?;
+                let value_use = source.observe(indices, field, SourceUseRole::Payload)?;
+                Ok(SourcedXmlAttribute {
+                    name: sources.value(
+                        SourceValue::Present(name.to_owned()),
+                        &[name_use],
+                        complete,
+                    ),
+                    value: sources.value(
+                        SourceValue::Present(value.to_owned()),
+                        &[value_use],
+                        complete,
+                    ),
+                })
+            })
+            .collect()
+    }
+
+    /// Returns direct text occurrences in their original order.
+    pub(crate) fn sourced_text<'node>(
+        &self,
+        node: impl Node<'node>,
+    ) -> Result<Vec<SourcedValue<String>>, CatalogError> {
+        let source = self.node_source(node)?;
+        let sources = self.capture.source_uses();
+        let complete = !self.is_lossy();
+        let text = |ordinal: usize, value: &str| {
+            let ordinal = u64::try_from(ordinal)
+                .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;
+            let usage = source.observe(
+                vec![u64::from(source.index()), ordinal],
+                "$text".to_owned(),
+                SourceUseRole::Payload,
+            )?;
+            Ok(sources.value(SourceValue::Present(value.to_owned()), &[usage], complete))
+        };
+        match node.original() {
+            Root::Cry(node) => node
+                .content()
+                .map(|value| text(0, value))
+                .into_iter()
+                .collect(),
+            Root::Text(node) => node
+                .children()
+                .enumerate()
+                .filter(|(_, child)| child.is_text())
+                .filter_map(|(ordinal, child)| child.text().map(|value| text(ordinal, value)))
+                .collect(),
+        }
     }
 
     pub(crate) fn name<'node>(

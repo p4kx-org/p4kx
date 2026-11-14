@@ -18,6 +18,8 @@ dataforgeRecordHeader; genuine body paths, identity, selection and counts retain
 
 ## Every open catalog issue
 
+[Particle library sources](catalog-particle-libraries.md) added in #1150 are exported in `definitions.particleLibraries` with scoped `RainOcclusion`, exact field provenance and original light tokens.
+
 | Issue | Owning contract location | Facts/cardinality/scope kept |
 |---|---|---|
 | #844 | P.containerInstances, P.starmapPlacements | XML/Child/entxml/HCD declared traversal; reusable tile instances; local/world transforms, source chain and limits; existing LIVE placement convention |

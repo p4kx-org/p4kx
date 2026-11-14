@@ -325,6 +325,7 @@ impl Kind {
             | Self::HarvestableLocations
             | Self::Shops
             | Self::ShopInventories
+            | Self::ParticleLibraries
             | Self::ContractShipSpawns
             | Self::ContractLocationQueries
             | Self::ContractNpcSpawns

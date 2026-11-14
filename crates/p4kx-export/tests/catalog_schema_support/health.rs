@@ -90,9 +90,11 @@ fn row_count(kind: Kind, catalog: &Value) -> usize {
 
 const fn mode(kind: Kind) -> ExportSourceMode {
     match kind {
-        Kind::HarvestableLocations | Kind::LootContainers | Kind::Shops | Kind::ShopInventories => {
-            ExportSourceMode::ArchiveEntries
-        }
+        Kind::HarvestableLocations
+        | Kind::LootContainers
+        | Kind::Shops
+        | Kind::ShopInventories
+        | Kind::ParticleLibraries => ExportSourceMode::ArchiveEntries,
         Kind::Paints
         | Kind::Loadouts
         | Kind::ContractShipSpawns

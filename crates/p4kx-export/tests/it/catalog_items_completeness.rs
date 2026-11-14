@@ -72,6 +72,7 @@ fn expected_completeness() -> Value {
         "harvestableLocations",
         "shops",
         "shopInventories",
+        "particleLibraries",
         "explosionDefinitions",
         "ammoDefinitions",
         "factions",

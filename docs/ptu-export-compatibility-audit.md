@@ -112,9 +112,11 @@ pre-#844 integration tip with the updated catalog on the same Archive. Both wrot
 CRC-verified weather and lightning ParticleLibrary Entries are readable in both installed
 builds. The weather library has 62 elements on each Build and adds eight lexical Boolean
 `RainOcclusion` attributes in PTU. The lightning sample has 30 Lightning elements in LIVE and
-31 in PTU. The catalog preserves existing particle reference paths. Original library definitions
-and field origins require a separate producer tracked in
-[#1150](https://github.com/p4kx-org/p4kx/issues/1150).
+31 in PTU. The catalog preserves existing particle reference paths.
+[#1150](https://github.com/p4kx-org/p4kx/issues/1150) exports the original library definitions and
+field origins in [the particle-library table](catalog-particle-libraries.md). The installed
+source-to-projection test checked both original library shapes in each Build and verified the
+Boolean slots, node counts and authored light-attribute keys.
 The added climate-asset sample has 87 distinct field-path/type pairs, including climate limits,
 shading GUIDs and ordered harvestable-related sub-assets. The producing family is tracked in
 [#849](https://github.com/p4kx-org/p4kx/issues/849).

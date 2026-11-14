@@ -80,6 +80,7 @@ pub(crate) struct Completeness<'a> {
     pub(crate) shops: KindCompleteness<'a>,
     /// The complete physical inventory file selection, independent of Record filters.
     pub(crate) shop_inventories: KindCompleteness<'a>,
+    pub(crate) particle_libraries: KindCompleteness<'a>,
     /// The completeness of `factions`.
     pub(crate) factions: KindCompleteness<'a>,
     /// The completeness of the physical `FactionIdentity` selection.
@@ -225,6 +226,7 @@ impl<'a> Completeness<'a> {
             loot_containers: completeness,
             shops: completeness,
             shop_inventories: KindCompleteness::Complete,
+            particle_libraries: completeness,
             factions: completeness,
             faction_identities: completeness,
             reputation_perks: completeness,

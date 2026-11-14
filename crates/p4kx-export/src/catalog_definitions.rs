@@ -6,6 +6,7 @@ use serde::Serialize;
 
 use crate::blueprint_category::BlueprintCategoryDefinition;
 use crate::broker_definition::BrokerDefinition;
+use crate::build_derived::particle_library::ParticleLibraryTable;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition::AmmoDefinition;
 use crate::catalog_v3::explosion_definition::ExplosionDefinition;
@@ -64,6 +65,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) quality_quantizations: CatalogTable<QualityQuantizationDefinition<'source>>,
     pub(crate) tags: CatalogTable<super::tag_catalog::TagDefinition<'source>>,
     pub(crate) shop_inventories: ShopInventoryTable,
+    pub(crate) particle_libraries: ParticleLibraryTable,
     pub(crate) explosion_definitions: CatalogTable<ExplosionDefinition<'source>>,
     pub(crate) inventory_containers: CatalogTable<InventoryContainerDefinition<'source>>,
     pub(crate) medical_item_tier_configs: CatalogTable<MedicalItemTierConfig<'source>>,

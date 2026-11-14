@@ -107,9 +107,11 @@ fn count_selected(counts: &mut ExportSourceCounts, disposition: SourceDispositio
 /// Returns the source unit declared by the actual reader of a kind.
 pub(crate) const fn source_mode(kind: Kind) -> ExportSourceMode {
     match kind {
-        Kind::HarvestableLocations | Kind::LootContainers | Kind::Shops | Kind::ShopInventories => {
-            ExportSourceMode::ArchiveEntries
-        }
+        Kind::HarvestableLocations
+        | Kind::LootContainers
+        | Kind::Shops
+        | Kind::ShopInventories
+        | Kind::ParticleLibraries => ExportSourceMode::ArchiveEntries,
         Kind::Paints
         | Kind::Loadouts
         | Kind::ContractShipSpawns

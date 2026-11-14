@@ -217,7 +217,8 @@ impl<'f> Picked<'f> {
             | Kind::LootContainers
             | Kind::MineableEntities
             | Kind::Shops
-            | Kind::ShopInventories => return None,
+            | Kind::ShopInventories
+            | Kind::ParticleLibraries => return None,
         })
     }
 

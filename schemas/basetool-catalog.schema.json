@@ -4965,6 +4965,9 @@
         "npcClassPools": {
           "$ref": "#/$defs/CatalogTableOfNpcClassPoolDefinition"
         },
+        "particleLibraries": {
+          "$ref": "#/$defs/CatalogTableOfParticleLibrary"
+        },
         "proceduralPlanetAudio": {
           "$ref": "#/$defs/CatalogTableOfProceduralPlanetAudio"
         },
@@ -5076,6 +5079,7 @@
         "missionScenarios",
         "npcArchetypes",
         "npcClassPools",
+        "particleLibraries",
         "proceduralPlanetAudio",
         "qualityDistributions",
         "qualityQuantizations",
@@ -6666,6 +6670,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/NpcClassPoolDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfParticleLibrary": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ParticleLibrary"
           },
           "type": "array"
         }
@@ -8713,6 +8736,9 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `paints`."
         },
+        "particleLibraries": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
         "proceduralPlanetAudio": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The filtered physical DataForge procedural planet audio selection."
@@ -8879,6 +8905,7 @@
         "npcArchetypes",
         "npcClassPools",
         "paints",
+        "particleLibraries",
         "proceduralPlanetAudio",
         "qualityDistributions",
         "qualityQuantizations",
@@ -20293,6 +20320,10 @@
           "value": "shopInventories"
         },
         {
+          "description": "Original particle-library XML files in the Archive.",
+          "value": "particleLibraries"
+        },
+        {
           "description": "Reusable physical `ExplosionRecord` definitions.",
           "value": "explosionDefinitions"
         },
@@ -27203,6 +27234,71 @@
       ],
       "type": "object"
     },
+    "ParticleLibrary": {
+      "description": "One original particle-library Entry and its ordered XML elements.",
+      "properties": {
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/ParticleLibraryElement"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "identity",
+        "nodes"
+      ],
+      "type": "object"
+    },
+    "ParticleLibraryElement": {
+      "description": "One original particle-library element and its source-bound values.",
+      "properties": {
+        "attributes": {
+          "items": {
+            "$ref": "#/$defs/SourcedXmlAttribute"
+          },
+          "type": "array"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "nodeIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "parentNodeIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "rainOcclusion": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfboolean"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "text": {
+          "items": {
+            "$ref": "#/$defs/SourcedValueOfstring"
+          },
+          "type": "array",
+          "x-gameText": true
+        }
+      },
+      "required": [
+        "attributes",
+        "name",
+        "nodeIndex",
+        "parentNodeIndex",
+        "rainOcclusion",
+        "text"
+      ],
+      "type": "object"
+    },
     "ParticleResource": {
       "properties": {
         "path": {
@@ -27355,6 +27451,32 @@
       "required": [
         "inputRef",
         "recordIndex"
+      ],
+      "type": "object"
+    },
+    "PhysicalEntryIdentity": {
+      "description": "Exact directory identity and path facts for one observed physical Archive Entry.",
+      "properties": {
+        "entryIndex": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "inputRef": {
+          "$ref": "#/$defs/PhysicalSourceRef"
+        },
+        "normalizedPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourcePath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "entryIndex",
+        "inputRef",
+        "normalizedPath",
+        "sourcePath"
       ],
       "type": "object"
     },
@@ -103175,6 +103297,23 @@
         "sourceSetComplete",
         "sourceUsesRefs",
         "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedXmlAttribute": {
+      "description": "One original XML attribute occurrence.",
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "value": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        }
+      },
+      "required": [
+        "name",
         "value"
       ],
       "type": "object"

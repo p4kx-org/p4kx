@@ -62,6 +62,7 @@ resourceTypes: 1 written, 0 skipped, complete
 tags: 0 written, 0 skipped, complete
 blueprintCategoryLists: 0 written, 0 skipped, complete
 shopInventories: 0 written, 0 skipped, complete
+particleLibraries: 0 written, 0 skipped, complete
 explosionDefinitions: 0 written, 0 skipped, complete
 ammoDefinitions: 0 written, 0 skipped, complete
 factions: 0 written, 0 skipped, complete
@@ -108,4 +109,4 @@ ships variants: 0 in 0 groups
 quality quantizations: 0 used by no ResourceType, 0 links reach no quantization
 en: 16 texts resolved, 1 unresolved, 0 placeholders
 de: 2 texts resolved, 15 unresolved, 0 placeholders
-wrote [DIR]/basetool-catalog.json: 238269 bytes, 1 Records skipped, 0 failed
+wrote [DIR]/basetool-catalog.json: 239096 bytes, 1 Records skipped, 0 failed

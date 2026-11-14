@@ -74,6 +74,7 @@ impl Kind {
             Self::Tags => "tags",
             Self::BlueprintCategoryLists => "blueprintCategoryLists",
             Self::ShopInventories => "shopInventories",
+            Self::ParticleLibraries => "particleLibraries",
             Self::ExplosionDefinitions => "explosionDefinitions",
             Self::AmmoDefinitions => "ammoDefinitions",
             Self::Factions => "factions",

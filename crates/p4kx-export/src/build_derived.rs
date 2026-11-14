@@ -172,3 +172,6 @@ pub(crate) fn add_loadouts<'f>(
     collected.add_failures(built.failures);
     Ok(built.summary)
 }
+
+#[path = "particle_library.rs"]
+pub(crate) mod particle_library;
