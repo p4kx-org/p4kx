@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::chunks::{ByteOrder as ChunkByteOrder, Chunk, Container};
+use p4kx_extraction::chunks::{ByteOrder as ChunkByteOrder, Chunk, ChunkType, Container, ivo};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -77,6 +77,33 @@ pub(super) enum ModelChunkProjection {
     UnknownType,
 }
 
+#[derive(Clone, Copy, Serialize, JsonSchema)]
+pub(super) enum ModelTypedRecord {
+    #[serde(rename = "model-physics-table")]
+    Physics,
+    #[serde(rename = "model-lod-distance-words")]
+    LodDistances,
+    #[serde(rename = "model-skeleton-chunk")]
+    Skeleton,
+    #[serde(rename = "model-mesh")]
+    Mesh,
+    #[serde(rename = "model-node-table")]
+    NodeTable,
+}
+
+impl ModelTypedRecord {
+    pub(super) const fn of_chunk(kind: ChunkType) -> Option<Self> {
+        match kind {
+            ivo::STAT_OBJ_PHYSICS => Some(Self::Physics),
+            ivo::LOD_DISTANCES => Some(Self::LodDistances),
+            ivo::COMPILED_BONES | ivo::COMPILED_BONES_2 => Some(Self::Skeleton),
+            ivo::SKIN | ivo::SKIN_2 => Some(Self::Mesh),
+            ivo::NODE_MESH_COMBO => Some(Self::NodeTable),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(super) struct ModelEntryRecord {
@@ -97,10 +124,12 @@ pub(super) struct ModelChunkRecord {
     pub(super) extent: ModelChunkExtent,
     pub(super) range: SourceRange,
     pub(super) projection: ModelChunkProjection,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) semantic_record: Option<ModelTypedRecord>,
 }
 
 impl ModelChunkRecord {
-    pub(super) fn new(chunk: &Chunk) -> Self {
+    pub(super) fn new(chunk: &Chunk, semantic_record: Option<ModelTypedRecord>) -> Self {
         let kind = chunk.chunk_type();
         Self {
             type_id: kind.id(),
@@ -125,6 +154,7 @@ impl ModelChunkRecord {
             } else {
                 ModelChunkProjection::UnknownType
             },
+            semantic_record,
         }
     }
 }

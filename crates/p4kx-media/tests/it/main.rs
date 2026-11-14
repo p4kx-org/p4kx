@@ -111,6 +111,7 @@ mod model_mesh_provider;
 mod model_nmc_provider;
 mod model_physics_frame_provider;
 mod model_physics_provider;
+mod model_semantic_chunks;
 mod model_skeleton_provider;
 mod model_source_provider;
 mod model_vehicle_grid_provider;

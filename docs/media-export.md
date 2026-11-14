@@ -101,6 +101,14 @@ next physical boundary and can include padding. Unknown chunk types retain their
 and payloads. The chunk rows reference the same hashed raw file as the Entry. Their ranges
 do not carry separate digests.
 
+The optional `semantic_record` gives the namespace of the typed disposition row for
+the same physical source and chunk ordinal. Follow it to distinguish measured,
+unsupported, unmeasured and malformed layouts. Unknown types and recognized types
+without a semantic reader omit it. The raw directory classification in `projection`
+remains `known-opaque` or `unknown-type`. Actual conversion use depends on the
+selected model and LOD. The consumer-side `p4kx model info --json` reports that
+context's `read`, `skipped` and `unknown` usage from the model it read.
+
 The provider reads the original header and table from retained bytes and charges the validated
 row count to the common metadata work budget before allocating the table. A malformed table
 is diagnosed in diagnostic output with its original Entry bytes.

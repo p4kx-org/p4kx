@@ -16,6 +16,7 @@ use super::nmc;
 use super::origins::{self, ModelOrigins};
 use super::payload::{
     self, ModelChunkRecord, ModelEntryRecord, ModelSourceFamily, ModelSourcePayload,
+    ModelTypedRecord,
 };
 use super::physics;
 use super::skeleton;
@@ -34,13 +35,13 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.9.0",
+            "1.10.0",
             "Selected original models, geometry and character definitions with positioned source declarations.",
         );
         capability.field_groups = vec![
             FieldGroup::new(
                 "chunk-directory",
-                "Original table order, raw byte ranges, IDs, versions and physical source identities.",
+                "Original table order, raw byte ranges, IDs, versions, physical source identities and links to semantic disposition rows.",
             ),
             FieldGroup::new(
                 "collision-shapes",
@@ -265,6 +266,7 @@ fn failed(
 fn chunk(
     file: &ChunkDirectory,
     index: usize,
+    semantic_record: Option<ModelTypedRecord>,
     origins: &ModelOrigins<'_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
@@ -275,6 +277,9 @@ fn chunk(
     let kind = origins.payload(row.kind, "modelChunkType", SourceUseRole::Payload, writer)?;
     for field in ["type_id", "type_name", "projection"] {
         put(&mut prepared, field, kind.clone(), writer)?;
+    }
+    if semantic_record.is_some() {
+        put(&mut prepared, "semantic_record", kind.clone(), writer)?;
     }
     origins::at(&mut prepared, "/subresource/indices", kind, writer)?;
     let version = origins.payload(
@@ -310,7 +315,7 @@ fn chunk(
         writer,
         &Subresource::new(payload::CHUNK, vec![index as u64]),
         Status::Complete,
-        &ModelSourcePayload::Chunk(ModelChunkRecord::new(chunk)),
+        &ModelSourcePayload::Chunk(ModelChunkRecord::new(chunk, semantic_record)),
         &[],
     )
 }
@@ -348,17 +353,29 @@ fn chunks(
         .as_ref()
         .map(|input| input.project(origins, writer))
         .transpose()?;
-    for index in 0..file.chunks().len() {
+    for (index, original) in file.chunks().iter().enumerate() {
         writer.checkpoint()?;
-        chunk(file, index, origins, writer)?;
-        physics::emit(file, index, reader, frames.as_ref(), origins, writer)?;
-        lod_distances::emit(file, index, reader, origins, writer)?;
-        skeleton::emit(file, index, reader, origins, writer)?;
-        mesh::emit(file, index, reader, origins, writer)?;
-        let admitted = frame_input
-            .as_ref()
-            .and_then(|input| input.original_bytes(index));
-        nmc::emit(file, index, admitted, reader, origins, writer)?;
+        let semantic = ModelTypedRecord::of_chunk(original.chunk_type());
+        chunk(file, index, semantic, origins, writer)?;
+        match semantic {
+            Some(ModelTypedRecord::Physics) => {
+                physics::emit(file, index, reader, frames.as_ref(), origins, writer)?;
+            }
+            Some(ModelTypedRecord::LodDistances) => {
+                lod_distances::emit(file, index, reader, origins, writer)?;
+            }
+            Some(ModelTypedRecord::Skeleton) => {
+                skeleton::emit(file, index, reader, origins, writer)?;
+            }
+            Some(ModelTypedRecord::Mesh) => mesh::emit(file, index, reader, origins, writer)?,
+            Some(ModelTypedRecord::NodeTable) => {
+                let admitted = frame_input
+                    .as_ref()
+                    .and_then(|input| input.original_bytes(index));
+                nmc::emit(file, index, admitted, reader, origins, writer)?;
+            }
+            None => {}
+        }
     }
     Ok(())
 }

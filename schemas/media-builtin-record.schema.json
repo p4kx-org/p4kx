@@ -13821,6 +13821,16 @@
         "range": {
           "$ref": "#/$defs/SourceRange"
         },
+        "semantic_record": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ModelTypedRecord"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "type_id": {
           "format": "uint32",
           "minimum": 0,
@@ -14151,6 +14161,16 @@
         }
       ],
       "title": "ModelSourcePayload"
+    },
+    "ModelTypedRecord": {
+      "enum": [
+        "model-physics-table",
+        "model-lod-distance-words",
+        "model-skeleton-chunk",
+        "model-mesh",
+        "model-node-table"
+      ],
+      "type": "string"
     },
     "ModelVehicleGridRecord": {
       "oneOf": [
