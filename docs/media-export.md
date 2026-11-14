@@ -647,6 +647,11 @@ Conventional rooted CAF paths resolve against the archive directory. Missing
 and repeated timeline names and unsupported paths have explicit states.
 The source strings carry no inferred timing units or coordinate conversions.
 
+The optional installed Archive replay checks each event document against its original
+Entry and SHA-256 receipt. It independently compares timeline selectors, event and
+attribute coordinates, source order, decoded values and text XML lexemes. Both source
+formats and nested physical identity are exercised by the synthetic fixture.
+
 The `graph-node` and `graph-attribute` rows identify Mannequin fragment
 alternatives, transitions, layers, sub-databases, blend-space examples,
 parameters, pseudo examples and blend faces. Source element ordinals identify

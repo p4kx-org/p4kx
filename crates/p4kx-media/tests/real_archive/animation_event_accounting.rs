@@ -12,7 +12,12 @@ use p4kx_media::{
 };
 
 use super::shader_accounting::require;
-use super::{TestResult, privacy};
+use super::{TestResult, manifests, privacy};
+
+#[path = "animation_event_source_fields.rs"]
+mod source_fields;
+
+use self::source_fields::ExpectedEvents;
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
@@ -31,8 +36,11 @@ fn verify_configured() -> TestResult {
 
 fn verify_archive(path: &Path) -> TestResult {
     let key = p4kx_testkit::real_archive_key()?;
-    let archive = Archive::open_with_key(path, Some(key))?;
-    let watch = ArchiveWatch::new(&archive);
+    verify_selected(&Archive::open_with_key(path, Some(key))?)
+}
+
+fn verify_selected(archive: &Archive) -> TestResult {
+    let watch = ArchiveWatch::new(archive);
     let output = tempfile::tempdir()?;
     let options = ExportOptions {
         include: Some(Filter::parse("*.animevents")?),
@@ -40,7 +48,7 @@ fn verify_archive(path: &Path) -> TestResult {
         ..ExportOptions::default()
     };
     let ExportOutcome::Published { index, .. } =
-        p4kx_media::export(&archive, output.path(), &options)?
+        p4kx_media::export(archive, output.path(), &options)?
     else {
         return Err("installed animation events did not produce a complete generation".into());
     };
@@ -59,8 +67,9 @@ fn verify_archive(path: &Path) -> TestResult {
         entries: 0,
         observed_event: false,
         watch: &watch,
+        base: &base,
     };
-    census.walk(&archive, &mut Vec::new())?;
+    census.walk(archive, &mut Vec::new())?;
     require(
         census.entries == index.source_entries.written,
         "complete source tally",
@@ -79,6 +88,7 @@ struct Census<'a, R: Iterator<Item = TestResult<MediaRecord>>> {
     entries: u64,
     observed_event: bool,
     watch: &'a ArchiveWatch,
+    base: &'a Path,
 }
 
 impl<R: Iterator<Item = TestResult<MediaRecord>>> Census<'_, R> {
@@ -113,6 +123,7 @@ impl<R: Iterator<Item = TestResult<MediaRecord>>> Census<'_, R> {
             .read_to_end(&mut bytes)?;
         let document = SourceDocument::parse(&bytes, SourceReadOptions::default())?;
         let expected = original(document.root());
+        let mut fields = ExpectedEvents::new(document.root())?;
         let mut observed = Tallies::default();
         let entry = ContainerIdentity::try_new_with_entry(archive, entry)?;
         while self.rows.peek().is_some_and(|next| {
@@ -122,10 +133,22 @@ impl<R: Iterator<Item = TestResult<MediaRecord>>> Census<'_, R> {
             let row = self.rows.next().ok_or("peeked row disappeared")??;
             require(row.status == Status::Complete, "installed event source projected completely")?;
             match row.subresource.namespace.as_str() {
-                "animation-definition-document" => observed.documents += 1,
-                "animation-definition-event-timeline" => observed.timelines += 1,
-                "animation-definition-event" => observed.events += 1,
-                "animation-definition-event-attribute" => observed.attributes += 1,
+                "animation-definition-document" => {
+                    verify_raw(self.base, &row, &bytes)?;
+                    observed.documents += 1;
+                }
+                "animation-definition-event-timeline" => {
+                    fields.timeline(&row)?;
+                    observed.timelines += 1;
+                }
+                "animation-definition-event" => {
+                    fields.event(&row)?;
+                    observed.events += 1;
+                }
+                "animation-definition-event-attribute" => {
+                    fields.attribute(&row)?;
+                    observed.attributes += 1;
+                }
                 "animation-definition-declaration"
                     if row.data.pointer("/payload/kind/type").and_then(serde_json::Value::as_str)
                         == Some("attribute") =>
@@ -136,7 +159,7 @@ impl<R: Iterator<Item = TestResult<MediaRecord>>> Census<'_, R> {
             }
         }
         require(
-            expected == observed,
+            expected == observed && fields.is_empty(),
             "event and declaration tallies match each physical Entry",
         )?;
         self.observed_event |= observed.events > 0;
@@ -182,6 +205,55 @@ fn original(root: SourceElement<'_>) -> Tallies {
     counts
 }
 
-fn named(element: SourceElement<'_>, name: &str) -> bool {
+pub(super) fn named(element: SourceElement<'_>, name: &str) -> bool {
     element.namespace().is_none() && element.name() == name
+}
+fn verify_raw(base: &Path, row: &MediaRecord, original: &[u8]) -> TestResult {
+    let raw = row
+        .source
+        .raw
+        .as_ref()
+        .ok_or("original animation event artifact")?;
+    let retained = manifests::check_payload(
+        base,
+        &raw.path,
+        raw.size,
+        &raw.digest,
+        original.len() as u64,
+    )?;
+    require(
+        retained == original,
+        "retained animation event bytes equal the verified source",
+    )
+}
+
+#[test]
+fn nested_event_replay_checks_original_values_lexemes_positions_and_receipts() -> TestResult {
+    use p4kx_testkit::{ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, TestElement, TestEntry};
+
+    let folder = tempfile::tempdir()?;
+    let input = folder.path().join("animations.p4k");
+    let text = br#"<anim_event_list><animation name="Animations/A.caf">
+        <event xmlns:x="urn:test" time="" parameter="a&amp;b" x:unknown="nine"/>
+        <event time="3.5" name="repeat"/>
+    </animation></anim_event_list>"#;
+    let binary = TestElement::new("anim_event_list")
+        .child(
+            TestElement::new("animation")
+                .attribute("name", "Animations/B.caf")
+                .child(
+                    TestElement::new("event")
+                        .attribute("time", "0.25")
+                        .attribute("time", "0.75"),
+                ),
+        )
+        .to_cryxml(CryXmlSignature::CryXmlB, CryXmlByteOrder::Little);
+    let nested = ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/fixture.animevents", binary))
+        .build();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/fixture.animevents", text))
+        .entry(TestEntry::stored("Data/fixture.pak", nested))
+        .write_to(&input)?;
+    verify_selected(&Archive::open(input)?)
 }
