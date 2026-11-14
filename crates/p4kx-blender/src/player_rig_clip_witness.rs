@@ -175,7 +175,8 @@ impl Originals<'_, '_> {
                 let entry = self.index.find(path).ok_or("declared bank unavailable")?;
                 let bytes = member(self.archive, entry)?;
                 let file = ChunkFile::parse(bytes)?;
-                let names = DbaMetadataRecords::read(path, &file)?
+                let names = DbaMetadataRecords::read(path, &file)
+                    .map_err(|_| "original bank metadata framing unavailable")?
                     .map(|record| {
                         let record = record.map_err(|_| "original bank metadata malformed")?;
                         std::str::from_utf8(record.name.bytes())

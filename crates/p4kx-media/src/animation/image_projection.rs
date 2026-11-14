@@ -205,11 +205,13 @@ impl ImageSource<'_, '_> {
         writer: &mut MediaWriter<'_>,
     ) -> Result<Layout<'a>, MediaError> {
         match (kind, version) {
-            (CafImage::CHUNK_TYPE, CafImage::CHUNK_VERSION) => Ok(match CafImage::read(bytes, start) {
-                Ok(image) => Layout::Caf(image),
-                Err(CafImageError::UnsupportedFormat(_)) => Layout::UnsupportedFormat,
-                Err(_) => Layout::InvalidFraming,
-            }),
+            (CafImage::CHUNK_TYPE, CafImage::CHUNK_VERSION) => {
+                Ok(match CafImage::read(bytes, start) {
+                    Ok(image) => Layout::Caf(image),
+                    Err(CafImageError::UnsupportedFormat(_)) => Layout::UnsupportedFormat,
+                    Err(_) => Layout::InvalidFraming,
+                })
+            }
             (DIRECTIONAL_IMAGE_TYPE, DIRECTIONAL_IMAGE_VERSION) => {
                 self.directional(bytes, start, writer)
             }

@@ -190,7 +190,9 @@ record ordinal and retains its full original path. Its ASCII-insensitive
 `aliasKey` can be compared with the matching key of a single original
 `adbFragment` animation name. These comparisons describe possible matches for
 each requested body. Controller scope and runtime playback selection remain
-unresolved. Multiple physical alternatives are retained.
+unresolved. Multiple physical alternatives are retained. An otherwise valid
+path with a basename outside the alias comparison's bare ASCII alphabet keeps
+its physical row and an unsupported key state.
 
 The CAF image's zero DBA checksum is an exact loose archive lookup. Other
 checksums select only authored `$TracksDatabase` declarations in the rule's

@@ -171,15 +171,12 @@ impl RigRules {
         index: usize,
         clips: &mut Vec<(usize, Clip)>,
     ) -> Result<(), PlayerSourceError> {
-        let Some(alias) = image
+        let alias = image
             .canonical
             .rsplit('/')
             .next()
             .and_then(|file| file.strip_suffix(".caf"))
-            .and_then(alias_key)
-        else {
-            return Ok(());
-        };
+            .and_then(alias_key);
         for (rule, authored) in self.rules.iter().enumerate() {
             check(inputs.cancel)?;
             let Some(Kind::RecursiveCaf {
@@ -209,7 +206,7 @@ impl RigRules {
         cache: &Cache,
         image: &Image<'_>,
         (rule, authored): (usize, &Rule),
-        alias: String,
+        alias: Option<String>,
     ) -> Result<Clip, PlayerSourceError> {
         let path = inputs.bytes(
             image.source,
@@ -230,7 +227,7 @@ impl RigRules {
             true,
         )?;
         let alias_key = inputs.sources.value_with_origins(
-            SourceValue::Present(alias),
+            alias.map_or(SourceValue::Unsupported, SourceValue::Present),
             &[path.origin(), authored.kind.origin()],
         )?;
         let origins = &[path.origin(), bank_crc32.origin(), authored.kind.origin()];

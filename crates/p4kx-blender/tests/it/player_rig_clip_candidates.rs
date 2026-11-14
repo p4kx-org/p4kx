@@ -34,8 +34,8 @@ const PARAMS: &[u8] = br##"<Params>
 fn rig_clip_candidates_use_original_folder_and_same_list_physical_bank_only() -> TestResult {
     let rows = capture(true)?;
     let clips = family(&rows, "rigClipCandidate");
-    let [first, duplicate, other_scope, loose] = clips.as_slice() else {
-        return Err("expected exactly four folder-bounded physical occurrences".into());
+    let [first, duplicate, other_scope, loose, unsupported_alias] = clips.as_slice() else {
+        return Err("expected exactly five folder-bounded physical occurrences".into());
     };
     assert_eq!(
         first.pointer("/value/aliasKey/value"),
@@ -77,6 +77,21 @@ fn rig_clip_candidates_use_original_folder_and_same_list_physical_bank_only() ->
         loose.pointer("/value/source/value/target/value/type"),
         Some(&json!("found")),
         "the loose archive Entry has an exact path match"
+    );
+    assert_eq!(
+        unsupported_alias.pointer("/value/record"),
+        Some(&json!(4)),
+        "an unsupported comparison key keeps its physical image position"
+    );
+    assert_eq!(
+        unsupported_alias.pointer("/value/aliasKey/state"),
+        Some(&json!("unsupported")),
+        "the raw archive path does not need a supported alias key"
+    );
+    assert_eq!(
+        unsupported_alias.pointer("/value/path/value"),
+        Some(&json!("Animations/Fixture/sub/🟣.caf")),
+        "the raw path survives independently of its key"
     );
     assert_rules(&rows)
 }
@@ -264,6 +279,7 @@ fn cif_image() -> TestResult<Vec<u8>> {
         ("data/animations/fixture/SUB/shared.caf", bank(BANK)?),
         (SHARED, bank(OTHER_BANK)?),
         ("Animations\\Fixture\\Loose.caf", 0),
+        ("Animations/Fixture/sub/🟣.caf", 0),
         ("Animations/FixtureOutside/sub/shared.caf", bank(BANK)?),
     ];
     let mut records = (u32::try_from(paths.len())?).to_le_bytes().to_vec();
