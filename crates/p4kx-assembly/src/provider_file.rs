@@ -207,7 +207,9 @@ fn lookup_failure<'archive, E>(error: PathIndexBuildError<E>) -> Result<RigEntry
     }
 }
 
-pub(crate) fn archive_entry_candidates(path: &str) -> [String; 2] {
+/// Returns the model provider's ordered exact archive path forms.
+#[must_use]
+pub fn archive_entry_candidates(path: &str) -> [String; 2] {
     let path = path.trim_start_matches(['/', '\\']);
     [format!("Data/{path}"), path.to_owned()]
 }

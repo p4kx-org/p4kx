@@ -36,6 +36,7 @@ mod package_vertex_map;
 mod package_write_context;
 mod player_source;
 mod player_source_bundle;
+mod soc_controller_candidates;
 mod soc_door_classes;
 mod soc_light_inheritance;
 mod soc_light_source;

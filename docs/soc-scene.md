@@ -146,6 +146,22 @@ projection. `sourceSetComplete` remains false for directory lookups
 while their known contributing sources remain filterable. The same binary
 table can be referenced from different branches with different target entries.
 
+A stream model slot exposes a `controllerCandidates` cell alongside its geometry
+target. The lookup uses the model provider's ordered exact path forms, with
+ASCII case and slash variants handled by the archive directory index. It admits
+only a unique CGA entry owned by the same root archive as the DataForge input.
+A same-name entry inside a nested container has a different physical identity.
+
+A candidate links the original DataForge record, geometry component and optional
+nested sub-geometry positions to a controller component of that same record.
+The original model, animation controller and animation database paths keep their
+own source states. Multiple authored occurrences remain separate candidates.
+Missing or ambiguous geometry, non-CGA entries, a nested archive owner, and
+unavailable or incomplete controller inventory have distinct dispositions. A
+complete inventory with no matching controller declaration reports
+`noControllerObserved`. The candidate describes a same-entry relationship.
+The authored XML class GUID and placement transforms are independent.
+
 ## Blender package
 
 `p4kx interior package <archive> <container>... --out <folder> --authored-soc` includes the

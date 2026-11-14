@@ -17,6 +17,7 @@ use crate::soc_scene::SocSceneError;
 use crate::soc_scene_class_candidates::{candidates, inline_candidate};
 use crate::soc_scene_class_components::{ClassComponent, ComponentInput};
 use crate::soc_scene_class_resources::Resources;
+use crate::soc_scene_controller_candidates::{ControllerIndex, GeometryEntries};
 use crate::soc_scene_light_classes::{DefaultClass, LightClasses};
 use crate::soc_scene_origin::XmlOrigin;
 
@@ -29,6 +30,7 @@ pub(crate) struct Classes {
     available: bool,
     guid_index: Option<SourceUse>,
     pub(crate) lights: LightClasses,
+    pub(crate) controllers: ControllerIndex,
 }
 
 struct ClassSite {
@@ -45,7 +47,8 @@ impl Classes {
         cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
         let wanted = candidates(capture, cancel)?;
-        if wanted.entities.is_empty() && wanted.lights.is_empty() {
+        let geometry = GeometryEntries::read(capture, archive, cancel)?;
+        if wanted.entities.is_empty() && wanted.lights.is_empty() && geometry.is_empty() {
             return Ok(Self {
                 available: true,
                 ..Self::default()
@@ -69,6 +72,7 @@ impl Classes {
             },
             SourceUseRole::Payload,
         )?);
+        result.controllers = geometry.controllers(&forge, archive, &scope, sources, cancel)?;
         let resources = Resources::new(archive, sources, cancel);
         result.add_wanted(&forge, wanted.entities, &scope, &resources)?;
         result.lights = LightClasses::read(wanted.lights, &forge, &scope, sources, cancel)?;

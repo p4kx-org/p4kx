@@ -12,6 +12,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
+use crate::soc_scene_controller_candidates::{Candidates, ControllerIndex};
 use crate::soc_scene_origin::XmlOrigin;
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -20,12 +21,15 @@ pub(super) struct GeometryReference {
     chunk_ordinal: usize,
     model_ordinal: usize,
     target: SourcedValue<Target>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    controller_candidates: Option<SourcedValue<Candidates>>,
 }
 
 impl GeometryReference {
     pub(super) fn read(
         original: &SocGeometryReference,
         origin: &XmlOrigin<'_>,
+        controllers: &ControllerIndex,
     ) -> Result<Self, SocSceneError> {
         let range = &original.source_range;
         let selector = origin.scope.at(
@@ -36,11 +40,14 @@ impl GeometryReference {
             },
             SourceUseRole::Selector,
         )?;
+        let controller_candidates =
+            controllers.candidates(&original.target, origin.sources, &selector)?;
         let mut uses = vec![selector];
         let (target, complete) = Target::read(&original.target, origin.sources, &mut uses)?;
         Ok(Self {
             chunk_ordinal: original.chunk_ordinal,
             model_ordinal: original.model_ordinal,
+            controller_candidates: Some(controller_candidates),
             target: origin
                 .sources
                 .value(SourceValue::Present(target), &uses, complete),
@@ -127,7 +134,7 @@ enum CandidateKind {
     Relative,
 }
 
-fn directory_entry(
+pub(super) fn directory_entry(
     original: &EntryOrigin,
     sources: &SourceUses,
     uses: &mut Vec<SourceUse>,

@@ -61,7 +61,8 @@ impl Stream {
                 for reference in &*stream.geometry {
                     crate::soc_scene_classes::check(cancel).map_err(InputState::Capture)?;
                     geometry.push(
-                        GeometryReference::read(reference, origin).map_err(InputState::Capture)?,
+                        GeometryReference::read(reference, origin, &index.classes.controllers)
+                            .map_err(InputState::Capture)?,
                     );
                 }
                 file.entity_chunks()

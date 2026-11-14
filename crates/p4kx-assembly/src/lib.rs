@@ -280,7 +280,10 @@ pub use prefab::{
     MAX_PREFAB_VISITS, PrefabError, PrefabFile, PrefabIssue, PrefabIssueKind, PrefabSet,
     ResolvedObject, ResolvedPrefab,
 };
-pub use provider::{ArchiveModels, ModelFailure, ModelProvider, ProvidedAttachment, ProvidedModel};
+pub use provider::{
+    ArchiveModels, ModelFailure, ModelProvider, ProvidedAttachment, ProvidedModel,
+    archive_entry_candidates,
+};
 pub use resolver::LoadoutResolver;
 pub use resolver_observation::{LoadoutReadEvent, LoadoutReadObserver};
 pub use room_model_helper::RoomModelHelper;
