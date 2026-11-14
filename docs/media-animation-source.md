@@ -67,12 +67,23 @@ malformed framing expose the original chunk and a diagnostic disposition. A cano
 image in a different container format or without its expected chunk retains the same
 original Entry and chunk table and records a partial source diagnosis.
 
-The directional chunk `0x6B8DF259` v0x901 retains its original bytes and extent.
-The path projection checks for a fixed-width, zero-padded AIM path at byte 12 and
-locates matching aligned fields within the chunk. It emits source-ordered path
-observations only when their total agrees with the original count. Each observation
-identifies the exact 256-byte path field. Record boundaries and pose data remain opaque.
-A chunk with unreconciled path coverage keeps the `directional-opaque` disposition.
+The directional chunk `0x6B8DF259` v0x901 starts with a little-endian record count.
+Each `animation-image-directional-record` row keeps its physical ordinal, inclusive
+record length, original second header word, 256-byte path field and stored AIM path
+CRC32. A length walk must reconcile exactly with the end of the original chunk.
+`opaque_tail` addresses the bytes after the path CRC through the record's end in
+the retained original Entry. The export assigns no pose or transform semantics to
+those bytes. A valid path gets a separate `animation-image-directional-path` row
+at the same ordinal and ordinary owning-Archive lookup. An invalid path does not
+renumber later records. When full framing cannot be established, the path-only
+projection still requires all counted and aligned original path fields. An
+unreconciled count keeps the `directional-opaque` disposition and original bytes.
+
+The installed replay checked LIVE, PTU, EPTU, HOTFIX and TECH-PREVIEW. All five
+channels contained the same directional image bytes. A length-only walk and an
+independent aligned path scan agreed at all 551 records and the final chunk end.
+The original CRC words agree with IEEE CRC32 of the ASCII-lowercased path. The
+common byte image supplies one distinct observed layout.
 
 CAF and AIM path lookups describe a physical loose Entry in the owning Archive.
 They distinguish missing, ambiguous and filtered identities. A successful lookup

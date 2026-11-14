@@ -23,7 +23,7 @@ impl Provider for AnimationProvider {
         let mut capability = Capability::new(
             MediaKind::Animation,
             "p4kx.animation.source",
-            "1.9.0",
+            "1.10.0",
             "Exact animation and image Entry bytes with positioned source data and separate decoded sample chunks.",
         );
         capability.field_groups = vec![
@@ -45,11 +45,11 @@ impl Provider for AnimationProvider {
             ),
             FieldGroup::new(
                 "animation-images",
-                "Global animation image chunks, CAF records and independently observed directional image paths.",
+                "Global animation image chunks, CAF records, and directional record framing and path evidence.",
             ),
             FieldGroup::new_with_unsupported_projection(
-                "directional-image-records",
-                "The directional image retains original bytes without interpreting record boundaries.",
+                "directional-image-pose-semantics",
+                "Directional pose data remains recoverable from the opaque range of each record.",
             ),
             FieldGroup::new(
                 "entity-clip-catalogue",

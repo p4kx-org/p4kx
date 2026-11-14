@@ -7,7 +7,7 @@ use crate::{MediaError, MediaWriter, SourceContext};
 
 const COUNT_LENGTH: usize = size_of::<u32>();
 const FIRST_PATH: usize = 12;
-const PATH_LENGTH: usize = 256;
+pub(super) const PATH_LENGTH: usize = 256;
 const ALIGNMENT: usize = size_of::<u32>();
 const ROOT: &[u8] = b"Animations";
 
@@ -71,7 +71,7 @@ impl<'a> DirectionalPaths<'a> {
     }
 }
 
-fn path_text(field: &[u8; PATH_LENGTH]) -> Option<&str> {
+pub(super) fn path_text(field: &[u8; PATH_LENGTH]) -> Option<&str> {
     let (root, tail) = field.split_first_chunk::<{ ROOT.len() }>()?;
     if !root.eq_ignore_ascii_case(ROOT) || !matches!(tail.first(), Some(b'/' | b'\\')) {
         return None;

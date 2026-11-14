@@ -1247,6 +1247,44 @@
       ],
       "type": "object"
     },
+    "AnimationDirectionalRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "aim_path_crc32": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "byte_length": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "header_word": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "opaque_tail": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "path_field": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "range": {
+          "$ref": "#/$defs/SourceRange"
+        }
+      },
+      "required": [
+        "range",
+        "byte_length",
+        "header_word",
+        "path_field",
+        "aim_path_crc32",
+        "opaque_tail"
+      ],
+      "type": "object"
+    },
     "AnimationEntityAttempt": {
       "additionalProperties": false,
       "properties": {
@@ -2202,6 +2240,29 @@
         {
           "additionalProperties": false,
           "properties": {
+            "header": {
+              "$ref": "#/$defs/SourceRange"
+            },
+            "record_count": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "status": {
+              "const": "directional-records",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "header",
+            "record_count"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
             "status": {
               "const": "directional-opaque",
               "type": "string"
@@ -2475,6 +2536,23 @@
             },
             "record_type": {
               "const": "image-directional-path",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationDirectionalRecord"
+            },
+            "record_type": {
+              "const": "image-directional-record",
               "type": "string"
             }
           },
@@ -41243,6 +41321,61 @@
                 "properties": {
                   "record_type": {
                     "const": "image-directional-path"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-image-directional-record"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "image-directional-record"
                   }
                 },
                 "required": [

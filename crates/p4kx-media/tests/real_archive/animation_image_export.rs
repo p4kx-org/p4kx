@@ -12,6 +12,9 @@ use serde_json::Value;
 use super::shader_accounting::require;
 use super::{TestResult, manifests, privacy};
 
+#[path = "animation_directional_record_oracle.rs"]
+mod directional_oracle;
+
 const CAF_IMAGE: &str = "Data/Animations/Animations.img";
 const DIRECTIONAL_IMAGE: &str = "Data/Animations/DirectionalBlends.img";
 const CAF_CHUNK: u32 = 0x3702_75B7;
@@ -57,13 +60,14 @@ fn verify_archive(archive: &Archive) -> TestResult {
     let generation = scratch.path().join(&index.artifact_base);
     let caf = ImageSource::read(archive, CAF_IMAGE, CAF_CHUNK, 0x902)?;
     let directional = ImageSource::read(archive, DIRECTIONAL_IMAGE, DIRECTIONAL_CHUNK, 0x901)?;
+    let framed = directional_oracle::Records::read(&directional)?;
     let stream = index
         .kinds
         .iter()
         .find(|kind| kind.provider.kind == MediaKind::Animation)
         .ok_or("animation stream")?;
     let rows = BufReader::new(File::open(generation.join(&stream.artifact.path))?);
-    verify_rows(&generation, rows, &caf, &directional)?;
+    verify_rows(&generation, rows, &caf, &directional, &framed)?;
     watch.check()?;
     scratch.close()?;
     Ok(())
@@ -87,7 +91,7 @@ impl ImageSource {
         })
     }
 
-    fn verify_raw(&self, generation: &Path, row: &MediaRecord) -> TestResult {
+    fn verify_raw(&self, generation: &Path, row: &MediaRecord) -> TestResult<Vec<u8>> {
         let raw = row.source.raw.as_ref().ok_or("original image artifact")?;
         let retained = manifests::check_payload(
             generation,
@@ -99,7 +103,8 @@ impl ImageSource {
         require(
             retained == self.bytes,
             "retained image equals its verified original",
-        )
+        )?;
+        Ok(retained)
     }
 }
 
@@ -121,10 +126,11 @@ fn verify_rows(
     rows: impl BufRead,
     caf: &ImageSource,
     directional: &ImageSource,
+    framed: &directional_oracle::Records<'_>,
 ) -> TestResult {
     let mut caf_observed = Coverage::default();
     let mut directional_observed = Coverage::default();
-    let mut last_directional_end = directional.chunk.start;
+    let mut framed_observed = framed.replay();
     for line in rows.lines() {
         let row: MediaRecord = serde_json::from_str(&line?)?;
         match row.subresource.namespace.as_str() {
@@ -133,14 +139,10 @@ fn verify_rows(
                 caf_observed.records += 1;
             }
             "animation-image-directional-path" => {
-                last_directional_end = compare_directional(
-                    &row,
-                    directional,
-                    directional_observed.records,
-                    last_directional_end,
-                )?;
+                framed_observed.path(&row)?;
                 directional_observed.records += 1;
             }
+            "animation-image-directional-record" => framed_observed.record(&row)?,
             "animation-entry" => {
                 let (source, count) =
                     match row.data.pointer("/payload/family").and_then(Value::as_str) {
@@ -152,7 +154,10 @@ fn verify_rows(
                             );
                         }
                     };
-                source.verify_raw(generation, &row)?;
+                let raw = source.verify_raw(generation, &row)?;
+                if std::ptr::eq(source, directional) {
+                    framed_observed.artifact(raw)?;
+                }
                 count.raw_entries += 1;
             }
             "animation-image-index" => {
@@ -165,8 +170,9 @@ fn verify_rows(
                         verify_caf_index(&row, caf)?;
                         caf_observed.indices += 1;
                     }
-                    Some("directional-paths") => {
-                        verify_directional_index(&row, directional)?;
+                    Some("directional-records") => {
+                        verify_index(&row, &directional.chunk)?;
+                        framed_observed.index(&row)?;
                         directional_observed.indices += 1;
                     }
                     _ => return Err("unexpected projected image layout".into()),
@@ -176,6 +182,7 @@ fn verify_rows(
         }
     }
     require(caf_observed.verified(caf), "CAF image reconciles")?;
+    framed_observed.finish()?;
     require(
         directional_observed.verified(directional),
         "directional image reconciles",
@@ -204,31 +211,6 @@ fn verify_caf_index(row: &MediaRecord, source: &ImageSource) -> TestResult {
         number(row, "/payload/layout/record_count")? == source.count,
         "exact CAF count declaration",
     )
-}
-
-fn verify_directional_index(row: &MediaRecord, source: &ImageSource) -> TestResult {
-    verify_index(row, &source.chunk)?;
-    require(
-        number(row, "/payload/layout/declared_paths")? == source.count,
-        "exact directional count declaration",
-    )
-}
-
-fn compare_directional(
-    row: &MediaRecord,
-    source: &ImageSource,
-    ordinal: usize,
-    previous_end: usize,
-) -> TestResult<usize> {
-    let start = compare_path(row, &source.bytes)?;
-    let end = start + PATH_LENGTH;
-    require(
-        start >= previous_end
-            && end <= source.chunk.end
-            && row.subresource.indices.as_slice() == [source.chunk.index as u64, ordinal as u64],
-        "directional path belongs to the original chunk and ordinal",
-    )?;
-    Ok(end)
 }
 
 fn source(archive: &Archive, path: &str) -> TestResult<Vec<u8>> {
@@ -373,13 +355,9 @@ fn animation_image_replay_checks_raw_bytes_headers_and_exact_trailer() -> TestRe
         .chunk(0x1234, 0x900, [9, 8])
         .chunk(CAF_CHUNK, 0x902, caf)
         .bytes();
-    let mut directional = vec![0; 3 * size_of::<u32>() + PATH_LENGTH + 20];
-    directional[..4].copy_from_slice(&1_u32.to_le_bytes());
-    let path = b"animations/demo.aim";
-    let field_start = 3 * size_of::<u32>();
-    directional[field_start..field_start + path.len()].copy_from_slice(path);
     let directional = TestChunkFile::ivo()
-        .chunk(DIRECTIONAL_CHUNK, 0x901, directional)
+        .chunk(0x1234, 0x900, [7, 6, 5])
+        .chunk(DIRECTIONAL_CHUNK, 0x901, directional_oracle::fixture()?)
         .bytes();
     let folder = tempfile::tempdir()?;
     let input = folder.path().join("fixture.p4k");

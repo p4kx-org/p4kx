@@ -20,6 +20,7 @@ use p4kx_extraction::chunks::{ChunkFile, Container};
 use p4kx_extraction::model::{CafImage, CafImageError, CafImagePath};
 
 use super::directional_paths::DirectionalPaths;
+use super::directional_records::DirectionalRecords;
 use super::image_payload::{ImageIndex, ImageLayout, ImagePath};
 use super::origin::{self as proof, AnimationOrigins};
 use super::payload::{self as wire, AnimationPayload, Family};
@@ -85,6 +86,9 @@ pub(super) fn write(
                     )?;
                 }
             }
+            Layout::DirectionalRecords(records) => {
+                source.write_directional_records(index, records, writer)?;
+            }
             Layout::DirectionalPaths { paths, .. } => {
                 let mut ordinal = 0;
                 paths.visit(context, writer, |path, writer| {
@@ -129,6 +133,7 @@ impl std::error::Error for ImageStructureError {}
 enum Layout<'a> {
     Caf(CafImage<'a>),
     Directional,
+    DirectionalRecords(DirectionalRecords<'a>),
     DirectionalPaths {
         paths: DirectionalPaths<'a>,
         count: usize,
@@ -147,6 +152,10 @@ impl Layout<'_> {
                 trailer: wire::entry_range(image.trailer_range()),
             },
             Self::Directional => ImageLayout::DirectionalOpaque,
+            Self::DirectionalRecords(records) => ImageLayout::DirectionalRecords {
+                header: wire::entry_range(records.header()),
+                record_count: records.count(),
+            },
             Self::DirectionalPaths { count, .. } => ImageLayout::DirectionalPaths {
                 declared_paths: *count,
             },
@@ -157,7 +166,10 @@ impl Layout<'_> {
     }
     fn issue(&self) -> Option<MediaIssue> {
         let (code, detail) = match self {
-            Self::Caf(_) | Self::Directional | Self::DirectionalPaths { .. } => return None,
+            Self::Caf(_)
+            | Self::Directional
+            | Self::DirectionalPaths { .. }
+            | Self::DirectionalRecords(_) => return None,
             Self::UnsupportedVersion => (
                 "animation.image-version",
                 "Unknown animation image chunk version",
@@ -207,33 +219,6 @@ impl ImageSource<'_, '_> {
         }
     }
 
-    fn directional<'a>(
-        &self,
-        bytes: &'a [u8],
-        start: u64,
-        writer: &mut MediaWriter<'_>,
-    ) -> Result<Layout<'a>, MediaError> {
-        let Some(paths) = DirectionalPaths::new(bytes, start) else {
-            return Ok(Layout::Directional);
-        };
-        let Some(count) = paths.declared() else {
-            return Ok(Layout::Directional);
-        };
-        if count == 0 || !paths.begins_with_path() {
-            return Ok(Layout::Directional);
-        }
-        let mut observed = 0;
-        paths.visit(self.context, writer, |_, _| {
-            observed += 1;
-            Ok(())
-        })?;
-        if observed == count {
-            Ok(Layout::DirectionalPaths { paths, count })
-        } else {
-            Ok(Layout::Directional)
-        }
-    }
-
     fn write_index(
         &self,
         file: &ChunkFile<Vec<u8>>,
@@ -264,16 +249,7 @@ impl ImageSource<'_, '_> {
             self.origins.independent(),
             writer,
         )?;
-        if matches!(layout, Layout::Caf(_)) {
-            for field in ["layout/header/basis", "layout/trailer/basis"] {
-                proof::at(
-                    &mut prepared,
-                    &format!("{FIELD}{field}"),
-                    self.origins.independent(),
-                    writer,
-                )?;
-            }
-        }
+        self.layout_field_origins(layout, &mut prepared, writer)?;
         let issue = layout.issue();
         if issue.is_some() {
             proof::at(&mut prepared, "/issues", layout_proof, writer)?;
@@ -295,6 +271,37 @@ impl ImageSource<'_, '_> {
         )
     }
 
+    fn layout_field_origins(
+        &self,
+        layout: &Layout<'_>,
+        prepared: &mut crate::origin_prepared::PreparedRecordOrigins,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        let position_bases: &[&str] = match layout {
+            Layout::Caf(_) => &["layout/header/basis", "layout/trailer/basis"],
+            Layout::DirectionalRecords(_) => &["layout/header/basis"],
+            _ => &[],
+        };
+        for field in position_bases {
+            proof::at(
+                prepared,
+                &format!("{FIELD}{field}"),
+                self.origins.independent(),
+                writer,
+            )?;
+        }
+        if let Layout::DirectionalRecords(records) = layout {
+            let count = self.origins.payload(
+                records.header(),
+                "directionalRecordCount",
+                SourceUseRole::Payload,
+                writer,
+            )?;
+            proof::at(prepared, "/data/payload/layout/record_count", count, writer)?;
+        }
+        Ok(())
+    }
+
     fn layout_proof(
         &self,
         range: &Range<u64>,
@@ -304,7 +311,14 @@ impl ImageSource<'_, '_> {
     ) -> Result<OriginContributions, MediaError> {
         let mut layout_proof = writer.capture_origins();
         layout_proof.include_original(table)?;
-        if matches!(
+        if let Layout::DirectionalRecords(records) = layout {
+            layout_proof.include_original(&self.origins.payload(
+                records.header(),
+                "directionalRecordCount",
+                SourceUseRole::Payload,
+                writer,
+            )?)?;
+        } else if matches!(
             layout,
             Layout::DirectionalPaths { .. } | Layout::Directional
         ) {

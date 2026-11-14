@@ -23,6 +23,10 @@ pub(super) enum ImageLayout {
         record_count: usize,
         trailer: SourceRange,
     },
+    DirectionalRecords {
+        header: SourceRange,
+        record_count: usize,
+    },
     DirectionalOpaque,
     DirectionalPaths {
         declared_paths: usize,
@@ -94,4 +98,16 @@ pub(super) struct DbaClipCandidate<'a> {
     #[schemars(skip)]
     pub(super) proof: super::dba_metadata_lookup::MatchProof,
     pub(super) metadata_range: SourceRange,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[schemars(rename = "AnimationDirectionalRecord")]
+pub(super) struct ImageDirectionalRecord {
+    pub(super) range: SourceRange,
+    pub(super) byte_length: u32,
+    pub(super) header_word: u32,
+    pub(super) path_field: SourceRange,
+    pub(super) aim_path_crc32: u32,
+    pub(super) opaque_tail: SourceRange,
 }
