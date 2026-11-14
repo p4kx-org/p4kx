@@ -225,6 +225,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "jumpDriveFlightTuning": absent_table(),
             "jumpTunnelForces": absent_table(),
             "quantumDrives": absent_table(),
+            "quantumInterdiction": absent_table(),
             "shieldGenerators": absent_table(),
             "itemPorts": absent_table(),
             "itemAttachmentConstraints": absent_table(),

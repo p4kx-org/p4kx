@@ -170,6 +170,8 @@ pub(crate) mod catalog_jump_drive;
 mod catalog_mission_board;
 #[path = "catalog_quantum_drive.rs"]
 pub(crate) mod catalog_quantum_drive;
+#[path = "catalog_quantum_interdiction.rs"]
+pub(crate) mod catalog_quantum_interdiction;
 #[path = "catalog_resource_component.rs"]
 mod catalog_resource_component;
 #[path = "catalog_resource_connection.rs"]

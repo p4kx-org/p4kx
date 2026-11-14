@@ -316,6 +316,7 @@ fn assemble<R>(
             missile_configurations: components.missile_configurations,
             jump_drives: components.jump_drives,
             quantum_drives: components.quantum_drives,
+            quantum_interdiction: components.quantum_interdiction,
             shield_generators: components.shield_generators,
             entity_configurations: collected.entity_configurations.into_tables(&forge),
             local_contract_generators: collected.local_contract_generators,

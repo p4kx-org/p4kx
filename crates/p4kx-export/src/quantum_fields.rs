@@ -85,6 +85,20 @@ impl<'reader, 'scope, 'read, 'source, 'notes>
         Ok(cell)
     }
 
+    pub(super) fn project<T>(
+        &mut self,
+        name: &'static str,
+        read: impl FnOnce(
+            Observed<'reader, 'scope, 'read, 'source>,
+            &'static str,
+            &mut Vec<FieldError>,
+        ) -> Result<SourcedValue<T>, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let cell = read(self.source, name, self.notes)?;
+        self.projected.push((name, cell.state()));
+        Ok(cell)
+    }
+
     pub(super) fn additional_fields(self) -> Result<SourceArenaOutput<'source>, CatalogError> {
         self.source.authored_members_except(self.projected)
     }

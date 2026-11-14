@@ -15,6 +15,7 @@ use super::catalog_explosives::{self, Explosive, ExplosiveComponent};
 use super::catalog_hacking_chips::{self, HackingChip, HackingComponent};
 use super::catalog_jump_drive::{self, JumpDrive};
 use super::catalog_quantum_drive::{self, QuantumDrive};
+use super::catalog_quantum_interdiction::{self, QuantumInterdictionGenerator};
 use super::catalog_shield_generator::{self, ShieldGenerator};
 use super::catalog_weapon_actions::{self, WeaponActions};
 use super::catalog_weapon_magazine_slots::{self, WeaponMagazineSlots};
@@ -45,6 +46,7 @@ pub(crate) struct ItemComponentRows<'source> {
     pub(crate) missile_configurations: Vec<MissileConfiguration<'source>>,
     pub(crate) jump_drives: Vec<JumpDrive<'source>>,
     pub(crate) quantum_drives: Vec<QuantumDrive<'source>>,
+    pub(crate) quantum_interdiction: Vec<QuantumInterdictionGenerator<'source>>,
     pub(crate) shield_generators: Vec<ShieldGenerator<'source>>,
     pub(crate) magazine_resolutions: Vec<WeaponMagazineResolution>,
     pub(crate) numbers: Vec<CapturedNumber>,
@@ -63,6 +65,7 @@ impl<'source> ItemComponentRows<'source> {
             .extend(other.missile_configurations);
         self.jump_drives.extend(other.jump_drives);
         self.quantum_drives.extend(other.quantum_drives);
+        self.quantum_interdiction.extend(other.quantum_interdiction);
         self.shield_generators.extend(other.shield_generators);
         self.magazine_resolutions.extend(other.magazine_resolutions);
         self.numbers.extend(other.numbers);
@@ -83,6 +86,10 @@ impl<'source> ItemComponentRows<'source> {
             ),
             jump_drives: catalog_jump_drive::table(forge, self.jump_drives),
             quantum_drives: catalog_quantum_drive::table(forge, self.quantum_drives),
+            quantum_interdiction: catalog_quantum_interdiction::table(
+                forge,
+                self.quantum_interdiction,
+            ),
             shield_generators: catalog_shield_generator::table(forge, self.shield_generators),
             magazine_resolutions: resolution::table(forge, self.magazine_resolutions),
         }
@@ -100,6 +107,7 @@ pub(crate) struct ItemComponentTables<'source> {
     pub(crate) missile_configurations: CatalogTable<MissileConfiguration<'source>>,
     pub(crate) jump_drives: CatalogTable<JumpDrive<'source>>,
     pub(crate) quantum_drives: CatalogTable<QuantumDrive<'source>>,
+    pub(crate) quantum_interdiction: CatalogTable<QuantumInterdictionGenerator<'source>>,
     pub(crate) shield_generators: CatalogTable<ShieldGenerator<'source>>,
     pub(crate) magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
 }
@@ -153,11 +161,13 @@ impl<'source> ItemComponentsRead<'source> {
                     .push(JumpDrive::read(owner, observed, &mut self.notes)?);
             }
             Component::QuantumDrive => {
-                self.rows.quantum_drives.push(QuantumDrive::read(
-                    owner,
-                    observed,
-                    &mut self.notes,
-                )?);
+                let drive = QuantumDrive::read(owner, observed, &mut self.notes)?;
+                self.rows.quantum_drives.push(drive);
+            }
+            Component::QuantumInterdictionGenerator => {
+                let generator =
+                    QuantumInterdictionGenerator::read(owner, observed, &mut self.notes)?;
+                self.rows.quantum_interdiction.push(generator);
             }
             Component::ShieldGenerator => self.rows.shield_generators.push(ShieldGenerator::read(
                 owner,
@@ -228,6 +238,7 @@ enum Component {
     Weapon,
     JumpDrive,
     QuantumDrive,
+    QuantumInterdictionGenerator,
     ShieldGenerator,
 }
 
@@ -242,6 +253,9 @@ impl Component {
             catalog_emp::SOURCE_TYPE => return Some((value, Self::Emp)),
             catalog_jump_drive::SOURCE_TYPE => return Some((value, Self::JumpDrive)),
             catalog_quantum_drive::SOURCE_TYPE => return Some((value, Self::QuantumDrive)),
+            catalog_quantum_interdiction::SOURCE_TYPE => {
+                return Some((value, Self::QuantumInterdictionGenerator));
+            }
             catalog_shield_generator::SOURCE_TYPE => return Some((value, Self::ShieldGenerator)),
             catalog_weapon_magazine_slots::SOURCE_TYPE => {
                 return Some((value, Self::Weapon));

@@ -15,6 +15,7 @@ use crate::catalog_v3::catalog_hacking_chips::HackingChip;
 use crate::catalog_v3::catalog_independent_configurations::IndependentConfigurationTables;
 use crate::catalog_v3::catalog_jump_drive::JumpDrive;
 use crate::catalog_v3::catalog_quantum_drive::QuantumDrive;
+use crate::catalog_v3::catalog_quantum_interdiction::QuantumInterdictionGenerator;
 use crate::catalog_v3::catalog_shield_generator::ShieldGenerator;
 use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
 use crate::catalog_v3::reputation_trigger_configuration::ReputationTriggerConfiguration;
@@ -41,6 +42,7 @@ pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) missile_configurations: CatalogTable<MissileConfiguration<'source>>,
     pub(crate) jump_drives: CatalogTable<JumpDrive<'source>>,
     pub(crate) quantum_drives: CatalogTable<QuantumDrive<'source>>,
+    pub(crate) quantum_interdiction: CatalogTable<QuantumInterdictionGenerator<'source>>,
     pub(crate) shield_generators: CatalogTable<ShieldGenerator<'source>>,
     #[serde(flatten)]
     pub(crate) entity_configurations:

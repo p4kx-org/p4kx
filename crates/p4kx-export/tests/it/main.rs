@@ -80,6 +80,7 @@ mod catalog_npc_spawns;
 mod catalog_paints;
 mod catalog_playability;
 mod catalog_quantization;
+mod catalog_quantum_interdiction;
 mod catalog_recovery;
 mod catalog_reputation;
 mod catalog_resource_1069_packaging;
