@@ -12,6 +12,8 @@ use p4kx_extraction::{Archive, ArchiveWatch, CancelToken, Entry};
 use p4kx_testkit as testkit;
 use serde_json::Value;
 
+#[path = "soc_included_installed/geometry.rs"]
+mod geometry;
 #[path = "soc_included_installed/original.rs"]
 mod original;
 #[path = "soc_included_installed/wire.rs"]
@@ -25,10 +27,7 @@ const MAX_PARENT_BYTES: u64 = 512 * 1024;
 const MAX_CANDIDATE_PARENTS: usize = 300;
 const INCLUDED_OBJECTS: ChunkType = ChunkType::new(Container::CrCh, 0x0010);
 
-fn projected_table(scene: &Value, stream_index: usize, ordinal: usize) -> Check<&Value> {
-    let stream = scene
-        .pointer(&format!("/occurrences/0/streams/{stream_index}"))
-        .ok_or("projected stream occurrence")?;
+fn projected_table<'a>(scene: &'a Value, stream: &Value, ordinal: usize) -> Check<&'a Value> {
     let tables = wire::array(scene, "includedObjects")?;
     wire::array(stream, "includedObjects")?
         .iter()
@@ -66,9 +65,19 @@ fn verify_selected(
     };
     let projection = SocScene::from_archive_capture(&capture, archive, &cancel)?;
     let value = serde_json::to_value(projection)?;
-    let table = projected_table(&value, stream_index, original.ordinal)?;
+    let stream = value
+        .pointer(&format!("/occurrences/0/streams/{stream_index}"))
+        .ok_or("projected stream occurrence")?;
+    let table = projected_table(&value, stream, original.ordinal)?;
     wire::compare(&value, table, container, parent, entry, original)?;
-    Ok(true)
+    geometry::compare(
+        &value,
+        stream,
+        &table["source"],
+        [container, archive],
+        parent,
+        original,
+    )
 }
 
 fn verify_candidate(archive: &Archive, parent: &Entry) -> Check<bool> {
