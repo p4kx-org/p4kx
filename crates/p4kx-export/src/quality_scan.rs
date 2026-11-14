@@ -40,7 +40,7 @@ pub(crate) fn distribution<'f>(
     )?;
     exclude(tree, Kind::QualityDistributions, retention, ledger);
     Ok(Input::Distribution {
-        definition: found.value,
+        definition: Box::new(found.value),
         retention,
     })
 }
@@ -70,7 +70,7 @@ pub(crate) fn quantization<'f>(
     let eligible = quantization_eligibility(tree, origins, &original, role, cancel)?;
     exclude(tree, Kind::QualityQuantizations, retention, ledger);
     Ok(Input::Quantization {
-        definition: found.value,
+        definition: Box::new(found.value),
         eligibility: eligible,
         retention,
     })

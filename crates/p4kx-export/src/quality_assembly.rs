@@ -18,11 +18,11 @@ use super::rows::QualityRows;
 
 pub(crate) enum Input<'source> {
     Distribution {
-        definition: QualityDistributionDefinition<'source>,
+        definition: Box<QualityDistributionDefinition<'source>>,
         retention: Retention,
     },
     Quantization {
-        definition: QualityQuantizationDefinition<'source>,
+        definition: Box<QualityQuantizationDefinition<'source>>,
         eligibility: Eligibility,
         retention: Retention,
     },
@@ -71,7 +71,7 @@ impl<'source> Assembly<'source> {
                 definition: row,
                 retention,
             }) => match retention {
-                Retention::Selected => self.rows.distributions.push(row),
+                Retention::Selected => self.rows.distributions.push(*row),
                 Retention::Leftover => self.rows.skipped_distributions += 1,
                 Retention::Dependency => {}
             },
@@ -79,7 +79,7 @@ impl<'source> Assembly<'source> {
                 definition: row,
                 eligibility,
                 retention,
-            }) => self.quantization(row, eligibility, retention),
+            }) => self.quantization(*row, eligibility, retention),
             Some(Input::Resource(resource)) => self.resources.push(resource),
             Some(Input::UnavailableQuantization {
                 guid,
