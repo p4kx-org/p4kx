@@ -79,7 +79,7 @@ Recommended follow-up: define an artifact-carried `exportHealth` with per-kind r
 failed GUIDs and relevant warnings, and update the consumer to require it before removal
 detection. Adding metadata is compatible with schema v2, but old consumers ignore new fields.
 A changed completeness meaning or stronger mandatory import guarantee needs a coordinated
-schema version change under [ADR-0054](adr/0054-the-p4kx-catalog-grows-additively-within-version-1.md).
+schema version change under [ADR-0054](adr/0054-the-basetool-catalog-grows-additively-within-version-1.md).
 Consider keeping the normal target file unchanged on partial failure and writing diagnostic
 partial exports only through an explicit workflow. Do not silently change existing semantics.
 

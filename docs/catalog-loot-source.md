@@ -62,7 +62,7 @@ not game values or original byte/pool/instance positions. References never expan
 
 Each node has `value: SourcedValue<SourcePayload>` and required nullable `originalError`. A scalar's
 immediate `node.value` is its one source-backed datum. Its typed scalar encoding inside that cell
-is not wrapped a second time with the identical origin. Basetool can filter that immediate cell
+is not wrapped a second time with the identical origin. Consumers can filter that immediate cell
 using `containsEncryptedSource`, `sourceUsesRefs` and `sourceSetComplete`. Distinct source facts,
 such as a declaration name/type/array flag/target, nested concrete type, Reference target metadata
 or original error parameter, retain their own immediate sourced cell. Variant labels, local indices

@@ -53,7 +53,7 @@ Importers resolve a text reference only in the same owning report. They classify
 field using that immediate occurrence cell's marker, refs and completeness. The storage atom has
 an aggregate origin for its storage datum; it cannot assign a member or replace the occurrence's
 origin. Equal text from a plain and encrypted input may share one atom while the plain occurrence
-remains plain. Filtering BaseTool members by the atom's aggregate marker would incorrectly
+remains plain. Filtering fields by the atom's aggregate marker would incorrectly
 back-taint that plain field.
 
 The Rust API borrows context-bound collections through `kinds()`, `failed_records()`,

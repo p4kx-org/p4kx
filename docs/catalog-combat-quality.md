@@ -1,11 +1,11 @@
 # Values by Crafting quality
 
-`formulaVersion: 1` governs Basetool and VerseKit calculations against Catalog
+`formulaVersion: 1` governs consumer calculations against Catalog
 `schemaVersion: 3`. P4KX supplies authored inputs, Blueprint positions and derived factory
 weapon values. Consumers select equipment, modes, branches and qualities, apply the formula
 and aggregate their selected loadouts. The versioned fixtures describe synthetic builds.
-The formula follows the [Basetool Exchange amendment](https://github.com/krt-profit/basetool/issues/2821#issuecomment-6878138700)
-and is a client contract subject to revision when measured Crafting results warrant a new version.
+Measured Crafting results can warrant a new version of the formula contract.
+[Original formula agreement](https://github.com/krt-profit/basetool/issues/2821#issuecomment-6878138700)
 
 ## Quality key and the active recipe
 

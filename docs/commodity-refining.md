@@ -30,7 +30,7 @@ commodity is the one whose `subtypeGuid` equals it, when the Archive has such a 
 
 Every `ResourceType` states the density in one unit only, `GramsPerCubicCentimeter`; the catalog
 carries it as `densityGramsPerCubicCentimetre`. The Wiki states other units for some commodities;
-a Basetool conversion is its own decision.
+consumers choose their own display units.
 
 ## Instability
 
@@ -38,8 +38,8 @@ Only the `MineableElement` Record holds `elementInstability` (with resistance an
 window), so it belongs to a mineable element, not to the commodity. 27 of the 46 elements link to
 a `ResourceType` that has a `refinedVersion`. Several elements may share a `ResourceType`, which
 makes a flat commodity field ambiguous, so the catalog carries no such field. The kind
-`mineableElements` exports every element with its `resourceTypeGuid` and the Basetool applies its
-own rule (ADR-0065, #460). One `ResourceType` carries `properties/ResourceTypeVolatility` (1 Record,
+`mineableElements` exports every element with its `resourceTypeGuid`. Consumers choose an
+aggregation rule when they need one (ADR-0065, #460). One `ResourceType` carries `properties/ResourceTypeVolatility` (1 Record,
 with a `healthDecayPerSecond`), a decay of cargo, not the instability of a rock. The mining laser
 `laserInstability` modifiers (names matching `*nstab*`) are item stats, not commodity data.
 
