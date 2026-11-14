@@ -3,20 +3,28 @@
 
 use std::path::Path;
 
-use p4kx_extraction::model::{MaterialLibrary, MaterialReadError, MaterialSourceLimits};
+use p4kx_extraction::model::{
+    MaterialError, MaterialLibrary, MaterialReadError, MaterialSourceLimits,
+};
 use p4kx_extraction::{Archive, ArchiveWatch, Entry, Filter};
 use p4kx_media::{
-    Artifact, ContainerIdentity, Digest, ExportOptions, Identity, Index, MediaKind, MediaRecord,
-    Source, Tally, reconstruct_material_library,
+    Artifact, ContainerIdentity, Digest, ExportOptions, Identity, Index, Limits, MediaKind,
+    MediaRecord, Source, Tally, reconstruct_material_library,
 };
 use serde_json::Value;
 
-use super::archive_replay::{Lines, compare_original, generation};
+use super::archive_replay::{Lines, generation};
 use super::shader_accounting::require;
-use super::{TestResult, manifests, privacy};
+use super::{TestResult, privacy};
 
 #[path = "material_accounting_fields.rs"]
 mod fields;
+#[path = "material_accounting_raw.rs"]
+mod raw;
+
+#[cfg(test)]
+#[path = "material_accounting_fixtures.rs"]
+mod fixtures;
 
 #[derive(Default)]
 struct Counts {
@@ -43,20 +51,21 @@ fn verify_configured() -> TestResult {
     let key = p4kx_testkit::real_archive_key()?;
     for (ordinal, path) in std::iter::once(primary).chain(secondary).enumerate() {
         let archive = Archive::open_with_key(path, Some(key.clone()))?;
-        let counts = verify(&archive)?;
+        let counts = verify(&archive, Limits::default())?;
         report(ordinal + 1, &counts);
         require(counts.selected > 0, "selected material inventory is empty")?;
     }
     Ok(())
 }
 
-fn verify(archive: &Archive) -> TestResult<Counts> {
+fn verify(archive: &Archive, limits: Limits) -> TestResult<Counts> {
     let watch = ArchiveWatch::new(archive);
     let directory = tempfile::tempdir()?;
     let options = ExportOptions {
         kinds: vec![MediaKind::Material],
         include: Some(Filter::parse("*.mtl")?),
         diagnostic: true,
+        limits,
         ..ExportOptions::default()
     };
     let (index, base) = generation(
@@ -223,15 +232,23 @@ impl Census<'_> {
             "exact raw artifact receipt for this presented physical source",
         )?;
         let limits = MaterialSourceLimits::default();
-        let bytes = manifests::check_payload(
+        if let Some(bytes) = raw::check_payload(
+            archive,
+            self.watch,
+            entry,
             self.base,
-            &raw.path,
-            raw.size,
-            &raw.digest,
-            limits.source_bytes as u64,
-        )?;
-        compare_original(archive, entry, &bytes)?;
-        self.check_fields(entry, &row, &bytes, limits)?;
+            raw,
+            limits.source_bytes,
+        )? {
+            self.check_fields(entry, &row, &bytes, limits)?;
+        } else {
+            self.check_failure(
+                &MaterialError::SourceBytes {
+                    limit: limits.source_bytes,
+                },
+                &row,
+            )?;
+        }
         self.counts.selected += 1;
         self.counts.nested += u64::from(!chain.is_empty());
         Ok(())
@@ -277,12 +294,15 @@ impl Census<'_> {
                 self.counts.complete += u64::from(complete);
                 self.counts.partial += u64::from(!complete);
             }
-            Err(MaterialReadError::Material(error)) => {
-                fields::failure(&error, row)?;
-                self.counts.failed += 1;
-            }
+            Err(MaterialReadError::Material(error)) => self.check_failure(&error, row)?,
             Err(error) => return Err(error.into()),
         }
+        Ok(())
+    }
+
+    fn check_failure(&mut self, error: &MaterialError, row: &MediaRecord) -> TestResult {
+        fields::failure(error, row)?;
+        self.counts.failed += 1;
         Ok(())
     }
 }
@@ -296,12 +316,10 @@ fn check_row_source(row: &MediaRecord, source: &Source) -> TestResult {
         row.source.identity == source.identity
             && row.source.raw == source.raw
             && row.source.root == source.root
-            && row.source.size == source.size,
+            && row.source.size == source.size
+            && row.source.declared_integrity == source.declared_integrity
+            && row.source.verification == source.verification,
         "provider and manifest agree on the actual original input",
-    )?;
-    require(
-        row.subresource.indices.is_empty(),
-        "one row for the whole library",
     )
 }
 
@@ -320,42 +338,4 @@ fn report(archive: usize, counts: &Counts) {
         counts.failed,
         counts.materials,
     );
-}
-
-#[test]
-fn material_census_reconciles_distinct_root_and_nested_libraries_and_failed_decodes() -> TestResult
-{
-    use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry, TestMtl, TestMtlMaterial};
-
-    let directory = tempfile::tempdir()?;
-    let input = directory.path().join("fixture.p4k");
-    let source =
-        TestMtl::multi(&[TestMtlMaterial::new("retained").attribute("Glow", "0")]).cryxml();
-    let nested = TestContainer::new()
-        .entry(TestEntry::stored("same.mtl", source.as_slice()))
-        .entry(TestEntry::stored("failed.mtl", b"<NotAMaterial/>"))
-        .build();
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored("same.mtl", source))
-        .entry(TestEntry::stored(
-            "loose.MTL",
-            br#"<Material Custom="source"><Unknown/></Material>"#,
-        ))
-        .entry(TestEntry::stored("inner.socpak", nested))
-        .write_to(&input)?;
-    let counts = verify(&Archive::open(input)?)?;
-    assert_eq!(
-        counts.selected, 4,
-        "both container and root libraries are selected"
-    );
-    assert_eq!(counts.nested, 2, "the original nested occurrences survive");
-    assert_eq!(
-        counts.complete, 3,
-        "valid text and CryXml libraries reconcile"
-    );
-    assert_eq!(
-        counts.failed, 1,
-        "raw evidence survives the diagnosed invalid root"
-    );
-    Ok(())
 }
