@@ -34,6 +34,7 @@ const WITNESSES: &[(&str, &str)] = &[
     ("P8-SC", "behr_smg_ballistic_01"),
     ("Volt", "volt_sniper_energy_01"),
     ("Revenant", "apar_ballisticgatling_s4"),
+    ("Tractor beam", "grin_tractorbeam_s1"),
 ];
 
 #[derive(Default)]

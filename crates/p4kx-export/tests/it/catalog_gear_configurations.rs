@@ -6,7 +6,7 @@ use p4kx_extraction::{Archive, Filter};
 use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, TestResult};
-use crate::gear_fixture::{self, ARMOR, ARMOR_DANGLING, CLOTHING, RADAR};
+use crate::gear_fixture::{self, ARMOR, ARMOR_DANGLING, CLOTHING, RADAR, WRAPPED_TRACTOR};
 use crate::health_origin_assertions as proof;
 
 #[test]
@@ -137,6 +137,64 @@ fn clothing_and_radar_keep_original_structure_values_and_provenance() -> TestRes
         &json!([]),
         "per-device radar data does not create global mode rows",
     );
+    let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
+    validator
+        .validate(&catalog)
+        .map_err(|error| error.to_string())?;
+    proof::closure(&catalog)
+}
+
+#[test]
+fn a_wrapped_tractor_beam_has_exact_original_action_inputs_and_residual_fields() -> TestResult {
+    let filter = Filter::new("*/gear/wrapped_tractor");
+    let catalog = catalog(Some(&filter))?;
+    let weapon = owner(&catalog, "weaponActions", 0, WRAPPED_TRACTOR, 8)?;
+    let [beam, toggle, tractor] = proof::rows(weapon, "/actionNodes")? else {
+        return Err("a direct beam, a toggle and its nested tractor beam".into());
+    };
+    assert_eq!(proof::at(beam, "/kind/type")?, "beam");
+    assert_eq!(proof::at(toggle, "/kind/type")?, "toggle");
+    assert_eq!(proof::at(toggle, "/kind/value/weaponAction/value")?, 2);
+    assert_eq!(proof::at(tractor, "/kind/type")?, "tractorBeam");
+    proof::present(
+        tractor,
+        "sourceType",
+        &json!("SWeaponActionFireTractorBeamParams"),
+        Some(true),
+    )?;
+    number(tractor, "recoilInterval", 0.125)?;
+    let body = proof::at(tractor, "/kind/value")?;
+    for (field, value) in [
+        ("minForce", 0.0),
+        ("maxForce", 42.0),
+        ("minDistance", 0.0),
+        ("maxDistance", 7.0),
+        ("fullStrengthDistance", 0.0),
+        ("maxVolume", 0.0),
+        ("maxAngle", 0.0),
+    ] {
+        number(body, field, value)?;
+        let cell = proof::cell(body, field, "present")?;
+        assert!(proof::uses(&catalog, cell)?.iter().any(|used| {
+            used.pointer("/location/namespace").and_then(Value::as_str) == Some("dataforgeValue")
+                && used.pointer("/location/field").and_then(Value::as_str) == Some("$value")
+        }));
+    }
+    assert_ne!(
+        proof::at(body, "/maxForce/sourceUsesRefs")?,
+        proof::at(body, "/maxDistance/sourceUsesRefs")?,
+    );
+    let [root] = proof::rows(body, "/authored/roots")? else {
+        return Err("the unprojected source field remains in the raw arena".into());
+    };
+    proof::present(root, "name", &json!("fixtureOnlyFlag"), Some(true))?;
+    assert_eq!(proof::at(root, "/value/valueIndex")?, "0");
+    proof::present(
+        proof::at(body, "/authored/values/0")?,
+        "value",
+        &json!({"type": "boolean", "value": true}),
+        Some(true),
+    )?;
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     validator
         .validate(&catalog)

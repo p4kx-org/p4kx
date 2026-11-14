@@ -25,6 +25,8 @@ mod condition;
 mod launcher;
 #[path = "weapon_action_sequence.rs"]
 mod sequence;
+#[path = "weapon_action_tractor.rs"]
+mod tractor;
 
 use super::recoil::WeaponActionRecoil;
 
@@ -34,6 +36,7 @@ use charge::ChargedAction;
 use condition::{ConditionalAction, ToggleAction};
 use launcher::WeaponLauncher;
 use sequence::{ParallelAction, SequenceAction};
+use tractor::TractorBeamAction;
 
 /// An action node and its stable original occurrence within the physical Record.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -166,6 +169,7 @@ pub(crate) enum WeaponActionKind<'source> {
     Rapid(Box<RapidAction<'source>>),
     Burst(Box<BurstAction<'source>>),
     Beam(Box<BeamAction<'source>>),
+    TractorBeam(Box<TractorBeamAction<'source>>),
     Aim(Box<AimAction<'source>>),
     Sequence(Box<SequenceAction<'source>>),
     Parallel(Box<ParallelAction<'source>>),
@@ -195,6 +199,9 @@ impl<'source> WeaponActionKind<'source> {
             }
             "SWeaponActionFireBeamParams" => {
                 Self::Beam(Box::new(BeamAction::read(source, notes, recoil)?))
+            }
+            "SWeaponActionFireTractorBeamParams" => {
+                Self::TractorBeam(Box::new(TractorBeamAction::read(source, notes, recoil)?))
             }
             "SWeaponActionAimSimpleParams" => {
                 Self::Aim(Box::new(AimAction::read(source, notes, recoil)?))

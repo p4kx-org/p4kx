@@ -123650,6 +123650,46 @@
       ],
       "type": "object"
     },
+    "TractorBeamAction": {
+      "description": "Stored force, distance, volume and angle inputs for a tractor beam action.",
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "fullStrengthDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxAngle": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxForce": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "maxVolume": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minForce": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "authored",
+        "fullStrengthDistance",
+        "maxAngle",
+        "maxDistance",
+        "maxForce",
+        "maxVolume",
+        "minDistance",
+        "minForce"
+      ],
+      "type": "object"
+    },
     "TractorBeamStats": {
       "description": "A tractor beam, from its `SWeaponActionFireTractorBeamParams`.",
       "properties": {
@@ -124225,6 +124265,22 @@
             },
             "value": {
               "$ref": "#/$defs/BeamAction"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "tractorBeam",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/TractorBeamAction"
             }
           },
           "required": [

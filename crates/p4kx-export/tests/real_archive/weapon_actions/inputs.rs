@@ -32,6 +32,15 @@ const BEAM: &[&str] = &[
     "chargeDownTime",
     "fireDuringChargeUp",
 ];
+const TRACTOR_BEAM: &[&str] = &[
+    "minForce",
+    "maxForce",
+    "minDistance",
+    "maxDistance",
+    "fullStrengthDistance",
+    "maxVolume",
+    "maxAngle",
+];
 const CHARGED: &[&str] = &[
     "chargeTime",
     "overchargeTime",
@@ -83,6 +92,7 @@ pub(super) fn action<'source>(
             count
         }
         "beam" => fields(trace, original, data, BEAM)? + beam_damage(trace, original, data)?,
+        "tractorBeam" => fields(trace, original, data, TRACTOR_BEAM)?,
         "aim" => {
             fields(trace, original, data, &["hasReloadModesOnUI"])?
                 + owned_input(trace, original, data, "aimModifier")?

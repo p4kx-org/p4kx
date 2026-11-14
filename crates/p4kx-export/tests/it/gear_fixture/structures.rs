@@ -86,7 +86,7 @@ fn weapons() -> Vec<TestStruct> {
     vec![
         component("SCItemWeaponComponentParams")
             .array("fireActions", pointer("SWeaponActionParams")),
-        TestStruct::new("SWeaponActionParams"),
+        TestStruct::new("SWeaponActionParams").field("recoilInterval", TestType::Single),
         singles(
             "SWeaponActionFireTractorBeamParams",
             &[
@@ -99,7 +99,8 @@ fn weapons() -> Vec<TestStruct> {
                 "maxAngle",
             ],
         )
-        .parent("SWeaponActionParams"),
+        .parent("SWeaponActionParams")
+        .field("fixtureOnlyFlag", TestType::Bool),
         TestStruct::new("SWeaponActionToggleParams")
             .parent("SWeaponActionParams")
             .field("weaponAction", pointer("SWeaponActionParams")),

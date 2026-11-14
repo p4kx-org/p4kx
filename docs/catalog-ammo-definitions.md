@@ -200,6 +200,12 @@ own provenance. Where present, read their payload through `.value`.
   fields such as `DamageEnergy` use the labels `physical`, `energy`,
   `distortion`, `thermal`, `biochemical` and `stun`. The parameter
   alternative uses `damageMacro` and `damageTotal`.
+- Tractor beam actions use `kind.type = "tractorBeam"`. Their `kind.value`
+  keeps the stored Singles `minForce`, `maxForce`, `minDistance`,
+  `maxDistance`, `fullStrengthDistance`, `maxVolume` and `maxAngle`.
+  Each value includes its exact IEEE bits and source. Other stored members
+  remain in `authored`. Tractor beam actions supply no projectile damage
+  or DPS inputs.
 - `kind.value` keeps `mode` and `sequenceEntries` for sequences,
   `weaponActions` for parallel actions, `conditionalWeaponActions`
   and `defaultWeaponAction` for both conditional kinds, and

@@ -210,9 +210,14 @@ fn wrapped_tractor() -> TestValue {
                     "SWeaponActionToggleParams",
                     vec![(
                         "weaponAction".to_owned(),
-                        singles_of(
+                        instance(
                             "SWeaponActionFireTractorBeamParams",
-                            &[("maxForce", 42.0), ("maxDistance", 7.0)],
+                            vec![
+                                single("maxForce", 42.0),
+                                single("maxDistance", 7.0),
+                                single("recoilInterval", 0.125),
+                                ("fixtureOnlyFlag".to_owned(), TestValue::Bool(true)),
+                            ],
                         ),
                     )],
                 ),
