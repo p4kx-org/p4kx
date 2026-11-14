@@ -490,6 +490,27 @@
       ],
       "type": "object"
     },
+    "Candidate": {
+      "properties": {
+        "document": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfSocXmlPosition"
+        }
+      },
+      "required": [
+        "document",
+        "position",
+        "name"
+      ],
+      "type": "object"
+    },
     "ClassRecord": {
       "properties": {
         "guid": {
@@ -934,6 +955,25 @@
       ],
       "type": "object"
     },
+    "FragmentOwner": {
+      "properties": {
+        "lookup": {
+          "$ref": "#/$defs/Lookup"
+        },
+        "tagScope": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "lookup"
+      ],
+      "type": "object"
+    },
     "Helper": {
       "properties": {
         "itemOffsetHelperName": {
@@ -1031,6 +1071,52 @@
       ],
       "type": "object"
     },
+    "Link": {
+      "oneOf": [
+        {
+          "properties": {
+            "index": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "root",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "index"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "document": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "index": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "definition",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "document",
+            "index"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "Loadout": {
       "oneOf": [
         {
@@ -1099,6 +1185,34 @@
           "type": "object"
         }
       ]
+    },
+    "Lookup": {
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "matches": {
+          "items": {
+            "$ref": "#/$defs/Candidate"
+          },
+          "type": "array"
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        }
+      },
+      "required": [
+        "status",
+        "sourceSetComplete",
+        "matches"
+      ],
+      "type": "object"
     },
     "Member": {
       "oneOf": [
@@ -1727,6 +1841,42 @@
       "required": [
         "position",
         "members"
+      ],
+      "type": "object"
+    },
+    "Selector": {
+      "properties": {
+        "attribute": {
+          "$ref": "#/$defs/AttributeSelection"
+        },
+        "fragmentOwner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FragmentOwner"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rootScope": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "tokens": {
+          "items": {
+            "$ref": "#/$defs/Token"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "attribute",
+        "tokens"
       ],
       "type": "object"
     },
@@ -5458,6 +5608,19 @@
       ],
       "type": "object"
     },
+    "Status": {
+      "enum": [
+        "resolved",
+        "missing",
+        "ambiguous",
+        "incomplete",
+        "emptyToken",
+        "unsupportedSpelling",
+        "noFragmentDefinition",
+        "noFragmentTagDefinition"
+      ],
+      "type": "string"
+    },
     "Tag": {
       "properties": {
         "name": {
@@ -5478,6 +5641,155 @@
         "name",
         "priority",
         "subTagDef"
+      ],
+      "type": "object"
+    },
+    "TagScope": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      ],
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "documents": {
+          "items": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "type": "array"
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "documents",
+        "links",
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs"
+      ],
+      "type": "object"
+    },
+    "Token": {
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "matches": {
+          "items": {
+            "$ref": "#/$defs/Candidate"
+          },
+          "type": "array"
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "spelling": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/Status"
+        }
+      },
+      "required": [
+        "spelling",
+        "status",
+        "sourceSetComplete",
+        "matches"
       ],
       "type": "object"
     },
@@ -5971,6 +6283,62 @@
       "required": [
         "type",
         "document",
+        "index",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "document": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fragment": {
+          "$ref": "#/$defs/Selector"
+        },
+        "global": {
+          "$ref": "#/$defs/Selector"
+        },
+        "index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "const": "adbTagSelectors",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "document",
+        "index",
+        "global",
+        "fragment"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "const": "adbTagScope",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/TagScope"
+        }
+      },
+      "required": [
+        "type",
         "index",
         "value"
       ],

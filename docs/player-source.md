@@ -103,3 +103,23 @@ attributes while reading lines. Source preparation still retains the selected ty
 projection in memory. It writes original XML bytes directly instead of building a
 second full XML node table. The bundle contains source data and preserves unresolved
 clip candidates without rendering.
+
+`adbTagSelectors` refers to an `adbFragment` by `document` and `index`.
+It retains original `Tags` and `FragTags` values with their attribute occurrences.
+A whole empty value selects no tags. Empty tokens within a nonempty `+`-separated
+value are retained and marked invalid for lookup. An attribute with multiple original
+occurrences stays invalid and all occurrences remain visible.
+
+Global tokens are compared with the ADB's own `TagDef`. Fragment tokens first
+match the authored FragmentID in the ADB's `FragDef`, then use that declaration's
+`subTagDef`. The comparison ignores ASCII case and preserves both authored
+spellings. Non-ASCII spellings have an explicit unsupported result. See
+[CryEngine Mannequin Tags & Tag Definitions](https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756816/pages/29450874).
+
+`adbTagScope` rows retain the shared original evidence for a lookup, including
+imports, contributing source-use references and whether the consulted scope is
+complete. Several import paths to one physical tag return one candidate. Separate
+physical declarations stay separate. An incomplete scope cannot establish a unique
+or missing match. Candidate coordinates point to the original definition. A lookup's
+encryption marker covers its original selector and referenced scope evidence.
+These records describe authored matches and make no runtime selection.

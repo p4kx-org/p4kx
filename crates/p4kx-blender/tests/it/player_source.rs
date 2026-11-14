@@ -22,6 +22,9 @@ mod motion_option_assertions;
 #[path = "player_tag_definition_assertions.rs"]
 mod tag_definition_assertions;
 
+#[path = "player_adb_tag_selectors.rs"]
+mod adb_tag_selectors;
+
 #[path = "player_subadb_graph_assertions.rs"]
 mod subadb_graph_assertions;
 
@@ -43,6 +46,13 @@ pub(super) fn fixture_with_entries(
 
 fn fixture_with(
     root_links: &str,
+    extra: impl IntoIterator<Item = TestEntry>,
+) -> TestResult<(tempfile::TempDir, Archive)> {
+    fixture_with_motion(motion_option_assertions::entries(root_links), extra)
+}
+
+fn fixture_with_motion(
+    motion: [TestEntry; 3],
     extra: impl IntoIterator<Item = TestEntry>,
 ) -> TestResult<(tempfile::TempDir, Archive)> {
     let folder = tempfile::tempdir()?;
@@ -87,7 +97,7 @@ fn fixture_with(
             "Data/Scripts/Loadouts/Player/DefaultLoadouts/sample.xml",
             loadout,
         ));
-    motion_option_assertions::entries(root_links)
+    motion
         .into_iter()
         .chain(subadb_graph_assertions::entries())
         .chain(extra)

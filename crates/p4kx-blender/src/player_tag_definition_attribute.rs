@@ -29,6 +29,12 @@ pub(in super::super) struct PendingAttribute {
     values: Vec<(SocXmlPosition, String)>,
 }
 
+impl Attribute {
+    pub(in super::super) const fn value(&self) -> &SourcedValue<String> {
+        &self.value
+    }
+}
+
 impl PendingAttribute {
     pub(in super::super) const fn is_declared(&self) -> bool {
         !self.values.is_empty()

@@ -44,6 +44,12 @@ pub(super) fn write(
             })?;
         }
     }
+    for (index, value) in capture.adb_tag_uses.scopes.iter().enumerate() {
+        push(&Row::AdbTagScope { index, value })?;
+    }
+    for value in &capture.adb_tag_uses.selectors {
+        push(&Row::AdbTagSelectors { value })?;
+    }
     for (index, value) in capture.tag_definitions.roots.iter().enumerate() {
         push(&Row::TagDefinitionRoot { index, value })?;
     }

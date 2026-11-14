@@ -31,7 +31,11 @@ pub(crate) struct Fragment {
     group_ordinal: usize,
     option_ordinal: usize,
     group_position: SourcedValue<SocXmlPosition>,
-    name: SourcedValue<String>,
+    pub(crate) name: SourcedValue<String>,
+    #[serde(skip)]
+    pub(crate) tags: AttributeSelection,
+    #[serde(skip)]
+    pub(crate) local_tags: AttributeSelection,
     position: SourcedValue<SocXmlPosition>,
     guid: AttributeSelection,
     layers: Vec<Layer>,
@@ -53,16 +57,16 @@ struct Animation {
     name: AttributeSelection,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct AttributeSelection {
+pub(crate) struct AttributeSelection {
     #[serde(flatten)]
-    origin: FieldOrigin,
+    pub(crate) origin: FieldOrigin,
     state: AttributeState,
-    occurrences: Vec<Attribute>,
+    pub(crate) occurrences: Vec<Attribute>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 enum AttributeState {
     Absent,
@@ -70,11 +74,11 @@ enum AttributeState {
     Invalid,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-struct Attribute {
+pub(crate) struct Attribute {
     position: SocXmlPosition,
-    value: SourcedValue<String>,
+    pub(crate) value: SourcedValue<String>,
 }
 
 impl AdbDeclarations {
@@ -108,6 +112,12 @@ impl AdbDeclarations {
                     true,
                 ),
                 guid: AttributeSelection::bind(fragment.guid, &fragment.node_use, &origin)?,
+                tags: AttributeSelection::bind(fragment.tags, &fragment.node_use, &origin)?,
+                local_tags: AttributeSelection::bind(
+                    fragment.local_tags,
+                    &fragment.node_use,
+                    &origin,
+                )?,
                 position: origin.sources.value(
                     SourceValue::Present(fragment.position),
                     std::slice::from_ref(&fragment.node_use),

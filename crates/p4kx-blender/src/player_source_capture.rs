@@ -16,7 +16,7 @@ use crate::player_adb_declarations::AdbDeclarations;
 use crate::player_source_body::{self, Body};
 use crate::player_source_loadout::{self, Loadout};
 use crate::player_source_motion::Motion;
-use crate::player_tag_definitions::TagDefinitions;
+use crate::player_tag_definitions::{AdbTagUses, TagDefinitions};
 use crate::soc_scene_class_resources::Resources;
 use crate::soc_scene_xml::XmlDocuments;
 
@@ -102,6 +102,7 @@ pub struct PlayerSourceCapture {
     pub(crate) motion: Motion,
     pub(crate) adb_declarations: Vec<AdbDeclarations>,
     pub(crate) tag_definitions: TagDefinitions,
+    pub(crate) adb_tag_uses: AdbTagUses,
     pub(crate) source_inventory: SourceInventory,
 }
 
@@ -120,6 +121,7 @@ pub(super) struct PreparedCapture<'sink> {
     pub(super) tag_definitions: TagDefinitions,
     pub(super) documents: XmlDocuments<'sink>,
     pub(super) source_inventory: SourceInventory,
+    adb_tag_uses: AdbTagUses,
 }
 
 impl PlayerSourceCapture {
@@ -138,6 +140,7 @@ impl PlayerSourceCapture {
             bodies: prepared.bodies,
             loadouts: prepared.loadouts,
             motion: prepared.motion,
+            adb_tag_uses: prepared.adb_tag_uses,
             adb_declarations: prepared.adb_declarations,
             tag_definitions: prepared.tag_definitions,
             source_inventory: prepared.source_inventory,
@@ -191,6 +194,7 @@ pub(super) fn prepare<'sink>(
     let motion = Motion::read(&resources, &directory, classes, &mut documents)?;
     let adb_declarations = documents.bind_adb_declarations(&sources, cancel)?;
     let tag_definitions = documents.bind_tag_definitions(&resources)?;
+    let adb_tag_uses = AdbTagUses::read(&adb_declarations, &tag_definitions, &sources, cancel)?;
     watch.check()?;
     Ok(PreparedCapture {
         bodies,
@@ -200,6 +204,7 @@ pub(super) fn prepare<'sink>(
         tag_definitions,
         documents,
         source_inventory: sources.freeze()?,
+        adb_tag_uses,
     })
 }
 

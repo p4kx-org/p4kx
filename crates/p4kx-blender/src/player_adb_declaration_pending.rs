@@ -35,6 +35,8 @@ pub(super) struct Fragment {
     pub(super) position: SocXmlPosition,
     pub(super) node_use: SourceUse,
     pub(super) guid: Selector,
+    pub(super) tags: Selector,
+    pub(super) local_tags: Selector,
     pub(super) layers: Vec<Layer>,
 }
 
@@ -91,6 +93,8 @@ impl Draft {
             position: position(option)?,
             node_use,
             guid: Selector::read(option, "GUID")?,
+            tags: Selector::read(option, "Tags")?,
+            local_tags: Selector::read(option, "FragTags")?,
             layers,
         });
         Ok(())

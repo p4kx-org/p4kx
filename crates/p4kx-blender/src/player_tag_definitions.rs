@@ -17,6 +17,15 @@ use crate::soc_scene_xml::XmlDocuments;
 #[path = "player_tag_definition_source.rs"]
 mod source;
 
+#[path = "player_tag_scope.rs"]
+mod scope;
+
+#[path = "player_tag_selectors.rs"]
+mod selectors;
+
+pub(crate) use scope::TagScope;
+pub(crate) use selectors::{AdbTagSelectors, AdbTagUses};
+
 #[path = "player_tag_definition_cycles.rs"]
 mod cycles;
 
@@ -48,6 +57,8 @@ pub(crate) struct Edge {
     position: SourcedValue<SocXmlPosition>,
     selector: Attribute,
     target: SourcedValue<Resource<usize>>,
+    #[serde(skip)]
+    evidence: Vec<SourceUse>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -216,7 +227,10 @@ impl Traversal<'_, '_, '_> {
         let (selector, selectors) = edge
             .selector
             .bind(&origin, &node, SourceUseRole::Selector)?;
-        let target = self.target(edge.selector.value(), &selectors)?;
+        let capture = self.target(edge.selector.value())?;
+        let target = capture.bind(self.resources.sources, &selectors);
+        let mut evidence = selectors;
+        evidence.extend_from_slice(capture.uses());
         if let Some(Resource::Present { data, .. }) = target.value()
             && self.visited.insert((*data, target_kind))
         {
@@ -230,14 +244,14 @@ impl Traversal<'_, '_, '_> {
             position,
             selector,
             target,
+            evidence,
         })
     }
 
     fn target(
         &mut self,
         value: SourceValue<String>,
-        selectors: &[SourceUse],
-    ) -> Result<SourcedValue<Resource<usize>>, SocSceneError> {
+    ) -> Result<ResourceCapture<usize>, SocSceneError> {
         let key = match &value {
             SourceValue::Present(path) => {
                 soc_scene_class_resources::resource_path(path, ResourceKind::DataRelative)
@@ -246,13 +260,12 @@ impl Traversal<'_, '_, '_> {
             _ => None,
         };
         let Some(key) = key else {
-            let capture = self.resources.capture_with_documents(
+            return self.resources.capture_with_documents(
                 value,
                 ResourceKind::DataRelative,
                 self.documents,
                 |_, _, _| Ok(None),
-            )?;
-            return Ok(capture.into_bound(self.resources.sources, selectors));
+            );
         };
         if let Some(definition) = self.observed.remove(&key) {
             let original = self.captures.get_mut(&key).ok_or(SocSceneError::Position)?;
@@ -276,8 +289,10 @@ impl Traversal<'_, '_, '_> {
                 &mut self.definitions,
             )?);
         }
-        let capture = self.captures.get(&key).ok_or(SocSceneError::Position)?;
-        Ok(capture.bind(self.resources.sources, selectors))
+        self.captures
+            .get(&key)
+            .cloned()
+            .ok_or(SocSceneError::Position)
     }
 }
 

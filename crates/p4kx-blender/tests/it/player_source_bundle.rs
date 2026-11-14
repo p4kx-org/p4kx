@@ -94,6 +94,8 @@ fn verify_rows(rows: &[Value], manifest: &Value) -> TestResult {
         "databaseLink",
         "adbDocument",
         "adbFragment",
+        "adbTagScope",
+        "adbTagSelectors",
         "tagDefinitionRoot",
         "source",
         "sourceUse",

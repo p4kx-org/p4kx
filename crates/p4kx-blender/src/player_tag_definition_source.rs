@@ -66,6 +66,8 @@ pub(super) struct Definition {
     pub(super) root_name: SourcedValue<String>,
     pub(super) version: Attribute,
     pub(super) sections: Vec<Section>,
+    #[serde(skip)]
+    pub(super) evidence: Vec<SourceUse>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -99,8 +101,10 @@ enum PendingMember {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct Tag {
-    position: SourcedValue<SocXmlPosition>,
-    name: Attribute,
+    pub(super) position: SourcedValue<SocXmlPosition>,
+    pub(super) name: Attribute,
+    #[serde(skip)]
+    pub(super) name_uses: Vec<SourceUse>,
     priority: Attribute,
     sub_tag_def: Attribute,
 }
@@ -262,6 +266,9 @@ impl PendingDefinition {
                 .collect::<Result<_, _>>()?;
             sections.push(Section { position, members });
         }
+        let (version, evidence) = self
+            .version
+            .bind(&origin, &root_use, SourceUseRole::Payload)?;
         Ok(Definition {
             position,
             root_name: sources.value(
@@ -269,11 +276,9 @@ impl PendingDefinition {
                 std::slice::from_ref(&root_use),
                 true,
             ),
-            version: self
-                .version
-                .bind(&origin, &root_use, SourceUseRole::Payload)?
-                .0,
+            version,
             sections,
+            evidence,
         })
     }
 
@@ -323,9 +328,11 @@ impl PendingTag {
     fn bind(&self, origin: &XmlOrigin<'_>, cancel: &CancelToken) -> Result<Tag, SocSceneError> {
         check(cancel)?;
         let (position, owner) = node(origin, self.position.clone())?;
+        let (name, name_uses) = self.name.bind(origin, &owner, SourceUseRole::Payload)?;
         Ok(Tag {
             position,
-            name: self.name.bind(origin, &owner, SourceUseRole::Payload)?.0,
+            name,
+            name_uses,
             priority: self
                 .priority
                 .bind(origin, &owner, SourceUseRole::Payload)?
@@ -334,6 +341,17 @@ impl PendingTag {
                 .sub_tag_def
                 .bind(origin, &owner, SourceUseRole::Payload)?
                 .0,
+        })
+    }
+}
+
+impl Definition {
+    pub(super) fn tags(&self) -> impl Iterator<Item = &Tag> {
+        self.sections.iter().flat_map(|section| {
+            section.members.iter().flat_map(|member| match member {
+                Member::Group { tags, .. } => tags.as_slice(),
+                Member::Tag(tag) => std::slice::from_ref(tag),
+            })
         })
     }
 }
