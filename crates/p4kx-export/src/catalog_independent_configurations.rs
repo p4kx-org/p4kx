@@ -77,14 +77,14 @@ pub(crate) fn read<'source>(
     )?;
     collected.ledger.merge(ledger);
     collected.add_failures(failures);
-    let mut jump = jump_drive_definitions::read(
+    let jump = jump_drive_definitions::read(
         forge,
         projection.original(),
         options.filter,
         options.cancel,
         &collected.item_components.jump_drives,
     )?;
-    let jump_drive_definitions = jump.take_tables(forge);
+    let jump_drive_definitions = jump.tables;
     configuration_numbers.extend(jump.numbers);
     collected.ledger.merge(jump.ledger);
     collected.add_failures(jump.failures);

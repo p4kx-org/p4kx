@@ -274,6 +274,8 @@ mod quantum_fields;
 mod quantum_heat;
 #[path = "quantum_profile.rs"]
 mod quantum_profile;
+#[path = "referenced_definition_read.rs"]
+mod referenced_definition_read;
 #[path = "resource_network_links.rs"]
 mod resource_network_links;
 #[path = "resource_network_placements.rs"]
