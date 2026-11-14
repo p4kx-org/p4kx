@@ -75,6 +75,15 @@ The directory and changed declaration inventories have no matches for territory,
 server meshing or claim reservation names. This name-based check leaves the
 territory transform, entity-count bias and runtime candidate behavior unverified.
 
+The PTU declaration adds an ordered `EntityComponentSpawnClosetParams.autoSpawnsRecords`
+Reference array with target `AutoSpawns`. The field census across 31,060 readable
+`EntityClassDefinition` Records reports zero occurrences of that path and zero
+unreadable Records or values. Three representative changed Spawn Closet
+containers supplied 12 readable XML members and no literal occurrence of the new
+field in those members. The existing AutoSpawns definition and mission-property
+tables cover their independently evidenced owners. This sample leaves the new
+component occurrence and its runtime spawn placement unverified.
+
 Current PTU has 24 `.resource`, 35 `.climasset`, 68 `.geoasset` and 156 `.dst` Entry additions
 against LIVE. The prior 5.0 audit already observed the loose planet descriptor families.
 The present Entry comparison shows 980 additions, 80 removals and 7,677 changes for SOCPAKs.
