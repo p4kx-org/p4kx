@@ -21,7 +21,7 @@ impl<'catalog> Origins<'catalog> {
         let DataForgeOrigin::Archive(entry) = origin else {
             return Err("original DataForge must be an Archive Entry".into());
         };
-        let sources = SourceUses::new();
+        let sources = SourceUses::with_compact_coordinates();
         let scope = sources.observe(SourceInput::Archive(entry), InputScope::Payload)?;
         let input = scope.source_ref().as_str().to_owned();
         let original = serde_json::to_value(sources.freeze()?)?;
@@ -132,4 +132,32 @@ fn value_location(owner: u32, ordinal: usize, field: &str) -> Value {
         "indices": [owner.to_string(), ordinal.to_string()],
         "field": field,
     })
+}
+
+#[test]
+fn origins_match_the_catalogs_compact_physical_inventory() -> TestResult {
+    use std::time::UNIX_EPOCH;
+
+    use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
+    use p4kx_extraction::{Archive, DataForgeEntry};
+    use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, TestStruct};
+
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("fixture.p4k");
+    let database = DataForgeBuilder::new()
+        .version(8)
+        .structure(TestStruct::new("Fixture"));
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/Game2.dcb", database.build()))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let options = CatalogOptions {
+        publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        ..CatalogOptions::new(UNIX_EPOCH)
+    };
+    let built = build_catalog_from(&archive, &entry, &options)?;
+    let catalog = serde_json::from_slice(built.json())?;
+    Origins::read(&catalog, entry.origin())?;
+    Ok(())
 }
