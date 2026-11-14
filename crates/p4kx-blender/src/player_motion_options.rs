@@ -132,6 +132,9 @@ impl Database {
         let file = AuthoredFile::at([root], root, "FragDef", origin)?;
         let tag_file = string_attribute(root, "TagDef", origin)?;
         let links = SubDatabase::read_all(root, origin, cancel)?;
+        if let Some(draft) = &mut declarations {
+            draft.branches(root, cancel)?;
+        }
         let options = database_options(root, origin, cancel, declarations.as_mut())?;
         Ok(Self {
             source: origin.source(),

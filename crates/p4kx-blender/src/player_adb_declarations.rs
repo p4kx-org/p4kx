@@ -22,6 +22,8 @@ pub(crate) struct AdbDeclarations {
     pub(crate) document: usize,
     pub(crate) source: PhysicalSourceRef,
     pub(crate) fragments: Vec<Fragment>,
+    #[serde(skip)]
+    pub(crate) branches: Vec<Branch>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -39,6 +41,21 @@ pub(crate) struct Fragment {
     position: SourcedValue<SocXmlPosition>,
     guid: AttributeSelection,
     layers: Vec<Layer>,
+}
+
+#[derive(Debug)]
+pub(crate) struct Branch {
+    pub(crate) ordinal: usize,
+    pub(crate) position: SourcedValue<SocXmlPosition>,
+    pub(crate) tags: AttributeSelection,
+    pub(crate) fragments: Vec<BranchFragment>,
+}
+
+#[derive(Debug)]
+pub(crate) struct BranchFragment {
+    pub(crate) ordinal: usize,
+    pub(crate) position: SourcedValue<SocXmlPosition>,
+    pub(crate) name: AttributeSelection,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -130,8 +147,42 @@ impl AdbDeclarations {
             document,
             source: origin.source(),
             fragments,
+            branches: branches(draft.branches, &origin, cancel)?,
         })
     }
+}
+
+fn branches(
+    drafts: Vec<pending::Branch>,
+    origin: &XmlOrigin<'_>,
+    cancel: &CancelToken,
+) -> Result<Vec<Branch>, SocSceneError> {
+    drafts
+        .into_iter()
+        .map(|branch| {
+            pending::check(cancel)?;
+            let (position, owner) = node_position(branch.position, origin)?;
+            let fragments = branch
+                .fragments
+                .into_iter()
+                .map(|fragment| {
+                    pending::check(cancel)?;
+                    let (position, used) = node_position(fragment.position, origin)?;
+                    Ok(BranchFragment {
+                        ordinal: fragment.ordinal,
+                        position,
+                        name: AttributeSelection::bind(fragment.name, &used, origin)?,
+                    })
+                })
+                .collect::<Result<_, SocSceneError>>()?;
+            Ok(Branch {
+                ordinal: branch.ordinal,
+                position,
+                tags: AttributeSelection::bind(branch.tags, &owner, origin)?,
+                fragments,
+            })
+        })
+        .collect()
 }
 
 fn layers(

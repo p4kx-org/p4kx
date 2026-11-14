@@ -14,11 +14,17 @@ use super::scope::{Candidate, Link, Survey, TagScope};
 use super::source::{self, Kind, Role};
 use super::{Document, Edge, TagDefinitions};
 
+#[path = "player_subadb_selectors.rs"]
+mod subadb;
+
+pub(crate) use subadb::AdbBranchSelectors;
+
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AdbTagUses {
     pub(crate) scopes: Vec<TagScope>,
     pub(crate) selectors: Vec<AdbTagSelectors>,
+    pub(crate) branches: Vec<AdbBranchSelectors>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -100,6 +106,7 @@ impl AdbTagUses {
     ) -> Result<Self, SocSceneError> {
         let mut resolver = Resolver::new(definitions, sources, cancel);
         let mut selectors = Vec::new();
+        let mut branches = Vec::new();
         for document in declarations {
             for (index, option) in document.fragments.iter().enumerate() {
                 source::check(cancel)?;
@@ -107,6 +114,10 @@ impl AdbTagUses {
                     continue;
                 }
                 selectors.push(resolver.option(document.document, index, option)?);
+            }
+            for branch in &document.branches {
+                source::check(cancel)?;
+                branches.push(resolver.branch(document.document, branch)?);
             }
         }
         Ok(Self {
@@ -116,6 +127,7 @@ impl AdbTagUses {
                 .map(|survey| survey.output)
                 .collect(),
             selectors,
+            branches,
         })
     }
 }
@@ -154,12 +166,7 @@ impl<'a> Resolver<'a> {
         index: usize,
         option: &Fragment,
     ) -> Result<AdbTagSelectors, SocSceneError> {
-        let mut global = Selector::new(&option.tags);
-        if let Some(value) = text(&option.tags) {
-            let root = self.root(document, Kind::Tags)?;
-            global.root_scope = Some(root);
-            global.tokens = self.tokens(value, &option.tags.origin, Some(root), None)?;
-        }
+        let global = self.global(document, &option.tags)?;
         let fragment = self.fragment(document, option)?;
         Ok(AdbTagSelectors {
             document,
@@ -167,6 +174,20 @@ impl<'a> Resolver<'a> {
             global,
             fragment,
         })
+    }
+
+    fn global(
+        &mut self,
+        document: usize,
+        attribute: &AttributeSelection,
+    ) -> Result<Selector, SocSceneError> {
+        let mut selector = Selector::new(attribute);
+        if let Some(value) = text(attribute) {
+            let root = self.root(document, Kind::Tags)?;
+            selector.root_scope = Some(root);
+            selector.tokens = self.tokens(value, &attribute.origin, Some(root), None)?;
+        }
+        Ok(selector)
     }
 
     fn fragment(&mut self, document: usize, option: &Fragment) -> Result<Selector, SocSceneError> {

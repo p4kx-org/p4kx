@@ -24,7 +24,7 @@ mod scope;
 mod selectors;
 
 pub(crate) use scope::TagScope;
-pub(crate) use selectors::{AdbTagSelectors, AdbTagUses};
+pub(crate) use selectors::{AdbBranchSelectors, AdbTagSelectors, AdbTagUses};
 
 #[path = "player_tag_definition_cycles.rs"]
 mod cycles;

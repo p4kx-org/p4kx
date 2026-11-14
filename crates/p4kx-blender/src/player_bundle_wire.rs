@@ -17,7 +17,9 @@ use crate::player_source_motion::{
     BranchFields, BranchOption, ControllerRigOwner, ControllerTopology, DatabaseLink,
     MotionComponentFields, MotionOptionFields, OptionRow,
 };
-use crate::player_tag_definitions::{AdbTagSelectors, CycleEdge, Document, Edge, TagScope};
+use crate::player_tag_definitions::{
+    AdbBranchSelectors, AdbTagSelectors, CycleEdge, Document, Edge, TagScope,
+};
 use p4kx_extraction::{SourceValueState, SourcedValue};
 
 pub(super) const FORMAT: &str = "p4kx-player-source-bundle";
@@ -151,6 +153,10 @@ pub(crate) enum Row<'a> {
     AdbTagSelectors {
         #[serde(flatten)]
         value: &'a AdbTagSelectors,
+    },
+    AdbBranchSelectors {
+        #[serde(flatten)]
+        value: &'a AdbBranchSelectors,
     },
     AdbTagScope {
         index: usize,

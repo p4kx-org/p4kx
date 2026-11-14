@@ -47,11 +47,28 @@ pub(super) fn write(
             })?;
         }
     }
+    tag_rows(capture, &mut push)?;
+    for value in capture.source_inventory.sources() {
+        push(&Row::Source { value })?;
+    }
+    for value in capture.source_inventory.uses() {
+        push(&Row::SourceUse { value })?;
+    }
+    Ok(())
+}
+
+fn tag_rows(
+    capture: &PlayerSourceCapture,
+    push: &mut impl FnMut(&Row<'_>) -> io::Result<()>,
+) -> io::Result<()> {
     for (index, value) in capture.adb_tag_uses.scopes.iter().enumerate() {
         push(&Row::AdbTagScope { index, value })?;
     }
     for value in &capture.adb_tag_uses.selectors {
         push(&Row::AdbTagSelectors { value })?;
+    }
+    for value in &capture.adb_tag_uses.branches {
+        push(&Row::AdbBranchSelectors { value })?;
     }
     for (index, value) in capture.tag_definitions.roots.iter().enumerate() {
         push(&Row::TagDefinitionRoot { index, value })?;
@@ -61,12 +78,6 @@ pub(super) fn write(
     }
     for value in &capture.tag_definitions.cycle_back_edges {
         push(&Row::TagCycleBackEdge { value })?;
-    }
-    for value in capture.source_inventory.sources() {
-        push(&Row::Source { value })?;
-    }
-    for value in capture.source_inventory.uses() {
-        push(&Row::SourceUse { value })?;
     }
     Ok(())
 }

@@ -1056,6 +1056,45 @@
       ],
       "type": "object"
     },
+    "FragmentDefinition": {
+      "properties": {
+        "lookup": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Lookup"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "name": {
+          "$ref": "#/$defs/AttributeSelection"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfSocXmlPosition"
+        },
+        "scope": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "ordinal",
+        "position",
+        "name"
+      ],
+      "type": "object"
+    },
     "FragmentOwner": {
       "properties": {
         "lookup": {
@@ -6814,6 +6853,46 @@
         "index",
         "global",
         "fragment"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "document": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "fragmentDefinitions": {
+          "items": {
+            "$ref": "#/$defs/FragmentDefinition"
+          },
+          "type": "array"
+        },
+        "globalTags": {
+          "$ref": "#/$defs/Selector"
+        },
+        "index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfSocXmlPosition"
+        },
+        "type": {
+          "const": "adbBranchSelectors",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "document",
+        "index",
+        "position",
+        "globalTags",
+        "fragmentDefinitions"
       ],
       "type": "object"
     },

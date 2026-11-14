@@ -132,3 +132,10 @@ scope/context declaration indexes. Duplicate definitions stay distinct. A
 The component's physical rig owner stays unresolved when the authoring sources
 provide a scope/context relationship without an observed model binding. See
 [CryEngine Mannequin Scope Contexts](https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756816/pages/29450870).
+
+`adbBranchSelectors` preserves each original SubADB selection at its owning
+ADB document and local `databaseLink` index. Its global tags use that document's
+`TagDef`. Direct `FragmentID` children retain original order and name occurrences.
+Each usable name compares against the owning `FragDef`, with the matching
+definition positions and source origin. Matches record authored narrowing rules.
+The archive graph still retains every explicitly referenced branch.

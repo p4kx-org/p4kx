@@ -28,6 +28,9 @@ mod adb_tag_selectors;
 #[path = "player_controller_contexts.rs"]
 mod controller_contexts;
 
+#[path = "player_subadb_selectors.rs"]
+mod subadb_selectors;
+
 #[path = "player_subadb_graph_assertions.rs"]
 mod subadb_graph_assertions;
 

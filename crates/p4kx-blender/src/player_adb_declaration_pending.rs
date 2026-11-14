@@ -11,6 +11,7 @@ use crate::soc_scene_rooms::position;
 pub(crate) struct Draft {
     pub(super) scope: SourceScope,
     pub(super) fragments: Vec<Fragment>,
+    pub(super) branches: Vec<Branch>,
 }
 
 pub(crate) struct FragmentSite {
@@ -40,6 +41,19 @@ pub(super) struct Fragment {
     pub(super) layers: Vec<Layer>,
 }
 
+pub(super) struct Branch {
+    pub(super) ordinal: usize,
+    pub(super) position: SocXmlPosition,
+    pub(super) tags: Selector,
+    pub(super) fragments: Vec<BranchFragment>,
+}
+
+pub(super) struct BranchFragment {
+    pub(super) ordinal: usize,
+    pub(super) position: SocXmlPosition,
+    pub(super) name: Selector,
+}
+
 pub(super) struct Layer {
     pub(super) ordinal: usize,
     pub(super) position: SocXmlPosition,
@@ -67,7 +81,38 @@ impl Draft {
         Self {
             scope,
             fragments: Vec::new(),
+            branches: Vec::new(),
         }
+    }
+
+    pub(crate) fn branches(
+        &mut self,
+        root: SourceElement<'_>,
+        cancel: &CancelToken,
+    ) -> Result<(), SocSceneError> {
+        for (_, section) in ordered_children(root, "SubADBs") {
+            for (_, branch) in ordered_children(section, "SubADB") {
+                check(cancel)?;
+                let fragments = ordered_children(branch, "FragmentID")
+                    .map(|(ordinal, fragment)| {
+                        check(cancel)?;
+                        Ok(BranchFragment {
+                            ordinal,
+                            position: position(fragment)?,
+                            name: Selector::read(fragment, "Name")?,
+                        })
+                    })
+                    .collect::<Result<_, SocSceneError>>()?;
+                let ordinal = self.branches.len();
+                self.branches.push(Branch {
+                    ordinal,
+                    position: position(branch)?,
+                    tags: Selector::read(branch, "Tags")?,
+                    fragments,
+                });
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn fragment(
