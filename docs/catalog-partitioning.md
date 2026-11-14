@@ -76,3 +76,19 @@ dangling and cyclic links, protected text, a global health blocker alongside a h
 publication and partial replacement. Measure stored and decoded bytes, generation time and peak
 producer and consumer memory. The current writer streams serialization from a prepared catalog.
 Smaller files alone leave that producer preparation cost in place.
+
+## Measuring a complete export
+
+For each Build, record the full Build identity, exporter revision and hash, and archive length
+and modification time before and after the export. Run the normal `p4kx catalog` writer with a
+fixed export time, default text selection and one private `.json.zst` output. Record the exit
+status, elapsed time, peak process memory, file length and decoded byte count from the text
+summary. Count section and decoded bytes by streaming the compressed output through a Zstd
+decoder. Reconcile section totals and JSON framing with the writer's byte count. Measure reader
+memory in a separate process. Diagnostic results and build or source changes invalidate the
+complete measurements.
+
+The compressed writer prepares a typed Catalog once. It first counts serialized bytes for the
+frame header and then streams serialization into the encoder. A second raw file adds storage
+without changing the measured decoded bytes. A comparison with raw writer timing is a separate
+experiment.
