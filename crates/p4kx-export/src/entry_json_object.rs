@@ -3,6 +3,7 @@
 
 use p4kx_extraction::{Guid, SourceUseRole, SourceUses, SourceValue, SourcedValue};
 
+use super::catalog_json_number::CatalogJsonNumber;
 use crate::CatalogError;
 use crate::catalog_read::parsed_entry_json::{
     self, ParsedEntryJson, SourceMember, SourceNode, SourceNodeValue,
@@ -101,4 +102,11 @@ fn parse_guid(raw: &str) -> Option<CatalogGuid> {
         .and_then(|inner| inner.strip_suffix('}'))
         .unwrap_or(raw);
     raw.parse::<Guid>().ok().map(CatalogGuid)
+}
+
+pub(crate) fn number(node: &SourceNode<'_>) -> SourceValue<CatalogJsonNumber> {
+    match node.value {
+        SourceNodeValue::Number(token) => SourceValue::Present(CatalogJsonNumber(token.to_owned())),
+        _ => SourceValue::Invalid,
+    }
 }

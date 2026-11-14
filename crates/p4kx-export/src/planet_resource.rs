@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
-
-use p4kx_extraction::{
-    Archive, CancelToken, DataForge, Filter, Guid, SourceValueState, SourcedValue,
-};
+use p4kx_extraction::{Archive, CancelToken, DataForge, Filter, SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -13,28 +9,22 @@ use super::planet_palette_reference::PlanetPaletteReference;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
 use crate::catalog_read::loose_archive_path::{self, LooseArchivePathState};
-use crate::catalog_read::loose_json::{LooseJson, LooseJsonFailure};
-use crate::catalog_read::original::{EntryCapture, EntryReceipt, PhysicalEntryIdentity};
-use crate::catalog_read::parsed_entry_json;
-use crate::catalog_table::{CatalogTable, DatasetAvailability};
-use crate::entry_source::EntrySource;
-use crate::export_diagnostic::{
-    ExportDiagnosticCode, ExportDiagnosticSeverity, ExportDiagnosticStage, ExportDiagnosticUnit,
-    ExportSourceRole,
+use crate::catalog_read::loose_definition::{
+    self, DefinitionFamily, DefinitionIssue, LooseDefinition,
 };
-use crate::export_entry_ledger::EntryOperation;
-use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::catalog_read::original::{EntryCapture, PhysicalEntryIdentity};
+use crate::catalog_table::CatalogTable;
+use crate::export_diagnostic::ExportDiagnosticCode;
+use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
-use crate::health_diagnostic_observation::DiagnosticObservation;
 use crate::schema_fields::every_field_required;
-use crate::selection::starts_with_folder;
-use crate::starmap_index;
 use crate::{CatalogError, CatalogOptions, Kind};
 
 const FOLDER: &str = "data/libs/planets/resources/";
 const EXTENSION: &str = "resource";
 const KIND: Kind = Kind::PlanetResources;
-const SOURCE_TYPE: &str = "PlanetResource";
+const FAMILY: DefinitionFamily =
+    DefinitionFamily::new(KIND, FOLDER, EXTENSION, "PlanetResource", "guid");
 
 pub(crate) type PlanetResourceTable = CatalogTable<PlanetResource>;
 
@@ -51,15 +41,17 @@ pub(crate) struct PlanetResource {
     minable: SourcedValue<bool>,
     tint_palette_path: SourcedValue<String>,
     tint_palette: PlanetPaletteReference,
-    issues: Vec<PlanetResourceIssue>,
+    issues: Vec<DefinitionIssue>,
 }
 
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-struct PlanetResourceIssue {
-    field: &'static str,
-    code: ExportDiagnosticCode,
+impl LooseDefinition for PlanetResource {
+    fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.guid
+    }
+
+    fn issues(&mut self) -> &mut Vec<DefinitionIssue> {
+        &mut self.issues
+    }
 }
 
 struct Definitions<'input, 'forge, 'source> {
@@ -89,68 +81,22 @@ pub(crate) fn read(
         cancel: options.cancel,
         keys: None,
     };
-    let selected = archive
-        .entries()
-        .iter()
-        .filter(|entry| in_scope(entry.path()));
-    let mut available = false;
-    let mut rows = Vec::new();
-    ledger.inventory(KIND);
-    for entry in selected {
-        parsed_entry_json::check_cancel(options.cancel)?;
-        available = true;
-        if options
-            .filter
-            .is_some_and(|filter| !filter.matches(entry.path()))
-        {
-            continue;
-        }
-        let source =
-            EntrySource::outer(capture, archive, entry)?.operation(EntryOperation::SourceJson);
-        let projected = match LooseJson::read(archive, entry, &source, options.cancel)? {
-            Ok(read) => reader.project(&read, source.receipt())?,
-            Err(error) => Err(error),
-        };
-        match projected {
-            Ok(row) => {
-                source.record(ledger, KIND, SourceDisposition::Projected);
-                parsed_entry_json::push(&mut rows, row)?;
-            }
-            Err(error) => {
-                source.diagnosed(
-                    ledger,
-                    KIND,
-                    error.disposition,
-                    error.diagnosis(SOURCE_TYPE),
-                );
-            }
-        }
-    }
-    annotate_duplicates(&mut rows, ledger)?;
-    let availability = if available {
-        DatasetAvailability::Available
-    } else if ledger.archive_inventory_problem.is_some() {
-        DatasetAvailability::Unavailable
-    } else {
-        DatasetAvailability::Absent
-    };
-    Ok(CatalogTable { availability, rows })
+    loose_definition::read(
+        archive,
+        capture,
+        ledger,
+        options,
+        FAMILY,
+        |identity, object| reader.project(identity, object),
+    )
 }
 
 impl Definitions<'_, '_, '_> {
     fn project(
         &mut self,
-        read: &LooseJson,
-        receipt: &EntryReceipt,
-    ) -> Result<Result<PlanetResource, LooseJsonFailure>, CatalogError> {
-        let parsed = match read.parse(self.capture, self.cancel)? {
-            Ok(parsed) => parsed,
-            Err(error) => return Ok(Err(error)),
-        };
-        let Some(object) = EntryJsonObject::new(&parsed, parsed.root, self.capture.source_uses())?
-        else {
-            return Ok(Err(LooseJsonFailure::malformed()));
-        };
+        identity: PhysicalEntryIdentity,
+        object: &EntryJsonObject<'_, '_>,
+    ) -> Result<PlanetResource, CatalogError> {
         let guid = object.field("guid", entry_json_object::guid)?;
         let guid_raw = object.field("guid", entry_json_object::text)?;
         let name = object.field("name", entry_json_object::text)?;
@@ -158,8 +104,8 @@ impl Definitions<'_, '_, '_> {
         let tint_palette_path = object.field("tintPalettePath", entry_json_object::text)?;
         let tint_palette = self.resolve(&tint_palette_path)?;
         let issues = field_issues(&guid, &name, &minable, tint_palette.state());
-        Ok(Ok(PlanetResource {
-            identity: receipt.physical_payload_file(starmap_index::key)?,
+        Ok(PlanetResource {
+            identity,
             guid,
             guid_raw,
             name,
@@ -167,7 +113,7 @@ impl Definitions<'_, '_, '_> {
             tint_palette_path,
             tint_palette,
             issues,
-        }))
+        })
     }
 
     fn resolve(
@@ -207,44 +153,21 @@ fn field_issues(
     name: &SourcedValue<String>,
     minable: &SourcedValue<bool>,
     palette: Option<LooseArchivePathState>,
-) -> Vec<PlanetResourceIssue> {
-    let mut issues = Vec::new();
-    if matches!(
-        guid.state(),
-        SourceValueState::Absent | SourceValueState::Invalid | SourceValueState::Null
-    ) {
-        issues.push(PlanetResourceIssue {
-            field: "guid",
-            code: ExportDiagnosticCode::MalformedSource,
-        });
-    } else if guid.value().is_some_and(|guid| guid.0 == Guid::default()) {
-        issues.push(PlanetResourceIssue {
-            field: "guid",
-            code: ExportDiagnosticCode::EmptyValue,
-        });
-    }
+) -> Vec<DefinitionIssue> {
+    let mut issues: Vec<_> = loose_definition::identity_issue("guid", guid)
+        .into_iter()
+        .collect();
     for (field, state) in [("name", name.state()), ("bMinable", minable.state())] {
         if state == SourceValueState::Invalid {
-            issues.push(PlanetResourceIssue {
+            issues.push(DefinitionIssue {
                 field,
                 code: ExportDiagnosticCode::MalformedSource,
             });
         }
     }
-    let code = match palette {
-        Some(LooseArchivePathState::Invalid | LooseArchivePathState::WrongFamily) => {
-            Some(ExportDiagnosticCode::MalformedSource)
-        }
-        Some(LooseArchivePathState::Missing) => Some(ExportDiagnosticCode::DanglingReference),
-        Some(LooseArchivePathState::Unreadable) => Some(ExportDiagnosticCode::UnreadableSource),
-        Some(LooseArchivePathState::Unavailable | LooseArchivePathState::Filtered) => {
-            Some(ExportDiagnosticCode::CatalogTargetUnavailable)
-        }
-        Some(LooseArchivePathState::Ambiguous) => Some(ExportDiagnosticCode::AmbiguousIdentity),
-        _ => None,
-    };
+    let code = palette.and_then(loose_definition::reference_issue);
     if let Some(code) = code {
-        issues.push(PlanetResourceIssue {
+        issues.push(DefinitionIssue {
             field: "tintPalettePath",
             code,
         });
@@ -252,53 +175,9 @@ fn field_issues(
     issues
 }
 
-fn annotate_duplicates(
-    rows: &mut [PlanetResource],
-    ledger: &mut ExportLedger,
-) -> Result<(), CatalogError> {
-    let mut counts = HashMap::<CatalogGuid, usize>::new();
-    counts
-        .try_reserve(rows.len())
-        .map_err(CatalogError::SourceUseAllocation)?;
-    for row in rows.iter() {
-        if let Some(guid) = row.guid.value().filter(|guid| guid.0 != Guid::default()) {
-            *counts.entry(*guid).or_default() += 1;
-        }
-    }
-    for row in rows {
-        if row
-            .guid
-            .value()
-            .and_then(|guid| counts.get(guid))
-            .is_some_and(|count| *count > 1)
-        {
-            row.issues.push(PlanetResourceIssue {
-                field: "guid",
-                code: ExportDiagnosticCode::AmbiguousIdentity,
-            });
-        }
-        for issue in &row.issues {
-            ledger.field_diagnostic(DiagnosticObservation {
-                kind: Some(KIND),
-                stage: ExportDiagnosticStage::SourceField,
-                code: issue.code,
-                severity: ExportDiagnosticSeverity::Information,
-                source_role: Some(ExportSourceRole::DerivedInput),
-                warning_code: None,
-                count: 1,
-                count_unit: ExportDiagnosticUnit::Values,
-                examples: Vec::new(),
-            });
-        }
-    }
-    Ok(())
-}
-
+#[cfg(test)]
 fn in_scope(path: &str) -> bool {
-    starts_with_folder(path, FOLDER)
-        && path
-            .rsplit_once('.')
-            .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case(EXTENSION))
+    FAMILY.includes(path)
 }
 
 #[cfg(test)]

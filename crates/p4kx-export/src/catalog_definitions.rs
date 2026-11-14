@@ -34,12 +34,16 @@ use crate::catalog_v3::weapon_procedural_definitions::WeaponProceduralTables;
 use crate::commodity_contract::CommodityDefinition;
 use crate::manufacturer::ManufacturerDefinition;
 use crate::mission_generator::GeneratorDefinition;
-use planet_resource::PlanetResourceTable;
+use planet_tech_definitions::PlanetTechDefinitions;
 
+#[path = "planet_creature.rs"]
+pub(crate) mod planet_creature;
 #[path = "planet_palette_reference.rs"]
 mod planet_palette_reference;
 #[path = "planet_resource.rs"]
 pub(crate) mod planet_resource;
+#[path = "planet_tech_definitions.rs"]
+pub(crate) mod planet_tech_definitions;
 use crate::quality_catalog::contract::{
     QualityDistributionDefinition, QualityQuantizationDefinition,
 };
@@ -72,7 +76,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) tags: CatalogTable<super::tag_catalog::TagDefinition<'source>>,
     pub(crate) shop_inventories: ShopInventoryTable,
     pub(crate) particle_libraries: ParticleLibraryTable,
-    pub(crate) planet_resources: PlanetResourceTable,
+    #[serde(flatten)]
+    pub(crate) planet_tech: PlanetTechDefinitions,
     pub(crate) explosion_definitions: CatalogTable<ExplosionDefinition<'source>>,
     pub(crate) inventory_containers: CatalogTable<InventoryContainerDefinition<'source>>,
     pub(crate) medical_item_tier_configs: CatalogTable<MedicalItemTierConfig<'source>>,

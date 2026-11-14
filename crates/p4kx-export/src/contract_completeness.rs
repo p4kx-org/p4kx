@@ -82,6 +82,7 @@ pub(crate) struct Completeness<'a> {
     pub(crate) shop_inventories: KindCompleteness<'a>,
     pub(crate) particle_libraries: KindCompleteness<'a>,
     pub(crate) planet_resources: KindCompleteness<'a>,
+    pub(crate) creatures: KindCompleteness<'a>,
     /// The completeness of `factions`.
     pub(crate) factions: KindCompleteness<'a>,
     /// The completeness of the physical `FactionIdentity` selection.
@@ -229,6 +230,7 @@ impl<'a> Completeness<'a> {
             shop_inventories: KindCompleteness::Complete,
             particle_libraries: completeness,
             planet_resources: completeness,
+            creatures: completeness,
             factions: completeness,
             faction_identities: completeness,
             reputation_perks: completeness,

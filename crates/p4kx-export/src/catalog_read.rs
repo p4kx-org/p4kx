@@ -14,12 +14,18 @@ mod catalog_record_context;
 #[path = "catalog_reference_read.rs"]
 mod catalog_reference_read;
 
+#[path = "catalog_json_number.rs"]
+pub(crate) mod catalog_json_number;
 #[path = "entry_json_object.rs"]
 pub(crate) mod entry_json_object;
 #[path = "loose_archive_path.rs"]
 pub(crate) mod loose_archive_path;
+#[path = "loose_definition.rs"]
+pub(crate) mod loose_definition;
 #[path = "loose_json.rs"]
 pub(crate) mod loose_json;
+#[path = "loose_record_link.rs"]
+pub(crate) mod loose_record_link;
 #[path = "parsed_entry_json.rs"]
 pub(crate) mod parsed_entry_json;
 

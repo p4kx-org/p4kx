@@ -222,7 +222,7 @@ fn assemble<R>(
             blueprints: blueprints.definitions,
             shop_inventories: collected.shop_inventories,
             particle_libraries: collected.particle_libraries,
-            planet_resources: collected.planet_resources,
+            planet_tech: collected.planet_tech,
             inventory_containers: inventory_table(&forge, collected.inventory_containers),
             medical_item_tier_configs: medical_tier_config::table(
                 &forge,

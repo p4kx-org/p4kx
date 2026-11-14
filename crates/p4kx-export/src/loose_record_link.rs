@@ -1,0 +1,113 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use p4kx_extraction::{CancelToken, Filter, Record, SourceValue, SourcedValue};
+use schemars::JsonSchema;
+use serde::Serialize;
+
+use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_read::loose_archive_path::LooseArchivePathState;
+use crate::catalog_read::parsed_entry_json;
+use crate::guid_text::CatalogGuid;
+use crate::record_header_field::RecordHeaderField;
+use crate::schema_fields::every_field_required;
+
+/// Resolution of an authored loose JSON reference against original Record headers.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub(crate) struct LooseRecordLink {
+    pub(crate) state: SourcedValue<LooseArchivePathState>,
+    pub(crate) candidates: Vec<LooseRecordCandidate>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub(crate) struct LooseRecordCandidate {
+    index: SourcedValue<u32>,
+    guid: SourcedValue<CatalogGuid>,
+    path: SourcedValue<String>,
+    source_type: SourcedValue<String>,
+}
+
+pub(crate) fn resolve<'record, T>(
+    selector: &SourcedValue<T>,
+    original: &OriginalCatalogInput<'_, '_>,
+    records: impl Iterator<Item = Record<'record>>,
+    expected_type: &str,
+    filter: Option<&Filter>,
+    cancel: Option<&CancelToken>,
+) -> Result<LooseRecordLink, CatalogError> {
+    let mut candidates = Vec::new();
+    let mut unreadable = false;
+    let mut matching = 0;
+    let mut included = false;
+    for record in records {
+        parsed_entry_json::check_cancel(cancel)?;
+        let (Ok(source_type), Ok(record_path)) = (record.type_name(), record.record_path()) else {
+            unreadable = true;
+            continue;
+        };
+        if source_type == expected_type {
+            matching += 1;
+            included |= filter.is_none_or(|filter| filter.matches(record_path));
+        }
+        let candidate = candidate(original, &record, record_path, source_type)?;
+        parsed_entry_json::push(&mut candidates, candidate)?;
+    }
+    let state = match matching {
+        0 | 1 if unreadable => LooseArchivePathState::Unreadable,
+        0 if !candidates.is_empty() => LooseArchivePathState::WrongFamily,
+        0 => LooseArchivePathState::Missing,
+        1 if !included => LooseArchivePathState::Filtered,
+        1 => LooseArchivePathState::Resolved,
+        _ => LooseArchivePathState::Ambiguous,
+    };
+    let sources = &original.origins().uses;
+    let unknown = sources.origin(&[], false);
+    let mut origins = vec![selector.origin()];
+    if matches!(
+        state,
+        LooseArchivePathState::Missing | LooseArchivePathState::Unreadable
+    ) {
+        origins.push(&unknown);
+    }
+    for candidate in &candidates {
+        origins.extend([
+            candidate.path.origin(),
+            candidate.source_type.origin(),
+            candidate.guid.origin(),
+        ]);
+    }
+    let state = sources.value_with_origins(SourceValue::Present(state), &origins)?;
+    Ok(LooseRecordLink { state, candidates })
+}
+
+fn candidate(
+    original: &OriginalCatalogInput<'_, '_>,
+    record: &Record<'_>,
+    record_path: &str,
+    source_type: &str,
+) -> Result<LooseRecordCandidate, CatalogError> {
+    let context = original.record_context(record)?;
+    Ok(LooseRecordCandidate {
+        index: context.header_selector(
+            RecordHeaderField::RecordIndex,
+            SourceValue::Present(record.index()),
+        )?,
+        guid: context.header_value(
+            RecordHeaderField::Guid,
+            SourceValue::Present(CatalogGuid(record.guid())),
+        )?,
+        path: context.header_conversion(
+            RecordHeaderField::FileName,
+            SourceValue::Present(record_path.to_owned()),
+        )?,
+        source_type: context.header_selector(
+            RecordHeaderField::SourceType,
+            SourceValue::Present(source_type.to_owned()),
+        )?,
+    })
+}

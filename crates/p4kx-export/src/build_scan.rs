@@ -66,7 +66,7 @@ pub(super) fn scan<'f>(
     collected.ledger.archive_inventory_problem = crate::export_archive_health::inventory(archive);
     let original = projection.original();
     let capture = EntryCapture::for_input(original);
-    collected.planet_resources = crate::catalog_definitions::planet_resource::read(
+    collected.planet_tech = crate::catalog_definitions::planet_tech_definitions::read(
         archive,
         forge,
         original,

@@ -74,6 +74,7 @@ fn expected_completeness() -> Value {
         "shopInventories",
         "particleLibraries",
         "planetResources",
+        "creatures",
         "explosionDefinitions",
         "ammoDefinitions",
         "factions",

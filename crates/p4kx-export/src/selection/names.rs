@@ -76,6 +76,7 @@ impl Kind {
             Self::ShopInventories => "shopInventories",
             Self::ParticleLibraries => "particleLibraries",
             Self::PlanetResources => "planetResources",
+            Self::Creatures => "creatures",
             Self::ExplosionDefinitions => "explosionDefinitions",
             Self::AmmoDefinitions => "ammoDefinitions",
             Self::Factions => "factions",

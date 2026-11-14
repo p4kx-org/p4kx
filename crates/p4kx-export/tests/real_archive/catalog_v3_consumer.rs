@@ -14,6 +14,11 @@ mod category_lists;
 #[path = "catalog_v3_gameplay_properties.rs"]
 pub(crate) mod gameplay_properties;
 
+#[path = "catalog_v3_named_tables.rs"]
+mod named_tables;
+
+use named_tables::uses_named_definition_table;
+
 type TestResult<T> = Result<T, Box<dyn Error>>;
 
 /// Reads the one actual dataset for a Kind.
@@ -93,32 +98,6 @@ fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
         }
     };
     checked_table(catalog, kind, path)
-}
-
-const fn uses_named_definition_table(kind: Kind) -> bool {
-    matches!(
-        kind,
-        Kind::NpcArchetypes
-            | Kind::NpcClassPools
-            | Kind::AutoSpawns
-            | Kind::AutoSpawnSets
-            | Kind::PlanetResources
-            | Kind::InventoryContainers
-            | Kind::MedicalItemTierConfigs
-            | Kind::ParticleLibraries
-            | Kind::EncounterIndices
-            | Kind::MissionItems
-            | Kind::ProceduralPlanetAudio
-            | Kind::ContractScopes
-            | Kind::LootPoolFilters
-            | Kind::LootSecondaryChoiceSingleLayers
-            | Kind::LootSecondaryChoiceMultiLayers
-            | Kind::LootThemes
-            | Kind::HierarchicalContextualDataPresets
-            | Kind::LootGenerationGlobalParams
-            | Kind::SubHarvestableConfigs
-            | Kind::SubHarvestableMultiConfigs
-    )
 }
 
 fn checked_table<'catalog>(

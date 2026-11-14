@@ -4901,6 +4901,9 @@
         "contractTemplates": {
           "$ref": "#/$defs/CatalogTableOfTemplateDefinition"
         },
+        "creatures": {
+          "$ref": "#/$defs/CatalogTableOfPlanetCreature"
+        },
         "encounterIndices": {
           "$ref": "#/$defs/CatalogTableOfEncounterIndex"
         },
@@ -5076,6 +5079,7 @@
         "contractGenerators",
         "contractScopes",
         "contractTemplates",
+        "creatures",
         "encounterIndices",
         "explosionDefinitions",
         "factionIdentities",
@@ -5165,6 +5169,14 @@
         "sourceType"
       ],
       "type": "object"
+    },
+    "CatalogJsonNumber": {
+      "description": "Exact authored JSON number token with all digits, sign and exponent.",
+      "not": {
+        "pattern": "[^0-9eE+.-]"
+      },
+      "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?([eE][+-]?[0-9]+)?$",
+      "type": "string"
     },
     "CatalogPlacements": {
       "description": "Contextual placements and relationships keyed by their physical definitions.",
@@ -6716,6 +6728,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ParticleLibrary"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfPlanetCreature": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/PlanetCreature"
           },
           "type": "array"
         }
@@ -8603,6 +8634,9 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `crafters`."
         },
+        "creatures": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
         "dismantleProcesses": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `dismantleProcesses`."
@@ -8915,6 +8949,7 @@
         "contractTemplates",
         "contracts",
         "crafters",
+        "creatures",
         "dismantleProcesses",
         "encounterIndices",
         "explosionDefinitions",
@@ -11127,6 +11162,22 @@
         }
       ],
       "required": []
+    },
+    "DefinitionIssue": {
+      "description": "A represented issue of one authored field in a readable loose definition.",
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ExportDiagnosticCode"
+        },
+        "field": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "field"
+      ],
+      "type": "object"
     },
     "DefinitionReference": {
       "description": "The source identity and availability of an authored Record Reference.",
@@ -20475,6 +20526,10 @@
           "value": "planetResources"
         },
         {
+          "description": "Original loose `PlanetTech` fauna definitions in the Archive.",
+          "value": "creatures"
+        },
+        {
           "description": "Reusable physical `ExplosionRecord` definitions.",
           "value": "explosionDefinitions"
         },
@@ -22524,6 +22579,48 @@
       ],
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
+    },
+    "LooseRecordCandidate": {
+      "properties": {
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "index": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "path": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "guid",
+        "index",
+        "path",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "LooseRecordLink": {
+      "description": "Resolution of an authored loose JSON reference against original Record headers.",
+      "properties": {
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/LooseRecordCandidate"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourcedValueOfLooseArchivePathState"
+        }
+      },
+      "required": [
+        "candidates",
+        "state"
+      ],
+      "type": "object"
     },
     "LootArchetype": {
       "description": "A loot archetype: a `LootArchetypeV3Record` Record under `lootgeneration/lootarchetypes`, the\nweighted kinds of item a table entry stands for.",
@@ -27406,29 +27503,6 @@
       ],
       "type": "object"
     },
-    "PaletteRecordCandidate": {
-      "properties": {
-        "guid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
-        },
-        "index": {
-          "$ref": "#/$defs/SourcedValueOfuint32"
-        },
-        "path": {
-          "$ref": "#/$defs/SourcedValueOfstring"
-        },
-        "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
-        }
-      },
-      "required": [
-        "guid",
-        "index",
-        "path",
-        "sourceType"
-      ],
-      "type": "object"
-    },
     "ParallelAction": {
       "description": "The ordered original slots of a parallel action.",
       "properties": {
@@ -27930,6 +28004,53 @@
       ],
       "type": "object"
     },
+    "PlanetCreature": {
+      "description": "Original `PlanetTech` fauna configuration from a physical loose JSON Entry.",
+      "properties": {
+        "entity": {
+          "$ref": "#/$defs/LooseRecordLink"
+        },
+        "entityClass": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "entityClassRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "guidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/DefinitionIssue"
+          },
+          "type": "array"
+        },
+        "needVerticalOffset": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "slopeTolerance": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        }
+      },
+      "required": [
+        "entity",
+        "entityClass",
+        "entityClassRaw",
+        "guid",
+        "guidRaw",
+        "identity",
+        "issues",
+        "needVerticalOffset",
+        "slopeTolerance"
+      ],
+      "type": "object"
+    },
     "PlanetPaletteReference": {
       "description": "A tint palette library path and its physical target candidates.",
       "oneOf": [
@@ -27969,7 +28090,7 @@
           "properties": {
             "candidates": {
               "items": {
-                "$ref": "#/$defs/PaletteRecordCandidate"
+                "$ref": "#/$defs/LooseRecordCandidate"
               },
               "type": "array"
             },
@@ -28004,7 +28125,7 @@
         },
         "issues": {
           "items": {
-            "$ref": "#/$defs/PlanetResourceIssue"
+            "$ref": "#/$defs/DefinitionIssue"
           },
           "type": "array"
         },
@@ -28031,21 +28152,6 @@
         "name",
         "tintPalette",
         "tintPalettePath"
-      ],
-      "type": "object"
-    },
-    "PlanetResourceIssue": {
-      "properties": {
-        "code": {
-          "$ref": "#/$defs/ExportDiagnosticCode"
-        },
-        "field": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "code",
-        "field"
       ],
       "type": "object"
     },
@@ -60227,6 +60333,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/BulletPierceability"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCatalogJsonNumber": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CatalogJsonNumber"
               }
             }
           }
