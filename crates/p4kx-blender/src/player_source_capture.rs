@@ -15,6 +15,7 @@ use crate::player_adb_declarations::AdbDeclarations;
 use crate::player_source_body::{self, Body};
 use crate::player_source_loadout::{self, Loadout};
 use crate::player_source_motion::Motion;
+use crate::player_tag_definitions::TagDefinitions;
 use crate::soc_scene_class_resources::Resources;
 use crate::soc_scene_xml::XmlDocuments;
 
@@ -99,6 +100,7 @@ pub struct PlayerSourceCapture {
     loadouts: Vec<SourcedValue<Loadout>>,
     motion: Motion,
     adb_declarations: Vec<AdbDeclarations>,
+    tag_definitions: TagDefinitions,
     source_inventory: SourceInventory,
 }
 
@@ -114,6 +116,7 @@ pub(super) struct PreparedCapture<'sink> {
     pub(super) loadouts: Vec<SourcedValue<Loadout>>,
     pub(super) motion: Motion,
     pub(super) adb_declarations: Vec<AdbDeclarations>,
+    pub(super) tag_definitions: TagDefinitions,
     pub(super) documents: XmlDocuments<'sink>,
     pub(super) source_inventory: SourceInventory,
 }
@@ -135,6 +138,7 @@ impl PlayerSourceCapture {
             loadouts: prepared.loadouts,
             motion: prepared.motion,
             adb_declarations: prepared.adb_declarations,
+            tag_definitions: prepared.tag_definitions,
             source_inventory: prepared.source_inventory,
         })
     }
@@ -182,19 +186,17 @@ pub(super) fn prepare<'sink>(
         &mut documents,
         cancel,
     )?;
-    let motion = Motion::read(
-        &Resources::new(archive, &sources, cancel),
-        &directory,
-        classes,
-        &mut documents,
-    )?;
+    let resources = Resources::new(archive, &sources, cancel);
+    let motion = Motion::read(&resources, &directory, classes, &mut documents)?;
     let adb_declarations = documents.bind_adb_declarations(&sources, cancel)?;
+    let tag_definitions = documents.bind_tag_definitions(&resources)?;
     watch.check()?;
     Ok(PreparedCapture {
         bodies,
         loadouts,
         motion,
         adb_declarations,
+        tag_definitions,
         documents,
         source_inventory: sources.freeze()?,
     })

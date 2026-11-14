@@ -356,17 +356,29 @@ fn shared_fragment_file(
         return Ok(resources.sources.value(SourceValue::Invalid, uses, true));
     }
     let mut target = None;
-    let value = resources
-        .capture_with_documents(
-            SourceValue::Present(controller_path),
-            ResourceKind::DataRelative,
-            documents,
-            |document, origin, documents| {
-                target = Some(origin.node(document.root(), SourceUseRole::Selector)?);
-                documents.bind(document, origin).map(Some)
-            },
-        )?
-        .into_bound(resources.sources, uses);
+    let capture = resources.capture_with_documents(
+        SourceValue::Present(controller_path.clone()),
+        ResourceKind::DataRelative,
+        documents,
+        |document, origin, documents| {
+            target = Some(origin.node(document.root(), SourceUseRole::Selector)?);
+            let index = documents.bind(document, origin)?;
+            if let Some(seeds) = documents.tag_definitions() {
+                seeds.observe_definition(
+                    &controller_path,
+                    index,
+                    document.root(),
+                    origin,
+                    resources.cancel,
+                )?;
+            }
+            Ok(Some(index))
+        },
+    )?;
+    if let Some(seeds) = documents.tag_definitions() {
+        seeds.retain_lookup(&controller_path, &capture);
+    }
+    let value = capture.into_bound(resources.sources, uses);
     uses.extend(target);
     Ok(value)
 }

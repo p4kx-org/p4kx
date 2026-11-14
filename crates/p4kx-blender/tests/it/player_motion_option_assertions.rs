@@ -7,17 +7,17 @@ use serde_json::Value;
 use super::TestResult;
 
 pub(super) fn entries(root_links: &str) -> [TestEntry; 3] {
-    let controller = br#"<ControllerDef><Fragments filename="Animations/Test/fragments.xml"/>
+    let controller = br#"<ControllerDef><Tags filename="Animations/test/root-tags.xml"/><Fragments filename="Animations/Test/fragments.xml"/>
         <FragmentDefs><Walk/><Walk/><Idle scopes="Body+Head"/></FragmentDefs>
         <ScopeDefs><Head/><Body/></ScopeDefs></ControllerDef>"#;
     let database = format!(
-        r#"<AnimDB FragDef="animations\test\fragments.xml"><FragmentList>
+        r#"<AnimDB FragDef="animations\test\fragments.xml" TagDef="Animations/test/root-tags.xml"><FragmentList>
         <Walk><Fragment Tags="one"/><Fragment Tags="two"/></Walk>
         <Idle><Fragment FragTags="rest"/></Idle>
         <Missing><Fragment/></Missing>
     </FragmentList>{root_links}</AnimDB>"#
     );
-    let fragment_definitions = br"<FragmentDefinition><Walk/><Idle/></FragmentDefinition>";
+    let fragment_definitions = br#"<TagDefinition version="2"><Tags><Tag name="Walk" subTagDef="Animations/test/scoped-tags.xml"/><Tag name="Idle"/></Tags></TagDefinition>"#;
     [
         TestEntry::stored("Data/Animations/test/controller.xml", controller),
         TestEntry::stored("Data/Animations/test/player.adb", database.into_bytes()),

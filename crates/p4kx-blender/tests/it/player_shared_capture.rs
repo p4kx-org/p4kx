@@ -192,10 +192,19 @@ fn a_single_shared_capture_preserves_existing_payload_and_exact_origin_ids() -> 
 }
 
 pub(super) fn same_legacy_inventory(existing: &Value, shared: &Value) -> TestResult {
-    assert_eq!(
-        existing.pointer("/sourceInventory/sources"),
-        shared.pointer("/sourceInventory/sources"),
-        "same physical source identities",
+    let existing_sources = existing
+        .pointer("/sourceInventory/sources")
+        .and_then(Value::as_array)
+        .ok_or("v1 physical sources")?;
+    let shared_sources = shared
+        .pointer("/sourceInventory/sources")
+        .and_then(Value::as_array)
+        .ok_or("shared physical sources")?;
+    assert!(
+        existing_sources
+            .iter()
+            .all(|source| shared_sources.contains(source)),
+        "same existing physical source identities"
     );
     let existing_uses = existing
         .pointer("/sourceInventory/uses")

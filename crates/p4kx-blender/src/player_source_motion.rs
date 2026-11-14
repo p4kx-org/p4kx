@@ -274,6 +274,9 @@ impl MotionInput<'_, '_, '_> {
                     return Ok(None);
                 }
                 let index = documents.bind(xml, origin)?;
+                if let Some(seeds) = documents.tag_definitions() {
+                    seeds.owner(index, root, origin)?;
+                }
                 observed = Some(Observed {
                     selector: selector.clone(),
                     data: read(xml, origin, self.resources.cancel, documents, index)?,

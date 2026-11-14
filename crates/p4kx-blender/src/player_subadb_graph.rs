@@ -192,6 +192,9 @@ impl Graph<'_, '_, '_> {
                     let mut database =
                         Database::read(document, origin, self.resources.cancel, draft)?;
                     let index = documents.bind(document, origin)?;
+                    if let Some(seeds) = documents.tag_definitions() {
+                        seeds.owner(index, document.root(), origin)?;
+                    }
                     database.retain_declarations(documents, index);
                     loaded = Some((index, database));
                     Ok(Some(index))

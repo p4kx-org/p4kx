@@ -61,6 +61,7 @@ enum XmlRead<'document, 'input> {
     },
 }
 
+#[derive(Clone)]
 pub(crate) struct ResourceCapture<T> {
     value: SourceValue<Resource<T>>,
     uses: Vec<SourceUse>,
@@ -83,6 +84,13 @@ impl<T: Clone> ResourceCapture<T> {
 }
 
 impl<T> ResourceCapture<T> {
+    pub(crate) const fn from_observation(value: Resource<T>, uses: Vec<SourceUse>) -> Self {
+        Self {
+            value: SourceValue::Present(value),
+            uses,
+        }
+    }
+
     fn bind_parts(
         sources: &SourceUses,
         value: SourceValue<Resource<T>>,

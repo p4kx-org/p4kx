@@ -59,3 +59,14 @@ name keeps its attribute position and source origin. Omitted names, empty names 
 duplicates have separate states. Document indexes refer to this capture; physical
 source identities and XML coordinates identify the original declarations. A declared
 animation name can be retained before a physical clip candidate is resolved.
+
+The shared capture's `tagDefinitions` links selected controller and ADB declarations
+to authored Tag Definitions and FragmentID Definitions. Each source keeps its ordered
+Tags sections, loose tags, groups, priorities and imports. A FragmentID's `subTagDef`
+has its own scoped link. An original document can serve both roles and is retained
+once. Links keep their own positions, source evidence and lookup dispositions, and
+`cycleBackEdges` records where a traversal encounters an active ancestor. The graph
+preserves authored topology without applying runtime tag-selection rules. See the
+[CryEngine Tag Definition](https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756816/pages/23308473)
+and [FragmentID Definition](https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756816/pages/23308474)
+format references.

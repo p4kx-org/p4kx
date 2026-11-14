@@ -9,7 +9,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::player_adb_declarations::{AdbDeclarations, Draft};
+use crate::player_tag_definitions::{Seeds, TagDefinitions};
 use crate::soc_scene::SocSceneError;
+use crate::soc_scene_class_resources::Resources;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 use crate::{PlayerDocument, PlayerDocumentRejection, PlayerDocumentSink, RejectedPlayerDocument};
 
@@ -53,6 +55,7 @@ pub(crate) struct XmlDocuments<'sink> {
     rows: Vec<XmlDocument>,
     rejected: BTreeSet<(PhysicalSourceRef, PlayerDocumentRejection)>,
     adb_declarations: BTreeMap<usize, Draft>,
+    tag_definitions: Option<Seeds>,
     sink: Option<&'sink mut dyn PlayerDocumentSink>,
 }
 
@@ -60,6 +63,7 @@ impl<'sink> XmlDocuments<'sink> {
     pub(crate) fn stream_to(sink: &'sink mut dyn PlayerDocumentSink) -> Self {
         Self {
             sink: Some(sink),
+            tag_definitions: Some(Seeds::default()),
             ..Self::default()
         }
     }
@@ -169,6 +173,20 @@ impl<'sink> XmlDocuments<'sink> {
             .into_iter()
             .map(|(index, draft)| AdbDeclarations::bind(index, draft, sources, cancel))
             .collect()
+    }
+
+    pub(crate) const fn tag_definitions(&mut self) -> Option<&mut Seeds> {
+        self.tag_definitions.as_mut()
+    }
+
+    pub(crate) fn bind_tag_definitions(
+        &mut self,
+        resources: &Resources<'_>,
+    ) -> Result<TagDefinitions, SocSceneError> {
+        self.tag_definitions.take().map_or_else(
+            || Ok(TagDefinitions::default()),
+            |seeds| seeds.finish(resources, self),
+        )
     }
 
     pub(crate) fn finish(self) -> Vec<XmlDocument> {

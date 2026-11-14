@@ -19,6 +19,9 @@ mod adb_declaration_assertions;
 #[path = "player_motion_option_assertions.rs"]
 mod motion_option_assertions;
 
+#[path = "player_tag_definition_assertions.rs"]
+mod tag_definition_assertions;
+
 #[path = "player_subadb_graph_assertions.rs"]
 mod subadb_graph_assertions;
 
