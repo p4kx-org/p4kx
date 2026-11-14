@@ -106,8 +106,8 @@ This scoped Catalog has incomplete overall export health.
 A filtered LIVE control produces 2,094 physical Starmap rows in each of the two tested
 integration builds. Their placement field states and values are identical. Each export has
 1,189 positioned rows, three missing containers and zero unreadable containers or malformed
-children. This compares the retained placement-origin build to the updated catalog on the
-same Archive. Both wrote diagnostic catalogs.
+children. This compares a retained source snapshot whose ten placement files match the
+pre-#844 integration tip with the updated catalog on the same Archive. Both wrote diagnostic catalogs.
 
 CRC-verified weather and lightning ParticleLibrary Entries are readable in both installed
 builds. The weather library has 62 elements on each Build and adds eight lexical Boolean
