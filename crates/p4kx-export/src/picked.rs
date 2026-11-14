@@ -26,9 +26,7 @@ use crate::contract::{
 };
 use crate::crafter::crafter;
 use crate::crafting_warning::CraftingWarning;
-use crate::item::item;
 use crate::item_class::ClassLine;
-use crate::loadout::carries_ports;
 use crate::loot_kinds::LootPick;
 use crate::manufacturer::Manufacturer;
 use crate::mining::{mineable_composition, mineable_element, refining_process};
@@ -50,6 +48,8 @@ pub(crate) enum Picked<'f> {
         line: ClassLine,
         ports: bool,
         components: crate::catalog_v3::catalog_item_components::ItemComponentRows<'f>,
+        definition:
+            Box<crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition<'f>>,
     },
     /// A ship and the vehicle facts its paints are derived from.
     Ship(Ship<'f>, VehicleFacts),
@@ -123,7 +123,6 @@ impl<'f> Picked<'f> {
     )]
     pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>, texts: &Texts<'f>) -> Option<Self> {
         Some(match kind {
-            Kind::Items => Self::item_entity(tree, texts),
             Kind::Crafters => return crafter(tree).map(Self::Crafter),
             Kind::MineableElements => Self::Mineable(mineable_element(tree)),
             Kind::RefiningProcesses => Self::Refining(refining_process(tree, texts)),
@@ -141,7 +140,8 @@ impl<'f> Picked<'f> {
             | Kind::LegacyLootArchetypes => {
                 return LootPick::entity(kind, tree).map(Self::Loot);
             }
-            Kind::LootPoolFilters
+            Kind::Items
+            | Kind::LootPoolFilters
             | Kind::LootSecondaryChoiceSingleLayers
             | Kind::LootSecondaryChoiceMultiLayers
             | Kind::LootThemes
@@ -230,16 +230,6 @@ impl<'f> Picked<'f> {
             | Kind::SoilTextureSets
             | Kind::ShadingClasses => return None,
         })
-    }
-
-    fn item_entity(tree: &RecordTree<'f>, texts: &Texts<'f>) -> Self {
-        let (item, line) = item(tree, texts);
-        Self::Item {
-            entity: item,
-            line,
-            ports: carries_ports(tree),
-            components: crate::catalog_v3::catalog_item_components::ItemComponentRows::default(),
-        }
     }
 
     /// Returns `self` joined with the crafting station `tree` describes when `self` is an item,

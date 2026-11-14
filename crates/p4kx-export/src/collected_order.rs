@@ -19,6 +19,9 @@ impl Collected<'_> {
         self.factions
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         sort_by_guid(&mut self.items, |entity| entity.guid);
+        crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition::order(
+            &mut self.item_definitions,
+        );
         sort_by_guid(&mut self.ships, |entity| entity.guid);
         sort_by_guid(&mut self.commodities, |entity| entity.guid);
         self.resource_groups

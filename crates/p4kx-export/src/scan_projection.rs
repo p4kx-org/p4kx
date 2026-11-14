@@ -4,6 +4,7 @@
 use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
 use super::Scan;
+use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
 use crate::catalog_v3::catalog_weapon_projectile_ammo::{self, LinkedAmmunitionReader};
 use crate::catalog_v3::loot_definition_catalog::{self, LootDefinitionKind};
@@ -59,17 +60,23 @@ impl<'f> Scan<'_, '_, 'f> {
                     .crafted(tree),
             ));
         }
-        let mut picked = Picked::entity(kind, tree, self.texts);
-        if let Some(Picked::Item {
-            entity, components, ..
-        }) = &mut picked
-        {
-            let (read, stats) = self.item_components(tree, trees, admission, ledger)?;
-            *components = read.rows;
-            entity.variant_key = item_variant::key(tree, stats.as_ref());
-            entity.stats = stats.and_then(ItemStats::into_published).map(Box::new);
+        if kind == Kind::Items {
+            let (definition, read, stats) = self.item_components(tree, trees, admission, ledger)?;
+            let (mut item, line) = crate::item::item(tree, self.texts);
+            item.variant_key = item_variant::key(tree, stats.as_ref());
+            item.stats = stats.and_then(ItemStats::into_published).map(Box::new);
+            return Ok(Some(
+                Picked::Item {
+                    entity: item,
+                    line,
+                    ports: crate::loadout::carries_ports(tree),
+                    components: read.rows,
+                    definition: Box::new(definition),
+                }
+                .crafted(tree),
+            ));
         }
-        Ok(picked.map(|picked| picked.crafted(tree)))
+        Ok(Picked::entity(kind, tree, self.texts).map(|picked| picked.crafted(tree)))
     }
 
     fn starmap(
@@ -111,7 +118,14 @@ impl<'f> Scan<'_, '_, 'f> {
         trees: &mut TreeBuilder<'f>,
         admission: &RecordObservation<'_, 'f>,
         ledger: &mut ExportLedger,
-    ) -> Result<(ItemComponentsRead<'f>, Option<ItemStats<'f>>), CatalogError> {
+    ) -> Result<
+        (
+            ItemDefinition<'f>,
+            ItemComponentsRead<'f>,
+            Option<ItemStats<'f>>,
+        ),
+        CatalogError,
+    > {
         let cancel = self.options.cancel;
         catalog_item_components::read(
             tree,
@@ -131,7 +145,7 @@ impl<'f> Scan<'_, '_, 'f> {
         tree: &RecordTree<'f>,
         trees: &mut TreeBuilder<'f>,
         admission: &RecordObservation<'_, 'f>,
-        originals: Option<&crate::catalog_read::original::OriginalFlowFields<'_, '_, 'f>>,
+        originals: &crate::catalog_read::original::OriginalFlowFields<'_, '_, 'f>,
         read: &mut ItemComponentsRead<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Option<ItemStats<'f>>, CatalogError> {
@@ -159,20 +173,19 @@ impl<'f> Scan<'_, '_, 'f> {
             || health,
             |record, _| self.ammo.dependency(record, ledger),
             |observed| {
-                let fields = originals.ok_or(ExportAccountingError::ConflictingSourceDatum)?;
                 observed_magazine = true;
                 if let Some(row) = resolution::read(
                     self.projection.original(),
                     admission.record(),
                     tree,
-                    fields,
+                    originals,
                     observed,
                     cancel,
                 )? {
                     read.rows.magazine_resolutions.push(row);
                 }
                 read.rows.projectile_ammo_selections = catalog_weapon_projectile_ammo::read(
-                    fields,
+                    originals,
                     &reader,
                     &read.rows.weapon_actions,
                     &read.rows.ammo_bindings,
@@ -182,9 +195,9 @@ impl<'f> Scan<'_, '_, 'f> {
                 Ok(())
             },
         )?;
-        if !observed_magazine && let Some(fields) = originals {
+        if !observed_magazine {
             read.rows.projectile_ammo_selections = catalog_weapon_projectile_ammo::read(
-                fields,
+                originals,
                 &reader,
                 &read.rows.weapon_actions,
                 &read.rows.ammo_bindings,

@@ -4,7 +4,7 @@
 use std::cell::RefCell;
 
 use p4kx_extraction::{
-    DecimalU64, SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value,
+    DataType, DecimalU64, SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value,
 };
 
 use crate::build::original_input::OriginalCatalogInput;
@@ -214,6 +214,13 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
                 _ => None,
             })
         })
+    }
+
+    pub(super) fn storage_type(&self, name: &str) -> Result<Option<DataType>, CatalogError> {
+        Ok(self
+            .originals
+            .field(self.owner, name)?
+            .map(|(_, fact)| fact.field().storage().data_type()))
     }
 
     pub(super) fn has_member(&self, name: &str) -> Result<bool, CatalogError> {

@@ -18,6 +18,8 @@ type TestResult = Result<(), Box<dyn Error>>;
 
 #[path = "catalog_items_completeness.rs"]
 mod completeness;
+#[path = "catalog_item_definitions.rs"]
+mod definitions;
 
 const EXPORTED_AT: Duration = Duration::from_secs(1_792_000_000);
 
@@ -73,6 +75,41 @@ fn a_manufacturer_given_by_reference_is_its_guid() -> TestResult {
 fn a_manufacturer_given_by_a_strong_or_weak_pointer_is_null() -> TestResult {
     for maker in [Maker::StrongPointer, Maker::WeakPointer] {
         let catalog = catalog_of(maker)?;
+        let rows = catalog["definitions"]["items"]["rows"]
+            .as_array()
+            .ok_or("canonical items")?;
+        let item = rows
+            .iter()
+            .find(|row| row.pointer("/className/value") == Some(&json!("POWR_ACAS_S01")))
+            .ok_or("canonical item")?;
+        let attachment = item
+            .pointer("/components/value")
+            .and_then(Value::as_array)
+            .and_then(|rows| rows.iter().find(|row| row["kind"] == "attachment"))
+            .ok_or("source attachment")?;
+        let manufacturer = attachment
+            .pointer("/value/value/manufacturer")
+            .ok_or("authored manufacturer pointer")?;
+        let raw = manufacturer
+            .pointer("/value/value/values/0")
+            .ok_or("original pointer fact")?;
+        assert_eq!(
+            manufacturer["kind"], "authored",
+            "retain the original pointer shape"
+        );
+        match maker {
+            Maker::StrongPointer => assert_eq!(
+                raw.pointer("/value/value/type"),
+                Some(&json!("struct")),
+                "retain an owned manufacturer value without inventing a Record reference",
+            ),
+            Maker::WeakPointer => assert_eq!(
+                raw.pointer("/originalError/type"),
+                Some(&json!("outsideRecord")),
+                "retain the original outside-owner fact without blocking publication",
+            ),
+            Maker::Reference => return Err("a pointer fixture is required".into()),
+        }
         for kind in ["items", "ships"] {
             let guids = manufacturer_guids(&catalog, kind);
             assert!(!guids.is_empty(), "{kind} present");

@@ -233,6 +233,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `configurations.globalJumpPointConfigurations` | Original global jump-point and tunnel-host setup by physical Record. [Jump points](catalog-jump-points.md) |
 | `configurations.blueprintTiers` | Every interpreted tier with cost relationships, normalized values and Research |
 | `projections.blueprintPresentation` | Source-backed name, category, product, default availability, dismantle and first-tier ingredient links |
+| `definitions.items` | Physical original Item definitions with exact Record headers, source component slots and game/public text references. [Item definitions](catalog-item-definitions.md) |
 | `definitions.resourceGroups`, `declarations.resourceGroupMembers`, `projections.resourceGroupParents` | Physical group definitions, every ordered authored membership and the first-selected parent with direct per-value origins ([contract](catalog-resource-groups.md)) |
 | `definitions.blueprintCategories` | Source-family availability and physical fieldless category rows with the shared eight sourced header fields in GUID order |
 | `declarations.blueprintCategoryLists` | Physical `BlueprintCategoryDatabaseRecord` owners selected at every path by the ordinary Filter, with eight sourced headers and ordered sourced category-reference slots ([contract](catalog-blueprint-category-lists.md)) |
@@ -863,6 +864,7 @@ these source facts and choices:
 
 | Dataset | Fields and source |
 | --- | --- |
+| `definitions.items` | Physical original Item definitions with exact Record headers, source component slots and game/public text references. [Item definitions](catalog-item-definitions.md) |
 | `definitions.resourceGroups` | Original physical header, declared `recordName`, className, recordPath, recordIndex and sourceType; name references from displayName, protected description references and exact thumbnail paths |
 | `declarations.resourceGroupMembers` | Each selected physical owner's original groups/resources arrays, retaining nulls, repetitions, wrong/missing targets, all parent edges and cycles in authored order |
 | `projections.resourceGroupParents` | The first selected parent with a different GUID in physical Record order; nominal child-GUID matching retains duplicate child definitions' shared choice and excludes same-GUID edges even across different physical Records |

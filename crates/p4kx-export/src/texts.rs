@@ -106,6 +106,27 @@ impl<'e> Texts<'e> {
         }
     }
 
+    pub(crate) fn legacy_item_view<'a>(&self, key: Option<&'a str>) -> LocalisedText<'a>
+    where
+        'e: 'a,
+    {
+        LocalisedText {
+            key,
+            en: key
+                .and_then(|key| {
+                    self.lookup_forms(Language::English, key)
+                        .map(|text| text.display)
+                })
+                .filter(|value| !value.is_empty()),
+            de: key
+                .and_then(|key| {
+                    self.lookup_forms(Language::German, key)
+                        .map(|text| text.display)
+                })
+                .filter(|value| !value.is_empty()),
+        }
+    }
+
     /// Returns a note for every `global.ini` that was read lossily or had lines skipped.
     pub(crate) fn notes(&self) -> &[LocalizationNote] {
         &self.notes
@@ -136,20 +157,24 @@ impl<'e> Texts<'e> {
             .languages
             .iter()
             .find(|count| count.language == language)?;
-        let text = if is_placeholder_key(key) {
-            None
-        } else {
-            self.set.text(key, language).map(|source| TextProjection {
-                source,
-                display: display_text(source),
-            })
-        };
+        let text = self.lookup_forms(language, key);
         if text.as_ref().is_some_and(|text| !text.display.is_empty()) {
             count.resolved.fetch_add(1, Ordering::Relaxed);
         } else {
             count.unresolved.fetch_add(1, Ordering::Relaxed);
         }
         text
+    }
+
+    fn lookup_forms(&self, language: Language, key: &str) -> Option<TextProjection<'e>> {
+        if is_placeholder_key(key) {
+            return None;
+        }
+        let source = self.set.text(key, language)?;
+        Some(TextProjection {
+            source,
+            display: display_text(source),
+        })
     }
 
     pub(crate) fn note_placeholder(&self) {

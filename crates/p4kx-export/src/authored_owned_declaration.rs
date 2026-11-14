@@ -202,6 +202,30 @@ impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> 
         )
     }
 
+    /// Retains one original member including stored value diagnostics.
+    pub(in crate::catalog_v3) fn authored_member_with_errors(
+        &self,
+        name: &str,
+    ) -> Result<SourcedValue<SourceArenaOutput<'source>>, CatalogError> {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
+            return self.absent();
+        };
+        let state = match fact.value() {
+            Value::Null => SourceValue::Null,
+            _ => SourceValue::Present(source_value_catalog::read_subtree(
+                self.originals,
+                fact,
+                |child| self.retain_raw_number(child),
+            )?),
+        };
+        self.bind_field(
+            fact,
+            OriginalValuePart::Value,
+            state,
+            SourceUseRole::Selector,
+        )
+    }
+
     pub(in crate::catalog_v3) fn restriction_label(
         &self,
         name: &str,

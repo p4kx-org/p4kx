@@ -31,7 +31,7 @@ pub(crate) fn is_paint(tree: &RecordTree<'_>) -> bool {
 pub(crate) fn item<'f>(tree: &RecordTree<'f>, texts: &Texts<'f>) -> (Item<'f>, ClassLine) {
     let definition = structure(component(tree, "SAttachableComponentParams"), "AttachDef");
     let localization = structure(definition, "Localization");
-    let description = texts.localised(locale_key(localization, "Description"));
+    let description = texts.legacy_item_view(locale_key(localization, "Description"));
     let line = ClassLine::read(description.en.as_deref());
     let physics = structure(
         component(tree, "SEntityPhysicsControllerParams"),
@@ -44,7 +44,7 @@ pub(crate) fn item<'f>(tree: &RecordTree<'f>, texts: &Texts<'f>) -> (Item<'f>, C
         guid: CatalogGuid(tree.guid()),
         class_name: class_name(tree),
         record_path: tree.record_path(),
-        name: texts.localised(name_key),
+        name: texts.legacy_item_view(name_key),
         description,
         r#type,
         sub_type: text(definition, "SubType"),
@@ -53,7 +53,7 @@ pub(crate) fn item<'f>(tree: &RecordTree<'f>, texts: &Texts<'f>) -> (Item<'f>, C
         mass: single(physics, "Mass"),
         manufacturer_guid: reference(definition, "Manufacturer"),
         tags: words(text(definition, "Tags")),
-        display_type: texts.localised(locale_key(
+        display_type: texts.legacy_item_view(locale_key(
             component(tree, "SCItemPurchasableParams"),
             "displayType",
         )),

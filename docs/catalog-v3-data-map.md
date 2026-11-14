@@ -84,7 +84,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | Existing root field(s) | Proposed owning contract | Preserved distinction |
 |---|---|---|
 | manufacturers | D.manufacturers | Sourced raw header/code and owned Localization states; canonical public Name/protected Description; physical target-row joins |
-| items | D.items | Entity identity, AttachDef classification/word tags, source text; component links |
+| items | D.items; C.itemAttachmentConstraints | Shared original header and physical component positions; source grade, manufacturer, mass and texts. Join authored classification and tags by owner and slot. [Item definitions](catalog-item-definitions.md) |
 | ships | D.ships; V.shipBaseFacts | Entity identity/playability/role/career; existing mass/hull/cargo/size/crew projections remain defined, raw configs separate |
 | commodities | D.commodities; V.commodityPresentation | Entity vs resource fallback, GUID identity, existing first Resource/group/name/density meaning |
 | resourceTypes | D.resourceTypes | complete resource source fact owner |

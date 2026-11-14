@@ -79,6 +79,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) location_vocabulary: LocationVocabulary<'f>,
     pub(crate) npc_spawn_definitions: NpcSpawnDefinitions<'f>,
     pub(crate) items: Vec<Item<'f>>,
+    pub(crate) item_definitions: Vec<crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition<'f>>,
     pub(crate) item_components: ItemComponentRows<'f>,
     pub(crate) entity_configurations: EntityConfigurationRows<'f>,
     pub(crate) ships: Vec<Ship<'f>>,
@@ -188,6 +189,7 @@ impl<'f> Collected<'f> {
             faction_identities: Vec::new(),
             factions: Vec::new(),
             items: Vec::new(),
+            item_definitions: Vec::new(),
             item_components: ItemComponentRows::default(),
             entity_configurations: EntityConfigurationRows::default(),
             ships: Vec::new(),
@@ -272,6 +274,7 @@ impl<'f> Collected<'f> {
                 line,
                 ports,
                 components,
+                definition,
             } => {
                 self.item_classes.count(line);
                 if ports {
@@ -283,6 +286,7 @@ impl<'f> Collected<'f> {
                 }
                 self.playability.items.count(entity.playability);
                 self.items.push(entity);
+                self.item_definitions.push(*definition);
                 self.item_components.extend(components);
             }
             Picked::Ship(entity, vehicle) => {

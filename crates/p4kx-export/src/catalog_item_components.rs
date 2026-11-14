@@ -30,8 +30,12 @@ use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
 
+#[path = "item_definition.rs"]
+pub(crate) mod item_definition;
 #[path = "catalog_weapon_magazine_resolution.rs"]
 pub(crate) mod resolution;
+
+use item_definition::ItemDefinition;
 
 use self::resolution::WeaponMagazineResolution;
 
@@ -286,20 +290,16 @@ pub(crate) fn read<'source, T>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
     project: impl FnOnce(
-        Option<&OriginalFlowFields<'_, '_, 'source>>,
+        &OriginalFlowFields<'_, '_, 'source>,
         &mut ItemComponentsRead<'source>,
     ) -> Result<T, CatalogError>,
-) -> Result<(ItemComponentsRead<'source>, T), CatalogError> {
+) -> Result<(ItemDefinition<'source>, ItemComponentsRead<'source>, T), CatalogError> {
     let mut result = ItemComponentsRead::default();
     let components = match tree.field("Components") {
         Some(Value::Array(components)) => components.as_ref(),
         _ => &[],
     };
-    let mut components = components.iter().filter_map(Component::of).peekable();
-    if components.peek().is_none() {
-        let projected = project(None, &mut result)?;
-        return Ok((result, projected));
-    }
+    let components = components.iter().filter_map(Component::of);
     let input = projection.original();
     let scope = input.record_scope(admission.record(), tree)?;
     let originals = OriginalFlowFields::read(&scope, cancel)?;
@@ -316,7 +316,15 @@ pub(crate) fn read<'source, T>(
         let observed = Observed::new(&originals, input, component, &capture, &numbers);
         result.push(kind, owner, observed)?;
     }
+    let definition = ItemDefinition::read(
+        tree,
+        &originals,
+        &capture,
+        projection,
+        &numbers,
+        &mut result.notes,
+    )?;
     result.rows.numbers = numbers.into_inner();
-    let projected = project(Some(&originals), &mut result)?;
-    Ok((result, projected))
+    let projected = project(&originals, &mut result)?;
+    Ok((definition, result, projected))
 }

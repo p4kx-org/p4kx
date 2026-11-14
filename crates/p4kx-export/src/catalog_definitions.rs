@@ -102,6 +102,8 @@ use crate::template_definition::TemplateDefinition;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogDefinitions<'source> {
+    pub(crate) items:
+        CatalogTable<super::catalog_item_components::item_definition::ItemDefinition<'source>>,
     pub(crate) blueprints: CatalogTable<crate::blueprint_definition::BlueprintDefinition<'source>>,
     pub(crate) contract_generators: CatalogTable<GeneratorDefinition<'source>>,
     pub(crate) mission_module_declarations: CatalogTable<MissionModuleDeclaration<'source>>,

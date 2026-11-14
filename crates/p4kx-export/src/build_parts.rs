@@ -4,6 +4,7 @@
 use p4kx_extraction::DataForge;
 
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::faction_identity_definition::{
     self, FactionIdentityDefinition, PreparedFactionIdentity,
 };
@@ -57,6 +58,13 @@ impl Parts {
             compressed_size,
         }
     }
+}
+
+pub(super) fn item_definitions<'source>(
+    forge: &DataForge<'_>,
+    rows: Vec<ItemDefinition<'source>>,
+) -> CatalogTable<ItemDefinition<'source>> {
+    CatalogTable::new(forge, &[crate::Kind::Items.records().type_name], rows)
 }
 
 pub(super) fn faction_identities<'source>(
