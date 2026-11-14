@@ -16,7 +16,8 @@ use crate::player_adb_declarations::AdbDeclarations;
 use crate::player_source_body::{self, Body};
 use crate::player_source_loadout::{self, Loadout};
 use crate::player_source_motion::{ControllerTopology, Motion, RigCandidate, read_rig_candidates};
-use crate::player_tag_definitions::{AdbTagUses, TagDefinitions};
+use crate::player_tag_definitions::{AdbTagUses, TagDefinitions, WeaponMotionTag};
+use crate::player_weapon_motion_sources::{self, WeaponMotionSources};
 use crate::soc_scene_class_resources::Resources;
 use crate::soc_scene_xml::XmlDocuments;
 
@@ -105,6 +106,8 @@ pub struct PlayerSourceCapture {
     pub(crate) adb_declarations: Vec<AdbDeclarations>,
     pub(crate) tag_definitions: TagDefinitions,
     pub(crate) adb_tag_uses: AdbTagUses,
+    pub(crate) weapon_motion_sources: WeaponMotionSources,
+    pub(crate) weapon_motion_tags: Vec<WeaponMotionTag>,
     pub(crate) source_inventory: SourceInventory,
 }
 
@@ -126,6 +129,8 @@ pub(super) struct PreparedCapture<'sink> {
     pub(super) documents: XmlDocuments<'sink>,
     pub(super) source_inventory: SourceInventory,
     adb_tag_uses: AdbTagUses,
+    weapon_motion_sources: WeaponMotionSources,
+    weapon_motion_tags: Vec<WeaponMotionTag>,
 }
 
 impl PlayerSourceCapture {
@@ -153,6 +158,8 @@ impl PreparedCapture<'_> {
             controller_topology: self.controller_topology,
             actor_rig_candidates: self.actor_rig_candidates,
             adb_tag_uses: self.adb_tag_uses,
+            weapon_motion_sources: self.weapon_motion_sources,
+            weapon_motion_tags: self.weapon_motion_tags,
             adb_declarations: self.adb_declarations,
             tag_definitions: self.tag_definitions,
             source_inventory: self.source_inventory,
@@ -196,15 +203,7 @@ fn prepare_observed<'sink>(
         .flatten();
     let classes = forge.as_ref().zip(data_scope.as_ref());
     observe(data.as_ref(), classes);
-    let mut bodies = Vec::with_capacity(variants.len());
-    for &variant in variants {
-        let body =
-            player_source_body::read(&paths, variant, &sources, &directory, classes, cancel)?;
-        bodies.push(CapturedBody {
-            body_variant: variant.code(),
-            body,
-        });
-    }
+    let bodies = capture_bodies(&paths, variants, &sources, &directory, classes, cancel)?;
     let loadouts = player_source_loadout::read(
         archive,
         &sources,
@@ -214,27 +213,104 @@ fn prepare_observed<'sink>(
         cancel,
     )?;
     let resources = Resources::new(archive, &sources, cancel);
-    let motion = Motion::read(&resources, &directory, classes, &mut documents)?;
-    let adb_declarations = documents.bind_adb_declarations(&sources, cancel)?;
-    let tag_definitions = documents.bind_tag_definitions(&resources)?;
-    let adb_tag_uses = AdbTagUses::read(&adb_declarations, &tag_definitions, &sources, cancel)?;
+    let original_motion = OriginalMotion::read(&resources, &directory, classes, &mut documents)?;
     let actor_rig_candidates = documents
         .is_streaming()
         .then(|| read_rig_candidates(classes, &directory, &sources, cancel))
         .transpose()?;
+    let (weapon_motion_sources, weapon_motion_tags) = weapon_motion(
+        &documents,
+        &loadouts,
+        classes,
+        &sources,
+        &original_motion.adb_tag_uses,
+        cancel,
+    )?;
     watch.check()?;
     Ok(PreparedCapture {
         bodies,
         loadouts,
-        motion,
+        motion: original_motion.motion,
         controller_topology: documents.bind_controller_topology(&sources, cancel)?,
         actor_rig_candidates,
-        adb_declarations,
-        tag_definitions,
+        adb_declarations: original_motion.adb_declarations,
+        tag_definitions: original_motion.tag_definitions,
         documents,
         source_inventory: sources.freeze()?,
-        adb_tag_uses,
+        adb_tag_uses: original_motion.adb_tag_uses,
+        weapon_motion_sources,
+        weapon_motion_tags,
     })
+}
+
+fn capture_bodies(
+    paths: &p4kx_extraction::PathIndex<'_>,
+    variants: &[BodyVariant],
+    sources: &SourceUses,
+    directory: &p4kx_extraction::SourceUse,
+    classes: crate::player_source_classes::Classes<'_, '_>,
+    cancel: &CancelToken,
+) -> Result<Vec<CapturedBody>, PlayerSourceError> {
+    variants
+        .iter()
+        .map(|&variant| {
+            Ok(CapturedBody {
+                body_variant: variant.code(),
+                body: player_source_body::read(
+                    paths, variant, sources, directory, classes, cancel,
+                )?,
+            })
+        })
+        .collect()
+}
+
+struct OriginalMotion {
+    motion: Motion,
+    adb_declarations: Vec<AdbDeclarations>,
+    tag_definitions: TagDefinitions,
+    adb_tag_uses: AdbTagUses,
+}
+
+impl OriginalMotion {
+    fn read(
+        resources: &Resources<'_>,
+        directory: &p4kx_extraction::SourceUse,
+        classes: crate::player_source_classes::Classes<'_, '_>,
+        documents: &mut XmlDocuments<'_>,
+    ) -> Result<Self, PlayerSourceError> {
+        let motion = Motion::read(resources, directory, classes, documents)?;
+        let adb_declarations =
+            documents.bind_adb_declarations(resources.sources, resources.cancel)?;
+        let tag_definitions = documents.bind_tag_definitions(resources)?;
+        let adb_tag_uses = AdbTagUses::read(
+            &adb_declarations,
+            &tag_definitions,
+            resources.sources,
+            resources.cancel,
+        )?;
+        Ok(Self {
+            motion,
+            adb_declarations,
+            tag_definitions,
+            adb_tag_uses,
+        })
+    }
+}
+
+fn weapon_motion(
+    documents: &XmlDocuments<'_>,
+    loadouts: &[SourcedValue<Loadout>],
+    classes: crate::player_source_classes::Classes<'_, '_>,
+    sources: &SourceUses,
+    adb_tag_uses: &AdbTagUses,
+    cancel: &CancelToken,
+) -> Result<(WeaponMotionSources, Vec<WeaponMotionTag>), PlayerSourceError> {
+    if !documents.is_streaming() {
+        return Ok((WeaponMotionSources::default(), Vec::new()));
+    }
+    let weapons = player_weapon_motion_sources::read(loadouts, classes, sources, cancel)?;
+    let tags = adb_tag_uses.weapon_tags(&weapons.weapons, sources, cancel)?;
+    Ok((weapons, tags))
 }
 
 fn validate_body_selection(variants: &[BodyVariant]) -> Result<(), PlayerSourceError> {

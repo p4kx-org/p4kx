@@ -49,6 +49,7 @@ pub(super) fn write(
         }
     }
     tag_rows(capture, &mut push)?;
+    weapon_rows(capture, &mut push)?;
     for value in capture.source_inventory.sources() {
         push(&Row::Source { value })?;
     }
@@ -95,6 +96,22 @@ fn rig_rows(
         for (index, value) in candidates.value().into_iter().flatten().enumerate() {
             push(&Row::ActorRigCandidate { index, value })?;
         }
+    }
+    Ok(())
+}
+
+fn weapon_rows(
+    capture: &PlayerSourceCapture,
+    push: &mut impl FnMut(&Row<'_>) -> io::Result<()>,
+) -> io::Result<()> {
+    for (index, value) in capture.weapon_motion_sources.weapons.iter().enumerate() {
+        push(&Row::WeaponMotionSource { index, value })?;
+    }
+    for value in &capture.weapon_motion_sources.loadouts {
+        push(&Row::WeaponMotionLoadout { value })?;
+    }
+    for value in &capture.weapon_motion_tags {
+        push(&Row::WeaponMotionTag { value })?;
     }
     Ok(())
 }

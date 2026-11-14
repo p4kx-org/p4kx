@@ -162,3 +162,16 @@ the selected ControllerDef, ADB and TagDef originals. The test checks stored
 order and coordinates, field-use references and original encryption. It reads
 the selected source graph without writing a bundle or running release acceptance.
 The diagnostics report structural mismatches without printing source values.
+
+`weaponMotionSource` records identify observed personal weapon AttachDef
+occurrences by physical record index, GUID and component ordinal, and preserve the authored Tags. `weaponMotionLoadout`
+references the source candidates of each original loadout item occurrence,
+including competing physical item records. `weaponMotionTag` links original weapon
+token occurrences and ADB global tag occurrences through the option's own
+TagDef scope. Each source value carries its own origin. The ADB token evidence
+addresses the original attribute, and the weapon token evidence addresses the
+original DataForge field. The scoped match basis distinguishes unique, competing and
+incomplete definitions. These shared lists retain each original occurrence
+without materializing the combinations of weapons and options. The relationships
+describe authored source candidates. Runtime selection and physical rig binding
+require separate evidence.

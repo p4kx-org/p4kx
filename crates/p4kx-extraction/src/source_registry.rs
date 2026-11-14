@@ -263,7 +263,10 @@ impl SourceRegistry {
             SourceUseRole::Payload,
             SourceEncryptionState::Unknown,
         );
-        SourcedValue::new(value, FieldOrigin::new([&used], true))
+        SourcedValue::new(
+            value,
+            FieldOrigin::new(Arc::clone(&self.identity), [&used], true),
+        )
     }
 
     pub(crate) fn metadata_value<T>(
@@ -280,6 +283,9 @@ impl SourceRegistry {
             SourceUseRole::Payload,
             encryption,
         );
-        SourcedValue::new(value, FieldOrigin::new([&used], true))
+        SourcedValue::new(
+            value,
+            FieldOrigin::new(Arc::clone(&self.identity), [&used], true),
+        )
     }
 }

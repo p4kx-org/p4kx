@@ -112,6 +112,10 @@ fn project<'forge>(
 }
 
 impl ClassRecord {
+    pub(crate) const fn record_index(&self) -> u32 {
+        self.record_index
+    }
+
     fn read(
         sources: &SourceUses,
         scope: &SourceScope,

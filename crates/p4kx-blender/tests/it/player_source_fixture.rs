@@ -135,6 +135,8 @@ pub(super) fn forge(tune: impl FnOnce(TestEntity) -> TestEntity) -> Vec<u8> {
                 "SharedWeapon",
                 "libs/foundry/records/entities/test/weapon-a",
             )
+            .attach_type("WeaponPersonal")
+            .tags("One one Two")
             .port(TestPort::new("nested").helper("WeaponAnchor", [0.0; 3], [0.0; 3]))
             .record(),
         )
@@ -144,6 +146,8 @@ pub(super) fn forge(tune: impl FnOnce(TestEntity) -> TestEntity) -> Vec<u8> {
                 "SharedWeapon",
                 "libs/foundry/records/entities/test/weapon-b",
             )
+            .attach_type("WeaponPersonal")
+            .tags("two")
             .record(),
         )
         .build()

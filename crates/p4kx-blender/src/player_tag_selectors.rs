@@ -24,6 +24,11 @@ mod subadb;
 
 pub(crate) use subadb::AdbBranchSelectors;
 
+#[path = "player_weapon_motion_tag.rs"]
+mod weapon_tag;
+
+pub(crate) use weapon_tag::WeaponMotionTag;
+
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct AdbTagUses {
@@ -81,6 +86,15 @@ struct Resolver<'a> {
 }
 
 impl AdbTagUses {
+    pub(crate) fn weapon_tags(
+        &self,
+        weapons: &[crate::player_weapon_motion_sources::Weapon],
+        sources: &SourceUses,
+        cancel: &CancelToken,
+    ) -> Result<Vec<WeaponMotionTag>, SocSceneError> {
+        weapon_tag::compare(weapons, &self.selectors, &self.scopes, sources, cancel)
+    }
+
     pub(crate) fn read(
         declarations: &[AdbDeclarations],
         definitions: &TagDefinitions,

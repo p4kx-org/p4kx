@@ -1341,6 +1341,32 @@
         }
       ]
     },
+    "LoadoutLink": {
+      "properties": {
+        "ambiguousTarget": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "declaration": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "loadout": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "weapons": {
+          "items": {
+            "$ref": "#/$defs/SourcedValueOfuint"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "loadout",
+        "declaration",
+        "ambiguousTarget",
+        "weapons"
+      ],
+      "type": "object"
+    },
     "Lookup": {
       "properties": {
         "containsEncryptedSource": {
@@ -1392,6 +1418,14 @@
         "status"
       ],
       "type": "object"
+    },
+    "MatchBasis": {
+      "enum": [
+        "unique",
+        "competing",
+        "incomplete"
+      ],
+      "type": "string"
     },
     "Member": {
       "oneOf": [
@@ -1535,6 +1569,29 @@
         "fragmentTags",
         "scopes",
         "controllerFragments"
+      ],
+      "type": "object"
+    },
+    "OptionToken": {
+      "properties": {
+        "document": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "option": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "spelling": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "document",
+        "option",
+        "ordinal",
+        "spelling"
       ],
       "type": "object"
     },
@@ -4453,6 +4510,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfMatchBasis": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MatchBasis"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfPhysicalSourceRef": {
       "allOf": [
         {
@@ -6518,6 +6705,85 @@
         "unresolved"
       ],
       "type": "string"
+    },
+    "Weapon": {
+      "properties": {
+        "component": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "itemType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "record": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "subtype": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "record",
+        "component",
+        "guid",
+        "itemType",
+        "subtype",
+        "tags"
+      ],
+      "type": "object"
+    },
+    "WeaponMotionTag": {
+      "properties": {
+        "basis": {
+          "$ref": "#/$defs/SourcedValueOfMatchBasis"
+        },
+        "optionTokens": {
+          "items": {
+            "$ref": "#/$defs/OptionToken"
+          },
+          "type": "array"
+        },
+        "scope": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "weaponTokens": {
+          "items": {
+            "$ref": "#/$defs/WeaponToken"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "scope",
+        "basis",
+        "weaponTokens",
+        "optionTokens"
+      ],
+      "type": "object"
+    },
+    "WeaponToken": {
+      "properties": {
+        "ordinal": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        },
+        "spelling": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "weapon": {
+          "$ref": "#/$defs/SourcedValueOfuint"
+        }
+      },
+      "required": [
+        "weapon",
+        "ordinal",
+        "spelling"
+      ],
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -6911,6 +7177,63 @@
       "required": [
         "type",
         "index",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "const": "weaponMotionSource",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Weapon"
+        }
+      },
+      "required": [
+        "type",
+        "index",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "weaponMotionLoadout",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/LoadoutLink"
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "weaponMotionTag",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/WeaponMotionTag"
+        }
+      },
+      "required": [
+        "type",
         "value"
       ],
       "type": "object"

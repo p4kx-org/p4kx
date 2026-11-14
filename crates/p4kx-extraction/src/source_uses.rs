@@ -10,6 +10,9 @@ use p4kx_archive::Archive;
 #[path = "source_use_batches.rs"]
 mod batches;
 
+#[path = "source_origin_union.rs"]
+mod union;
+
 #[path = "source_inventory_freeze.rs"]
 mod freeze;
 pub use self::freeze::SourceInventoryFreezeError;
@@ -206,7 +209,7 @@ impl SourceUses {
     #[must_use]
     pub fn origin(&self, uses: &[SourceUse], source_set_complete: bool) -> FieldOrigin {
         let (own, complete) = self.owned_uses(uses, source_set_complete);
-        FieldOrigin::new(own, complete)
+        FieldOrigin::new(Arc::clone(&self.identity), own, complete)
     }
 
     /// Captures a contributor set shared by values derived from the same source survey.

@@ -21,9 +21,10 @@ mod shared_tests;
 use self::refs::OriginRefs;
 
 /// Shared authoritative uses and the immediate filter index for one data value.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct FieldOrigin {
     fields: Arc<OriginFields>,
+    identity: Option<Arc<()>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Serialize, JsonSchema)]
@@ -159,9 +160,14 @@ impl OriginFacts {
 }
 
 impl FieldOrigin {
-    pub(crate) fn new<'a>(uses: impl IntoIterator<Item = &'a SourceUse>, complete: bool) -> Self {
+    pub(crate) fn new<'a>(
+        identity: Arc<()>,
+        uses: impl IntoIterator<Item = &'a SourceUse>,
+        complete: bool,
+    ) -> Self {
         let facts = OriginFacts::measure(uses, complete);
         Self {
+            identity: Some(identity),
             fields: Arc::new(OriginFields {
                 contains_encrypted_source: facts.contains_encrypted_source,
                 source_uses_refs: OriginRefs::Flat(facts.references),
@@ -186,12 +192,19 @@ impl FieldOrigin {
             _ => None,
         };
         Self {
+            identity: Some(Arc::clone(&shared.identity)),
             fields: Arc::new(OriginFields {
                 contains_encrypted_source,
                 source_uses_refs: OriginRefs::shared(&shared.source_uses_refs, local.references),
                 source_set_complete,
             }),
         }
+    }
+
+    pub(crate) fn belongs_to(&self, identity: &Arc<()>) -> bool {
+        self.identity
+            .as_ref()
+            .is_some_and(|original| Arc::ptr_eq(original, identity))
     }
 
     /// Returns true for any proved encrypted contributor, false only for a complete unencrypted set.
@@ -212,6 +225,14 @@ impl FieldOrigin {
         self.fields.source_set_complete
     }
 }
+
+impl PartialEq for FieldOrigin {
+    fn eq(&self, other: &Self) -> bool {
+        self.fields == other.fields
+    }
+}
+
+impl Eq for FieldOrigin {}
 
 impl Serialize for FieldOrigin {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
@@ -247,6 +268,7 @@ impl FieldOrigin {
             return Err("empty contributor origin has an inconsistent marker");
         }
         Ok(Self {
+            identity: None,
             fields: Arc::new(OriginFields {
                 contains_encrypted_source,
                 source_uses_refs: OriginRefs::Flat(source_uses_refs),

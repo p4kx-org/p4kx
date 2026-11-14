@@ -118,6 +118,16 @@ impl<T> SourcedValue<T> {
         }
     }
 
+    /// Projects a borrowed present value and retains its state and source evidence.
+    #[must_use]
+    pub fn map_ref<U>(&self, map: impl FnOnce(&T) -> U) -> SourcedValue<U> {
+        SourcedValue {
+            state: self.state,
+            value: self.value.as_ref().map(map),
+            origin: self.origin.clone(),
+        }
+    }
+
     /// Maps a present value through a fallible projection and retains its source state.
     ///
     /// # Errors

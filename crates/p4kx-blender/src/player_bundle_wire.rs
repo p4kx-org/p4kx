@@ -18,8 +18,9 @@ use crate::player_source_motion::{
     MotionComponentFields, MotionOptionFields, OptionRow, RigCandidate,
 };
 use crate::player_tag_definitions::{
-    AdbBranchSelectors, AdbTagSelectors, CycleEdge, Document, Edge, TagScope,
+    AdbBranchSelectors, AdbTagSelectors, CycleEdge, Document, Edge, TagScope, WeaponMotionTag,
 };
+use crate::player_weapon_motion_sources::{LoadoutLink, Weapon};
 use p4kx_extraction::{SourceValueState, SourcedValue};
 
 pub(super) const FORMAT: &str = "p4kx-player-source-bundle";
@@ -119,6 +120,16 @@ pub(crate) enum Row<'a> {
     ActorRigCandidate {
         index: usize,
         value: &'a RigCandidate,
+    },
+    WeaponMotionSource {
+        index: usize,
+        value: &'a Weapon,
+    },
+    WeaponMotionLoadout {
+        value: &'a LoadoutLink,
+    },
+    WeaponMotionTag {
+        value: &'a WeaponMotionTag,
     },
     MotionOptions {
         component: usize,

@@ -27,6 +27,9 @@ mod tag_definition_assertions;
 #[path = "player_adb_tag_selectors.rs"]
 mod adb_tag_selectors;
 
+#[path = "player_weapon_motion_links.rs"]
+mod weapon_motion_links;
+
 #[path = "player_actor_rig_candidates.rs"]
 mod actor_rig_candidates;
 
