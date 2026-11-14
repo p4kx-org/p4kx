@@ -13,6 +13,8 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
 
+#[path = "weapon_action_aim.rs"]
+mod aim;
 #[path = "weapon_action_beam.rs"]
 mod beam;
 #[path = "weapon_action_charge.rs"]
@@ -24,6 +26,7 @@ mod launcher;
 #[path = "weapon_action_sequence.rs"]
 mod sequence;
 
+use aim::AimAction;
 use beam::BeamAction;
 use charge::ChargedAction;
 use condition::{ConditionalAction, ToggleAction};
@@ -63,6 +66,7 @@ pub(crate) enum WeaponActionKind<'source> {
     Rapid(Box<RapidAction<'source>>),
     Burst(Box<BurstAction<'source>>),
     Beam(Box<BeamAction<'source>>),
+    Aim(Box<AimAction<'source>>),
     Sequence(Box<SequenceAction<'source>>),
     Parallel(Box<ParallelAction<'source>>),
     Conditional(Box<ConditionalAction<'source>>),
@@ -89,6 +93,7 @@ impl<'source> WeaponActionKind<'source> {
                 Self::Burst(Box::new(BurstAction::read(source, notes)?))
             }
             "SWeaponActionFireBeamParams" => Self::Beam(Box::new(BeamAction::read(source, notes)?)),
+            "SWeaponActionAimSimpleParams" => Self::Aim(Box::new(AimAction::read(source, notes)?)),
             "SWeaponActionSequenceParams" => {
                 Self::Sequence(Box::new(SequenceAction::read(source, pending, notes)?))
             }

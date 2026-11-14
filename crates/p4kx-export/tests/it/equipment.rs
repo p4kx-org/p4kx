@@ -15,3 +15,5 @@ mod catalog_mining_stats;
 mod catalog_quantum_interdiction;
 #[path = "catalog_scan_signature.rs"]
 mod catalog_scan_signature;
+#[path = "catalog_weapon_operating.rs"]
+mod catalog_weapon_operating;

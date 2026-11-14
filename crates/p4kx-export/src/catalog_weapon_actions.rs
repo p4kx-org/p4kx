@@ -16,8 +16,11 @@ use crate::source_fields::FieldError;
 
 #[path = "weapon_action.rs"]
 mod action;
+#[path = "weapon_operating_configuration.rs"]
+mod operating;
 
 use action::WeaponAction;
+use operating::WeaponOperatingConfiguration;
 
 const ACTION_BASE: &str = "SWeaponActionParams";
 
@@ -31,6 +34,7 @@ pub(crate) struct WeaponActions<'source> {
     fire_actions: SourcedValue<Vec<SourcedValue<u32>>>,
     aim_action: SourcedValue<u32>,
     action_nodes: Vec<WeaponAction<'source>>,
+    operating_configuration: WeaponOperatingConfiguration<'source>,
 }
 
 impl<'source> WeaponActions<'source> {
@@ -48,6 +52,7 @@ impl<'source> WeaponActions<'source> {
             fire_actions,
             aim_action,
             action_nodes,
+            operating_configuration: WeaponOperatingConfiguration::read(source, notes)?,
         })
     }
 }

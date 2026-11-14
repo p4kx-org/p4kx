@@ -440,6 +440,30 @@
       ],
       "type": "object"
     },
+    "AimAction": {
+      "description": "Stored aim modifier, geometry settings and reload UI flag of a concrete aim action.",
+      "properties": {
+        "aimGeometryTags": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        },
+        "aimModifier": {
+          "$ref": "#/$defs/SourcedValueOfWeaponModifier"
+        },
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "hasReloadModesOnUI": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "aimGeometryTags",
+        "aimModifier",
+        "authored",
+        "hasReloadModesOnUI"
+      ],
+      "type": "object"
+    },
     "AlignmentAxis": {
       "properties": {
         "label": {
@@ -97408,6 +97432,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfWeaponConnection": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/WeaponConnection"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfWeaponLauncher": {
       "allOf": [
         {
@@ -97502,6 +97656,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/WeaponLauncher"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfWeaponModifier": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/WeaponModifier"
               }
             }
           }
@@ -102440,6 +102724,22 @@
         {
           "properties": {
             "type": {
+              "const": "aim",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/AimAction"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
               "const": "sequence",
               "type": "string"
             },
@@ -102570,6 +102870,9 @@
         "fireActions": {
           "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfuint32"
         },
+        "operatingConfiguration": {
+          "$ref": "#/$defs/WeaponOperatingConfiguration"
+        },
         "ownerGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
@@ -102582,8 +102885,49 @@
         "aimAction",
         "componentOrdinal",
         "fireActions",
+        "operatingConfiguration",
         "ownerGuid",
         "ownerRecordIndex"
+      ],
+      "type": "object"
+    },
+    "WeaponConnection": {
+      "description": "Stored modifier blocks for each power and temperature operating state.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "heatStats": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        },
+        "noPowerStats": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        },
+        "overclockStats": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        },
+        "overheatLockedStats": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        },
+        "overpowerStats": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "underpowerStats": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "heatStats",
+        "noPowerStats",
+        "overclockStats",
+        "overheatLockedStats",
+        "overpowerStats",
+        "sourceType",
+        "underpowerStats"
       ],
       "type": "object"
     },
@@ -102828,6 +103172,26 @@
       ],
       "type": "object"
     },
+    "WeaponModifier": {
+      "description": "A concrete modifier and its independently authored weapon stats.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "weaponStats": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "sourceType",
+        "weaponStats"
+      ],
+      "type": "object"
+    },
     "WeaponModifierStats": {
       "description": "The tractor and salvage multipliers an attachment applies, from the `weaponStats` of its\n`EntityComponentAttachableModifierParams`.",
       "properties": {
@@ -102857,6 +103221,30 @@
       "required": [
         "salvage",
         "tractor"
+      ],
+      "type": "object"
+    },
+    "WeaponOperatingConfiguration": {
+      "description": "Authored Record links and operating modifiers of the physical weapon component.",
+      "properties": {
+        "actorProceduralRecoilConfig": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "connectionParams": {
+          "$ref": "#/$defs/SourcedValueOfWeaponConnection"
+        },
+        "proceduralAnimationRecord": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "weaponDegradationModifier": {
+          "$ref": "#/$defs/SourcedValueOfWeaponModifier"
+        }
+      },
+      "required": [
+        "actorProceduralRecoilConfig",
+        "connectionParams",
+        "proceduralAnimationRecord",
+        "weaponDegradationModifier"
       ],
       "type": "object"
     },

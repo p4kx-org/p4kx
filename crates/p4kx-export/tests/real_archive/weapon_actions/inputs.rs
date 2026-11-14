@@ -76,6 +76,11 @@ pub(super) fn action<'source>(
             count
         }
         "beam" => fields(trace, original, data, BEAM)?,
+        "aim" => {
+            fields(trace, original, data, &["hasReloadModesOnUI"])?
+                + owned_input(trace, original, data, "aimModifier")?
+                + owned_input(trace, original, data, "aimGeometryTags")?
+        }
         "charged" => fields(trace, original, data, CHARGED)? + modifier(trace, original, data)?,
         "sequence" => fields(trace, original, data, &["mode"])?,
         "authored" => authored_roots(trace, original, data)?,

@@ -149,6 +149,18 @@ declarations retain their original fields and local value links under the
 legacy `items[].stats.weapon.fireActions` list
 retains its existing flattening and precedence.
 
+The row's `operatingConfiguration` keeps the component's original
+`proceduralAnimationRecord` and `actorProceduralRecoilConfig` References.
+`connectionParams` distinguishes the no-power, underpower, overpower,
+overclock, heat and locked-overheat stat blocks. Each block keeps its
+original fields and exact numeric representations. The other connection
+members, such as ranged heat states and overheat effects, remain in
+`additionalFields` in source order. `weaponDegradationModifier` and
+the aim action's `aimModifier` expose their own `weaponStats` blocks.
+The typed aim action also retains its geometry settings and
+`hasReloadModesOnUI` flag. These fields describe stored configuration.
+The flag records UI availability for that action.
+
 A projectile launcher's `projectileType` is the stored label of the
 declared `EProjectileType` Enum. A readable different declaration is
 `unsupported`. A failed declaration or label read is `unreadable`. The ammunition

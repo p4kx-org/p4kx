@@ -121,6 +121,7 @@ fn kind(source_type: &str) -> &'static str {
         "SWeaponActionFireRapidParams" => "rapid",
         "SWeaponActionFireBurstParams" => "burst",
         "SWeaponActionFireBeamParams" => "beam",
+        "SWeaponActionAimSimpleParams" => "aim",
         "SWeaponActionSequenceParams" => "sequence",
         "SWeaponActionParallelParams" => "parallel",
         "SWeaponActionConditionParams" => "conditional",
