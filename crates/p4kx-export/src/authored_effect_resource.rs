@@ -43,6 +43,12 @@ impl AudioResource {
             audio_trigger: source.string("audioTrigger", notes)?,
         })
     }
+
+    pub(super) const fn projected_member(
+        &self,
+    ) -> (&'static str, p4kx_extraction::SourceValueState) {
+        ("audioTrigger", self.audio_trigger.state())
+    }
 }
 
 /// The authored audio RTPC identifier.

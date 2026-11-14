@@ -29,6 +29,7 @@ pub(crate) enum ConfigurationInspection {
     FlightController,
     Ifcs,
     Thruster,
+    HackableDevice,
 }
 
 /// Inspection of the canonical values relevant to one source scope.

@@ -229,6 +229,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `configurations.shieldGenerators` | Original shield generator component occurrences, typed values and provenance. [Shield generators](catalog-shield-generators.md) |
 | `configurations.explosives` | Original sensor mine triggers and explosive ordnance settings by physical Item and component position. [Explosive components](catalog-explosives.md) |
 | `configurations.hackingChips` | Original chip charge counts and ordered removable modifier declarations by physical Item and component slot. [Hacking chips](catalog-hacking-chips.md) |
+| `configurations.hackableDevices` | Original target-device timing, error checks and audio declarations by physical Entity and component slot. Hacking state links remain in `configurations.interactions`. [Hacking devices](catalog-hacking-chips.md#hackable-devices) |
 | `configurations.blueprintTiers` | Every interpreted tier with cost relationships, normalized values and Research |
 | `projections.blueprintPresentation` | Source-backed name, category, product, default availability, dismantle and first-tier ingredient links |
 | `definitions.resourceGroups`, `declarations.resourceGroupMembers`, `projections.resourceGroupParents` | Physical group definitions, every ordered authored membership and the first-selected parent with direct per-value origins ([contract](catalog-resource-groups.md)) |

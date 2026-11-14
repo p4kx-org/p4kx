@@ -14,6 +14,11 @@ use crate::CatalogError;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
+#[path = "hacking_state_modifier.rs"]
+mod hacking_state_modifier;
+
+use hacking_state_modifier::HackingStateModifier;
+
 pub(super) const SOURCE_TYPE: &str = "SInteractionStateType";
 
 /// An authored state category with ordered state and modifier slots.
@@ -85,6 +90,7 @@ impl<'source> InteractionStateType<'source> {
 #[serde(tag = "kind", rename_all = "camelCase")]
 enum InteractionStateModifier<'source> {
     CargoOccupancy(CargoOccupancyModifier<'source>),
+    Hacking(HackingStateModifier<'source>),
     Original(UnitSource<'source>),
 }
 
@@ -97,6 +103,7 @@ impl<'source> InteractionStateModifier<'source> {
             "CargoOccupancyStateModifier" => {
                 Self::CargoOccupancy(CargoOccupancyModifier::read(source, notes)?)
             }
+            "SHackableStateModifier" => Self::Hacking(HackingStateModifier::read(source, notes)?),
             _ => Self::Original(UnitSource::read(source, [])?),
         })
     }

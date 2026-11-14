@@ -32,10 +32,13 @@ use loot_generation_component::LootGenerationComponent;
 mod entity_animation_controller;
 #[path = "flight_configuration_tables.rs"]
 pub(in crate::catalog_v3) mod flight_configuration_tables;
+#[path = "hackable_configuration.rs"]
+mod hackable_configuration;
 #[path = "loot_generation_component.rs"]
 mod loot_generation_component;
 
 use flight_configuration_tables::FlightConfigurationTables;
+use hackable_configuration::HackableConfiguration;
 
 /// Independently scoped configurations with their physical owners.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -50,6 +53,7 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     mission_boards: CatalogTable<MissionBoard<'source>>,
     entity_animation_controllers: CatalogTable<EntityAnimationController<'source>>,
     loot_generation: CatalogTable<LootGenerationComponent<'source>>,
+    hackable_devices: CatalogTable<HackableConfiguration<'source>>,
     #[serde(flatten)]
     pub(crate) flight: FlightConfigurationTables<'source>,
     #[serde(flatten)]
@@ -111,6 +115,7 @@ pub(crate) fn read<'source>(
     let entity_animation_controllers =
         components.table(ANIMATION_CONTROLLERS, EntityAnimationController::read)?;
     let loot_generation = components.table(LOOT_GENERATION, LootGenerationComponent::read)?;
+    let hackable_devices = components.table(HACKABLE_DEVICES, HackableConfiguration::read)?;
     Ok(IndependentConfigurations {
         tables: IndependentConfigurationTables {
             item_recovery_economy,
@@ -121,6 +126,7 @@ pub(crate) fn read<'source>(
             mission_boards,
             entity_animation_controllers,
             loot_generation,
+            hackable_devices,
             flight,
             jump_drive_definitions,
         },
@@ -142,6 +148,10 @@ const MISSION_BOARDS: ComponentKind = ComponentKind {
 const LOOT_GENERATION: ComponentKind = ComponentKind {
     source_type: loot_generation_component::COMPONENT,
     inspection: ConfigurationInspection::LootGeneration,
+};
+const HACKABLE_DEVICES: ComponentKind = ComponentKind {
+    source_type: hackable_configuration::COMPONENT,
+    inspection: ConfigurationInspection::HackableDevice,
 };
 
 struct PhysicalComponents<'options, 'input, 'source> {

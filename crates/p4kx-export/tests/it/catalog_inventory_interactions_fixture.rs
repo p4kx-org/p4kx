@@ -5,6 +5,9 @@ use p4kx_testkit::{
     DataForgeBuilder, TestEntity, TestInstance, TestRecord, TestStruct, TestType, TestValue,
 };
 
+#[path = "hackable_device_fixture.rs"]
+mod hackable_device;
+
 pub(super) const OWNER: u128 = 0x1057_0400;
 pub(super) const PRESET: u128 = 0x1057_0401;
 pub(super) const MISSING_PRESET: u128 = 0x1057_0402;
@@ -34,13 +37,14 @@ const CONDITION_PRESET: &str = "InteractionConditionPreset";
 const FIXTURE_CONDITION: &str = "FixtureCondition";
 const AUTO_CHANGE: &str = "SStateAutoChange";
 const CARGO_MODIFIER: &str = "CargoOccupancyStateModifier";
+const HACKING_MODIFIER: &str = "SHackableStateModifier";
 const RAW_MODIFIER: &str = "FixtureStateModifier";
 
 pub(super) fn database() -> DataForgeBuilder {
     let builder = p4kx_testkit::entity_schema(DataForgeBuilder::new().version(8));
     let builder = condition_schema(interaction_schema(builder));
-    let builder =
-        modifier_schema(state_schema(builder)).instance("fixture-initial", initial_state());
+    let builder = hackable_device::schema(modifier_schema(state_schema(builder)))
+        .instance("fixture-initial", initial_state());
     builder
         .record(
             TestEntity::new(
@@ -51,6 +55,7 @@ pub(super) fn database() -> DataForgeBuilder {
             .attach_type("Misc")
             .component(interactable())
             .component(machine())
+            .component(hackable_device::component())
             .record(),
         )
         .record(TestRecord::new(
@@ -140,6 +145,22 @@ fn modifier_schema(builder: DataForgeBuilder) -> DataForgeBuilder {
             TestStruct::new(RAW_MODIFIER)
                 .parent(MODIFIER)
                 .field("fixtureModifierParameter", TestType::UInt16),
+        )
+        .structure(
+            TestStruct::new(HACKING_MODIFIER)
+                .parent(MODIFIER)
+                .field(
+                    "onHackingErrorState",
+                    TestType::WeakPointer(STATE.to_owned()),
+                )
+                .field(
+                    "onHackingResetState",
+                    TestType::WeakPointer(STATE.to_owned()),
+                )
+                .field(
+                    "onHackingSuccessState",
+                    TestType::WeakPointer(STATE.to_owned()),
+                ),
         )
         .structure(
             TestStruct::new(AUTO_CHANGE)
@@ -304,6 +325,15 @@ fn machine() -> TestValue {
                 TestValue::Struct(
                     TestInstance::new(RAW_MODIFIER)
                         .value("fixtureModifierParameter", TestValue::UInt16(41)),
+                ),
+                TestValue::Struct(
+                    TestInstance::new(HACKING_MODIFIER)
+                        .value("onHackingErrorState", TestValue::Null)
+                        .value("onHackingResetState", TestValue::pointer("fixture-initial"))
+                        .value(
+                            "onHackingSuccessState",
+                            TestValue::pointer("fixture-initial"),
+                        ),
                 ),
             ]),
         );

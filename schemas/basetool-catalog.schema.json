@@ -4683,6 +4683,9 @@
         "fuelTanks": {
           "$ref": "#/$defs/CatalogTableOfFuelTank"
         },
+        "hackableDevices": {
+          "$ref": "#/$defs/CatalogTableOfHackableConfiguration"
+        },
         "hackingChips": {
           "$ref": "#/$defs/CatalogTableOfHackingChip"
         },
@@ -4794,6 +4797,7 @@
         "flightControllers",
         "fuelIntakes",
         "fuelTanks",
+        "hackableDevices",
         "hackingChips",
         "ifcs",
         "interactions",
@@ -6149,6 +6153,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/GeologyTextureSet"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfHackableConfiguration": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/HackableConfiguration"
           },
           "type": "array"
         }
@@ -17487,6 +17510,150 @@
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
       "type": "string"
     },
+    "HackableConfiguration": {
+      "description": "The original timing, error and audio configuration of one hackable Entity component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "audioRtpcOverallProgress": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound"
+        },
+        "audioRtpcPartProgress": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound"
+        },
+        "audioRtpcRemainingDuration": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound"
+        },
+        "audioRtpcTotalDuration": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound"
+        },
+        "audioTriggerError": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound2"
+        },
+        "audioTriggerPartSuccess": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound2"
+        },
+        "audioTriggerPause": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound2"
+        },
+        "audioTriggerProgressLoopStart": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound2"
+        },
+        "audioTriggerProgressLoopStop": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound2"
+        },
+        "audioTriggerReset": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound2"
+        },
+        "audioTriggerResume": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound2"
+        },
+        "audioTriggerStart": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound2"
+        },
+        "audioTriggerSuccess": {
+          "$ref": "#/$defs/SourcedValueOfHackableSound2"
+        },
+        "baseDuration": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "baseErrorChance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "maxPauseDuration": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "numErrorChecks": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "resetAfterHackSuccess": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "updateProgressDeltaTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "audioRtpcOverallProgress",
+        "audioRtpcPartProgress",
+        "audioRtpcRemainingDuration",
+        "audioRtpcTotalDuration",
+        "audioTriggerError",
+        "audioTriggerPartSuccess",
+        "audioTriggerPause",
+        "audioTriggerProgressLoopStart",
+        "audioTriggerProgressLoopStop",
+        "audioTriggerReset",
+        "audioTriggerResume",
+        "audioTriggerStart",
+        "audioTriggerSuccess",
+        "baseDuration",
+        "baseErrorChance",
+        "componentOrdinal",
+        "maxPauseDuration",
+        "numErrorChecks",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "resetAfterHackSuccess",
+        "sourceType",
+        "updateProgressDeltaTime"
+      ],
+      "type": "object"
+    },
+    "HackableSound": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "rtpc": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "rtpc",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "HackableSound2": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "audioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "audioTrigger",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "HackingChip": {
       "description": "The original chip component on its physical Item owner.",
       "properties": {
@@ -17551,6 +17718,34 @@
         }
       ],
       "required": []
+    },
+    "HackingStateModifier": {
+      "description": "The authored interaction states selected by three hacking outcomes.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "onHackingErrorState": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "onHackingResetState": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "onHackingSuccessState": {
+          "$ref": "#/$defs/SourcedValueOfSourceWeakReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "onHackingErrorState",
+        "onHackingResetState",
+        "onHackingSuccessState",
+        "sourceType"
+      ],
+      "type": "object"
     },
     "HardpointLink": {
       "properties": {
@@ -20332,6 +20527,19 @@
           "properties": {
             "kind": {
               "const": "cargoOccupancy",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/HackingStateModifier",
+          "properties": {
+            "kind": {
+              "const": "hacking",
               "type": "string"
             }
           },
@@ -73588,6 +73796,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/Guid"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfHackableSound": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/HackableSound"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfHackableSound2": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/HackableSound2"
               }
             }
           }

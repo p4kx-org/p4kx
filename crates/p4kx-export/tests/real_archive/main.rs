@@ -52,6 +52,7 @@ mod real_archive_gear_stats;
 mod real_archive_gear_trace;
 mod real_archive_grade;
 mod real_archive_hacking_components;
+mod real_archive_hacking_device;
 mod real_archive_hauling;
 mod real_archive_insurance;
 mod real_archive_inventory_interactions;

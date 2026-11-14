@@ -25,9 +25,29 @@ ownerRecordIndex to that declaration's recordIndex to find its ordered Tag refer
 including dangling targets. This keeps Entity root tags distinct from attachable tags and
 from modifier names.
 
-The chip declaration has no direct errorChance field in the surveyed Build. An authored
-modifier with that name remains an ordered value. HackableParams.baseErrorChance and
-controller/state interactions have their own owning source.
+An authored chip modifier named `errorChance` remains an ordered value.
+The target Entity owns `HackableParams.baseErrorChance`.
+
+## Hackable devices
+
+`configurations.hackableDevices` retains every selected `HackableParams` occurrence by
+physical Record and Components slot, including Entities outside the Item selection.
+`baseDuration`, `baseErrorChance`, `maxPauseDuration` and `updateProgressDeltaTime`
+retain their exact `Single` bits and finite value. The declarations establish the
+storage type. Units, scaling and the runtime combination with chip modifiers are
+unconfirmed. `numErrorChecks` is a stored unsigned count and `resetAfterHackSuccess`
+is the original flag. Zero values remain present.
+
+The four `audioRtpc*` fields and nine `audioTrigger*` fields retain their original
+class, `rtpc` or `audioTrigger` identifier, and any additional members. Empty identifiers
+remain present. Every typed value carries its own origin and source state.
+
+`configurations.interactions` retains the `SHackableStateModifier` variant as
+`kind: "hacking"` in the original state category and array position. Its
+`onHackingErrorState`, `onHackingResetState` and `onHackingSuccessState` are weak state
+links. Join by `ownerRecordIndex` to inspect the state machine and hackable settings
+on the same Entity. This join identifies the owning Entity and cannot select an
+effective modifier or determine a hack result.
 
 ## Real Archive verification
 
@@ -37,3 +57,12 @@ With `P4KX_DATA_P4K` configured, the opt-in test
 values, declarations and DCB provenance. Set `P4KX_EXPECT_HACKING_COMPONENTS` to
 require both chip families and at least one original modifier for a positive
 acceptance run. The test prints counts only.
+
+For a target-device check, set `P4KX_HACKABLE_DEVICE_RECORD` to the exact Record path
+of a hackable Entity with a resolved hacking outcome state. With the same Archive
+configuration, run the following test. It compares the complete known `HackableParams`
+fields, the original state targets and their source coordinates.
+
+```powershell
+cargo test -p p4kx-export --test real_archive --locked hackable_device_keeps_original_target_values_and_state_links -- --ignored
+```

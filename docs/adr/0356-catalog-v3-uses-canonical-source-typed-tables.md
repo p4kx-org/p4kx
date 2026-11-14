@@ -236,3 +236,12 @@ with the same port selection evidence and a separate typed flight link list.
 The vehicle root has an empty port position. Repeated and invisible attachments
 remain separate placements. The docked vehicle boundary preserves independent
 vehicle roots. See the [flight-control contract](../catalog-flight-configurations.md).
+
+## Hacking devices and outcome states
+
+`configurations.hackingChips` owns original chip charges and modifiers.
+`configurations.hackableDevices` owns `HackableParams` timing, base error and audio
+settings at their physical Entity component slots. Hacking outcome links belong to
+their original `configurations.interactions` state category and modifier slot. The
+shared Entity Record identity connects these facts without assigning a chip to a
+target or evaluating their runtime interaction.

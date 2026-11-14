@@ -19,6 +19,11 @@ fn interaction_components_preserve_slots_states_and_original_weak_links() -> Tes
     assert_eq!(rows.len(), 2, "one row per physical interaction component");
     check_interactable(&rows[0])?;
     check_state_machine(&rows[1])?;
+    let devices = proof::rows(&catalog, "/configurations/hackableDevices/rows")?;
+    let [device] = devices else {
+        return Err("expected one physical hackable component".into());
+    };
+    check_hackable(device)?;
     jsonschema::validator_for(&p4kx_export::catalog_schema())?
         .validate(&catalog)
         .map_err(|error| format!("schema: {error}"))?;
@@ -212,8 +217,8 @@ fn check_state_machine(row: &Value) -> TestResult {
 
 fn check_modifiers(initial: &Value) -> TestResult {
     let modifiers = proof::rows(initial, "/stateModifiers/value")?;
-    let [cargo, other] = modifiers else {
-        return Err("expected two authored concrete state modifiers".into());
+    let [cargo, other, hacking] = modifiers else {
+        return Err("expected three authored concrete state modifiers".into());
     };
     let cargo = proof::at(cargo, "/value")?;
     assert_eq!(
@@ -234,6 +239,44 @@ fn check_modifiers(initial: &Value) -> TestResult {
         &json!("fixtureModifierParameter"),
         Some(true),
     )?;
+    let hacking = proof::at(hacking, "/value")?;
+    assert_eq!(hacking["kind"], "hacking", "authored hacking modifier");
+    proof::cell(hacking, "onHackingErrorState", "null")?;
+    for field in ["onHackingResetState", "onHackingSuccessState"] {
+        let cell = proof::cell(hacking, field, "present")?;
+        assert_eq!(
+            cell["containsEncryptedSource"], true,
+            "original hacking link"
+        );
+        let link = proof::at(cell, "/value")?;
+        check_owned_link(link)?;
+        assert_eq!(
+            link.pointer("/target/location/value"),
+            initial.pointer("/defaultState/value/target/location/value"),
+            "original hacking target instance for {field}"
+        );
+    }
+    Ok(())
+}
+
+fn check_hackable(row: &Value) -> TestResult {
+    owner(row, 3)?;
+    proof::present(row, "sourceType", &json!("HackableParams"), Some(true))?;
+    proof::present(row, "numErrorChecks", &json!(0), Some(true))?;
+    proof::present(row, "resetAfterHackSuccess", &json!(false), Some(true))?;
+    proof::present(
+        row,
+        "baseErrorChance",
+        &json!({"rawBits": "80000000", "finite": -0.0}),
+        Some(true),
+    )?;
+    proof::cell(row, "audioTriggerSuccess", "absent")?;
+    let trigger = proof::at(row, "/audioTriggerStart/value")?;
+    proof::present(trigger, "audioTrigger", &json!(""), Some(true))?;
+    let parameter = proof::at(row, "/audioRtpcOverallProgress/value")?;
+    proof::present(parameter, "rtpc", &json!("FixtureProgress"), Some(true))?;
+    let extra = proof::at(parameter, "/additionalFields/roots/0")?;
+    proof::present(extra, "name", &json!("fixtureTuning"), Some(true))?;
     Ok(())
 }
 

@@ -17,7 +17,8 @@ default, next-state, automatic transition, point and sequence links retain their
 target. Record targets and owned-instance targets carry their original identities and locations.
 The same target can appear in multiple independently sourced slots. Null pointers, missing members
 and stored empty arrays have distinct states. Cargo occupancy modifiers retain their authored
-vacant and occupied state links.
+vacant and occupied state links. Hacking modifiers retain the authored error, reset and success
+state links in the same order and physical state category. [Hacking devices](catalog-hacking-chips.md#hackable-devices)
 
 Polymorphic predicates, dispatchers, animated parameters and other modifiers retain their
 concrete source types and raw original members. Additional fields also preserve point
