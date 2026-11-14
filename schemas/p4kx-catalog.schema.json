@@ -4709,6 +4709,9 @@
         "clothing": {
           "$ref": "#/$defs/CatalogTableOfClothing"
         },
+        "consumables": {
+          "$ref": "#/$defs/CatalogTableOfConsumable"
+        },
         "contractTemplates": {
           "$ref": "#/$defs/CatalogTableOfTemplateProjection"
         },
@@ -4861,6 +4864,7 @@
         "ammoContainers",
         "blueprintTiers",
         "clothing",
+        "consumables",
         "contractTemplates",
         "countermeasureEmitters",
         "degradation",
@@ -4990,6 +4994,12 @@
         },
         "commodities": {
           "$ref": "#/$defs/CatalogTableOfCommodityDefinition"
+        },
+        "consumableSubtypes": {
+          "$ref": "#/$defs/CatalogTableOfConsumableSubtype"
+        },
+        "consumableTypes": {
+          "$ref": "#/$defs/CatalogTableOfConsumableType"
         },
         "contractGenerators": {
           "$ref": "#/$defs/CatalogTableOfGeneratorDefinition"
@@ -5200,6 +5210,8 @@
         "blueprints",
         "climateAssets",
         "commodities",
+        "consumableSubtypes",
+        "consumableTypes",
         "contractGenerators",
         "contractScopes",
         "contractTemplates",
@@ -5751,6 +5763,63 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/CommodityPresentation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfConsumable": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/Consumable"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfConsumableSubtype": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ConsumableSubtype"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfConsumableType": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ConsumableType"
           },
           "type": "array"
         }
@@ -10454,6 +10523,333 @@
       ],
       "type": "object"
     },
+    "Consumable": {
+      "description": "The shared physical Record and original Components slot of a configuration.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "canBeReclosed": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "canConsumeInProne": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "canSkipConsumeAnimLoop": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "consumableVolume": {
+          "$ref": "#/$defs/SourcedValueOfResourceCapacity"
+        },
+        "containerClosed": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "containerTypeTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "defaultContents": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfContents"
+        },
+        "discardWhenConsumed": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "isPropAnimated": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "isTwoHandedConsume": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "lidTypeTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "oneShotConsume": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "utensilTypeTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "canBeReclosed",
+        "canConsumeInProne",
+        "canSkipConsumeAnimLoop",
+        "componentOrdinal",
+        "consumableVolume",
+        "containerClosed",
+        "containerTypeTag",
+        "defaultContents",
+        "discardWhenConsumed",
+        "isPropAnimated",
+        "isTwoHandedConsume",
+        "lidTypeTag",
+        "oneShotConsume",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType",
+        "utensilTypeTag"
+      ],
+      "type": "object"
+    },
+    "ConsumableEffect": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "oneOf": [
+        {
+          "properties": {
+            "kind": {
+              "const": "modifyActorStatus",
+              "type": "string"
+            },
+            "statCooldownChange": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "statPointChange": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "statType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            }
+          },
+          "required": [
+            "kind",
+            "statType",
+            "statPointChange",
+            "statCooldownChange"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "healthChange": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "kind": {
+              "const": "health",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "healthChange"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "buffDurationOverride": {
+              "$ref": "#/$defs/SourcedValueOfOverride"
+            },
+            "buffType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "buffValueOverride": {
+              "$ref": "#/$defs/SourcedValueOfOverride"
+            },
+            "kind": {
+              "const": "addBuffEffect",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "buffType",
+            "buffDurationOverride",
+            "buffValueOverride"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "amount": {
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+            },
+            "consumableResourceType": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "kind": {
+              "const": "resource",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "consumableResourceType",
+            "amount"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "gasMass": {
+              "$ref": "#/$defs/SourcedValueOfGasMass"
+            },
+            "kind": {
+              "const": "gas",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "gasMass"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "kind": {
+              "const": "authored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "effectDescription": {
+          "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "x-gameText": true
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "effectDescription",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "ConsumableSubtype": {
+      "description": "Independently sourced original metadata and stable convenience values of one physical Record.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "consumableName": {
+          "$ref": "#/$defs/SourcedValueOfPublicNameRef"
+        },
+        "effectsPerMicroSCU": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfConsumableEffect"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "tintOverride": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        },
+        "typeName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "className",
+        "consumableName",
+        "effectsPerMicroSCU",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType",
+        "tintOverride",
+        "typeName"
+      ],
+      "type": "object"
+    },
+    "ConsumableType": {
+      "description": "Independently sourced original metadata and stable convenience values of one physical Record.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "subtypes": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "typeName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType",
+        "subtypes",
+        "typeName"
+      ],
+      "type": "object"
+    },
     "ContainerAmmoSlots": {
       "description": "The two ordered source roles owned by one container.",
       "properties": {
@@ -10559,6 +10955,30 @@
       "required": [
         "childNodeIndices",
         "rootEntryIndex"
+      ],
+      "type": "object"
+    },
+    "Contents": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "consumableSubtype": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "ratio": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "consumableSubtype",
+        "ratio",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -17007,6 +17427,30 @@
       "type": "object"
     },
     "GasMass": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "gas": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "mass": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "gas",
+        "mass",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "GasMass2": {
       "description": "One authored death-gas slot, its stored mass and original gas link.",
       "properties": {
         "gas": {
@@ -31352,6 +31796,26 @@
         "additionalFields",
         "itemSubType",
         "itemType",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "Override": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "amount": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "amount",
         "sourceType"
       ],
       "type": "object"
@@ -49554,6 +50018,272 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfConsumableEffect": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfConsumableEffect"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfContents": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfContents"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfContractLocationTagTerm": {
       "allOf": [
         {
@@ -50978,7 +51708,7 @@
             "properties": {
               "value": {
                 "items": {
-                  "$ref": "#/$defs/SourcedValueOfGasMass"
+                  "$ref": "#/$defs/SourcedValueOfGasMass2"
                 },
                 "type": "array"
               }
@@ -68612,6 +69342,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfConsumableEffect": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ConsumableEffect"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfContainerInstanceKey": {
       "allOf": [
         {
@@ -68706,6 +69566,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ContainerInstanceKey"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfContents": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/Contents"
               }
             }
           }
@@ -74816,6 +75806,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/GasMass"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGasMass2": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GasMass2"
               }
             }
           }
@@ -94259,6 +95379,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/OutfitHangerPortType"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfOverride": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/Override"
               }
             }
           }

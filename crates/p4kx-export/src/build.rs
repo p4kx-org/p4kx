@@ -231,6 +231,7 @@ fn assemble<R>(
             weapon_action_recoil_definitions: independent.weapon_action_recoil_definitions,
             weapon_procedural: independent.weapon_procedural,
             damage_resistance_macros: independent.damage_resistance_macros,
+            consumables: independent.consumable_definitions,
             reputation_contexts: reputation_tables.contexts,
             faction_reputations: reputation_tables.factions.definitions,
             reputation_scopes: reputation_tables.scopes,

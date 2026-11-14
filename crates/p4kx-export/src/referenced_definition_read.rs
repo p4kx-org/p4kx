@@ -64,7 +64,12 @@ pub(super) fn read<'source, Row>(
     input: &OriginalCatalogInput<'_, 'source>,
     selection: &Selection<'_>,
     cancel: Option<&CancelToken>,
-    project: Projection<'source, Row>,
+    project: impl Fn(
+        &'source str,
+        CanonicalRecordHeader<'source>,
+        Observed<'_, '_, '_, 'source>,
+        &mut Vec<FieldError>,
+    ) -> Result<Row, CatalogError>,
 ) -> Result<Definitions<'source, Row>, CatalogError> {
     input.check_forge(forge)?;
     let mut result = Definitions {
@@ -106,7 +111,7 @@ pub(super) fn read<'source, Row>(
                     &admission,
                     selection.inspection,
                     cancel,
-                    project,
+                    &project,
                 )?;
                 result.rows.push((source_type, emitted.row));
                 result.numbers.extend(emitted.numbers);
@@ -150,7 +155,12 @@ fn read_row<'source, Row>(
     admission: &RecordObservation<'_, 'source>,
     inspection: ConfigurationInspection,
     cancel: Option<&CancelToken>,
-    project: Projection<'source, Row>,
+    project: impl Fn(
+        &'source str,
+        CanonicalRecordHeader<'source>,
+        Observed<'_, '_, '_, 'source>,
+        &mut Vec<FieldError>,
+    ) -> Result<Row, CatalogError>,
 ) -> Result<RowRead<Row>, CatalogError> {
     let scope = input.record_scope(admission.record(), tree)?;
     let originals = OriginalFlowFields::read(&scope, cancel)?;

@@ -33,6 +33,7 @@ mod canonical_header_origin;
 mod catalog_broker_entries;
 mod catalog_commodity;
 mod catalog_compression;
+mod catalog_consumables;
 mod catalog_contract_completion_tag_results;
 mod catalog_contract_property_values;
 mod catalog_contract_template_parts;

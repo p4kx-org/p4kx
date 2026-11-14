@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use serde_json::Value;
 
-const GAME_TEXT: [&str; 28] = [
+const GAME_TEXT: [&str; 29] = [
     "description",
     "displayDescription",
     "gameTexts",
@@ -36,6 +36,7 @@ const GAME_TEXT: [&str; 28] = [
     "objectiveLongDescription",
     "objectiveShortDescription",
     "causeOfDeath",
+    "effectDescription",
 ];
 
 struct Property<'schema> {
@@ -107,7 +108,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 100,
+        marked, 101,
         "every protected field in the canonical schema is accounted for"
     );
 }
@@ -151,7 +152,8 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
         | ("RawPlanetAssetMember", "name" | "token")
         | ("IfcsAeroSurface", "name" | "detachParentPartName" | "transformParentPartName")
         | ("ProjectedMissionText", "key" | "translations" | "itemTokens") => true,
-        ("SharedInteraction", "displayType") => false,
+        ("SharedInteraction", "displayType")
+        | ("ConsumableType" | "ConsumableSubtype", "typeName") => false,
         ("BlackboardPropertyBody", "value") => {
             field.get("$ref").and_then(Value::as_str) == Some("#/$defs/SourcedValueOfGameTextRef")
         }

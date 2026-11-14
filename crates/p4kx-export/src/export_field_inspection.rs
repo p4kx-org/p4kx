@@ -36,6 +36,8 @@ pub(crate) enum ConfigurationInspection {
     Clothing,
     ItemRadar,
     DamageResistanceMacro,
+    ConsumableComponent,
+    ConsumableDefinition,
 }
 
 /// Inspection of the canonical values relevant to one source scope.

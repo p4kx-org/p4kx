@@ -16,6 +16,7 @@ use super::catalog_resource_network_configuration::ResourceNetworkConfiguration;
 use super::catalog_resource_network_read::{self, GameModeRead};
 use super::catalog_weapon_actions::RECOIL_DEFINITION;
 use super::jump_drive_definitions::{self, JumpDriveDefinitions};
+use super::referenced_definition_read::Definitions;
 use super::weapon_action_recoil_definitions::{self, WeaponActionRecoilDefinition};
 use super::weapon_procedural_definitions::{self, WeaponProceduralTables};
 use crate::catalog_number_capture::CapturedNumber;
@@ -30,6 +31,8 @@ use crate::{CatalogError, CatalogOptions};
 use entity_animation_controller::EntityAnimationController;
 use loot_generation_component::LootGenerationComponent;
 
+#[path = "consumable_tables.rs"]
+mod consumables;
 #[path = "catalog_entity_animation_controller.rs"]
 mod entity_animation_controller;
 #[path = "flight_configuration_tables.rs"]
@@ -44,6 +47,8 @@ mod jump_point_globals;
 mod loot_generation_component;
 #[path = "worn_gear_tables.rs"]
 mod worn_gear;
+pub(crate) use consumables::ConsumableDefinitions;
+use consumables::{ConsumableConfigurations, ConsumableTables};
 
 use flight_configuration_tables::FlightConfigurationTables;
 use hackable_configuration::HackableConfiguration;
@@ -74,6 +79,8 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     global_jump_point_configurations: CatalogTable<GlobalJumpConfiguration<'source>>,
     #[serde(flatten)]
     worn_gear: WornGearTables<'source>,
+    #[serde(flatten)]
+    consumables: ConsumableConfigurations<'source>,
 }
 
 pub(crate) struct IndependentConfigurations<'source> {
@@ -82,6 +89,7 @@ pub(crate) struct IndependentConfigurations<'source> {
         CatalogTable<WeaponActionRecoilDefinition<'source>>,
     pub(crate) weapon_procedural: WeaponProceduralTables<'source>,
     pub(crate) damage_resistance_macros: CatalogTable<DamageResistanceMacro<'source>>,
+    pub(crate) consumable_definitions: ConsumableDefinitions<'source>,
     pub(crate) recovery_numbers: Vec<CapturedNumber>,
     pub(crate) configuration_numbers: Vec<CapturedNumber>,
 }
@@ -125,6 +133,7 @@ pub(crate) fn read<'source>(
     let jump_points = components.jump_points(jump_owners)?;
     let worn_gear = WornGearTables::read(&mut components)?;
     let damage_resistance_macros = worn_gear.resistance_macros(&mut components)?;
+    let consumables = ConsumableTables::read(&mut components)?;
     Ok(IndependentConfigurations {
         tables: IndependentConfigurationTables {
             item_recovery_economy,
@@ -141,9 +150,11 @@ pub(crate) fn read<'source>(
             jump_point_configurations: jump_points.local,
             global_jump_point_configurations: jump_points.global,
             worn_gear,
+            consumables: consumables.configurations,
         },
         weapon_action_recoil_definitions,
         damage_resistance_macros,
+        consumable_definitions: consumables.definitions,
         weapon_procedural,
         recovery_numbers,
         configuration_numbers,
@@ -219,6 +230,12 @@ struct PhysicalComponents<'options, 'input, 'source> {
 }
 
 impl<'source> PhysicalComponents<'_, '_, 'source> {
+    fn keep_definitions<Row>(&mut self, definitions: Definitions<'source, Row>) -> Vec<Row> {
+        self.numbers.extend(definitions.numbers);
+        self.collected.ledger.merge(definitions.ledger);
+        self.collected.add_failures(definitions.failures);
+        definitions.rows.into_iter().map(|(_, row)| row).collect()
+    }
     fn jump_points(
         &mut self,
         owners: &HashSet<u32>,

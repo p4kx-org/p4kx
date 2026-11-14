@@ -221,6 +221,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `configurations.quantumInterdiction` | Original jammer, pulse and visual graph configuration per physical component. [Quantum interdiction](catalog-quantum-interdiction.md) |
 | `configurations.quantumDrives` | Original quantum drive components with independent standard, spline, thermal and boost values. [Quantum drives](catalog-quantum-drives.md) |
 | `configurations.lootGeneration` | Original Entity loot components, ordered constraints, theme references and secondary-choice wrappers. [Loot source](catalog-loot-source.md) |
+| `configurations.consumables`, `definitions.consumableTypes`, `definitions.consumableSubtypes` | Original composition, units, flags, subtype links and ordered effects by physical source. [Consumables](catalog-consumables.md) |
 | `configurations.suitArmor`, `configurations.clothing`, `configurations.itemRadars`, `definitions.damageResistanceMacros` | Original worn gear and item radar by physical owner. Shared resistance definitions retain their original Reference targets. [Worn gear and item radar](catalog-worn-gear.md) |
 | `configurations.shieldGenerators` | Original shield generator component occurrences, typed values and provenance. [Shield generators](catalog-shield-generators.md) |
 | `configurations.explosives` | Original sensor mine triggers, explosive ordnance, triggerable devices and priming by physical Item and component position. [Explosive components](catalog-explosives.md) |

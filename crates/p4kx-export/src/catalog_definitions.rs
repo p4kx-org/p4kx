@@ -9,7 +9,9 @@ use crate::broker_definition::BrokerDefinition;
 use crate::build_derived::particle_library::ParticleLibraryTable;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition::AmmoDefinition;
-use crate::catalog_v3::catalog_independent_configurations::DamageResistanceMacro;
+use crate::catalog_v3::catalog_independent_configurations::{
+    ConsumableDefinitions, DamageResistanceMacro,
+};
 use crate::catalog_v3::explosion_definition::ExplosionDefinition;
 use crate::catalog_v3::faction_definition::FactionDefinition;
 use crate::catalog_v3::faction_identity_definition::FactionIdentityDefinition;
@@ -131,6 +133,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     #[serde(flatten)]
     pub(crate) weapon_procedural: WeaponProceduralTables<'source>,
     pub(crate) damage_resistance_macros: CatalogTable<DamageResistanceMacro<'source>>,
+    #[serde(flatten)]
+    pub(crate) consumables: ConsumableDefinitions<'source>,
     pub(crate) reputation_contexts: CatalogTable<ContextDefinition<'source>>,
     pub(crate) reputation_scopes: CatalogTable<ScopeDefinition<'source>>,
     pub(crate) reputation_standings: CatalogTable<StandingDefinition<'source>>,
