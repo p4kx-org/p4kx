@@ -18,7 +18,7 @@ pub(crate) struct MeasuredSource {
     pub(crate) dataset: SourceDataset,
     pub(crate) entries: BTreeMap<String, usize>,
     records: BTreeSet<Guid>,
-    universe: BTreeSet<LogicalKey>,
+    universe_len: usize,
 }
 
 fn build(archive: &Archive) -> Result<BuildIdentity> {
@@ -56,29 +56,19 @@ pub(crate) fn measure(archive: &Archive, tool: Tool) -> Result<MeasuredSource> {
         dataset,
         entries,
         records: BTreeSet::new(),
-        universe: BTreeSet::new(),
+        universe_len: 0,
     };
     if tool == Tool::Starbreaker {
         let records = super::reference_records::measure(archive)?;
         source.dataset.dcb = Some(records.dcb);
         source.records = records.guids;
-        source.universe = records.universe;
+        source.universe_len = source.records.len();
     } else {
-        source.universe = source
+        source.universe_len = source
             .entries
             .keys()
-            .filter(|path| {
-                tool == Tool::Unp4k
-                    || std::path::Path::new(path)
-                        .extension()
-                        .is_some_and(|extension| {
-                            extension.eq_ignore_ascii_case("cdf")
-                                || extension.eq_ignore_ascii_case("chrparams")
-                        })
-            })
-            .cloned()
-            .map(LogicalKey::Entry)
-            .collect();
+            .filter(|path| supports_entry(tool, path))
+            .count();
     }
     watch
         .check()
@@ -102,11 +92,12 @@ impl MeasuredSource {
                 "main-only is a Record selection mode",
             ));
         }
-        let mut selected = BTreeSet::new();
         for expected in &manifest.expected {
             let key = reference_identity::key(&expected.identity)?;
             match &key {
-                LogicalKey::Entry(path) if self.entries.contains_key(path) => {}
+                LogicalKey::Entry(path)
+                    if supports_entry(manifest.producer.tool, path)
+                        && self.entries.contains_key(path) => {}
                 LogicalKey::Record { guid, dcb }
                     if self.records.contains(guid)
                         && self.dataset.dcb.as_ref().is_some_and(|source| {
@@ -119,9 +110,11 @@ impl MeasuredSource {
                     ));
                 }
             }
-            selected.insert(key);
         }
-        if manifest.selection.mode == SelectionMode::All && selected != self.universe {
+        // Layout validation requires the declared source identities to be unique.
+        if manifest.selection.mode == SelectionMode::All
+            && manifest.expected.len() != self.universe_len
+        {
             return Err(ReferenceError::new(
                 Code::Coverage,
                 "all-source selection omits or invents source identities",
@@ -165,7 +158,17 @@ impl MeasuredSource {
         Ok(())
     }
 
-    pub(crate) fn universe_len(&self) -> usize {
-        self.universe.len()
+    pub(crate) const fn universe_len(&self) -> usize {
+        self.universe_len
+    }
+}
+
+fn supports_entry(tool: Tool, path: &str) -> bool {
+    match tool {
+        Tool::Unp4k => true,
+        Tool::Unforge => std::path::Path::new(path)
+            .extension()
+            .is_some_and(|extension| matches!(extension.to_str(), Some("cdf" | "chrparams"))),
+        Tool::Starbreaker => false,
     }
 }

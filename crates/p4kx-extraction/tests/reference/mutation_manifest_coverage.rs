@@ -227,3 +227,19 @@ fn a_preexisting_payload_cannot_be_post_hoc_certified_as_preconversion_selection
     );
     Ok(())
 }
+
+#[test]
+fn sampled_unforge_rejects_non_xml_source_members() -> TestResult {
+    let fixture = Fixture::new(vec![TestEntry::stored("Data/model.bin", b"<model/>")])?;
+    let plan = Fixture::plan(
+        Tool::Unforge,
+        vec![selected("Data/model.bin", "cdf/model.xml")],
+        selection(SelectionMode::Sampled),
+        &["cdf/model.xml"],
+    );
+    let error = reference_prepare::begin(&fixture.archive, &fixture.root, plan, &fixture.binary)
+        .err()
+        .ok_or("an unsupported sampled source was accepted")?;
+    assert_eq!(error.code, Code::Identity);
+    Ok(())
+}

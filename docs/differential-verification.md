@@ -43,6 +43,9 @@ The verifier locally recomputes SHA-256 of the current Archive, its canonical En
 for Record references, the decoded preferred DCB. Channel and all Build identifiers must also match.
 A digest stored in JSON alone is not considered verified. The Archive watch rejects observed
 source changes. Hashing a large Archive is deliberate and can dominate a bounded comparison run.
+The complete Archive directory is fingerprinted in normalized path order with streamed
+serialization. The manifest's logical source count limits only the declared comparison, so an
+Archive with a larger directory can still be the source of a bounded comparison.
 
 Expected logical identities and output locations are frozen **before conversion**. They are Entry
 paths or canonical Record GUIDs plus DCB identity, not surviving filenames. All selected identities
