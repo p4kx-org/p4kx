@@ -139,18 +139,24 @@ impl PlayerSourceCapture {
         cancel: &CancelToken,
         sink: &mut dyn PlayerDocumentSink,
     ) -> Result<Self, PlayerSourceError> {
-        let prepared = prepare(archive, variants, cancel, XmlDocuments::stream_to(sink))?;
-        Ok(Self {
-            bodies: prepared.bodies,
-            loadouts: prepared.loadouts,
-            motion: prepared.motion,
-            controller_topology: prepared.controller_topology,
-            actor_rig_candidates: prepared.actor_rig_candidates,
-            adb_tag_uses: prepared.adb_tag_uses,
-            adb_declarations: prepared.adb_declarations,
-            tag_definitions: prepared.tag_definitions,
-            source_inventory: prepared.source_inventory,
-        })
+        prepare(archive, variants, cancel, XmlDocuments::stream_to(sink))
+            .map(PreparedCapture::into_capture)
+    }
+}
+
+impl PreparedCapture<'_> {
+    fn into_capture(self) -> PlayerSourceCapture {
+        PlayerSourceCapture {
+            bodies: self.bodies,
+            loadouts: self.loadouts,
+            motion: self.motion,
+            controller_topology: self.controller_topology,
+            actor_rig_candidates: self.actor_rig_candidates,
+            adb_tag_uses: self.adb_tag_uses,
+            adb_declarations: self.adb_declarations,
+            tag_definitions: self.tag_definitions,
+            source_inventory: self.source_inventory,
+        }
     }
 }
 
@@ -158,7 +164,17 @@ pub(super) fn prepare<'sink>(
     archive: &Archive,
     variants: &[BodyVariant],
     cancel: &CancelToken,
+    documents: XmlDocuments<'sink>,
+) -> Result<PreparedCapture<'sink>, PlayerSourceError> {
+    prepare_observed(archive, variants, cancel, documents, |_, _| {})
+}
+
+fn prepare_observed<'sink>(
+    archive: &Archive,
+    variants: &[BodyVariant],
+    cancel: &CancelToken,
     mut documents: XmlDocuments<'sink>,
+    observe: impl FnOnce(Option<&DataForgeEntry>, crate::player_source_classes::Classes<'_, '_>),
 ) -> Result<PreparedCapture<'sink>, PlayerSourceError> {
     validate_body_selection(variants)?;
     let watch = ArchiveWatch::new(archive);
@@ -179,6 +195,7 @@ pub(super) fn prepare<'sink>(
         .transpose()?
         .flatten();
     let classes = forge.as_ref().zip(data_scope.as_ref());
+    observe(data.as_ref(), classes);
     let mut bodies = Vec::with_capacity(variants.len());
     for &variant in variants {
         let body =
@@ -249,3 +266,7 @@ fn scope(
 #[cfg(test)]
 #[path = "player_adb_installed_witness.rs"]
 mod installed_witness;
+
+#[cfg(test)]
+#[path = "player_bundle_installed_witness.rs"]
+mod bundle_witness;

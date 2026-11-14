@@ -147,3 +147,18 @@ model path with source receipts. Original tag hints and exact matches for the
 standard body skeleton paths are separate values, so contradictory hints and
 repeated paths remain visible. These candidates do not establish which rig is
 assigned to any controller context.
+
+### Installed source verification
+
+With `P4KX_DATA_P4K` set to the installed archive and the usual archive key
+configured, run the focused witness locally.
+
+```text
+cargo test --locked -p p4kx-blender --lib installed_player_bundle_matches_selected_original_sources -- --ignored
+```
+
+It compares one two-body capture against the accepted actor DataForge entry and
+the selected ControllerDef, ADB and TagDef originals. The test checks stored
+order and coordinates, field-use references and original encryption. It reads
+the selected source graph without writing a bundle or running release acceptance.
+The diagnostics report structural mismatches without printing source values.
