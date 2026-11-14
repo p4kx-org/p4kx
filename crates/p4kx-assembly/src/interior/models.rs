@@ -133,9 +133,10 @@ impl Fill<'_> {
                     .as_ref()
                     .and_then(|key| self.libraries.get(key))
                     .map_or_else(|| Arc::clone(&self.unnamed), Arc::clone);
-                let (palette, palette_issues) = self
-                    .palettes
-                    .of_named(placement.palette.as_ref(), part.materials());
+                let (palette, palette_issues) = self.palettes.of_named_observed(
+                    placement.palette.as_ref(),
+                    (&part.materials.status, part.materials.origins.library()),
+                );
                 part.palette = palette;
                 for kind in palette_issues {
                     self.note(container, &name, kind);

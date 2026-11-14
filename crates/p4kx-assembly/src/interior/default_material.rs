@@ -87,7 +87,7 @@ impl Interior {
                 let scene_part = ScenePart::new(model, part.materials());
                 let mut scene_part =
                     fallback.map_or(scene_part, |material| scene_part.with_fallback(material));
-                if let Some(palette) = &part.palette {
+                if let Some(palette) = part.palette() {
                     scene_part = scene_part.with_palette(palette);
                 }
                 node = node.with_part(scene_part);

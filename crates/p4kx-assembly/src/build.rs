@@ -96,14 +96,14 @@ impl Assembly {
         let shared = (&libraries, &unnamed);
         let mut reported = HashSet::new();
         let mut characters = HashSet::new();
-        let mut palettes = Palettes::new(palettes);
+        let mut palettes = Palettes::new(palettes).with_geometry_origin(tree.forge_origin.as_ref());
         let cut = BodyCut::of(tree, &drafts, &chosen, &mut issues);
         let mut parts: Vec<Part> = Vec::with_capacity(drafts.len());
         for (index, (draft, model)) in drafts.iter().zip(&chosen).enumerate() {
             let library = materials_of(draft, *model, shared, &mut reported, &mut issues);
             note_character(draft, *model, &mut characters, &mut issues);
             let attachments = attached(draft, *model, shared, &mut reported, &mut issues);
-            let (palette, unresolved) = palettes.of_part(draft, *model, &library.materials.status);
+            let (palette, unresolved) = palettes.of_part(index, draft, *model, &library.materials);
             issues.extend(unresolved.into_iter().map(|kind| issue(draft, kind)));
             let rig = under_skin(draft, &parts)
                 .then(|| creature_rig::anchor_skeleton(&parts, &issues, options.lod))

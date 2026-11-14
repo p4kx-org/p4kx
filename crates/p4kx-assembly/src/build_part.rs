@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::Arc;
-
-use p4kx_model::{TintPalette, Transform};
+use p4kx_model::Transform;
 
 use super::{Library, RenderedGeometry};
 use crate::build_place::PlacedPart;
 use crate::flatten::Draft;
+use crate::palette::ChosenPalette;
 use crate::{AttachedModel, Part};
 
 pub(super) fn build_part(
@@ -16,7 +15,7 @@ pub(super) fn build_part(
     world: Transform,
     geometry: RenderedGeometry,
     (materials, from_model): (Library, bool),
-    palette: Option<Arc<TintPalette>>,
+    palette: Option<ChosenPalette>,
     attachments: Vec<AttachedModel>,
 ) -> Part {
     Part {

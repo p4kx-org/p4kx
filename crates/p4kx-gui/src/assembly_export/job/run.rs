@@ -7,8 +7,8 @@ use p4kx_assembly::{
     LoadoutChanges,
 };
 use p4kx_extraction::{
-    Archive, ArchiveWriteProtection, CancelToken, ConversionError, DataForge, GlbSummary,
-    GltfError, Guid, PathIndex, write_replacing_protected,
+    Archive, ArchiveWriteProtection, CancelToken, ConversionError, DataForge, DataForgeEntry,
+    GlbSummary, GltfError, Guid, PathIndex, write_replacing_protected,
 };
 
 use super::stop::{Observed, Stoppable, StoppableTextures};
@@ -146,12 +146,17 @@ fn assembled(
             return Err(Ended::Failed(ModelExportFailure::Failed(describe(&error))));
         }
     };
-    let assembly = hull(index, (&forge, tree), lod, (cancel, archive_models))?;
+    let assembly = hull(
+        index,
+        (&forge, &source.entry, tree),
+        lod,
+        (cancel, archive_models),
+    )?;
     if !interior {
         return Ok(assembly);
     }
     shared.enter(AssemblyExportStage::Interior);
-    let classes = InteriorForge::new(&forge);
+    let classes = InteriorForge::new(&forge).with_entry(&source.entry);
     let built = interior_of(index, (&assembly, tree), (lod, &classes), (cancel, shared))?;
     Ok(assembly.with_interior(built))
 }
@@ -195,11 +200,11 @@ fn write_glb(
 /// Reads the models of the parts of `tree` and places them.
 fn hull(
     index: &EntryIndex,
-    (forge, tree): (&DataForge<'_>, &EntityNode),
+    (forge, entry, tree): (&DataForge<'_>, &DataForgeEntry, &EntityNode),
     lod: u32,
     (cancel, archive_models): (&CancelToken, &ArchiveModels<'_>),
 ) -> Result<Assembly, Ended> {
-    let palettes = ForgePalettes::new(forge);
+    let palettes = ForgePalettes::new(forge).with_entry(entry);
     let models = Stoppable {
         models: archive_models,
         cancel,
@@ -242,7 +247,7 @@ fn with_classes<T>(
     let Ok(forge) = source.entry.open() else {
         return Ok(build(None));
     };
-    let classes = InteriorForge::new(&forge);
+    let classes = InteriorForge::new(&forge).with_entry(&source.entry);
     Ok(build(Some(&classes)))
 }
 

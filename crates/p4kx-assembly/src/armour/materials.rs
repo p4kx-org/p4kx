@@ -111,7 +111,7 @@ fn painted(
     else {
         return (materials, None);
     };
-    let (palette, unresolved) = tints.of_named_observed(job.palette.as_ref(), &materials);
+    let (palette, unresolved) = tints.of_named_observed(job.palette.as_ref(), (&materials, None));
     issues.extend(unresolved.into_iter().map(|kind| issue(job, kind)));
     let Some(palette) = palette else {
         return (materials, None);
@@ -125,7 +125,7 @@ fn painted(
         }
     }
     let applied = (!slots.is_empty()).then_some(PaletteApplication {
-        records: palette.records,
+        records: palette.source.records(),
         slots,
     });
     (Arc::new(MaterialStatus::Loaded(library)), applied)

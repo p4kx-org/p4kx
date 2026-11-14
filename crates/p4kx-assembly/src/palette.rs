@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_dataforge::{DataForge, Guid, Record, StructValue};
+use p4kx_extraction::{DataForgeEntry, DataForgeOrigin};
 use p4kx_model::{TintEntry, TintPalette, srgb8_to_linear};
 use thiserror::Error;
 
@@ -10,7 +11,10 @@ use crate::read::{as_struct, struct_field, text, unsigned};
 #[path = "palette_source.rs"]
 mod source;
 
-pub use source::{PaletteRead, PaletteRecordSelection, PaletteRecords};
+pub(crate) use source::ChosenPalette;
+pub use source::{
+    PaletteRead, PaletteRecordSelection, PaletteRecords, PaletteSelection, PaletteSource,
+};
 
 const TINT_PALETTE_TREE: &str = "TintPaletteTree";
 /// The fields of the palette root that hold the colours of the red, green and blue masks of a
@@ -61,6 +65,11 @@ pub trait PaletteProvider {
     /// Returns [`PaletteFailure::Missing`] when no tint palette is at the path.
     fn guid_at(&self, path: &str) -> Result<Guid, PaletteFailure>;
 
+    /// Returns the verified DataForge supplying this provider's palette Records.
+    fn forge_origin(&self) -> Option<&DataForgeOrigin> {
+        None
+    }
+
     /// Reads a palette and its selected DataForge Record coordinate.
     ///
     /// # Errors
@@ -82,17 +91,32 @@ pub trait PaletteProvider {
 #[derive(Debug, Clone, Copy)]
 pub struct ForgePalettes<'f> {
     forge: &'f DataForge<'f>,
+    origin: Option<&'f DataForgeOrigin>,
 }
 
 impl<'f> ForgePalettes<'f> {
     /// Reads palettes from `forge`.
     #[must_use]
     pub const fn new(forge: &'f DataForge<'f>) -> Self {
-        Self { forge }
+        Self {
+            forge,
+            origin: None,
+        }
+    }
+
+    /// Binds the provider to an Entry that supplied this exact opened DataForge.
+    #[must_use]
+    pub fn with_entry(mut self, entry: &'f DataForgeEntry) -> Self {
+        self.origin = entry.origin_of(self.forge);
+        self
     }
 }
 
 impl PaletteProvider for ForgePalettes<'_> {
+    fn forge_origin(&self) -> Option<&DataForgeOrigin> {
+        self.origin
+    }
+
     fn by_guid(&self, guid: Guid) -> Result<TintPalette, PaletteFailure> {
         self.by_guid_observed(guid).map(|read| read.value)
     }

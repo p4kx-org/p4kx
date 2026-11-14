@@ -63,8 +63,7 @@ impl Assembly {
                 let drawn = ScenePart::new(model, part.materials());
                 let drawn = fallback.map_or(drawn, |material| drawn.with_fallback(material));
                 node = node.with_part(
-                    part.palette
-                        .as_deref()
+                    part.palette()
                         .map_or(drawn, |palette| drawn.with_palette(palette)),
                 );
             }
@@ -74,10 +73,7 @@ impl Assembly {
         for (index, attached) in self.attached_models() {
             let drawn = ScenePart::new(&attached.model, attached.materials());
             let drawn = fallback.map_or(drawn, |material| drawn.with_fallback(material));
-            let palette = self
-                .parts
-                .get(index)
-                .and_then(|part| part.palette.as_deref());
+            let palette = self.parts.get(index).and_then(crate::Part::palette);
             let node = SceneNode::new(attached.name.clone(), Some(index), attached.local)
                 .with_part(palette.map_or(drawn, |palette| drawn.with_palette(palette)));
             let index = scene.push(node)?;

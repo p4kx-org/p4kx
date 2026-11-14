@@ -131,7 +131,7 @@ pub struct Part {
     pub(crate) model_definition: ModelDefinition,
     pub(crate) geometry_selectors: GeometrySelectors,
     pub(crate) materials: Arc<ArchiveMaterialRead>,
-    pub(crate) palette: Option<Arc<TintPalette>>,
+    pub(crate) palette: Option<crate::palette::ChosenPalette>,
     pub(crate) attachments: Vec<AttachedModel>,
     pub(crate) hidden: bool,
 }
@@ -229,7 +229,13 @@ impl Part {
     /// built without palettes or none could be resolved.
     #[must_use]
     pub fn palette(&self) -> Option<&TintPalette> {
-        self.palette.as_deref()
+        self.palette.as_ref().map(|chosen| chosen.palette.as_ref())
+    }
+
+    /// Returns the physical observations used to choose this part's palette.
+    #[must_use]
+    pub fn palette_source(&self) -> Option<&crate::PaletteSource> {
+        self.palette.as_ref().map(|chosen| &chosen.source)
     }
 
     /// Returns the rigid models the part carries at bones of its skeleton, the bone attachments

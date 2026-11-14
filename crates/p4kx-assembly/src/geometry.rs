@@ -14,11 +14,27 @@ pub(crate) use self::origins::{GeometryComponent, GeometrySelectors};
 
 /// The tint palette an Entity's geometry names (`Palette.TintPaletteRef`): the `TintPaletteTree`
 /// Record and the child of its tree.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct PaletteRef {
     pub(crate) guid: Guid,
     pub(crate) child_path: String,
+    pub(crate) selector: PaletteReferenceSource,
 }
+
+#[derive(Debug, Clone)]
+pub(crate) enum PaletteReferenceSource {
+    Named(Option<SourceLocation>),
+    IncludedPath(Option<crate::PaletteRecordSelection>),
+    SocEntity,
+}
+
+impl PartialEq for PaletteRef {
+    fn eq(&self, other: &Self) -> bool {
+        self.guid == other.guid && self.child_path == other.child_path
+    }
+}
+
+impl Eq for PaletteRef {}
 
 impl PaletteRef {
     /// Returns the GUID of the `TintPaletteTree` Record.
@@ -212,11 +228,21 @@ impl Geometry {
         let material = struct_field(data, "Material")
             .map(|resource| text(resource, "path"))
             .filter(|path| !path.is_empty());
+        let origins = GeometrySelectors::of(owner, slots, material.is_some());
+        let mut palette = read_palette(data);
+        if let Some(palette) = &mut palette {
+            palette.selector = PaletteReferenceSource::Named(
+                origins
+                    .model
+                    .as_ref()
+                    .map(|position| position.at(".Geometry.Palette.RootRecord")),
+            );
+        }
         Some(Self {
             path: path.to_owned(),
             material: material.map(str::to_owned),
-            palette: read_palette(data),
-            origins: GeometrySelectors::of(owner, slots, material.is_some()),
+            palette,
+            origins,
         })
     }
 }
@@ -231,6 +257,7 @@ fn read_palette(data: &StructValue<'_>) -> Option<PaletteRef> {
     Some(PaletteRef {
         guid,
         child_path: text(reference, "ChildPath").trim().to_owned(),
+        selector: PaletteReferenceSource::Named(None),
     })
 }
 

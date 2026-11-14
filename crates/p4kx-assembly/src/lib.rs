@@ -257,7 +257,7 @@ pub use outfit::{Outfit, OutfitReport};
 pub use p4kx_character as character;
 pub use palette::{
     ForgePalettes, PaletteFailure, PaletteProvider, PaletteRead, PaletteRecordSelection,
-    PaletteRecords,
+    PaletteRecords, PaletteSelection, PaletteSource,
 };
 pub use pick::LoadoutPicks;
 pub use placement::offset_transform;

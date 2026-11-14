@@ -5,25 +5,25 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use p4kx_dataforge::Guid;
-use p4kx_model::{MaterialStatus, TintPalette};
+use p4kx_extraction::{ArchiveMaterialRead, DataForgeOrigin, EntryOrigin};
+use p4kx_model::MaterialStatus;
 
 use crate::build_models::Loaded;
 use crate::flatten::Draft;
-use crate::{Geometry, IssueKind, PaletteFailure, PaletteProvider, PaletteRecords};
+use crate::geometry::PaletteReferenceSource;
+use crate::palette::ChosenPalette;
+use crate::{
+    Geometry, IssueKind, PaletteFailure, PaletteProvider, PaletteRecords, PaletteSelection,
+    PaletteSource,
+};
 
 type Cached = Result<ChosenPalette, PaletteFailure>;
 
-#[derive(Clone)]
-pub(crate) struct ChosenPalette {
-    pub(crate) palette: Arc<TintPalette>,
-    pub(crate) records: PaletteRecords,
-}
-
 /// The palette of a part and the one it hands down to its attachments.
 #[derive(Default)]
-pub(crate) struct Resolved {
-    pub(crate) palette: Option<Arc<TintPalette>>,
-    pub(crate) handed_down: Option<Arc<TintPalette>>,
+struct Resolved {
+    palette: Option<ChosenPalette>,
+    handed_down: Option<(usize, ChosenPalette)>,
 }
 
 /// Resolves the tint palette of each part, reading every distinct palette Record once.
@@ -34,29 +34,42 @@ pub(crate) struct Resolved {
 /// Record is one palette. Each failure message is reported for the first part that meets it.
 pub(crate) struct Palettes<'p> {
     provider: Option<&'p dyn PaletteProvider>,
+    forge_origin: Option<Arc<DataForgeOrigin>>,
+    geometry_forge: Option<Arc<DataForgeOrigin>>,
     cache: HashMap<Guid, Cached>,
     reported: HashSet<String>,
-    handed_down: Vec<Option<Arc<TintPalette>>>,
+    handed_down: Vec<Option<(usize, ChosenPalette)>>,
 }
 
 impl<'p> Palettes<'p> {
     pub(crate) fn new(provider: Option<&'p dyn PaletteProvider>) -> Self {
         Self {
             provider,
+            forge_origin: provider
+                .and_then(PaletteProvider::forge_origin)
+                .cloned()
+                .map(Arc::new),
+            geometry_forge: None,
             cache: HashMap::new(),
             reported: HashSet::new(),
             handed_down: Vec::new(),
         }
     }
 
+    pub(crate) fn with_geometry_origin(mut self, origin: Option<&Arc<DataForgeOrigin>>) -> Self {
+        self.geometry_forge = origin.cloned();
+        self
+    }
+
     /// Returns the palette of the next part `draft`, in the order of the drafts, and what could not
     /// be resolved on the way. A part without a model has no palette and hands its parent's down.
     pub(crate) fn of_part(
         &mut self,
+        index: usize,
         draft: &Draft<'_>,
         model: Option<&Loaded>,
-        library: &MaterialStatus,
-    ) -> (Option<Arc<TintPalette>>, Vec<IssueKind>) {
+        library: &ArchiveMaterialRead,
+    ) -> (Option<ChosenPalette>, Vec<IssueKind>) {
         let inherited = draft
             .parent
             .and_then(|parent| self.handed_down.get(parent))
@@ -66,7 +79,7 @@ impl<'p> Palettes<'p> {
             self.handed_down.push(inherited);
             return (None, Vec::new());
         }
-        let (resolved, issues) = self.of(draft.geometry, inherited.as_ref(), library);
+        let (resolved, issues) = self.of(index, draft.geometry, inherited, library);
         self.handed_down.push(resolved.handed_down);
         (resolved.palette, issues)
     }
@@ -77,11 +90,12 @@ impl<'p> Palettes<'p> {
     /// The part takes the palette its Entity's geometry names; else `inherited`, the one of its
     /// nearest ancestor; else the default palette of `library`. Only the first two are handed
     /// down: a library default is no palette of the part's own.
-    pub(crate) fn of(
+    fn of(
         &mut self,
+        index: usize,
         geometry: Option<&Geometry>,
-        inherited: Option<&Arc<TintPalette>>,
-        library: &MaterialStatus,
+        inherited: Option<(usize, ChosenPalette)>,
+        library: &ArchiveMaterialRead,
     ) -> (Resolved, Vec<IssueKind>) {
         let mut issues = Vec::new();
         let Some(provider) = self.provider else {
@@ -90,12 +104,21 @@ impl<'p> Palettes<'p> {
         let own = geometry
             .and_then(Geometry::palette)
             .and_then(|named| self.named(provider, named, &mut issues))
-            .map(|chosen| chosen.palette);
-        let handed_down = own.or_else(|| inherited.cloned());
-        let palette = handed_down.clone().or_else(|| {
-            self.library_default(provider, library, &mut issues)
-                .map(|chosen| chosen.palette)
-        });
+            .map(|chosen| (index, chosen));
+        let handed_down = own.or(inherited);
+        let palette = handed_down
+            .clone()
+            .map(|(owner, mut chosen)| {
+                chosen.source.ancestor = (owner != index).then_some(owner);
+                chosen
+            })
+            .or_else(|| {
+                self.library_default(
+                    provider,
+                    (&library.status, library.origins.library()),
+                    &mut issues,
+                )
+            });
         (
             Resolved {
                 palette,
@@ -107,19 +130,10 @@ impl<'p> Palettes<'p> {
 
     /// Returns the palette of a part drawn with `library` that names the palette `named`, and what
     /// could not be resolved on the way.
-    pub(crate) fn of_named(
-        &mut self,
-        named: Option<&crate::PaletteRef>,
-        library: &MaterialStatus,
-    ) -> (Option<Arc<TintPalette>>, Vec<IssueKind>) {
-        let (chosen, issues) = self.of_named_observed(named, library);
-        (chosen.map(|chosen| chosen.palette), issues)
-    }
-
     pub(crate) fn of_named_observed(
         &mut self,
         named: Option<&crate::PaletteRef>,
-        library: &MaterialStatus,
+        library: (&MaterialStatus, Option<&EntryOrigin>),
     ) -> (Option<ChosenPalette>, Vec<IssueKind>) {
         let mut issues = Vec::new();
         let Some(provider) = self.provider else {
@@ -147,7 +161,22 @@ impl<'p> Palettes<'p> {
             })
         };
         match found {
-            Ok(palette) => Some(palette),
+            Ok(mut palette) => {
+                palette.source.selection = match &named.selector {
+                    PaletteReferenceSource::IncludedPath(record) => {
+                        palette.source.records.selector = *record;
+                        PaletteSelection::IncludedPath
+                    }
+                    PaletteReferenceSource::SocEntity => PaletteSelection::SocEntity,
+                    PaletteReferenceSource::Named(location) => {
+                        palette.source.named_origin.clone_from(&self.geometry_forge);
+                        PaletteSelection::Named {
+                            location: location.clone(),
+                        }
+                    }
+                };
+                Some(palette)
+            }
             Err(failure) => {
                 self.note(issues, &what, &failure);
                 None
@@ -158,16 +187,19 @@ impl<'p> Palettes<'p> {
     fn library_default(
         &mut self,
         provider: &dyn PaletteProvider,
-        library: &MaterialStatus,
+        (status, library): (&MaterialStatus, Option<&EntryOrigin>),
         issues: &mut Vec<IssueKind>,
     ) -> Option<ChosenPalette> {
-        let path = library
+        let path = status
             .library()
             .and_then(|library| library.default_palette.as_deref())?;
         let what = format!("the default tint palette {path} of the material library");
         match provider.guid_at_observed(path).and_then(|selector| {
             let mut chosen = self.read(provider, selector.value)?;
-            chosen.records.selector = selector.record;
+            chosen.source.records.selector = selector.record;
+            chosen.source.selection = PaletteSelection::MaterialDefault {
+                library: library.cloned().map(Arc::new),
+            };
             Ok(chosen)
         }) {
             Ok(palette) => Some(palette),
@@ -184,9 +216,15 @@ impl<'p> Palettes<'p> {
             .or_insert_with(|| {
                 provider.by_guid_observed(guid).map(|read| ChosenPalette {
                     palette: Arc::new(read.value),
-                    records: PaletteRecords {
-                        selector: None,
-                        palette: read.record,
+                    source: PaletteSource {
+                        records: PaletteRecords {
+                            selector: None,
+                            palette: read.record,
+                        },
+                        forge_origin: self.forge_origin.clone(),
+                        named_origin: None,
+                        selection: PaletteSelection::Named { location: None },
+                        ancestor: None,
                     },
                 })
             })

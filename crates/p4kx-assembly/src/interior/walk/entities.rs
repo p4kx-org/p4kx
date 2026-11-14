@@ -239,6 +239,7 @@ impl Walker<'_> {
         Some(PaletteRef {
             guid,
             child_path: palette.child.clone(),
+            selector: crate::geometry::PaletteReferenceSource::SocEntity,
         })
     }
 }

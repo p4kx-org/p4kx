@@ -155,7 +155,7 @@ pub struct InteriorPart {
     pub(crate) model: Option<Arc<Model>>,
     pub(crate) model_archive_sources: Arc<[ModelArchiveSource]>,
     pub(crate) materials: Arc<ArchiveMaterialRead>,
-    pub(crate) palette: Option<Arc<TintPalette>>,
+    pub(crate) palette: Option<crate::palette::ChosenPalette>,
     pub(crate) light: Option<SocLight>,
     pub(crate) light_placement: Option<Box<InteriorLightPlacement>>,
 }
@@ -166,7 +166,13 @@ impl InteriorPart {
     /// [`InteriorForge`] or when there is none.
     #[must_use]
     pub fn palette(&self) -> Option<&TintPalette> {
-        self.palette.as_deref()
+        self.palette.as_ref().map(|chosen| chosen.palette.as_ref())
+    }
+
+    /// Returns the physical observations used to choose this part's palette.
+    #[must_use]
+    pub fn palette_source(&self) -> Option<&crate::PaletteSource> {
+        self.palette.as_ref().map(|chosen| &chosen.source)
     }
 
     /// Returns the light of a [`Light`](InteriorPartKind::Light) part as the `.soc` file states

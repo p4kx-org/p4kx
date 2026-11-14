@@ -19,7 +19,7 @@ pub(super) struct Position {
 }
 
 impl Position {
-    fn at(&self, member: &str) -> SourceLocation {
+    pub(super) fn at(&self, member: &str) -> SourceLocation {
         let mut path = format!("Components[{}].Geometry", self.owner.ordinal);
         for slot in &self.slots {
             path.push_str(".SubGeometry[");
