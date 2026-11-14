@@ -7,10 +7,11 @@ use p4kx_extraction::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::schema_fields::every_field_required;
-use crate::shop_inventory_source_read::{
-    self as source, ParsedInventory, SourceMember, SourceNode, SourceNodeValue,
+use crate::catalog_read::parsed_entry_json::{
+    self, ParsedEntryJson, SourceMember, SourceNode, SourceNodeValue,
 };
+use crate::schema_fields::every_field_required;
+use crate::shop_inventory_source_read as source;
 use crate::shop_registry;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -73,14 +74,14 @@ const ONLY_FIELD: FieldPosition = FieldPosition::Sequence {
 };
 
 struct View<'source, 'read> {
-    parsed: &'source ParsedInventory<'read>,
+    parsed: &'source ParsedEntryJson<'read>,
     sources: &'source SourceUses,
     cancel: Option<&'source CancelToken>,
 }
 
 impl ShopInventoryFields {
     pub(super) fn read(
-        parsed: &ParsedInventory<'_>,
+        parsed: &ParsedEntryJson<'_>,
         sources: &SourceUses,
         cancel: Option<&CancelToken>,
     ) -> Result<Self, CatalogError> {
@@ -103,7 +104,7 @@ impl ShopInventoryFields {
 
     pub(super) fn public_strings(
         &self,
-        parsed: &ParsedInventory<'_>,
+        parsed: &ParsedEntryJson<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<Vec<usize>, CatalogError> {
         let mut result = Vec::new();
@@ -264,7 +265,7 @@ impl<'read> View<'_, 'read> {
             return self.absent(parent);
         };
         let node = self.parsed.node(member.value)?;
-        let own = member_uses(member, node)?;
+        let own = parsed_entry_json::member_uses(member, node)?;
         if let Some(duplicate) = matching.next() {
             return self.repeated(own, std::iter::once(duplicate).chain(matching));
         }
@@ -310,7 +311,7 @@ impl<'read> View<'_, 'read> {
         for member in remaining {
             source::check_cancel(self.cancel)?;
             let node = self.parsed.node(member.value)?;
-            let next = member_uses(member, node)?;
+            let next = parsed_entry_json::member_uses(member, node)?;
             uses.try_reserve(next.len())
                 .map_err(CatalogError::JsonSourceAllocation)?;
             uses.extend(next);
@@ -344,18 +345,8 @@ fn field_value<'read, T>(
     }
 }
 
-fn member_uses(
-    member: &SourceMember<'_>,
-    node: &SourceNode<'_>,
-) -> Result<[SourceUse; 2], CatalogError> {
-    Ok([
-        member.name_token.observe(SourceUseRole::Selector)?,
-        node.payload.clone(),
-    ])
-}
-
 fn admit_public(
-    parsed: &ParsedInventory<'_>,
+    parsed: &ParsedEntryJson<'_>,
     reference: Option<&DecimalU64>,
     valid: impl FnOnce(&str) -> bool,
     result: &mut Vec<usize>,

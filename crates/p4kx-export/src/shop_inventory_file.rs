@@ -11,6 +11,7 @@ use crate::catalog_read::original::{
     EntryCapture, EntryDiagnosis, EntryJson, EntryRead, EntryReceipt, OriginalDatum,
     PhysicalEntryIdentity, PhysicalEntryRef,
 };
+use crate::catalog_read::parsed_entry_json::ParsedEntryJson;
 use crate::entry_source::EntrySource;
 use crate::export_diagnostic::ExportDiagnosticCode;
 use crate::export_entry_ledger::EntryOperation;
@@ -19,7 +20,6 @@ use crate::schema_fields::every_field_required;
 use crate::shop_inventory_compatibility::{self as compatibility, ItemList};
 use crate::shop_inventory_fields::ShopInventoryFields;
 use crate::shop_inventory_source::ShopInventorySource;
-use crate::shop_inventory_source_read::ParsedInventory;
 use crate::starmap_index;
 use crate::{CatalogError, Kind};
 
@@ -191,7 +191,7 @@ fn document(
             )
         });
     };
-    let parsed = ParsedInventory::read(root, cancel)?;
+    let parsed = ParsedEntryJson::read(root, cancel)?;
     let fields = ShopInventoryFields::read(&parsed, uses, cancel)?;
     let items = compatibility::items(&fields, &parsed, cancel)?;
     let public_strings = fields.public_strings(&parsed, cancel)?;

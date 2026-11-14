@@ -76,6 +76,7 @@ impl Kind {
                 | Self::Shops
                 | Self::ShopInventories
                 | Self::ParticleLibraries
+                | Self::PlanetResources
                 | Self::LootContainers
                 | Self::ContractShipSpawns
                 | Self::ContractLocationQueries

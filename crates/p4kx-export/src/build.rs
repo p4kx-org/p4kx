@@ -89,7 +89,6 @@ fn assemble<R>(
         crafting,
     )?;
     let tags = add_tags(&forge, &input, options, &mut collected)?;
-    collected.ledger.archive_inventory_problem = crate::export_archive_health::inventory(archive);
     let paint_summary = add_paints(&forge, &input, &mut collected, options.cancel)?;
     let loadout_summary = add_loadouts(archive, &entities, &mut collected, &input, options.cancel)?;
     let variants = collected.group_variants();
@@ -223,6 +222,7 @@ fn assemble<R>(
             blueprints: blueprints.definitions,
             shop_inventories: collected.shop_inventories,
             particle_libraries: collected.particle_libraries,
+            planet_resources: collected.planet_resources,
             inventory_containers: inventory_table(&forge, collected.inventory_containers),
             medical_item_tier_configs: medical_tier_config::table(
                 &forge,

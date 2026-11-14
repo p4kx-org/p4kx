@@ -94,7 +94,8 @@ const fn mode(kind: Kind) -> ExportSourceMode {
         | Kind::LootContainers
         | Kind::Shops
         | Kind::ShopInventories
-        | Kind::ParticleLibraries => ExportSourceMode::ArchiveEntries,
+        | Kind::ParticleLibraries
+        | Kind::PlanetResources => ExportSourceMode::ArchiveEntries,
         Kind::Paints
         | Kind::Loadouts
         | Kind::ContractShipSpawns

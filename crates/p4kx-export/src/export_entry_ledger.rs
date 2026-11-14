@@ -42,6 +42,8 @@ pub enum EntryOperation {
     ShopSoc,
     /// Reading another required source XML document.
     SourceXml,
+    /// Reading a required loose JSON document.
+    SourceJson,
     /// Completing the byte read required by an XML Loadout.
     XmlLoadoutBytes,
     /// Completing the byte read required by a vehicle implementation.

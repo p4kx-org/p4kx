@@ -165,6 +165,8 @@ pub enum Kind {
     ShopInventories,
     /// Original particle-library XML files in the Archive.
     ParticleLibraries,
+    /// Original loose planet resource definitions in the Archive.
+    PlanetResources,
     /// Reusable physical `ExplosionRecord` definitions.
     ExplosionDefinitions,
     /// Physical ammunition configurations.
@@ -235,7 +237,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 92] = [
+    pub const ALL: [Self; 93] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -295,6 +297,7 @@ impl Kind {
         Self::BlueprintCategoryLists,
         Self::ShopInventories,
         Self::ParticleLibraries,
+        Self::PlanetResources,
         Self::ExplosionDefinitions,
         Self::AmmoDefinitions,
         Self::Factions,

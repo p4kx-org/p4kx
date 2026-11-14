@@ -24,24 +24,7 @@ pub(super) fn scan<'f>(
     projection: &'f CatalogProjection<'f, 'f>,
     crafting: CraftingKinds<'f>,
 ) -> Result<(Collected<'f>, Placements), CatalogError> {
-    let rules = [
-        crate::Kind::StarmapObjects.records(),
-        crate::Kind::HarvestableProviderPresets.records(),
-    ];
-    let wanted = forge.records().any(|record| {
-        record.record_path().is_ok_and(|path| {
-            rules.iter().any(|rule| rule.matches_path(path))
-                && options.filter.is_none_or(|filter| filter.matches(path))
-        })
-    });
-    let scope = if wanted {
-        Some(PlacementScope::RecordSelection)
-    } else {
-        options
-            .filter
-            .is_none()
-            .then_some(PlacementScope::ArchiveInventory)
-    };
+    let scope = placement_scope(forge, options);
     let mut placements = match scope {
         Some(scope) => Placements::read(
             archive,
@@ -80,5 +63,37 @@ pub(super) fn scan<'f>(
         std::mem::take(&mut placements.ledger)
     };
     collected.ledger.merge(entry_ledger);
+    collected.ledger.archive_inventory_problem = crate::export_archive_health::inventory(archive);
+    let original = projection.original();
+    let capture = EntryCapture::for_input(original);
+    collected.planet_resources = crate::catalog_definitions::planet_resource::read(
+        archive,
+        forge,
+        original,
+        &capture,
+        &mut collected.ledger,
+        options,
+    )?;
     Ok((collected, placements))
+}
+
+fn placement_scope(forge: &DataForge<'_>, options: &CatalogOptions<'_>) -> Option<PlacementScope> {
+    let rules = [
+        crate::Kind::StarmapObjects.records(),
+        crate::Kind::HarvestableProviderPresets.records(),
+    ];
+    let wanted = forge.records().any(|record| {
+        record.record_path().is_ok_and(|path| {
+            rules.iter().any(|rule| rule.matches_path(path))
+                && options.filter.is_none_or(|filter| filter.matches(path))
+        })
+    });
+    if wanted {
+        Some(PlacementScope::RecordSelection)
+    } else {
+        options
+            .filter
+            .is_none()
+            .then_some(PlacementScope::ArchiveInventory)
+    }
 }

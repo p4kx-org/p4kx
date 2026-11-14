@@ -4991,6 +4991,9 @@
         "particleLibraries": {
           "$ref": "#/$defs/CatalogTableOfParticleLibrary"
         },
+        "planetResources": {
+          "$ref": "#/$defs/CatalogTableOfPlanetResource"
+        },
         "proceduralPlanetAudio": {
           "$ref": "#/$defs/CatalogTableOfProceduralPlanetAudio"
         },
@@ -5103,6 +5106,7 @@
         "npcArchetypes",
         "npcClassPools",
         "particleLibraries",
+        "planetResources",
         "proceduralPlanetAudio",
         "qualityDistributions",
         "qualityQuantizations",
@@ -6712,6 +6716,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ParticleLibrary"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfPlanetResource": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/PlanetResource"
           },
           "type": "array"
         }
@@ -8773,6 +8796,9 @@
         "particleLibraries": {
           "$ref": "#/$defs/KindCompleteness"
         },
+        "planetResources": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
         "proceduralPlanetAudio": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The filtered physical DataForge procedural planet audio selection."
@@ -8940,6 +8966,7 @@
         "npcClassPools",
         "paints",
         "particleLibraries",
+        "planetResources",
         "proceduralPlanetAudio",
         "qualityDistributions",
         "qualityQuantizations",
@@ -12450,6 +12477,10 @@
         {
           "description": "Reading another required source XML document.",
           "value": "sourceXml"
+        },
+        {
+          "description": "Reading a required loose JSON document.",
+          "value": "sourceJson"
         },
         {
           "description": "Completing the byte read required by an XML Loadout.",
@@ -20440,6 +20471,10 @@
           "value": "particleLibraries"
         },
         {
+          "description": "Original loose planet resource definitions in the Archive.",
+          "value": "planetResources"
+        },
+        {
           "description": "Reusable physical `ExplosionRecord` definitions.",
           "value": "explosionDefinitions"
         },
@@ -22452,6 +22487,43 @@
         "sourceType"
       ],
       "type": "object"
+    },
+    "LooseArchivePath": {
+      "description": "A directory-only link and its source-bound outcome.",
+      "properties": {
+        "state": {
+          "$ref": "#/$defs/SourcedValueOfLooseArchivePathState"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "state",
+        "targets"
+      ],
+      "type": "object"
+    },
+    "LooseArchivePathState": {
+      "description": "Resolution of a declared Archive-relative path against directory evidence.",
+      "enum": [
+        "absent",
+        "null",
+        "empty",
+        "invalid",
+        "unreadable",
+        "unavailable",
+        "missing",
+        "wrongFamily",
+        "ambiguous",
+        "filtered",
+        "resolved"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "LootArchetype": {
       "description": "A loot archetype: a `LootArchetypeV3Record` Record under `lootgeneration/lootarchetypes`, the\nweighted kinds of item a table entry stands for.",
@@ -27334,6 +27406,29 @@
       ],
       "type": "object"
     },
+    "PaletteRecordCandidate": {
+      "properties": {
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "index": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "path": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "guid",
+        "index",
+        "path",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "ParallelAction": {
       "description": "The ordered original slots of a parallel action.",
       "properties": {
@@ -27832,6 +27927,125 @@
       "required": [
         "additionalFields",
         "rtpc"
+      ],
+      "type": "object"
+    },
+    "PlanetPaletteReference": {
+      "description": "A tint palette library path and its physical target candidates.",
+      "oneOf": [
+        {
+          "properties": {
+            "state": {
+              "$ref": "#/$defs/SourcedValueOfLooseArchivePathState"
+            },
+            "targetKind": {
+              "const": "unclassified",
+              "type": "string"
+            }
+          },
+          "required": [
+            "targetKind",
+            "state"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "resolution": {
+              "$ref": "#/$defs/LooseArchivePath"
+            },
+            "targetKind": {
+              "const": "archiveEntry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "targetKind",
+            "resolution"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "candidates": {
+              "items": {
+                "$ref": "#/$defs/PaletteRecordCandidate"
+              },
+              "type": "array"
+            },
+            "state": {
+              "$ref": "#/$defs/SourcedValueOfLooseArchivePathState"
+            },
+            "targetKind": {
+              "const": "dataForge",
+              "type": "string"
+            }
+          },
+          "required": [
+            "targetKind",
+            "state",
+            "candidates"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "PlanetResource": {
+      "description": "One physical loose planet resource and its original definition fields.",
+      "properties": {
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "guidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/PlanetResourceIssue"
+          },
+          "type": "array"
+        },
+        "minable": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "tintPalette": {
+          "$ref": "#/$defs/PlanetPaletteReference"
+        },
+        "tintPalettePath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "guid",
+        "guidRaw",
+        "identity",
+        "issues",
+        "minable",
+        "name",
+        "tintPalette",
+        "tintPalettePath"
+      ],
+      "type": "object"
+    },
+    "PlanetResourceIssue": {
+      "properties": {
+        "code": {
+          "$ref": "#/$defs/ExportDiagnosticCode"
+        },
+        "field": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "field"
       ],
       "type": "object"
     },
@@ -76003,6 +76217,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/LogoutSlot"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfLooseArchivePathState": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/LooseArchivePathState"
               }
             }
           }

@@ -42,10 +42,9 @@ fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
         Kind::BlueprintCategoryLists => "/declarations/blueprintCategoryLists",
         Kind::Blueprints => "/definitions/blueprints",
         Kind::ShopInventories => "/definitions/shopInventories",
+        Kind::ParticleLibraries => "/definitions/particleLibraries",
         Kind::ExplosionDefinitions => "/definitions/explosionDefinitions",
         Kind::AmmoDefinitions => "/definitions/ammoDefinitions",
-        Kind::InventoryContainers => "/definitions/inventoryContainers",
-        Kind::MedicalItemTierConfigs => "/definitions/medicalItemTierConfigs",
         Kind::MissionScenarios => "/definitions/missionScenarios",
         Kind::MissionModuleDeclarations => "/definitions/missionModuleDeclarations",
         Kind::ReputationContexts => "/definitions/reputationContexts",
@@ -103,6 +102,9 @@ const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::NpcClassPools
             | Kind::AutoSpawns
             | Kind::AutoSpawnSets
+            | Kind::PlanetResources
+            | Kind::InventoryContainers
+            | Kind::MedicalItemTierConfigs
             | Kind::ParticleLibraries
             | Kind::EncounterIndices
             | Kind::MissionItems

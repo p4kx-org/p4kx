@@ -5,8 +5,9 @@ use std::collections::BTreeSet;
 
 use p4kx_extraction::{CancelToken, SourceValueState};
 
+use crate::catalog_read::parsed_entry_json::{ParsedEntryJson, SourceNodeValue};
 use crate::shop_inventory_fields::ShopInventoryFields;
-use crate::shop_inventory_source_read::{self as source, ParsedInventory, SourceNodeValue};
+use crate::shop_inventory_source_read as source;
 use crate::shop_registry;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -20,7 +21,7 @@ pub(crate) enum ItemList {
 
 pub(super) fn items(
     fields: &ShopInventoryFields,
-    parsed: &ParsedInventory<'_>,
+    parsed: &ParsedEntryJson<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<Option<ItemList>, CatalogError> {
     if fields.inventory.state() == SourceValueState::Invalid

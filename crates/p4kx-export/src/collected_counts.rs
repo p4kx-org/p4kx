@@ -77,6 +77,7 @@ impl Collected<'_> {
             Kind::Shops => self.shops.len(),
             Kind::ShopInventories => self.shop_inventories.rows.len(),
             Kind::ParticleLibraries => self.particle_libraries.rows.len(),
+            Kind::PlanetResources => self.planet_resources.rows.len(),
             Kind::Crafters => self.crafters.len(),
             Kind::FactionReputations
             | Kind::ReputationScopes

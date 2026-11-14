@@ -205,6 +205,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.resourceTypes` | Closed source-family `availability` and canonical `rows`, independently selected and ordered by GUID; every source-backed field uses the typed value carrier ([contract](catalog-resource-types.md)) |
 | `texts.publicNames`, `texts.gameTexts` | Canonical sourced-definition short-name and protected-description rows, each with sourced `id`, `key` and per-language `translations` containing separate source and display forms |
 | `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the sourced definition carriers |
+| `definitions.planetResources` | Original loose planet resource definitions and declared tint palette paths with physical source and link states ([contract](catalog-planet-resources.md)) |
 | `definitions.proceduralPlanetAudio` | Physical planet audio records with separately sourced RTPC identifiers and original declaration collections. [Procedural planet audio](catalog-procedural-planet-audio.md) |
 | `definitions.ammoDefinitions` | Physical `AmmoParams` definitions with original projectile, physics and conversion fields and per-value source origin. [Ammunition definitions](catalog-ammo-definitions.md) |
 | `configurations.ammoContainers`, `declarations.ammoBindings` | Physical container settings and authored ammunition and magazine slots, including ordered secondary conditions. [Ammunition definitions](catalog-ammo-definitions.md) |

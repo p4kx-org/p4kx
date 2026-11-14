@@ -13,6 +13,9 @@ use crate::CatalogRefusal;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CatalogError {
+    /// Building or querying the original Archive directory index failed.
+    #[error(transparent)]
+    ArchivePathIndex(#[from] p4kx_extraction::PathIndexError),
     /// Shared field-origin evidence was interrupted during mutation.
     #[error(transparent)]
     SourceEvidence(#[from] p4kx_extraction::SourceEvidenceError),
