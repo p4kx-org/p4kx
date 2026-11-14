@@ -24,6 +24,7 @@ tempfile.workspace = true
 
 [dev-dependencies]
 crc32fast.workspace = true
+p4kx-gltf.workspace = true
 p4kx-testkit.workspace = true
 jsonschema.workspace = true
 

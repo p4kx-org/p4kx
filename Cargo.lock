@@ -3893,6 +3893,7 @@ dependencies = [
  "jsonschema",
  "p4kx-assembly",
  "p4kx-extraction",
+ "p4kx-gltf",
  "p4kx-shader",
  "p4kx-testkit",
  "schemars",

@@ -77,3 +77,17 @@ Native CI exchanges actual packages between Windows, Linux and macOS and checks 
 Python and the available Blender runtimes. The source-fixture generation, isolation, runtime
 coverage and commands are documented in
 [media fixture selection](../docs/media-fixture-selection.md#rust-exported-synthetic-packages-in-blender).
+
+The native model LOD check uses GLBs from one synthetic Archive with two geometry and skeleton
+companions. From the repository root, replace the path with an existing scratch directory:
+
+```powershell
+$env:P4KX_SYNTHETIC_MODEL_GLB_DIR = '<scratch directory>'
+cargo test --locked -p p4kx-media --test it model_glb_levels
+blender --background --factory-startup --disable-autoexec --threads 2 --python-exit-code 1 --python blender_addon/tests/verify_model_lod_export.py -- $env:P4KX_SYNTHETIC_MODEL_GLB_DIR
+Remove-Item Env:P4KX_SYNTHETIC_MODEL_GLB_DIR
+```
+
+The test verifies the Media ranges and source vertex order in each GLB before Blender imports it.
+Blender checks the helper, skeleton, bound mesh and material assignments for LODs 0 and 1 and the
+fallback from LOD 3 to the physical geometry of LOD 0.
