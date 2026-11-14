@@ -154,6 +154,15 @@ paths, missing targets, duplicate targets and unselected physical targets stay d
 The references establish physical identities without reading their target payloads. Join them
 to model collision or skeleton facts by the root Archive and physical Entry identity.
 
+An authored attachment Material attribute also has a `material_reference` alongside its
+unchanged original spelling. A mapped sibling lookup requires Binding to identify one physical
+model Entry, including when that Entry is outside the current selection. The material lookup
+uses the bound model's folder and only falls back to Data after complete sibling absence.
+If the required Binding scope is unavailable or ambiguous, the material reference is unavailable.
+A material request without a sibling lookup uses its virtual Data path independently.
+This establishes only authored references and directory identity. Both target payloads may
+remain unread and neither claims that an attachment was used during assembly.
+
 Bone attachments carry the authored bone name, material override, relative position in metres
 and relative quaternion in WXYZ order. An absent position or rotation uses the CDF offset
 default for that bone attachment. Malformed values retain their original spelling with a null

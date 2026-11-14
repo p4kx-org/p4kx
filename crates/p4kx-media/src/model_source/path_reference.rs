@@ -7,6 +7,7 @@ use p4kx_extraction::model::character_definition::is_definition_path;
 use super::payload::ModelSourceFamily;
 use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
+use crate::origin_lookup::ObservedInputLookup;
 use crate::origin_prepared::PreparedRecordOrigins;
 use crate::origin_reference::{ReferenceIdentifier, ReferenceOriginInputs, ReferenceSubresource};
 use crate::reference_resolve::ReferenceObservations;
@@ -23,33 +24,83 @@ pub(super) fn field(
     prepared: &mut PreparedRecordOrigins,
     writer: &mut MediaWriter<'_>,
 ) -> Result<Reference, MediaError> {
-    let (reference, candidates, inventory) = lookup(directory, path, writer)?;
-    let prefix = FieldPath::parse(pointer).map_err(|cause| origin_error::address(&cause))?;
-    ReferenceOriginInputs {
-        original: authored,
-        selector: authored,
-        inventory: &inventory,
-        semantic: &OriginContributions::independent(&writer.origins.owner),
-        candidates: &candidates,
-        read_selected: false,
-        identifier: ReferenceIdentifier::Path,
-        subresource: ReferenceSubresource::None,
-    }
-    .write(prepared, &prefix, &reference, writer)?;
-    Ok(reference)
+    let observed = lookup(directory, path, writer)?;
+    observed.write(pointer, authored, authored, prepared, writer)?;
+    Ok(observed.reference)
 }
-fn lookup(
+
+pub(super) struct Observation {
+    pub(super) reference: Reference,
+    evidence: ReferenceObservations<MediaOriginInput>,
+    inventory: OriginContributions,
+}
+
+impl Observation {
+    pub(super) fn unavailable(
+        original: OriginalIdentifier,
+        reason: ReferenceUnavailable,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<Self, MediaError> {
+        let (reference, evidence) = writer.try_resolve_reference_observed(
+            original,
+            std::iter::empty(),
+            CandidateInventory::Unavailable(reason),
+        )?;
+        Ok(Self {
+            reference,
+            evidence,
+            inventory: OriginContributions::independent(&writer.origins.owner),
+        })
+    }
+
+    pub(super) fn write(
+        &self,
+        pointer: &str,
+        authored: &OriginContributions,
+        selector: &OriginContributions,
+        prepared: &mut PreparedRecordOrigins,
+        writer: &MediaWriter<'_>,
+    ) -> Result<OriginContributions, MediaError> {
+        let prefix = FieldPath::parse(pointer).map_err(|cause| origin_error::address(&cause))?;
+        let semantic = OriginContributions::independent(&writer.origins.owner);
+        self.inputs(authored, selector, &semantic)
+            .write_with_origin(prepared, &prefix, &self.reference, writer)
+    }
+
+    const fn inputs<'a>(
+        &'a self,
+        original: &'a OriginContributions,
+        selector: &'a OriginContributions,
+        semantic: &'a OriginContributions,
+    ) -> ReferenceOriginInputs<'a, MediaOriginInput> {
+        ReferenceOriginInputs {
+            original,
+            selector,
+            inventory: &self.inventory,
+            semantic,
+            candidates: &self.evidence,
+            read_selected: false,
+            identifier: ReferenceIdentifier::Path,
+            subresource: ReferenceSubresource::None,
+        }
+    }
+}
+
+impl From<ObservedInputLookup<'_>> for Observation {
+    fn from(observed: ObservedInputLookup<'_>) -> Self {
+        Self {
+            reference: observed.lookup.reference,
+            evidence: observed.evidence,
+            inventory: observed.inventory,
+        }
+    }
+}
+
+pub(super) fn lookup(
     directory: &DirectoryLookup<'_>,
     original: &str,
     writer: &mut MediaWriter<'_>,
-) -> Result<
-    (
-        Reference,
-        ReferenceObservations<MediaOriginInput>,
-        OriginContributions,
-    ),
-    MediaError,
-> {
+) -> Result<Observation, MediaError> {
     let identifier = OriginalIdentifier::new_with_path(original);
     let path = original.trim_start_matches(['/', '\\']);
     if path.contains([':', '!', '\0'])
@@ -57,16 +108,11 @@ fn lookup(
             .split(['/', '\\'])
             .any(|part| matches!(part, "" | "." | ".."))
     {
-        let (reference, evidence) = writer.try_resolve_reference_observed(
+        return Observation::unavailable(
             identifier,
-            std::iter::empty(),
-            CandidateInventory::Unavailable(ReferenceUnavailable::InvalidIdentifier),
-        )?;
-        return Ok((
-            reference,
-            evidence,
-            OriginContributions::independent(&writer.origins.owner),
-        ));
+            ReferenceUnavailable::InvalidIdentifier,
+            writer,
+        );
     }
     let kind = (ModelSourceFamily::of(path).is_some() || is_definition_path(path))
         .then_some(MediaKind::Model);
@@ -84,9 +130,5 @@ fn lookup(
     } else {
         prefixed
     };
-    Ok((
-        observed.lookup.reference,
-        observed.evidence,
-        observed.inventory,
-    ))
+    Ok(observed.into())
 }

@@ -65,6 +65,17 @@ impl<E: CandidateInput> ReferenceOriginInputs<'_, E> {
         reference: &Reference,
         writer: &MediaWriter<'_>,
     ) -> Result<(), MediaError> {
+        self.write_with_origin(prepared, prefix, reference, writer)
+            .map(|_| ())
+    }
+
+    pub(crate) fn write_with_origin(
+        &self,
+        prepared: &mut PreparedRecordOrigins,
+        prefix: &FieldPath,
+        reference: &Reference,
+        writer: &MediaWriter<'_>,
+    ) -> Result<OriginContributions, MediaError> {
         let full = self.resolution(writer)?;
         prepared.insert_subtree(prefix, full.clone(), writer)?;
         let original = child(prefix, "original")?;
@@ -83,7 +94,8 @@ impl<E: CandidateInput> ReferenceOriginInputs<'_, E> {
             prepared.insert_subtree(&child(prefix, field)?, full.clone(), writer)?;
         }
         let resolution = child(prefix, "resolution")?;
-        self.targets(prepared, &resolution, reference.resolution(), writer)
+        self.targets(prepared, &resolution, reference.resolution(), writer)?;
+        Ok(full)
     }
 
     pub(crate) fn resolution(

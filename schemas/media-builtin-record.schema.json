@@ -5698,6 +5698,16 @@
             "null"
           ]
         },
+        "material_reference": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Reference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "name": {
           "type": [
             "string",
@@ -44584,61 +44594,6 @@
           "subresource": {
             "properties": {
               "namespace": {
-                "const": "model-material-library"
-              }
-            },
-            "required": [
-              "namespace"
-            ]
-          }
-        },
-        "required": [
-          "kind",
-          "subresource"
-        ]
-      },
-      "then": {
-        "properties": {
-          "data": {
-            "allOf": [
-              {
-                "$ref": "#/$defs/ModelMaterialLibraryRecord"
-              },
-              {
-                "properties": {
-                  "record_type": {
-                    "const": "material-library"
-                  }
-                },
-                "required": [
-                  "record_type"
-                ]
-              }
-            ]
-          },
-          "subresource": {
-            "properties": {
-              "indices": {
-                "maxItems": 1,
-                "minItems": 1
-              }
-            }
-          }
-        },
-        "required": [
-          "data"
-        ]
-      }
-    },
-    {
-      "if": {
-        "properties": {
-          "kind": {
-            "const": "model"
-          },
-          "subresource": {
-            "properties": {
-              "namespace": {
                 "const": "model-character-attachment"
               }
             },
@@ -44951,6 +44906,61 @@
               "indices": {
                 "maxItems": 2,
                 "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-material-library"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelMaterialLibraryRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "material-library"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
               }
             }
           }

@@ -36,7 +36,7 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.11.0",
+            "1.12.0",
             "Selected original models, geometry and character definitions with positioned source declarations.",
         );
         capability.field_groups = vec![
@@ -62,7 +62,7 @@ impl Provider for ModelSourceProvider {
             ),
             FieldGroup::new(
                 "character-definitions",
-                "Original CDF skeleton and attachment declarations, physical path references and bone-relative offsets.",
+                "Original CDF skeleton, attachment and material declarations, physical path references and bone-relative offsets.",
             ),
             FieldGroup::new(
                 "vehicle-physics-grids",

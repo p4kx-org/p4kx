@@ -91,6 +91,9 @@ pub(super) struct Attachment {
     #[schemars(schema_with = "optional_reference")]
     pub(super) binding: Option<Reference>,
     pub(super) material: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(schema_with = "optional_reference")]
+    pub(super) material_reference: Option<Box<Reference>>,
     pub(super) bone_name: Option<String>,
     pub(super) relative_position: BoneOffset<[f32; 3]>,
     pub(super) relative_rotation_wxyz: BoneOffset<[f32; 4]>,

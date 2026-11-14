@@ -33,7 +33,10 @@ pub(super) fn emit(
     let parsed = CharacterDefinition::read(&bytes);
     write_definition(&parsed, bytes.len(), &origins, writer)?;
     if let Ok(source) = parsed {
-        let references = CharacterReferences { context };
+        let references = CharacterReferences {
+            context,
+            strings_lossy: source.is_lossy(),
+        };
         for (index, model) in source.models() {
             writer.checkpoint()?;
             write_skeleton(index, model, &origins, &references, writer)?;
@@ -127,7 +130,6 @@ fn write_attachment(
     let mut prepared = attachment.prepare(writer)?;
     let mut original = |name, pointer| attachment.field(name, pointer, &mut prepared, writer);
     let name = original("AName", "/data/payload/name")?;
-    let material = original("Material", "/data/payload/material")?;
     let bone_name = original("BoneName", "/data/payload/bone_name")?;
     let (attachment_type, kind_origin) = attachment.value("Type", writer)?;
     origins::at(
@@ -141,13 +143,7 @@ fn write_attachment(
         |name, pointer| attachment.offset(name, pointer, &kind_origin, &mut prepared, writer);
     let position = offset("RelPosition", "/data/payload/relative_position")?;
     let rotation = offset("RelRotation", "/data/payload/relative_rotation_wxyz")?;
-    let binding = references.field(
-        &attachment,
-        "Binding",
-        "/data/payload/binding",
-        &mut prepared,
-        writer,
-    )?;
+    let links = references.attachment(&attachment, &mut prepared, writer)?;
     prepared.write(
         writer,
         &Subresource::new(wire::ATTACHMENT, indices.map(|value| value as u64).to_vec()),
@@ -155,8 +151,9 @@ fn write_attachment(
         &CharacterRecord::Attachment(Attachment {
             name: name.map(str::to_owned),
             kind: attachment_type.map(str::to_owned),
-            binding,
-            material: material.map(str::to_owned),
+            binding: links.binding,
+            material: links.material.map(str::to_owned),
+            material_reference: links.material_reference,
             bone_name: bone_name.map(str::to_owned),
             relative_position: BoneOffset {
                 authored: position.map(str::to_owned),

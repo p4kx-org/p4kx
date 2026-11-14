@@ -3,22 +3,19 @@
 
 use p4kx_extraction::chunks::ChunkDirectory;
 use p4kx_extraction::model::MaterialName;
-use p4kx_extraction::{ArchiveMaterialPaths, FieldPath, SourceUseRole};
+use p4kx_extraction::{ArchiveMaterialPaths, SourceUseRole};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::material_path;
 use super::origins::{self, ModelOrigins};
 use super::payload::ModelSourceFamily;
 use crate::origin_contributions::OriginContributions;
-use crate::origin_input::MediaOriginInput;
 use crate::origin_prepared::PreparedRecordOrigins;
-use crate::origin_reference::{ReferenceIdentifier, ReferenceOriginInputs, ReferenceSubresource};
-use crate::reference_resolve::ReferenceObservations;
 use crate::required_reader::RequiredReader;
 use crate::{
-    CandidateInventory, MediaError, MediaKind, MediaWriter, OffsetBasis, OriginalIdentifier,
-    Reference, ReferenceResolution, ReferenceUnavailable, SourceContext, SourceRange, Status,
-    Subresource, origin_error,
+    MediaError, MediaWriter, OffsetBasis, OriginalIdentifier, Reference, ReferenceUnavailable,
+    SourceContext, SourceRange, Status, Subresource,
 };
 
 const NAMESPACE: &str = "model-material-library";
@@ -184,19 +181,18 @@ impl<'context, 'input> Source<'context, 'input> {
         if paths.as_ref().is_ok_and(|paths| paths.sibling.is_some()) {
             selector.include_original(&origins.directory("modelMaterialSiblingFolder", writer)?)?;
         }
-        let reference = reference(
-            self.context,
-            paths.ok(),
-            name,
-            &evidence,
-            &selector.finish(),
-            prepared,
+        let original = OriginalIdentifier::new_with_path(name);
+        let observed = material_path::observe(
+            self.context.directory,
+            original,
+            paths.map_err(|_| ReferenceUnavailable::InvalidIdentifier),
             writer,
         )?;
+        observed.write(REFERENCE, &evidence, &selector.finish(), prepared, writer)?;
         Ok(Payload::Named {
             primary_model_reader_selector,
             token: field.token,
-            reference: Box::new(reference),
+            reference: Box::new(observed.reference),
         })
     }
 }
@@ -242,77 +238,4 @@ fn name_origin(
         SourceUseRole::Payload,
         writer,
     )
-}
-
-fn reference(
-    context: &SourceContext<'_>,
-    paths: Option<ArchiveMaterialPaths>,
-    name: &str,
-    authored: &OriginContributions,
-    selector: &OriginContributions,
-    prepared: &mut PreparedRecordOrigins,
-    writer: &mut MediaWriter<'_>,
-) -> Result<Reference, MediaError> {
-    let original = OriginalIdentifier::new_with_path(name);
-    let resolved = lookup(context, original, paths, writer)?;
-    let prefix = FieldPath::parse(REFERENCE).map_err(|cause| origin_error::address(&cause))?;
-    ReferenceOriginInputs {
-        original: authored,
-        selector,
-        inventory: &resolved.inventory,
-        semantic: &OriginContributions::independent(&writer.origins.owner),
-        candidates: &resolved.evidence,
-        read_selected: false,
-        identifier: ReferenceIdentifier::Path,
-        subresource: ReferenceSubresource::None,
-    }
-    .write(prepared, &prefix, &resolved.reference, writer)?;
-    Ok(resolved.reference)
-}
-
-struct Resolution {
-    reference: Reference,
-    evidence: ReferenceObservations<MediaOriginInput>,
-    inventory: OriginContributions,
-}
-
-fn lookup(
-    context: &SourceContext<'_>,
-    original: OriginalIdentifier,
-    paths: Option<ArchiveMaterialPaths>,
-    writer: &mut MediaWriter<'_>,
-) -> Result<Resolution, MediaError> {
-    let Some(paths) = paths else {
-        let (reference, evidence) = writer.try_resolve_reference_observed(
-            original,
-            std::iter::empty(),
-            CandidateInventory::Unavailable(ReferenceUnavailable::InvalidIdentifier),
-        )?;
-        return Ok(Resolution {
-            reference,
-            evidence,
-            inventory: OriginContributions::independent(&writer.origins.owner),
-        });
-    };
-    let kind = Some(MediaKind::Material);
-    let directory = context.directory;
-    if let Some(sibling) = paths.sibling {
-        let observed = directory.lookup_input_observed(original.clone(), &sibling, kind, writer)?;
-        if !matches!(
-            observed.lookup.reference.resolution(),
-            ReferenceResolution::Missing
-        ) {
-            return Ok(Resolution {
-                reference: observed.lookup.reference,
-                evidence: observed.evidence,
-                inventory: observed.inventory,
-            });
-        }
-    }
-    let observed = directory.lookup_input_observed(original, &paths.data_root, kind, writer)?;
-    Ok(Resolution {
-        reference: observed.lookup.reference,
-        evidence: observed.evidence,
-        inventory: observed.inventory,
-    })
 }
