@@ -93,6 +93,11 @@ pub(crate) enum AtlField {
     RadiusMax,
     ListenerRtpc,
     RtpcGroupName,
+    RtpcMin,
+    RtpcMax,
+    RtpcDefault,
+    ExternalFilename,
+    Language,
     PreloadType,
     ConfigGroupName,
     Multiplier,
@@ -124,7 +129,18 @@ impl AtlField {
             (AtlFamily::Rtpc | AtlFamily::WwiseRtpc, "rtpc_group_name") => Self::RtpcGroupName,
             (AtlFamily::PreloadRequest, "atl_type") => Self::PreloadType,
             (AtlFamily::Platform, "atl_config_group_name") => Self::ConfigGroupName,
-            (AtlFamily::Trigger | AtlFamily::PreloadRequest, "path") => Self::Path,
+            (
+                AtlFamily::Trigger
+                | AtlFamily::PreloadRequest
+                | AtlFamily::Rtpc
+                | AtlFamily::ExternalSource,
+                "path",
+            ) => Self::Path,
+            (AtlFamily::ExternalSourceEntry, "language") => Self::Language,
+            (AtlFamily::WwiseExternalSource, "wwise_filename") => Self::ExternalFilename,
+            (AtlFamily::WwiseRtpc, "min") => Self::RtpcMin,
+            (AtlFamily::WwiseRtpc, "max") => Self::RtpcMax,
+            (AtlFamily::WwiseRtpc, "default") => Self::RtpcDefault,
             (
                 AtlFamily::WwiseEvent
                 | AtlFamily::WwiseFile
@@ -136,16 +152,23 @@ impl AtlField {
                 | AtlFamily::WwiseValue,
                 "wwise_name",
             ) => Self::WwiseName,
-            (
+            (AtlFamily::ExternalSource, "is_localised")
+            | (
                 AtlFamily::WwiseEvent | AtlFamily::WwiseFile | AtlFamily::WwiseExternalSource,
                 "wwise_localised" | "wwise_localized",
             ) => Self::Localised,
             (AtlFamily::WwiseRtpc, "atl_mult") => Self::Multiplier,
             (AtlFamily::WwiseRtpc, "atl_shift") => Self::Shift,
             (AtlFamily::WwiseValue, "wwise_value") => Self::WwiseValue,
-            (AtlFamily::WwiseEvent, "wwise_duration_type") => Self::DurationType,
-            (AtlFamily::WwiseEvent, "wwise_duration_min") => Self::DurationMin,
-            (AtlFamily::WwiseEvent, "wwise_duration_max") => Self::DurationMax,
+            (AtlFamily::WwiseEvent | AtlFamily::WwiseExternalSource, "wwise_duration_type") => {
+                Self::DurationType
+            }
+            (AtlFamily::WwiseEvent | AtlFamily::WwiseExternalSource, "wwise_duration_min") => {
+                Self::DurationMin
+            }
+            (AtlFamily::WwiseEvent | AtlFamily::WwiseExternalSource, "wwise_duration_max") => {
+                Self::DurationMax
+            }
             (AtlFamily::WwiseEvent, "wwise_radius_max") => Self::RadiusMax,
             _ => return None,
         })
@@ -162,6 +185,9 @@ impl AtlField {
             Self::DurationMin
             | Self::DurationMax
             | Self::RadiusMax
+            | Self::RtpcMin
+            | Self::RtpcMax
+            | Self::RtpcDefault
             | Self::Multiplier
             | Self::Shift => value
                 .parse::<f64>()

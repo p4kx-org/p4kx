@@ -27,5 +27,9 @@ tempfile.workspace = true
 p4kx-testkit.workspace = true
 jsonschema.workspace = true
 
+[[test]]
+name = "audio_control_accounting"
+path = "tests/real_archive/audio_control_accounting.rs"
+
 [lints]
 workspace = true

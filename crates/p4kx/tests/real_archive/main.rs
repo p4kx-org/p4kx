@@ -17,7 +17,6 @@ mod package_scratch;
 mod package_support;
 mod package_types;
 mod real_action_map;
-mod real_atl_control;
 mod real_audio_loop;
 mod real_blender_packages;
 mod real_bnk_objects;

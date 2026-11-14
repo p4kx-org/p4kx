@@ -150,6 +150,15 @@ pub(crate) fn authored_name(
     declaration: NameDeclaration<'_>,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
+    if matches!(declaration.field, AtlField::ExternalFilename) {
+        return paths::project(
+            directory,
+            input,
+            declaration,
+            paths::AtlFileKind::ExternalMedia,
+            writer,
+        );
+    }
     if matches!(declaration.field, AtlField::WwiseName) {
         return match declaration.family {
             AtlFamily::WwiseFile => paths::project(

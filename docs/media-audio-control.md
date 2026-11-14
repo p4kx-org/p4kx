@@ -32,10 +32,10 @@ namespace declarations, decoded values and available literal spellings. Unknown 
 attributes remain there regardless of typed recognition. Known source families include triggers,
 Wwise Events, RTPCs, switches and states, environments, preloads, groups, platform choices,
 dependees and external sources. Field rows cite the original declaration. Numeric facts include
-the declared Wwise duration and radius bounds and RTPC multiplier and shift where present.
-RTPC ranges and external-source attributes whose spelling lacks an established typed mapping
-are available in the ordered declaration rows. The
-raw declaration keeps its original literal independently of the typed number. An invalid typed
+authored Wwise duration and radius bounds, RTPC multiplier and shift, and
+`WwiseRtpc` min, max and default. External-source rows retain the authored
+localisation flag, entry language, duration declarations and Wwise filename
+as separate fields. The raw declaration keeps its original literal independently of the typed number. An invalid typed
 literal keeps its original spelling and an explicit typed invalid outcome. The bounds are authored
 metadata and give no runtime timing, unit or playback guarantee.
 
@@ -48,7 +48,8 @@ An incomplete directory or unread potential target keeps scope completeness expl
 Wwise Event links keep the authored name and the Wwise ShortID and can join the owning directory's
 Audio `audio-bank-foreign-target-resolution` by query index. With Audio omitted the link reports
 `not-selected`. Full authored Archive file paths can be checked against physical directory
-metadata. Exact duplicate entries are emitted in order with independent filter/key information.
+metadata. Relative external filenames retain their original spelling and an
+explicit unresolved path state. Exact duplicate entries are emitted in order with independent filter/key information.
 An unsafe or unproved relative spelling retains the original token and an explicit reason. The
 path lookup consumes only directory metadata. Runtime availability belongs to playback.
 

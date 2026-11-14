@@ -31,6 +31,7 @@ fn every_atl_family_matches_between_plain_and_binary_with_immediate_origins() ->
     let rows = support::records(&output, &index, "audio-control.jsonl")?;
     check_equivalence(&rows);
     check_unknown(&rows);
+    check_ranged_rtpc_and_external_source(&rows);
     check_origins(&output.join(&index.artifact_base), &rows)?;
     let schema = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
     for row in rows {
@@ -89,6 +90,37 @@ fn check_equivalence(rows: &[MediaRecord]) {
         observed(0, "audio-control-field"),
         observed(1, "audio-control-field"),
         "typed facts preserve their values independently from format coordinates"
+    );
+}
+
+fn check_ranged_rtpc_and_external_source(rows: &[MediaRecord]) {
+    for (field, value) in [
+        ("rtpc-min", json!({"type": "number", "value": -1.5})),
+        ("rtpc-max", json!({"type": "invalid-number"})),
+        ("rtpc-default", json!({"type": "number", "value": 0.0})),
+        ("localised", json!({"type": "boolean", "value": true})),
+        ("language", json!({"type": "text", "value": "Synthetic"})),
+        (
+            "external-filename",
+            json!({"type": "text", "value": "unproved.wem"}),
+        ),
+        ("duration-max", json!({"type": "number", "value": 2.0})),
+    ] {
+        assert!(
+            rows.iter().any(
+                |row| row.data.pointer("/payload/field") == Some(&json!(field))
+                    && row.data.pointer("/payload/typed_value") == Some(&value)
+            ),
+            "observed ATL field {field} keeps its source type and value"
+        );
+    }
+    assert!(
+        rows.iter()
+            .any(|row| row.subresource.namespace == "audio-control-reference"
+                && row.data.pointer("/payload/target/path") == Some(&json!("unproved.wem"))
+                && row.data.pointer("/payload/link/reason")
+                    == Some(&json!("unproved-target-path"))),
+        "external filename keeps its link without assuming a directory"
     );
 }
 
@@ -165,7 +197,10 @@ fn definition() -> TestElement {
                     .child(
                         TestElement::new("WwiseRtpc")
                             .attribute("wwise_name", "RtpcSource")
-                            .attribute("atl_mult", "01.0"),
+                            .attribute("atl_mult", "01.0")
+                            .attribute("min", "-001.50")
+                            .attribute("max", "NaN")
+                            .attribute("default", "0"),
                     ),
             ),
         )
@@ -187,16 +222,7 @@ fn definition() -> TestElement {
                 .child(TestElement::new("ATLEnvironment").child(TestElement::new("WwiseAuxBus"))),
         )
         .child(preloads())
-        .child(
-            TestElement::new("AudioExternalSources").child(
-                TestElement::new("ATLExternalSource").child(
-                    TestElement::new("ATLExternalSourceEntry").child(
-                        TestElement::new("WwiseExternalSource")
-                            .attribute("custom_language", "Synthetic"),
-                    ),
-                ),
-            ),
-        )
+        .child(external_sources())
         .child(
             TestElement::new("AudioTriggers").child(
                 TestElement::new("ATLTrigger")
@@ -208,6 +234,25 @@ fn definition() -> TestElement {
                     ),
             ),
         )
+}
+
+fn external_sources() -> TestElement {
+    TestElement::new("AudioExternalSources").child(
+        TestElement::new("ATLExternalSource")
+            .attribute("is_localised", "true")
+            .attribute("path", "Synthetic Group")
+            .child(
+                TestElement::new("ATLExternalSourceEntry")
+                    .attribute("language", "Synthetic")
+                    .child(
+                        TestElement::new("WwiseExternalSource")
+                            .attribute("custom_language", "Synthetic")
+                            .attribute("wwise_filename", "unproved.wem")
+                            .attribute("wwise_duration_type", "fixture")
+                            .attribute("wwise_duration_max", "2.00"),
+                    ),
+            ),
+    )
 }
 
 fn preloads() -> TestElement {
