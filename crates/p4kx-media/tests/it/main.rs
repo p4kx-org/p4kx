@@ -120,6 +120,7 @@ mod model_physics_provider;
 mod model_semantic_chunks;
 mod model_skeleton_provider;
 mod model_source_provider;
+mod model_vehicle_grid_collision;
 mod model_vehicle_grid_provider;
 mod non_finite;
 mod owned_outputs;

@@ -18,7 +18,7 @@ const FOOTER: usize = 32;
 fn collision_frame_preserves_sparse_authored_identity_and_composes_nonuniform_parent() -> TestResult
 {
     let folder = tempfile::tempdir()?;
-    let file = fixture(false)?;
+    let file = nmc_collision_fixture(false)?;
     let archive = support::archive_with(folder.path(), [TestEntry::stored("source.cgf", file)])?;
     let output = folder.path().join("out");
     let options = ExportOptions {
@@ -47,7 +47,7 @@ fn collision_frame_preserves_sparse_authored_identity_and_composes_nonuniform_pa
 #[test]
 fn a_missing_node_footer_keeps_the_observed_physics_frame_in_diagnostics() -> TestResult {
     let folder = tempfile::tempdir()?;
-    let file = fixture(true)?;
+    let file = nmc_collision_fixture(true)?;
     let archive = support::archive_with(folder.path(), [TestEntry::stored("source.cgf", file)])?;
     let output = folder.path().join("out");
     let options = ExportOptions {
@@ -180,7 +180,9 @@ fn put(bytes: &mut [u8], offset: usize, value: &[u8]) -> TestResult {
     Ok(())
 }
 
-fn fixture(truncated: bool) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+pub(super) fn nmc_collision_fixture(
+    truncated: bool,
+) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     let shape = collision_shape(4, &[0.0, 0.0, 0.0, 2.0]);
     let mut nodes = nmc([
         (

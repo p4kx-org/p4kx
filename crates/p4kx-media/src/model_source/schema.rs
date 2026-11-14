@@ -33,6 +33,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
     material_library_reference::insert_schema(&mut base)?;
     nmc_record::insert_schema(&mut base)?;
     vehicle_grid_record::insert_schema(&mut base)?;
+    super::vehicle_grid_collision::insert_schema(&mut base)?;
     let branches = base
         .get_mut("allOf")
         .and_then(Value::as_array_mut)
@@ -50,6 +51,7 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
     .chain([material_library_reference::SCHEMA_ROW])
     .chain(nmc_record::SCHEMA_ROWS)
     .chain(vehicle_grid_record::SCHEMA_ROWS)
+    .chain(super::vehicle_grid_collision::SCHEMA_ROWS)
     {
         branches.push(json!({
             "if": {

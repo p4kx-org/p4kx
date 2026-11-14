@@ -10789,6 +10789,52 @@
       ],
       "type": "string"
     },
+    "GridCollisionSlot": {
+      "additionalProperties": false,
+      "properties": {
+        "model_frame": {
+          "$ref": "#/$defs/Subresource"
+        },
+        "slot": {
+          "$ref": "#/$defs/Subresource"
+        },
+        "vehicle_placement": {
+          "$ref": "#/$defs/VehiclePlacement"
+        }
+      },
+      "required": [
+        "slot",
+        "model_frame",
+        "vehicle_placement"
+      ],
+      "type": "object"
+    },
+    "GridCollisionState": {
+      "enum": [
+        "no-path",
+        "target-missing",
+        "target-ambiguous",
+        "target-not-selected",
+        "target-unavailable",
+        "unsupported-target",
+        "malformed-target",
+        "no-physics-tables",
+        "tables-present"
+      ],
+      "type": "string"
+    },
+    "GridCollisionTable": {
+      "additionalProperties": false,
+      "properties": {
+        "table": {
+          "$ref": "#/$defs/Subresource"
+        }
+      },
+      "required": [
+        "table"
+      ],
+      "type": "object"
+    },
     "GridDatabaseState": {
       "enum": [
         "ready",
@@ -14255,6 +14301,45 @@
         "model-material-library"
       ],
       "type": "string"
+    },
+    "ModelVehicleGridCollisionRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/GridCollisionTable"
+            },
+            "record_type": {
+              "const": "vehicle-grid-collision-table",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/GridCollisionSlot"
+            },
+            "record_type": {
+              "const": "vehicle-grid-collision-slot",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "GridCollisionRecord"
     },
     "ModelVehicleGridRecord": {
       "oneOf": [
@@ -25098,6 +25183,9 @@
     "VehicleGrid": {
       "additionalProperties": false,
       "properties": {
+        "collision_state": {
+          "$ref": "#/$defs/GridCollisionState"
+        },
         "field": {
           "type": "string"
         },
@@ -25129,7 +25217,8 @@
         "record_file",
         "field",
         "state",
-        "path"
+        "path",
+        "collision_state"
       ],
       "type": "object"
     },
@@ -25144,6 +25233,12 @@
         "reason"
       ],
       "type": "object"
+    },
+    "VehiclePlacement": {
+      "enum": [
+        "unavailable"
+      ],
+      "type": "string"
     },
     "Verification": {
       "description": "Comparison against available source-declared integrity, independent of hash computation.",
@@ -45346,6 +45441,116 @@
               "indices": {
                 "maxItems": 1,
                 "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-vehicle-grid-collision-table"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelVehicleGridCollisionRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "vehicle-grid-collision-table"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-vehicle-grid-collision-slot"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelVehicleGridCollisionRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "vehicle-grid-collision-slot"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 4,
+                "minItems": 4
               }
             }
           }

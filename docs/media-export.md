@@ -191,10 +191,25 @@ array. Repeated declarations remain separate even when they use the same target.
 
 The record keeps the physical DataForge owner, original Record GUID and filename when readable,
 and each exact authored path with the owning Archive's target-resolution state. Empty paths,
-missing targets, ambiguous matches and unselected physical targets remain distinct. Paths link
-to collision facts by physical Entry identity and do not read or duplicate the target payload.
-Original DCB byte and selector coordinates carry the source encryption marker. A record can
-remain diagnostic while readable sibling declarations are retained.
+missing targets, ambiguous matches and unselected physical targets remain distinct. Only a unique selected
+Model target contributes bytes to the collision inventory. The reader uses the existing retained
+payload and the caller's work and byte budgets. Unselected, missing, ambiguous and unavailable
+targets retain their separate outcomes and have no shape links.
+
+The grid row's `collision_state` describes that inventory. `model-vehicle-grid-collision-table`
+rows append the original collision chunk ordinal to the Record and Components indices and link
+to the canonical `model-physics-table`. Such a table can be unreadable or a version the reader
+does not support. `model-vehicle-grid-collision-slot` rows append the original slot ordinal and
+link to the canonical `model-physics-slot` and `model-physics-frame` for the same target. To
+follow either link, use the grid row's resolved target Entry and the link's subresource key.
+Repeated grid declarations point to shared original geometry and frames. A proven NMC affine
+is in the proxy model's frame, with scale and parent composition preserved. The model-to-vehicle
+placement has an explicit `unavailable` state because the authored path supplies no such
+transform. Whole-object or unresolved slot frames keep their canonical dispositions.
+
+Original DCB byte and selector coordinates and the exact target chunk and slot words carry
+their source encryption markers. A record can remain diagnostic while readable sibling
+declarations are retained.
 
 IVO Skin and Skin2 chunks at version 0x900 emit a positioned model mesh inventory.
 A `model-mesh` row records the authored counts and the two original bounding boxes. Each box

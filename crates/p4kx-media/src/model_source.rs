@@ -48,6 +48,8 @@ mod skeleton_record;
 mod path_reference;
 #[path = "model_source/vehicle_grid.rs"]
 mod vehicle_grid;
+#[path = "model_source/vehicle_grid_collision.rs"]
+mod vehicle_grid_collision;
 #[path = "model_source/vehicle_grid_origins.rs"]
 mod vehicle_grid_origins;
 #[path = "model_source/vehicle_grid_record.rs"]

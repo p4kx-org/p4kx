@@ -6,6 +6,8 @@ use std::io::{self, Read, Seek, SeekFrom};
 use std::ops::Range;
 use std::path::Path;
 
+use p4kx_extraction::chunks::{ChunkDirectory, ChunkDirectoryError};
+
 use crate::checkpoint::{Checkpoint, IO_BLOCK_BYTES};
 use crate::error;
 use crate::input_budget::InputBudget;
@@ -91,6 +93,26 @@ impl<'input> RequiredReader<'input> {
         };
         reader.check_length()?;
         Ok(reader)
+    }
+
+    pub(crate) fn read_chunk_directory(&mut self) -> Result<ChunkDirectory, ChunkDirectoryError> {
+        let Self {
+            size,
+            budget,
+            checkpoint,
+            limits,
+            ..
+        } = *self;
+        ChunkDirectory::read(
+            self,
+            size,
+            |rows| {
+                budget
+                    .metadata(0, rows, limits, checkpoint)
+                    .map_err(io::Error::other)
+            },
+            || checkpoint.check().map_err(io::Error::other),
+        )
     }
 
     pub(crate) fn read_payload(&mut self) -> Result<Vec<u8>, MediaError> {

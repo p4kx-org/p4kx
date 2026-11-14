@@ -8,12 +8,12 @@ use serde::Serialize;
 use super::frame_hierarchy::PhysicsFrame;
 use crate::SourceRange;
 
-pub(super) const TABLE: &str = "model-physics-table";
-pub(super) const SLOT: &str = "model-physics-slot";
+pub(in crate::provider::model_source) const TABLE: &str = "model-physics-table";
+pub(in crate::provider::model_source) const SLOT: &str = "model-physics-slot";
 pub(super) const VERTEX: &str = "model-physics-vertex";
 pub(super) const TRIANGLE: &str = "model-physics-triangle";
 pub(super) const NODE: &str = "model-physics-node";
-pub(super) const FRAME: &str = "model-physics-frame";
+pub(in crate::provider::model_source) const FRAME: &str = "model-physics-frame";
 
 #[derive(Serialize, JsonSchema)]
 #[serde(rename_all = "kebab-case")]

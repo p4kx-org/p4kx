@@ -7,6 +7,7 @@ use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 use crate::origin_capture::OriginSite;
+use p4kx_extraction::chunks::{ChunkDirectory, ChunkDirectoryError};
 use p4kx_extraction::{Entry, InputScope, SourceUseRole};
 
 use crate::directory_lookup::DirectoryLookup;
@@ -37,6 +38,21 @@ impl RequiredInput<'_> {
 impl RequiredInput<'_> {
     pub(crate) fn read_payload(&mut self) -> Result<Vec<u8>, MediaError> {
         self.reader.read_payload()
+    }
+
+    pub(crate) fn read_chunk_directory(&mut self) -> Result<ChunkDirectory, ChunkDirectoryError> {
+        self.reader.read_chunk_directory()
+    }
+
+    pub(crate) fn charge_metadata_work(&self, count: u64) -> Result<(), MediaError> {
+        self.reader.charge_metadata_work(count)
+    }
+
+    pub(crate) fn read_chunk(
+        &mut self,
+        range: std::ops::Range<u64>,
+    ) -> Result<Vec<u8>, MediaError> {
+        self.reader.read_chunk(range)
     }
 
     fn observe_digest_origin(&self, writer: &MediaWriter<'_>) -> Result<(), MediaError> {

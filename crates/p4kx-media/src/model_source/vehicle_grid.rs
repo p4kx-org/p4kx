@@ -5,6 +5,7 @@ use p4kx_extraction::query::{CompiledQuery, Query, QueryErrorKind, QuerySource, 
 use p4kx_extraction::{DATAFORGE_ENTRIES, DataForge, DataForgeEntry, Record, Value, ValueError};
 
 use super::origins::ModelOrigins;
+use super::vehicle_grid_collision::ProxyCache;
 use super::vehicle_grid_record::{self as records, GridDatabaseState};
 use crate::{MediaError, MediaWriter, Projection, SourceContext, required_reader};
 
@@ -33,9 +34,10 @@ pub(super) fn emit(
     };
     let bytes = required_reader::read_all(context, writer)?;
     writer.checkpoint()?;
-    let outcome = Dispatch {
+    let mut outcome = Dispatch {
         context,
         origins: &origins,
+        proxies: ProxyCache::default(),
     };
     if let Ok(forge) = DataForge::open(&bytes) {
         outcome.rows(&forge, writer)?;
@@ -53,10 +55,15 @@ pub(super) fn emit(
 struct Dispatch<'context, 'input> {
     context: &'context SourceContext<'input>,
     origins: &'context ModelOrigins<'input>,
+    proxies: ProxyCache,
 }
 
 impl Dispatch<'_, '_> {
-    fn rows(&self, forge: &DataForge<'_>, writer: &mut MediaWriter<'_>) -> Result<(), MediaError> {
+    fn rows(
+        &mut self,
+        forge: &DataForge<'_>,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
         let query = Query::parse(QUERY).map_err(|cause| MediaError::Contract(cause.to_string()))?;
         match query.compile_with(forge, None) {
             Ok(compiled) => {
@@ -84,7 +91,7 @@ impl Dispatch<'_, '_> {
     }
 
     fn record(
-        &self,
+        &mut self,
         record: Record<'_>,
         compiled: &CompiledQuery<'_>,
         writer: &mut MediaWriter<'_>,
@@ -114,7 +121,7 @@ impl Dispatch<'_, '_> {
     }
 
     fn occurrences(
-        &self,
+        &mut self,
         row: &Row<'_>,
         values: &[Value<'_>],
         writer: &mut MediaWriter<'_>,
@@ -152,8 +159,9 @@ impl Dispatch<'_, '_> {
                     state,
                     sites,
                 },
-                self.context.directory,
+                self.context,
                 self.origins,
+                &mut self.proxies,
                 writer,
             )?;
         }

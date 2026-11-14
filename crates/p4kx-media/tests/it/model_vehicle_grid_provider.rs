@@ -17,8 +17,8 @@ use super::model_source_provider::field_uses;
 use super::support::{self, TestResult};
 
 const STREAM: &str = "model.jsonl";
-const MODEL: &str = "Data/ship.cgf";
-const FORGE: &str = "Data/Game2.dcb";
+pub(super) const MODEL: &str = "Data/ship.cgf";
+pub(super) const FORGE: &str = "Data/Game2.dcb";
 
 #[test]
 fn vehicle_grids_keep_physical_record_occurrences_and_target_resolution() -> TestResult {
@@ -90,6 +90,15 @@ fn check_references(rows: &[MediaRecord], base: &Path) -> TestResult {
             ("/payload/path/original/value", json!(path)),
             ("/payload/path/resolution/status", json!(status)),
             ("/payload/record_file", json!(stored_filename)),
+            (
+                "/payload/collision_state",
+                json!(match status {
+                    "not-selected" => "target-not-selected",
+                    "ambiguous" => "target-ambiguous",
+                    "missing" => "target-missing",
+                    _ => "target-unavailable",
+                }),
+            ),
         ] {
             assert_eq!(row.data.pointer(field), Some(&value), "exact field {field}");
         }
@@ -181,7 +190,7 @@ fn options(filter: &str) -> Result<ExportOptions, Box<dyn std::error::Error>> {
     })
 }
 
-fn schema() -> DataForgeBuilder {
+pub(super) fn schema() -> DataForgeBuilder {
     let class = |name: &str| TestType::Class(name.to_owned());
     DataForgeBuilder::new()
         .structure(TestStruct::new("EntityClassDefinition").array(
@@ -199,7 +208,7 @@ fn schema() -> DataForgeBuilder {
         .structure(TestStruct::new("Geometry").field("path", TestType::String))
 }
 
-fn vehicle<const N: usize>(
+pub(super) fn vehicle<const N: usize>(
     guid: u128,
     file: &str,
     preceding: usize,

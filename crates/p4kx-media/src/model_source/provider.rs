@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io;
 use std::ops::Range;
 use std::path::Path;
 
@@ -36,7 +35,7 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.12.0",
+            "1.13.0",
             "Selected original models, geometry and character definitions with positioned source declarations.",
         );
         capability.field_groups = vec![
@@ -66,7 +65,7 @@ impl Provider for ModelSourceProvider {
             ),
             FieldGroup::new(
                 "vehicle-physics-grids",
-                "Original vehicle physics-grid paths from the selected DataForge Entry and exact archive targets.",
+                "Original vehicle physics-grid paths, exact Archive targets and physical collision table, slot and frame links.",
             ),
             FieldGroup::new(
                 "collision-frames",
@@ -127,16 +126,7 @@ fn chunk_source(
     let name = context.entry.path();
     let mut reader =
         RequiredReader::open(context.payload, name, length, budget, checkpoint, limits)?;
-    let parsed = ChunkDirectory::read(
-        &mut reader,
-        length,
-        |rows| {
-            budget
-                .metadata(0, rows, limits, checkpoint)
-                .map_err(io::Error::other)
-        },
-        || checkpoint.check().map_err(io::Error::other),
-    );
+    let parsed = reader.read_chunk_directory();
     match parsed {
         Ok(file) => {
             entry(family, &file, &origins, writer)?;

@@ -9,15 +9,16 @@ use serde::Serialize;
 use super::character_payload::optional_reference;
 use super::origins::{self, ModelOrigins};
 use super::path_reference;
+use super::vehicle_grid_collision::{GridCollisionState, ProxyCache};
 use super::vehicle_grid_origins::{path_evidence, record_field};
 use crate::origin_contributions::OriginContributions;
 
 use crate::{
-    DirectoryLookup, MediaError, MediaIssue, MediaWriter, Reference, Severity, Status, Subresource,
+    MediaError, MediaIssue, MediaWriter, Reference, Severity, SourceContext, Status, Subresource,
 };
 
 const OWNER: &str = "model-vehicle-grid-database";
-const LINK: &str = "model-vehicle-grid";
+pub(super) const LINK: &str = "model-vehicle-grid";
 const FAILURE: &str = "model-vehicle-grid-record-failure";
 const SCHEMA_NAME: &str = "ModelVehicleGridRecord";
 pub(super) const SCHEMA_ROWS: [(&str, &str, usize, &str); 3] = [
@@ -44,6 +45,7 @@ struct VehicleGrid<'record> {
     state: GridPathDisposition,
     #[schemars(schema_with = "optional_reference")]
     path: Option<&'record Reference>,
+    collision_state: GridCollisionState,
 }
 
 #[derive(Serialize, JsonSchema)]
@@ -191,8 +193,9 @@ enum GridPathDisposition {
 
 pub(super) fn occurrence(
     data: GridOccurrence<'_, '_>,
-    directory: &DirectoryLookup<'_>,
+    context: &SourceContext<'_>,
     originals: &ModelOrigins<'_>,
+    proxies: &mut ProxyCache,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let GridOccurrence {
@@ -224,11 +227,19 @@ pub(super) fn occurrence(
         originals.independent(),
         writer,
     )?;
-    let (state, path, issues) =
-        path_and_status(state, directory, &evidence, &mut prepared, writer)?;
+    let occurrence = [record_index, u64::from(component_index)];
+    let (state, path, path_origin, issues) =
+        path_and_status(state, context, &evidence, &mut prepared, writer)?;
+    let collision = proxies.projection(context, path.as_ref(), occurrence, writer)?;
+    origins::at(
+        &mut prepared,
+        "/data/payload/collision_state",
+        collision.state_evidence(&path_origin, writer)?,
+        writer,
+    )?;
     prepared.write(
         writer,
-        &Subresource::new(LINK, vec![record_index, u64::from(component_index)]),
+        &Subresource::new(LINK, occurrence.to_vec()),
         if issues.is_some() {
             Status::Partial
         } else {
@@ -240,32 +251,29 @@ pub(super) fn occurrence(
             field,
             state,
             path: path.as_ref(),
+            collision_state: collision.state(),
         }),
         issues.as_slice(),
-    )
+    )?;
+    collision.write_links(occurrence, originals, &path_origin, writer)
 }
+
+type GridPath = (
+    GridPathDisposition,
+    Option<Reference>,
+    OriginContributions,
+    Option<MediaIssue>,
+);
 
 fn path_and_status(
     state: PathState<'_>,
-    directory: &DirectoryLookup<'_>,
+    context: &SourceContext<'_>,
     evidence: &OriginContributions,
     prepared: &mut crate::origin_prepared::PreparedRecordOrigins,
     writer: &mut MediaWriter<'_>,
-) -> Result<(GridPathDisposition, Option<Reference>, Option<MediaIssue>), MediaError> {
+) -> Result<GridPath, MediaError> {
     origins::at(prepared, "/data/payload/state", evidence.clone(), writer)?;
-    let path = if let PathState::Present(path) = state {
-        Some(path_reference::field(
-            directory,
-            path,
-            "/data/payload/path",
-            evidence,
-            prepared,
-            writer,
-        )?)
-    } else {
-        origins::at(prepared, "/data/payload/path", evidence.clone(), writer)?;
-        None
-    };
+    let (path, path_origin) = grid_reference(state, context, evidence, prepared, writer)?;
     let (state, issue) = match state {
         PathState::Present(_) => (GridPathDisposition::Present, None),
         PathState::Null => (GridPathDisposition::Null, None),
@@ -282,5 +290,22 @@ fn path_and_status(
             (GridPathDisposition::Unreadable, Some(issue))
         }
     };
-    Ok((state, path, issue))
+    Ok((state, path, path_origin, issue))
+}
+
+fn grid_reference(
+    state: PathState<'_>,
+    context: &SourceContext<'_>,
+    evidence: &OriginContributions,
+    prepared: &mut crate::origin_prepared::PreparedRecordOrigins,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(Option<Reference>, OriginContributions), MediaError> {
+    let field = "/data/payload/path";
+    let PathState::Present(path) = state else {
+        origins::at(prepared, field, evidence.clone(), writer)?;
+        return Ok((None, evidence.clone()));
+    };
+    let observed = path_reference::lookup(context.directory, path, writer)?;
+    let selected = observed.write(field, evidence, evidence, prepared, writer)?;
+    Ok((Some(observed.reference), selected))
 }

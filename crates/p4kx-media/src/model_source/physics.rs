@@ -31,6 +31,7 @@ use payload::PhysicsTableStatus;
 
 use frame_projection::FrameProjection;
 pub(super) use frame_projection::NodeFrames;
+pub(super) use payload::{FRAME, SLOT, TABLE};
 pub(super) use schema::bind;
 
 pub(super) fn emit(
