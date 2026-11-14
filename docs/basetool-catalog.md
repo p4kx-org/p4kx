@@ -1935,9 +1935,15 @@ and the derived placement's `placedUnderGuid` can differ.
 | `placedUnderGuid` | The nearest starmap Record above the placement in the container hierarchy. |
 | `position` | `[x, y, z]` in metres in the frame of the system container, rounded to a millimetre. |
 
-The current placement traversal supplies these derived values without a complete per-field
-XML contribution chain. Their cells report an incomplete source set and unknown encryption
-origin. The physical owner identity has independent DataForge evidence.
+Each placement cell cites its actual original root and XML Child route. Position cites the
+leaf and ancestor translations and the ancestor rotations that affect it. The physical
+owner identity has independent DataForge evidence. Sources with undeclared encryption can
+yield a null encryption marker even when the contributor set is complete.
+
+`placements.containerInstances` keeps a separate row for each resolved physical SOCpak
+occurrence. The instance key identifies the system root and original Child route. Parent
+keys refer to the enclosing physical container occurrence. Reused tiles keep separate
+local and world transforms, the exact declaring path, label and entity name.
 
 
 **Where a position comes from.** The main container of a star system is
@@ -1945,7 +1951,7 @@ origin. The physical owner identity has independent DataForge evidence.
 of the folder). It is a container (ZIP) whose XML, named like the container, lists
 `ChildObjectContainers/Child` elements. A Child places an object with `starMapRecord` (the GUID of
 a `StarMapObject`), `pos` (`x,y,z`) and `rot` (a quaternion `w,x,y,z`), may nest further
-`ChildObjectContainers`, and with `external="1"` names another container (`name`) whose Children
+`ChildObjectContainers`, and with `external="1"` or `external="true"` names another container (`name`) whose Children
 are placed in the frame of this Child. Positions compose from the top: the position of a child is
 rotated by the rotation of its container before it is added, and the rotations multiply, so
 `world = parent.position + parent.rotation * child.pos` and `rotation = parent.rotation *
