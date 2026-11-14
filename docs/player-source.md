@@ -157,10 +157,12 @@ configured, run the focused witness locally.
 cargo test --locked -p p4kx-blender --lib installed_player_bundle_matches_selected_original_sources -- --ignored
 ```
 
-It compares one two-body capture against the accepted actor DataForge entry and
-the selected ControllerDef, ADB and TagDef originals. The test checks stored
-order and coordinates, field-use references and original encryption. It reads
-the selected source graph without writing a bundle or running release acceptance.
+It compares one two-body capture against the actor DataForge entry and the selected
+ControllerDef, Loadout, ADB and TagDef originals. A separate DataForge read
+reconciles the physical weapons and their complete ordered Loadout candidates.
+The test follows original ADB TagDef roots and imports to reconcile each
+scoped weapon and option token and checks field-use coordinates and encryption.
+The selected source graph is read without writing a bundle.
 The diagnostics report structural mismatches without printing source values.
 
 `weaponMotionSource` records identify observed personal weapon AttachDef

@@ -181,7 +181,7 @@ fn verify_position(value: &Value, original: &Document, sources: &Sources<'_>) ->
     verify_coordinate(value, &value["value"], "$element", original, sources)
 }
 
-fn verify_coordinate(
+pub(super) fn verify_coordinate(
     value: &Value,
     position: &Value,
     field: &str,

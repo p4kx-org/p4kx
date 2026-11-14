@@ -26,6 +26,7 @@ pub(super) struct Coverage {
 pub(super) struct Document {
     physical: Physical,
     source: String,
+    path: String,
     expected: Expected,
 }
 
@@ -34,8 +35,14 @@ enum Expected {
     Adb {
         options: Vec<Value>,
         branches: Vec<Value>,
+        tag_definition: Option<String>,
     },
-    Tags(Vec<Value>),
+    Loadout(Vec<Option<String>>),
+    Tags {
+        names: Vec<Value>,
+        version: Option<String>,
+        imports: Vec<Option<String>>,
+    },
 }
 
 impl Document {
@@ -45,19 +52,113 @@ impl Document {
         let root = xml.root();
         let expected = match root.name() {
             "ControllerDef" => Expected::Controller(controller(root)?),
+            "Loadout" if root.namespace().is_none() => Expected::Loadout(loadout_items(root)),
             "AnimDB" => Expected::Adb {
                 options: options(root)?,
                 branches: branches(root)?,
+                tag_definition: single_path(root, "TagDef"),
             },
-            "TagDefinition" => Expected::Tags(tag_names(root)?),
+            "TagDefinition" => Expected::Tags {
+                names: tag_names(root)?,
+                version: single_path(root, "version"),
+                imports: children(root, "Imports")
+                    .flat_map(|section| children(section, "Import"))
+                    .map(|node| single_path(node, "filename"))
+                    .collect(),
+            },
             _ => return Ok(None),
         };
         Ok(Some(Self {
             physical: Physical::of(document.original),
             source: document.source.as_str().to_owned(),
+            path: document.original.entry().path().to_owned(),
             expected,
         }))
     }
+}
+
+impl Document {
+    pub(super) fn path(&self) -> &str {
+        &self.path
+    }
+
+    pub(super) fn adb(&self) -> Option<(&[Value], Option<&str>)> {
+        let Expected::Adb {
+            options,
+            tag_definition,
+            ..
+        } = &self.expected
+        else {
+            return None;
+        };
+        Some((options, tag_definition.as_deref()))
+    }
+
+    pub(super) fn loadout(&self) -> Option<&[Option<String>]> {
+        let Expected::Loadout(items) = &self.expected else {
+            return None;
+        };
+        Some(items)
+    }
+
+    pub(super) fn tag_definition(&self) -> Option<TagDefinition<'_>> {
+        let Expected::Tags {
+            names,
+            version,
+            imports,
+        } = &self.expected
+        else {
+            return None;
+        };
+        Some(TagDefinition {
+            names,
+            version: version.as_deref(),
+            imports,
+        })
+    }
+
+    pub(super) fn attribute_field(
+        &self,
+        value: &Value,
+        original: &Value,
+        field: &str,
+        sources: &Sources<'_>,
+    ) -> io::Result<()> {
+        if value["sourceUsesRefs"].as_array().map(Vec::len) != Some(1) {
+            return Err(io::Error::other(
+                "an ADB token needs only its authored attribute",
+            ));
+        }
+        projection::verify_coordinate(value, &original[0], field, self, sources)
+    }
+}
+
+pub(super) struct TagDefinition<'a> {
+    pub(super) names: &'a [Value],
+    pub(super) version: Option<&'a str>,
+    pub(super) imports: &'a [Option<String>],
+}
+
+fn loadout_items(root: SourceElement<'_>) -> Vec<Option<String>> {
+    let mut result = Vec::new();
+    let mut pending = children(root, "Items").collect::<Vec<_>>();
+    pending.reverse();
+    while let Some(node) = pending.pop() {
+        let is_group = node.name() == "Items";
+        result.push((!is_group).then(|| single_path(node, "itemName")).flatten());
+        let start = pending.len();
+        pending.extend(children(node, if is_group { "Item" } else { "Items" }));
+        pending[start..].reverse();
+    }
+    result
+}
+
+fn single_path(node: SourceElement<'_>, field: &str) -> Option<String> {
+    let mut matches = node
+        .attributes()
+        .filter(|attribute| attribute.name() == field && attribute.namespace().is_none());
+    let value = matches.next()?.value();
+    matches.next().is_none().then(|| value.to_owned())
 }
 
 impl Coverage {
@@ -96,9 +197,12 @@ impl Coverage {
             ("branches", Expected::Adb { branches, .. }) => {
                 verify_branch(value, at(branches, local)?, original, sources)
             }
-            ("definitions", Expected::Tags(expected)) => {
-                verify_tags(value, expected, original, sources)
-            }
+            (
+                "definitions",
+                Expected::Tags {
+                    names: expected, ..
+                },
+            ) => verify_tags(value, expected, original, sources),
             _ => Err(io::Error::other("selected original document role differs")),
         }
     }
@@ -107,7 +211,9 @@ impl Coverage {
         for (&document, original) in originals {
             match &original.expected {
                 Expected::Controller(_) => self.require(document, "controller", 0)?,
-                Expected::Adb { options, branches } => {
+                Expected::Adb {
+                    options, branches, ..
+                } => {
                     for (index, option) in options.iter().enumerate() {
                         if option[0].as_array().is_some_and(|attrs| !attrs.is_empty())
                             || option[1].as_array().is_some_and(|attrs| !attrs.is_empty())
@@ -119,7 +225,7 @@ impl Coverage {
                         self.require(document, "branches", index as u64)?;
                     }
                 }
-                Expected::Tags(_) => {}
+                Expected::Tags { .. } | Expected::Loadout(_) => {}
             }
         }
         for required in ["controller", "options", "branches", "definitions"] {

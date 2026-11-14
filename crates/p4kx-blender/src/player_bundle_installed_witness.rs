@@ -20,6 +20,8 @@ use super::{PreparedCapture, prepare_observed};
 
 #[path = "player_bundle_witness_actor.rs"]
 mod actor;
+#[path = "player_bundle_witness_weapon.rs"]
+mod weapon;
 #[path = "player_bundle_witness_xml.rs"]
 mod xml;
 
@@ -60,7 +62,12 @@ fn installed_player_bundle_matches_selected_original_sources() -> Check {
     let sources = Sources::new(&capture.source_inventory)?;
     let mut coverage = xml::Coverage::default();
     let mut candidates = 0;
+    let data = p4kx_extraction::DataForgeEntry::read(&archive)
+        .map_err(|_| "cannot independently reread the weapon DataForge")?;
+    let forge = weapon::Forge::new(&data)?;
+    let mut weapon_rows = weapon::Coverage::default();
     player_bundle_rows::write(&capture, |row| {
+        weapon_rows.verify(row, &forge, &sources)?;
         match row {
             Row::ActorRigCandidate { value, .. } => {
                 actor.verify(candidates, &serde_json::to_value(value)?, &sources)?;
@@ -79,6 +86,7 @@ fn installed_player_bundle_matches_selected_original_sources() -> Check {
         return Err("actor geometry candidate coverage differs".into());
     }
     coverage.finish(&documents.0)?;
+    weapon_rows.finish(&documents.0, &forge, &sources)?;
     Ok(())
 }
 
@@ -123,6 +131,20 @@ impl<'capture> Sources<'capture> {
             .map(|row| (row.id().as_str(), row))
             .collect();
         Ok(Self { sources, uses })
+    }
+
+    fn single_field(
+        &self,
+        field: &Value,
+        expected: &Physical,
+        coordinate: &SourceLocation,
+    ) -> io::Result<()> {
+        if field["sourceUsesRefs"].as_array().map(Vec::len) != Some(1) {
+            return Err(io::Error::other(
+                "a direct value needs one exact source use",
+            ));
+        }
+        self.field(field, expected, coordinate)
     }
 
     fn field(
