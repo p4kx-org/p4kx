@@ -207,7 +207,7 @@ fn lookup_failure<'archive, E>(error: PathIndexBuildError<E>) -> Result<RigEntry
     }
 }
 
-fn archive_entry_candidates(path: &str) -> [String; 2] {
+pub(crate) fn archive_entry_candidates(path: &str) -> [String; 2] {
     let path = path.trim_start_matches(['/', '\\']);
     [format!("Data/{path}"), path.to_owned()]
 }

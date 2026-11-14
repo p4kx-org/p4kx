@@ -7,6 +7,7 @@ use p4kx_extraction::{
 use p4kx_model::SocContainerDescriptor;
 
 use super::soc_archive_member::{origin, select};
+use super::soc_geometry_capture;
 use super::{CaptureCheck, SocCaptureError, SocContainerOccurrence, SocMemberSelector};
 use crate::ChildContainerPath;
 
@@ -89,8 +90,9 @@ impl<'a, 'check> Walk<'a, 'check> {
     pub(super) fn visit(&mut self, root: EntryOrigin) -> Result<(), SocCaptureError> {
         let (archive, keys) = self.given.last().ok_or(SocCaptureError::Root)?;
         let binding = root.binding();
-        self.occurrences
-            .push(super::scan(&keys.index(archive), root, None, self.check)?);
+        let mut capture = super::scan(&keys.index(archive), root, None, self.check)?;
+        soc_geometry_capture::capture(&mut capture, self.geometry_layers(), self.check)?;
+        self.occurrences.push(capture);
         self.active.push(Frame {
             owned: None,
             binding,
@@ -140,7 +142,13 @@ impl<'a, 'check> Walk<'a, 'check> {
         let binding = origin.binding();
         let keys = check.keys(&archive)?;
         let occurrence = self.occurrences.len();
-        let capture = super::scan(&keys.index(&archive), origin, Some(at), check)?;
+        let index = keys.index(&archive);
+        let mut capture = super::scan(&index, origin, Some(at), check)?;
+        soc_geometry_capture::capture(
+            &mut capture,
+            std::iter::once(index).chain(self.geometry_layers()),
+            check,
+        )?;
         self.occurrences.push(capture);
         Ok((
             SocChildState::Opened { occurrence },
@@ -151,6 +159,20 @@ impl<'a, 'check> Walk<'a, 'check> {
                 next_child: 0,
             }),
         ))
+    }
+
+    fn geometry_layers(&self) -> impl Iterator<Item = PathIndex<'_>> {
+        self.active
+            .iter()
+            .rev()
+            .filter_map(|frame| frame.owned.as_ref())
+            .map(|(archive, keys)| keys.index(archive))
+            .chain(
+                self.given
+                    .iter()
+                    .rev()
+                    .map(|(archive, keys)| keys.index(archive)),
+            )
     }
 
     fn resolve(&self, path: &ChildContainerPath<'_>) -> Result<ChildTarget, SocCaptureError> {

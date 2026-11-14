@@ -140,6 +140,7 @@ mod prop_on_skin_port;
 mod prop_on_skin_port_edges;
 mod soc_container_capture;
 mod soc_entity_index;
+mod soc_geometry_capture;
 mod soc_light_class;
 mod soc_room_index;
 mod soc_tile_ports;

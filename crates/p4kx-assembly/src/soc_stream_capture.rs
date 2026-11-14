@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_extraction::PathIndex;
 use p4kx_extraction::cryxml::{SourceAttributePosition, SourceElementPosition};
 use p4kx_model::{SocContainerDeclaration, SocContainerDescriptor, SocSourceValue};
 
-use super::SocCaptureError;
 use super::soc_descriptor_member::SocMemberSelection;
+use super::{SocCaptureError, SocGeometryReference};
 use crate::interior::plain_container_path;
 
 /// The original name selector and positions of an authored container member.
@@ -59,6 +61,8 @@ pub struct SocStreamInput {
     pub parent: Option<SourceElementPosition>,
     /// The admitted physical selection, absent when the selector is unusable.
     pub member: Option<SocMemberSelection>,
+    /// Directory lookup of the original model slots in this logical stream occurrence.
+    pub geometry: Arc<[SocGeometryReference]>,
 }
 
 pub(super) fn streams(
@@ -79,6 +83,7 @@ pub(super) fn streams(
                 selector,
                 parent: stream.parent_position(),
                 member,
+                geometry: Arc::default(),
             })
         })
         .collect()

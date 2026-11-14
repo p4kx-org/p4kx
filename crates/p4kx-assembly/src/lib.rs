@@ -287,7 +287,8 @@ pub use room_model_helper::RoomModelHelper;
 pub use skeleton::{MAX_SKELETON_LEN, SkeletonProblem};
 pub use soc_container_capture::{
     SocArchiveMember, SocCaptureError, SocChildInput, SocChildState, SocContainerCapture,
-    SocContainerOccurrence, SocMemberError, SocMemberSelection, SocMemberSelector, SocStreamInput,
+    SocContainerOccurrence, SocGeometryCandidateKind, SocGeometryReference, SocGeometryTarget,
+    SocGeometryTier, SocMemberError, SocMemberSelection, SocMemberSelector, SocStreamInput,
 };
 pub use soc_entity_index::{SocEntityIndex, SocEntitySite, SocEntityTarget};
 pub use soc_light_class::{SocLightClass, SocLightClassSelector, SocLightClassSource};

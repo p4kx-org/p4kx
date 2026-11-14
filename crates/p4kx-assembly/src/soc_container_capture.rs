@@ -14,6 +14,8 @@ use thiserror::Error;
 mod soc_archive_member;
 #[path = "soc_descriptor_member.rs"]
 mod soc_descriptor_member;
+#[path = "soc_geometry_capture.rs"]
+mod soc_geometry_capture;
 #[path = "soc_nested_capture.rs"]
 mod soc_nested_capture;
 #[path = "soc_stream_capture.rs"]
@@ -21,6 +23,9 @@ mod soc_stream_capture;
 
 pub use soc_archive_member::{SocArchiveMember, SocMemberError};
 pub use soc_descriptor_member::SocMemberSelection;
+pub use soc_geometry_capture::{
+    SocGeometryCandidateKind, SocGeometryReference, SocGeometryTarget, SocGeometryTier,
+};
 pub use soc_nested_capture::{SocChildInput, SocChildState};
 pub use soc_stream_capture::{SocMemberSelector, SocStreamInput};
 
