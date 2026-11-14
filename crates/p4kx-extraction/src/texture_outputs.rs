@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::cell::RefCell;
-use std::fs::{self, File};
+use std::fs::File;
 use std::io::{self, BufWriter, Write};
 
 use p4kx_archive::Checksum;
@@ -14,7 +14,7 @@ use crate::buffers::Buffers;
 use crate::texture_convert::{Source, Step};
 use crate::texture_siblings::Capturing;
 use crate::tracker::Tracker;
-use crate::write::{Chunk, Destination, EntryWriter, Outcome, create_temporary, write_error};
+use crate::write::{Chunk, Destination, EntryWriter, Outcome, write_error};
 
 const WRITE_BUFFER_LEN: usize = 256 * 1024;
 
@@ -32,7 +32,7 @@ impl EntryWriter<'_> {
         if destination.existing.is_some() && self.policy == ConflictPolicy::Skip {
             return Ok(Step::Kept);
         }
-        let (temporary, file) = create_temporary(&destination.folder)?;
+        let (temporary, file, ownership) = self.temporary(&destination.folder)?;
         let decided = self
             .merge_to(file, source, (capture, counted), buffers)
             .map_err(|error| write_error_at(error, destination))
@@ -46,21 +46,35 @@ impl EntryWriter<'_> {
         let step = match decided {
             Ok(None) => step_of(&self.put_in_place(
                 &temporary,
+                &ownership,
                 &destination.file,
                 Ok(Chunk::End),
                 Outcome::Converted,
             )?),
-            Ok(Some(outcome)) => {
-                let _ignored = fs::remove_file(&temporary);
-                step_of(&outcome)
-            }
-            Err(_) if self.tracker.should_stop() => {
-                let _ignored = fs::remove_file(&temporary);
-                Step::Cancelled
+            Ok(Some(outcome)) => crate::output_cleanup::extraction(
+                Ok(step_of(&outcome)),
+                &ownership,
+                &temporary,
+                self.cancel,
+            )?,
+            Err(error)
+                if self.tracker.should_stop()
+                    && !crate::guard_cancellation::retained_output(&error) =>
+            {
+                crate::output_cleanup::extraction(
+                    Ok(Step::Cancelled),
+                    &ownership,
+                    &temporary,
+                    self.cancel,
+                )?
             }
             Err(error) => {
-                let _ignored = fs::remove_file(&temporary);
-                return Err(error);
+                return crate::output_cleanup::extraction(
+                    Err(error),
+                    &ownership,
+                    &temporary,
+                    self.cancel,
+                );
             }
         };
         Ok(step)

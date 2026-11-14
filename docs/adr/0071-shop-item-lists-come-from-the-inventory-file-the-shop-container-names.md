@@ -6,6 +6,13 @@ in every container and found by anchor, and placeholder inventories give no list
 ADR-0069 left the item list out because no rule assigned an inventory file to a shop. The
 `ShopID` chain inside a file is the wrong end to look at; the shop side names its file.
 
+## Catalog v3 amendment
+
+The physical inventory definition retains the full original JSON and provides typed navigation to
+ordered lines, all authored ID alternatives, exact price and stock number tokens, and rental
+variants. The same parsed source supplies the ordered, unique `itemGuids` of a resolved shop.
+The all-sources-agree matching rule remains the source of that resolution.
+
 ## Decision
 
 - **The rule.** The `.soc` of a shop container holds the `EntityComponentShop` component of its

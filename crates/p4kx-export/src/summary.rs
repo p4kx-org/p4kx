@@ -7,7 +7,8 @@ use crate::quantization_summary::QuantizationSummary;
 use crate::shop_summary::ShopSummary;
 use crate::store_slug_summary::StoreSlugSummary;
 use crate::{
-    CatalogFailure, CraftingWarning, ItemClassSummary, Kind, PlayabilitySummary, StarmapReport,
+    CatalogFailures, CatalogProvenance, CraftingWarning, ItemClassSummary, Kind,
+    PlayabilitySummary, StarmapReport,
 };
 
 /// The largest catalog file the basetool accepts for upload, in bytes, compressed if it is; it
@@ -67,7 +68,7 @@ pub struct KindSummary {
     pub count: usize,
     /// The selected Records left out as development leftovers.
     pub skipped: usize,
-    /// Whether the kind is a complete snapshot, i.e. no Filter was used.
+    /// Whether the kind has its full selection scope; global tags ignore the Entity Filter.
     pub complete: bool,
 }
 
@@ -173,6 +174,8 @@ pub struct TextSummary {
 /// What a catalog holds: the counts per kind, how its texts resolved and its size.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CatalogSummary {
+    pub(crate) export_health: crate::ExportHealth,
+    pub(crate) provenance: CatalogProvenance,
     pub(crate) kinds: Vec<KindSummary>,
     pub(crate) texts: Vec<TextSummary>,
     pub(crate) notes: Vec<LocalizationNote>,
@@ -186,13 +189,19 @@ pub struct CatalogSummary {
     pub(crate) playability: PlayabilitySummary,
     pub(crate) variants: VariantSummary,
     pub(crate) quantizations: QuantizationSummary,
-    pub(crate) failures: Vec<CatalogFailure>,
     pub(crate) warnings: Vec<CraftingWarning>,
     pub(crate) size: u64,
     pub(crate) compressed_size: Option<u64>,
+    pub(crate) archive_key: crate::ArchiveKeyUse,
 }
 
 impl CatalogSummary {
+    /// Returns the actual source-read and projection health of the serialized catalog.
+    #[must_use]
+    pub const fn export_health(&self) -> &crate::ExportHealth {
+        &self.export_health
+    }
+
     /// Returns the counts of the paints: how many the catalog holds, how many fit a ship and how
     /// many fit none.
     #[must_use]
@@ -236,29 +245,22 @@ impl CatalogSummary {
         &self.store_slugs
     }
 
-    /// Returns the Records that could not be read and were left out, the selected ones and those
-    /// a rule reads, ordered by GUID.
-    ///
-    /// Their entries are left out of the catalog; a ship whose loadout cannot be resolved stays in
-    /// `ships` without a loadout.
+    /// Returns Record failures ordered by GUID, including failures that retain partial rows.
     #[must_use]
-    pub fn failures(&self) -> &[CatalogFailure] {
-        &self.failures
+    pub fn failures(&self) -> CatalogFailures<'_> {
+        self.export_health.failures()
     }
 
-    /// Returns what makes the crafting data incomplete or ambiguous although every Record was
-    /// read: a truncated reference index (reward sources missing), Records it could not read,
-    /// several dismantle processes.
+    /// Returns source warnings and incomplete or ambiguous catalog relationships.
     #[must_use]
     pub fn warnings(&self) -> &[CraftingWarning] {
         &self.warnings
     }
 
-    /// Returns whether every selected Record could be read and the crafting data has no
-    /// [warning](Self::warnings).
+    /// Returns whether every required source read and projection completed without a source warning.
     #[must_use]
     pub const fn is_complete(&self) -> bool {
-        self.failures.is_empty() && self.warnings.is_empty()
+        self.export_health.is_complete()
     }
 
     /// Returns how the item classes of the items were read.
@@ -369,32 +371,5 @@ impl CatalogSummary {
     #[must_use]
     pub const fn decompressed_warning(&self) -> Option<SizeWarning> {
         SizeWarning::for_decompressed_size(self.size)
-    }
-}
-
-/// A built Basetool catalog: its JSON and its summary.
-#[derive(Debug, Clone)]
-pub struct BuiltCatalog {
-    pub(crate) json: Vec<u8>,
-    pub(crate) summary: CatalogSummary,
-}
-
-impl BuiltCatalog {
-    /// Returns the catalog as UTF-8 JSON ending in a newline.
-    #[must_use]
-    pub fn json(&self) -> &[u8] {
-        &self.json
-    }
-
-    /// Returns the summary.
-    #[must_use]
-    pub const fn summary(&self) -> &CatalogSummary {
-        &self.summary
-    }
-
-    /// Returns the JSON and the summary.
-    #[must_use]
-    pub fn into_parts(self) -> (Vec<u8>, CatalogSummary) {
-        (self.json, self.summary)
     }
 }

@@ -9,12 +9,13 @@ use serde::Serialize;
 use sha2::{Digest as _, Sha256};
 
 use crate::contract::every_field_required;
+use crate::definition_reference::DefinitionReference;
 use crate::guid_text::CatalogGuid;
 
 /// The level of a contract that states a property or a prerequisite.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum SpawnLevel {
     /// The overrides of the sub contract.
     SubContract,
@@ -30,7 +31,7 @@ pub(crate) enum SpawnLevel {
 
 /// A set of tags written as their full tag paths, e.g. `AI.Ship.SpawnFlags.PoweredOff`, in
 /// stored order.
-pub(crate) type TagPaths = Vec<String>;
+pub(crate) type TagPaths = Vec<crate::spawn_tag_text::SpawnTagText>;
 
 /// An [`io::Write`] that feeds what it is given to a SHA-256 hasher.
 struct HashWriter(Sha256);
@@ -76,6 +77,8 @@ pub(crate) struct ShipSpawnOption {
     /// The `includeLocationAISpawnTags` flag; `null` when absent.
     #[serde(rename = "includeLocationAISpawnTags")]
     pub(crate) include_location_ai_spawn_tags: Option<bool>,
+    /// The authored `crewInheritsLocationFaction` flag.
+    pub(crate) crew_inherits_location_faction: Option<bool>,
     /// The `tags` the game searches ships and crew by: ship model, role, faction, cargo, spawn
     /// flags.
     pub(crate) tags: TagPaths,
@@ -153,7 +156,7 @@ pub(crate) enum LocationCondition {
     #[serde(rename_all = "camelCase")]
     ExcludeNearbyLocations {
         /// The `exclusionRangeKm`, `null` when absent.
-        range_km: Option<i64>,
+        range_km: Option<f32>,
         /// The `missionVariableName` of the `locationProperty`, `null` when absent.
         location_property: Option<String>,
     },
@@ -161,7 +164,7 @@ pub(crate) enum LocationCondition {
     #[serde(rename_all = "camelCase")]
     ExcludeDistantLocations {
         /// The `exclusionRangeKm`, `null` when absent.
-        range_km: Option<i64>,
+        range_km: Option<f32>,
         /// The `missionVariableName` of the `locationProperty`, `null` when absent.
         location_property: Option<String>,
     },
@@ -197,12 +200,18 @@ pub(crate) enum LocationCondition {
         /// The `MissionItem` Records.
         item_guids: Vec<CatalogGuid>,
     },
+    /// `DataSetMatchCondition_FactionIdentityDef`.
+    #[serde(rename_all = "camelCase")]
+    FactionIdentity {
+        /// The source faction identity Reference without following its Record.
+        faction_identity: Option<DefinitionReference>,
+    },
 }
 
 /// Whether a location property holds one location or several.
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum LocationCount {
     /// `MissionPropertyValue_Location`.
     One,

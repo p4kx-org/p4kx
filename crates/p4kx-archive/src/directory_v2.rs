@@ -3,26 +3,17 @@
 
 use p4kx_foundation::ByteReader;
 
+use crate::archive_metadata::ArchiveMetadata;
+use crate::directory_v2_trailer::{RECORD_LEN, TRAILER_LEN, Trailer};
 use crate::entry::stated_sha256;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog, decode_path};
+use crate::metadata_range::MetadataRange;
 use crate::source::Source;
-use crate::{Checksum, Compression, Entry, EntryIssue, layout};
+use crate::{Checksum, Compression, DosTimestamp, Entry, EntryIssue, EntryMetadata};
 
-const TRAILER_LEN: usize = 175;
-const RECORD_LEN: usize = 204;
-const TRAILER_EXTENSION_COUNT_LEN: usize = 8;
-const TRAILER_EXTENSION_SIZE_LEN: usize = 8;
-const RECORD_TIME_AND_DATE_LEN: usize = 4;
 const RECORD_SIGNATURE_LEN: usize = 128;
 const RECORD_SHA256_LEN: usize = 32;
-
-struct Trailer {
-    directory_offset: u64,
-    directory_size: u64,
-    names_offset: u64,
-    names_size: u64,
-}
 
 /// Reads the Entries of a v2 Archive from its trailer, directory records and name table, refusing
 /// more than `max_entries` before the directory is read.
@@ -34,65 +25,52 @@ pub(crate) fn read_entries(
         .len()
         .checked_sub(TRAILER_LEN as u64)
         .ok_or_else(|| FormatError::corrupt(0, "v2 trailer is cut off"))?;
-    let trailer = read_trailer(source, trailer_offset, max_entries)?;
+    let trailer = Trailer::read(source, trailer_offset, max_entries)?;
     let directory = read_range(
         source,
         trailer.directory_offset,
-        trailer.directory_size,
+        trailer.directory_size()?,
         trailer_offset,
         "central directory",
     )?;
     let names = read_range(
         source,
         trailer.names_offset,
-        trailer.names_size,
+        trailer.names_size()?,
         trailer_offset,
         "name table",
     )?;
     let mut entries = Vec::with_capacity(directory.len() / RECORD_LEN);
     let mut log = IssueLog::default();
-    let data_limit = trailer.directory_offset.min(trailer.names_offset);
+    let data_limit = trailer.payload_end;
+    let progress = trailer.progress(source)?;
+    let mut installed = ByteReader::with_base(&progress, trailer.payload_end);
     let mut record_offset = trailer.directory_offset;
     for record in directory.as_chunks::<RECORD_LEN>().0 {
-        let entry = parse_record(
+        let mut entry = parse_record(
             record,
             record_offset,
             &names,
             (entries.len(), data_limit),
             &mut log,
+            source.len(),
         )?;
+        let installed_bytes = installed.read_u64()?;
+        if installed_bytes > entry.compressed_size {
+            return Err(FormatError::corrupt(
+                record_offset,
+                "installed-byte counter exceeds stored size",
+            ));
+        }
+        entry.installed_bytes = Some(installed_bytes);
         entries.push(entry);
         record_offset += RECORD_LEN as u64;
     }
-    Ok(Directory { entries, log })
-}
-
-fn read_trailer(
-    source: &Source,
-    offset: u64,
-    max_entries: Option<u64>,
-) -> Result<Trailer, FormatError> {
-    let bytes = source.read_at(offset, TRAILER_LEN)?;
-    let mut reader = ByteReader::with_base(&bytes, offset);
-    let entry_count = reader.read_u64()?;
-    reader.skip(TRAILER_EXTENSION_COUNT_LEN)?;
-    let directory_offset = reader.read_u64()?;
-    let directory_size = reader.read_u64()?;
-    reader.skip(TRAILER_EXTENSION_SIZE_LEN)?;
-    let names_offset = reader.read_u64()?;
-    let names_size = reader.read_u64()?;
-    layout::check_entry_count(entry_count, max_entries)?;
-    if entry_count.checked_mul(RECORD_LEN as u64) != Some(directory_size) {
-        return Err(FormatError::corrupt(
-            offset,
-            format!("central directory size does not match its {entry_count} Entries"),
-        ));
-    }
-    Ok(Trailer {
-        directory_offset,
-        directory_size,
-        names_offset,
-        names_size,
+    Ok(Directory {
+        entries,
+        log,
+        installation_flags: Some(trailer.flags),
+        metadata: ArchiveMetadata::v2(source.len(), trailer),
     })
 }
 
@@ -125,19 +103,24 @@ fn parse_record(
     names: &[u8],
     at: (usize, u64),
     log: &mut IssueLog,
+    source_len: u64,
 ) -> Result<Entry, FormatError> {
     let (index, data_limit) = at;
     let mut reader = ByteReader::with_base(record, offset);
     let method = reader.read_u16()?;
-    reader.skip(RECORD_TIME_AND_DATE_LEN)?;
+    let time = reader.read_u16()?;
+    let date = reader.read_u16()?;
     let crc32c = reader.read_u32()?;
     let compressed_size = reader.read_u64()?;
     let uncompressed_size = reader.read_u64()?;
     let data_offset = reader.read_u64()?;
     let name_offset = reader.read_u64()?;
     reader.skip(RECORD_SIGNATURE_LEN)?;
+    let encryption_offset = reader.offset();
     let encryption = reader.read_u16()?;
     let sha256 = stated_sha256(reader.read_bytes(RECORD_SHA256_LEN)?);
+    let ordinal = u64::try_from(index)
+        .map_err(|_| FormatError::corrupt(offset, "v2 record ordinal exceeds u64"))?;
     if data_offset
         .checked_add(compressed_size)
         .is_none_or(|end| end > data_limit)
@@ -151,6 +134,14 @@ fn parse_record(
         );
     }
     Ok(Entry {
+        metadata: EntryMetadata::from_v2(
+            DosTimestamp::new(date, time),
+            method,
+            ordinal,
+            encryption,
+            encryption_offset,
+            MetadataRange::checked(offset, RECORD_LEN as u64, source_len)?,
+        ),
         path: read_name(names, name_offset, offset, index, log)?,
         compressed_size,
         uncompressed_size,
@@ -162,6 +153,7 @@ fn parse_record(
         index: u32::try_from(index).unwrap_or(u32::MAX),
         encrypted: encryption != 0,
         local_header: false,
+        installed_bytes: None,
     })
 }
 

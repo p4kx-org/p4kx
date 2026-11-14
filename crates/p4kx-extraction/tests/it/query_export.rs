@@ -50,7 +50,7 @@ fn csv_is_written_like_the_cli_writes_it() -> TestResult {
 
     let written = export_query(
         &compiled,
-        &compiled.run(),
+        &compiled.run()?,
         (&out, ResultFormat::Csv),
         &no_archive(),
         &QueryExportOptions::default(),
@@ -76,7 +76,7 @@ fn json_is_one_array_of_typed_objects() -> TestResult {
 
     export_query(
         &compiled,
-        &compiled.run(),
+        &compiled.run()?,
         (&out, ResultFormat::Json),
         &no_archive(),
         &QueryExportOptions::default(),
@@ -101,7 +101,7 @@ fn progress_counts_the_rows_written() -> TestResult {
 
     export_query(
         &compiled,
-        &compiled.run(),
+        &compiled.run()?,
         (&dir.path().join("result.csv"), ResultFormat::Csv),
         &no_archive(),
         &QueryExportOptions {
@@ -128,7 +128,7 @@ fn a_cancelled_export_keeps_the_existing_file_and_leaves_no_part_file() -> TestR
 
     let result = export_query(
         &compiled,
-        &compiled.run(),
+        &compiled.run()?,
         (&out, ResultFormat::Csv),
         &no_archive(),
         &QueryExportOptions {
@@ -157,7 +157,7 @@ fn a_folder_that_does_not_exist_is_a_write_error_naming_the_file() -> TestResult
 
     let result = export_query(
         &compiled,
-        &compiled.run(),
+        &compiled.run()?,
         (&out, ResultFormat::Csv),
         &no_archive(),
         &QueryExportOptions::default(),
@@ -182,7 +182,7 @@ fn an_export_over_the_open_archive_is_refused() -> TestResult {
 
     let result = export_query(
         &compiled,
-        &compiled.run(),
+        &compiled.run()?,
         (&out, ResultFormat::Csv),
         &archive,
         &QueryExportOptions::default(),

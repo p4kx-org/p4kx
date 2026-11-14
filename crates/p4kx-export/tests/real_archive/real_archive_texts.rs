@@ -7,17 +7,26 @@
 //! translation completeness of the game is measured, never asserted as a global share.
 //!
 //! The expectation is built here from the file's lines with the game's rules (the key without its
-//! `@`, ASCII case ignored, a `key,P=` line standing for `key`, the first non-empty text, `\n`
-//! decoded and the text trimmed) and does not use the exporter's lookup.
-
-use std::borrow::Cow;
-use std::collections::HashMap;
+//! `@`, ASCII case ignored, the last plain and suffixed declarations with a non-empty plain
+//! value preferred, `\n` decoded and the text trimmed) and does not use the exporter's lookup.
 
 use p4kx_export::{Kind, Language, catalog_schema};
-use p4kx_extraction::{Archive, LocalizationSet, TextSet, display_text, is_placeholder_key};
+use p4kx_extraction::{Archive, LocalizationSet, is_placeholder_key};
 use serde_json::Value;
 
+use crate::real_archive_canonical_texts::kind_coverage;
+pub(crate) use crate::real_archive_canonical_texts::manufacturer_text;
+use crate::real_archive_text_oracle::Oracle;
 use crate::real_archive_verification::{TestResult, list, print_line};
+
+#[path = "real_archive_texts_tests.rs"]
+mod tests;
+
+#[path = "real_archive_canonical_texts_tests.rs"]
+mod canonical_tests;
+
+#[path = "real_archive_live_texts.rs"]
+mod live;
 
 /// The baseline of a kind: the largest share of its keyed texts the English and the German
 /// `global.ini` may lack, as measured on LIVE and rounded up to the hundredth. A kind with keyed
@@ -71,53 +80,30 @@ const MISSION_TOKEN: &str = "~mission(";
 /// How many keys of a kind a failure message names.
 const SAMPLE: usize = 3;
 
-/// The texts one language's file holds, by lower-case key without `@`.
-struct Oracle<'a>(HashMap<String, Cow<'a, str>>);
-
-impl<'a> Oracle<'a> {
-    fn of(texts: &TextSet<'a>, language: Language) -> Result<Self, String> {
-        let ini = texts
-            .ini(language)
-            .ok_or_else(|| format!("the Archive holds {language}"))?;
-        let map = ini
-            .iter()
-            .filter_map(|(key, text)| {
-                let shown = display_text(text);
-                (!shown.is_empty()).then(|| (key.to_ascii_lowercase(), shown))
-            })
-            .collect();
-        Ok(Self(map))
-    }
-
-    fn text(&self, key: &str) -> Option<&str> {
-        let key = key.strip_prefix('@').unwrap_or(key).to_ascii_lowercase();
-        self.0.get(&key).map(AsRef::as_ref)
-    }
-}
-
 /// What the catalog holds for the keyed texts of one kind in one language.
 #[derive(Debug, Default)]
-struct Coverage {
+pub(crate) struct Coverage {
     /// Texts the file holds and the catalog has, equal.
     resolved: usize,
-    /// Texts the file lacks and the catalog has as `null`.
+    /// Texts without a non-empty source translation.
     fallback: usize,
     /// Texts where the catalog contradicts the file: the exporter is wrong.
     contradictions: usize,
+    supplemental_contradictions: usize,
     /// The first keys of the contradictions and of the fallbacks.
     contradicted: Vec<String>,
     lacking: Vec<String>,
 }
 
 impl Coverage {
-    fn count(&mut self, oracle: &Oracle<'_>, key: &str, shown: Option<&Value>) {
-        match (oracle.text(key), shown.and_then(Value::as_str)) {
-            (Some(expected), Some(shown))
-                if expected == shown || expected.contains(MISSION_TOKEN) =>
+    pub(crate) fn count(&mut self, oracle: &Oracle, key: &str, shown: Option<&Value>) {
+        match (oracle.text(key), shown) {
+            (Some(expected), Some(Value::String(shown)))
+                if expected == shown || (!shown.is_empty() && expected.contains(MISSION_TOKEN)) =>
             {
                 self.resolved += 1;
             }
-            (None, None) => {
+            (None, Some(Value::Null)) => {
                 self.fallback += 1;
                 if self.lacking.len() < SAMPLE {
                     self.lacking.push(key.to_owned());
@@ -131,6 +117,62 @@ impl Coverage {
                 }
             }
         }
+    }
+
+    pub(crate) fn count_canonical(&mut self, oracle: &Oracle, key: &str, shown: &Value) {
+        let Some(expected) = oracle.canonical_text(key) else {
+            self.count(oracle, key, Some(shown));
+            return;
+        };
+        if shown.as_str() == Some(expected) {
+            if expected.is_empty() {
+                self.fallback += 1;
+                if self.lacking.len() < SAMPLE {
+                    self.lacking.push(key.to_owned());
+                }
+            } else {
+                self.resolved += 1;
+            }
+        } else {
+            self.contradictions += 1;
+            if self.contradicted.len() < SAMPLE {
+                self.contradicted
+                    .push(format!("{key}: file {expected:?}, catalog {shown:?}"));
+            }
+        }
+    }
+
+    pub(crate) fn count_forms(
+        &mut self,
+        oracle: &Oracle,
+        key: &str,
+        source: &Value,
+        shown: &Value,
+    ) {
+        let expected = oracle.source_text(key);
+        let matches = match (expected, source) {
+            (Some(expected), Value::String(actual)) => actual == expected,
+            (None, Value::Null) => true,
+            _ => false,
+        };
+        if matches {
+            self.count_canonical(oracle, key, shown);
+        } else {
+            self.contradictions += 1;
+            if self.contradicted.len() < SAMPLE {
+                self.contradicted.push(format!(
+                    "{key}: source file {expected:?}, catalog {source:?}"
+                ));
+            }
+        }
+    }
+
+    pub(super) fn with_supplemental(mut self, extra: Self) -> Self {
+        self.supplemental_contradictions = extra.contradictions;
+        let available = SAMPLE.saturating_sub(self.contradicted.len());
+        self.contradicted
+            .extend(extra.contradicted.into_iter().take(available));
+        self
     }
 
     const fn total(&self) -> usize {
@@ -165,7 +207,11 @@ fn text_fields() -> Vec<String> {
 
 /// Collects the texts with a key below `node`: the value of every field named in `fields` that
 /// is an object with a string `key`, placeholder keys excluded.
-fn keyed_texts<'v>(node: &'v Value, fields: &[String], found: &mut Vec<(&'v str, &'v Value)>) {
+pub(crate) fn keyed_texts<'v>(
+    node: &'v Value,
+    fields: &[String],
+    found: &mut Vec<(&'v str, &'v Value)>,
+) {
     match node {
         Value::Object(map) => {
             for (name, value) in map {
@@ -209,57 +255,23 @@ fn baseline(kind: Kind) -> Baseline {
 /// holds for LIVE only.
 pub(crate) fn check_texts(archive: &Archive, catalog: &Value, baselined: bool) -> TestResult {
     let set = LocalizationSet::read(archive, &[Language::English, Language::German])?;
-    let texts = set.index()?;
     let (english_oracle, german_oracle) = (
-        Oracle::of(&texts, Language::English)?,
-        Oracle::of(&texts, Language::German)?,
+        Oracle::of(&set, Language::English)?,
+        Oracle::of(&set, Language::German)?,
     );
     let fields = text_fields();
     let mut failures: Vec<String> = Vec::new();
     for kind in Kind::ALL {
-        let (mut english, mut german) = (Coverage::default(), Coverage::default());
-        let mut found = Vec::new();
-        for entity in list(catalog, kind)? {
-            keyed_texts(entity, &fields, &mut found);
-        }
-        for (key, text) in found {
-            english.count(&english_oracle, key, text.get("en"));
-            german.count(&german_oracle, key, text.get("de"));
-        }
-        let keyed = english.total();
-        if keyed == 0 {
-            continue;
-        }
-        let baseline = baseline(kind);
-        print_line(&format!(
-            "{kind}: {keyed} keyed texts, en {} resolved / {} unresolved ({:.3}, baseline {:.2}, e.g. {:?}), de {} resolved / {} fall back to en ({:.3}, baseline {:.2})",
-            english.resolved,
-            english.fallback,
-            share(english.fallback, keyed),
-            baseline.english,
-            english.lacking,
-            german.resolved,
-            german.fallback,
-            share(german.fallback, keyed),
-            baseline.german,
-        ));
-        verdict(
+        let (english, german) =
+            kind_coverage(catalog, kind, &fields, &english_oracle, &german_oracle)?;
+        check_coverage(
             kind,
-            "en",
             &english,
-            baselined.then_some(baseline.english),
-            &mut failures,
-        );
-        verdict(
-            kind,
-            "de",
             &german,
-            baselined.then_some(baseline.german),
+            baselined,
+            list(catalog, kind)?.len(),
             &mut failures,
         );
-        if baselined {
-            floor_verdict(kind, &german, &mut failures);
-        }
     }
     if failures.is_empty() {
         Ok(())
@@ -286,10 +298,11 @@ fn verdict(
     ceiling: Option<f64>,
     failures: &mut Vec<String>,
 ) {
-    if coverage.contradictions > 0 {
+    let contradictions = coverage.contradictions + coverage.supplemental_contradictions;
+    if contradictions > 0 {
         failures.push(format!(
             "{kind}: {} {language} texts contradict the global.ini, e.g. {:?}",
-            coverage.contradictions, coverage.contradicted
+            contradictions, coverage.contradicted
         ));
     }
     let fallback = share(coverage.fallback, coverage.total());
@@ -300,5 +313,70 @@ fn verdict(
             "{kind}: {fallback:.3} of the {language} texts fall back, above the baseline {ceiling:.2}, e.g. {:?}",
             coverage.lacking
         ));
+    }
+}
+
+fn check_coverage(
+    kind: Kind,
+    english: &Coverage,
+    german: &Coverage,
+    baselined: bool,
+    row_count: usize,
+    failures: &mut Vec<String>,
+) {
+    let keyed = english.total();
+    if keyed == 0 {
+        if baselined
+            && matches!(
+                kind,
+                Kind::Manufacturers
+                    | Kind::ResourceTypes
+                    | Kind::ResourceGroups
+                    | Kind::GameplayProperties
+                    | Kind::Commodities
+                    | Kind::ContractTemplates
+                    | Kind::MissionBrokerEntries
+                    | Kind::ReputationScopes
+                    | Kind::ReputationStandings
+            )
+            && row_count > 0
+        {
+            failures.push(format!(
+                "{kind}: positive baseline rows have no verifiable canonical texts"
+            ));
+        }
+        verdict(kind, "en", english, None, failures);
+        verdict(kind, "de", german, None, failures);
+        return;
+    }
+    let baseline = baseline(kind);
+    print_line(&format!(
+        "{kind}: {keyed} keyed texts, en {} resolved / {} unresolved ({:.3}, baseline {:.2}, e.g. {:?}), de {} resolved / {} fall back to en ({:.3}, baseline {:.2})",
+        english.resolved,
+        english.fallback,
+        share(english.fallback, keyed),
+        baseline.english,
+        english.lacking,
+        german.resolved,
+        german.fallback,
+        share(german.fallback, keyed),
+        baseline.german,
+    ));
+    verdict(
+        kind,
+        "en",
+        english,
+        baselined.then_some(baseline.english),
+        failures,
+    );
+    verdict(
+        kind,
+        "de",
+        german,
+        baselined.then_some(baseline.german),
+        failures,
+    );
+    if baselined {
+        floor_verdict(kind, german, failures);
     }
 }

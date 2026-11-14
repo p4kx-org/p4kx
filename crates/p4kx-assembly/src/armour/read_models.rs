@@ -4,6 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use p4kx_extraction::{EntryOrigin, ModelArchiveSource};
 use p4kx_model::{Lod, Model};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
@@ -18,6 +19,8 @@ const WAVE: usize = 64;
 pub(super) struct Loaded {
     pub(super) entry: String,
     pub(super) model: Arc<Model>,
+    pub(super) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(super) definition_origin: Option<EntryOrigin>,
 }
 
 pub(super) type Models = HashMap<String, Result<Loaded, ModelFailure>>;
@@ -51,6 +54,8 @@ pub(super) fn read_models(
                 let result = provider.model(path, options.lod).map(|provided| Loaded {
                     entry: provided.entry,
                     model: Arc::new(provided.model),
+                    archive_sources: provided.archive_sources,
+                    definition_origin: provided.definition_origin,
                 });
                 (key.clone(), result)
             })

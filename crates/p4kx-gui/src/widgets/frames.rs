@@ -22,9 +22,9 @@ pub(crate) const MODAL_PADDING_Y: f32 = SPACE_3;
 /// The height of the foot of a modal: its gap, the hairline's gap and the action.
 pub(crate) const FOOT_HEIGHT: f32 = SPACE_4 + SPACE_3 + BUTTON_HEIGHT;
 /// The width of the body of a modal.
-pub(crate) const MODAL_BODY_WIDTH: f32 = MODAL_WIDTH - 2.0 * SPACE_4;
+pub(crate) const MODAL_BODY_WIDTH: f32 = 2.0f32.mul_add(-SPACE_4, MODAL_WIDTH);
 /// The width of the body of a wide modal.
-pub(crate) const MODAL_WIDE_BODY_WIDTH: f32 = MODAL_WIDE_WIDTH - 2.0 * SPACE_4;
+pub(crate) const MODAL_WIDE_BODY_WIDTH: f32 = 2.0f32.mul_add(-SPACE_4, MODAL_WIDE_WIDTH);
 
 /// The tone of a modal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -123,7 +123,7 @@ pub(crate) fn preview_body() -> Frame {
 
 /// Returns the width a text inside an `.alert` that is `outer` wide may take.
 pub(crate) const fn alert_text_width(outer: f32) -> f32 {
-    outer - 2.0 * SPACE_4 - ACCENT_BAR - 2.0
+    2.0f32.mul_add(-SPACE_4, outer) - ACCENT_BAR - 2.0
 }
 
 /// Shows an `.alert.alert-warning` with `body` inside.

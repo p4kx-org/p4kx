@@ -49,6 +49,7 @@ pub fn convert_folder(
     };
     let entries = &selection.entries;
     let rules = Rules {
+        entry_target: crate::write::EntryTarget::Source,
         copy_other,
         pick: &by_name_then_content,
     };

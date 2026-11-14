@@ -144,8 +144,11 @@ fn generator_structs() -> Vec<TestStruct> {
         TestStruct::new("StarMapObjectType").field("name", TestType::String),
         TestStruct::new("StarMapObject")
             .field("name", TestType::Locale)
-            .field("type", TestType::Reference)
-            .field("parent", TestType::Reference)
+            .field(
+                "type",
+                TestType::ReferenceTo("StarMapObjectType".to_owned()),
+            )
+            .field("parent", TestType::ReferenceTo("StarMapObject".to_owned()))
             .field("hideInStarmap", TestType::Bool),
         TestStruct::new("ContractResultBlock").array("contractResults", pointer("ContractResult")),
         TestStruct::new("ContractResult"),
@@ -183,7 +186,7 @@ fn property_structs() -> Vec<TestStruct> {
             .array("options", class("MissionPropertyValueOption_StringHash")),
         TestStruct::new("MissionPropertyValueOption_StringHash")
             .field("textId", TestType::Locale)
-            .field("weighting", TestType::Int32),
+            .field("weighting", TestType::Single),
         value("MissionPropertyValue_Organization")
             .array("matchConditions", pointer("DataSetMatchCondition")),
         TestStruct::new("DataSetMatchCondition"),

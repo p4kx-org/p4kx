@@ -45,6 +45,7 @@ pub struct VehicleItemPort {
     pub(crate) required_tags: String,
     pub(crate) types: Vec<String>,
     pub(crate) item_types: Vec<VehicleItemType>,
+    pub(crate) light_attachments: Vec<super::VehicleLightAttachment>,
     pub(crate) origins: Vec<(String, ValueOrigin)>,
 }
 

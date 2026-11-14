@@ -10,10 +10,7 @@ use crate::record_fields::{class_name, elements, integer, reference, structure};
 use crate::selection::{Kind, KindRule};
 
 pub(crate) const QUANTIZATIONS: KindRule = Kind::QualityQuantizations.records();
-pub(crate) const RESOURCE_TYPES: KindRule = KindRule {
-    prefixes: &["libs/foundry/records/resourcetypedatabase/"],
-    type_name: "ResourceType",
-};
+pub(crate) const RESOURCE_TYPES: KindRule = Kind::ResourceTypes.records();
 
 /// Why a `CraftingQualityQuantizationRecord` cannot be read.
 #[derive(Debug, Error, PartialEq, Eq)]
@@ -77,13 +74,13 @@ pub(crate) fn quantization<'f>(
 pub(crate) fn linked_quantizations(tree: &RecordTree<'_>) -> Vec<Guid> {
     elements(Some(tree.root()), "properties")
         .iter()
-        .filter_map(as_struct)
-        .filter_map(|data| {
+        .filter_map(|value| {
+            let data = as_struct(value)?;
             reference(
                 structure(Some(data), "qualityQuantization"),
                 "qualityQuantizationRecord",
             )
+            .map(|target| target.0)
         })
-        .map(|guid| guid.0)
         .collect()
 }

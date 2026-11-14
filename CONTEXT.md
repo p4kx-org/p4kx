@@ -100,6 +100,21 @@ an image one mip at a time, or a Model drawn in 3D that the user turns, pans and
 an Extraction.
 _Avoid_: viewer, inspector
 
+**Source encryption**:
+The declared encryption of an original physical input, independently of whether it can be read or
+whether its exported bytes are encrypted. Missing or contradictory evidence remains unknown.
+_Avoid_: key status, output encryption
+
+**Data origin**:
+The original inputs and containing Entries that actually supplied a data value, selected it through
+authored declarations, or were used to convert it. An unused reference target is not a contribution.
+_Avoid_: Archive-wide encryption, reference closure
+
+**Source use**:
+One actual contribution to a data value, retaining its physical source and payload, selector or
+conversion role. The complete set supports origin classification separately for each data value.
+_Avoid_: candidate, attempted dependency
+
 ### Game data
 
 **DataForge**:
@@ -202,6 +217,14 @@ resolves to one text per language in that language's `global.ini` Entry
 (`Data\Localization\<folder>\global.ini`), of which a Build holds eleven. Code follows the game's
 spelling `Localization`.
 _Avoid_: loc string, text id
+
+**Source text**:
+The winning decoded value of a Localisation key before display escapes or surrounding whitespace
+are changed. A UI format template keeps this form as data and is not evaluated by the Export.
+
+**Display text**:
+The display form of a Source text, with stored line-break escapes decoded and surrounding
+whitespace removed. It remains separate from the unchanged Source text.
 
 **Tag**:
 A Record of the struct `Tag` that labels game content, e.g. `Ship.Series.Avenger`. Fields such as
@@ -685,8 +708,8 @@ The set of Entries and Records that were added, removed or changed between two A
 _Avoid_: diff (fine in code), delta
 
 **Release**:
-A published version of P4KX itself: a `v*` tag with its portable ZIP, its MSI and its
-notes from `CHANGELOG.md`.
+A published version of P4KX itself, identified by a `v*` tag and accompanied by packages
+for the supported platforms and notes from `CHANGELOG.md`.
 _Avoid_: build (a Build is a game version), update
 
 **Update check**:
@@ -704,6 +727,25 @@ One group of entities in the Basetool catalog, e.g. manufacturers or items, sele
 prefix and type and complete or partial on its own.
 _Avoid_: category, entity type
 
+**Blueprint category list**:
+An authored ordered collection of references to blueprint categories, separate from the category
+definitions. Repeated references and null positions remain part of the list; it declares no
+category rules or hierarchy.
+_Avoid_: category definition, category rule
+
+**Display transformation**:
+An authored operation describing how a gameplay property's value is displayed. The
+catalog retains its concrete source form, parameters and ordered Sequence children
+without executing it; local node links organize original occurrences, not game identity.
+_Avoid_: evaluated stat, formatting result, shared operation identity
+
+**Export health**:
+Measured source-read and projection outcomes carried by the Basetool catalog, independently of
+Filter completeness. Physical source Records, required Archive Entry operations and emitted rows
+have separate accounting units; an incomplete result requires explicit diagnostic publication
+(`exportHealth`, ADR-0347).
+_Avoid_: completeness (when describing read failures), successful absence (without source evidence)
+
 **Contract template**:
 A `ContractTemplate` Record that a contract names by `templateGuid`: its mission properties, ship
 spawn and location links, hauling orders, modifiers, mission flow and reward contributions, stated
@@ -715,6 +757,12 @@ A `MissionBrokerEntry` Record, an offer of the mission board with its texts, ava
 schedule, reward and requirements; a contract names it by `brokerEntryGuid`
 (`missionBrokerEntries`, ADR-0320).
 _Avoid_: mission offer, board entry
+
+**Mission property set**:
+One authored collection of mission declarations at a handler, contract or sub-contract of a
+Generator, shared by the contract rows that refer to that source position. It preserves the
+declarations without choosing their runtime values (`missionPropertySets`, ADR-0345).
+_Avoid_: effective properties, resolved location
 
 **Export**:
 A structured file derived from DataForge for another tool, as opposed to an Extraction of Entries.

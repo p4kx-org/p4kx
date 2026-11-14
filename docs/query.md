@@ -235,10 +235,9 @@ of them, and the Query selects the Records that refer to any of them. A Record t
 itself is not selected for that. A weak pointer to a nested instance of another Record, not to
 that Record itself, is not a Reference and selects nothing. It combines with `from` and `at`:
 both keep only the Records that also meet them. The clauses stand in the order `from`, `at`,
-`referencing`, `select`, `where`; `at "…"` behind `referencing` is an error that says so. An
-Archive with more than 8,388,608 References is indexed up to that many, the first ones in Record
-order. The first Query with `referencing` of an Archive reads every Record once to
-index the References ([ADR-0029](adr/0029-references-are-indexed-once-per-archive-from-record-trees.md));
+`referencing`, `select`, `where`. An `at "…"` behind `referencing` is an error. The first
+Query with `referencing` of an Archive reads every Record once and indexes the readable
+References without a fixed count limit ([ADR-0029](adr/0029-references-are-indexed-once-per-archive-from-record-trees.md));
 the window keeps that index for the Archive, and `p4kx dcb refs` lists the References themselves
 with their fields.
 
@@ -322,18 +321,16 @@ writes that same JSON array in its field. The table writes the values in their t
 separated by `, ` in brackets, e.g. `[250.5, 1200]` or `[]`, shortened after 8 values; the
 values are not quoted there, so a string holding `, ` or `]` reads ambiguously in the table only.
 
-Paths reach at most 4,096 array elements (`MAX_PATH_VALUES`). The `select` paths of one row share
-this budget, as their cells hold their values: it bounds the memory of a page to at most 4,096
-values per row. Each comparison of `where` has a budget of its own, as it holds none of the values
-it compares, so `tags[*] = -1 or tags[*] = 1` checks both comparisons in full. `[n]` counts one
-element, `[*]` and `[TypeName]` every element of their array, also those `[TypeName]` skips, and
-nested brackets count on every level: `Components[*].modes[*]` counts the components and then
-the modes of each.
+The `select` paths of one row share a budget of 4,096 array elements (`MAX_PATH_VALUES`), as
+cells retain their values. `[n]` counts one element, `[*]` and `[TypeName]` every element of their
+array, including those a type selector skips; nested brackets count at every level. A bracket
+that would exceed the remaining budget produces the error value `error: the paths of the Record
+reach more than 4096 array elements` in its cell. The cells after it can use the remaining budget.
 
-A bracket that would go beyond the budget of the row gives the error value `error: the paths of
-the Record reach more than 4096 array elements` in its cell, and the cells after it can still
-read what remains. A comparison that would go beyond its budget is unknown, unless a value it
-reached before already holds.
+Comparisons in `where` stream values without retaining a list or imposing an element-count cap.
+An existential comparison stops when a value proves it true. Cancellable selection checks its
+callback at Records, path steps and array elements, including elements skipped by `[TypeName]`.
+An observed stop is latched and drops the entire selection.
 
 ## Conditions
 
@@ -394,15 +391,31 @@ damage, ships without weapons included.
 
 A comparison is unknown when the Record has no value for its path: its type does not resolve the
 path (without `from`), the path ends at a type the value cannot be compared with, reaches `null`
-through a null pointer or an index out of range, or the value cannot be read. An unknown
+through a null pointer or an index out of range. An unknown
 comparison never matches, and the conditions combine as in SQL:
 `not` of unknown is unknown, `false and unknown` is false, `true or unknown` is true, and any
 other combination with unknown is unknown. A Record is kept only when the whole condition is
 true, so `x = 1` and `not x = 1` together never select a Record without a value for `x`.
 
-A Record whose layout or instance cannot be read is different: no value of it can be read, so
-the condition cannot be decided, and the Record is reported as failed rather than silently
-dropped, as for `select`.
+A demanded value that cannot be read is a selection failure, carrying the Record definition
+index, record path, comparison index and original value-reading error. It does not become unknown
+or a successful empty result. A true existential witness, `true or ...`, or `false and ...` proves
+the result without demanding irrelevant read failures, including failures reached before that
+proof. Without such a proof, a reached read failure is reported even alongside ordinary unknowns.
+A stop remains authoritative over a proof or read failure.
+
+`CompiledQuery::run` returns `Result<QueryRun, SelectionError>`; `run_while` returns
+`Result<Option<QueryRun>, SelectionError>`, with `Ok(None)` for a stop. Successful indexes alone
+may be cached or resumed. CLI query and field statistics return DataForge error status 5 on a
+selection failure before writing output; MCP returns a tool error and the GUI reports a failed
+Query. Existing atomic exports remain intact when selection fails or is stopped.
+
+A Record whose entire layout or instance cannot be read retains its visible failed row. This is
+separate from an unreadable value reached while deciding a condition. For candidates with readable
+whole-Record layouts and instances, successful selection completes demanded condition evaluation
+under SQL/Kleene semantics. Whole-Record failures remain explicit failed rows; successful selection
+does not certify global source completeness.
+The contract is recorded in [ADR-0358](adr/0358-query-selection-is-complete-or-explicitly-failed.md).
 
 ## Field statistics
 
@@ -445,14 +458,21 @@ otherwise text anywhere in it, ignoring case), e.g. `--path "*/fireRate"`. The p
 segment by segment ignoring ASCII case, so a path is followed by the paths below it. The result
 is the same for every number of threads.
 
-A Record whose layout or instance cannot be read, or that has more than 1,048,576 values, is not
-counted at all, not even the values found before the limit (the paths it walked still count
-towards the path limit below), and is reported on stderr with exit
-code 1. A value that cannot be read (a bad array
-range, a pointer to no instance, an instance owned twice, a struct nested deeper than 64) is not
-counted and is reported as a number on stderr and in the JSON. An Archive whose Records have more
-than 1,048,576 distinct paths is an error (exit code 5), which bounds the memory
-([ADR-0049](adr/0049-field-statistics-are-counted-per-path-in-one-parallel-pass.md)).
+A requested Record whose root layout or instance cannot be read adds to the unreadable Record
+count and contributes no field counts; stderr reports it with exit code 1. Statistics traverse
+owned values iteratively without a depth or mixed value/work cutoff.
+
+An unreadable scalar occurrence retains its declared occurrence and kind count but adds no
+distinct value or numeric extremum. Invalid array ranges, missing instances, unreadable nested
+layouts, repeated ownership and cyclic inline declarations add to the unreadable-value count.
+Only observations retained before a rejected source edge contribute field counts; unread
+descendant occurrences are not invented. The unreadable counts appear on stderr and in JSON.
+
+The existing path policy allows 1,048,576 trie nodes including the empty root. Requiring another
+node during discovery or merge is an error (exit code 5), not a successful prefix. This bounds
+trie-node cardinality, not all retained observations, path spelling, scratch or process memory.
+See [ADR-0049](adr/0049-field-statistics-are-counted-per-path-in-one-parallel-pass.md) and
+[canonical owned values](canonical-owned-values.md) for exact policies and cost boundaries.
 
 ## Errors
 

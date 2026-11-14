@@ -8,6 +8,21 @@ use thiserror::Error;
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum MaterialError {
+    /// Plain XML input contains invalid UTF-8 bytes.
+    #[error("the material XML source is not UTF-8")]
+    TextEncoding(#[from] std::str::Utf8Error),
+    /// A validated XML source span cannot be retained consistently.
+    #[error("the material XML source span is inconsistent")]
+    SourceSpan,
+    /// The caller supplied zero budgets or an unsupported recursion bound.
+    #[error("invalid material source projection limits")]
+    InvalidSourceLimits,
+    /// The structured input exceeds the configured source byte bound.
+    #[error("material source exceeds {limit} bytes")]
+    SourceBytes {
+        /// Actual input bound applied before parsing.
+        limit: usize,
+    },
     /// The file is no readable `CryXml`.
     #[error("the file is not valid CryXml")]
     CryXml(#[from] CryXmlError),

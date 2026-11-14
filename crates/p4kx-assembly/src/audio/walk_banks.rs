@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashMap;
 use std::rc::Rc;
+
+#[cfg(test)]
+use self::bank_probe::BankProbe;
 
 use p4kx_archive::Archive;
 use p4kx_audio::Soundbank;
@@ -69,6 +73,8 @@ impl Refused<'_> {
 #[derive(Debug, Default)]
 pub(crate) struct Spare<'i> {
     slot: Option<(u32, Result<Loaded<'i>, AudioFileError>)>,
+    #[cfg(test)]
+    probe: Option<BankProbe>,
 }
 
 impl<'i> Spare<'i> {
@@ -84,13 +90,16 @@ impl<'i> Spare<'i> {
             return result.clone();
         }
         let result = Loaded::read(archive, index, position);
+        #[cfg(test)]
+        if let Some(probe) = &mut self.probe {
+            probe.reads.push(position);
+        }
         self.slot = Some((position, result.clone()));
         result
     }
 }
 
-/// The soundbanks one event walk may be in: the one it starts in and at most one other, taken
-/// on the first reference that leaves the first and read through the shared [`Spare`].
+/// Indexed bank selection, stable first-foreign preference and per-walk read failures.
 #[derive(Debug)]
 pub(crate) struct Banks<'w, 'i> {
     archive: &'w Archive,
@@ -98,11 +107,12 @@ pub(crate) struct Banks<'w, 'i> {
     pub(crate) choice: &'w LanguageChoice,
     pub(crate) home: Loaded<'i>,
     spare: &'w mut Spare<'i>,
-    other: Option<u32>,
+    first_foreign: Option<u32>,
+    failed: HashMap<u32, AudioFileError>,
 }
 
 impl<'w, 'i> Banks<'w, 'i> {
-    pub(crate) const fn new(
+    pub(crate) fn new(
         archive: &'w Archive,
         index: &'i AudioIndex,
         choice: &'w LanguageChoice,
@@ -115,18 +125,46 @@ impl<'w, 'i> Banks<'w, 'i> {
             choice,
             home,
             spare,
-            other: None,
+            first_foreign: None,
+            failed: HashMap::new(),
         }
     }
 
-    /// Returns the soundbank a reference to `id` leaving the soundbank at `from` goes to: the
-    /// start soundbank or the one other soundbank, read now unless the spare holds it.
-    pub(crate) fn enter(
+    /// Selects a referenced bank and shares an admitted active owner before consulting the spare.
+    pub(crate) fn enter<'active>(
         &mut self,
         from: u32,
         id: u32,
         via: Via,
-    ) -> Result<Loaded<'i>, Refused<'i>> {
+        mut active: impl Iterator<Item = &'active Loaded<'i>>,
+    ) -> Result<Loaded<'i>, Refused<'i>>
+    where
+        'i: 'active,
+    {
+        let position = self.select(from, id, via)?;
+        if position == self.home.position {
+            return Ok(self.home.clone());
+        }
+        if let Some(error) = self.failed.get(&position) {
+            return Err(Refused {
+                reason: BreakReason::Unreadable(error.clone()),
+                bank: soundbank_at(self.index, position),
+            });
+        }
+        if let Some(loaded) = active.find(|loaded| loaded.position == position) {
+            return Ok(loaded.clone());
+        }
+        let result = self.spare.get(self.archive, self.index, position);
+        if let Err(error) = &result {
+            self.failed.insert(position, error.clone());
+        }
+        result.map_err(|error| Refused {
+            reason: BreakReason::Unreadable(error),
+            bank: soundbank_at(self.index, position),
+        })
+    }
+
+    fn select(&mut self, from: u32, id: u32, via: Via) -> Result<u32, Refused<'i>> {
         let candidates = self.candidates(id, via).map_err(Refused::here)?;
         if candidates.contains(&from) {
             return Err(Refused::here(BreakReason::Missing { id }));
@@ -138,23 +176,25 @@ impl<'w, 'i> Banks<'w, 'i> {
             }));
         };
         if candidates.contains(&self.home.position) {
-            return Ok(self.home.clone());
+            return Ok(self.home.position);
         }
-        let position = match self.other {
-            Some(taken) if candidates.contains(&taken) => taken,
-            Some(_) => {
-                let bank_id = soundbank_at(self.index, wanted).map_or(0, IndexedSoundbank::id);
-                return Err(Refused::here(BreakReason::OtherSoundbank { id, bank_id }));
-            }
-            None => wanted,
-        };
-        self.other = Some(position);
-        self.spare
-            .get(self.archive, self.index, position)
-            .map_err(|error| Refused {
-                reason: BreakReason::Unreadable(error),
-                bank: soundbank_at(self.index, position),
-            })
+        let position = self
+            .first_foreign
+            .filter(|taken| candidates.contains(taken))
+            .unwrap_or(wanted);
+        self.first_foreign.get_or_insert(position);
+        Ok(position)
+    }
+    #[cfg(test)]
+    pub(super) fn probe_selection(
+        &mut self,
+        position: u32,
+        object: u32,
+        bank: &Rc<Soundbank<Vec<u8>>>,
+    ) {
+        if let Some(probe) = &mut self.spare.probe {
+            probe.selected(position, object, bank);
+        }
     }
 
     fn candidates(&self, id: u32, via: Via) -> Result<Vec<u32>, BreakReason> {
@@ -218,3 +258,11 @@ pub(crate) fn gone() -> AudioFileError {
         reason: "the Archive no longer holds the soundbank Entry".to_owned(),
     }
 }
+
+#[cfg(test)]
+#[path = "bank_probe.rs"]
+mod bank_probe;
+
+#[cfg(test)]
+#[path = "bank_probe_tests.rs"]
+mod probe_tests;

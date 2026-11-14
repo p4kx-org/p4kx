@@ -3,14 +3,17 @@
 
 use std::path::{Component, Path, PathBuf, Prefix};
 use std::sync::{Arc, Mutex, PoisonError};
-use std::time::SystemTime;
 
-use p4kx_channels::{
-    Channel, LAUNCHER_LOG_FILES, PublicPatches, SearchPaths, detect, launcher_logs_folder,
-};
-use p4kx_settings::Settings;
+use p4kx_channels::{Channel, PublicPatches, SearchRecipe};
+use p4kx_settings::{Settings, SettingsError};
 
+use crate::discovery_notes;
 use crate::error::{ToolError, capped};
+
+#[path = "locate_patches.rs"]
+mod patches;
+
+use patches::PatchCache;
 
 /// The longest `archive` argument accepted, in bytes.
 pub(crate) const MAX_ARCHIVE_LEN: usize = 4096;
@@ -37,15 +40,10 @@ impl Accepts {
 /// settings file with the manual entries.
 #[derive(Debug, Clone)]
 pub(crate) struct Locations {
-    default_library: Option<PathBuf>,
-    launcher: Option<PathBuf>,
-    wine_prefixes: Vec<PathBuf>,
+    recipe: SearchRecipe,
     settings_file: Option<PathBuf>,
-    patches: Arc<Mutex<Option<CachedPatches>>>,
+    patches: Arc<Mutex<PatchCache>>,
 }
-
-type Stamp = Vec<Option<(SystemTime, u64)>>;
-type CachedPatches = (Stamp, Arc<PublicPatches>);
 
 impl Locations {
     /// Creates the locations; `None` falls back to the platform default.
@@ -54,57 +52,62 @@ impl Locations {
         launcher: Option<PathBuf>,
         settings_file: Option<PathBuf>,
     ) -> Self {
-        let standard = SearchPaths::standard();
+        let mut recipe = SearchRecipe::standard();
+        if let Some(path) = default_library {
+            recipe = recipe.with_default_library(path);
+        }
+        if let Some(path) = launcher {
+            recipe = recipe.with_launcher(path);
+        }
+        Self::with_recipe(recipe, settings_file)
+    }
+
+    /// Captures discovery inputs; manual entries are loaded from the settings file.
+    pub(super) fn with_recipe(recipe: SearchRecipe, settings_file: Option<PathBuf>) -> Self {
         Self {
-            default_library: default_library.or(standard.default_library),
-            launcher: launcher.or(standard.launcher),
-            wine_prefixes: standard.wine_prefixes,
+            recipe: recipe.with_manual(Vec::new(), Vec::new()),
             settings_file,
-            patches: Arc::default(),
+            patches: Arc::new(Mutex::new(PatchCache::default())),
         }
     }
 
-    /// Returns the detected Channels; only directory listings, manifests, the launcher log and
-    /// the settings file are read.
+    /// Returns detected Channels and reports incomplete discovery alongside the result.
     pub(crate) fn channels(&self) -> Result<Vec<Channel>, ToolError> {
-        let settings = match &self.settings_file {
-            Some(file) => Settings::load(file)?,
-            None => Settings::default(),
-        };
-        Ok(detect(&SearchPaths {
-            default_library: self.default_library.clone(),
-            launcher: self.launcher.clone(),
-            wine_prefixes: self.wine_prefixes.clone(),
-            manual_folders: settings.channels.folders,
-            manual_archives: settings.channels.archives,
-        }))
+        let settings = self.settings()?;
+        let snapshot = self.recipe.snapshot_with_settings(&settings);
+        let report = snapshot.detect();
+        discovery_notes::remember(report.issues());
+        let complete = report.is_complete();
+        let (channels, patches) = report.into_value().into_parts();
+        self.patches
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .record(&snapshot, patches, complete);
+        Ok(channels)
     }
 
-    /// Returns the public patches the launcher log in the launcher folder names; empty without a
-    /// launcher folder.
-    ///
-    /// The log files are read again only when their size or modification time changed.
+    /// Returns patches from the current source set, reusing only a complete unchanged scan.
     pub(crate) fn public_patches(&self) -> Arc<PublicPatches> {
-        let Some(launcher) = &self.launcher else {
-            return Arc::default();
+        let settings = match self.settings() {
+            Ok(settings) => settings,
+            Err(error) => {
+                discovery_notes::remember_settings(&error);
+                let report = self.recipe.snapshot().read_patches();
+                discovery_notes::remember(report.issues());
+                return Arc::new(report.into_value());
+            }
         };
-        let folder = launcher_logs_folder(launcher);
-        let stamp: Stamp = LAUNCHER_LOG_FILES
-            .iter()
-            .map(|name| {
-                let metadata = std::fs::metadata(folder.join(name)).ok()?;
-                Some((metadata.modified().ok()?, metadata.len()))
-            })
-            .collect();
-        let mut cache = self.patches.lock().unwrap_or_else(PoisonError::into_inner);
-        if let Some((seen, patches)) = cache.as_ref()
-            && *seen == stamp
-        {
-            return Arc::clone(patches);
-        }
-        let patches = Arc::new(PublicPatches::read_from(&folder));
-        *cache = Some((stamp, Arc::clone(&patches)));
-        patches
+        let snapshot = self.recipe.snapshot_with_settings(&settings);
+        self.patches
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .read(&snapshot)
+    }
+
+    fn settings(&self) -> Result<Settings, SettingsError> {
+        self.settings_file
+            .as_deref()
+            .map_or_else(|| Ok(Settings::default()), Settings::load)
     }
 
     /// Returns the Archive path `text` names: a detected Channel by name, ignoring ASCII case,
@@ -257,3 +260,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "locate_source_tests.rs"]
+mod source_tests;

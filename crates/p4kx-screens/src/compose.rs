@@ -5,7 +5,10 @@ use std::collections::HashMap;
 use std::io::Write;
 
 use p4kx_dataforge::{DataForge, Guid};
-use p4kx_gfx::{Font, Localise, Raster, RasterOptions, RgbaImage, Scene, SvgReport};
+use p4kx_gfx::{
+    Font, Localise, ObservedRaster, ObservedSvgReport, Raster, RasterOptions, RgbaImage, Scene,
+    SvgReport,
+};
 
 use crate::canvas::{CanvasStore, StyleRef, find_canvas};
 use crate::colour::{Palette, slot_names};
@@ -15,6 +18,7 @@ use crate::images::{ImageSources, Images};
 use crate::limits::Limits;
 use crate::paint::Area;
 use crate::report::{Report, VariableInForce};
+use crate::still_inputs::{StillInputs, TrackedInputs};
 use crate::style::TagPaths;
 use crate::text::Texts;
 use crate::variables::{Variable, check_variable_count};
@@ -24,38 +28,42 @@ use crate::widget::CanvasSizing;
 const STYLES: &str = "libs/foundry/records/ui/buildingblocks/styles";
 const DEFAULT_STYLE: &str = "libs/foundry/records/ui/buildingblocks/styles/default";
 const MAX_CANVAS_SIDE: f32 = 16_384.0;
-const CLIP_LIMIT: &str = "clipping stopped at the 24th mask: later content is not clipped";
+
+pub(crate) struct BrandSelection {
+    pub(crate) code: String,
+    pub(crate) record_index: u32,
+}
 
 /// A screen composed into a scene, with what the composition left out.
 #[derive(Debug)]
 pub struct Composed {
     scene: Scene,
     bitmaps: HashMap<u16, RgbaImage>,
+    record_index: u32,
+    inputs: TrackedInputs,
     report: Report,
     width: u32,
     height: u32,
 }
 
 impl Composed {
-    /// Closes the composition that `cx` took part in: the canvas `path` of `size` pixels, with
-    /// the `variables` that were set.
+    /// Completes the composition at the requested pixel size with the selected variables.
     fn finish(
         cx: Context<'_>,
         variables: Vec<VariableInForce>,
-        (path, [width, height]): (&str, [f32; 2]),
+        [width, height]: [f32; 2],
+        record_index: u32,
     ) -> Self {
         let Context {
             painter,
             mut report,
             images,
+            inputs,
             ..
         } = cx;
         report.shapes = painter.len();
         report.truncated |= painter.is_full();
         report.variables = variables;
-        if painter.state.mask_limit_hit {
-            report.note("Overflow", CLIP_LIMIT, path);
-        }
         #[expect(
             clippy::cast_possible_truncation,
             clippy::cast_sign_loss,
@@ -65,6 +73,8 @@ impl Composed {
         Self {
             scene: painter.finish(width, height),
             bitmaps: images.into_bitmaps(),
+            record_index,
+            inputs: inputs.unwrap_or_default(),
             report,
             width: pixels_wide,
             height: pixels_high,
@@ -117,6 +127,32 @@ impl Composed {
     ) -> Result<SvgReport, ScreenError> {
         Ok(self.scene.write_svg(&self.bitmaps, options, title, out)?)
     }
+
+    pub(crate) fn rasterize_observed(
+        &self,
+        options: &RasterOptions,
+    ) -> Result<ObservedRaster, ScreenError> {
+        Ok(self.scene.rasterize_observed(&self.bitmaps, options)?)
+    }
+
+    pub(crate) fn write_svg_observed(
+        &self,
+        options: &RasterOptions,
+        title: &str,
+        out: impl Write,
+    ) -> Result<ObservedSvgReport, ScreenError> {
+        Ok(self
+            .scene
+            .write_svg_observed(&self.bitmaps, options, Some(title), out)?)
+    }
+
+    pub(crate) fn take_used_inputs(
+        &mut self,
+        bitmap_ids: &[u16],
+        item_ordinals: Vec<usize>,
+    ) -> StillInputs {
+        std::mem::take(&mut self.inputs).selected(self.record_index, bitmap_ids, item_ordinals)
+    }
 }
 
 /// The fonts and the language the texts of screens are drawn with.
@@ -142,6 +178,7 @@ pub struct ScreenComposer<'a, 'f> {
     variables: Vec<Variable>,
     texts: Option<TextSources<'a>>,
     images: Option<ImageSources<'a>>,
+    observe_inputs: bool,
 }
 
 impl<'a, 'f> ScreenComposer<'a, 'f> {
@@ -156,6 +193,7 @@ impl<'a, 'f> ScreenComposer<'a, 'f> {
             variables: Vec::new(),
             texts: None,
             images: None,
+            observe_inputs: false,
         }
     }
 
@@ -171,6 +209,11 @@ impl<'a, 'f> ScreenComposer<'a, 'f> {
     #[must_use]
     pub const fn with_images(mut self, images: ImageSources<'a>) -> Self {
         self.images = Some(images);
+        self
+    }
+
+    pub(crate) const fn observing_inputs(mut self) -> Self {
+        self.observe_inputs = true;
         self
     }
 
@@ -258,7 +301,8 @@ impl<'a, 'f> ScreenComposer<'a, 'f> {
         Ok(Composed::finish(
             cx,
             variables,
-            (&root.record_path, [width, height]),
+            [width, height],
+            root.record_index,
         ))
     }
 
@@ -266,11 +310,14 @@ impl<'a, 'f> ScreenComposer<'a, 'f> {
         Context {
             palette: self.base_palette(brand),
             texts: self.texts.map_or_else(Texts::default, |texts| {
-                Texts::new(texts.fonts, texts.localise)
+                let mut source = Texts::new(texts.fonts, texts.localise);
+                source.observe_inputs = self.observe_inputs;
+                source
             }),
             images: self.images.map_or_else(Images::default, |sources| {
                 Images::new(sources, side, self.limits)
             }),
+            inputs: self.observe_inputs.then(TrackedInputs::default),
             ..Context::default()
         }
     }
@@ -279,8 +326,18 @@ impl<'a, 'f> ScreenComposer<'a, 'f> {
     /// `AEGS_Avenger_Titan`, when the Archive has a HUD style for it.
     #[must_use]
     pub fn brand_of(&self, class_name: &str) -> Option<String> {
+        self.brand_selection(class_name)
+            .map(|selection| selection.code)
+    }
+
+    pub(crate) fn brand_selection(&self, class_name: &str) -> Option<BrandSelection> {
         let code = class_name.split('_').next()?.to_ascii_lowercase();
-        self.style_ref(&brand_style_path(&code)).map(|_| code)
+        let path = brand_style_path(&code);
+        let record = self.store.forge().records_at_path(&path).next()?;
+        Some(BrandSelection {
+            code,
+            record_index: record.index(),
+        })
     }
 
     fn style_ref(&self, path: &str) -> Option<StyleRef> {

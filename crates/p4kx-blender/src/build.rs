@@ -2,16 +2,16 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::Issue as AssemblyIssue;
-use p4kx_gltf::{DrawnMaterial, GlbOptions, GlbSummary, TextureFile};
+use p4kx_gltf::{DrawnMaterial, GlbOptions, TextureFile};
 
 use crate::PackageInfo;
 use crate::collect::{Collected, id_of as material_id};
 use crate::describe::settle_stencil;
 use crate::items::Item;
 use crate::manifest::{
-    Basis, Coordinates, EntityRef, FORMAT_VERSION, Format, Generator, Issue, IssueOrigin,
-    MESHES_FOLDER, Manifest, MaterialTextures, Mesh, MeshMaterial, Node, Options, Source,
-    TEXTURES_FOLDER, Texture, TextureFormat, Unit,
+    Basis, ColourSpace, Coordinates, EntityRef, FORMAT_VERSION, Format, Generator, Issue,
+    IssueOrigin, MESHES_FOLDER, Manifest, MaterialTextures, Mesh, MeshMaterial, Node, Options,
+    Source, TEXTURES_FOLDER, Texture, Unit,
 };
 use crate::manifest_light::Light;
 use crate::manifest_materials::{MaterialDescription, Palette, PaletteColours};
@@ -28,11 +28,13 @@ pub(crate) struct Inputs<'a> {
     pub(crate) plan: &'a MeshPlan,
     pub(crate) collected: &'a Collected,
     pub(crate) outcomes: &'a [Outcome],
-    pub(crate) meshes: &'a [GlbSummary],
+    pub(crate) meshes: &'a [crate::meshes::WrittenMesh],
 }
 
 /// Builds the manifest of a package whose files are written.
 pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
+    let materials = materials(inputs);
+
     Manifest {
         format: Format::P4kxBlenderPackage,
         version: FORMAT_VERSION.to_owned(),
@@ -54,8 +56,21 @@ pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
         nodes: nodes(inputs),
         meshes: meshes(inputs),
         textures: textures(inputs),
-        materials: materials(inputs),
+        materials,
+        material_libraries: inputs
+            .collected
+            .library_sources
+            .descriptions()
+            .cloned()
+            .collect(),
         palettes: palettes(inputs),
+        palette_provenance: None,
+        authored_soc: None,
+        collision_helpers: None,
+        default_material: None,
+        entity_provenance: None,
+        light_placements: None,
+        entity_glow: None,
         issues: issues(inputs),
     }
 }
@@ -101,7 +116,8 @@ fn meshes(inputs: &Inputs<'_>) -> Vec<Mesh> {
         .meshes
         .iter()
         .enumerate()
-        .map(|(index, summary)| {
+        .map(|(index, written)| {
+            let summary = &written.summary;
             let mesh = index;
             let first = inputs
                 .plan
@@ -110,6 +126,7 @@ fn meshes(inputs: &Inputs<'_>) -> Vec<Mesh> {
             let id = mesh_id(index);
             Mesh {
                 file: format!("{MESHES_FOLDER}/{id}.glb"),
+                vertex_map: written.vertex_map.as_ref().map(|file| file.path.clone()),
                 id,
                 geometry: first.and_then(|item| item.geometry).map(str::to_owned),
                 palette: first
@@ -130,7 +147,7 @@ fn meshes(inputs: &Inputs<'_>) -> Vec<Mesh> {
                     .collected
                     .materials
                     .get(index)
-                    .map(|drawn| {
+                    .map_or_default(|drawn| {
                         drawn
                             .iter()
                             .enumerate()
@@ -138,21 +155,25 @@ fn meshes(inputs: &Inputs<'_>) -> Vec<Mesh> {
                                 mesh_material(inputs, mesh, position, material)
                             })
                             .collect()
-                    })
-                    .unwrap_or_default(),
+                    }),
                 rig: None,
             }
         })
         .collect()
 }
 
-fn written_path(inputs: &Inputs<'_>, path: &str) -> Option<String> {
-    let position = inputs.collected.position_of(path)?;
+fn written_position(inputs: &Inputs<'_>, position: usize) -> Option<String> {
     matches!(inputs.outcomes.get(position), Some(Outcome::Written { .. })).then(|| id_of(position))
 }
 
-fn written_id(inputs: &Inputs<'_>, file: Option<&TextureFile>) -> Option<String> {
-    written_path(inputs, &file?.path)
+fn written_id(
+    inputs: &Inputs<'_>,
+    file: Option<&TextureFile>,
+    role: crate::TextureUse,
+) -> Option<String> {
+    let file = file?;
+    let mode = crate::texture_encoding::TextureMode::drawn(file, role);
+    written_position(inputs, inputs.collected.position_of(&file.path, mode)?)
 }
 
 fn palette_id(position: usize) -> String {
@@ -165,10 +186,26 @@ fn mesh_material(
     index: usize,
     material: &DrawnMaterial,
 ) -> MeshMaterial {
-    let normal = written_id(inputs, material.normal.as_ref());
+    let normal = written_id(inputs, material.normal.as_ref(), crate::TextureUse::Normal);
+    let authored = inputs
+        .plan
+        .first(mesh)
+        .and_then(|item| inputs.items.get(item)?.drawn);
     MeshMaterial {
         index,
         name: material.name.clone(),
+        source_material_ids: material.source_material_ids.clone(),
+        archive_default: material.archive_default,
+        authored_library: inputs
+            .collected
+            .authored_libraries
+            .get(mesh)
+            .copied()
+            .flatten()
+            .filter(|_| material.library_index.is_none()),
+        fallback_slots: authored.map_or_default(|drawn| {
+            crate::package_default_material::fallback_slots(material, drawn.materials)
+        }),
         material: inputs
             .collected
             .described
@@ -178,9 +215,17 @@ fn mesh_material(
             .flatten()
             .map(material_id),
         textures: MaterialTextures {
-            diffuse: written_id(inputs, material.diffuse.as_ref()),
+            diffuse: written_id(
+                inputs,
+                material.diffuse.as_ref(),
+                crate::TextureUse::Diffuse,
+            ),
             normal,
-            specular: written_id(inputs, material.specular.as_ref()),
+            specular: written_id(
+                inputs,
+                material.specular.as_ref(),
+                crate::TextureUse::Specular,
+            ),
         },
     }
 }
@@ -192,8 +237,12 @@ fn materials(inputs: &Inputs<'_>) -> Vec<MaterialDescription> {
         .iter()
         .map(|described| {
             let mut description = described.description.clone();
-            for (texture, path) in description.textures.iter_mut().zip(&described.paths) {
-                texture.texture = path.as_deref().and_then(|path| written_path(inputs, path));
+            for (texture, position) in description
+                .textures
+                .iter_mut()
+                .zip(&described.texture_positions)
+            {
+                texture.texture = position.and_then(|position| written_position(inputs, position));
             }
             settle_stencil(&mut description);
             description
@@ -236,25 +285,69 @@ fn textures(inputs: &Inputs<'_>) -> Vec<Texture> {
                 width,
                 height,
                 colour_space,
+                encoding,
                 alpha,
+                source_metadata,
+                format,
+                dds_asset,
+                dds_fallback,
+                smoothness,
                 ..
             } => {
                 let id = id_of(position);
                 Some(Texture {
-                    file: format!("{TEXTURES_FOLDER}/{id}.png"),
+                    file: format!("{TEXTURES_FOLDER}/{id}.{}", format.extension()),
                     id,
                     source: wanted.path.clone(),
-                    format: TextureFormat::Png,
+                    source_rendition: Some(wanted.mode.rendition()),
+                    format: *format,
                     bit_depth: 8,
                     colour_space: *colour_space,
+                    encoding: Some(*encoding),
                     alpha: *alpha,
+                    ddna_pair: smoothness
+                        .as_ref()
+                        .map(|value| Box::new(value.pairing.clone())),
+                    source_metadata: source_metadata.clone(),
+                    dds_asset: dds_asset.clone(),
+                    dds_fallback: *dds_fallback,
                     width: *width,
                     height: *height,
                 })
             }
-            Outcome::Failed(_) => None,
+            Outcome::Failed { .. } => None,
         })
+        .chain(inputs.outcomes.iter().filter_map(companion_texture))
         .collect()
+}
+
+fn companion_texture(outcome: &Outcome) -> Option<Texture> {
+    let Outcome::Written {
+        width,
+        height,
+        smoothness: Some(value),
+        ..
+    } = outcome
+    else {
+        return None;
+    };
+    Some(Texture {
+        id: value.id.clone(),
+        file: format!("{TEXTURES_FOLDER}/{}.dds", value.id),
+        source: value.source.clone(),
+        source_rendition: Some(crate::TextureRendition::SeparateSmoothness),
+        format: crate::TextureFormat::Dds,
+        bit_depth: 8,
+        colour_space: ColourSpace::Linear,
+        encoding: Some(crate::TextureEncoding::Data),
+        alpha: crate::AlphaMeaning::None,
+        ddna_pair: None,
+        source_metadata: None,
+        dds_asset: Some(Box::new(value.asset.clone())),
+        dds_fallback: None,
+        width: *width,
+        height: *height,
+    })
 }
 
 /// Returns the manifest's issue for an issue of the Assembly.
@@ -272,10 +365,12 @@ pub(crate) fn assembly_issue(issue: &AssemblyIssue) -> Issue {
 fn issues(inputs: &Inputs<'_>) -> Vec<Issue> {
     let mut issues: Vec<Issue> = inputs.assembly_issues.iter().map(assembly_issue).collect();
     for (wanted, outcome) in inputs.collected.wanted.iter().zip(inputs.outcomes) {
-        if let Outcome::Failed(reason) = outcome {
+        if let Outcome::Failed { reason, dds } = outcome {
             issues.push(Issue {
                 origin: IssueOrigin::Texture,
-                kind: "texture".to_owned(),
+                kind: dds
+                    .map_or("texture", crate::DdsTextureFallback::code)
+                    .to_owned(),
                 path: wanted.file.clone(),
                 name: wanted.material.clone(),
                 skipped: false,

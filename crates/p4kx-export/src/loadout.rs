@@ -8,11 +8,21 @@ use p4kx_assembly::{ArchiveFiles, Entities, LoadoutResolver};
 use p4kx_extraction::{Archive, CancelToken, DataForge, Guid, RecordTree, Value};
 use rayon::prelude::*;
 
+use crate::catalog_v3::catalog_item_alignment::{AlignmentIndex, ItemAlignmentRows};
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
 use crate::guid_text::CatalogGuid;
 use crate::loadout_port::PortReader;
 use crate::record_fields::elements;
-use crate::{CatalogError, CatalogFailure, LoadoutSummary};
+use crate::{CatalogError, CatalogReadFailure, LoadoutSummary};
+
+#[path = "loadout_alignment.rs"]
+pub(crate) mod alignment;
+#[path = "loadout_ledger.rs"]
+pub(crate) mod ledger;
+
+use crate::Kind;
+use crate::export_ledger::ExportLedger;
+use ledger::Capture;
 
 const DEFAULT_LOADOUT: &str = "SEntityComponentDefaultLoadoutParams";
 const PORT_CONTAINER: &str = "SItemPortContainerComponentParams";
@@ -36,14 +46,17 @@ pub(crate) fn carries_ports(tree: &RecordTree<'_>) -> bool {
 /// The resolvers and port readers not in use. A resolver keeps the Records it has read, so one
 /// taken for an entity and given back for the next keeps its caches across the splits of the
 /// parallel run.
-struct Pool<'f, 'a> {
-    entities: Arc<Entities<'f>>,
-    files: &'a ArchiveFiles<'a>,
-    idle: Mutex<Vec<(LoadoutResolver<'f>, PortReader)>>,
+struct Pool<'source, 'worker> {
+    forge: &'source DataForge<'source>,
+    entities: Arc<Entities<'worker>>,
+    files: &'worker ArchiveFiles<'worker>,
+    idle: Mutex<Vec<(LoadoutResolver<'worker>, PortReader<'worker>)>>,
+    alignment: &'worker AlignmentIndex<'worker>,
+    capture: Arc<Capture<'worker>>,
 }
 
-impl<'f> Pool<'f, 'f> {
-    fn read(&self, want: Wanted) -> Result<Option<Loadout>, CatalogFailure> {
+impl<'source: 'worker, 'worker> Pool<'source, 'worker> {
+    fn read(&self, want: Wanted) -> Result<Option<Loadout>, CatalogReadFailure<'source>> {
         let taken = self
             .idle
             .lock()
@@ -51,13 +64,16 @@ impl<'f> Pool<'f, 'f> {
             .pop();
         let (mut resolver, mut reader) = taken.unwrap_or_else(|| {
             (
-                LoadoutResolver::with_entities(Arc::clone(&self.entities))
-                    .with_files(self.files)
-                    .stopping_at_docked_vehicles(),
-                PortReader::new(),
+                LoadoutResolver::with_observed_entities(
+                    Arc::clone(&self.entities),
+                    self.capture.clone(),
+                )
+                .with_files(self.files)
+                .stopping_at_docked_vehicles(),
+                PortReader::with_alignment(self.alignment),
             )
         });
-        let result = read_with(&mut resolver, &mut reader, self.entities.forge(), want);
+        let result = read_with(&mut resolver, &mut reader, self.forge, want, &self.capture);
         self.idle
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
@@ -69,15 +85,23 @@ impl<'f> Pool<'f, 'f> {
 /// An entry of `ships` or `items` whose ports are wanted.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Wanted {
+    pub(crate) record_index: u32,
     pub(crate) guid: CatalogGuid,
     pub(crate) kind: EntityKind,
 }
 
 /// The loadouts of a catalog, the Records that could not be resolved and what was counted.
-pub(crate) struct Loadouts {
+pub(crate) struct Loadouts<'f> {
     pub(crate) entries: Vec<Loadout>,
-    pub(crate) failures: Vec<CatalogFailure>,
+    pub(crate) failures: Vec<CatalogReadFailure<'f>>,
     pub(crate) summary: LoadoutSummary,
+    pub(crate) ledger: ExportLedger,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct SelectedSources<'rows, 'source> {
+    pub(crate) ledger: &'rows ExportLedger,
+    pub(crate) alignment: &'rows ItemAlignmentRows<'source>,
 }
 
 /// Resolves the Default Loadout of every entity in `wanted` and returns the ports of each,
@@ -90,20 +114,35 @@ pub(crate) struct Loadouts {
 /// # Errors
 ///
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
-pub(crate) fn loadouts(
+pub(crate) fn loadouts<'f>(
     archive: &Archive,
-    entities: &Arc<Entities<'_>>,
+    entities: &Arc<Entities<'f>>,
     wanted: &[Wanted],
     known: &HashSet<Guid>,
+    sources: SelectedSources<'_, 'f>,
+    input: &crate::build::original_input::OriginalCatalogInput<'_, 'f>,
     cancel: Option<&CancelToken>,
-) -> Result<Loadouts, CatalogError> {
+) -> Result<Loadouts<'f>, CatalogError> {
+    if cancel.is_some_and(CancelToken::is_cancelled) {
+        return Err(CatalogError::Cancelled);
+    }
+    let capture = Arc::new(Capture::for_input(
+        input,
+        sources.ledger,
+        cancel,
+        Kind::Loadouts,
+    ));
+    let alignment = AlignmentIndex::new(sources.alignment)?;
     let files = ArchiveFiles::new(archive);
     let pool = Pool {
+        forge: entities.forge(),
         entities: Arc::clone(entities),
         files: &files,
         idle: Mutex::new(Vec::new()),
+        alignment: &alignment,
+        capture: Arc::clone(&capture),
     };
-    let read: Vec<Option<Result<Option<Loadout>, CatalogFailure>>> = wanted
+    let read: Vec<Option<Result<Option<Loadout>, CatalogReadFailure<'f>>>> = wanted
         .par_iter()
         .map(|want| {
             if cancel.is_some_and(CancelToken::is_cancelled) {
@@ -112,6 +151,8 @@ pub(crate) fn loadouts(
             Some(pool.read(*want))
         })
         .collect();
+    let mut ledger = capture.finish()?;
+    ledger.inventory(Kind::Loadouts);
     let mut entries = Vec::with_capacity(read.len());
     let mut failures = Vec::new();
     for result in read {
@@ -127,27 +168,46 @@ pub(crate) fn loadouts(
         entries,
         failures,
         summary,
+        ledger,
     })
 }
 
-fn read_with<'f>(
-    resolver: &mut LoadoutResolver<'f>,
-    reader: &mut PortReader,
+fn read_with<'f: 'worker, 'worker>(
+    resolver: &mut LoadoutResolver<'worker>,
+    reader: &mut PortReader<'_>,
     forge: &'f DataForge<'f>,
     want: Wanted,
-) -> Result<Option<Loadout>, CatalogFailure> {
-    let Some(record) = forge.record_by_guid(want.guid.0) else {
+    capture: &Capture<'_>,
+) -> Result<Option<Loadout>, CatalogReadFailure<'f>> {
+    let Some(record) = forge
+        .record(want.record_index)
+        .filter(|record| record.guid() == want.guid.0)
+    else {
+        capture.missing_root();
         return Ok(None);
     };
-    let node = resolver
-        .resolve(&record)
-        .map_err(|error| CatalogFailure::of_loadout(&record, &error))?;
-    let ports = reader.ports(&node);
+    let node = match resolver.resolve(&record) {
+        Ok(node) => node,
+        Err(error) => {
+            capture.root(&record, want.kind, Err(&error));
+            return Err(CatalogReadFailure::of_loadout(&record, &error));
+        }
+    };
+    capture.root(&record, want.kind, Ok(&node));
+    let ports = match reader.ports(&node, capture) {
+        Ok(ports) => ports,
+        Err(error) => {
+            capture.record_error(error);
+            return Ok(None);
+        }
+    };
     let issues = reader.take_issues();
     if want.kind == EntityKind::Item && ports.is_empty() {
         return Ok(None);
     }
     Ok(Some(Loadout {
+        root_record_index: want.record_index,
+        port_inventory_complete: node.issues().is_empty(),
         entity_guid: want.guid,
         entity_kind: want.kind,
         issues,

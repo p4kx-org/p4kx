@@ -143,16 +143,14 @@ impl QueryTab {
                 from: self
                     .saved
                     .get(*index)
-                    .map(|saved| saved.name().to_owned())
-                    .unwrap_or_default(),
+                    .map_or_default(|saved| saved.name().to_owned()),
                 to: name.trim().to_owned(),
             },
             SavedDialog::Delete { index } => SavedQueryEdit::Delete {
                 name: self
                     .saved
                     .get(*index)
-                    .map(|saved| saved.name().to_owned())
-                    .unwrap_or_default(),
+                    .map_or_default(|saved| saved.name().to_owned()),
             },
         };
         let changed = self.saved.apply(&edit);

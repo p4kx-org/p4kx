@@ -4,53 +4,50 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use p4kx_dataforge::{Guid, RecordTree, StructValue, Value, ValueError};
+use p4kx_dataforge::{Guid, RecordTree, StructValue};
 
+use crate::ItemClassification;
+use crate::LoadoutXmlClassUse;
 use crate::armour::{ZoneList, read_zones};
-use crate::assortment::read_assortments;
+use crate::geometry::GeometryComponent;
+use crate::loadout_path::PathRead;
+use crate::loadout_reference::LoadoutReference;
+use crate::loadout_xml_use::XmlRoute;
+use crate::manual_loadout::ManualLoadout;
 use crate::merge::port_key;
 use crate::outfit_read::OutfitInfo;
-use crate::port::{PortDefinition, read_definition};
-use crate::read::{as_struct, struct_field, struct_items, text, unsigned};
-use crate::{Geometry, GeometryVariant, ItemFacts, MaterialVariant, ObjectContainerRef};
+use crate::port::{PortDefinition, PortDefinitionPosition, read_definition};
+use crate::read::{indexed_struct_items, struct_field, text, unsigned};
+pub(crate) use crate::spec_loadout::read_loadout;
+use crate::target_spec;
+pub(crate) use crate::target_spec::TargetSpec;
+use crate::{
+    Geometry, GeometryVariant, ItemFacts, LoadoutPath, LoadoutPathOperation, MaterialVariant,
+    ObjectContainerRef,
+};
 
-const GEOMETRY_RESOURCE: &str = "SGeometryResourceParams";
+pub(crate) const GEOMETRY_RESOURCE: &str = "SGeometryResourceParams";
 const DEFAULT_LOADOUT: &str = "SEntityComponentDefaultLoadoutParams";
 const PORT_CONTAINER: &str = "SItemPortContainerComponentParams";
-const XML_LOADOUT: &str = "SItemPortLoadoutXMLParams";
 const OUTFIT_LOADOUT: &str = "SItemPortLoadoutOutfitParams";
-const GENERATED_LOADOUT: &str = "SItemPortLoadoutRandomGeneratedParams";
 const VEHICLE_PARAMS: &str = "VehicleComponentParams";
 const ATTACHABLE: &str = "SAttachableComponentParams";
 const INVENTORY_CONTAINER: &str = "SCItemInventoryContainerComponentParams";
 const DOCKED_VEHICLE_TYPE: &str = "NOITEM_Vehicle";
 
-/// What a Loadout entry or a port default names to attach.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum TargetSpec {
-    /// Nothing.
-    None,
-    /// The Record of this GUID.
-    Reference(Guid),
-    /// The Entity of this class name.
-    ClassName(String),
-    /// A Reference that cannot be read.
-    Invalid(ValueError),
-}
-
 /// A Loadout as an Entity Record or a Loadout entry states it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum LoadoutSpec {
     /// Entries in the Record.
-    Manual(Arc<[EntrySpec]>),
+    Manual(ManualLoadout),
     /// An XML Loadout file, by the path the Record names.
-    Xml(Arc<str>),
+    Xml(LoadoutPath),
     /// Loadouts laid over each other in order, an outfit (`SItemPortLoadoutOutfitParams`): its
     /// base Loadout, then the Loadouts of the outfits that always apply. An entry without an
     /// Entity adds its nested entries to those of the earlier entry of the same port.
     Layered(Arc<[Self]>),
     /// A Loadout generated at random from `SLoadoutAssortment` Records: the Records by GUID.
-    Assortments(Arc<[Guid]>),
+    Assortments(Arc<[LoadoutReference]>),
 }
 
 /// What supplied the attachment of a port: an Entity Record, or an XML Loadout file.
@@ -79,33 +76,50 @@ impl LoadoutOrigin {
 }
 
 /// One entry of a Loadout: a port, what it holds and the Loadout given to that.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub(crate) struct EntrySpec {
     pub(crate) origin: LoadoutOrigin,
     pub(crate) port: String,
+    pub(crate) port_proof: Option<LoadoutPath>,
     pub(crate) target: TargetSpec,
     pub(crate) loadout: Option<LoadoutSpec>,
+    pub(crate) xml_route: Option<Arc<XmlRoute>>,
+    pub(crate) xml_use: Option<LoadoutXmlClassUse>,
 }
 
 /// One item port an Entity Record defines.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct PortSpec {
     pub(crate) name: String,
+    pub(crate) name_proof: LoadoutPath,
     pub(crate) definition: Arc<PortDefinition>,
     pub(crate) default_item: TargetSpec,
 }
 
 /// The vehicle implementation a Record names and the Modification it selects.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub(crate) struct VehicleSpec {
-    pub(crate) definition: String,
-    pub(crate) modification: String,
-    pub(crate) landing_system: Option<Guid>,
+    pub(crate) definition: LoadoutPath,
+    pub(crate) modification: LoadoutPath,
+    pub(crate) class_name: Option<LoadoutPath>,
+    pub(crate) landing_system: Option<LoadoutReference>,
+    pub(crate) component: usize,
 }
+
+impl PartialEq for VehicleSpec {
+    fn eq(&self, other: &Self) -> bool {
+        self.definition == other.definition
+            && self.modification == other.modification
+            && self.landing_system == other.landing_system
+    }
+}
+
+impl Eq for VehicleSpec {}
 
 /// What the Loadout tree needs of one Entity Record.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct EntitySpec {
+    pub(crate) record_index: Option<u32>,
     pub(crate) guid: Guid,
     pub(crate) record_path: String,
     pub(crate) origin: LoadoutOrigin,
@@ -119,58 +133,59 @@ pub(crate) struct EntitySpec {
     pub(crate) variants: Vec<GeometryVariant>,
     pub(crate) vehicle: Option<VehicleSpec>,
     pub(crate) docked_vehicle: bool,
-    pub(crate) attach_type: String,
-    pub(crate) attach_sub_type: String,
+    pub(crate) classification: ItemClassification,
     pub(crate) attach_tags: Vec<String>,
     pub(crate) material_variants: Vec<MaterialVariant>,
     pub(crate) size: Option<u32>,
     pub(crate) container: Option<Guid>,
     pub(crate) object_containers: Arc<[ObjectContainerRef]>,
     pub(crate) zones: ZoneList,
-    pub(crate) animation_database: Option<Arc<str>>,
+    pub(crate) animation_database: Option<crate::creature_animation::AnimationDatabase>,
 }
 
 impl EntitySpec {
     /// Reads the ports and the default Loadout from the components of an Entity's tree.
-    pub(crate) fn read(tree: &RecordTree<'_>) -> Self {
+    pub(crate) fn read(tree: &RecordTree<'_>, paths: &PathRead<'_>) -> Self {
         let components = components_of(tree);
         let record: Arc<str> = Arc::from(tree.record_path());
-        let (loadout, outfit) = read_default_loadout(&components, &record);
-        let (ports, port_flags) = read_ports(&components);
+        let (loadout, outfit) = read_default_loadout(&components, &record, paths);
+        let (ports, port_flags) = read_ports(tree, paths);
         let mut port_index = HashMap::with_capacity(ports.len());
         for (at, port) in ports.iter().enumerate() {
             port_index.entry(port_key(&port.name)).or_insert(at);
         }
-        let geometry_component = components
-            .iter()
-            .find(|component| component.type_name() == GEOMETRY_RESOURCE);
-        let geometry = geometry_component.and_then(|component| Geometry::read(component));
-        let variants = geometry_component
-            .map(|component| Geometry::read_variants(component))
-            .unwrap_or_default();
-        let vehicle = components
-            .iter()
-            .find(|component| component.type_name() == VEHICLE_PARAMS)
-            .map(|component| read_vehicle(component));
-        let (attach_type, container) = item_facts(&components);
-        let definition = attach_def(&components);
+        let geometry_component = geometry_component(tree);
+        let position = |ordinal| GeometryComponent {
+            record: tree.record_index(),
+            ordinal,
+        };
+        let geometry = geometry_component
+            .and_then(|(ordinal, component)| Geometry::read(component, position(ordinal)));
+        let variants = geometry_component.map_or_default(|(ordinal, component)| {
+            Geometry::read_variants(component, position(ordinal))
+        });
+        let vehicle = component_slots(tree)
+            .find(|(_, component)| component.type_name() == VEHICLE_PARAMS)
+            .map(|(ordinal, component)| read_vehicle(component, ordinal, tree, paths));
+        let attachable = attachable_component(tree);
+        let definition = attachable.and_then(|(_, component)| struct_field(component, "AttachDef"));
+        let classification = ItemClassification::read(tree, attachable);
         Self {
-            attach_sub_type: definition
-                .map_or("", |definition| text(definition, "SubType"))
-                .to_owned(),
             attach_tags: definition
-                .map(|definition| tag_words(text(definition, "Tags")))
-                .unwrap_or_default(),
+                .map_or_default(|definition| tag_words(text(definition, "Tags"))),
             material_variants: geometry_component
-                .map(|component| MaterialVariant::read(component))
-                .unwrap_or_default(),
+                .map_or_default(|(_, component)| MaterialVariant::read(component)),
             size: definition.and_then(|definition| unsigned(definition, "Size")),
-            docked_vehicle: is_docked_vehicle_type(attach_type),
-            attach_type: attach_type.to_owned(),
-            container,
-            object_containers: crate::object_containers::read(&components).into(),
+            docked_vehicle: is_docked_vehicle_type(classification.item_type_text()),
+            classification,
+            container: inventory_container(&components),
+            object_containers: crate::object_containers::read(tree, component_slots(tree)).into(),
             zones: read_zones(&components),
-            animation_database: crate::creature_animation::database_of(&components),
+            animation_database: crate::creature_animation::database_of(
+                tree.record_index(),
+                component_slots(tree),
+            ),
+            record_index: Some(tree.record_index()),
             guid: tree.guid(),
             record_path: tree.record_path().to_owned(),
             origin: LoadoutOrigin::Record(record),
@@ -199,8 +214,8 @@ impl EntitySpec {
             class_name: crate::entities::class_name_of(&self.name)
                 .unwrap_or(&self.name)
                 .to_owned(),
-            item_type: self.attach_type.clone(),
-            sub_type: self.attach_sub_type.clone(),
+            item_type: self.classification.item_type_text().to_owned(),
+            sub_type: self.classification.subtype_text().to_owned(),
             size: self.size,
         }
     }
@@ -223,6 +238,7 @@ impl EntitySpec {
 fn read_default_loadout(
     components: &[&StructValue<'_>],
     record: &Arc<str>,
+    paths: &PathRead<'_>,
 ) -> (Option<LoadoutSpec>, Option<OutfitInfo>) {
     let default_loadout = components
         .iter()
@@ -230,104 +246,133 @@ fn read_default_loadout(
         .and_then(|component| struct_field(component, "loadout"));
     match default_loadout {
         Some(loadout) if loadout.type_name() == OUTFIT_LOADOUT => {
-            let read = crate::outfit_read::read(loadout, record, true);
+            let read = crate::outfit_read::read(loadout, record, true, paths);
             (read.loadout, read.info)
         }
-        Some(loadout) => (read_loadout(loadout, record), None),
+        Some(loadout) => (read_loadout(loadout, record, paths), None),
         None => (None, None),
     }
 }
 
 /// Reads the item ports of the port containers among `components`, and the flags the containers
 /// give all their ports.
-fn read_ports(components: &[&StructValue<'_>]) -> (Vec<PortSpec>, Vec<String>) {
-    let containers = || {
-        components
-            .iter()
-            .filter(|component| component.type_name() == PORT_CONTAINER)
-    };
+fn read_ports(tree: &RecordTree<'_>, paths: &PathRead<'_>) -> (Vec<PortSpec>, Vec<String>) {
+    let record_index = tree.record_index();
+    let containers =
+        || component_slots(tree).filter(|(_, component)| component.type_name() == PORT_CONTAINER);
     let ports = containers()
-        .flat_map(|component| struct_items(component, "Ports"))
-        .map(|port| PortSpec {
-            name: text(port, "Name").to_owned(),
-            definition: Arc::new(read_definition(port)),
-            default_item: struct_field(port, "defaultItem")
-                .and_then(|item| item.field("entityClass"))
-                .map_or(TargetSpec::None, reference_target),
+        .flat_map(|(component_index, component)| {
+            indexed_struct_items(component, "Ports").map(move |(port_index, port)| {
+                let name_proof = paths.field(port, "Name", LoadoutPathOperation::PortName);
+                PortSpec {
+                    name: name_proof.value().to_owned(),
+                    name_proof,
+                    definition: Arc::new(read_definition(
+                        port,
+                        PortDefinitionPosition {
+                            record: record_index,
+                            component: component_index,
+                            port: port_index,
+                        },
+                    )),
+                    default_item: struct_field(port, "defaultItem")
+                        .and_then(|item| {
+                            item.field("entityClass")
+                                .map(|value| target_spec::reference_target_at(item, value, paths))
+                        })
+                        .unwrap_or(TargetSpec::None),
+                }
+            })
         })
         .collect();
     let flags = containers()
-        .flat_map(|component| text(component, "PortFlags").split_whitespace())
+        .flat_map(|(_, component)| text(component, "PortFlags").split_whitespace())
         .map(str::to_owned)
         .collect();
     (ports, flags)
 }
 
+fn component_slots<'v, 'f>(
+    tree: &'v RecordTree<'f>,
+) -> impl Iterator<Item = (usize, &'v StructValue<'f>)> {
+    indexed_struct_items(tree.root(), "Components")
+}
+
 fn components_of<'v, 'f>(tree: &'v RecordTree<'f>) -> Vec<&'v StructValue<'f>> {
-    match tree.field("Components") {
-        Some(Value::Array(items)) => items.iter().filter_map(as_struct).collect(),
-        _ => Vec::new(),
-    }
+    component_slots(tree)
+        .map(|(_, component)| component)
+        .collect()
+}
+
+fn geometry_component<'tree, 'source>(
+    tree: &'tree RecordTree<'source>,
+) -> Option<(usize, &'tree StructValue<'source>)> {
+    component_slots(tree).find(|(_, component)| component.type_name() == GEOMETRY_RESOURCE)
 }
 
 /// Reads the main geometry an Entity Record names, without its ports and Loadout.
-pub(crate) fn read_geometry(tree: &RecordTree<'_>) -> Option<Geometry> {
-    components_of(tree)
-        .into_iter()
-        .find(|component| component.type_name() == GEOMETRY_RESOURCE)
-        .and_then(|component| Geometry::read(component))
+#[must_use]
+pub fn read_geometry(tree: &RecordTree<'_>) -> Option<Geometry> {
+    let (ordinal, component) = geometry_component(tree)?;
+    Geometry::read(
+        component,
+        GeometryComponent {
+            record: tree.record_index(),
+            ordinal,
+        },
+    )
 }
 
 /// Reads what an Entity Record offers a port, with its class name taken from `name`.
 pub(crate) fn read_item_facts(tree: &RecordTree<'_>) -> ItemFacts {
-    let components = components_of(tree);
-    let definition = attach_def(&components);
+    let attachable = attachable_component(tree);
+    let definition = attachable.and_then(|(_, component)| struct_field(component, "AttachDef"));
+    let classification = ItemClassification::read(tree, attachable);
     let name = tree.name();
     ItemFacts {
         class_name: crate::entities::class_name_of(name)
             .unwrap_or(name)
             .to_owned(),
-        item_type: definition
-            .map_or("", |definition| text(definition, "Type"))
-            .to_owned(),
-        sub_type: definition
-            .map_or("", |definition| text(definition, "SubType"))
-            .to_owned(),
+        item_type: classification.item_type_text().to_owned(),
+        sub_type: classification.subtype_text().to_owned(),
         size: definition.and_then(|definition| unsigned(definition, "Size")),
     }
 }
 
-fn read_vehicle(component: &StructValue<'_>) -> VehicleSpec {
+fn read_vehicle(
+    component: &StructValue<'_>,
+    ordinal: usize,
+    tree: &RecordTree<'_>,
+    paths: &PathRead<'_>,
+) -> VehicleSpec {
     VehicleSpec {
-        definition: text(component, "vehicleDefinition").trim().to_owned(),
-        modification: text(component, "modification").trim().to_owned(),
-        landing_system: match component.field("landingSystem").map(reference_target) {
-            Some(TargetSpec::Reference(guid)) => Some(guid),
+        component: ordinal,
+        definition: paths.field(component, "vehicleDefinition", LoadoutPathOperation::Trim),
+        modification: paths.field(component, "modification", LoadoutPathOperation::Trim),
+        class_name: paths.record_name(tree),
+        landing_system: match component
+            .field("landingSystem")
+            .map(|value| target_spec::reference_target_at(component, value, paths))
+        {
+            Some(TargetSpec::Reference(reference)) => Some(reference),
             _ => None,
         },
     }
 }
 
-/// Returns the `AttachDef` of the attachable component, if the components have one.
-fn attach_def<'v, 'f>(components: &[&'v StructValue<'f>]) -> Option<&'v StructValue<'f>> {
-    components
-        .iter()
-        .find(|component| component.type_name() == ATTACHABLE)
-        .and_then(|component| struct_field(component, "AttachDef"))
+fn attachable_component<'v, 'f>(tree: &'v RecordTree<'f>) -> Option<(usize, &'v StructValue<'f>)> {
+    component_slots(tree).find(|(_, component)| component.type_name() == ATTACHABLE)
 }
 
-/// Returns the `AttachDef.Type` and the inventory container Record the components name.
-fn item_facts<'f>(components: &[&StructValue<'f>]) -> (&'f str, Option<Guid>) {
-    let attach_type = attach_def(components).map_or("", |definition| text(definition, "Type"));
-    let container = components
+fn inventory_container(components: &[&StructValue<'_>]) -> Option<Guid> {
+    components
         .iter()
         .find(|component| component.type_name() == INVENTORY_CONTAINER)
         .and_then(|component| component.field("containerParams"))
-        .and_then(|value| match reference_target(value) {
-            TargetSpec::Reference(guid) => Some(guid),
+        .and_then(|value| match target_spec::reference_target(value) {
+            TargetSpec::Reference(reference) => Some(reference.guid()),
             _ => None,
-        });
-    (attach_type, container)
+        })
 }
 
 /// Returns whether an `AttachDef.Type` marks a docked vehicle: it starts with `NOITEM_Vehicle`,
@@ -347,50 +392,4 @@ fn tag_words(tags: &str) -> Vec<String> {
         .filter(|word| !word.is_empty())
         .map(str::to_owned)
         .collect()
-}
-
-/// Reads a manual, XML or outfit Loadout; `None` for any other struct.
-pub(crate) fn read_loadout(loadout: &StructValue<'_>, record: &Arc<str>) -> Option<LoadoutSpec> {
-    if loadout.type_name() == XML_LOADOUT {
-        let path = text(loadout, "loadoutPath");
-        return (!path.is_empty()).then(|| LoadoutSpec::Xml(Arc::from(path)));
-    }
-    if loadout.type_name() == OUTFIT_LOADOUT {
-        return crate::outfit_read::read(loadout, record, false).loadout;
-    }
-    if loadout.type_name() == GENERATED_LOADOUT {
-        return read_assortments(loadout);
-    }
-    loadout.field("entries")?;
-    Some(LoadoutSpec::Manual(
-        struct_items(loadout, "entries")
-            .map(|entry| read_entry(entry, record))
-            .collect(),
-    ))
-}
-
-fn read_entry(entry: &StructValue<'_>, record: &Arc<str>) -> EntrySpec {
-    let reference = entry
-        .field("entityClassReference")
-        .map_or(TargetSpec::None, reference_target);
-    let class_name = text(entry, "entityClassName");
-    let target = match reference {
-        TargetSpec::None if !class_name.is_empty() => TargetSpec::ClassName(class_name.to_owned()),
-        other => other,
-    };
-    EntrySpec {
-        origin: LoadoutOrigin::Record(Arc::clone(record)),
-        port: text(entry, "itemPortName").to_owned(),
-        target,
-        loadout: struct_field(entry, "loadout").and_then(|loadout| read_loadout(loadout, record)),
-    }
-}
-
-pub(crate) fn reference_target(value: &Value<'_>) -> TargetSpec {
-    match value {
-        Value::Reference(link) => TargetSpec::Reference(link.guid()),
-        Value::Error(ValueError::DanglingReference { guid }) => TargetSpec::Reference(*guid),
-        Value::Error(error) => TargetSpec::Invalid(*error),
-        _ => TargetSpec::None,
-    }
 }

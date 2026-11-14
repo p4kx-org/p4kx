@@ -6,6 +6,9 @@ on:
       os:
         type: string
         required: true
+      target:
+        type: string
+        required: true
       partitions:
         type: string
         required: true
@@ -21,11 +24,13 @@ env:
   CARGO_INCREMENTAL: 0
   CARGO_PROFILE_DEV_DEBUG: line-tables-only
   NEXTEST_PROFILE: ci
+  P4KX_TARGET: ${{ inputs.target }}
 
 jobs:
   build-tests:
-    name: Build tests (${{ inputs.os }})
+    name: Build tests (${{ inputs.target }})
     runs-on: ${{ inputs.os }}
+    timeout-minutes: 90
     steps:
       - name: Disk space before the build
         if: runner.os == 'Linux'
@@ -36,13 +41,31 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: test
+          target: ${{ inputs.target }}
           nextest: "true"
-      - name: Build every test binary once and archive them
-        run: cargo nextest archive --workspace --locked --archive-file nextest-archive.tar.zst
+      - name: Build all native applications
+        shell: pwsh
+        run: cargo build --locked --target $env:P4KX_TARGET -p p4kx -p p4kx-gui -p p4kx-mcp
+      - name: Build every native test binary once and archive them
+        shell: pwsh
+        run: cargo nextest archive --workspace --locked --target $env:P4KX_TARGET --archive-file nextest-archive.tar.zst
+      - name: Inspect application machine types and identify the test archive
+        shell: pwsh
+        run: .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -BinaryDirectory "target/$env:P4KX_TARGET/debug" -ArchivePath nextest-archive.tar.zst -MetadataPath nextest-archive.json
+      - name: Test the opt-in MSI fixture without Registry access
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cargo nextest run --locked --target $env:P4KX_TARGET -p p4kx-msi-path --lib --features native-fixtures
+          if ($LASTEXITCODE -ne 0) { throw 'Pure MSI fixture library tests failed.' }
+          cargo test --locked --target $env:P4KX_TARGET -p p4kx-msi-path --example p4kx-msi-registry-fixture --features native-fixtures
+          if ($LASTEXITCODE -ne 0) { throw 'Pure MSI fixture codec tests failed.' }
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: nextest-archive-${{ inputs.os }}
-          path: nextest-archive.tar.zst
+          name: nextest-archive-${{ inputs.target }}-${{ github.sha }}
+          path: |
+            nextest-archive.tar.zst
+            nextest-archive.json
           compression-level: 0
           retention-days: 1
           if-no-files-found: error
@@ -51,9 +74,10 @@ jobs:
         run: df -h /
 
   test:
-    name: Test (${{ inputs.os }} ${{ matrix.partition }}/${{ inputs.count }})
+    name: Test (${{ inputs.target }} ${{ matrix.partition }}/${{ inputs.count }})
     needs: build-tests
     runs-on: ${{ inputs.os }}
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -62,31 +86,137 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+      - uses: ./.github/actions/install-rust
         with:
-          tool: nextest
+          target: ${{ inputs.target }}
+          nextest: "true"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: nextest-archive-${{ inputs.os }}
-      - name: Install the software Vulkan driver (lavapipe) the render tests draw on
+          name: nextest-archive-${{ inputs.target }}-${{ github.sha }}
+      - name: Refuse a different source, target or tool archive before execution
+        shell: pwsh
+        run: .github/scripts/check-native-platform.ps1 -Target $env:P4KX_TARGET -ArchivePath nextest-archive.tar.zst -MetadataPath nextest-archive.json -ValidateArchive
+      - name: Preserve actual native format layout evidence
+        id: format_layout
+        if: matrix.partition == 1
+        shell: pwsh
+        run: |
+          . .github/scripts/platform-contract.ps1
+          $platform = Get-P4kxPlatform -Target $env:P4KX_TARGET
+          $directory = Join-Path $env:RUNNER_TEMP 'native-format-layout'
+          New-Item -ItemType Directory -Path $directory -Force | Out-Null
+          Copy-Item -LiteralPath nextest-archive.json -Destination (Join-Path $directory 'nextest-archive.json')
+          $log = Join-Path $directory 'native-layout.log'
+          cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --no-capture --no-tests fail -E 'package(p4kx-dataforge) & (test(original_field_storage_distinguishes_reference_and_weak_scalar_and_array_decoding) | test(original_target_receipts_keep_actual_lookup_owners_for_scalar_and_array_links))' 2>&1 | Tee-Object -FilePath $log
+          $layoutExit = $LASTEXITCODE
+          if ($layoutExit -ne 0) { throw "Native format layout tests failed with exit $layoutExit." }
+          $arch = [regex]::Escape(($env:P4KX_TARGET -split '-')[0])
+          $os = [regex]::Escape($platform.os)
+          $field = "^FIELD_STORAGE_LAYOUT arch=$arch os=$os field=[0-9]+/[0-9]+ storage=[0-9]+/[0-9]+ value=[0-9]+/[0-9]+ datatype=[0-9]+/[0-9]+$"
+          $reference = "^REFERENCE_ORIGIN_LAYOUT arch=$arch os=$os reference=[0-9]+/[0-9]+ view=[0-9]+/[0-9]+ value=[0-9]+/[0-9]+$"
+          $location = "^LOCATION_ORIGIN_LAYOUT arch=$arch os=$os location=[0-9]+/[0-9]+$"
+          $lines = @(Get-Content -LiteralPath $log)
+          if (@($lines | Where-Object { $_ -cmatch $field }).Count -ne 1 -or @($lines | Where-Object { $_ -cmatch $reference }).Count -ne 1 -or @($lines | Where-Object { $_ -cmatch $location }).Count -ne 1) {
+            throw 'Native format layout output is missing, duplicated or belongs to a different CPU/OS.'
+          }
+      - name: Upload native format layout evidence
+        if: always() && matrix.partition == 1 && steps.format_layout.outcome != 'skipped'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: native-format-layout-${{ inputs.target }}-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/native-format-layout/native-layout.log
+            ${{ runner.temp }}/native-format-layout/nextest-archive.json
+          retention-days: 14
+          if-no-files-found: error
+      - name: Install the native software Vulkan driver
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1
-      - name: Tests with nextest, one process per test
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1 libasound2t64 libx11-6 libxcursor1 libxi6 libxrandr2 libxkbcommon-x11-0 libegl1 xvfb
+      - name: Use native Metal for macOS graphical checks
+        if: runner.os == 'macOS'
+        shell: pwsh
+        run: 'Add-Content -LiteralPath $env:GITHUB_ENV -Value "WGPU_BACKEND=metal" -Encoding utf8NoBOM'
+      - name: Tests with nextest, one native process per test
         env:
-          P4KX_REQUIRE_SOFTWARE_ADAPTER: '1'
+          P4KX_REQUIRE_RENDER_ADAPTER: '1'
           PARTITION: ${{ matrix.partition }}
           PARTITION_COUNT: ${{ inputs.count }}
-        shell: bash
-        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --partition "count:${PARTITION}/${PARTITION_COUNT}"
-      - name: Install the X server and the libraries the window loads at run time
-        if: runner.os == 'Linux' && matrix.partition == 1
-        run: sudo apt-get install -y --no-install-recommends xvfb libx11-6 libxcursor1 libxi6 libxrandr2 libxkbcommon-x11-0 libegl1
-      - name: Smoke run of the window under Xvfb, drawing on lavapipe
-        if: runner.os == 'Linux' && matrix.partition == 1
-        run: xvfb-run --auto-servernum cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --run-ignored only -E 'test(the_window_starts_draws_frames_and_exits)'
-      - name: Name the software adapter the render tests drew on
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --partition "count:$env:PARTITION/$env:PARTITION_COUNT"
+      - name: Native CLI synthetic Archive listing
+        id: cli_list
+        if: matrix.partition == 1
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --no-tests fail -E 'package(p4kx) & test(list::)'
+      - name: Native CLI synthetic Archive extraction
+        id: cli_extract
+        if: matrix.partition == 1
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --no-tests fail -E 'package(p4kx) & test(extract::)'
+      - name: Native CLI synthetic Archive conversion
+        id: cli_convert
+        if: matrix.partition == 1
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --no-tests fail -E 'package(p4kx) & test(extract_convert::)'
+      - name: Native MCP initialization and tool listing
+        id: mcp_tools
+        if: matrix.partition == 1
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --no-tests fail -E 'package(p4kx-mcp) & test(tool_list::)'
+      - name: Native MCP synthetic read-only request
+        id: mcp_read
+        if: matrix.partition == 1
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --no-tests fail -E 'package(p4kx-mcp) & test(entries::the_top_level_lists_folders_then_entries)'
+      - name: Native Windows window draws frames and exits
+        id: window_windows
+        if: runner.os == 'Windows' && matrix.partition == 1
         env:
           P4KX_REQUIRE_SOFTWARE_ADAPTER: '1'
-        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --no-capture -E 'test(the_software_adapter_is_named)'
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --run-ignored only --no-tests fail -E 'test(the_window_starts_draws_frames_and_exits)'
+      - name: Native Linux window draws frames under Xvfb and lavapipe
+        id: window_linux
+        if: runner.os == 'Linux' && matrix.partition == 1
+        env:
+          P4KX_REQUIRE_SOFTWARE_ADAPTER: '1'
+        run: xvfb-run --auto-servernum cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --run-ignored only --no-tests fail -E 'test(the_window_starts_draws_frames_and_exits)'
+      - name: Native macOS window draws Metal frames and exits
+        id: window_macos
+        if: runner.os == 'macOS' && matrix.partition == 1
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --run-ignored only --no-tests fail -E 'test(the_window_starts_draws_frames_and_exits)'
+      - name: Draw and read a frame with the native Metal adapter
+        id: metal_adapter
+        if: runner.os == 'macOS' && matrix.partition == 1
+        env:
+          P4KX_REQUIRE_RENDER_ADAPTER: '1'
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --no-capture --no-tests fail -E 'test(the_metal_adapter_draws_and_reads_back_a_frame)'
+      - name: Name the native software adapter
+        id: adapter
+        if: runner.os == 'Windows' || runner.os == 'Linux'
+        env:
+          P4KX_REQUIRE_SOFTWARE_ADAPTER: '1'
+        shell: pwsh
+        run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --no-capture --no-tests fail -E 'test(the_software_adapter_is_named)'
+      - name: Record executed native smoke outcomes
+        if: matrix.partition == 1
+        shell: pwsh
+        env:
+          CLI_LIST_OUTCOME: ${{ steps.cli_list.outcome }}
+          CLI_EXTRACT_OUTCOME: ${{ steps.cli_extract.outcome }}
+          CLI_CONVERT_OUTCOME: ${{ steps.cli_convert.outcome }}
+          MCP_TOOLS_OUTCOME: ${{ steps.mcp_tools.outcome }}
+          MCP_READ_OUTCOME: ${{ steps.mcp_read.outcome }}
+          GUI_FRAMES_OUTCOME: ${{ runner.os == 'Windows' && steps.window_windows.outcome || runner.os == 'Linux' && steps.window_linux.outcome || steps.window_macos.outcome }}
+          SOFTWARE_ADAPTER_OUTCOME: ${{ steps.adapter.outcome }}
+          METAL_ADAPTER_OUTCOME: ${{ steps.metal_adapter.outcome }}
+        run: .github/scripts/record-native-runtime.ps1 -Target $env:P4KX_TARGET -MetadataPath nextest-archive.json -OutputPath native-runtime.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: matrix.partition == 1
+        with:
+          name: native-runtime-${{ inputs.target }}-${{ github.sha }}
+          path: native-runtime.json
+          retention-days: 14
+          if-no-files-found: error

@@ -106,7 +106,7 @@ fn cube_names_its_material_library() -> TestResult {
         "the MtlName chunk"
     );
     assert!(
-        matches!(&model.materials, MaterialStatus::Missing { path } if path == CUBE_MATERIAL_LIBRARY),
+        matches!(&model.materials, MaterialStatus::Missing { path, .. } if path == CUBE_MATERIAL_LIBRARY),
         "no resolver file: {:?}",
         model.materials
     );

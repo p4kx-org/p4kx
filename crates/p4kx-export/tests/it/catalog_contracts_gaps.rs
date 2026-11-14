@@ -52,10 +52,10 @@ fn a_contract_links_its_localities_and_a_sub_contract_replaces_them() -> TestRes
 }
 
 #[test]
-fn a_locality_is_not_capped_where_the_pickup_places_are() -> TestResult {
+fn a_locality_and_its_pickup_places_retain_every_resolved_object() -> TestResult {
     let (_, catalog) = build(None)?;
     let contract = entry(&catalog, B, None)?;
-    assert_eq!(contract["pickupPlaces"].as_array().map(Vec::len), Some(5));
+    assert_eq!(contract["pickupPlaces"].as_array().map(Vec::len), Some(7));
     assert_eq!(contract["offeredAt"]["localityGuids"], json!([LOC_B]));
     let localities = catalog["missionLocalities"]
         .as_array()

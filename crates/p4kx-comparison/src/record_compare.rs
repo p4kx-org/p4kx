@@ -164,7 +164,7 @@ fn diff<'a>(pair: Joined<'a>, options: &CompareOptions<'_>) -> Option<RecordChan
             old.map(|record| record.index()),
             new.map(|record| record.index()),
         ),
-        guid: new.or(old).map(|record| record.guid()).unwrap_or_default(),
+        guid: new.or(old).map_or_default(|record| record.guid()),
         old: old_state,
         new: new_state,
         fields: Vec::new(),

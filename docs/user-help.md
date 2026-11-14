@@ -2,6 +2,42 @@
 
 How to use the P4KX window. Terms follow [CONTEXT.md](../CONTEXT.md). The command line and the
 MCP server are described in [commands.md](commands.md).
+[Linux packages](linux-packages.md) explains choosing and starting a native package.
+[Profile folders](profile-folders.md) lists the Linux locations for settings, the stored Archive
+key, cache and application data.
+
+## Flatpak startup and export protection
+
+The Flatpak window requires host Documents-portal API 5 with authenticated host-path lookup.
+When that prerequisite is missing, a notice explains it before the normal window or profile
+opens. See [Linux packages](linux-packages.md) for the separate host requirement and grants.
+
+For file exports and Blender packages, **Choose export destination** asks for a parent folder
+and a file or package-folder name. **Choose folder…** selects the parent; the full destination
+is shown below the name. **Use destination** returns a model, Entity or Character destination
+to its export setup. **Start export** starts the catalog, Query, report or picture export.
+Cancelling discards this choice, including permission for a diagnostic catalog. The dialog
+scrolls in a small window while its action buttons stay visible.
+
+If a system chooser cannot open or closes without a reply, the window shows the reason.
+Close that notice before opening the chooser again. Cancelling a chooser does not show an
+error and starts no output job.
+
+An export refusal distinguishes a known Star Citizen installation from a source or destination
+whose identity cannot be verified. A file chooser grant can hide the Archive's host parent; a
+write grant does not establish that writing there is safe. Choose a source and destination with
+the required visibility. Cleanup or restoration failures remain visible even after cancellation.
+
+## Channel discovery
+
+The Channel picker searches native launcher logs and, on Linux, bounded Proton, Steam, Bottles
+and immediate `~/Games/*` prefixes. If automatic discovery or startup installation protection
+is incomplete, a warning names the manual fallback; its tooltip gives the first technical reason.
+Use **Add folder.** or **Add Archive.** for a missing installation. Existing manual entries remain
+listed. Adding a new entry stores and protects it immediately, then refreshes the automatic list
+in the background. The list updates when the current search completes; earlier results cannot
+replace a newer selection. A search failure appears in the existing warning notice. See [Channel discovery](channel-discovery.md)
+for source priority, supported roots, limits and cache behavior.
 
 ## Preview
 
@@ -24,6 +60,9 @@ the window stays responsive while it loads.
   left (the facts bar then gives their number as **Layers**), an alpha tail is merged into the
   alpha channel, and BC6H and floating-point formats are tone-mapped. A format the preview cannot decode is
   named; the Text and Hex tabs still show the Entry's data.
+  Hover over the facts bar, mip selector or image to see whether its data came from an
+  encrypted archive entry. The image tooltip reflects the colour and alpha data actually
+  used by the selected mip. Uncertain source information is shown as unknown.
 - **Info** appears next to Model for a model file and lists what the file holds: the nodes, the
   meshes and levels of detail with their vertices and triangles, the geometry file, the material
   library and the material IDs the submeshes use, the bones, and the chunks, counted as read,
@@ -59,6 +98,12 @@ and its animations play with **Play**. Above the view a facts bar gives the
   is lost, the tab says so and the rest of the window keeps working. Enlarge the preview by
   dragging the divider above it to see more of the model.
 - **Copy** puts the open tab on the clipboard: the text, or the hex rows as shown.
+
+On Windows, Linux and macOS, text copy and paste use the system clipboard. Text copied with
+**Copy** can be pasted into another application, and text copied there can be pasted into an
+editable P4KX field. Multiline fields retain line breaks; single-line fields keep their normal
+editing rules. An empty clipboard inserts no text. If another program temporarily holds the
+clipboard, release it and repeat the explicit copy or paste action.
 
 ### Size limits
 
@@ -171,7 +216,9 @@ The table keeps the width of its columns and scrolls sideways in a narrow window
 a number and stands right-aligned. The tab reads the tags in the background when it is first opened for an Archive and shares the
 DataForge with the other views. A note above the tree says when it differs from what the
 `TagDatabase` lists, for example Tags that no `TagDatabase` reaches, which stand as roots of their
-own. `p4kx dcb tags` prints the same tree; `p4kx dcb export --tags` writes the tag path next to every
+own. Unreadable type metadata leaves family selection unresolved: an empty result then keeps the
+warning instead of confirming that the Archive has no Tags. `p4kx dcb tags` prints the same tree;
+`p4kx dcb export --tags` writes the tag path next to every
 Reference to a Tag in the Records.
 
 ### Searching Records
@@ -225,13 +272,21 @@ shows the compressed and the uncompressed size, so it tells which form was writt
 
 The catalog is created in the background with a progress window; DataForge already read for the
 Record tree, a Query or a Record export is reused, and the other way round. **Cancel** stops it at once and writes no file; an
-existing file stays as it was. The summary lists per kind the entities written, the Records left
-out as development leftovers and whether the kind is complete, per language the texts resolved,
+existing file stays as it was. The summary shows export health separately from each kind's selection
+scope, then the entities written, the Records left out as development leftovers, per language the texts resolved,
 missing and placeholders, the size against the basetool upload limit of 64 MB and the file. A
 catalog close to the upload limit gets a warning, one over it an error note, because the basetool
-rejects it. A selected Record that cannot be read does not stop the catalog: it is left out and
-listed in the summary under "Records that could not be read and were left out", with its record
-path, GUID and reason.
+rejects it. A read/projection failure or a source warning that makes the export incomplete refuses
+normal publication. The window explains the refusal and leaves any existing file intact.
+Both outcomes report failed Archive Entry operations by dataset, reason and count.
+
+**Export › Diagnostic Basetool catalog…** explicitly writes a result for investigation, including
+incomplete data. Its save dialog proposes `basetool-catalog.diagnostic.json.zst`. The progress and
+outcome windows identify the diagnostic job, and the file carries its publication mode and health.
+Unreadable selected Records are listed with their record path, GUID and reason. This permission
+applies only to that job. Check the file's `exportHealth` before importing it; incomplete source
+data must not become deletions of previously stored entities. A healthy Filter-scoped export is
+publishable normally, while its selection scope remains partial.
 
 ## Searching the contents
 
@@ -294,6 +349,10 @@ value that cannot be read red. Click a column head to sort by it: numbers by val
 case and lists by their first value and then their length; click again to reverse. Values that
 cannot be read, nulls and missing values stay at the end either way. Large results are shown
 500 rows per page; the number of Records and the page buttons are below the table.
+
+A value that cannot be read to decide `where` fails the Query with its Record and reason.
+Missing or null values keep their normal unknown meaning and may yield a successful empty result.
+Cancellation drops the partial selection. A failed or cancelled selection cannot replace an export.
 
 **Export CSV…** and **Export JSON…** write the whole result in the order of `docs/query.md`,
 byte for byte as `p4kx dcb query --format csv|json --out <file>` writes it, whatever the table is
@@ -439,23 +498,30 @@ The command line behaves the same way: `p4kx extract` stops and exits with code 
 
 ## Installing and updating
 
-Each Release on GitHub offers three downloads:
+Windows releases provide AMD64 (`x86_64-pc-windows-msvc`) and ARM64
+(`aarch64-pc-windows-msvc`) packages. Choose the target matching your device:
 
-- **`P4KX-<version>-x86_64.msi`** installs for the current user only, without
+- **`P4KX-<version>-<target>.msi`** installs for the current user only, without
   administrator rights, into `%LOCALAPPDATA%\Programs\P4KX`. It installs `p4kx-gui.exe`,
   `p4kx.exe` and `p4kx-mcp.exe`, adds P4KX to the Start menu and that folder to your `PATH`, so
   `p4kx` works in a new terminal. A newer MSI replaces the installed version in place; uninstall
   through **Settings › Apps**.
-- **`P4KX-<version>-x86_64-portable.zip`** holds `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe`
+- **`P4KX-<version>-<target>-portable.zip`** holds `p4kx-gui.exe`, `p4kx.exe` and `p4kx-mcp.exe`
   to run from any folder, without installing anything.
 - **`p4kx_importer-<version>.zip`** is the Blender add-on that imports a Blender package. In
-  Blender 5.2 LTS use Edit › Preferences › Get Extensions › Install from Disk. It needs no
+  Blender 5.2 LTS or 5.3 use Edit › Preferences › Get Extensions › Install from Disk. It needs no
   installer and has the same version as the Release.
 
 Both keep their settings in `%APPDATA%\P4KX\settings.toml`, so switching between them or
 uninstalling keeps them. Coming from P4K-Extractor, the first start copies its old settings
 folder `%APPDATA%\P4K-Extractor` (settings and stored Archive key) into `%APPDATA%\P4KX` when that
 does not exist yet; the old folder stays as a backup.
+Both CPU installers manage one per-user installation. Explicitly installing the other CPU
+package at the same version replaces that installation on Windows ARM64; updates select the
+running binary's CPU and never change it automatically. A lower version is rejected. An upgrade
+failure rolls back the installed version. Settings and the stored Archive key survive CPU
+replacement and uninstall. Older AMD64 releases use the historical `-x86_64` filenames.
+See [Windows packages](windows-packages.md) for exact native verification systems and evidence.
 
 ### About
 
@@ -481,7 +547,9 @@ covered by a non-disclosure agreement and must not be shared. The command line p
 **Help › Check for a new version at start** is off until you switch it on. While it is on, the
 window asks the GitHub API once at start for the latest Release of P4KX; switching it on
 also asks at once. When a newer Release exists, the status bar shows **Version … is available**,
-which opens its page in your browser.
+which opens the compatible package for your installed OS, binary CPU and package format when
+its identity and Release asset are available. Otherwise it opens the Release page in your browser.
+Following the link is your choice; the check does not download or install an update.
 
 The request is a plain anonymous GET of
 `https://api.github.com/repos/p4kx-org/p4kx/releases/latest`; it carries only the

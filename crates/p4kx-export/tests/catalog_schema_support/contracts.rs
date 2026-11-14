@@ -4,10 +4,13 @@
 //! One contract with a pickup place, a reputation gain, the contract facts and a hauling order,
 //! and a cargo manifest.
 
-use serde_json::json;
+use p4kx_extraction::SourceValue;
+use serde_json::{Value, json};
+
+use super::source_values::{present, source};
 
 /// The places, the giver faction and the blueprint rewards of an entry.
-fn gaps() -> serde_json::Value {
+fn gaps() -> Value {
     json!({
         "offeredAt": {
             "localityGuids": ["a0000000-0000-4000-8000-000000000001"],
@@ -30,27 +33,25 @@ fn gaps() -> serde_json::Value {
     })
 }
 
-pub(super) fn contracts() -> serde_json::Value {
-    let gains = json!([{
-        "factionReputationGuid": "60000000-0000-4000-8000-000000000001",
-        "factionReputationName": "acme",
-        "scopeGuid": "60000000-0000-4000-8000-000000000002",
-        "scopeName": "faction",
-        "amount": 200
-    }]);
+pub(super) fn contracts() -> Value {
+    let gains = present(json!([{
+        "factionReputationGuid": present(json!("60000000-0000-4000-8000-000000000001")),
+        "factionReputationName": present(json!("acme")),
+        "scopeGuid": present(json!("60000000-0000-4000-8000-000000000002")),
+        "scopeName": present(json!("faction")),
+        "amount": present(json!("200"))
+    }]));
     let mut entry = json!({
-        "guid": "20000000-0000-4000-8000-000000000001",
-        "subContractGuid": "30000000-0000-4000-8000-000000000002",
-        "recordGuid": "10000000-0000-4000-8000-000000000001",
-        "recordPath": "libs/foundry/records/contracts/contractgenerator/delivery",
+        "source": occurrence(),
+        "guid": present(json!("20000000-0000-4000-8000-000000000001")),
+        "subContractGuid": present(json!("30000000-0000-4000-8000-000000000002")),
         "debugName": "Deliver_A",
         "handler": "Delivery_Career",
         "templateGuid": "40000000-0000-4000-8000-000000000001",
         "brokerEntryGuid": "b1000000-0000-4000-8000-000000000001",
+        "propertySetGuids": ["a7000000-0000-4000-8000-000000000001"],
         "notForRelease": false,
         "workInProgress": null,
-        "title": {"key": "@title_a", "en": "Deliver Scrap to [LOCATION]", "de": null},
-        "description": {"key": "@desc_handler", "en": "Wanted", "de": null},
         "missionTypeGuid": "50000000-0000-4000-8000-000000000001",
         "missionType": {"key": "@type_delivery", "en": "Delivery", "de": null},
         "contractor": {"key": null, "en": null, "de": null},
@@ -71,7 +72,12 @@ pub(super) fn contracts() -> serde_json::Value {
             "minStandingGuid": "62000000-0000-4000-8000-000000000001",
             "maxStandingGuid": null
         }],
-        "fixedRewards": [{"currency": "UEC", "amount": 40000, "max": 0, "plusBonuses": false}],
+        "fixedRewards": present(json!([{
+            "currency": present(json!("UEC")),
+            "amount": present(json!("40000")),
+            "max": present(json!("0")),
+            "plusBonuses": present(json!(false))
+        }])),
         "haulingOrders": orders()
     });
     for extra in [facts(), cooldown(), gaps()] {
@@ -79,32 +85,57 @@ pub(super) fn contracts() -> serde_json::Value {
             entry.extend(extra.clone());
         }
     }
-    if let (Some(target), serde_json::Value::Object(links)) = (entry.as_object_mut(), spawn_links())
-    {
+    if let (Some(target), Value::Object(links)) = (entry.as_object_mut(), spawn_links()) {
         target.extend(links);
     }
-    json!([entry])
+    json!({"availability":"available", "rows":[entry]})
 }
 
-fn cooldown() -> serde_json::Value {
-    json!({
-        "cooldownLayer": "contract",
-        "cooldownLayers": {
-            "hasPersonalCooldown": "handler",
-            "personalCooldownTime": "contract",
-            "personalCooldownTimeVariation": "handler",
-            "abandonedCooldownTime": "handler",
-            "abandonedCooldownTimeVariation": null
+pub(super) fn titles() -> Value {
+    json!({"availability":"available", "rows":[{
+        "contract": occurrence(),
+        "title": {
+            "key": present(json!("fixture-protected-title")),
+            "translations": {"en": present(json!("Deliver Scrap to [LOCATION]"))},
+            "itemTokens": {}
         },
-        "hasPersonalCooldown": true,
-        "personalCooldownTime": 2880.0,
-        "personalCooldownTimeVariation": 60.0,
-        "abandonedCooldownTime": 30.0,
-        "abandonedCooldownTimeVariation": null
+        "description": {
+            "key": source(SourceValue::Absent),
+            "translations": {},
+            "itemTokens": {}
+        }
+    }]})
+}
+
+fn occurrence() -> Value {
+    json!({
+        "inputRef":"fixture-generator",
+        "recordIndex":0,
+        "handler":{"valueIndex":"0"},
+        "contract":{"valueIndex":"1"},
+        "subContract":{"valueIndex":"2"}
     })
 }
 
-fn places() -> serde_json::Value {
+fn cooldown() -> Value {
+    json!({
+        "cooldownLayer": present(json!("contract")),
+        "cooldownLayers": {
+            "hasPersonalCooldown": present(json!("handler")),
+            "personalCooldownTime": present(json!("contract")),
+            "personalCooldownTimeVariation": present(json!("handler")),
+            "abandonedCooldownTime": present(json!("handler")),
+            "abandonedCooldownTimeVariation": source(SourceValue::Absent)
+        },
+        "hasPersonalCooldown": present(json!(true)),
+        "personalCooldownTime": present(json!(2880.0)),
+        "personalCooldownTimeVariation": present(json!(60.0)),
+        "abandonedCooldownTime": present(json!(30.0)),
+        "abandonedCooldownTimeVariation": source(SourceValue::Absent)
+    })
+}
+
+fn places() -> Value {
     json!([{
         "starmapObjectGuid": "a2000000-0000-4000-8000-000000000001",
         "objectType": "Planet",
@@ -112,7 +143,7 @@ fn places() -> serde_json::Value {
     }])
 }
 
-fn spawn_links() -> serde_json::Value {
+fn spawn_links() -> Value {
     json!({
         "shipSpawns": [{
             "variable": "HostileShips_BP",
@@ -147,27 +178,40 @@ fn spawn_links() -> serde_json::Value {
     })
 }
 
-fn facts() -> serde_json::Value {
+fn facts() -> Value {
     json!({
-        "timeToComplete": 20.0,
-        "buyInAmount": 0,
-        "canBeShared": {"value": true, "layer": "template"},
-        "illegal": {"value": false, "layer": "contract"},
-        "onceOnly": {"value": true, "layer": "subContract"},
-        "maxPlayersPerInstance": {"value": 1, "layer": "handler"},
-        "availableInPrison": null,
-        "canReacceptAfterAbandoning": {"value": true, "layer": "handler"},
-        "canReacceptAfterFailing": null,
-        "hideInMobiGlas": null,
-        "requiredIntros": [{
-            "level": "handler",
-            "tagGuid": "90000000-0000-4000-8000-000000000002",
-            "introContracts": ["20000000-0000-4000-8000-000000000001"]
-        }]
+        "timeToComplete": present(json!(20.0)),
+        "buyInAmount": present(json!(0)),
+        "canBeShared": layered(Some((json!(true), "template"))),
+        "illegal": layered(Some((json!(false), "contract"))),
+        "onceOnly": layered(Some((json!(true), "subContract"))),
+        "maxPlayersPerInstance": layered(Some((json!(1), "handler"))),
+        "availableInPrison": layered(None),
+        "canReacceptAfterAbandoning": layered(Some((json!(true), "handler"))),
+        "canReacceptAfterFailing": layered(None),
+        "hideInMobiGlas": layered(None),
+        "requiredIntros": present(json!([{
+            "level": present(json!("handler")),
+            "tagGuid": present(json!("90000000-0000-4000-8000-000000000002")),
+            "introContracts": present(json!([present(json!("20000000-0000-4000-8000-000000000001"))]))
+        }]))
     })
 }
 
-fn orders() -> serde_json::Value {
+fn layered(fact: Option<(Value, &str)>) -> Value {
+    let (value, layer) = fact.map_or(
+        (SourceValue::Absent, SourceValue::Absent),
+        |(value, layer)| {
+            (
+                SourceValue::Present(value),
+                SourceValue::Present(json!(layer)),
+            )
+        },
+    );
+    json!({"value": source(value), "layer": source(layer)})
+}
+
+fn orders() -> Value {
     json!([{
         "source": "contract",
         "variableName": "HaulingOverride",
@@ -185,7 +229,7 @@ fn orders() -> serde_json::Value {
     }])
 }
 
-pub(super) fn manifests() -> serde_json::Value {
+pub(super) fn manifests() -> Value {
     json!([{
         "guid": "f7000000-0000-4000-8000-000000000001",
         "className": "LegalCargo_Even",

@@ -191,6 +191,9 @@ pub enum IssueKind {
         /// How many.
         count: usize,
     },
+    /// A direct vehicle tile light kept its original placement because a source join failed.
+    #[error("tile light could not be anchored: {0}")]
+    LightAnchor(crate::SocTileLightAnchorError),
     /// Lights of a type `KHR_lights_punctual` cannot express (ambient lights, which stand in for
     /// global illumination, planar area lights and unknown types), so they are left out.
     #[error(

@@ -5,24 +5,27 @@ use std::fmt;
 use std::ops::Range;
 
 use crate::bank_reader::SectionReader;
+use crate::bank_structure::{HircEnvelope, OBJECT_HEADER_LEN, OBJECT_ID_LEN};
 use crate::hirc_action::{self, ActionTarget};
+use crate::hirc_actor_mixer::{self, ActorMixer};
+use crate::hirc_container;
+use crate::hirc_event;
 use crate::hirc_layout::has_decoder;
 use crate::hirc_music::{MusicPlaylist, MusicSegment, MusicSwitch, MusicTrack};
 use crate::hirc_music_parse;
-use crate::hirc_node::{self, Container};
+use crate::hirc_music_track;
+use crate::hirc_node::Container;
 use crate::hirc_source;
+use crate::hirc_state::{self, StateObject};
 use crate::{BankError, SectionId};
 
-const OBJECT_HEADER_LEN: usize = 5;
-const ID_LEN: usize = 4;
 const LAST_SOUND_WITHOUT_CACHE_ID_VERSION: u32 = 150;
-const CONTAINER_VERSION: u32 = 154;
+pub(crate) const CONTAINER_VERSION: u32 = 154;
 const LAST_KNOWN_VERSION: u32 = 154;
 const LAST_OLD_TYPE_NUMBERING_VERSION: u32 = 126;
 const PLUGIN_TYPE_MASK: u32 = 0x0F;
 const LANGUAGE_SPECIFIC_BIT: u8 = 0x01;
 const SOURCE_PLUGIN_TYPE: u32 = 2;
-const LAST_FIXED_EVENT_COUNT_VERSION: u32 = 122;
 
 /// The type of a `HIRC` object, from its type byte.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -198,6 +201,8 @@ impl SoundSource {
 /// What this reader decodes from the body of a `HIRC` object.
 #[derive(Debug, Clone, PartialEq)]
 pub enum HircValue {
+    /// A standalone State's original property bundle.
+    State(Box<StateObject>),
     /// A Sound object's media source, from bank version 150 on.
     Sound(SoundSource),
     /// An Action object's type and target.
@@ -206,6 +211,8 @@ pub enum HircValue {
     Event(Vec<u32>),
     /// A random, sequence, switch or blend container's children, in bank version 154.
     Container(Container),
+    /// An `ActorMixer`'s shared node parent and children, in bank version 154.
+    ActorMixer(ActorMixer),
     /// A music segment, in bank version 154.
     MusicSegment(Box<MusicSegment>),
     /// A music track, in bank version 154.
@@ -256,27 +263,24 @@ pub(crate) fn parse(version: u32, body: &[u8], base: usize) -> Result<Hirc, Bank
     let count = reader.u32()?;
     let capacity = usize::try_from(count)
         .unwrap_or(usize::MAX)
-        .min(reader.remaining() / (OBJECT_HEADER_LEN + ID_LEN));
+        .min(reader.remaining() / (OBJECT_HEADER_LEN + OBJECT_ID_LEN));
     let mut objects = Vec::with_capacity(capacity);
     for _ in 0..count {
-        let kind = HircKind::of(version, reader.u8()?);
-        let len = usize::try_from(reader.u32()?).unwrap_or(usize::MAX);
-        if len < ID_LEN {
-            return Err(BankError::invalid(
-                SectionId::HIRC,
-                "an object is shorter than its ID",
-            ));
-        }
+        let header = HircEnvelope::read(&mut reader)?;
+        let kind = HircKind::of(version, header.type_code);
+        let len = usize::try_from(header.body_len).unwrap_or(usize::MAX);
         let range = reader.skip(len)?;
         let object = body.get(range.clone()).unwrap_or_default();
         let mut fields = SectionReader::new(SectionId::HIRC, object);
         let id = fields.u32()?;
-        let value = value(kind, version, &mut fields).unwrap_or_else(HircValue::Malformed);
+        let bank_offset = base + range.start;
+        let value = value(kind, version, &mut fields, bank_offset as u64)
+            .unwrap_or_else(HircValue::Malformed);
         objects.push(HircObject {
             kind,
             id,
             value,
-            body: base + range.start..base + range.end,
+            body: bank_offset..base + range.end,
         });
     }
     Ok(Hirc {
@@ -293,64 +297,44 @@ pub(crate) const fn has_cache_id(version: u32) -> bool {
 
 /// Returns whether an object of `kind` is one this reader decodes but whose layout in a bank of
 /// `version` is not known, because the version is newer than 154.
-const fn has_unknown_layout(kind: HircKind, version: u32) -> bool {
+pub(crate) const fn has_unknown_layout(kind: HircKind, version: u32) -> bool {
     version > LAST_KNOWN_VERSION && has_decoder(kind)
 }
 
-/// Decodes the fields of an object after its ID.
-///
-/// The layouts known are those of bank versions up to 154: a Sound from version 150 (plug-in ID,
-/// storage byte, source ID, with a `cacheID` after the source ID from version 151, then the
-/// in-memory media size), an Action and an Event from version 49 (an Event counts its actions in
-/// 4 bytes up to version 122, in a variable-length integer after), a random, sequence, switch or
-/// blend container and a music segment, track, switch or playlist in version 154 only. The body
-/// of such an object in a bank above version 154, whose layouts changed, is kept raw with
-/// [`BankError::UnsupportedObjectLayout`]; below its first version it is kept raw without a
-/// reason. Other objects are never decoded.
+/// Decodes the version-qualified fields after an object's ID.
 fn value(
     kind: HircKind,
     version: u32,
     fields: &mut SectionReader<'_>,
+    bank_offset: u64,
 ) -> Result<HircValue, BankError> {
     if has_unknown_layout(kind, version) {
         return Err(BankError::UnsupportedObjectLayout { kind, version });
     }
     Ok(match kind {
+        HircKind::State if hirc_state::supports_standalone(version) => {
+            HircValue::State(Box::new(hirc_state::read_object(fields, bank_offset)?))
+        }
         HircKind::Sound if hirc_source::has_sound_layout(version) => {
             HircValue::Sound(hirc_source::sound(version, fields)?)
         }
         HircKind::Action => HircValue::Action(hirc_action::action(version, fields)?),
-        HircKind::Event => {
-            let count = if version > LAST_FIXED_EVENT_COUNT_VERSION {
-                fields.variable_length()?
-            } else {
-                fields.u32()?
-            };
-            let count = usize::try_from(count).unwrap_or(usize::MAX);
-            if count > fields.remaining() / ID_LEN {
-                return Err(BankError::invalid(
-                    SectionId::HIRC,
-                    "an event lists more actions than its body holds",
-                ));
-            }
-            let mut actions = Vec::with_capacity(count);
-            for _ in 0..count {
-                actions.push(fields.u32()?);
-            }
-            HircValue::Event(actions)
-        }
+        HircKind::Event => HircValue::Event(hirc_event::read(version, fields)?),
         HircKind::RandomSequenceContainer
         | HircKind::SwitchContainer
         | HircKind::LayerContainer
             if version == CONTAINER_VERSION =>
         {
-            HircValue::Container(hirc_node::container(kind, fields)?)
+            HircValue::Container(hirc_container::container(kind, fields)?)
+        }
+        HircKind::ActorMixer if version == hirc_actor_mixer::VERSION => {
+            HircValue::ActorMixer(hirc_actor_mixer::read(fields, bank_offset)?)
         }
         HircKind::MusicSegment if version == CONTAINER_VERSION => {
             HircValue::MusicSegment(Box::new(hirc_music_parse::segment(fields)?))
         }
         HircKind::MusicTrack if version == CONTAINER_VERSION => {
-            HircValue::MusicTrack(Box::new(hirc_music_parse::track(version, fields)?))
+            HircValue::MusicTrack(Box::new(hirc_music_track::track(version, fields)?))
         }
         HircKind::MusicSwitch if version == CONTAINER_VERSION => {
             HircValue::MusicSwitch(Box::new(hirc_music_parse::switch(fields)?))

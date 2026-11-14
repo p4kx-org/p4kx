@@ -39,9 +39,10 @@ sideways along X. A part at `[30, 0, 90]` keeps its right axis level.
   attachments have none, and an entity attachment has no helper offset of its own.
 - `detach_direction`: the `detachDirection` vector every port has (68,597 ports in 13,704 Records).
 
-Neither changes a placement yet: they are read so that a front-end can show them and a later change
-can keep a gimbal or turret in its own orientation (`no_rotation`) without reading the Record
-again. `PortTags` and `RequiredPortTags` were read already; the port container holds no tags of its
+Static placement applies the complete helper transform. A rotated relay fixture
+distinguishes that rule from translation-only placement. The stored
+`no_rotation` flag remains available to consumers. `PortTags` and
+`RequiredPortTags` were read already; the port container holds no tags of its
 own in LIVE, only `PortFlags`.
 
 ## Sub-geometry selection
@@ -66,5 +67,6 @@ first Entity in definition order.
 
 ## Not decided here
 
-Applying `no_rotation` to placements, and the Loadouts of XML files, whose entries carry no
-Reference.
+The meaning of `no_rotation` during animation is unresolved. A discriminating
+reference must establish coordinate space and orientation over time. The Loadouts
+of XML files, whose entries carry no Reference, are also outside this decision.

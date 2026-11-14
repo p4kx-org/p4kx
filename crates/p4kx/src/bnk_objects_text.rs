@@ -43,7 +43,21 @@ pub(crate) fn write_object(out: &mut impl Write, object: &ObjectView<'_>) -> io:
     if let Some(error) = &object.error {
         writeln!(out, "{INDENT}{}", one_line(error))?;
     }
-    match &object.detail {
+    write_detail(out, object.detail.as_ref())
+}
+
+fn write_detail(out: &mut impl Write, detail: Option<&Detail<'_>>) -> io::Result<()> {
+    match detail {
+        Some(Detail::State(state)) => {
+            for property in &state.properties {
+                writeln!(
+                    out,
+                    "{INDENT}property {}  {:#010x}",
+                    property.id, property.value_bits
+                )?;
+            }
+            Ok(())
+        }
         Some(Detail::Sound(sound)) => sound_lines(out, sound),
         Some(Detail::Action(action)) => {
             write!(
@@ -77,7 +91,7 @@ pub(crate) fn write_object(out: &mut impl Write, object: &ObjectView<'_>) -> io:
                 .iter()
                 .try_for_each(|item| item_line(out, item))
         }
-        None => Ok(()),
+        Some(Detail::ActorMixer(_)) | None => Ok(()),
     }
 }
 

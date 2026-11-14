@@ -88,14 +88,33 @@ fn a_variable_alone_needs_no_home_folder() -> TestResult {
 
 #[cfg(windows)]
 #[test]
-fn the_windows_config_folder_is_the_known_folder() {
-    assert_eq!(
-        p4kx_settings::base_folder(FolderKind::Config),
-        dirs::config_dir()
+fn the_windows_config_folder_is_the_known_folder() -> TestResult {
+    let output = location_child()?.output()?;
+    let text = String::from_utf8(output.stdout)?;
+    let expected = dirs::config_dir().map_or_else(String::new, |path| path.display().to_string());
+    assert!(output.status.success(), "profile child failed: {text}");
+    assert!(
+        text.lines()
+            .any(|line| line.strip_prefix("config=") == Some(expected.as_str())),
+        "Windows known config folder: {text}"
     );
+    Ok(())
 }
 
 const CHILD_MARKER: &str = "P4KX_LOCATIONS_CHILD";
+
+fn location_child() -> std::io::Result<std::process::Command> {
+    let mut command = std::process::Command::new(std::env::current_exe()?);
+    command
+        .args([
+            "--exact",
+            "locations::child_prints_the_folders",
+            "--nocapture",
+        ])
+        .env(CHILD_MARKER, "1")
+        .env_remove(p4kx_settings::FOLDERS_ROOT_VARIABLE);
+    Ok(command)
+}
 
 /// Prints the folders of this process for the parent test; does nothing outside the child.
 #[test]
@@ -121,13 +140,7 @@ fn child_prints_the_folders() {
 #[test]
 fn on_linux_the_variables_of_the_process_decide_the_folders() -> TestResult {
     let root = tempfile::tempdir()?;
-    let output = std::process::Command::new(std::env::current_exe()?)
-        .args([
-            "--exact",
-            "locations::child_prints_the_folders",
-            "--nocapture",
-        ])
-        .env(CHILD_MARKER, "1")
+    let output = location_child()?
         .env("XDG_CONFIG_HOME", root.path().join("c"))
         .env("XDG_CACHE_HOME", root.path().join("k"))
         .env("XDG_DATA_HOME", root.path().join("d"))
@@ -150,6 +163,32 @@ fn on_linux_the_variables_of_the_process_decide_the_folders() -> TestResult {
             )),
             "{name} in {text}"
         );
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn macos_uses_the_standard_library_directories_with_a_unicode_home() -> TestResult {
+    let root = tempfile::tempdir()?;
+    let home = root.path().join("P4KX ü Ω");
+    std::fs::create_dir(&home)?;
+    let unwanted = root.path().join("unwanted-xdg");
+    let output = location_child()?
+        .env("HOME", &home)
+        .env("XDG_CONFIG_HOME", &unwanted)
+        .env("XDG_CACHE_HOME", &unwanted)
+        .env("XDG_DATA_HOME", &unwanted)
+        .output()?;
+    let text = String::from_utf8(output.stdout)?;
+    assert!(output.status.success(), "profile child failed: {text}");
+    for (name, path) in [
+        ("config", "Library/Application Support"),
+        ("cache", "Library/Caches/P4KX"),
+        ("data", "Library/Application Support/P4KX"),
+    ] {
+        let expected = format!("{name}={}", home.join(path).display());
+        assert!(text.lines().any(|line| line == expected), "{name}: {text}");
     }
     Ok(())
 }

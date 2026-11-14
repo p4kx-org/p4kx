@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 use p4kx_extraction::model::{LayerBudget, MaterialStatus, Model, RigLogicBytes};
+use p4kx_extraction::{ArchiveDefaultMaterial, ArchiveMaterialRead, EntryOrigin};
 
 use crate::provider::{ModelFailure, ModelProvider, ProvidedModel};
 
@@ -246,12 +247,28 @@ impl ModelProvider for CachedModels<'_> {
         self.inner.library(entry, name)
     }
 
+    fn library_observed(&self, entry: &str, name: &str) -> ArchiveMaterialRead {
+        self.inner.library_observed(entry, name)
+    }
+
+    fn default_material(&self) -> Option<Arc<ArchiveDefaultMaterial>> {
+        self.inner.default_material()
+    }
+
     fn layer_budget(&self) -> LayerBudget {
         self.inner.layer_budget()
     }
 
     fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
         self.inner.layer_library(path, budget)
+    }
+
+    fn layer_library_observed(
+        &self,
+        path: &str,
+        budget: &mut LayerBudget,
+    ) -> (Arc<MaterialStatus>, Option<EntryOrigin>) {
+        self.inner.layer_library_observed(path, budget)
     }
 
     fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {

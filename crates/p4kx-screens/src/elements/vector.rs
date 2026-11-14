@@ -142,8 +142,14 @@ pub(super) fn draw(
             cx.report.note(&widget.type_name, note, record_path);
         }
     }
+    let item = cx.painter.len();
     if place(cx, widget, look, area, alpha, &entry) {
         cx.report.images_drawn += 1;
+        if cx.painter.len() > item
+            && let Some(inputs) = cx.inputs.as_mut()
+        {
+            inputs.vectors.insert(item, record_path.to_owned());
+        }
     }
 }
 

@@ -7,16 +7,28 @@ const MAX_COMPARED_LEN: usize = 128;
 /// Returns the candidate closest to `name`: one equal ignoring ASCII case, otherwise the first
 /// with the smallest edit distance up to a third of the name's length, at least 1.
 pub(crate) fn closest<'c>(name: &str, candidates: impl Iterator<Item = &'c str>) -> Option<String> {
+    match closest_fallible(name, candidates.map(Ok::<_, std::convert::Infallible>)) {
+        Ok(suggestion) => suggestion,
+        Err(error) => match error {},
+    }
+}
+
+/// Returns the closest readable candidate, propagating a failed candidate traversal.
+pub(crate) fn closest_fallible<'c, E>(
+    name: &str,
+    candidates: impl Iterator<Item = Result<&'c str, E>>,
+) -> Result<Option<String>, E> {
     let wanted: Vec<char> = name.chars().take(MAX_COMPARED_LEN + 1).collect();
     let limit = (wanted.len() / 3).max(1);
     let mut best: Option<(usize, &str)> = None;
     let mut row = Vec::new();
     for candidate in candidates {
+        let candidate = candidate?;
         if candidate == name {
             continue;
         }
         if candidate.eq_ignore_ascii_case(name) {
-            return Some(candidate.to_owned());
+            return Ok(Some(candidate.to_owned()));
         }
         if wanted.len() > MAX_COMPARED_LEN || candidate.len() > MAX_COMPARED_LEN * 4 {
             continue;
@@ -26,7 +38,7 @@ pub(crate) fn closest<'c>(name: &str, candidates: impl Iterator<Item = &'c str>)
             best = Some((distance, candidate));
         }
     }
-    best.map(|(_, candidate)| candidate.to_owned())
+    Ok(best.map(|(_, candidate)| candidate.to_owned()))
 }
 
 /// Returns the Levenshtein distance between `left` and `right` when it is at most `bound`.

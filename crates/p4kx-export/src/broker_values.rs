@@ -10,7 +10,7 @@ use serde::Serialize;
 /// A calendar month of an availability schedule.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum Month {
     /// January.
     January,
@@ -62,7 +62,7 @@ impl Month {
 /// How an availability schedule repeats.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum RepeatType {
     /// The window repeats every year until the repeat end (`RepeatYearly`).
     RepeatYearly,
@@ -78,7 +78,7 @@ impl RepeatType {
 /// How a reputation requirement compares the standing of the player with the one it names.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum Comparison {
     /// The standing equals it (`EqualTo`).
     EqualTo,

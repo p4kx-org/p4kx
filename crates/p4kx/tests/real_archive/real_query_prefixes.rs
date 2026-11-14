@@ -43,9 +43,9 @@ struct Timing {
     rows_min: Duration,
 }
 
-fn render(compiled: &CompiledQuery<'_>, runs: usize) -> Timing {
+fn render(compiled: &CompiledQuery<'_>, runs: usize) -> Result<Timing, Box<dyn Error>> {
     let started = Instant::now();
-    let run = compiled.run();
+    let run = compiled.run()?;
     let select = started.elapsed();
     let mut times = Vec::with_capacity(runs);
     let mut rows = Vec::new();
@@ -80,13 +80,13 @@ fn render(compiled: &CompiledQuery<'_>, runs: usize) -> Timing {
         }
         text.push('\n');
     }
-    Timing {
+    Ok(Timing {
         records: rows.len(),
         text,
         select,
         rows_median: times.get(runs / 2).copied().unwrap_or_default(),
         rows_min: times.first().copied().unwrap_or_default(),
-    }
+    })
 }
 
 fn measure(name: &str, query: &str, runs: usize, archive: &Archive) -> TestResult {
@@ -97,8 +97,8 @@ fn measure(name: &str, query: &str, runs: usize, archive: &Archive) -> TestResul
         .compile(&forge)?
         .without_shared_prefixes();
     for round in 0..5 {
-        let with = render(&shared, runs);
-        let without = render(&alone, runs);
+        let with = render(&shared, runs)?;
+        let without = render(&alone, runs)?;
         println!(
             "{name} round {round}: {} records, {} bytes of cells; rows median/min of {runs}: \
              shared {:?}/{:?}, alone {:?}/{:?}; selection {:?}/{:?}",

@@ -18,7 +18,7 @@ impl TestHircObject {
     /// `markers` the names of its markers.
     #[must_use]
     pub fn music_segment(id: u32, children: &[u32], markers: &[&str]) -> Self {
-        Self::segment(id, children, markers, DEFAULT_STINGER)
+        Self::segment(id, children, markers, &[DEFAULT_STINGER])
     }
 
     /// A music segment object without markers whose one stinger plays the segment `segment_id`
@@ -30,11 +30,17 @@ impl TestHircObject {
         trigger_id: u32,
         segment_id: u32,
     ) -> Self {
-        Self::segment(id, children, &[], (trigger_id, segment_id))
+        Self::segment(id, children, &[], &[(trigger_id, segment_id)])
     }
 
-    fn segment(id: u32, children: &[u32], markers: &[&str], stinger: (u32, u32)) -> Self {
-        let mut body = music_node(children, stinger);
+    /// A music segment whose authored stingers are the ordered trigger/segment ID pairs.
+    #[must_use]
+    pub fn music_segment_with_stingers(id: u32, children: &[u32], stingers: &[(u32, u32)]) -> Self {
+        Self::segment(id, children, &[], stingers)
+    }
+
+    fn segment(id: u32, children: &[u32], markers: &[&str], stingers: &[(u32, u32)]) -> Self {
+        let mut body = music_node(children, stingers);
         body.extend_from_slice(&4000.5_f64.to_le_bytes());
         put_u32(&mut body, len_u32(markers));
         for (id, name) in (FIRST_MARKER_ID..).zip(markers) {
@@ -79,11 +85,6 @@ impl TestHircObject {
     /// It lists `children` and two transition rules, the second with a transition object.
     #[must_use]
     pub fn music_switch(id: u32, children: &[u32], group_id: u32, targets: &[u32]) -> Self {
-        let mut body = transition_node(children);
-        body.push(1);
-        put_u32(&mut body, 1);
-        put_u32(&mut body, group_id);
-        body.push(0);
         let mut tree = Vec::new();
         put_u32(&mut tree, 0);
         put_u16(&mut tree, 1);
@@ -96,9 +97,27 @@ impl TestHircObject {
             put_u16(&mut tree, 50);
             put_u16(&mut tree, 100);
         }
-        put_u32(&mut body, len_u32(&tree));
+        Self::music_switch_with_tree(id, children, &[(group_id, SWITCH_GROUP)], &tree)
+    }
+
+    /// A music switch with original ordered group IDs, group types and decision tree bytes.
+    #[must_use]
+    pub fn music_switch_with_tree(
+        id: u32,
+        children: &[u32],
+        groups: &[(u32, u8)],
+        tree: &[u8],
+    ) -> Self {
+        let mut body = transition_node(children);
+        body.push(1);
+        put_u32(&mut body, len_u32(groups));
+        for &(id, _) in groups {
+            put_u32(&mut body, id);
+        }
+        body.extend(groups.iter().map(|&(_, code)| code));
+        put_u32(&mut body, len_u32(tree));
         body.push(0);
-        body.extend_from_slice(&tree);
+        body.extend_from_slice(tree);
         Self::raw(12, id, body)
     }
 
@@ -180,7 +199,7 @@ impl TestPlaylistItem {
     }
 }
 
-fn music_node(children: &[u32], stinger: (u32, u32)) -> Vec<u8> {
+fn music_node(children: &[u32], stingers: &[(u32, u32)]) -> Vec<u8> {
     let mut body = vec![0];
     body.extend_from_slice(&node_base(TestNodeBase::Full));
     put_u32(&mut body, len_u32(children));
@@ -192,15 +211,17 @@ fn music_node(children: &[u32], stinger: (u32, u32)) -> Vec<u8> {
     body.extend_from_slice(&120.0_f32.to_le_bytes());
     body.extend_from_slice(&[4, 4]);
     body.push(1);
-    put_u32(&mut body, 1);
-    put_u32(&mut body, stinger.0);
-    put_u32(&mut body, stinger.1);
-    body.extend_from_slice(&[0; 16]);
+    put_u32(&mut body, len_u32(stingers));
+    for &(trigger_id, segment_id) in stingers {
+        put_u32(&mut body, trigger_id);
+        put_u32(&mut body, segment_id);
+        body.extend_from_slice(&[0; 16]);
+    }
     body
 }
 
 fn transition_node(children: &[u32]) -> Vec<u8> {
-    let mut body = music_node(children, DEFAULT_STINGER);
+    let mut body = music_node(children, &[DEFAULT_STINGER]);
     put_u32(&mut body, 2);
     for with_object in [false, true] {
         put_u32(&mut body, 1);

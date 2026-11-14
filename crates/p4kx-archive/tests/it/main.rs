@@ -4,15 +4,26 @@
 //! Integration tests of `p4kx-archive`, built as one test binary.
 
 mod archive_key;
+mod archive_metadata;
 mod build;
+mod build_manifest_origin;
 mod container_limits;
 mod containers;
 mod decoding;
+mod effective_encoding;
+mod encryption_declaration;
+mod entry_metadata;
+mod entry_origin;
 mod hash_block;
+mod installation_v2;
+mod key_demand;
+mod key_demand_identity;
 mod layout_v2;
+mod layout_v2_extensions;
 mod listing;
 mod malformed;
 mod no_launcher_log;
+mod observed_entry;
 mod overlong;
 mod ranged;
 mod read_only;

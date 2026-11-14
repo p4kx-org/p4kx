@@ -200,7 +200,7 @@ fn wrapped_tractor() -> TestValue {
             TestValue::Array(vec![
                 instance("SWeaponActionFireBeamParams", Vec::new()),
                 instance(
-                    "SWeaponActionWrapParams",
+                    "SWeaponActionToggleParams",
                     vec![(
                         "weaponAction".to_owned(),
                         singles_of(

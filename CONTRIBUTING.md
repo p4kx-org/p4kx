@@ -102,13 +102,38 @@ P4KX reads your own Star Citizen installation and ships no game data.
 
 ## Local development setup
 
-You need the stable Rust toolchain (see the [README](README.md#build)) on Windows or Linux, and
-for the Blender add-on Python and Blender 5.2 LTS.
+Install rustup on a [supported platform](docs/supported-platforms.md). The repository's
+[`rust-toolchain.toml`](rust-toolchain.toml) selects the exact compiler and components. For the
+Blender add-on you also need Python and Blender 5.2 LTS or 5.3. Install the exact test runner selected by
+[`.config/nextest-version`](.config/nextest-version):
+
+```powershell
+cargo install cargo-nextest --version (Get-Content .config/nextest-version).Trim() --locked
+.github/scripts/check-build-tools.ps1 -Verify -Nextest
+```
+
+CI build jobs, test-archive consumers, packages and SBOM generation use the same verified pins.
+Update both files deliberately and run the configuration check, workspace tests, doctests,
+clippy and repository checks before accepting new versions; see
+[ADR-0340](docs/adr/0340-exact-build-tool-versions.md). Native target/runtime validation is separate
+from pin consistency.
+The [native platform contract](docs/supported-platforms.md) drives the target matrix, target-bound
+test archives and release preflight. Run the PowerShell platform/evidence regression scripts when
+changing their contracts, and preserve the recorded distinction between native synthetic checks
+and physical device verification.
+Linux packaging additionally uses the declared Ubuntu 24.04 / glibc 2.39 baseline, native
+AppImage runtime source builds and fresh native package consumers. Run
+`test-linux-package-contract.ps1` and the source-collector tests when changing their boundaries;
+the [Linux package guide](docs/linux-packages.md) describes the complete evidence and source contract.
 
 On Linux the audio preview builds against the ALSA headers: `sudo apt-get install
 libasound2-dev` (Debian and Ubuntu; CI installs the same package). PipeWire and PulseAudio need
 nothing extra at build time; at run time they serve the ALSA `default` device through
 `pipewire-alsa` or `pulseaudio-alsa`, which desktop distributions install.
+The [native test workflow](.github/workflows/tests.yml) lists the Ubuntu 24.04 runtime
+libraries used for the Linux Xvfb and lavapipe checks on both CPUs. The
+[platform guide](docs/supported-platforms.md#build-and-test-contract) explains how CI records
+those results and the separate device checks.
 
 ```powershell
 cargo build --release
@@ -121,7 +146,7 @@ cargo xtask
 
 `cargo test --workspace --locked` works as well when cargo-nextest is not installed. `cargo xtask`
 checks the layer direction of the crates, the 400-line limit, the SPDX headers, the changelog
-fragments, the lint set and the Archive key. After a dependency change, run
+fragments, the lint set, exact tool pins and the Archive key. After a dependency change, run
 `cargo xtask notices --write` (needs `cargo install cargo-about --version 0.9.2 --locked`).
 
 The tests against a real Archive are ignored by default; see
@@ -144,8 +169,23 @@ $env:P4KX_DATA_P4K_B = 'C:\Program Files\Roberts Space Industries\StarCitizen\PT
 cargo test --release --workspace --locked -- --ignored
 ```
 
-The Archive is only read. The extracted subset goes to a temporary folder below `TMP`, which is
-removed afterwards. `CLAUDE.md` describes the test layout, the differential tests against unp4k,
+On Linux, set the Archive path to the actual host path of `Data.p4k`, including any Wine or
+Proton prefix components. Use an absolute private directory for temporary files. This PowerShell
+example runs the Extraction crate's ignored Archive suite on the native Linux host.
+
+```powershell
+$env:P4KX_DATA_P4K = '/path/to/prefix/drive_c/Games/StarCitizen/LIVE/Data.p4k'
+$env:TMPDIR = '/absolute/path/to/private/test-scratch'
+New-Item -ItemType Directory -Force -Path $env:TMPDIR | Out-Null
+cargo test --release --locked -p p4kx-extraction --test real_archive -- --ignored
+```
+
+The stored key follows the [platform profile](docs/profile-folders.md), including an explicit
+`P4KX_FOLDERS_ROOT`. This command also accepts the named key-file and key environment sources
+described above.
+
+The Archive is only read. The extracted subset goes below `TMP` on Windows or `TMPDIR` on Linux
+and is removed afterwards. `CLAUDE.md` describes the test layout, the differential tests against unp4k,
 unforge and StarBreaker ([docs/differential-verification.md](docs/differential-verification.md))
 and how to run a single real-Archive test.
 
@@ -157,8 +197,8 @@ and how to run a single real-Archive test.
    request of their own.
 4. Fill in the [pull request template](.github/PULL_REQUEST_TEMPLATE.md) and link the issue with
    `Closes #<issue>`.
-5. CI runs the lints, `cargo xtask`, the tests on Windows and Linux, the schema and concurrency
-   tests, the Blender add-on tests, CodeQL and the DCO check. All must pass.
+5. CI runs lints, `cargo xtask`, the tests across the [native matrix](docs/supported-platforms.md),
+   schema and concurrency checks, Blender add-on tests, CodeQL and the DCO check. All must pass.
 6. A maintainer checks your [CLA](#contributor-license-agreement-cla), reviews and merges with a
    merge commit.
 
@@ -270,25 +310,37 @@ everything; nobody uploads assets by hand.
    <version>`) and merge that pull request. The version of `p4kx-gui` is the Release version.
 2. Push the tag `vMAJOR.MINOR.PATCH[-suffix]` on the merge commit. The workflow refuses any other
    tag name.
-3. The workflow builds the portable ZIP, the MSI and the Blender add-on ZIP, tests install,
-   upgrade and uninstall of the MSI, and generates a CycloneDX SBOM per shipped binary
-   (`p4kx-gui`, `p4kx`, `p4kx-mcp`). The add-on is Python without bundled third-party packages
-   and has no SBOM of its own.
-4. The ZIP and the MSI are scanned on VirusTotal. A failed or missing scan never blocks the
-   Release; the notes then say the scan did not run.
-5. The build provenance of every asset and the SBOMs of the ZIP and the MSI are attested
+3. The workflow builds and tests packages for the [five native targets](docs/supported-platforms.md).
+   Windows AMD64 and ARM64 ship MSI and portable ZIP packages. Native consumers exercise the
+   release EXEs, upgrades, blocked downgrades, rollback, explicit CPU replacement and profile
+   preservation. Linux AMD64 and ARM64 ship tar.gz, AppImage, deb and Flatpak packages. Native
+   consumers exercise all three applications in each format, deb and Flatpak upgrades, profile
+   preservation and Flatpak Documents portal grants. macOS 26 and later use the Apple Silicon DMG and require
+   [matching device evidence](docs/macos-support.md#submit-the-native-device-receipt).
+   CycloneDX SBOMs identify each target and shipped binary (`p4kx-gui`, `p4kx`, `p4kx-mcp`).
+   The architecture-neutral Python add-on has its own provenance bundle.
+4. Tag publication requires a completed VirusTotal report for every native package digest.
+   The release gate verifies the package bytes, source revision, version and workflow run against
+   the report receipt. Pending, missing or failed reports stop publication. The release notes link
+   the completed reports.
+5. The build provenance of every asset and each target's package SBOMs are attested
    (Sigstore, via GitHub Artifact Attestations). The bundles become Release assets.
 6. `SHA256SUMS.txt` and `SHA3-512SUMS.txt` list every other asset, as plain text files that open
    in any text editor. The Release notes are the
    `CHANGELOG.md` section, the VirusTotal result, the verification commands, and GitHub's generated
    "What's Changed" list.
 
-A pull request that changes the workflow, its scripts, the installer or the add-on runs the same
-jobs as a dry run: everything is built, but nothing is scanned, attested or published.
-The `workflow_dispatch` trigger adds the VirusTotal scan to such a run.
+Pull requests matching the release paths build the complete matrix in a dry run. Scans,
+attestations and publication run at their respective release gates. A full manual branch
+run can record VirusTotal availability. Operating-system-specific dry runs skip scanning
+and combined release assembly.
 
-Secret: the owner sets the repository secret `VIRUSTOTAL_API_KEY` (Settings, Secrets and
-variables, Actions). Without it the scan is skipped.
+The [release preflight](docs/supported-platforms.md#release-preflight-and-evidence) checks the
+complete native package, SBOM and runtime evidence inventory. Each proof binds the executed
+packages and binaries to the source revision. See [Windows package verification](docs/windows-packages.md),
+[Linux package verification](docs/linux-packages.md) and [macOS support](docs/macos-support.md).
+
+Set the repository secret `VIRUSTOTAL_API_KEY` in the GitHub Actions settings before tagging.
 
 ### Verifying a download
 
@@ -302,12 +354,12 @@ Replace `<file>` with the name of the downloaded asset.
   path>")))`, which prints upper-case hex. Compare the output with the line of the file in
   `SHA256SUMS.txt` or `SHA3-512SUMS.txt`, ignoring case.
 - Attestation: `gh attestation verify <file> --repo p4kx-org/p4kx`.
-- Attestation offline, with the bundle from the Release:
-  `gh attestation verify <file> --bundle P4KX-<version>-provenance.sigstore.json --repo
-  p4kx-org/p4kx`. The bundle of an SBOM is named after it (`<sbom>.cdx.json.sigstore.json`) and
-  needs `--predicate-type https://cyclonedx.org/bom`.
-- SBOM: the `P4KX-<version>-<binary>.cdx.json` assets are CycloneDX 1.5 JSON. Their attestation
-  ties them to the ZIP and the MSI, and the provenance bundle covers the SBOM files themselves.
+- Offline attestation uses `gh attestation verify <file> --bundle <bundle> --repo p4kx-org/p4kx`.
+  Select `P4KX-<version>-<target>-provenance.sigstore.json` for a native package, or
+  `P4KX-<version>-addon-provenance.sigstore.json` for the Blender add-on.
+- For an SBOM, use `P4KX-<version>-<target>-<binary>.cdx.json.sigstore.json` with
+  `--predicate-type https://cyclonedx.org/bom`. The matching `.cdx.json` describes the
+  shipped binary for that target. The target provenance bundle also covers the SBOM file.
 
 ## Licence
 

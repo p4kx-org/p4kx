@@ -5,27 +5,44 @@ use std::collections::HashMap;
 use std::io::Read;
 use std::sync::OnceLock;
 
-use p4kx_archive::Archive;
+use p4kx_archive::{Archive, Entry};
 use thiserror::Error;
+
+use crate::{LoadoutFileIdentity, LoadoutFileRead, LoadoutFileSource};
 
 /// The largest XML Loadout file that is read, 16 MiB.
 pub const MAX_XML_LOADOUT_LEN: u64 = 16 << 20;
 
 /// Where the XML Loadout files a Record names are read from.
 pub trait LoadoutFiles: Sync {
-    /// Returns the bytes of the file at `path` as a Record names it, e.g.
-    /// `Scripts/Loadouts/Objects/Doors/Grin_MXC_Door_NameMDC.xml`.
+    /// Returns the bytes of the file at the configured source path.
     ///
     /// # Errors
     ///
-    /// Returns a [`LoadoutFileError`] when there is no such file or it cannot be read.
+    /// Returns a typed error when the file is absent or cannot be read.
     fn read(&self, path: &str) -> Result<Vec<u8>, LoadoutFileError>;
+
+    /// Reads once with an unbound source unless this provider captures its original admission.
+    fn read_observed(&self, path: &str) -> LoadoutFileRead {
+        LoadoutFileRead::unbound(path, self.read(path))
+    }
+
+    /// Returns the exact source identity selected by the same resolution as `read`.
+    fn identity(&self, _path: &str) -> Option<LoadoutFileIdentity<'_>> {
+        None
+    }
 }
 
 /// An XML Loadout file cannot be read.
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum LoadoutFileError {
+    /// The optional observer stopped the operation.
+    #[error("the loadout file observer stopped the operation")]
+    ObservationStopped,
+    /// Original Entry membership could not be retained for an admitted source.
+    #[error("the original loadout file admission could not be retained")]
+    SourceEvidenceUnavailable,
     /// There is no such file.
     #[error("there is no such file")]
     NotFound,
@@ -75,19 +92,57 @@ impl<'a> ArchiveFiles<'a> {
                 .collect()
         })
     }
-}
 
-impl LoadoutFiles for ArchiveFiles<'_> {
-    fn read(&self, path: &str) -> Result<Vec<u8>, LoadoutFileError> {
+    fn entry_index(&self, path: &str) -> Option<usize> {
         let mut wanted = key(path);
         if !wanted.starts_with("data\\") {
             wanted.insert_str(0, "data\\");
         }
+        self.index().get(&wanted).copied()
+    }
+}
+
+impl LoadoutFiles for ArchiveFiles<'_> {
+    fn read(&self, path: &str) -> Result<Vec<u8>, LoadoutFileError> {
         let entry = self
-            .index()
-            .get(&wanted)
-            .and_then(|index| self.archive.entries().get(*index))
+            .entry_index(path)
+            .and_then(|index| self.archive.entries().get(index))
             .ok_or(LoadoutFileError::NotFound)?;
+        self.read_entry(entry)
+    }
+
+    fn read_observed(&self, path: &str) -> LoadoutFileRead {
+        let Some(entry) = self
+            .entry_index(path)
+            .and_then(|index| self.archive.entries().get(index))
+        else {
+            return LoadoutFileRead::new(
+                LoadoutFileSource::missing_archive(path, self.archive.input_origin()),
+                Err(LoadoutFileError::NotFound),
+            );
+        };
+        let Some(original) = self.archive.entry_origin(entry) else {
+            return LoadoutFileRead::unbound(
+                path,
+                Err(LoadoutFileError::SourceEvidenceUnavailable),
+            );
+        };
+        let source = LoadoutFileSource::archive(original);
+        LoadoutFileRead::new(source, self.read_entry(entry))
+    }
+
+    fn identity(&self, path: &str) -> Option<LoadoutFileIdentity<'_>> {
+        let index = self.entry_index(path)?;
+        let entry = self.archive.entries().get(index)?;
+        Some(LoadoutFileIdentity {
+            entry_index: Some(index),
+            path: entry.path(),
+        })
+    }
+}
+
+impl ArchiveFiles<'_> {
+    fn read_entry(&self, entry: &Entry) -> Result<Vec<u8>, LoadoutFileError> {
         let size = entry.uncompressed_size();
         if size > MAX_XML_LOADOUT_LEN {
             return Err(LoadoutFileError::TooLarge { size });
@@ -106,7 +161,7 @@ impl LoadoutFiles for ArchiveFiles<'_> {
     }
 }
 
-/// Returns a path in lower case with `\` as separator and no leading separator.
+/// Returns a path in lower case with backslash separators and no leading separator.
 fn key(path: &str) -> String {
     path.trim_start_matches(['/', '\\'])
         .chars()

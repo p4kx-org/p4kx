@@ -7,23 +7,46 @@ use p4kx_assembly::{
     Attachment, EntityNode, LoadoutError, PortDefinition, PortNode, PortSource, Target,
     VehicleItemPort,
 };
-use p4kx_extraction::is_placeholder_key;
+use p4kx_extraction::{SourceUse, is_placeholder_key};
 
+use crate::CatalogError;
+use crate::catalog_v3::catalog_item_alignment::AlignmentIndex;
 use crate::contract_loadout::{LoadoutPort, PortType};
 use crate::guid_text::CatalogGuid;
+use crate::loadout::{alignment::LoadoutAlignment, ledger::Capture};
 
 const VEHICLE_SOURCE: &str = "vehicle";
 
-/// Turns the tree of an Entity into catalog ports and collects the codes of the issues found.
-pub(crate) struct PortReader {
-    issues: BTreeSet<&'static str>,
+impl LoadoutPort {
+    pub(crate) fn append_name_uses(&self, uses: &mut Vec<SourceUse>) -> Result<bool, CatalogError> {
+        let Some(proof) = &self.name_proof else {
+            return Ok(false);
+        };
+        let (original, complete) = proof.selector_inputs()?;
+        uses.extend(original);
+        Ok(complete)
+    }
 }
 
-impl PortReader {
-    /// Returns a reader that has found no issue yet.
+/// Turns the tree of an Entity into catalog ports and collects the codes of the issues found.
+pub(crate) struct PortReader<'rows> {
+    issues: BTreeSet<&'static str>,
+    alignment: Option<&'rows AlignmentIndex<'rows>>,
+}
+
+impl<'rows> PortReader<'rows> {
+    #[cfg(test)]
     pub(crate) const fn new() -> Self {
         Self {
             issues: BTreeSet::new(),
+            alignment: None,
+        }
+    }
+
+    pub(crate) const fn with_alignment(alignment: &'rows AlignmentIndex<'rows>) -> Self {
+        Self {
+            issues: BTreeSet::new(),
+            alignment: Some(alignment),
         }
     }
 
@@ -35,7 +58,11 @@ impl PortReader {
     /// Returns the ports of `node` as catalog ports: the ports of its tree, which ends with the
     /// item ports only its vehicle implementation declares, listed with the source `vehicle`.
     /// Parts sharing a name all take the item port of the first, as the tree does.
-    pub(crate) fn ports(&mut self, node: &EntityNode) -> Vec<LoadoutPort> {
+    pub(crate) fn ports(
+        &mut self,
+        node: &EntityNode,
+        capture: &Capture<'_>,
+    ) -> Result<Vec<LoadoutPort>, CatalogError> {
         self.issues
             .extend(node.issues().iter().map(LoadoutError::kind));
         let vehicle = node.vehicle();
@@ -43,12 +70,17 @@ impl PortReader {
             .iter()
             .map(|port| {
                 let xml = vehicle.and_then(|vehicle| vehicle.item_port(port.name()));
-                self.read_port(port, xml)
+                self.read_port(port, xml, capture)
             })
             .collect()
     }
 
-    fn read_port(&mut self, port: &PortNode, xml: Option<&VehicleItemPort>) -> LoadoutPort {
+    fn read_port(
+        &mut self,
+        port: &PortNode,
+        xml: Option<&VehicleItemPort>,
+        capture: &Capture<'_>,
+    ) -> Result<LoadoutPort, CatalogError> {
         let shape = match (port.definition(), xml) {
             (Some(definition), _) => read_definition(definition),
             (None, Some(xml)) => read_vehicle(xml),
@@ -61,8 +93,13 @@ impl PortReader {
         };
         let mut shape = LoadoutPort {
             name: port.name().to_owned(),
+            name_proof: capture.port_name_proof(port.name(), port.name_proof())?,
             source,
             visibility,
+            source_constraints: self.alignment.map_or_else(
+                || Ok(LoadoutAlignment::default()),
+                |index| LoadoutAlignment::read(port, index, capture),
+            )?,
             ..shape
         };
         match port.attachment() {
@@ -70,15 +107,16 @@ impl PortReader {
                 shape.ports = port
                     .nested()
                     .iter()
-                    .map(|nested| self.read_port(nested, None))
-                    .collect();
+                    .map(|nested| self.read_port(nested, None, capture))
+                    .collect::<Result<_, _>>()?;
             }
             Attachment::Entity(child) => {
                 shape.item_guid = Some(CatalogGuid(child.guid()));
                 shape.item_class_name = Some(child.class_name().to_owned());
                 shape.docked_vehicle = child.is_docked_vehicle();
+                shape.attachment_port_inventory_complete = child.issues().is_empty();
                 if child.is_expanded() {
-                    shape.ports = self.ports(child);
+                    shape.ports = self.ports(child, capture)?;
                 }
             }
             Attachment::Unresolved(unresolved) => {
@@ -91,7 +129,7 @@ impl PortReader {
                 }
             }
         }
-        shape
+        Ok(shape)
     }
 }
 

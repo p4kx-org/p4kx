@@ -4,7 +4,7 @@
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
-use p4kx_extraction::{Build, Entry};
+use p4kx_extraction::{Build, Entry, EntryMetadataInfo};
 use serde::Serialize;
 
 /// Writes `value` as one line of compact JSON to stdout.
@@ -50,11 +50,16 @@ pub(crate) struct EntryJson<'a> {
     encrypted: bool,
     compressed_size: u64,
     size: u64,
+    metadata: EntryMetadataInfo,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     parts: Vec<&'a str>,
 }
 
 impl<'a> EntryJson<'a> {
+    pub(crate) const fn metadata(&self) -> &EntryMetadataInfo {
+        &self.metadata
+    }
+
     /// Makes the Entry the row of a split texture: the sizes are those of the whole group, and
     /// `parts` are the paths of its other Entries.
     pub(crate) fn grouped(mut self, compressed_size: u64, size: u64, parts: Vec<&'a str>) -> Self {
@@ -73,6 +78,7 @@ impl<'a> From<&'a Entry> for EntryJson<'a> {
             encrypted: entry.is_encrypted(),
             compressed_size: entry.compressed_size(),
             size: entry.uncompressed_size(),
+            metadata: EntryMetadataInfo::of(entry),
             parts: Vec::new(),
         }
     }

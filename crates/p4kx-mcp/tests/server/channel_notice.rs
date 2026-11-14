@@ -8,8 +8,7 @@ use crate::support::{Install, TestResult};
 fn texts(result: &Value) -> Vec<&str> {
     result["content"]
         .as_array()
-        .map(|blocks| blocks.iter().filter_map(|b| b["text"].as_str()).collect())
-        .unwrap_or_default()
+        .map_or_default(|blocks| blocks.iter().filter_map(|b| b["text"].as_str()).collect())
 }
 
 #[test]

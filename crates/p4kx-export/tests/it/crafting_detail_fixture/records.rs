@@ -109,11 +109,11 @@ fn contracts(builder: DataForgeBuilder) -> DataForgeBuilder {
     )
 }
 
-fn normal(min: f32, mean: f32, stddev: f64) -> TestValue {
+fn normal(min: i32, mean: f32, stddev: f64) -> TestValue {
     TestValue::Struct(
         TestInstance::new("CraftingQualityDistributionNormal")
-            .value("min", TestValue::Single(min))
-            .value("max", TestValue::Single(1000.0))
+            .value("min", TestValue::Int32(min))
+            .value("max", TestValue::Int32(1000))
             .value("mean", TestValue::Single(mean))
             .value("stddev", TestValue::Double(stddev)),
     )
@@ -128,7 +128,7 @@ pub(super) fn quality(builder: DataForgeBuilder) -> DataForgeBuilder {
                 "CraftingQualityDistributionRecord.Creature_Default",
                 format!("{CRAFTING}/qualitydistribution/creatures/creature_default.xml"),
             )
-            .value("qualityDistribution", normal(1.0, 269.0, 254.0)),
+            .value("qualityDistribution", normal(1, 269.0, 254.0)),
         )
         .record(
             TestRecord::new(
@@ -144,7 +144,7 @@ pub(super) fn quality(builder: DataForgeBuilder) -> DataForgeBuilder {
                     TestValue::Array(vec![TestValue::Struct(
                             TestInstance::new("CraftingQualityLocationOverrideEntry")
                                 .value("location", TestValue::Reference(PYRO))
-                                .value("qualityDistribution", normal(201.0, 295.0, 1.0e300)),
+                                .value("qualityDistribution", normal(201, 295.0, 1.0)),
                         )]),
                 )),
             ),

@@ -6,7 +6,7 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::Result;
-use p4kx_extraction::{UiExtraction, UiMovie};
+use p4kx_extraction::{FieldOrigins, SourceInventory, UiExtraction, UiMovie};
 use serde::Serialize;
 
 use crate::ui::chain;
@@ -18,6 +18,11 @@ struct ExtractJson<'a> {
     target: String,
     extracted: Vec<WrittenJson>,
     failed: Vec<FailedJson>,
+    #[serde(rename = "originReceipt")]
+    origin_receipt: Option<String>,
+    #[serde(rename = "fieldOrigins")]
+    field_origins: &'a FieldOrigins,
+    provenance: &'a SourceInventory,
 }
 
 #[derive(Serialize)]
@@ -42,8 +47,9 @@ struct FailedJson {
 
 /// Runs `p4kx ui extract` on an opened movie.
 pub(crate) fn extract(movie: &UiMovie<'_>, out: &Path, as_json: bool) -> Result<ExitCode> {
-    let extraction = movie.extract_assets(out)?;
-    let failed = failed(&extraction);
+    let observed = movie.extract_assets_observed(out)?;
+    let extraction = observed.extraction();
+    let failed = failed(extraction);
     if as_json {
         json::print(&ExtractJson {
             movie: movie.name(),
@@ -59,6 +65,9 @@ pub(crate) fn extract(movie: &UiMovie<'_>, out: &Path, as_json: bool) -> Result<
                 })
                 .collect(),
             failed,
+            origin_receipt: observed.receipt().map(json::path),
+            field_origins: observed.fields(),
+            provenance: observed.inventory(),
         })?;
     } else {
         let mut stderr = io::stderr().lock();

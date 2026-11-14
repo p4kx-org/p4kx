@@ -4,23 +4,27 @@
 //! The package of one rigged mesh, the form of a Character and of a creature with a skeleton.
 
 use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use std::io::{self, BufWriter};
 use std::path::Path;
 
 use crate::mesh_options::package_mesh_options;
+use p4kx_extraction::OriginDigestWriter;
 use p4kx_gltf::{GlbOptions, GlbSummary, GltfError};
 
 use crate::build::{coordinates, generator};
 use crate::finite::sanitise;
 use crate::manifest::{
-    FORMAT_VERSION, Format, Issue, IssueOrigin, MANIFEST_FILE, MESHES_FOLDER, Manifest, Mesh, Node,
-    Options, Source,
+    FORMAT_VERSION, Format, Issue, IssueOrigin, MESHES_FOLDER, Manifest, Mesh, Node, Options,
+    Source,
 };
 use crate::manifest_rig::Rig;
+use crate::mesh_vertex_map::Writer;
+
+use crate::package_receipt::{self, PackageFile, PackageTotals};
 use crate::plan::mesh_id;
 use crate::stage::Staging;
-use crate::write::write_manifest;
-use crate::{Cancelled, PackageError, PackageInfo, PackageResult, PackageSummary};
+use crate::stoppable::Stoppable;
+use crate::{PackageError, PackageInfo, PackageResult, PackageSummary, PackageWriteContext};
 
 /// What the manifest of a rigged package says besides the file's size: where it comes from, the
 /// node that draws the mesh, the mesh's geometry file and rig, and the issues.
@@ -67,6 +71,7 @@ pub(crate) fn rig_manifest(
         nodes: vec![node],
         meshes: vec![Mesh {
             file: format!("{MESHES_FOLDER}/{id}.glb"),
+            vertex_map: None,
             id,
             geometry: scene.geometry,
             palette: None,
@@ -80,32 +85,24 @@ pub(crate) fn rig_manifest(
         }],
         textures: Vec::new(),
         materials: Vec::new(),
+        material_libraries: Vec::new(),
         palettes: Vec::new(),
+        palette_provenance: None,
+        authored_soc: None,
+        collision_helpers: None,
+        default_material: None,
+        entity_provenance: None,
+        light_placements: None,
+        entity_glow: None,
         issues,
     }
 }
 
-/// Stops a write when the caller asks to.
-pub(crate) struct Stoppable<'a, W> {
-    inner: W,
-    cancelled: &'a Cancelled<'a>,
-}
-
-impl<W: Write> Write for Stoppable<'_, W> {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if self.cancelled.check().is_err() {
-            return Err(io::Error::other("cancelled"));
-        }
-        self.inner.write(bytes)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
-    }
-}
-
 /// The file a rigged mesh is written to.
-pub(crate) type RigWriter<'a> = Stoppable<'a, BufWriter<File>>;
+pub(crate) type RigWriter<'a, 'sink> =
+    Stoppable<'a, OriginDigestWriter<&'sink mut BufWriter<File>>>;
+
+type OptionalMap<'a> = Option<&'a mut Writer>;
 
 /// Writes a package into the folder `out` whose only mesh, `meshes/m0001.glb`, `write_glb` writes
 /// to the writer it is given with the GLB options of a package mesh (`options` with the vertex
@@ -117,39 +114,85 @@ pub(crate) fn write_rig_package(
     out: &Path,
     name: &str,
     options: &GlbOptions,
-    cancelled: &(dyn Fn() -> bool + Sync),
-    write_glb: impl FnOnce(&GlbOptions, &mut RigWriter<'_>) -> Result<GlbSummary, GltfError>,
+    cancelled: &PackageWriteContext<'_>,
+
+    write_glb: impl FnOnce(
+        &GlbOptions,
+        &mut RigWriter<'_, '_>,
+        OptionalMap<'_>,
+    ) -> Result<GlbSummary, GltfError>,
     manifest_of: impl FnOnce(&GlbSummary) -> Manifest,
 ) -> PackageResult<PackageSummary> {
-    let cancelled = Cancelled::new(cancelled);
-    let staging = Staging::create(out)?;
+    let staging = Staging::create(out, *cancelled)?;
+    let result = write_rig_files(
+        staging.path(),
+        name,
+        options,
+        cancelled,
+        write_glb,
+        manifest_of,
+    );
+    staging.complete(result)
+}
+
+fn write_rig_files(
+    staging: &Path,
+    name: &str,
+    options: &GlbOptions,
+    cancelled: &PackageWriteContext<'_>,
+
+    write_glb: impl FnOnce(
+        &GlbOptions,
+        &mut RigWriter<'_, '_>,
+        OptionalMap<'_>,
+    ) -> Result<GlbSummary, GltfError>,
+    manifest_of: impl FnOnce(&GlbSummary) -> Manifest,
+) -> PackageResult<PackageSummary> {
     cancelled.check()?;
     let id = mesh_id(0);
-    let path = staging.path().join(MESHES_FOLDER).join(format!("{id}.glb"));
-    let file = File::create_new(&path).map_err(|source| PackageError::write(&path, source))?;
-    let mut writer = Stoppable {
-        inner: BufWriter::new(file),
-        cancelled: &cancelled,
-    };
-    let written = write_glb(&package_mesh_options(options), &mut writer)
-        .map_err(|error| glb_error(error, &path, (&id, name), &cancelled))?;
-    writer
-        .flush()
-        .map_err(|source| flush_error(source, &path, &cancelled))?;
-    let file = writer
-        .inner
+    let relative = format!("{MESHES_FOLDER}/{id}.glb");
+    let path = staging.join(&relative);
+    let map_name = format!("{id}.vertex-map.jsonl");
+    let map_path = staging.join(MESHES_FOLDER).join(&map_name);
+    let mut map = cancelled
+        .vertex_maps
+        .then(|| Writer::new(&map_path, cancelled))
+        .transpose()?;
+    let (file, ownership) = cancelled.create_file(&path)?.into_parts();
+    let mut sink = BufWriter::new(file);
+    let mut writer = Stoppable::new(OriginDigestWriter::new(&mut sink), cancelled);
+    let written = write_glb(&package_mesh_options(options), &mut writer, map.as_mut())
+        .map_err(|error| glb_error(error, &path, (&id, name), cancelled))?;
+    let digest = writer
         .into_inner()
-        .map_err(|error| PackageError::write(&path, error.into_error()))?;
-    file.sync_all()
+        .finish()
+        .map_err(|source| flush_error(source, &path, cancelled))?;
+    ownership.ensure_writable(&path, cancelled.cancel_flag())?;
+    sink.get_ref()
+        .sync_all()
         .map_err(|source| PackageError::write(&path, source))?;
-    drop(file);
+    drop(sink);
     cancelled.check()?;
     let mut manifest = manifest_of(&written);
+    let sidecar = map
+        .map(|map| map.finish(&map_path, &map_name, &relative, &digest, cancelled))
+        .transpose()?;
+    if let Some(sidecar) = &sidecar {
+        let mesh = manifest.meshes.first_mut().ok_or_else(|| {
+            PackageError::write(
+                &map_path,
+                io::Error::other("rigged mesh is missing from its manifest"),
+            )
+        })?;
+        mesh.vertex_map = Some(sidecar.path.clone());
+    }
     sanitise(&mut manifest);
-    let manifest_len = write_manifest(&staging.path().join(MANIFEST_FILE), &manifest)?;
-    let summary = summarise(&manifest, &written, manifest_len);
+    let files = std::iter::once(PackageFile::new(relative, &digest))
+        .chain(sidecar)
+        .collect();
+    let totals = package_receipt::write_metadata(staging, &manifest, files, cancelled)?;
+    let summary = summarise(&manifest, &written, totals);
     cancelled.check()?;
-    staging.commit()?;
     Ok(summary)
 }
 
@@ -157,7 +200,7 @@ fn glb_error(
     error: GltfError,
     path: &Path,
     (id, name): (&str, &str),
-    cancelled: &Cancelled<'_>,
+    cancelled: &PackageWriteContext<'_>,
 ) -> PackageError {
     match error {
         GltfError::Write(source) => flush_error(source, path, cancelled),
@@ -169,7 +212,11 @@ fn glb_error(
     }
 }
 
-fn flush_error(source: io::Error, path: &Path, cancelled: &Cancelled<'_>) -> PackageError {
+fn flush_error(
+    source: io::Error,
+    path: &Path,
+    cancelled: &PackageWriteContext<'_>,
+) -> PackageError {
     if cancelled.check().is_err() {
         PackageError::Cancelled
     } else {
@@ -177,14 +224,14 @@ fn flush_error(source: io::Error, path: &Path, cancelled: &Cancelled<'_>) -> Pac
     }
 }
 
-fn summarise(manifest: &Manifest, written: &GlbSummary, manifest_len: u64) -> PackageSummary {
+fn summarise(manifest: &Manifest, written: &GlbSummary, totals: PackageTotals) -> PackageSummary {
     PackageSummary {
         nodes: manifest.nodes.len(),
         drawn_nodes: 1,
         meshes: 1,
         materials: written.materials,
-        files: 2,
-        bytes: manifest_len + written.bytes,
+        files: totals.files,
+        bytes: totals.bytes,
         vertices: written.vertices,
         triangles: written.triangles,
         lod_fallbacks: written.lod_fallbacks,

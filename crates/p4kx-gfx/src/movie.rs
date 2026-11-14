@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::GfxError;
 use crate::assets::Assets;
 use crate::header::{Header, read_file_header, read_movie};
 use crate::scene::Scene;
-use crate::scene_compose::Composer;
+use crate::scene_compose::{Composer, ObservedScene};
 use crate::text_fonts::TextOptions;
 use crate::walker::Walker;
+use crate::{AssetOrigins, GfxError, MovieSource};
 
 /// A GFx or SWF movie, decompressed in memory.
 #[derive(Debug, Clone)]
@@ -15,6 +15,17 @@ pub struct Movie {
     header: Header,
     data: Vec<u8>,
     tags: usize,
+    source: MovieSource,
+}
+
+/// A single asset walk and the physical declarations that contributed to its results.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ObservedAssets<'a> {
+    /// Assets and summaries emitted by the normal reader.
+    pub assets: Assets<'a>,
+    /// Original source coordinates of the accepted values and diagnostics.
+    pub origins: AssetOrigins,
 }
 
 impl Movie {
@@ -29,8 +40,13 @@ impl Movie {
     /// [`GfxError::Decompress`] when its compressed data is corrupt, and another [`GfxError`]
     /// when its header is truncated or invalid.
     pub fn parse(bytes: Vec<u8>) -> Result<Self, GfxError> {
-        let (header, data, tags) = read_movie(bytes)?;
-        Ok(Self { header, data, tags })
+        let decoded = read_movie(bytes)?;
+        Ok(Self {
+            header: decoded.header,
+            data: decoded.data,
+            tags: decoded.tags,
+            source: decoded.source,
+        })
     }
 
     /// Reads the uncompressed length that the file header of `bytes` declares, file header
@@ -43,6 +59,12 @@ impl Movie {
     /// [`GfxError`] when the file header is truncated.
     pub fn declared_len(bytes: &[u8]) -> Result<u32, GfxError> {
         read_file_header(bytes).map(|(_, _, declared)| declared)
+    }
+
+    /// Returns the header and decompression input coordinates observed during the read.
+    #[must_use]
+    pub const fn read_source(&self) -> &MovieSource {
+        &self.source
     }
 
     /// Returns the header.
@@ -69,6 +91,14 @@ impl Movie {
         Walker::read(self.data.get(self.tags..).unwrap_or_default(), self.tags)
     }
 
+    /// Reads the assets and retains the physical source coordinates from the same walk.
+    #[must_use]
+    pub fn assets_observed(&self) -> ObservedAssets<'_> {
+        let (assets, origins) =
+            Walker::read_observed(self.data.get(self.tags..).unwrap_or_default(), self.tags);
+        ObservedAssets { assets, origins }
+    }
+
     /// Composes the first frame of the main timeline from `assets`, read from this movie, into
     /// a scene on its stage.
     ///
@@ -87,5 +117,15 @@ impl Movie {
     #[must_use]
     pub fn first_frame_with_text(&self, assets: &Assets<'_>, options: &TextOptions<'_>) -> Scene {
         Composer::compose(assets, self.header.frame_size, options)
+    }
+
+    /// Composes a frame and retains the physical asset ordinals selected by its drawings.
+    #[must_use]
+    pub fn first_frame_observed(
+        &self,
+        assets: &Assets<'_>,
+        options: &TextOptions<'_>,
+    ) -> ObservedScene {
+        Composer::compose_observed(assets, self.header.frame_size, options)
     }
 }

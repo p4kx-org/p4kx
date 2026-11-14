@@ -3,9 +3,7 @@
 
 use crate::build::{element_bytes, pointer, words};
 use crate::dataforge::out_of_range;
-use crate::{
-    DataForge, DataForgeError, DataType, MAX_RECORD_VALUES, Record, Struct, TreeBuilder, ValueKind,
-};
+use crate::{DataForge, DataForgeError, DataType, Record, Struct, TreeBuilder, ValueKind};
 
 /// A cheap test whether a Record's strong pointer array holds an instance of one struct, without
 /// building the Record tree.
@@ -49,8 +47,7 @@ impl<'f> TreeBuilder<'f> {
     ///
     /// Returns the [`DataForgeError`] of the Record's struct layout,
     /// [`DataForgeError::IndexOutOfRange`] when the array reaches beyond the pool of strong
-    /// pointers and [`DataForgeError::RecordTooLarge`] when it holds more than
-    /// [`MAX_RECORD_VALUES`] elements, as the tree of the Record would report.
+    /// pointers.
     pub fn holds(
         &mut self,
         probe: &PointerProbe<'f>,
@@ -59,9 +56,15 @@ impl<'f> TreeBuilder<'f> {
         let forge = record.forge;
         let def = record.def;
         let layout = self.layouts.get(forge, def.struct_index)?;
-        let Some(slot) = layout.fields.iter().find(|slot| {
-            slot.name == probe.field && slot.array && slot.data_type == DataType::StrongPointer
-        }) else {
+        let mut cursor = layout.cursor()?;
+        let mut found = None;
+        while let Some(slot) = cursor.next_slot()? {
+            if slot.name == probe.field && slot.array && slot.data_type == DataType::StrongPointer {
+                found = Some(slot);
+                break;
+            }
+        }
+        let Some(slot) = found else {
             return Ok(false);
         };
         let Some(bytes) = forge
@@ -86,11 +89,6 @@ fn array_holds(
     let end = u64::from(first) + u64::from(count);
     if end > pool as u64 {
         return Err(out_of_range("Record", record, "strong pointer pool", end));
-    }
-    if count as usize > MAX_RECORD_VALUES {
-        return Err(DataForgeError::RecordTooLarge {
-            limit: MAX_RECORD_VALUES,
-        });
     }
     Ok((first..first.saturating_add(count)).any(|element| {
         pointer(element_bytes(forge, ValueKind::StrongPointer, element)).is_some_and(

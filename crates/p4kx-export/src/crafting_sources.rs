@@ -2,14 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashSet;
+use std::slice::Iter;
 
-use p4kx_extraction::{Guid, RecordTree, StructValue, Value};
+use p4kx_extraction::{Field, Guid, RecordTree, StructValue, Value};
 
-use crate::blueprint::as_struct;
 use crate::crafting_types::RewardSource;
 use crate::record_fields::{guid_value, number, text};
-
-const MAX_DEPTH: usize = 128;
 
 /// The nearest enclosing identity of a struct: the `id` and the `debugName` of the nearest struct
 /// with an `id`, or, above any such struct, the nearest `debugName`.
@@ -35,32 +33,21 @@ impl<'f> Scope<'f> {
     }
 }
 
-/// Appends to `out` every struct of `tree` with a Reference to one of the `pools`, with the
-/// chance the struct states. A Reference of a Record to itself, as a pool Record to its own GUID,
-/// is no reward source.
-pub(crate) fn collect<'f>(
-    tree: &RecordTree<'f>,
+/// Appends selected direct pool References from owned structs in source order.
+pub(crate) fn collect<'source>(
+    tree: &RecordTree<'source>,
     pools: &HashSet<Guid>,
-    out: &mut Vec<RewardSource<'f>>,
+    out: &mut Vec<RewardSource<'source>>,
 ) {
-    visit(tree, tree.root(), Scope::default(), pools, 0, out);
-}
-
-fn visit<'f>(
-    tree: &RecordTree<'f>,
-    node: &StructValue<'f>,
-    parent: Scope<'f>,
-    pools: &HashSet<Guid>,
-    depth: usize,
-    out: &mut Vec<RewardSource<'f>>,
-) {
-    if depth >= MAX_DEPTH {
-        return;
-    }
-    let scope = parent.within(node);
-    let next = depth.saturating_add(1);
-    for field in node.fields() {
-        match field.value() {
+    let mut pending = vec![Frame::new(tree.root(), Scope::default())];
+    while let Some(frame) = pending.last_mut() {
+        let Some(value) = frame.next() else {
+            pending.pop();
+            continue;
+        };
+        let node = frame.node;
+        let scope = frame.scope;
+        match value {
             Value::Reference(reference)
                 if reference.location().is_none()
                     && reference.guid() != tree.guid()
@@ -75,13 +62,51 @@ fn visit<'f>(
                     chance: number(Some(node), "chance"),
                 });
             }
-            Value::Struct(child) => visit(tree, child, scope, pools, next, out),
-            Value::Array(items) => {
-                for child in items.iter().filter_map(as_struct) {
-                    visit(tree, child, scope, pools, next, out);
-                }
-            }
+            Value::Struct(child) => pending.push(Frame::new(child, scope)),
             _ => {}
         }
     }
 }
+
+struct Frame<'tree, 'source> {
+    node: &'tree StructValue<'source>,
+    scope: Scope<'source>,
+    fields: Iter<'tree, Field<'source>>,
+    children: Iter<'tree, Value<'source>>,
+}
+
+impl<'tree, 'source> Frame<'tree, 'source> {
+    fn new(node: &'tree StructValue<'source>, parent: Scope<'source>) -> Self {
+        Self {
+            node,
+            scope: parent.within(node),
+            fields: node.fields().iter(),
+            children: [].iter(),
+        }
+    }
+}
+
+impl<'tree, 'source> Iterator for Frame<'tree, 'source> {
+    type Item = &'tree Value<'source>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            if let Some(child) = self
+                .children
+                .find(|value| matches!(value, Value::Struct(_)))
+            {
+                return Some(child);
+            }
+            let value = self.fields.next()?.value();
+            if let Value::Array(children) = value {
+                self.children = children.iter();
+            } else {
+                return Some(value);
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+#[path = "crafting_sources_tests.rs"]
+mod tests;

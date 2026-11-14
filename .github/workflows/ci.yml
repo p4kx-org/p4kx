@@ -6,6 +6,10 @@ on:
   pull_request:
   merge_group:
 
+concurrency:
+  group: ci-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
@@ -16,13 +20,48 @@ env:
   NEXTEST_PROFILE: ci
 
 jobs:
+  platforms:
+    name: Native platform contract
+    runs-on: ubuntu-24.04
+    outputs:
+      matrix: ${{ steps.platforms.outputs.matrix }}
+      macos-matrix: ${{ steps.platforms.outputs.macos-matrix }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Validate and publish the five native rows
+        id: platforms
+        shell: pwsh
+        run: .github/scripts/read-platform-matrix.ps1
+      - name: Platform contract regression cases
+        shell: pwsh
+        run: .github/scripts/test-platform-contract.ps1
+      - name: Native image and archive evidence regression cases
+        shell: pwsh
+        run: .github/scripts/test-native-evidence.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'native-evidence-fixtures')
+      - name: Complete release matrix regression cases
+        shell: pwsh
+        run: .github/scripts/test-release-matrix.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'release-matrix-fixtures')
+      - name: Reject misbound macOS device receipts
+        shell: pwsh
+        run: .github/scripts/test-macos-device-evidence-intake.ps1
+      - name: Required release scan evidence regression cases
+        shell: pwsh
+        run: .github/scripts/test-release-scan.ps1 -Directory (Join-Path $env:RUNNER_TEMP 'release-scan-fixtures')
+
   lint:
-    name: Lint (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Lint (${{ matrix.target }})
+    needs: platforms
+    runs-on: ${{ matrix.runner }}
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+    defaults:
+      run:
+        shell: pwsh
     strategy:
       fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
     steps:
       - name: Disk space before the build
         if: runner.os == 'Linux'
@@ -33,14 +72,19 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: lint
+          target: ${{ matrix.target }}
           components: rustfmt, clippy
       - name: Formatting, one package at a time to keep the Windows command line short
-        shell: bash
         run: |
-          for package in $(cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name' | tr -d '\r'); do
-            cargo fmt -p "$package" --check
-          done
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
+          $metadata = cargo metadata --no-deps --format-version 1 --locked | ConvertFrom-Json
+          if ($LASTEXITCODE -ne 0) { throw 'Workspace metadata failed.' }
+          foreach ($package in $metadata.packages) {
+            cargo fmt -p $package.name --check
+            if ($LASTEXITCODE -ne 0) { throw "Formatting failed for $($package.name)." }
+          }
+      - run: cargo clippy --workspace --all-targets --target $env:P4KX_TARGET --locked -- -D warnings
+      - name: Check the opt-in MSI fixture on the native target
+        run: cargo clippy -p p4kx-msi-path --all-targets --features native-fixtures --target $env:P4KX_TARGET --locked -- -D warnings
       - run: cargo xtask
       - name: Install cargo-about
         if: runner.os == 'Linux'
@@ -57,28 +101,31 @@ jobs:
         if: runner.os == 'Linux'
         run: df -h /
 
-  tests-windows:
-    name: Tests (windows-latest)
-    uses: ./.github/workflows/tests.yml
-    with:
-      os: windows-latest
-      partitions: "[1, 2, 3, 4]"
-      count: 4
-
-  tests-ubuntu:
-    name: Tests (ubuntu-24.04)
-    uses: ./.github/workflows/tests.yml
-    with:
-      os: ubuntu-24.04
-      partitions: "[1, 2]"
-      count: 2
-  doctests:
-    name: Doctests (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+  tests:
+    name: Native tests (${{ matrix.target }})
+    needs: platforms
     strategy:
       fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
+    uses: ./.github/workflows/tests.yml
+    with:
+      os: ${{ matrix.runner }}
+      target: ${{ matrix.target }}
+      partitions: ${{ toJSON(matrix.partitions) }}
+      count: ${{ matrix.count }}
+
+  doctests:
+    name: Doctests (${{ matrix.target }})
+    needs: platforms
+    runs-on: ${{ matrix.runner }}
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+    defaults:
+      run:
+        shell: pwsh
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
     steps:
       - name: Disk space before the build
         if: runner.os == 'Linux'
@@ -89,18 +136,24 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: doctests
+          target: ${{ matrix.target }}
       - name: Doctests, which nextest does not run
-        run: cargo test --workspace --locked --doc
+        run: cargo test --workspace --target $env:P4KX_TARGET --locked --doc
       - name: Disk space after the build
         if: runner.os == 'Linux'
         run: df -h /
   focused:
-    name: Schemas and concurrency (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    name: Schemas and concurrency (${{ matrix.target }})
+    needs: platforms
+    runs-on: ${{ matrix.runner }}
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+    defaults:
+      run:
+        shell: pwsh
     strategy:
       fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
     steps:
       - name: Disk space before the build
         if: runner.os == 'Linux'
@@ -111,33 +164,67 @@ jobs:
       - uses: ./.github/actions/setup-rust
         with:
           cache-key: focused
+          target: ${{ matrix.target }}
           nextest: "true"
       - name: Comparison report schema is current
-        run: cargo nextest run --locked -p p4kx-comparison --test report_schema
+        run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-comparison --test report_schema
+      - name: Export deterministic native Blender fixtures
+        run: .github/scripts/export-blender-fixture.ps1 -Target $env:P4KX_TARGET -Directory (Join-Path $env:RUNNER_TEMP 'p4kx-blender-fixtures') -RunId $env:GITHUB_RUN_ID
       - name: Blender package schema is current
-        run: cargo nextest run --locked -p p4kx-blender --test schema
+        run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-blender --test schema
+      - name: Native Blender fixtures match the package schema
+        env:
+          P4KX_BLENDER_FIXTURES: ${{ runner.temp }}/p4kx-blender-fixtures/artifact/packages
+        run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-blender --test portable_fixture_schema --run-ignored only --no-tests fail
+      - name: Upload native Blender fixtures
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: p4kx-blender-package-${{ matrix.target }}
+          path: ${{ runner.temp }}/p4kx-blender-fixtures/artifact
+          if-no-files-found: error
+          overwrite: true
+          retention-days: 14
       - name: Record JSON schema matches the export
-        run: cargo nextest run --locked -p p4kx-export --test record_json_schema
+        run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-export --test record_json_schema
       - name: Basetool catalog schema is current
-        run: cargo nextest run --locked -p p4kx-export --test catalog_schema
+        run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-export --test catalog_schema
+      - name: Native Linux disk texture permission failures remain errors
+        if: runner.os == 'Linux'
+        run: |
+          $permissionRunnerIdentityLines = @(& id -u)
+          if ($LASTEXITCODE -ne 0) { throw 'Could not read the native permission runner user ID.' }
+          [uint32]$permissionRunnerUserId = 0
+          if ($permissionRunnerIdentityLines.Count -ne 1 -or
+              [string]$permissionRunnerIdentityLines[0] -cnotmatch '\A[0-9]+\z' -or
+              -not [uint32]::TryParse([string]$permissionRunnerIdentityLines[0], [ref]$permissionRunnerUserId) -or
+              $permissionRunnerUserId -eq 0) {
+            throw 'Native permission tests require one valid non-root user ID.'
+          }
+          cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-extraction --lib --run-ignored ignored-only --no-tests fail -E 'test(/^disk_textures::tests::native_/)'
+          if ($LASTEXITCODE -ne 0) { throw 'Native Linux disk texture permission tests failed.' }
       - name: DataForge lazy indexes survive concurrent lookups
-        run: cargo nextest run --cargo-profile concurrency --locked -p p4kx-dataforge --test lazy_indexes
+        run: cargo nextest run --cargo-profile concurrency --target $env:P4KX_TARGET --locked -p p4kx-dataforge --test lazy_indexes
       - name: Audio index survives concurrent first use
-        run: cargo nextest run --cargo-profile concurrency --locked -p p4kx-assembly --test audio_lazy_index
+        run: cargo nextest run --cargo-profile concurrency --target $env:P4KX_TARGET --locked -p p4kx-assembly --test audio_lazy_index
       - name: Disk space after the build
         if: runner.os == 'Linux'
         run: df -h /
 
   blender-addon:
-    name: Blender add-on (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    name: Blender add-on (${{ matrix.target }})
+    needs: [platforms, focused]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    env:
+      P4KX_TARGET: ${{ matrix.target }}
+      P4KX_PLATFORM_MATRIX: ${{ needs.platforms.outputs.matrix }}
+      PYTHONDONTWRITEBYTECODE: "1"
     strategy:
       fail-fast: false
-      matrix:
-        os: [windows-latest, ubuntu-latest]
+      matrix: ${{ fromJSON(needs.platforms.outputs.matrix) }}
     defaults:
       run:
+        shell: pwsh
         working-directory: blender_addon
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -146,18 +233,49 @@ jobs:
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
+          architecture: ${{ matrix.arch == 'arm64' && 'arm64' || 'x64' }}
           cache: pip
           cache-dependency-path: blender_addon/requirements-ci.txt
-      - name: Install system libraries of the bpy module
-        if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libgl1 libxi6 libxrender1 libsm6 libxxf86vm1 libxfixes3 libxkbcommon0
-        working-directory: .
-      - name: Install pytest and Blender as a Python module
+      - name: Select the native package exchange directory
+        run: |
+          $exchange = Join-Path $env:RUNNER_TEMP 'p4kx-blender-exchange'
+          Add-Content -LiteralPath $env:GITHUB_ENV -Value "P4KX_BLENDER_EXCHANGE=$exchange" -Encoding utf8NoBOM
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: p4kx-blender-package-*
+          path: ${{ env.P4KX_BLENDER_EXCHANGE }}
+          merge-multiple: false
+      - name: Install pytest
         run: python -m pip install -r requirements-ci.txt
       - name: Add-on tests without Blender
         run: python -m pytest
-      - name: Import a synthetic package in headless Blender
-        run: python tests/blender_smoke.py
+      - name: Validate the actual packages from every native producer
+        run: python tests/verify_portable_packages.py $env:P4KX_BLENDER_EXCHANGE --target $env:P4KX_TARGET
+      - name: Install system libraries of the bpy module
+        if: matrix.os == 'linux' && matrix.arch == 'amd64'
+        run: sudo apt-get update && sudo apt-get install -y libgl1 libxi6 libxrender1 libsm6 libxxf86vm1 libxfixes3 libxkbcommon0
+      - name: Import synthetic packages in native Blender 5.2 and 5.3
+        if: matrix.os != 'linux' || matrix.arch != 'arm64'
+        run: |
+          $versions = if ($env:P4KX_TARGET -ceq 'aarch64-pc-windows-msvc') { '5.2.3' } else { @('5.2.3', '5.3.0') }
+          foreach ($version in $versions) {
+            python -m pip install --only-binary=bpy "bpy==$version"
+            if ($LASTEXITCODE -ne 0) { throw "Native bpy $version could not be installed." }
+            python tests/blender_smoke.py
+            if ($LASTEXITCODE -ne 0) { throw "Blender $version synthetic smoke test failed." }
+            python tests/verify_portable_packages.py $env:P4KX_BLENDER_EXCHANGE --target $env:P4KX_TARGET --bpy-version $version
+            if ($LASTEXITCODE -ne 0) { throw "Blender $version native package exchange failed." }
+          }
+
+      - name: Import the exchanged packages in native Windows ARM64 Blender 5.3
+        if: matrix.os == 'windows' && matrix.arch == 'arm64'
+        working-directory: .
+        run: .github/scripts/verify-windows-arm64-blender.ps1 -Target $env:P4KX_TARGET -ArtifactDirectory $env:P4KX_BLENDER_EXCHANGE -BuildDirectory (Join-Path $env:RUNNER_TEMP 'p4kx-blender-windows-arm64')
+
+      - name: Import the exchanged packages in native Debian ARM64 Blender 5.2
+        if: matrix.os == 'linux' && matrix.arch == 'arm64'
+        working-directory: .
+        run: .github/scripts/verify-arm64-blender.ps1 -Target $env:P4KX_TARGET -ArtifactDirectory $env:P4KX_BLENDER_EXCHANGE -BuildDirectory (Join-Path $env:RUNNER_TEMP 'p4kx-blender-arm64')
 
   glb-validator:
     name: Khronos glTF-Validator
@@ -183,7 +301,7 @@ jobs:
 
   check:
     name: Check (${{ matrix.os }})
-    needs: [lint, tests-windows, tests-ubuntu, doctests, focused, blender-addon, glb-validator]
+    needs: [platforms, lint, tests, doctests, focused, blender-addon, glb-validator]
     if: always()
     runs-on: ubuntu-latest
     strategy:

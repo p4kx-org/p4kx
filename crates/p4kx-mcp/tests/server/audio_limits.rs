@@ -5,7 +5,7 @@ use p4kx_testkit::{
     TestAtl, TestBank, TestCodec, TestEntry, TestHircObject, TestPlaylistItem, TestWem,
     test_signal, wwise_short_id,
 };
-use serde_json::{Value, json};
+use serde_json::json;
 
 use crate::audio::serve;
 use crate::support::{Install, TestResult};
@@ -65,7 +65,7 @@ fn sounds() -> TestResult<Install> {
 }
 
 #[test]
-fn events_and_soundbanks_per_trigger_are_capped_with_their_totals() -> TestResult {
+fn events_are_complete_and_soundbank_previews_keep_their_totals() -> TestResult {
     let install = many()?;
     let mut server = serve(&install)?;
     let found = server.ok("search_audio_triggers", &json!({ "search": "Play_Many" }))?;
@@ -73,8 +73,8 @@ fn events_and_soundbanks_per_trigger_are_capped_with_their_totals() -> TestResul
     assert_eq!(hit["events_total"], EVENTS, "all events are counted");
     assert_eq!(
         hit["events"].as_array().map(Vec::len),
-        Some(25),
-        "25 listed"
+        Some(EVENTS),
+        "all original events listed"
     );
     assert_eq!(
         hit["events"][0]["soundbank_count"], BANKS,
@@ -92,14 +92,15 @@ fn events_and_soundbanks_per_trigger_are_capped_with_their_totals() -> TestResul
     );
     assert_eq!(
         resolved["trigger"]["events"].as_array().map(Vec::len),
-        Some(25),
-        "resolve lists 25"
+        Some(EVENTS),
+        "resolve lists every original event"
     );
-    let at_most = |value: &Value| value.as_str().map(str::len).unwrap_or_default() <= 256;
     let long = server.ok("search_audio_triggers", &json!({ "search": "PPPP" }))?;
-    assert!(
-        at_most(&long["triggers"][0]["name"]),
-        "names stop at 256 bytes"
+    let name = "P".repeat(300);
+    assert_eq!(
+        long["triggers"][0]["name"].as_str(),
+        Some(name.as_str()),
+        "the complete original trigger name is retained"
     );
     Ok(())
 }

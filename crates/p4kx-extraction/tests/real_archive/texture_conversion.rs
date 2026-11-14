@@ -1,115 +1,168 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Texture Conversion during an Extraction of the real Archive.
+//! Complete image sets produced while converting real Archive textures.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::io::Write;
 use std::path::Path;
 
-use p4kx_extraction::{
-    Archive, ConflictPolicy, Entry, EntryFailure, ExtractOptions, ExtractionReport, extract,
-};
+use p4kx_extraction::{Archive, ConflictPolicy, Entry, ExtractOptions, ExtractionReport, extract};
 use p4kx_testkit::real_archive_path;
 
 use crate::TestResult;
 
+#[path = "../support/texture_artifacts.rs"]
+mod artifacts;
+#[path = "texture_conversion_sample.rs"]
+mod selection;
+
+use selection::Sample;
+
 const TEXTURE_SAMPLE: usize = 400;
 const TAILED_SAMPLE: usize = 60;
 
-fn has_suffix(path: &str, suffix: &str) -> bool {
-    path.len()
-        .checked_sub(suffix.len())
-        .and_then(|start| path.get(start..))
-        .is_some_and(|end| end.eq_ignore_ascii_case(suffix))
-}
-
-fn output(target: &Path, entry_path: &str, extension: Option<&str>) -> bool {
-    let mut path = target.join(entry_path.replace('\\', "/"));
-    if let Some(extension) = extension {
-        path.set_extension(extension);
-    }
-    path.is_file()
-}
-
-fn sample<'a>(entries: impl Iterator<Item = &'a Entry>, size: usize) -> Vec<&'a Entry> {
-    let mut seen = HashSet::new();
-    let unique: Vec<&Entry> = entries
-        .filter(|entry| seen.insert(entry.path().replace('/', "\\").to_lowercase()))
+fn successful<'a, 'archive>(
+    report: &ExtractionReport,
+    headers: &'a [Sample<'archive>],
+) -> Vec<&'a Sample<'archive>> {
+    assert!(
+        report.failures().is_empty(),
+        "unexpected extraction failures: {:?}",
+        report.failures()
+    );
+    assert!(
+        report.cancelled().is_empty(),
+        "the conversion was not cancelled"
+    );
+    assert!(
+        !report.archive_changed(),
+        "the source archive stayed stable"
+    );
+    let sources: HashMap<_, _> = headers
+        .iter()
+        .map(|header| (header.entry.path(), header))
         .collect();
-    let stride = (unique.len() / size).max(1);
-    unique.into_iter().step_by(stride).collect()
+    for failure in report.unconverted() {
+        assert!(
+            sources
+                .get(failure.path())
+                .is_some_and(|header| artifacts::unsupported(
+                    failure.error(),
+                    header.header.format()
+                )),
+            "unexpected conversion failure: {failure:?}"
+        );
+    }
+    let unsupported: HashSet<_> = report
+        .unconverted()
+        .iter()
+        .map(p4kx_extraction::EntryFailure::path)
+        .collect();
+    headers
+        .iter()
+        .filter(|header| !unsupported.contains(header.entry.path()))
+        .collect()
 }
 
-fn convert(archive: &Archive, sample: &[&Entry], target: &Path) -> ExtractionReport {
+fn expected_images(
+    target: &Path,
+    converted: &[&Sample<'_>],
+) -> artifacts::CheckResult<Vec<artifacts::ExpectedImage>> {
+    let mut expected = Vec::new();
+    for header in converted {
+        expected.extend(artifacts::expected(
+            target,
+            header.entry.path(),
+            &header.header,
+            0,
+        )?);
+        let tail = target.join(format!("{}.a", header.entry.path()).replace('\\', "/"));
+        assert!(
+            !tail.exists(),
+            "a converted alpha tail is consumed: {}",
+            tail.display()
+        );
+    }
+    Ok(expected)
+}
+
+/// Requires an image plan when a selected source has an existing decoder.
+fn assert_supported_image_coverage(headers: &[Sample<'_>], expected: &[artifacts::ExpectedImage]) {
+    assert!(
+        !headers
+            .iter()
+            .any(|header| selection::supports_images(&header.header))
+            || !expected.is_empty(),
+        "selected supported sources require a nonempty validated image set"
+    );
+}
+
+fn verify_sample(
+    archive: &Archive,
+    headers: &[Sample<'_>],
+    entries: &[&Entry],
+    target: &Path,
+) -> TestResult {
+    fs::create_dir_all(target)?;
     let options = ExtractOptions {
         convert: true,
         ..ExtractOptions::default()
     };
-    extract(archive, sample, target, &options)
-}
-
-fn has_image(target: &Path, header: &str) -> bool {
-    ["png", "exr"].into_iter().any(|extension| {
-        output(target, header, Some(extension))
-            || output(
-                target,
-                &header.replace(".dds", "_posx.dds"),
-                Some(extension),
-            )
-    })
-}
-
-/// Checks that no Entry failed and most `headers` converted; returns those that did.
-fn converted<'a>(report: &ExtractionReport, headers: &[&'a Entry]) -> Vec<&'a Entry> {
+    let report = extract(archive, entries, target, &options);
+    assert_eq!(
+        report.extracted(),
+        entries.len(),
+        "every requested source entry completes: {report:?}"
+    );
+    let converted = successful(&report, headers);
+    let expected = expected_images(target, &converted)?;
+    assert_supported_image_coverage(headers, &expected);
+    artifacts::check(target, &expected)?;
+    artifacts::check_receipts(target, &expected, &report)?;
+    writeln!(
+        std::io::stderr(),
+        "{} sampled headers; {} converted; {} explicitly unsupported; {} validated images",
+        headers.len(),
+        converted.len(),
+        report.unconverted().len(),
+        expected.len()
+    )?;
+    let before = artifacts::snapshot(target)?;
+    let again = extract(
+        archive,
+        entries,
+        target,
+        &ExtractOptions {
+            policy: ConflictPolicy::IfChanged,
+            ..options
+        },
+    );
+    let repeated = successful(&again, headers);
     assert!(
-        report.failures().is_empty(),
-        "failed: {:?}",
-        report.failures()
+        repeated
+            .iter()
+            .map(|header| header.entry.path())
+            .eq(converted.iter().map(|header| header.entry.path())),
+        "the same headers convert or remain explicitly unsupported"
     );
-    let unconverted: HashSet<&str> = report
-        .unconverted()
-        .iter()
-        .map(EntryFailure::path)
-        .collect();
-    let converted: Vec<&Entry> = headers
-        .iter()
-        .copied()
-        .filter(|header| !unconverted.contains(header.path()))
-        .collect();
     assert!(
-        converted.len() > headers.len() / 2,
-        "most textures convert: {:?}",
-        report.unconverted()
+        again.texture_artifacts().is_empty(),
+        "no image was rewritten"
     );
-    converted
-}
-
-/// Returns a sample of the headers that have an alpha tail, and every Entry of their textures.
-fn tailed_textures(archive: &Archive) -> (Vec<&Entry>, Vec<&Entry>) {
-    let tails: HashSet<String> = archive
-        .entries()
-        .iter()
-        .filter(|entry| has_suffix(entry.path(), ".dds.a"))
-        .filter_map(|entry| entry.path().get(..entry.path().len() - 2))
-        .map(|header| header.replace('/', "\\").to_lowercase())
-        .collect();
-    let headers = sample(
-        archive.entries().iter().filter(|entry| {
-            has_suffix(entry.path(), ".dds")
-                && tails.contains(&entry.path().replace('/', "\\").to_lowercase())
-        }),
-        TAILED_SAMPLE,
+    assert_eq!(
+        again.skipped().len(),
+        entries.len(),
+        "IfChanged keeps every output: {again:?}"
     );
-    let members = archive
-        .entries()
-        .iter()
-        .filter(|entry| {
-            headers
-                .iter()
-                .any(|header| entry.path().starts_with(header.path()))
-        })
-        .collect();
-    (headers, members)
+    artifacts::check(target, &expected)?;
+    assert_eq!(
+        artifacts::snapshot(target)?,
+        before,
+        "every expected image remains byte-identical"
+    );
+    Ok(())
 }
 
 #[test]
@@ -119,38 +172,11 @@ fn converts_a_sample_of_real_textures_once_each() -> TestResult {
         real_archive_path()?,
         Some(p4kx_testkit::real_archive_key()?),
     )?;
-    let headers = sample(
-        archive
-            .entries()
-            .iter()
-            .filter(|entry| has_suffix(entry.path(), ".dds")),
-        TEXTURE_SAMPLE,
-    );
+    let headers = selection::select(&archive, TEXTURE_SAMPLE, false)?;
+    assert!(!headers.is_empty(), "the Archive has DDS headers");
+    let entries: Vec<_> = headers.iter().map(|header| header.entry).collect();
     let target = tempfile::tempdir()?;
-
-    let report = convert(&archive, &headers, target.path());
-
-    assert_eq!(report.extracted(), headers.len(), "every header is written");
-    for header in converted(&report, &headers) {
-        assert!(
-            has_image(target.path(), header.path()),
-            "{} has a PNG or OpenEXR",
-            header.path()
-        );
-    }
-    let options = ExtractOptions {
-        policy: ConflictPolicy::IfChanged,
-        convert: true,
-        ..ExtractOptions::default()
-    };
-    let again = extract(&archive, &headers, target.path(), &options);
-    assert_eq!(
-        again.skipped().len(),
-        headers.len(),
-        "every output is kept: {:?}",
-        again.failures()
-    );
-    Ok(())
+    verify_sample(&archive, &headers, &entries, target.path())
 }
 
 #[test]
@@ -160,28 +186,15 @@ fn converts_real_textures_with_alpha_tails_without_writing_the_tails() -> TestRe
         real_archive_path()?,
         Some(p4kx_testkit::real_archive_key()?),
     )?;
-    let (headers, members) = tailed_textures(&archive);
-    assert!(headers.len() >= 10, "the Archive has textures with tails");
-    let target = tempfile::tempdir()?;
-
-    let report = convert(&archive, &members, target.path());
-
-    assert_eq!(
-        report.extracted(),
-        members.len(),
-        "every Entry ends written"
-    );
-    for header in converted(&report, &headers) {
-        let tail = format!("{}.a", header.path());
-        assert!(
-            !output(target.path(), &tail, None),
-            "{tail} is not written raw"
-        );
-        assert!(
-            has_image(target.path(), header.path()),
-            "{} has a PNG or OpenEXR",
-            header.path()
-        );
+    let headers = selection::select(&archive, TAILED_SAMPLE, true)?;
+    if headers.is_empty() {
+        writeln!(
+            std::io::stderr(),
+            "no alpha-tail texture exists in this Archive"
+        )?;
+        return Ok(());
     }
-    Ok(())
+    let entries = selection::members(&archive, &headers);
+    let target = tempfile::tempdir()?;
+    verify_sample(&archive, &headers, &entries, target.path())
 }

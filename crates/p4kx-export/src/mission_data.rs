@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, RecordTree, StructValue, TreeBuilder, Value};
+use p4kx_extraction::{DataForge, RecordTree, StructValue, TreeBuilder, Value, ValueError};
 
 use crate::contract_mission_data::{
     ContractScenario, MissionLocality, MissionType, ScenarioFactionTiers, ScenarioProgression,
@@ -13,6 +13,8 @@ use crate::record_fields::{
     boolean, class_name, integer, number, reference, references, structs, text,
 };
 use crate::texts::Texts;
+
+const FACTION_REPUTATION: &str = "factionReputationRef";
 
 /// The `badgeToAward` the game stores for a tier without a badge.
 const NO_BADGE: &str = "None";
@@ -56,7 +58,10 @@ fn faction_tiers<'f>(tiers: &StructValue<'f>) -> ScenarioFactionTiers<'f> {
         _ => None,
     });
     ScenarioFactionTiers {
-        faction_guid: faction.map(|target| CatalogGuid(target.guid())),
+        faction_guid: match tiers.field("faction") {
+            Some(Value::Error(ValueError::DanglingReference { guid })) => Some(CatalogGuid(*guid)),
+            _ => faction.map(|target| CatalogGuid(target.guid())),
+        },
         faction_reputation_guid: None,
         faction_name: faction.and_then(|target| target.record_path().rsplit('/').next()),
         points_as_percent: boolean(Some(tiers), "convertTiersPointsToPercent"),
@@ -89,11 +94,21 @@ fn tier<'f>(tier: &StructValue<'f>) -> ScenarioTier<'f> {
 /// Sets the `faction_reputation_guid` of every faction in `scenarios` from the
 /// `factionReputationRef` of its `Faction` Record; a Record that is missing, unreadable or names
 /// none leaves `None`.
-pub(crate) fn link_scenario_factions(
-    forge: &DataForge<'_>,
-    scenarios: &mut [ContractScenario<'_>],
-) {
-    let mut trees = TreeBuilder::new();
+pub(crate) fn link_scenario_factions<'f>(
+    forge: &'f DataForge<'f>,
+    scenarios: &mut [ContractScenario<'f>],
+    input: &'f crate::build::original_input::OriginalCatalogInput<'f, 'f>,
+    cancel: Option<&p4kx_extraction::CancelToken>,
+) -> Result<crate::export_ledger::ExportLedger, crate::CatalogError> {
+    let capture = std::sync::Arc::new(
+        crate::export_builder_capture::BuilderCapture::for_input_record_field(
+            input,
+            crate::Kind::ContractScenarios,
+            FACTION_REPUTATION,
+            cancel,
+        ),
+    );
+    let mut trees = TreeBuilder::with_read_observer(capture.clone());
     for tiers in scenarios
         .iter_mut()
         .flat_map(|scenario| scenario.faction_reward_tiers.iter_mut())
@@ -102,6 +117,7 @@ pub(crate) fn link_scenario_factions(
             .faction_guid
             .and_then(|faction| forge.record_by_guid(faction.0))
             .and_then(|record| trees.build(&record).ok())
-            .and_then(|tree| reference(Some(tree.root()), "factionReputationRef"));
+            .and_then(|tree| reference(Some(tree.root()), FACTION_REPUTATION));
     }
+    capture.finish()
 }

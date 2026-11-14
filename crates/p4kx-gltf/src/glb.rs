@@ -2,19 +2,23 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::Write;
+use std::num::NonZeroU64;
 
 use gltf_json as json;
+use p4kx_model::Material;
 use p4kx_model::{Animation, Lod, Model};
 
 use crate::GltfError;
 use crate::animations::AnimationSummary;
 use crate::document::document;
+use crate::glb_json;
 pub use crate::glb_options::{GlbOptions, MaterialMode, VertexColours};
 use crate::glb_plan::{Skeletal, animation_plans, own_binds, plan_layout, summarise, texture_set};
 use crate::instance::{Content, Instance, material_requests};
 use crate::layout::Layout;
 use crate::material_index::index_materials;
 use crate::materials::MaterialPlan;
+use crate::mesh_vertex_map::{self, MeshVertexMap, ObserveMesh};
 use crate::scene_rig::SceneRig;
 use crate::texture_loader::{NoTextures, TextureLoader};
 use crate::texture_plan::TextureSet;
@@ -158,12 +162,67 @@ pub fn write_glb_animated_with(
     textures: &dyn TextureLoader,
     out: &mut impl Write,
 ) -> Result<GlbSummary, GltfError> {
+    write_glb_animated_with_fallback(model, animations, options, Some(textures), None, out)
+}
+
+/// Writes the model using a resolved source fallback for missing material assignments.
+///
+/// # Errors
+///
+/// As [`write_glb`].
+pub fn write_glb_animated_with_fallback(
+    model: &Model,
+    animations: &[Animation],
+    options: &GlbOptions,
+    textures: Option<&dyn TextureLoader>,
+    fallback: Option<&Material>,
+    out: &mut impl Write,
+) -> Result<GlbSummary, GltfError> {
+    write_model(model, animations, options, textures, fallback, out, None)
+}
+
+/// Writes a model and visits each emitted mesh in GLB order with its source vertex map.
+///
+/// The visitor borrows the map without copying vertex ordinals. It runs after the GLB
+/// writer flushes successfully.
+///
+/// # Errors
+/// Returns the same errors as the ordinary writer, or a write error from the visitor.
+pub fn write_glb_observed(
+    model: &Model,
+    animations: &[Animation],
+    options: &GlbOptions,
+    textures: Option<&dyn TextureLoader>,
+    fallback: Option<&Material>,
+    out: &mut impl Write,
+    visitor: &mut impl FnMut(MeshVertexMap<'_>) -> std::io::Result<()>,
+) -> Result<GlbSummary, GltfError> {
+    write_model(
+        model,
+        animations,
+        options,
+        textures,
+        fallback,
+        out,
+        Some(visitor),
+    )
+}
+
+fn write_model(
+    model: &Model,
+    animations: &[Animation],
+    options: &GlbOptions,
+    textures: Option<&dyn TextureLoader>,
+    fallback: Option<&Material>,
+    out: &mut impl Write,
+    visitor: Option<&mut ObserveMesh<'_>>,
+) -> Result<GlbSummary, GltfError> {
     let lod = find_lod(model, options.lod)?;
     let instance = Instance {
         model,
         lod: Some(lod),
         wrapper: None,
-        plan: MaterialPlan::new(model.materials.library(), lod),
+        plan: MaterialPlan::with_fallback(model.materials.library(), lod, fallback),
         twin: None,
     };
     let animations: Vec<&Animation> = animations.iter().collect();
@@ -173,7 +232,14 @@ pub fn write_glb_animated_with(
         rig: None,
         animations: &animations,
     };
-    write_instances(&content, options, textures, 0, out)
+    write_instances(
+        &content,
+        options,
+        textures.unwrap_or(&NoTextures),
+        0,
+        out,
+        visitor,
+    )
 }
 
 /// Returns how many meshes the twin instances reuse instead of writing them again.
@@ -197,6 +263,7 @@ pub(crate) fn write_instances(
     textures: &dyn TextureLoader,
     lod_fallbacks: usize,
     out: &mut impl Write,
+    visitor: Option<&mut ObserveMesh<'_>>,
 ) -> Result<GlbSummary, GltfError> {
     let Content {
         wrappers,
@@ -223,7 +290,10 @@ pub(crate) fn write_instances(
     if options.material_indices {
         index_materials(&mut root);
     }
-    let total = write_file(&root, &layout, &images, out)?;
+    let total = write_file(&root, &layout, &images, options.json_byte_budget, out)?;
+    if let Some(visitor) = visitor {
+        mesh_vertex_map::observe(&root, &layout, instances, options.lod, visitor)?;
+    }
     let defaulted = instances
         .iter()
         .map(|instance| instance.plan.defaulted())
@@ -240,7 +310,7 @@ pub(crate) fn write_instances(
         drawn_nodes,
         images,
         &animation_plans,
-        total,
+        total.len,
     );
     summary.parts = instances.len();
     summary.lod_fallbacks = lod_fallbacks;
@@ -252,20 +322,24 @@ pub(crate) fn write_instances(
     Ok(summary)
 }
 
+pub(crate) struct WrittenGlb {
+    pub(crate) len: u64,
+    pub(crate) binary_start: Option<u64>,
+}
+
 pub(crate) fn write_file(
     root: &json::Root,
     layout: &Layout<'_>,
     images: &TextureSet,
+    json_byte_budget: Option<NonZeroU64>,
     out: &mut impl Write,
-) -> Result<u64, GltfError> {
-    let mut json = root.to_vec()?;
-    json.resize(json.len().next_multiple_of(4), b' ');
+) -> Result<WrittenGlb, GltfError> {
+    let json = glb_json::encode(root, json_byte_budget)?;
     let json_len = json.len() as u64;
     let bin_len = layout.len;
-    let mut total = HEADER_LEN + CHUNK_HEADER_LEN + json_len;
-    if bin_len > 0 {
-        total += CHUNK_HEADER_LEN + bin_len;
-    }
+    let json_end = HEADER_LEN + CHUNK_HEADER_LEN + json_len;
+    let binary_start = (bin_len > 0).then_some(json_end + CHUNK_HEADER_LEN);
+    let total = binary_start.map_or(json_end, |start| start + bin_len);
     let too_large = || GltfError::TooLarge { len: total };
     let total_word = u32::try_from(total).map_err(|_| too_large())?;
     let json_word = u32::try_from(json_len).map_err(|_| too_large())?;
@@ -283,7 +357,10 @@ pub(crate) fn write_file(
         layout.write(out, &images.images)?;
     }
     out.flush()?;
-    Ok(total)
+    Ok(WrittenGlb {
+        len: total,
+        binary_start,
+    })
 }
 
 fn find_lod(model: &Model, level: u32) -> Result<&Lod, GltfError> {

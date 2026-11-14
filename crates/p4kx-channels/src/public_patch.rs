@@ -2,11 +2,16 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use p4kx_archive::Build;
+use p4kx_settings::WineLocations;
 
+use crate::discovery_limits::DiscoveryLimits;
+use crate::discovery_report::DiscoveryReport;
 use crate::launcher_log::{self, Wanted};
+use crate::launcher_snapshot::LauncherSnapshot;
+use crate::search_recipe::SearchRecipe;
 
 const MARKER: &str = "(SC ";
 const MAX_PATCHES: usize = 4096;
@@ -35,14 +40,34 @@ impl PartialEq for PublicPatches {
 impl Eq for PublicPatches {}
 
 impl PublicPatches {
-    /// Reads the public patches from the RSI Launcher's own log folder: `P4KX_LAUNCHER_LOGS`
-    /// when set, otherwise `logs` in the launcher's application-data folder.
+    /// Reads standard native and Wine sources, or only `P4KX_LAUNCHER_LOGS` when set.
     ///
     /// Only `log.log` and `log.old.log` are read; a missing or unreadable file is skipped.
     #[must_use]
     pub fn standard() -> Self {
-        launcher_log::standard_log_folder()
-            .map_or_else(Self::default, |folder| Self::read_from(&folder))
+        Self::standard_report().into_value()
+    }
+
+    /// Reads standard public-patch sources with explicit discovery diagnostics.
+    #[must_use]
+    pub fn standard_report() -> DiscoveryReport<Self> {
+        let folder = std::env::var_os("P4KX_LAUNCHER_LOGS").map(PathBuf::from);
+        standard_sources(folder.as_deref(), || SearchRecipe::standard().snapshot())
+    }
+
+    /// Reads public patches from the active profile's saved Wine locations and standard sources.
+    #[must_use]
+    pub fn standard_report_with_saved_wine(wine: &WineLocations) -> DiscoveryReport<Self> {
+        let folder = std::env::var_os("P4KX_LAUNCHER_LOGS").map(PathBuf::from);
+        standard_sources(folder.as_deref(), || {
+            SearchRecipe::standard().snapshot_with_saved_wine(wine)
+        })
+    }
+
+    /// Reads the snapshot's exact opened log sources in their original occurrence order.
+    #[must_use]
+    pub fn read_sources(snapshot: &LauncherSnapshot) -> DiscoveryReport<Self> {
+        snapshot.read_patches()
     }
 
     /// Reads the public patches from the log files in `log_folder`.
@@ -79,17 +104,25 @@ impl PublicPatches {
         self.get(build.change_number())
     }
 
-    pub(crate) fn note_line(&mut self, line: &str) {
+    pub(crate) fn note_line_admitted(
+        &mut self,
+        line: &str,
+        mut admit: impl FnMut(usize) -> bool,
+    ) -> bool {
         let mut rest = line;
         while let Some((_, after)) = rest.split_once(MARKER) {
             let Some((label, tail)) = after.split_once(')') else {
                 break;
             };
             if let Some((version, change)) = patch_of(label) {
+                if !admit(version.len() + change.len()) {
+                    return false;
+                }
                 self.record(change, version);
             }
             rest = tail;
         }
+        true
     }
 
     pub(crate) fn record(&mut self, change: &str, version: &str) {
@@ -107,16 +140,25 @@ impl PublicPatches {
         }
     }
 
-    pub(crate) fn absorb_newer(&mut self, newer: Self) {
-        let mut items: Vec<(u64, String, String)> = newer
+    pub(crate) fn absorb_admitted(
+        &mut self,
+        newer: &Self,
+        mut admit: impl FnMut(usize) -> bool,
+    ) -> bool {
+        let mut items: Vec<_> = newer
             .by_change
-            .into_iter()
-            .map(|(change, (version, stamp))| (stamp, change, version))
+            .iter()
+            .map(|(change, (version, stamp))| (*stamp, change.as_str(), version.as_str()))
             .collect();
         items.sort_unstable();
         for (_, change, version) in items {
-            self.record(&change, &version);
+            if !admit(version.len() + change.len()) {
+                return false;
+            }
+            self.record(change, version);
         }
+        self.trim();
+        true
     }
 
     /// Keeps the [`MAX_PATCHES`] changes whose newest line is the most recent.
@@ -132,6 +174,20 @@ impl PublicPatches {
         }
     }
 }
+
+fn standard_sources(
+    override_folder: Option<&Path>,
+    snapshot: impl FnOnce() -> LauncherSnapshot,
+) -> DiscoveryReport<PublicPatches> {
+    if let Some(folder) = override_folder {
+        return LauncherSnapshot::log_folder(folder, DiscoveryLimits::default()).read_patches();
+    }
+    snapshot().read_patches()
+}
+
+#[cfg(test)]
+#[path = "standard_source_tests.rs"]
+mod tests;
 
 /// Returns the version and the change of a label `<CHANNEL> <version>-<tag>.<change>`, e.g.
 /// `4.7.2` and `11674325` for `LIVE 4.7.2-live.11674325`.

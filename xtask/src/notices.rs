@@ -3,6 +3,7 @@
 
 mod about_json;
 mod markdown;
+mod source_notices;
 
 use std::fs;
 use std::path::Path;
@@ -103,7 +104,8 @@ fn placeholders(generated: &str) -> Vec<&'static str> {
 fn generate(root: &Path) -> Result<String> {
     ensure_version()?;
     let target = std::env::temp_dir().join(format!("p4kx-notices-{}.json", std::process::id()));
-    let output = cargo()
+    let mut command = cargo();
+    command
         .args([
             "about",
             "generate",
@@ -115,7 +117,12 @@ fn generate(root: &Path) -> Result<String> {
             "-o",
         ])
         .arg(&target)
-        .current_dir(root)
+        .current_dir(root);
+    let contract = fs::read_to_string(root.join(".config/platforms.json"))?;
+    for native_target in native_targets(&contract)? {
+        command.args(["--target", &native_target]);
+    }
+    let output = command
         .output()
         .with_context(|| format!("cannot run cargo about; {}", install_hint()));
     let json = output.and_then(|output| {
@@ -129,7 +136,9 @@ fn generate(root: &Path) -> Result<String> {
         }
     });
     let _ignored = fs::remove_file(&target);
-    let generated = markdown::render(&about_json::parse(&json?)?);
+    let mut licences = about_json::parse(&json?)?;
+    source_notices::apply(&mut licences)?;
+    let generated = markdown::render(&licences);
     let unfilled = placeholders(&generated);
     if !unfilled.is_empty() {
         bail!(
@@ -141,9 +150,66 @@ fn generate(root: &Path) -> Result<String> {
     Ok(generated)
 }
 
+fn native_targets(text: &str) -> Result<Vec<String>> {
+    let contract: serde_json::Value = serde_json::from_str(text)?;
+    let rows = contract
+        .get("targets")
+        .and_then(serde_json::Value::as_array)
+        .context("platform contract has no target rows")?;
+    let targets = rows
+        .iter()
+        .map(|row| {
+            row.get("target")
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned)
+                .context("platform row has no target")
+        })
+        .collect::<Result<Vec<_>>>()?;
+    if targets.is_empty()
+        || targets.iter().enumerate().any(|(index, target)| {
+            target.is_empty() || targets.iter().take(index).any(|other| other == target)
+        })
+    {
+        bail!("notices require distinct nonempty native targets");
+    }
+    Ok(targets)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn notices_use_every_declared_native_target() {
+        let contract = include_str!("../../.config/platforms.json");
+        let targets = native_targets(contract).expect("valid native contract");
+        assert_eq!(targets.len(), 5, "every required target is admitted");
+        assert!(
+            targets
+                .iter()
+                .any(|target| target == "aarch64-apple-darwin"),
+            "licence resolution includes the native macOS target"
+        );
+        assert!(
+            targets
+                .iter()
+                .any(|target| target == "aarch64-unknown-linux-gnu")
+        );
+        assert!(
+            targets
+                .iter()
+                .any(|target| target == "aarch64-pc-windows-msvc")
+        );
+        assert!(
+            native_targets(r#"{"targets":[{"target":"duplicate"},{"target":"duplicate"}]}"#)
+                .is_err()
+        );
+        assert!(native_targets("{}").is_err());
+        assert!(
+            native_targets(r#"{"targets":[]}"#).is_err(),
+            "empty platform inventory"
+        );
+    }
 
     #[test]
     fn generated_part_follows_the_marker() {

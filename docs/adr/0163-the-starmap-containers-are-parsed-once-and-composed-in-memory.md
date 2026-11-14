@@ -24,10 +24,16 @@ container on the chain (up to 128 MiB each) was held at once. Only the systems r
   while one container is parsed, so the peak is the kept Children plus, per rayon thread, one
   XML of up to 128 MiB and its DOM.
 - **A container whose XML is not named like it is reported.** When no `<stem>.xml` exists and the
-  first other XML entry is taken, the report gets an issue line naming it. It is read, not counted
-  as unreadable, because the position data is intact.
-- **A second `ChildObjectContainers` is reported.** Only the first list of an element is read;
-  when its direct siblings hold another one, an issue line says so. The positions are unchanged.
+  first eligible XML entry is taken, the report names it. The companion `hcd/`
+  directory is outside both the main XML lookup and its fallback. A container with
+  no eligible main XML reports an unreadable placement body.
+- **Resolve authored external Child paths with the shared grammar.** The external flag
+  accepts `1` and `true`. Existing exact root Archive matches take priority. For
+  other declarations the shared lookup tries the written path, optional `.socpak`
+  extension, and root Archive prefixes used by interior assembly.
+- **Read every direct `ChildObjectContainers` list in document order.** Each `Child` keeps
+  its actual owning list. The legacy wrapped-list fallback applies when the element has
+  no direct list.
 - **Type names are read once.** `TypeNames` caches the name of each type Record by GUID for the
   parallel scan.
 - **`StarmapReport` stays public, read-only.** Its lines are diagnostics for the real-Archive
@@ -41,3 +47,38 @@ container on the chain (up to 128 MiB each) was held at once. Only the systems r
 - The catalog JSON and its schema do not change.
 - An out-of-range position is reported with the composed number and the entity name of a placed
   Child, no longer with the raw attribute text, which is not kept.
+
+## Catalog placement evidence
+
+The same walk retains the selected root directory and the parsed XML node and attribute
+coordinates used by each placement. A reused container shares its parsed source sites.
+Each placement retains its own ancestor route so the same Child can supply different
+world positions in different instances.
+
+The route selects the occurrence for all placement fields. Position uses the leaf
+translation and ancestor translations and rotations. Entity name and parent GUID
+retain their respective original attribute uses. The two positions that establish an
+ambiguous placement supply the absence evidence. Referenced or attempted targets
+stay in the operation ledger unless their contents contribute to a placement.
+
+## Container instance table
+
+`placements.containerInstances` contains one row per resolved SOCpak occurrence,
+including each reused file's separate Child route. The instance key is the system
+root Archive entry ordinal and the ordered XML Child node ordinals. The parent key
+identifies the enclosing physical container occurrence. An inline XML Child can
+lie between the enclosing physical container and the declaring Child.
+
+Local positions are metres in the immediate XML parent's frame. Local rotations
+are the authored quaternion components in w, x, y, z order. Missing authored
+components are absent and the world transform uses zero translation or identity
+rotation for those slots. World positions are in the system frame at millimetre
+precision. World rotations use the composed unit quaternions in w, x, y, z order.
+The root frame is the identity. Unread, malformed and unreachable placements
+remain visible through the traversal diagnostics. Table availability describes
+the discovered source family independently of traversal completeness.
+
+Each external occurrence preserves the declaring Child's `label` and `entityName`
+as `declaredLabel` and `declaredEntityName`. Empty attributes remain present.
+The label retains its literal text or localization key and carries `x-gameText`.
+Each name cites its own original attribute or the observed absence at that Child.

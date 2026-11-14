@@ -12,6 +12,7 @@ const SKIN_ATTACHMENT: &str = "Skin";
 /// it sits.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PortDefinition {
+    pub(crate) position: PortDefinitionPosition,
     pub(crate) display_name: String,
     pub(crate) flags: String,
     pub(crate) min_size: Option<u32>,
@@ -26,8 +27,14 @@ pub struct PortDefinition {
 }
 
 impl PortDefinition {
-    /// Returns whether the item keeps its own orientation and takes only the translation of the
-    /// port (`constraintParams.noRotation` of an entity attachment), as gimbals and turrets do.
+    /// Returns the physical Record, component and port occurrence.
+    #[must_use]
+    pub const fn position(&self) -> PortDefinitionPosition {
+        self.position
+    }
+
+    /// Returns the authored entity attachment flag `constraintParams.noRotation`.
+    /// Static placement applies the complete helper transform.
     #[must_use]
     pub const fn no_rotation(&self) -> bool {
         self.no_rotation
@@ -97,6 +104,34 @@ impl PortDefinition {
     }
 }
 
+/// Original coordinates of one DataForge item port definition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PortDefinitionPosition {
+    pub(crate) record: u32,
+    pub(crate) component: usize,
+    pub(crate) port: usize,
+}
+
+impl PortDefinitionPosition {
+    /// Returns the physical Entity Record index.
+    #[must_use]
+    pub const fn record_index(self) -> u32 {
+        self.record
+    }
+
+    /// Returns the original ordinal in the Record's Components array.
+    #[must_use]
+    pub const fn component_ordinal(self) -> usize {
+        self.component
+    }
+
+    /// Returns the original ordinal in the component's Ports array.
+    #[must_use]
+    pub const fn port_ordinal(self) -> usize {
+        self.port
+    }
+}
+
 /// One item type a port takes, e.g. `WeaponGun` with the sub-type `Gun`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PortType {
@@ -126,6 +161,7 @@ pub struct PortTransform {
     pub(crate) offset_helper: String,
     pub(crate) position: [f32; 3],
     pub(crate) rotation: [f32; 3],
+    offset_fields: [bool; 2],
 }
 
 impl PortTransform {
@@ -153,6 +189,10 @@ impl PortTransform {
         self.position
     }
 
+    pub(crate) const fn offset_fields(&self) -> [bool; 2] {
+        self.offset_fields
+    }
+
     /// Returns the rotation from the helper in degrees as stored, `[x, y, z]`.
     #[must_use]
     pub const fn rotation(&self) -> [f32; 3] {
@@ -161,9 +201,13 @@ impl PortTransform {
 }
 
 /// Reads one `SItemPortDef`.
-pub(crate) fn read_definition(port: &StructValue<'_>) -> PortDefinition {
+pub(crate) fn read_definition(
+    port: &StructValue<'_>,
+    position: PortDefinitionPosition,
+) -> PortDefinition {
     let attachment = struct_field(port, "AttachmentImplementation");
     PortDefinition {
+        position,
         display_name: text(port, "DisplayName").to_owned(),
         flags: text(port, "Flags").to_owned(),
         min_size: unsigned(port, "MinSize"),
@@ -194,11 +238,14 @@ fn read_transform(attachment: &StructValue<'_>) -> Option<PortTransform> {
     let helper =
         struct_field(attachment, "Helper").and_then(|node| struct_field(node, "Helper"))?;
     let offset = struct_field(helper, "Offset");
+    let position = offset.and_then(|offset| struct_field(offset, "Position"));
+    let rotation = offset.and_then(|offset| struct_field(offset, "Rotation"));
     Some(PortTransform {
         attachment: attachment_kind(attachment).to_owned(),
         helper: text(helper, "Name").to_owned(),
         offset_helper: text(helper, "ItemOffsetHelperName").to_owned(),
-        position: xyz(offset.and_then(|offset| struct_field(offset, "Position"))),
-        rotation: xyz(offset.and_then(|offset| struct_field(offset, "Rotation"))),
+        position: xyz(position),
+        rotation: xyz(rotation),
+        offset_fields: [position.is_some(), rotation.is_some()],
     })
 }

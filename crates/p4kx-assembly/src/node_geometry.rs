@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_dataforge::Guid;
-
 use crate::geometry_choice::GeometryChoice;
 use crate::port::PortDefinition;
 use crate::resolver::LoadoutResolver;
@@ -22,12 +20,12 @@ impl LoadoutResolver<'_> {
             return;
         };
         let words = flag_words(node.definition.as_deref(), vehicle, &node.name, shared);
-        let Some(mut tagged) = self.tagged_geometry(child.guid, &words) else {
+        let Some(mut tagged) = self.tagged_geometry(child, &words) else {
             return;
         };
         if let Some(main) = &child.geometry {
             if tagged.material.is_none() {
-                tagged.material.clone_from(&main.material);
+                tagged.inherit_material(main);
             }
             if tagged.palette.is_none() {
                 tagged.palette.clone_from(&main.palette);
@@ -42,13 +40,13 @@ impl LoadoutResolver<'_> {
         child.fallback = child.geometry.replace(tagged);
     }
 
-    /// Returns the geometry of the [`select_variant`] of the Entity `guid` for the flag `words`
+    /// Returns the geometry of the [`select_variant`] of the Entity `node` for the flag `words`
     /// of its port.
-    fn tagged_geometry(&mut self, guid: Guid, words: &[&str]) -> Option<Geometry> {
+    fn tagged_geometry(&mut self, node: &crate::EntityNode, words: &[&str]) -> Option<Geometry> {
         if words.is_empty() {
             return None;
         }
-        let spec = self.spec(guid);
+        let spec = self.spec_of(node)?;
         let spec = spec.as_ref().as_ref().ok()?;
         select_variant(&spec.variants, words).map(|variant| variant.geometry().clone())
     }
@@ -102,12 +100,11 @@ pub(crate) fn flag_words<'a>(
     name: &str,
     shared: &'a [String],
 ) -> Vec<&'a str> {
-    let defined = definition.map(PortDefinition::flags).unwrap_or_default();
+    let defined = definition.map_or_default(PortDefinition::flags);
     let flags = if defined.trim().is_empty() {
         vehicle
             .and_then(|vehicle| vehicle.item_port(name))
-            .map(crate::VehicleItemPort::flags)
-            .unwrap_or_default()
+            .map_or_default(crate::VehicleItemPort::flags)
     } else {
         defined
     };
@@ -136,11 +133,7 @@ mod tests {
     fn variant(tags: &str, path: &str) -> GeometryVariant {
         GeometryVariant {
             tags: tags.split_whitespace().map(str::to_owned).collect(),
-            geometry: Geometry {
-                path: path.to_owned(),
-                material: None,
-                palette: None,
-            },
+            geometry: Geometry::fixture(path),
         }
     }
 

@@ -1,0 +1,401 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use crate::origin_input::MediaOriginInput;
+
+use std::io::{self, Read, Seek, SeekFrom};
+use std::path::{Path, PathBuf};
+
+use crate::origin_capture::OriginSite;
+use p4kx_extraction::chunks::{ChunkDirectory, ChunkDirectoryError};
+use p4kx_extraction::{Entry, InputScope, SourceUseRole};
+
+use crate::directory_lookup::DirectoryLookup;
+use crate::error;
+use crate::required_reader::RequiredReader;
+use crate::retained_source;
+use crate::source;
+use crate::source_selection::EntrySelection;
+use crate::{
+    EntryInput, Identity, InputOmission, InputReceipt, MediaError, MediaWriter, Source,
+    SourceContext, Subresource,
+};
+
+/// Checked access to one required input for the duration of its callback.
+pub struct RequiredInput<'input> {
+    receipt: InputReceipt,
+    reader: RequiredReader<'input>,
+}
+
+impl RequiredInput<'_> {
+    /// Returns measured input evidence without granting publication authority.
+    #[must_use]
+    pub const fn receipt(&self) -> &InputReceipt {
+        &self.receipt
+    }
+}
+
+impl RequiredInput<'_> {
+    pub(crate) fn read_payload(&mut self) -> Result<Vec<u8>, MediaError> {
+        self.reader.read_payload()
+    }
+
+    pub(crate) fn read_chunk_directory(&mut self) -> Result<ChunkDirectory, ChunkDirectoryError> {
+        self.reader.read_chunk_directory()
+    }
+
+    pub(crate) fn charge_metadata_work(&self, count: u64) -> Result<(), MediaError> {
+        self.reader.charge_metadata_work(count)
+    }
+
+    pub(crate) fn read_chunk(
+        &mut self,
+        range: std::ops::Range<u64>,
+    ) -> Result<Vec<u8>, MediaError> {
+        self.reader.read_chunk(range)
+    }
+
+    fn observe_digest_origin(&self, writer: &MediaWriter<'_>) -> Result<(), MediaError> {
+        let input = self.origin_input(writer)?;
+        let mut observation = writer.capture_origins();
+        observation.add(
+            &input,
+            InputScope::Payload,
+            OriginSite::new("media-physical-input", &[], "complete-payload"),
+            SourceUseRole::Conversion,
+            writer,
+        )
+    }
+    pub(crate) fn origin_input(
+        &self,
+        writer: &MediaWriter<'_>,
+    ) -> Result<MediaOriginInput, MediaError> {
+        writer.checkpoint()?;
+        let origin = self.receipt.origin.as_ref().ok_or_else(|| {
+            MediaError::Contract("required input lost its original evidence".into())
+        })?;
+        if !origin.owner.is_same_inventory(&writer.origins.owner) {
+            return Err(crate::origin_error::foreign());
+        }
+        Ok(origin.clone())
+    }
+}
+impl Read for RequiredInput<'_> {
+    fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+        self.reader.read(output)
+    }
+}
+
+impl Seek for RequiredInput<'_> {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        self.reader.seek(position)
+    }
+}
+
+impl SourceContext<'_> {
+    /// Uses one proved dependency and cleans private bytes before returning.
+    ///
+    /// # Errors
+    /// Returns original admission, source, I/O, callback and combined cleanup failures.
+    pub fn with_required_input<T>(
+        &self,
+        input: &EntryInput<'_>,
+        use_at: &Subresource,
+        writer: &mut MediaWriter<'_>,
+        consume: impl FnOnce(&mut RequiredInput<'_>, &mut MediaWriter<'_>) -> Result<T, MediaError>,
+    ) -> Result<T, MediaError> {
+        let entry = validate(self, input, use_at, writer)?;
+        let lookup = self.directory;
+        if lookup.selection.classify(lookup.chain, entry.path()) != EntrySelection::Excluded {
+            let (source, payload) = retain(lookup, entry, writer)?;
+            let digest = source
+                .raw
+                .as_ref()
+                .ok_or_else(|| MediaError::Contract("retained input has no raw receipt".into()))?
+                .digest
+                .clone();
+            return use_payload(
+                lookup,
+                entry,
+                &payload,
+                InputReceipt {
+                    source,
+                    digest,
+                    omission: None,
+                    use_at: use_at.clone(),
+                    origin: None,
+                },
+                writer,
+                consume,
+            );
+        }
+        if !lookup
+            .selection
+            .exclude
+            .is_part_of_kept_texture(self.entry.path(), entry.path())
+        {
+            return Err(MediaError::Contract(
+                "excluded input is not a required part of the selected texture".into(),
+            ));
+        }
+        with_private_input(lookup, entry, use_at, writer, consume)
+    }
+}
+
+/// Reads a proved selected reference target without publishing another source callback.
+pub(crate) fn with_reference_input<T>(
+    lookup: &DirectoryLookup<'_>,
+    entry: &Entry,
+    use_at: &Subresource,
+    writer: &mut MediaWriter<'_>,
+    consume: impl FnOnce(&mut RequiredInput<'_>, &mut MediaWriter<'_>) -> Result<T, MediaError>,
+) -> Result<T, MediaError> {
+    writer.require_output_callback()?;
+    if use_at.namespace.is_empty()
+        || writer.reference_root()? != lookup.root
+        || lookup.index.archive.entry_origin(entry).is_none()
+    {
+        return Err(MediaError::Contract(
+            "reference input is outside its active observed source scope".into(),
+        ));
+    }
+    if lookup.selection.classify(lookup.chain, entry.path()) != EntrySelection::Included {
+        return Err(MediaError::Contract(
+            "reference lookup cannot read an unselected target".into(),
+        ));
+    }
+    let declared = source::entry(lookup.root, lookup.index.archive, entry, lookup.chain)?;
+    let result = (|| {
+        lookup
+            .input_state()?
+            .budget
+            .bytes(entry.uncompressed_size(), writer.limits())?;
+        retained_source::with_private(
+            lookup.index.archive,
+            entry,
+            writer,
+            |digest, payload, writer| {
+                let mut verified = declared.clone();
+                source::verified(&mut verified, entry);
+                use_payload(
+                    lookup,
+                    entry,
+                    payload,
+                    InputReceipt {
+                        source: verified,
+                        digest,
+                        omission: Some(InputOmission::ReferenceLookup),
+                        use_at: use_at.clone(),
+                        origin: None,
+                    },
+                    writer,
+                    consume,
+                )
+            },
+        )
+    })();
+    result.map_err(|cause| error::at(&declared, cause))
+}
+
+pub(crate) fn with_retained_reference_input<T>(
+    lookup: &DirectoryLookup<'_>,
+    entry: &Entry,
+    use_at: &Subresource,
+    writer: &mut MediaWriter<'_>,
+    consume: impl FnOnce(&mut RequiredInput<'_>, &mut MediaWriter<'_>) -> Result<T, MediaError>,
+) -> Result<Option<T>, MediaError> {
+    writer.require_output_callback()?;
+    writer.require_source(&lookup.owning_source(0))?;
+    if use_at.namespace.is_empty()
+        || lookup.index.archive.entry_origin(entry).is_none()
+        || lookup.selection.classify(lookup.chain, entry.path()) != EntrySelection::Included
+    {
+        return Err(MediaError::Contract(
+            "retained reference input is outside its selected Archive scope".into(),
+        ));
+    }
+    let mut source = source::entry(lookup.root, lookup.index.archive, entry, lookup.chain)?;
+    let state = lookup.input_state()?;
+    let Some(raw) = state.begin_retained(entry.index(), writer)? else {
+        return Ok(None);
+    };
+    let payload = writer.root.join(&raw.path);
+    let digest = raw.digest.clone();
+    source::retained(&mut source, entry, raw);
+    let receipt = InputReceipt {
+        source,
+        digest,
+        omission: None,
+        use_at: use_at.clone(),
+        origin: None,
+    };
+    let result = use_payload(lookup, entry, &payload, receipt, writer, consume);
+    error::finish(result.map(Some), state.end(entry.index(), None))
+}
+
+fn with_private_input<T>(
+    lookup: &DirectoryLookup<'_>,
+    entry: &Entry,
+    use_at: &Subresource,
+    writer: &mut MediaWriter<'_>,
+    consume: impl FnOnce(&mut RequiredInput<'_>, &mut MediaWriter<'_>) -> Result<T, MediaError>,
+) -> Result<T, MediaError> {
+    let state = lookup.input_state()?;
+    let declared = source::entry(lookup.root, lookup.index.archive, entry, lookup.chain)?;
+    state.begin(entry.index(), writer)?;
+    let result = (|| {
+        state
+            .budget
+            .bytes(entry.uncompressed_size(), writer.limits())?;
+        retained_source::with_private(
+            lookup.index.archive,
+            entry,
+            writer,
+            |digest, payload, writer| {
+                let mut source = declared.clone();
+                source::verified(&mut source, entry);
+                use_payload(
+                    lookup,
+                    entry,
+                    payload,
+                    InputReceipt {
+                        source,
+                        digest,
+                        omission: Some(InputOmission::ExplicitExclusion),
+                        use_at: use_at.clone(),
+                        origin: None,
+                    },
+                    writer,
+                    consume,
+                )
+            },
+        )
+    })();
+    error::finish(result, state.end(entry.index(), None))
+        .map_err(|cause| error::at(&declared, cause))
+}
+
+pub(crate) fn retain(
+    lookup: &DirectoryLookup<'_>,
+    entry: &Entry,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(Source, PathBuf), MediaError> {
+    let state = lookup.input_state()?;
+    let declared = source::entry(lookup.root, lookup.index.archive, entry, lookup.chain)?;
+    let cached = state.begin(entry.index(), writer)?;
+    let first = cached.is_none();
+    let retained = match cached {
+        Some(raw) => {
+            let payload = writer.root.join(&raw.path);
+            Ok((raw, payload))
+        }
+        None => state
+            .budget
+            .bytes(entry.uncompressed_size(), writer.limits())
+            .and_then(|()| retained_source::retain(lookup.index.archive, entry, writer)),
+    };
+    let result = match retained {
+        Err(cause) => Err(error::at(&declared, cause)),
+        Ok((raw, payload)) => {
+            let mut source = declared;
+            source::retained(&mut source, entry, raw);
+            let publication = if first {
+                let origin = writer.origins.input(lookup.index.archive, entry)?;
+                writer.retained_with_input(&source, &origin)
+            } else {
+                Ok(())
+            };
+            match publication {
+                Ok(()) => Ok((source, payload)),
+                Err(cause) => Err(error::at(&source, cause)),
+            }
+        }
+    };
+    let raw = if first {
+        result
+            .as_ref()
+            .ok()
+            .and_then(|(source, _)| source.raw.clone())
+    } else {
+        None
+    };
+    error::finish(result, state.end(entry.index(), raw))
+}
+
+fn use_payload<T>(
+    lookup: &DirectoryLookup<'_>,
+    entry: &Entry,
+    payload: &Path,
+    mut receipt: InputReceipt,
+    writer: &mut MediaWriter<'_>,
+    consume: impl FnOnce(&mut RequiredInput<'_>, &mut MediaWriter<'_>) -> Result<T, MediaError>,
+) -> Result<T, MediaError> {
+    let reader = RequiredReader::open(
+        payload,
+        entry.path(),
+        receipt.source.size,
+        lookup.input_state()?.budget,
+        writer.checkpoint,
+        writer.limits(),
+    )
+    .map_err(|cause| error::at(&receipt.source, cause))?;
+    let origin = writer.origins.input(lookup.index.archive, entry)?;
+    receipt.origin = Some(origin);
+    let mut input = RequiredInput { receipt, reader };
+    input.observe_digest_origin(writer)?;
+    let result = consume(&mut input, writer)
+        .map_err(|cause| error::at(&input.receipt.source, error::input(cause)));
+    drop(input);
+    result
+}
+
+fn validate<'context>(
+    context: &'context SourceContext<'_>,
+    input: &EntryInput<'_>,
+    use_at: &Subresource,
+    writer: &MediaWriter<'_>,
+) -> Result<&'context Entry, MediaError> {
+    writer.require_source(context.source)?;
+    let lookup = context.directory;
+    let owner_matches = matches!(
+        &context.source.identity,
+        Identity::Entry { containers, entry }
+            if containers == lookup.chain && entry.entry_index == context.entry.index()
+    );
+    if use_at.namespace.is_empty()
+        || !owner_matches
+        || &context.source.root != lookup.root
+        || input.root != lookup.root
+        || input.chain != lookup.chain
+        || lookup
+            .selection
+            .classify(lookup.chain, context.entry.path())
+            != EntrySelection::Included
+    {
+        return Err(MediaError::Contract(
+            "required input is outside its active source scope".into(),
+        ));
+    }
+    let entry = lookup
+        .index
+        .archive
+        .entries()
+        .get(input.position)
+        .filter(|entry| entry.index() == input.position)
+        .ok_or_else(|| MediaError::Contract("required input has no physical Entry".into()))?;
+    if lookup.index.archive.raw_path(entry.index()).is_some() {
+        return Err(MediaError::Contract(
+            "required input has an unproved raw path".into(),
+        ));
+    }
+    writer.checkpoint()?;
+    Ok(entry)
+}
+
+#[cfg(test)]
+#[path = "required_input_fault_tests.rs"]
+mod fault_tests;
+
+#[cfg(test)]
+#[path = "required_token_fault_tests.rs"]
+mod token_fault_tests;

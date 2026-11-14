@@ -216,9 +216,7 @@ where
         for level in 0..parts {
             let index = parts - level;
             let size = dds.surface_size(level).ok_or_else(unsupported)?;
-            let offset = size
-                .checked_mul(u64::from(surface))
-                .ok_or_else(unsupported)?;
+            let offset = size.checked_mul(surface).ok_or_else(unsupported)?;
             let read_error = |source| TextureError::ReadPart { index, source };
             let mut reader = siblings.open_part(index).map_err(read_error)?;
             let skipped =

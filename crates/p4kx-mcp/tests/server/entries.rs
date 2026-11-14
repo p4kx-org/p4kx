@@ -6,16 +6,25 @@ use serde_json::{Value, json};
 
 use crate::support::{Install, Server, TestResult};
 
+fn metadata(owner: usize, method: u16) -> Value {
+    json!({
+        "owner_entry_index": owner, "original_directory_ordinal": owner.to_string(),
+        "dos_timestamp": {"raw_date": 0, "raw_time": 0, "calendar": {"state": "invalid"}},
+        "record_format": "zip_central_directory", "raw_compression_method": method,
+        "zip_header": {"raw_version_made_by": 45, "raw_version_needed": 45,
+            "general_purpose_flags": 0, "disk_start": 65535,
+            "internal_attributes": 0, "external_attributes": 0},
+        "raw_v2_encryption_word": null
+    })
+}
+
 fn paths(items: &Value) -> Vec<String> {
-    items
-        .as_array()
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item["path"].as_str().map(str::to_owned))
-                .collect()
-        })
-        .unwrap_or_default()
+    items.as_array().map_or_default(|items| {
+        items
+            .iter()
+            .filter_map(|item| item["path"].as_str().map(str::to_owned))
+            .collect()
+    })
 }
 
 fn collect_pages(
@@ -40,7 +49,7 @@ fn collect_pages(
 fn the_top_level_lists_folders_then_entries() -> TestResult {
     let install = Install::standard()?;
     let mut server = install.serve(&["--archive", "LIVE"])?;
-    let top = server.ok("list_entries", &json!({}))?;
+    let top = directory_payload(server.ok("list_entries", &json!({}))?)?;
     assert_eq!(
         top,
         json!({
@@ -55,7 +64,8 @@ fn the_top_level_lists_folders_then_entries() -> TestResult {
                     "compression": top["items"][1]["compression"],
                     "encrypted": false,
                     "compressed_size": 5,
-                    "size": 5
+                    "size": 5,
+                    "metadata": metadata(5, 0)
                 }
             ]
         }),
@@ -167,7 +177,8 @@ fn the_page_size_is_capped_at_one_thousand() -> TestResult {
 fn search_follows_the_filter_rules() -> TestResult {
     let install = Install::standard()?;
     let mut server = install.serve(&["--archive", "LIVE"])?;
-    let glob = server.ok("search_entries", &json!({ "filter": r"data\libs\*.XML" }))?;
+    let glob =
+        directory_payload(server.ok("search_entries", &json!({ "filter": r"data\libs\*.XML" }))?)?;
     assert_eq!(
         glob,
         json!({
@@ -180,14 +191,16 @@ fn search_follows_the_filter_rules() -> TestResult {
                     "compression": glob["entries"][0]["compression"],
                     "encrypted": false,
                     "compressed_size": 4,
-                    "size": 4
+                    "size": 4,
+                    "metadata": metadata(0, 0)
                 },
                 {
                     "path": "Data/Libs/Config/b.xml",
                     "compression": glob["entries"][1]["compression"],
                     "encrypted": false,
                     "compressed_size": glob["entries"][1]["compressed_size"],
-                    "size": 80
+                    "size": 80,
+                    "metadata": metadata(1, 8)
                 }
             ]
         }),
@@ -201,7 +214,7 @@ fn search_follows_the_filter_rules() -> TestResult {
     );
     let glob_whole = server.ok("search_entries", &json!({ "filter": "*.xm?" }))?;
     assert_eq!(glob_whole["total"], 2, "? matches one character");
-    let nothing = server.ok("search_entries", &json!({ "filter": "nothing" }))?;
+    let nothing = directory_payload(server.ok("search_entries", &json!({ "filter": "nothing" }))?)?;
     assert_eq!(
         nothing,
         json!({
@@ -213,6 +226,17 @@ fn search_follows_the_filter_rules() -> TestResult {
         "no match is no error"
     );
     Ok(())
+}
+
+fn directory_payload(mut reply: Value) -> TestResult<Value> {
+    let object = reply.as_object_mut().ok_or("structured directory result")?;
+    for name in ["fieldOrigins", "provenance"] {
+        assert!(
+            object.remove(name).is_some_and(|value| value.is_object()),
+            "{name}"
+        );
+    }
+    Ok(reply)
 }
 
 #[test]

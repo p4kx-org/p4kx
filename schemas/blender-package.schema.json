@@ -40,6 +40,274 @@
         }
       ]
     },
+    "Anchor": {
+      "oneOf": [
+        {
+          "properties": {
+            "status": {
+              "const": "undeclared",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "port": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Port"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reason": {
+              "type": "string"
+            },
+            "status": {
+              "const": "unresolved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "effective_group": {
+              "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+            },
+            "owner_from_container": {
+              "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+            },
+            "port": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Port"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "status": {
+              "const": "anchored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "effective_group",
+            "owner_from_container"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ArchiveDirectorySource": {
+      "description": "Admitted Entry positions from the original root Archive directory.",
+      "properties": {
+        "admittedEntryCount": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "admittedEntryCount"
+      ],
+      "type": "object"
+    },
+    "ArchiveEntryProof": {
+      "description": "Minimal original Entry proof when optional stored details were not retained.",
+      "properties": {
+        "details": {
+          "$ref": "#/$defs/SourceDetails",
+          "const": "captureLimited"
+        },
+        "entryIndex": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "details",
+        "entryIndex"
+      ],
+      "type": "object"
+    },
+    "ArchiveEntrySource": {
+      "description": "Physical Archive Entry facts, retaining all stored declaration occurrences.",
+      "properties": {
+        "declarations": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfSourceEncryptionDeclaration"
+        },
+        "entryIndex": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordFormat": {
+          "$ref": "#/$defs/SourceRecordFormat"
+        },
+        "recordRange": {
+          "description": "Exact half-open extent in immediately owning source coordinates.",
+          "properties": {
+            "length": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Number of bytes, including an explicitly empty extent."
+            },
+            "offset": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Original start measured from this Archive source, not the backing root file."
+            }
+          },
+          "required": [
+            "offset",
+            "length"
+          ],
+          "type": "object"
+        },
+        "zipFlags": {
+          "$ref": "#/$defs/SourcedValueOfuint16"
+        }
+      },
+      "required": [
+        "declarations",
+        "entryIndex",
+        "path",
+        "recordFormat",
+        "recordRange",
+        "zipFlags"
+      ],
+      "type": "object"
+    },
+    "ArchiveFileSource": {
+      "description": "Measured whole-Archive file facts independently of its stored Entry declarations.",
+      "properties": {
+        "byteLength": {
+          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+        }
+      },
+      "required": [
+        "byteLength"
+      ],
+      "type": "object"
+    },
+    "AuthoredEmission": {
+      "description": "A typed source token with explicit invalid and nonfinite states.",
+      "oneOf": [
+        {
+          "description": "The field is an authored text.",
+          "properties": {
+            "kind": {
+              "const": "text",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One numeric source value.",
+          "properties": {
+            "kind": {
+              "const": "scalar",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/EmissionSample"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Three authored channels without reinterpretation.",
+          "properties": {
+            "kind": {
+              "const": "colour",
+              "type": "string"
+            },
+            "value": {
+              "items": {
+                "$ref": "#/$defs/EmissionSample"
+              },
+              "maxItems": 3,
+              "minItems": 3,
+              "type": "array"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Original material flags retained without numeric truncation.",
+          "properties": {
+            "kind": {
+              "const": "flags",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/DecimalU64"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Invalid grammar for the original field.",
+          "properties": {
+            "kind": {
+              "const": "invalid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AuthoredMaterialOrigin": {
+      "additionalProperties": false,
+      "description": "Source-local evidence for the retained authored library fields.",
+      "properties": {
+        "field_origins": {
+          "$ref": "#/$defs/FieldOrigins",
+          "description": "Origins addressed by JSON Pointers relative to the enclosing material-library row."
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory",
+          "description": "Physical inputs and observed source uses of the authored library values."
+        }
+      },
+      "required": [
+        "field_origins",
+        "provenance"
+      ],
+      "type": "object"
+    },
     "Basis": {
       "description": "The axes of every transform and of the GLB meshes.",
       "oneOf": [
@@ -49,6 +317,40 @@
           "type": "string"
         }
       ]
+    },
+    "Binding": {
+      "additionalProperties": false,
+      "properties": {
+        "inheritedFrom": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "node": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selection": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node",
+        "payload",
+        "selection"
+      ],
+      "type": "object"
     },
     "BuildInfo": {
       "description": "The Build of the Archive a package was made from, as its build manifest states it.",
@@ -85,6 +387,23 @@
       ],
       "type": "object"
     },
+    "CandidateNode": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "node": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node",
+        "name"
+      ],
+      "type": "object"
+    },
     "CharacterSource": {
       "description": "What a Character was made from.",
       "properties": {
@@ -117,6 +436,29 @@
       ],
       "type": "object"
     },
+    "CollisionHelperReference": {
+      "description": "Reference to a versioned collision-helper companion in a package.",
+      "properties": {
+        "file": {
+          "const": "collision-helpers.json",
+          "description": "The package-relative file carrying the source facts and helper placements.",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "description": "The collision-helper document's schema version.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "file",
+        "schema_version"
+      ],
+      "type": "object"
+    },
     "ColourSpace": {
       "description": "How the colour channels of a texture are encoded.",
       "oneOf": [
@@ -131,6 +473,29 @@
           "type": "string"
         }
       ]
+    },
+    "Component": {
+      "properties": {
+        "authored": true,
+        "field_origins": {
+          "$ref": "#/$defs/FieldOrigins"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ordinal",
+        "source_type",
+        "authored",
+        "field_origins"
+      ],
+      "type": "object"
     },
     "Coordinates": {
       "description": "The coordinate system of a package.",
@@ -147,6 +512,1171 @@
       "required": [
         "basis",
         "unit"
+      ],
+      "type": "object"
+    },
+    "DdnaNormalAxis": {
+      "description": "Normal map convention stored by the DDS primary image.",
+      "oneOf": [
+        {
+          "const": "cryengine_y_down",
+          "description": "Original CryEngine green channel, inverted by the importer.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdnaSelection": {
+      "description": "Reason for the common DDNA level.",
+      "oneOf": [
+        {
+          "const": "requested",
+          "description": "Both input files contain the requested mip.",
+          "type": "string"
+        },
+        {
+          "const": "primary_chain",
+          "description": "The normal DDS bounds the selected mip.",
+          "type": "string"
+        },
+        {
+          "const": "smoothness_chain",
+          "description": "The smoothness DDS bounds the selected mip.",
+          "type": "string"
+        },
+        {
+          "const": "both_chains",
+          "description": "Both input chains stop at the selected mip.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdnaSmoothnessChannel": {
+      "description": "Channel that the separate texture stores.",
+      "oneOf": [
+        {
+          "const": "red",
+          "description": "Red samples of the positive-unsigned BC4 block.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdnaTexturePair": {
+      "additionalProperties": false,
+      "description": "Consumer pairing and provenance for a split normal and smoothness DDS.",
+      "properties": {
+        "channel": {
+          "$ref": "#/$defs/DdnaSmoothnessChannel",
+          "description": "Stored sample that drives smoothness."
+        },
+        "normal_axis": {
+          "$ref": "#/$defs/DdnaNormalAxis",
+          "description": "Convention of the normal samples stored in the primary DDS."
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory",
+          "description": "Original entries referenced by the pairing."
+        },
+        "requested_mip": {
+          "description": "Level requested by the package caller.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selected_mip": {
+          "description": "Common original level retained in the two files.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selection": {
+          "$ref": "#/$defs/DdnaSelection",
+          "description": "Which input determined the common level."
+        },
+        "smoothness": {
+          "description": "Texture ID of the independently written linear smoothness DDS.",
+          "pattern": "^t[0-9]{4,}$",
+          "type": "string"
+        },
+        "source_origin": {
+          "$ref": "#/$defs/FieldOrigin",
+          "description": "Source inputs contributing to the common mip and associated assets."
+        }
+      },
+      "required": [
+        "smoothness",
+        "normal_axis",
+        "channel",
+        "requested_mip",
+        "selected_mip",
+        "selection",
+        "source_origin",
+        "provenance"
+      ],
+      "type": "object"
+    },
+    "DdsAlphaAssociation": {
+      "description": "Association of the stored colour channels with alpha declared by the DDS header.",
+      "oneOf": [
+        {
+          "const": "unknown",
+          "description": "The header does not declare an association.",
+          "type": "string"
+        },
+        {
+          "const": "straight",
+          "description": "RGB is independent of the alpha channel.",
+          "type": "string"
+        },
+        {
+          "const": "premultiplied",
+          "description": "RGB has been multiplied by alpha.",
+          "type": "string"
+        },
+        {
+          "const": "opaque",
+          "description": "The consumer should treat the texture as opaque.",
+          "type": "string"
+        },
+        {
+          "const": "custom",
+          "description": "The fourth channel is authored as data.",
+          "type": "string"
+        },
+        {
+          "const": "reserved",
+          "description": "The alpha-mode bits contain an undefined value.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdsAlphaCoverage": {
+      "additionalProperties": false,
+      "description": "Exact alpha-value counts for one selected BC1, BC2 or BC3 image.",
+      "properties": {
+        "full": {
+          "description": "In-bounds texels whose decoded alpha is full scale.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "partial": {
+          "description": "In-bounds texels whose decoded alpha is greater than zero and below full scale.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "zero": {
+          "description": "In-bounds texels whose decoded alpha is zero.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "zero",
+        "partial",
+        "full"
+      ],
+      "type": "object"
+    },
+    "DdsAlphaTransform": {
+      "description": "Alpha-associated colour processing for an output image.",
+      "oneOf": [
+        {
+          "const": "preserve",
+          "description": "Retain the decoded colour and alpha samples.",
+          "type": "string"
+        },
+        {
+          "const": "unassociate_linear",
+          "description": "Divide linear-light colour by alpha and retain the established transfer.",
+          "type": "string"
+        },
+        {
+          "const": "unassociate_stored",
+          "description": "Divide the stored sample values by alpha when the source transfer is unknown.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdsBlockLayoutInfo": {
+      "description": "Encoded byte layout known to the current reader, independent of codec availability.",
+      "properties": {
+        "block_height": {
+          "description": "Block height in pixels.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "block_width": {
+          "description": "Block width in pixels.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "bytes_per_block": {
+          "description": "Encoded bytes per block.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "block_width",
+        "block_height",
+        "bytes_per_block"
+      ],
+      "type": "object"
+    },
+    "DdsDx10Info": {
+      "description": "The five authored DX10 extension words.",
+      "properties": {
+        "array_size": {
+          "description": "Authored array size before defaults.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dxgi_format": {
+          "description": "Unmodified DXGI format number.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "misc_flag": {
+          "description": "Unmodified miscellaneous flag word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "misc_flags2": {
+          "description": "Unmodified additional miscellaneous flags.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "resource_dimension": {
+          "description": "Unmodified resource-dimension number.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "dxgi_format",
+        "resource_dimension",
+        "misc_flag",
+        "array_size",
+        "misc_flags2"
+      ],
+      "type": "object"
+    },
+    "DdsLegacyInfo": {
+      "description": "The complete authored legacy DDS words.",
+      "properties": {
+        "caps": {
+          "description": "Unmodified surface capability word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "caps2": {
+          "description": "Unmodified additional capability word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "caps3": {
+          "description": "Uninterpreted capability word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "caps4": {
+          "description": "Uninterpreted capability word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "depth": {
+          "description": "Authored depth before defaults.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "flags": {
+          "description": "Unmodified validity flags.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "height": {
+          "description": "Authored pixel height.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mip_map_count": {
+          "description": "Authored mip count before defaults.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pitch_or_linear_size": {
+          "description": "Authored pitch or linear-size word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "pixel_format": {
+          "$ref": "#/$defs/DdsPixelFormatInfo",
+          "description": "Complete authored pixel-format words."
+        },
+        "reserved1": {
+          "description": "Uninterpreted reserved words in source order.",
+          "items": {
+            "format": "uint32",
+            "maximum": 4294967295,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 11,
+          "minItems": 11,
+          "type": "array"
+        },
+        "reserved2": {
+          "description": "Uninterpreted final reserved word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "size": {
+          "description": "Header structure size word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "width": {
+          "description": "Authored pixel width.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "size",
+        "flags",
+        "height",
+        "width",
+        "pitch_or_linear_size",
+        "depth",
+        "mip_map_count",
+        "reserved1",
+        "pixel_format",
+        "caps",
+        "caps2",
+        "caps3",
+        "caps4",
+        "reserved2"
+      ],
+      "type": "object"
+    },
+    "DdsNormalizedInfo": {
+      "description": "Topology after applying the existing reader's defaults and validation.",
+      "properties": {
+        "array_size": {
+          "description": "Normalized array size.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "block_layout": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsBlockLayoutInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Existing encoded block layout; null does not prove a corrupt source."
+        },
+        "cubemap": {
+          "description": "Existing reader cubemap predicate; raw legacy face bits remain in caps2.",
+          "type": "boolean"
+        },
+        "depth": {
+          "description": "Normalized largest-mip depth.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "faces": {
+          "description": "Reader-normalized face count per array element.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "format": {
+          "description": "Existing reader format label; raw format declarations remain separate.",
+          "type": "string"
+        },
+        "height": {
+          "description": "Normalized largest-mip height.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "mip_count": {
+          "description": "Normalized mip count.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reader_high_range": {
+          "description": "Whether the existing reader classifies this format as preserving high-range pixels.",
+          "type": "boolean"
+        },
+        "width": {
+          "description": "Normalized largest-mip width.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "array_size",
+        "block_layout",
+        "cubemap",
+        "depth",
+        "faces",
+        "format",
+        "height",
+        "mip_count",
+        "reader_high_range",
+        "width"
+      ],
+      "type": "object"
+    },
+    "DdsPixelFormatInfo": {
+      "description": "The eight authored legacy pixel-format words.",
+      "properties": {
+        "a_bit_mask": {
+          "description": "Authored alpha mask.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "b_bit_mask": {
+          "description": "Authored blue mask.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "flags": {
+          "description": "Unmodified pixel-format flags.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "four_cc": {
+          "description": "Exact original bytes without a text or numeric-format guess.",
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "maxItems": 4,
+          "minItems": 4,
+          "type": "array"
+        },
+        "g_bit_mask": {
+          "description": "Authored green mask.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "r_bit_mask": {
+          "description": "Authored red mask.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rgb_bit_count": {
+          "description": "Authored bit-count word.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "size": {
+          "description": "Authored pixel-format structure size.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "size",
+        "flags",
+        "four_cc",
+        "rgb_bit_count",
+        "r_bit_mask",
+        "g_bit_mask",
+        "b_bit_mask",
+        "a_bit_mask"
+      ],
+      "type": "object"
+    },
+    "DdsPngTransform": {
+      "description": "Channel or transfer processing of a standalone DDS PNG.",
+      "oneOf": [
+        {
+          "const": "preserve_colour_transfer",
+          "description": "Decoded colour samples retain their source transfer.",
+          "type": "string"
+        },
+        {
+          "const": "reinhard_srgb",
+          "description": "Float RGB is Reinhard tone-mapped and encoded as sRGB.",
+          "type": "string"
+        },
+        {
+          "const": "reconstructed_normal",
+          "description": "BC5 reconstructs the normal's Z component.",
+          "type": "string"
+        },
+        {
+          "const": "data_channels",
+          "description": "Alpha or integer data is represented without an RGB transfer declaration.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdsRawHeaderInfo": {
+      "description": "Authored source header, including an explicitly absent DX10 extension.",
+      "properties": {
+        "dx10": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsDx10Info"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "All five extension words, or null when no DX10 extension was declared."
+        },
+        "header_length": {
+          "description": "Actual known-profile header length, including optional magic and DX10 extension.",
+          "format": "uint",
+          "maximum": 148,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "legacy": {
+          "$ref": "#/$defs/DdsLegacyInfo",
+          "description": "All thirty-one authored legacy words."
+        },
+        "magic_present": {
+          "description": "Whether the four DDS magic bytes preceded the header.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "dx10",
+        "header_length",
+        "legacy",
+        "magic_present"
+      ],
+      "type": "object"
+    },
+    "DdsSourceInfo": {
+      "description": "Complete authored header words and separate reader-normalized topology.",
+      "properties": {
+        "alpha_association": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsAlphaAssociation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Alpha association declared by the original header."
+        },
+        "header_source_bytes": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Header Entry declared decoded length or disk file length, excluding separate siblings."
+        },
+        "normalized": {
+          "$ref": "#/$defs/DdsNormalizedInfo",
+          "description": "Reader-derived topology and layout, without an image-decoding claim."
+        },
+        "raw": {
+          "$ref": "#/$defs/DdsRawHeaderInfo",
+          "description": "Every declared source header word without defaults."
+        },
+        "schema_version": {
+          "const": 1,
+          "description": "Metadata contract version, independent of any game or DDS version.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "transfer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTransferEvidence"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original transfer declarations and their agreement, absent in older reports."
+        }
+      },
+      "required": [
+        "schema_version",
+        "header_source_bytes",
+        "raw",
+        "normalized"
+      ],
+      "type": "object"
+    },
+    "DdsTextureAsset": {
+      "additionalProperties": false,
+      "description": "A normalized one-surface DDS asset and its original selected mip evidence.",
+      "properties": {
+        "alpha_coverage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsAlphaCoverage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Measured alpha samples of the original selected BC1, BC2 or BC3 image."
+        },
+        "artifact": {
+          "$ref": "#/$defs/OriginArtifactDigest",
+          "description": "Byte length and SHA-256 of the DDS file, including its normalized header."
+        },
+        "copied_payload": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/OriginArtifactDigest"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Byte length and SHA-256 of only the copied selected payload."
+        },
+        "dds": {
+          "$ref": "#/$defs/DdsSourceInfo",
+          "description": "Raw and reader-normalized original header."
+        },
+        "field_origins": {
+          "$ref": "#/$defs/FieldOrigins",
+          "description": "Source origins relative to this object; /artifact includes the actual copied bytes."
+        },
+        "header_checksum": {
+          "$ref": "#/$defs/DdsTextureSourceChecksum",
+          "description": "Original archive checksum of the header Entry."
+        },
+        "mip_level": {
+          "description": "Original zero-based mip copied into this two-dimensional asset.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "normalized_header_bytes": {
+          "description": "Number of derived header bytes before the copied DDS payload.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "part_checksum": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTextureSourceChecksum"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original archive checksum of the split mip Entry when separate."
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory",
+          "description": "Read and directory inputs referenced by the immediate origins."
+        }
+      },
+      "required": [
+        "artifact",
+        "dds",
+        "mip_level",
+        "header_checksum",
+        "field_origins",
+        "provenance"
+      ],
+      "type": "object"
+    },
+    "DdsTextureFallback": {
+      "description": "Why a requested DDS asset could not be used.",
+      "oneOf": [
+        {
+          "const": "unavailable_source",
+          "description": "The package caller does not provide a physical DDS source.",
+          "type": "string"
+        },
+        {
+          "const": "missing_member",
+          "description": "The required physical member does not exist.",
+          "type": "string"
+        },
+        {
+          "const": "ambiguous_member",
+          "description": "More than one physical member has the required path.",
+          "type": "string"
+        },
+        {
+          "const": "unproved_member",
+          "description": "The original path could not be established.",
+          "type": "string"
+        },
+        {
+          "const": "split_alpha",
+          "description": "The output requires combining colour with a separate alpha or smoothness member.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported_topology",
+          "description": "The consumer material slot requires one two-dimensional surface.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported_format",
+          "description": "The consumer has no verified sample-compatible decoder for this encoding and role.",
+          "type": "string"
+        },
+        {
+          "const": "signed_bc5",
+          "description": "Blender does not decode the signed BC5 format.",
+          "type": "string"
+        },
+        {
+          "const": "premultiplied_alpha",
+          "description": "The consumer would interpret associated RGB as straight opacity.",
+          "type": "string"
+        },
+        {
+          "const": "reserved_alpha_mode",
+          "description": "The header has undefined alpha-mode bits.",
+          "type": "string"
+        },
+        {
+          "const": "normal_coordinate_transform",
+          "description": "The material role requires a flipped normal Y channel.",
+          "type": "string"
+        },
+        {
+          "const": "invalid_input",
+          "description": "An input could not be read, parsed or verified completely.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdsTextureSourceChecksum": {
+      "description": "The archive directory's checksum of a completely verified original input.",
+      "oneOf": [
+        {
+          "description": "CRC-32 of decoded Entry bytes.",
+          "properties": {
+            "hex": {
+              "pattern": "^[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "kind": {
+              "const": "crc32",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "hex"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "CRC-32C of decoded Entry bytes.",
+          "properties": {
+            "hex": {
+              "pattern": "^[0-9a-f]{8}$",
+              "type": "string"
+            },
+            "kind": {
+              "const": "crc32c",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "hex"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "SHA-256 of stored Entry bytes.",
+          "properties": {
+            "hex": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "kind": {
+              "const": "sha256",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "hex"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "DdsTransfer": {
+      "description": "Transfer function declared for DDS colour samples.",
+      "oneOf": [
+        {
+          "const": "linear",
+          "description": "A linear transfer function.",
+          "type": "string"
+        },
+        {
+          "const": "srgb",
+          "description": "The sRGB transfer function.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "The source does not establish a transfer function.",
+          "type": "string"
+        }
+      ]
+    },
+    "DdsTransferEvidence": {
+      "additionalProperties": false,
+      "description": "Independent transfer declarations and their agreement in one authored DDS header.",
+      "properties": {
+        "conflict": {
+          "description": "Two recognised declarations disagree.",
+          "type": "boolean"
+        },
+        "cry": {
+          "$ref": "#/$defs/DdsTransfer",
+          "description": "Transfer indicated by the sRGB-read bit when the marker is valid."
+        },
+        "cry_image_flags": {
+          "description": "The original image flags word, including unrecognised bits.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "cry_marker": {
+          "description": "The original Cry marker word, including unrecognised values.",
+          "format": "uint32",
+          "maximum": 4294967295,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "dxgi": {
+          "$ref": "#/$defs/DdsTransfer",
+          "description": "Transfer declared by the original typed DXGI format, when known."
+        },
+        "effective": {
+          "$ref": "#/$defs/DdsTransfer",
+          "description": "The transfer established by the compatible declarations."
+        }
+      },
+      "required": [
+        "dxgi",
+        "cry_marker",
+        "cry_image_flags",
+        "cry",
+        "effective",
+        "conflict"
+      ],
+      "type": "object"
+    },
+    "DecimalU64": {
+      "description": "Canonical unsigned 64-bit decimal text, from 0 through 18446744073709551615.",
+      "maxLength": 20,
+      "not": {
+        "pattern": "[^0-9]"
+      },
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|1844674407370955[0-0][0-9]{3}|18446744073709551[0-5][0-9]{2}|184467440737095516[0-0][0-9]{1}|1844674407370955161[0-4][0-9]{0}|18446744073709551615)$",
+      "type": "string"
+    },
+    "Declaration": {
+      "properties": {
+        "components": {
+          "items": {
+            "$ref": "#/$defs/Component"
+          },
+          "type": "array"
+        },
+        "guid": {
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory"
+        },
+        "record_index": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "record_index",
+        "guid",
+        "components",
+        "provenance"
+      ],
+      "type": "object"
+    },
+    "DefaultMaterialContainer": {
+      "description": "Original directory coordinate of a containing Archive Entry.",
+      "properties": {
+        "entry_index": {
+          "description": "Original directory ordinal in the immediate owner.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "entry_path": {
+          "description": "Original stored Entry path.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "entry_index",
+        "entry_path"
+      ],
+      "type": "object"
+    },
+    "DefaultMaterialReceipt": {
+      "description": "Physical fallback lookup and its original Archive source evidence.",
+      "properties": {
+        "ambiguous_sources": {
+          "description": "Two original witnesses when more than one Entry matched.",
+          "items": {
+            "$ref": "#/$defs/DefaultMaterialSource"
+          },
+          "type": "array"
+        },
+        "decoded_sha256": {
+          "description": "SHA-256 of the verified decoded source when its payload could be read.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DefaultMaterialSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original Entry when the lookup found one unique candidate."
+        },
+        "state": {
+          "$ref": "#/$defs/DefaultMaterialState",
+          "description": "Outcome of the physical source lookup."
+        }
+      },
+      "required": [
+        "state",
+        "ambiguous_sources"
+      ],
+      "type": "object"
+    },
+    "DefaultMaterialSource": {
+      "description": "Original material Entry and its containing Archive Entries.",
+      "properties": {
+        "containers": {
+          "description": "Container Entry coordinates, outermost first, with unknown coordinates explicit.",
+          "items": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/DefaultMaterialContainer"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "type": "array"
+        },
+        "contains_encrypted_source": {
+          "description": "Effective encryption evidence across the original Entry and its known containers.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "entry_index": {
+          "description": "Original directory ordinal in the immediate owner.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "entry_path": {
+          "description": "Original stored Entry path.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "entry_index",
+        "entry_path",
+        "containers"
+      ],
+      "type": "object"
+    },
+    "DefaultMaterialState": {
+      "description": "Outcome of looking up a physical Archive default material.",
+      "oneOf": [
+        {
+          "const": "resolved",
+          "description": "A verified drawable material is available.",
+          "type": "string"
+        },
+        {
+          "const": "missing",
+          "description": "The owning Archive has no matching Entry.",
+          "type": "string"
+        },
+        {
+          "const": "ambiguous",
+          "description": "More than one physical Entry matches the policy path.",
+          "type": "string"
+        },
+        {
+          "const": "lookup-failed",
+          "description": "The lookup could not establish original ownership.",
+          "type": "string"
+        },
+        {
+          "const": "unreadable",
+          "description": "The selected Entry could not be read and verified.",
+          "type": "string"
+        },
+        {
+          "const": "malformed",
+          "description": "The verified payload could not be parsed as a material.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported-library",
+          "description": "The parsed library does not contain one drawable material.",
+          "type": "string"
+        }
+      ]
+    },
+    "DrawBinding": {
+      "properties": {
+        "first_index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "index_count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "lod": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "material": {
+          "$ref": "#/$defs/Surface"
+        },
+        "model_node": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "node_name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "source_node_id": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        },
+        "subset": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "lod",
+        "model_node",
+        "source_node_id",
+        "subset",
+        "first_index",
+        "index_count",
+        "node_name",
+        "material"
       ],
       "type": "object"
     },
@@ -179,12 +1709,181 @@
       ],
       "type": "object"
     },
+    "EmissionField": {
+      "description": "Authored location and typed parsing of one material emission field.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/EmissionSource",
+          "description": "Original element and attribute position in the referenced library."
+        },
+        "value": {
+          "$ref": "#/$defs/AuthoredEmission",
+          "description": "Literal field token and non-destructive numeric interpretation."
+        }
+      },
+      "required": [
+        "source",
+        "value"
+      ],
+      "type": "object"
+    },
+    "EmissionSample": {
+      "description": "One token in an authored emission scalar or colour.",
+      "oneOf": [
+        {
+          "description": "The finite stored float.",
+          "properties": {
+            "kind": {
+              "const": "finite",
+              "type": "string"
+            },
+            "value": {
+              "format": "float",
+              "type": "number"
+            }
+          },
+          "required": [
+            "kind",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Nonfinite NaN.",
+          "properties": {
+            "kind": {
+              "const": "nan",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Positive infinity.",
+          "properties": {
+            "kind": {
+              "const": "positive_infinity",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Negative infinity.",
+          "properties": {
+            "kind": {
+              "const": "negative_infinity",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "EmissionSlot": {
+      "description": "Original explicit texture slot and filename declarations.",
+      "properties": {
+        "file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EmissionSource"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "File attribute and its coordinate when authored."
+        },
+        "map": {
+          "$ref": "#/$defs/EmissionSource",
+          "description": "Map attribute and its coordinate."
+        }
+      },
+      "required": [
+        "map"
+      ],
+      "type": "object"
+    },
+    "EmissionSource": {
+      "description": "An original material input token.",
+      "properties": {
+        "attribute": {
+          "description": "Original attribute ordinal of the selected element.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "element": {
+          "description": "Original child ordinals within the retained material library root.",
+          "items": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Exact original field name including case.",
+          "type": "string"
+        },
+        "raw": {
+          "description": "Exact original decoded value.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "element",
+        "attribute",
+        "name",
+        "raw"
+      ],
+      "type": "object"
+    },
+    "EntityClassification": {
+      "additionalProperties": false,
+      "description": "The authored classification of an Entity node and its immediate origins.",
+      "properties": {
+        "item_type": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original `AttachDef` Type."
+        },
+        "subtype": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original `AttachDef` `SubType`."
+        }
+      },
+      "required": [
+        "item_type",
+        "subtype"
+      ],
+      "type": "object"
+    },
     "EntityRef": {
       "description": "An Entity of the Archive. In `source.entity` of a Character package, which is made from no\nEntity, `class_name` is the Character's name and `guid` is empty.",
       "properties": {
         "class_name": {
           "description": "The Entity's class name, e.g. `AEGS_Avenger_Titan`.",
           "type": "string"
+        },
+        "classification": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EntityClassification"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Authored classification of an Entity node when selected by the Assembly."
         },
         "guid": {
           "description": "The Entity's GUID.",
@@ -194,6 +1893,190 @@
       "required": [
         "class_name",
         "guid"
+      ],
+      "type": "object"
+    },
+    "FallbackMaterialCause": {
+      "description": "Why an authored material could not fill a geometry slot.",
+      "oneOf": [
+        {
+          "const": "unnamed-library",
+          "description": "The model names no material library.",
+          "type": "string"
+        },
+        {
+          "const": "missing-library",
+          "description": "The named library does not exist.",
+          "type": "string"
+        },
+        {
+          "const": "unreadable-library",
+          "description": "The named library could not be read.",
+          "type": "string"
+        },
+        {
+          "const": "skipped-library",
+          "description": "The library was skipped by the caller.",
+          "type": "string"
+        },
+        {
+          "const": "empty-slot",
+          "description": "The source ID selects an explicit empty authored slot.",
+          "type": "string"
+        },
+        {
+          "const": "missing-slot",
+          "description": "The source ID has no slot in the loaded library.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "The producer could not establish a narrower cause.",
+          "type": "string"
+        }
+      ]
+    },
+    "FallbackMaterialSlot": {
+      "description": "Fallback decision for one raw geometry material ID.",
+      "properties": {
+        "cause": {
+          "$ref": "#/$defs/FallbackMaterialCause",
+          "description": "Authored library condition that caused the fallback."
+        },
+        "source_material_id": {
+          "description": "Original geometry material ID.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_material_id",
+        "cause"
+      ],
+      "type": "object"
+    },
+    "FieldOrigin": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      ],
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs"
+      ],
+      "type": "object"
+    },
+    "FieldOrigins": {
+      "additionalProperties": false,
+      "description": "Immediate per-value origins addressed inside one complete unchanged output record.",
+      "patternProperties": {
+        "^(?:/(?:[^~]|~[01])*)?$": {
+          "$ref": "#/$defs/FieldOrigin"
+        }
+      },
+      "type": "object"
+    },
+    "FileSource": {
+      "description": "Observed standalone-file facts without a claim of original P4K lineage.",
+      "properties": {
+        "byteLength": {
+          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "byteLength",
+        "name"
       ],
       "type": "object"
     },
@@ -224,6 +2107,149 @@
         "version"
       ],
       "type": "object"
+    },
+    "Helper": {
+      "oneOf": [
+        {
+          "properties": {
+            "status": {
+              "const": "undeclared",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "reason": {
+              "type": "string"
+            },
+            "status": {
+              "const": "unresolved",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "helper_from_light": {
+              "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+            },
+            "model_node": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "name": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "owner_from_helper": {
+              "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+            },
+            "source": {
+              "$ref": "#/$defs/HelperSource"
+            },
+            "status": {
+              "const": "matched",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "model_node",
+            "name",
+            "owner_from_helper",
+            "helper_from_light",
+            "source"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "HelperSource": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "group",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "document": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "origin": {
+              "type": "string"
+            },
+            "part": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "point": {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            "type": {
+              "const": "vehicle_point",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "part",
+            "point",
+            "document",
+            "origin"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "unknown",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "InputScope": {
+      "description": "The source byte domain interpreted by one use.",
+      "oneOf": [
+        {
+          "const": "payload",
+          "description": "The Entry or standalone file's payload, including every containing Entry.",
+          "type": "string"
+        },
+        {
+          "const": "archiveDirectoryMetadata",
+          "description": "Directory facts, with only containing Entries affecting their origin.",
+          "type": "string"
+        },
+        {
+          "const": "fileMetadata",
+          "description": "Observed standalone-file metadata without original P4K lineage proof.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
     },
     "Issue": {
       "description": "Something that could not be resolved or written.",
@@ -282,6 +2308,23 @@
           "type": "string"
         }
       ]
+    },
+    "Kind": {
+      "enum": [
+        "tag",
+        "trigger"
+      ],
+      "type": "string"
+    },
+    "Kind2": {
+      "enum": [
+        "named",
+        "materialDefault",
+        "includedPath",
+        "socEntity",
+        "unknown"
+      ],
+      "type": "string"
     },
     "Light": {
       "description": "A punctual light at a node of the kind `light`.\n\nThe node's transform is already turned so that the light shines along its local -Z axis, as\nglTF and Blender lights do.",
@@ -357,6 +2400,349 @@
         }
       ]
     },
+    "LightPlacement": {
+      "properties": {
+        "anchor": {
+          "$ref": "#/$defs/Anchor"
+        },
+        "container": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "declared_helper": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "effective_light": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+        },
+        "helper": {
+          "$ref": "#/$defs/Helper"
+        },
+        "node": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "original_group": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+        },
+        "original_light": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_Array_size_4_of_float"
+        },
+        "owner": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "preview_state": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "tile_selector": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "node",
+        "owner",
+        "container",
+        "preview_state",
+        "original_light",
+        "original_group",
+        "tile_selector",
+        "declared_helper",
+        "effective_light",
+        "anchor",
+        "helper"
+      ],
+      "type": "object"
+    },
+    "LightPlacements": {
+      "properties": {
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/LightPlacement"
+          },
+          "type": "array"
+        },
+        "sourceInventory": {
+          "$ref": "#/$defs/SourceInventory"
+        }
+      },
+      "required": [
+        "rows",
+        "sourceInventory"
+      ],
+      "type": "object"
+    },
+    "Link": {
+      "properties": {
+        "component": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "effect": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selection": {
+          "$ref": "#/$defs/Selection"
+        }
+      },
+      "required": [
+        "component",
+        "kind",
+        "effect",
+        "ordinal",
+        "selection"
+      ],
+      "type": "object"
+    },
+    "Lookup": {
+      "additionalProperties": false,
+      "properties": {
+        "origin": {
+          "$ref": "#/$defs/FieldOrigin"
+        },
+        "record": {
+          "$ref": "#/$defs/Record"
+        }
+      },
+      "required": [
+        "record",
+        "origin"
+      ],
+      "type": "object"
+    },
+    "ManifestSocScene": {
+      "description": "An optional versioned authored SOC scene file in a package.",
+      "properties": {
+        "file": {
+          "const": "authored/soc-scene.json",
+          "description": "The fixed package-relative JSON file.",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "description": "The authored SOC scene schema version.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "file",
+        "schema_version"
+      ],
+      "type": "object"
+    },
+    "MaterialAttributeInfo": {
+      "description": "One original attribute and its independent semantic/lexical values.",
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/MaterialAttributeKindInfo",
+          "description": "Attribute or namespace-declaration meaning."
+        },
+        "lexeme": {
+          "description": "Original UTF-8 XML value token without quotes; absent for binary XML.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "description": "Original qualified attribute name.",
+          "type": "string"
+        },
+        "value": {
+          "description": "XML-decoded value without float or flag conversion.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "lexeme",
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "MaterialAttributeKindInfo": {
+      "description": "Explicit namespace interpretation of an authored attribute.",
+      "oneOf": [
+        {
+          "description": "A regular attribute.",
+          "properties": {
+            "namespace": {
+              "description": "Expanded URI when proved; library encoding distinguishes unqualified plain input from unresolved binary semantics.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "attribute",
+              "type": "string"
+            }
+          },
+          "required": [
+            "namespace",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A namespace declaration.",
+          "properties": {
+            "prefix": {
+              "description": "Authored prefix, absent for the default namespace.",
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "type": {
+              "const": "namespace",
+              "type": "string"
+            }
+          },
+          "required": [
+            "prefix",
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The reader supplies a kind this projection does not support.",
+          "properties": {
+            "type": {
+              "const": "unsupported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "MaterialContentInfo": {
+      "description": "An ordered plain-XML content unit or an original element-child ordinal.",
+      "oneOf": [
+        {
+          "description": "Plain XML text with a separate original token.",
+          "properties": {
+            "lexeme": {
+              "description": "Original UTF-8 source token, including any CDATA/entity spelling.",
+              "type": "string"
+            },
+            "type": {
+              "const": "text",
+              "type": "string"
+            },
+            "value": {
+              "description": "XML-decoded value.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value",
+            "lexeme"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An original element-child position, including a diagnosed unretained child.",
+          "properties": {
+            "ordinal": {
+              "description": "Original element-child ordinal.",
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "element",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "ordinal"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An authored comment.",
+          "properties": {
+            "type": {
+              "const": "comment",
+              "type": "string"
+            },
+            "value": {
+              "description": "Content without comment delimiters.",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "An authored processing instruction.",
+          "properties": {
+            "target": {
+              "description": "Instruction target.",
+              "type": "string"
+            },
+            "type": {
+              "const": "processing-instruction",
+              "type": "string"
+            },
+            "value": {
+              "description": "Optional instruction data.",
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "target",
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The reader supplies content this projection does not support.",
+          "properties": {
+            "type": {
+              "const": "unsupported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "MaterialDescription": {
       "description": "A material as the game defines it: the inputs of a Blender or any other renderer's material.\n\nColours are linear and exactly those of the file; a palette is not applied. The\n`parameters`, `attributes` and `elements` hold what the writer does not interpret, name and\nvalue as the file has them.",
       "properties": {
@@ -399,6 +2785,17 @@
             "$ref": "#/$defs/Element"
           },
           "type": "array"
+        },
+        "emission_source": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PackageMaterialEmission"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Exact authored emission and coverage controls with an explicit static preview disposition."
         },
         "emissive": {
           "description": "The emissive colour, linear; it counts times `glow`.",
@@ -505,6 +2902,15 @@
           "format": "float",
           "type": "number"
         },
+        "source_library": {
+          "description": "Source-library ordinal in `Manifest.material_libraries`, independent of renderer identity.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
         "specular": {
           "description": "The specular colour, linear.",
           "items": {
@@ -567,6 +2973,135 @@
         "elements"
       ],
       "type": "object"
+    },
+    "MaterialElementInfo": {
+      "description": "Bounded material XML syntax, independent of original byte retention and surface interpretation.",
+      "properties": {
+        "attributes": {
+          "description": "Existing decoded attributes in reader order.",
+          "items": {
+            "$ref": "#/$defs/MaterialParameterInfo"
+          },
+          "type": "array"
+        },
+        "children": {
+          "description": "Retained children in source order; their original ordinals remain in syntax.",
+          "items": {
+            "$ref": "#/$defs/MaterialElementInfo"
+          },
+          "type": "array"
+        },
+        "name": {
+          "description": "Existing XML-reader element name.",
+          "type": "string"
+        },
+        "syntax": {
+          "$ref": "#/$defs/MaterialElementSyntaxInfo",
+          "description": "Encoding-aware authored names, namespace declarations and content."
+        }
+      },
+      "required": [
+        "name",
+        "attributes",
+        "children",
+        "syntax"
+      ],
+      "type": "object"
+    },
+    "MaterialElementSyntaxInfo": {
+      "description": "Authored syntax supplementing the existing material element view.",
+      "properties": {
+        "attributes": {
+          "description": "Attributes and namespace declarations in one authored order.",
+          "items": {
+            "$ref": "#/$defs/MaterialAttributeInfo"
+          },
+          "type": "array"
+        },
+        "binary_text": {
+          "description": "Binary node text, with unspecified ordering relative to its children.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "content": {
+          "description": "Plain XML mixed-content sequence; no original-byte offset is implied.",
+          "items": {
+            "$ref": "#/$defs/MaterialContentInfo"
+          },
+          "type": "array"
+        },
+        "namespace": {
+          "description": "Expanded URI proved for plain XML; binary namespace semantics stay unasserted.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "ordinal": {
+          "description": "Original element-child position, absent for the captured root.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "qualified_name": {
+          "description": "Original qualified name, including its prefix.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "attributes",
+        "binary_text",
+        "content",
+        "namespace",
+        "ordinal",
+        "qualified_name"
+      ],
+      "type": "object"
+    },
+    "MaterialEncodingInfo": {
+      "description": "Actual source encoding, separate from generated XML or rendering output.",
+      "oneOf": [
+        {
+          "const": "text",
+          "description": "Original UTF-8 XML tokens.",
+          "type": "string"
+        },
+        {
+          "const": "cry-xml",
+          "description": "Binary XML strings and node-content declarations.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "The reader supplies an unsupported encoding.",
+          "type": "string"
+        }
+      ]
+    },
+    "MaterialEntryDispositionInfo": {
+      "description": "Existing surface-reader disposition of an original submaterial slot.",
+      "oneOf": [
+        {
+          "const": "material",
+          "description": "An interpreted material.",
+          "type": "string"
+        },
+        {
+          "const": "engine-default",
+          "description": "An unknown slot rendered with the existing engine-default fallback.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "The reader supplies an unsupported disposition.",
+          "type": "string"
+        }
+      ]
     },
     "MaterialLayer": {
       "description": "One layer of a material: another material blended into the surface.",
@@ -658,6 +3193,224 @@
         "name",
         "path",
         "attributes"
+      ],
+      "type": "object"
+    },
+    "MaterialLibrarySourceDescription": {
+      "description": "One authored library root retained independently of its interpreted child materials.",
+      "properties": {
+        "authored": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialLibrarySourceInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inline authored source root of an earlier manifest."
+        },
+        "authored_file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialSourceReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Streamed authored source data and original field positions of this library."
+        },
+        "authored_origin": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AuthoredMaterialOrigin"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inline source evidence of an earlier manifest."
+        },
+        "emission_provenance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceInventory"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Physical sources and exact use references for this library's emission fields."
+        },
+        "path": {
+          "description": "Library path exposed by the model reader, without a unique physical-source claim.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "type": "object"
+    },
+    "MaterialLibrarySourceInfo": {
+      "description": "One bounded canonical authored material root, kept once per source library.",
+      "properties": {
+        "encoding": {
+          "$ref": "#/$defs/MaterialEncodingInfo",
+          "description": "Actual original source encoding."
+        },
+        "entries": {
+          "description": "Original submaterial dispositions; empty for a single-material library.",
+          "items": {
+            "$ref": "#/$defs/MaterialSourceEntryInfo"
+          },
+          "type": "array"
+        },
+        "losses": {
+          "description": "Actual structured loss categories and first source locations.",
+          "items": {
+            "$ref": "#/$defs/MaterialSourceLossInfo"
+          },
+          "type": "array"
+        },
+        "root": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialElementInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Retained root syntax, absent only with an explicit loss boundary."
+        }
+      },
+      "required": [
+        "encoding",
+        "entries",
+        "losses",
+        "root"
+      ],
+      "type": "object"
+    },
+    "MaterialParameterInfo": {
+      "description": "One decoded material attribute without numeric reinterpretation.",
+      "properties": {
+        "name": {
+          "description": "Reader-exposed name with its original case.",
+          "type": "string"
+        },
+        "value": {
+          "description": "Uninterpreted decoded value.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
+    "MaterialSourceEntryInfo": {
+      "description": "One original submaterial position without renumbering unknown entries.",
+      "properties": {
+        "disposition": {
+          "$ref": "#/$defs/MaterialEntryDispositionInfo",
+          "description": "Existing rendering fallback or interpreted material disposition."
+        },
+        "element_name": {
+          "description": "Source-reader element name.",
+          "type": "string"
+        },
+        "ordinal": {
+          "description": "Original slot position.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ordinal",
+        "element_name",
+        "disposition"
+      ],
+      "type": "object"
+    },
+    "MaterialSourceLossInfo": {
+      "description": "First original element location for one actual coverage boundary.",
+      "properties": {
+        "indices": {
+          "description": "Original element ordinals from the root.",
+          "items": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "kind": {
+          "$ref": "#/$defs/MaterialSourceLossInfoKind",
+          "description": "Observed boundary, independent of raw byte preservation."
+        }
+      },
+      "required": [
+        "kind",
+        "indices"
+      ],
+      "type": "object"
+    },
+    "MaterialSourceLossInfoKind": {
+      "description": "Structured source coverage boundary actually reached by the material reader.",
+      "oneOf": [
+        {
+          "const": "repaired-encoding",
+          "description": "Invalid binary string-table bytes were repaired.",
+          "type": "string"
+        },
+        {
+          "const": "elements",
+          "description": "Canonical authored element capacity was exhausted.",
+          "type": "string"
+        },
+        {
+          "const": "text-bytes",
+          "description": "Canonical authored syntax/text storage was exhausted.",
+          "type": "string"
+        },
+        {
+          "const": "depth",
+          "description": "A populated child list reached the depth bound.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "The reader supplies an unsupported loss category.",
+          "type": "string"
+        }
+      ]
+    },
+    "MaterialSourceReference": {
+      "additionalProperties": false,
+      "description": "Package-local reference to the retained declarations of one material-library row.",
+      "properties": {
+        "file": {
+          "description": "The sidecar path derived from the zero-based position of its library row.",
+          "pattern": "^material-sources/s[0-9]{4,}\\.jsonl\\.gz$",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "description": "The material-source sidecar's schema version.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "file",
+        "schema_version"
       ],
       "type": "object"
     },
@@ -832,6 +3585,14 @@
           "minimum": 0,
           "type": "integer"
         },
+        "vertex_map": {
+          "description": "The streamed source map accompanying this GLB.",
+          "pattern": "^meshes/m[0-9]{4,}\\.vertex-map\\.jsonl$",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "vertices": {
           "description": "The number of vertices of the mesh.",
           "format": "uint",
@@ -853,6 +3614,26 @@
     "MeshMaterial": {
       "description": "A material of a mesh and the textures its material file names.",
       "properties": {
+        "archive_default": {
+          "description": "Whether this assignment uses the physical source described by `default_material`.",
+          "type": "boolean"
+        },
+        "authored_library": {
+          "description": "Authored library root examined for this assignment.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "fallback_slots": {
+          "description": "Why each affected raw material ID needed a fallback.",
+          "items": {
+            "$ref": "#/$defs/FallbackMaterialSlot"
+          },
+          "type": "array"
+        },
         "index": {
           "description": "The index of the glTF material in the mesh's file.",
           "format": "uint",
@@ -860,7 +3641,7 @@
           "type": "integer"
         },
         "material": {
-          "description": "The id of the material's description in `materials`; absent for the engine's default\nmaterial.",
+          "description": "The id of the material description, absent for a synthetic fallback.",
           "type": [
             "string",
             "null"
@@ -869,6 +3650,16 @@
         "name": {
           "description": "The name of the glTF material in the mesh's file.",
           "type": "string"
+        },
+        "source_material_ids": {
+          "description": "Raw geometry material IDs assigned to this dense material index, in ascending order.",
+          "items": {
+            "format": "uint16",
+            "maximum": 65535,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
         },
         "textures": {
           "$ref": "#/$defs/MaterialTextures",
@@ -1049,6 +3840,141 @@
       ],
       "type": "object"
     },
+    "OriginArtifactDigest": {
+      "additionalProperties": false,
+      "description": "Actual written byte length and SHA-256.",
+      "properties": {
+        "byteLength": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "byteLength",
+        "sha256"
+      ],
+      "type": "object"
+    },
+    "Owner": {
+      "properties": {
+        "declaration": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "links": {
+          "items": {
+            "$ref": "#/$defs/Link"
+          },
+          "type": "array"
+        },
+        "node": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory"
+        }
+      },
+      "required": [
+        "node",
+        "declaration",
+        "links",
+        "provenance"
+      ],
+      "type": "object"
+    },
+    "PackageGlow": {
+      "properties": {
+        "declarations": {
+          "items": {
+            "$ref": "#/$defs/Declaration"
+          },
+          "type": "array"
+        },
+        "owners": {
+          "items": {
+            "$ref": "#/$defs/Owner"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "declarations",
+        "owners"
+      ],
+      "type": "object"
+    },
+    "PackageMaterialEmission": {
+      "description": "Original material emission controls and the static preview selected from them.",
+      "properties": {
+        "attributes": {
+          "description": "Ordered original emission and coverage inputs.",
+          "items": {
+            "$ref": "#/$defs/EmissionField"
+          },
+          "type": "array"
+        },
+        "emittance_requested": {
+          "description": "Original mask requests an emittance map when a unique mask was present.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "field_origins": {
+          "$ref": "#/$defs/FieldOrigins",
+          "description": "Immediate origins of the scalar values and members within this description."
+        },
+        "forward_enabled": {
+          "description": "Original material flags request forward rendering when a unique value was present.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "preview": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/StaticEmission"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional Blender static preview with explicit valid authored inputs."
+        },
+        "source_complete": {
+          "description": "Whether the retained material source was complete.",
+          "type": "boolean"
+        },
+        "source_library": {
+          "description": "Original library root row holding the exact XML declarations.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "texture_slots": {
+          "description": "Explicit authored emissive texture declarations.",
+          "items": {
+            "$ref": "#/$defs/EmissionSlot"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "source_library",
+        "source_complete",
+        "attributes",
+        "texture_slots",
+        "field_origins"
+      ],
+      "type": "object"
+    },
     "Palette": {
       "description": "A tint palette: the colours a livery gives the materials that take a palette entry.\n\nA palette is written once; meshes reference it by id.",
       "properties": {
@@ -1177,6 +4103,39 @@
         }
       ]
     },
+    "PaletteProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "bindings": {
+          "items": {
+            "$ref": "#/$defs/Binding"
+          },
+          "type": "array"
+        },
+        "payloads": {
+          "items": {
+            "$ref": "#/$defs/Payload"
+          },
+          "type": "array"
+        },
+        "selections": {
+          "items": {
+            "$ref": "#/$defs/Selection2"
+          },
+          "type": "array"
+        },
+        "sourceInventory": {
+          "$ref": "#/$defs/SourceInventory"
+        }
+      },
+      "required": [
+        "payloads",
+        "selections",
+        "bindings",
+        "sourceInventory"
+      ],
+      "type": "object"
+    },
     "Parameter": {
       "description": "A name and a value as the material file gives them.",
       "properties": {
@@ -1192,6 +4151,183 @@
       "required": [
         "name",
         "value"
+      ],
+      "type": "object"
+    },
+    "Payload": {
+      "additionalProperties": false,
+      "properties": {
+        "fieldOrigins": {
+          "$ref": "#/$defs/FieldOrigins"
+        },
+        "palette": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "record": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Record"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "palette",
+        "fieldOrigins"
+      ],
+      "type": "object"
+    },
+    "PhysicalSource": {
+      "description": "One physical source, independent of the roles in which data values use it.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/ArchiveEntrySource",
+          "description": "One physical Entry inside its observed root input.",
+          "properties": {
+            "kind": {
+              "const": "archiveEntry",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ArchiveEntryProof",
+          "description": "Original Entry identity and encryption with explicitly limited stored details.",
+          "properties": {
+            "kind": {
+              "const": "archiveEntryProof",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ArchiveDirectorySource",
+          "description": "The original root Archive's parsed directory.",
+          "properties": {
+            "kind": {
+              "const": "archiveDirectory",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/ArchiveFileSource",
+          "description": "The completed whole-file read of an observed Archive input.",
+          "properties": {
+            "kind": {
+              "const": "archiveFile",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "$ref": "#/$defs/FileSource",
+          "description": "One observed file input, without publication of its host path.",
+          "properties": {
+            "kind": {
+              "const": "file",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A source or ancestor whose physical binding is not known.",
+          "properties": {
+            "kind": {
+              "const": "unknown",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "ancestors": {
+          "items": {
+            "$ref": "#/$defs/PhysicalSourceRef"
+          },
+          "type": "array"
+        },
+        "id": {
+          "$ref": "#/$defs/PhysicalSourceRef"
+        },
+        "storedEncryption": {
+          "$ref": "#/$defs/SourceEncryptionState"
+        }
+      },
+      "required": [
+        "ancestors",
+        "id",
+        "storedEncryption"
+      ],
+      "type": "object"
+    },
+    "PhysicalSourceRef": {
+      "description": "A document-local physical-source reference, without a machine address.",
+      "type": "string"
+    },
+    "Port": {
+      "properties": {
+        "interaction_offset": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "name",
+        "interaction_offset"
+      ],
+      "type": "object"
+    },
+    "Record": {
+      "additionalProperties": false,
+      "properties": {
+        "guid": {
+          "type": "string"
+        },
+        "guidOrigin": {
+          "$ref": "#/$defs/FieldOrigin"
+        },
+        "index": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index",
+        "guid",
+        "guidOrigin"
       ],
       "type": "object"
     },
@@ -1365,6 +4501,158 @@
         }
       ]
     },
+    "Selection": {
+      "oneOf": [
+        {
+          "properties": {
+            "status": {
+              "const": "absent",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "invalid_selector",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "missing_model",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "unobserved_nodes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "unmatched",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "nodes": {
+              "items": {
+                "$ref": "#/$defs/CandidateNode"
+              },
+              "type": "array"
+            },
+            "status": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "nodes"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "no_drawable_subsets",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "bound",
+              "type": "string"
+            },
+            "subsets": {
+              "items": {
+                "$ref": "#/$defs/DrawBinding"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "status",
+            "subsets"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "status": {
+              "const": "unsupported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Selection2": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/Kind2"
+        },
+        "lookup": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Lookup"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selector": {
+          "$ref": "#/$defs/FieldOrigin"
+        }
+      },
+      "required": [
+        "kind",
+        "selector"
+      ],
+      "type": "object"
+    },
     "Source": {
       "description": "Where a package comes from.",
       "properties": {
@@ -1407,6 +4695,1688 @@
       ],
       "type": "object"
     },
+    "SourceCoordinateOmission": {
+      "description": "Why an actual contributing use omits its optional source coordinate.",
+      "oneOf": [
+        {
+          "const": "captureLimit",
+          "description": "Optional coordinate capture was not admitted.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "description": "A proved original contribution has no retained source coordinate.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceDeclarationKind": {
+      "description": "The physical field supplying an encryption declaration.",
+      "oneOf": [
+        {
+          "const": "cigExtraBlock",
+          "description": "The CIG 0x5002 extra block.",
+          "type": "string"
+        },
+        {
+          "const": "p4kV2Field",
+          "description": "The P4K v2 encryption word.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "A future uninterpreted declaration kind.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceDetails": {
+      "description": "Detail retention independently of original input identity and encryption proof.",
+      "oneOf": [
+        {
+          "const": "full",
+          "description": "Retain complete stored paths and declaration details.",
+          "type": "string"
+        },
+        {
+          "const": "captureLimited",
+          "description": "Retain original ownership and encryption proof without variable detail copies.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceEncryptionDeclaration": {
+      "description": "An observed encryption declaration whose values originate in directory metadata.",
+      "properties": {
+        "declaredBlockLength": {
+          "$ref": "#/$defs/SourcedValueOfuint16"
+        },
+        "kind": {
+          "$ref": "#/$defs/SourceDeclarationKind"
+        },
+        "rawBytes": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_uint8"
+        },
+        "rawWord": {
+          "$ref": "#/$defs/SourcedValueOfuint16"
+        },
+        "valueOffset": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "declaredBlockLength",
+        "kind",
+        "rawBytes",
+        "rawWord",
+        "valueOffset"
+      ],
+      "type": "object"
+    },
+    "SourceEncryptionState": {
+      "description": "Conservatively interpreted encryption of a stored physical source.",
+      "oneOf": [
+        {
+          "const": "encrypted",
+          "description": "The source is proved encrypted.",
+          "type": "string"
+        },
+        {
+          "const": "unencrypted",
+          "description": "The source is proved unencrypted.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "Stored evidence does not establish either state.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceInventory": {
+      "description": "Immutable sorted physical sources and observed use inventory for one prepared result.",
+      "properties": {
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/PhysicalSource"
+          },
+          "type": "array"
+        },
+        "uses": {
+          "items": {
+            "$ref": "#/$defs/SourceUseDescription"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "sources",
+        "uses"
+      ],
+      "type": "object"
+    },
+    "SourceLocation": {
+      "description": "A retained source coordinate or an explicit omission inside an observed physical input.",
+      "oneOf": [
+        {
+          "description": "An actual input use with explicitly omitted optional coordinates.",
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/SourceCoordinateOmission",
+              "description": "Why coordinate details were not retained."
+            },
+            "type": {
+              "const": "opaque",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One field of the physical DataForge Record index.",
+          "properties": {
+            "field": {
+              "description": "Exact owned-field path, including stored list positions.",
+              "type": "string"
+            },
+            "recordIndex": {
+              "description": "Physical Record position, independent of nominal GUID aliases.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "dataForge",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "recordIndex",
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A localization lookup addressed by its retained authored selector.",
+          "properties": {
+            "language": {
+              "description": "The language Entry used by the lookup.",
+              "type": "string"
+            },
+            "selector": {
+              "$ref": "#/$defs/SourceUseRef",
+              "description": "The source use holding the actual lookup key."
+            },
+            "type": {
+              "const": "localizationLookup",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "language",
+            "selector"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Half-open admitted Entry positions in a parsed root Archive directory.",
+          "properties": {
+            "endEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Position after the last consulted Entry path."
+            },
+            "startEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First admitted Entry path position."
+            },
+            "type": {
+              "const": "archiveDirectoryPaths",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "startEntryIndex",
+            "endEntryIndex"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Half-open Entry positions in an original root Archive's path-ordered folder tree.",
+          "properties": {
+            "endEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Position after the last contributing path-order Entry."
+            },
+            "startEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First path-order Entry position."
+            },
+            "type": {
+              "const": "archiveDirectoryTreePaths",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "startEntryIndex",
+            "endEntryIndex"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One exact logical field inside an already observed structured source subresource.",
+          "properties": {
+            "field": {
+              "description": "Original source field or token-range label within that object.",
+              "type": "string"
+            },
+            "indices": {
+              "description": "Original source ordinals, including repeated declarations and unknown slots.",
+              "items": {
+                "$ref": "#/$defs/DecimalU64"
+              },
+              "type": "array"
+            },
+            "namespace": {
+              "description": "Format-owned namespace for the original source object.",
+              "type": "string"
+            },
+            "type": {
+              "const": "subresource",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "namespace",
+            "indices",
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A directory or standalone input metadata field.",
+          "properties": {
+            "field": {
+              "description": "Exact metadata field, including stored occurrence positions.",
+              "type": "string"
+            },
+            "type": {
+              "const": "metadata",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "field"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "SourceRecordFormat": {
+      "description": "The exact declaration-bearing directory record format.",
+      "oneOf": [
+        {
+          "const": "zipCentralDirectory",
+          "description": "A ZIP central-directory record, including CIG extensions.",
+          "type": "string"
+        },
+        {
+          "const": "p4kV2",
+          "description": "A fixed P4K v2 directory record.",
+          "type": "string"
+        },
+        {
+          "const": "unknown",
+          "description": "A future record format not interpreted by this exporter.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceUseDescription": {
+      "description": "One source-use inventory row, kept separately from the field's actual contribution set.",
+      "properties": {
+        "effectiveEncryption": {
+          "$ref": "#/$defs/SourceEncryptionState"
+        },
+        "id": {
+          "$ref": "#/$defs/SourceUseRef"
+        },
+        "location": {
+          "$ref": "#/$defs/SourceLocation"
+        },
+        "role": {
+          "$ref": "#/$defs/SourceUseRole"
+        },
+        "scope": {
+          "$ref": "#/$defs/InputScope"
+        },
+        "source": {
+          "$ref": "#/$defs/PhysicalSourceRef"
+        }
+      },
+      "required": [
+        "effectiveEncryption",
+        "id",
+        "location",
+        "role",
+        "scope",
+        "source"
+      ],
+      "type": "object"
+    },
+    "SourceUseRef": {
+      "description": "A document-local source-use identifier, independent of addresses or pointer values.",
+      "type": "string"
+    },
+    "SourceUseRole": {
+      "description": "Whether an observed input actually contributes to the emitted data value.",
+      "oneOf": [
+        {
+          "const": "payload",
+          "description": "Retained payload bytes or facts.",
+          "type": "string"
+        },
+        {
+          "const": "selector",
+          "description": "An authored selector used to select this result.",
+          "type": "string"
+        },
+        {
+          "const": "conversion",
+          "description": "A used input to the value's conversion.",
+          "type": "string"
+        },
+        {
+          "const": "attempted",
+          "description": "A planned or failed input without a retained contribution.",
+          "type": "string"
+        },
+        {
+          "const": "reference",
+          "description": "An untouched reference target.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceValueState": {
+      "description": "The interpretation state of one typed source value.",
+      "oneOf": [
+        {
+          "const": "present",
+          "description": "A value is present.",
+          "type": "string"
+        },
+        {
+          "const": "absent",
+          "description": "The field is absent.",
+          "type": "string"
+        },
+        {
+          "const": "null",
+          "description": "The source explicitly stores null.",
+          "type": "string"
+        },
+        {
+          "const": "unreadable",
+          "description": "The source value cannot be read.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "The concrete source shape is unsupported.",
+          "type": "string"
+        },
+        {
+          "const": "invalid",
+          "description": "The typed value is invalid.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfSourceEncryptionDeclaration": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfSourceEncryptionDeclaration"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_uint8": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "format": "uint8",
+                  "maximum": 255,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_size_3_of_Array_size_4_of_float": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "items": {
+                    "format": "float",
+                    "type": "number"
+                  },
+                  "maxItems": 4,
+                  "minItems": 4,
+                  "type": "array"
+                },
+                "maxItems": 3,
+                "minItems": 3,
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_size_3_of_double": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "format": "double",
+                  "type": "number"
+                },
+                "maxItems": 3,
+                "minItems": 3,
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfDecimalU64": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/DecimalU64"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfSourceEncryptionDeclaration": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SourceEncryptionDeclaration"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfboolean": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "boolean"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfstring": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfuint16": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "format": "uint16",
+                "maximum": 65535,
+                "minimum": 0,
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "StaticEmission": {
+      "description": "Blender static emission preview parameters, derived from authored data.",
+      "properties": {
+        "file": {
+          "description": "Original material texture filename token.",
+          "type": "string"
+        },
+        "slot": {
+          "description": "Original material texture-slot name.",
+          "type": "string"
+        },
+        "strength": {
+          "description": "Finite positive authored Glow strength.",
+          "format": "float",
+          "type": "number"
+        },
+        "tint": {
+          "description": "Finite authored linear emissive tint.",
+          "items": {
+            "format": "float",
+            "type": "number"
+          },
+          "maxItems": 3,
+          "minItems": 3,
+          "type": "array"
+        }
+      },
+      "required": [
+        "slot",
+        "file",
+        "tint",
+        "strength"
+      ],
+      "type": "object"
+    },
+    "Surface": {
+      "properties": {
+        "no_draw": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "packaged_material": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "resolves": {
+          "type": "boolean"
+        },
+        "shader": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "source_slot": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "source_slot",
+        "resolves",
+        "shader",
+        "no_draw"
+      ],
+      "type": "object"
+    },
     "Texture": {
       "description": "One texture file of the package.",
       "properties": {
@@ -1424,6 +6394,50 @@
         "colour_space": {
           "$ref": "#/$defs/ColourSpace",
           "description": "How the colour channels are encoded."
+        },
+        "ddna_pair": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdnaTexturePair"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional normal and separate DDS smoothness texture association."
+        },
+        "dds_asset": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTextureAsset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "A lossless selected-mip DDS byte binding and its original entry checksums."
+        },
+        "dds_fallback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTextureFallback"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The reason the requested direct DDS texture required PNG."
+        },
+        "encoding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureEncoding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The importer input encoding for this specific output role."
         },
         "file": {
           "description": "The image file relative to the package folder, e.g. `textures/t0001.png`.",
@@ -1447,6 +6461,28 @@
           "description": "The texture's path in the Archive, below `Data`.",
           "type": "string"
         },
+        "source_metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureSourceMetadata"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Original DDS header and actual mip evidence, when the loader exposes its physical input."
+        },
+        "source_rendition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureRendition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The rendition selected by the package writer for that source."
+        },
         "width": {
           "description": "The width in pixels of the mip level that was written.",
           "format": "uint32",
@@ -1467,6 +6503,41 @@
       ],
       "type": "object"
     },
+    "TextureChannelTransform": {
+      "description": "Channel handling applied after decoding a DDS image.",
+      "oneOf": [
+        {
+          "const": "preserve",
+          "description": "The decoded channels are used in their original order.",
+          "type": "string"
+        },
+        {
+          "const": "flip_normal_green",
+          "description": "The normal Y component is flipped to the consumer's coordinate convention.",
+          "type": "string"
+        }
+      ]
+    },
+    "TextureEncoding": {
+      "description": "How the package importer samples the image's colour channels.",
+      "oneOf": [
+        {
+          "const": "srgb",
+          "description": "RGB uses the sRGB transfer function.",
+          "type": "string"
+        },
+        {
+          "const": "linear_colour",
+          "description": "RGB carries scene-linear colour in Rec.709 primaries.",
+          "type": "string"
+        },
+        {
+          "const": "data",
+          "description": "Values are linear shader inputs without a colour-space transform.",
+          "type": "string"
+        }
+      ]
+    },
     "TextureFormat": {
       "description": "The image format of a texture file.",
       "oneOf": [
@@ -1474,8 +6545,123 @@
           "const": "png",
           "description": "An 8-bit RGBA PNG.",
           "type": "string"
+        },
+        {
+          "const": "dds",
+          "description": "A standard DDS container holding an original selected mip.",
+          "type": "string"
         }
       ]
+    },
+    "TextureRendition": {
+      "description": "The package rendition selected for one Archive texture source.",
+      "oneOf": [
+        {
+          "const": "colour",
+          "description": "Colour samples for a diffuse or emissive use.",
+          "type": "string"
+        },
+        {
+          "const": "specular",
+          "description": "Specular samples, with their original transfer when declared.",
+          "type": "string"
+        },
+        {
+          "const": "data",
+          "description": "Data channels without a colour-role transform.",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "A normal map without a smoothness request.",
+          "type": "string"
+        },
+        {
+          "const": "normal_smoothness",
+          "description": "A normal map requested with its authored smoothness data.",
+          "type": "string"
+        },
+        {
+          "const": "separate_smoothness",
+          "description": "The separate DDS image carrying smoothness for a normal map.",
+          "type": "string"
+        }
+      ]
+    },
+    "TextureSourceMetadata": {
+      "additionalProperties": false,
+      "description": "Same-read DDS source metadata and provenance for one written texture.",
+      "properties": {
+        "alpha_transform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsAlphaTransform"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "RGB unassociation applied for straight opacity output."
+        },
+        "channel_transform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureChannelTransform"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Additional channel handling selected by the material role."
+        },
+        "dds": {
+          "$ref": "#/$defs/DdsSourceInfo",
+          "description": "Shared raw and normalized DDS header projection."
+        },
+        "field_origins": {
+          "$ref": "#/$defs/FieldOrigins",
+          "description": "Source origins relative to this metadata object; /image refers to the encoded PNG."
+        },
+        "mip_level": {
+          "description": "The mip actually written by the package loader.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "output_transfer": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsTransfer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "RGB transfer proved for the output PNG, independent of importer fallback."
+        },
+        "png_transform": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DdsPngTransform"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Channel processing used to represent the DDS samples in the PNG."
+        },
+        "provenance": {
+          "$ref": "#/$defs/SourceInventory",
+          "description": "Read and directory inputs referenced by the immediate origins."
+        }
+      },
+      "required": [
+        "dds",
+        "mip_level",
+        "field_origins",
+        "provenance"
+      ],
+      "type": "object"
     },
     "TextureUse": {
       "description": "What a texture of a material is used for, by the file naming convention of the game's\ntextures and the slot it sits in.",
@@ -1556,9 +6742,64 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "The scene description of a package: `scene.json`.",
   "properties": {
+    "authored_soc": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ManifestSocScene"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "The optional authored SOC scene companion."
+    },
+    "collision_helpers": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CollisionHelperReference"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Optional collision helpers and their original frame evidence."
+    },
     "coordinates": {
       "$ref": "#/$defs/Coordinates",
       "description": "The axes and unit of every transform and of the GLB meshes."
+    },
+    "default_material": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/DefaultMaterialReceipt"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Physical fallback lookup for drawn mesh assignments that require one."
+    },
+    "entity_glow": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PackageGlow"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Original Entity Glow declarations and their separate owner model associations."
+    },
+    "entity_provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/SourceInventory"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Physical inputs and references used by sourced Entity classifications."
     },
     "format": {
       "$ref": "#/$defs/Format",
@@ -1572,6 +6813,24 @@
       "description": "What could not be resolved or written, with the node or texture it concerns.",
       "items": {
         "$ref": "#/$defs/Issue"
+      },
+      "type": "array"
+    },
+    "light_placements": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/LightPlacements"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Placement evidence for baked lights in directly owned vehicle containers."
+    },
+    "material_libraries": {
+      "description": "Authored material-library roots retained once, without inheriting values into children.",
+      "items": {
+        "$ref": "#/$defs/MaterialLibrarySourceDescription"
       },
       "type": "array"
     },
@@ -1600,6 +6859,17 @@
     "options": {
       "$ref": "#/$defs/Options",
       "description": "The choices the package was written with."
+    },
+    "palette_provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PaletteProvenance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Node-local selections and per-field physical inputs for rendered palette values."
     },
     "palettes": {
       "default": [],

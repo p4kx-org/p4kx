@@ -12,6 +12,7 @@ publish.workspace = true
 layer = "service"
 
 [dependencies]
+crc32fast.workspace = true
 p4kx-archive.workspace = true
 p4kx-audio.workspace = true
 p4kx-chunks.workspace = true
@@ -26,20 +27,22 @@ p4kx-localization.workspace = true
 p4kx-texture.workspace = true
 crc32c.workspace = true
 rayon.workspace = true
+same-file.workspace = true
 schemars.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-crc32fast.workspace = true
 exr.workspace = true
+jsonschema.workspace = true
 lewton = { workspace = true, features = ["ogg"] }
 p4kx-testkit.workspace = true
 png.workspace = true
 rayon.workspace = true
 roxmltree.workspace = true
-serde_json.workspace = true
-tempfile.workspace = true
 
 [lints]
 workspace = true

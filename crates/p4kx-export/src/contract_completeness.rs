@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::Filter;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -11,6 +12,8 @@ use crate::contract::every_field_required;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct Completeness<'a> {
+    /// The global taxonomy selection, independent of the Entity Filter.
+    pub(crate) tags: KindCompleteness<'a>,
     /// The completeness of `manufacturers`.
     pub(crate) manufacturers: KindCompleteness<'a>,
     /// The completeness of `items`.
@@ -23,8 +26,20 @@ pub(crate) struct Completeness<'a> {
     pub(crate) blueprints: KindCompleteness<'a>,
     /// The completeness of `resourceGroups`.
     pub(crate) resource_groups: KindCompleteness<'a>,
+    /// The completeness of `resourceTypes`.
+    pub(crate) resource_types: KindCompleteness<'a>,
     /// The completeness of `blueprintCategories`.
     pub(crate) blueprint_categories: KindCompleteness<'a>,
+    /// The ordinary filtered selection of authored category databases.
+    pub(crate) blueprint_category_lists: KindCompleteness<'a>,
+    /// The completeness of `inventoryContainers`.
+    pub(crate) inventory_containers: KindCompleteness<'a>,
+    /// The filtered physical medical tier and consumption configuration selection.
+    pub(crate) medical_item_tier_configs: KindCompleteness<'a>,
+    /// The filtered physical `ExplosionRecord` selection.
+    pub(crate) explosion_definitions: KindCompleteness<'a>,
+    /// The filtered physical `AmmoParams` selection.
+    pub(crate) ammo_definitions: KindCompleteness<'a>,
     /// The completeness of `gameplayProperties`.
     pub(crate) gameplay_properties: KindCompleteness<'a>,
     /// The completeness of `qualityDistributions`.
@@ -61,6 +76,45 @@ pub(crate) struct Completeness<'a> {
     pub(crate) loot_containers: KindCompleteness<'a>,
     /// The completeness of `shops`.
     pub(crate) shops: KindCompleteness<'a>,
+    /// The complete physical inventory file selection, independent of Record filters.
+    pub(crate) shop_inventories: KindCompleteness<'a>,
+    /// The completeness of `factions`.
+    pub(crate) factions: KindCompleteness<'a>,
+    /// The completeness of the physical `FactionIdentity` selection.
+    pub(crate) faction_identities: KindCompleteness<'a>,
+    /// The completeness of `reputationPerks`.
+    pub(crate) reputation_perks: KindCompleteness<'a>,
+    /// The completeness of `reputationTriggerRecords`.
+    pub(crate) reputation_trigger_records: KindCompleteness<'a>,
+    /// The completeness of `reputationRewardAmounts`.
+    pub(crate) reputation_reward_amounts: KindCompleteness<'a>,
+    /// The physical infraction definition selection.
+    pub(crate) infractions: KindCompleteness<'a>,
+    /// The physical infraction set selection.
+    pub(crate) infraction_sets: KindCompleteness<'a>,
+    /// The physical jurisdiction selection.
+    pub(crate) jurisdictions: KindCompleteness<'a>,
+    /// The physical security network manifest selection.
+    pub(crate) security_network_manifests: KindCompleteness<'a>,
+    pub(crate) location_classes: KindCompleteness<'a>,
+    pub(crate) location_functions: KindCompleteness<'a>,
+    pub(crate) location_sizes: KindCompleteness<'a>,
+    pub(crate) location_class_registries: KindCompleteness<'a>,
+    pub(crate) location_function_registries: KindCompleteness<'a>,
+    pub(crate) location_size_registries: KindCompleteness<'a>,
+    /// The filtered physical contract scope vocabulary.
+    pub(crate) contract_scopes: KindCompleteness<'a>,
+    pub(crate) npc_archetypes: KindCompleteness<'a>,
+    pub(crate) npc_class_pools: KindCompleteness<'a>,
+    pub(crate) auto_spawns: KindCompleteness<'a>,
+    pub(crate) auto_spawn_sets: KindCompleteness<'a>,
+    pub(crate) encounter_indices: KindCompleteness<'a>,
+    /// The physical `starmapTypes` selection.
+    pub(crate) starmap_types: KindCompleteness<'a>,
+    /// The physical `starmapPresets` selection.
+    pub(crate) starmap_presets: KindCompleteness<'a>,
+    /// The physical `starmapAmenities` selection.
+    pub(crate) starmap_amenities: KindCompleteness<'a>,
     /// The completeness of `factionReputations`.
     pub(crate) faction_reputations: KindCompleteness<'a>,
     /// The completeness of `reputationScopes`.
@@ -75,12 +129,30 @@ pub(crate) struct Completeness<'a> {
     pub(crate) mission_localities: KindCompleteness<'a>,
     /// The completeness of `contractScenarios`.
     pub(crate) contract_scenarios: KindCompleteness<'a>,
+    /// The filtered physical mission module declaration selection.
+    pub(crate) mission_module_declarations: KindCompleteness<'a>,
+    /// The filtered physical mission item definition selection.
+    pub(crate) mission_items: KindCompleteness<'a>,
+    /// The filtered physical mission scenario selection.
+    pub(crate) mission_scenarios: KindCompleteness<'a>,
     /// The completeness of `lootTables`.
     pub(crate) loot_tables: KindCompleteness<'a>,
     /// The completeness of `lootArchetypes`.
     pub(crate) loot_archetypes: KindCompleteness<'a>,
     /// The completeness of `lootPoolFilters`.
     pub(crate) loot_pool_filters: KindCompleteness<'a>,
+    /// The completeness of `lootSecondaryChoiceSingleLayers`.
+    pub(crate) loot_secondary_choice_single_layers: KindCompleteness<'a>,
+    /// The completeness of `lootSecondaryChoiceMultiLayers`.
+    pub(crate) loot_secondary_choice_multi_layers: KindCompleteness<'a>,
+    /// The completeness of `lootThemes`.
+    pub(crate) loot_themes: KindCompleteness<'a>,
+    /// The completeness of `hierarchicalContextualDataPresets`.
+    pub(crate) hierarchical_contextual_data_presets: KindCompleteness<'a>,
+    /// The completeness of `lootGenerationGlobalParams`.
+    pub(crate) loot_generation_global_params: KindCompleteness<'a>,
+    /// The completeness of `subHarvestableConfigs`.
+    pub(crate) sub_harvestable_configs: KindCompleteness<'a>,
     /// The completeness of `legacyLootTables`.
     pub(crate) legacy_loot_tables: KindCompleteness<'a>,
     /// The completeness of `legacyLootArchetypes`.
@@ -105,21 +177,31 @@ pub(crate) struct Completeness<'a> {
     pub(crate) contract_npc_spawns: KindCompleteness<'a>,
     /// The completeness of `contractEntitySpawns`.
     pub(crate) contract_entity_spawns: KindCompleteness<'a>,
+    /// The completeness of `missionPropertySets`.
+    pub(crate) mission_property_sets: KindCompleteness<'a>,
     /// The completeness of `shipStoreSlugs`.
     pub(crate) ship_store_slugs: KindCompleteness<'a>,
 }
 
 impl<'a> Completeness<'a> {
     /// Returns the completeness that states `completeness` for every kind.
+    #[expect(clippy::too_many_lines, reason = "one entry per exported kind")]
     pub(crate) const fn of_every_kind(completeness: KindCompleteness<'a>) -> Self {
         Self {
+            tags: KindCompleteness::Complete,
             manufacturers: completeness,
             items: completeness,
             ships: completeness,
             commodities: completeness,
             blueprints: completeness,
             resource_groups: completeness,
+            resource_types: completeness,
             blueprint_categories: completeness,
+            blueprint_category_lists: completeness,
+            explosion_definitions: completeness,
+            inventory_containers: completeness,
+            medical_item_tier_configs: completeness,
+            ammo_definitions: completeness,
             gameplay_properties: completeness,
             quality_distributions: completeness,
             quality_quantizations: completeness,
@@ -138,6 +220,31 @@ impl<'a> Completeness<'a> {
             harvestable_locations: completeness,
             loot_containers: completeness,
             shops: completeness,
+            shop_inventories: KindCompleteness::Complete,
+            factions: completeness,
+            faction_identities: completeness,
+            reputation_perks: completeness,
+            reputation_trigger_records: completeness,
+            reputation_reward_amounts: completeness,
+            infractions: completeness,
+            infraction_sets: completeness,
+            jurisdictions: completeness,
+            security_network_manifests: completeness,
+            location_classes: completeness,
+            location_functions: completeness,
+            location_sizes: completeness,
+            location_class_registries: completeness,
+            location_function_registries: completeness,
+            location_size_registries: completeness,
+            contract_scopes: completeness,
+            npc_archetypes: completeness,
+            npc_class_pools: completeness,
+            auto_spawns: completeness,
+            auto_spawn_sets: completeness,
+            encounter_indices: completeness,
+            starmap_types: completeness,
+            starmap_presets: completeness,
+            starmap_amenities: completeness,
             faction_reputations: completeness,
             reputation_scopes: completeness,
             reputation_standings: completeness,
@@ -145,9 +252,18 @@ impl<'a> Completeness<'a> {
             mission_types: completeness,
             mission_localities: completeness,
             contract_scenarios: completeness,
+            mission_scenarios: completeness,
+            mission_module_declarations: completeness,
+            mission_items: completeness,
             loot_tables: completeness,
             loot_archetypes: completeness,
             loot_pool_filters: completeness,
+            loot_secondary_choice_single_layers: completeness,
+            loot_secondary_choice_multi_layers: completeness,
+            loot_themes: completeness,
+            hierarchical_contextual_data_presets: completeness,
+            loot_generation_global_params: completeness,
+            sub_harvestable_configs: completeness,
             legacy_loot_tables: completeness,
             legacy_loot_archetypes: completeness,
             mineable_entities: completeness,
@@ -160,6 +276,7 @@ impl<'a> Completeness<'a> {
             mission_broker_entries: completeness,
             contract_npc_spawns: completeness,
             contract_entity_spawns: completeness,
+            mission_property_sets: completeness,
             ship_store_slugs: completeness,
         }
     }
@@ -176,4 +293,12 @@ pub(crate) enum KindCompleteness<'a> {
         /// The Filter text.
         filter: &'a str,
     },
+}
+
+impl<'a> KindCompleteness<'a> {
+    pub(crate) fn for_filter(filter: Option<&'a Filter>) -> Self {
+        filter.map_or(Self::Complete, |filter| Self::Partial {
+            filter: filter.as_str(),
+        })
+    }
 }

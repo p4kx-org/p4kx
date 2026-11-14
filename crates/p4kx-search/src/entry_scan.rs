@@ -7,6 +7,7 @@ use p4kx_extraction::cryxml::{self, Format};
 use p4kx_extraction::{Archive, ArchiveError, Entry};
 
 use crate::gate::Gate;
+use crate::line_match::LineMatch;
 use crate::line_sink::{Halt, LineSink};
 use crate::{EntryHit, Needle};
 
@@ -101,23 +102,23 @@ pub(crate) fn scan(
     if form.is_whole() && size > MAX_WHOLE_LEN {
         return Outcome::TooLarge;
     }
+    let memory = form
+        .memory(size)
+        .saturating_add(LineMatch::memory(context.needle.folded_len()));
+    let _permit = context.gate.acquire(memory);
     let sink = LineSink::new(context.needle, entry.path(), context.per_item, context.stop);
     let result = match form {
         Form::Utf8 => stream(&mut reader, head, buffer, sink),
         Form::Utf16 { big_endian } => {
-            let _permit = context.gate.acquire(form.memory(size));
             whole(&mut reader, head, size).and_then(|data| utf16(&data, big_endian, sink))
         }
-        Form::CryXml => {
-            let _permit = context.gate.acquire(form.memory(size));
-            whole(&mut reader, head, size).and_then(|data| cryxml_lines(&data, sink))
-        }
+        Form::CryXml => whole(&mut reader, head, size).and_then(|data| cryxml_lines(&data, sink)),
     };
     match result {
         Ok((hits, None | Some(Halt::Done))) => Outcome::Scanned(hits),
         Ok((_, Some(Halt::Binary))) | Err(Failure::Binary) => Outcome::Binary,
         Ok((_, Some(Halt::Cancelled))) => Outcome::Cancelled,
-        Err(Failure::Read) => Outcome::Unreadable,
+        Ok((_, Some(Halt::Unreadable))) | Err(Failure::Read) => Outcome::Unreadable,
     }
 }
 

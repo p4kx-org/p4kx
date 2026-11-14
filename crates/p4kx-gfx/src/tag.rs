@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::GfxError;
 use crate::reader::TagReader;
+use crate::{FailureOrigin, GfxError, MovieSpan, TagSite};
 
 const LONG_LENGTH: u16 = 0x3F;
 
@@ -12,13 +12,27 @@ pub(crate) struct Tag<'a> {
     pub(crate) code: u16,
     pub(crate) body: &'a [u8],
     pub(crate) offset: usize,
+    header_start: usize,
 }
 
 impl<'a> Tag<'a> {
+    pub(crate) const fn site(&self) -> TagSite {
+        TagSite {
+            code: self.code,
+            header: MovieSpan::new(self.header_start, self.offset),
+            body: MovieSpan::new(self.offset, self.offset + self.body.len()),
+        }
+    }
+
     /// Returns a reader over the body.
     pub(crate) const fn reader(&self) -> TagReader<'a> {
         TagReader::new(self.body, self.offset)
     }
+}
+
+pub(crate) struct TagReadFailure {
+    pub(crate) error: GfxError,
+    pub(crate) origin: FailureOrigin,
 }
 
 /// Reads the tags of a stream one by one until its `End` tag or its end.
@@ -41,10 +55,14 @@ impl<'a> TagStream<'a> {
         }
     }
 
+    pub(crate) const fn offset(&self) -> usize {
+        self.base + self.position
+    }
+
     /// Reads the next tag, `None` after the `End` tag or at the end of the data.
     ///
     /// A tag header or body that runs past the data is an error, after which the stream ends.
-    pub(crate) fn next_tag(&mut self) -> Option<Result<Tag<'a>, GfxError>> {
+    pub(crate) fn next_tag(&mut self) -> Option<Result<Tag<'a>, TagReadFailure>> {
         if self.ended || self.position >= self.bytes.len() {
             return None;
         }
@@ -62,8 +80,41 @@ impl<'a> TagStream<'a> {
     }
 }
 
-fn read_tag(bytes: &[u8], offset: usize) -> Result<(Tag<'_>, usize), GfxError> {
+fn read_tag(bytes: &[u8], offset: usize) -> Result<(Tag<'_>, usize), TagReadFailure> {
     let mut reader = TagReader::new(bytes, offset);
+    let fields = read_tag_header(&mut reader);
+    let body_offset = reader.offset();
+    let failure = |error| TagReadFailure {
+        error,
+        origin: FailureOrigin::Stream {
+            header: MovieSpan::new(offset, body_offset),
+            available: MovieSpan::new(body_offset, offset + bytes.len()),
+        },
+    };
+    let (code, len) = fields.map_err(failure)?;
+    let header_len = body_offset - offset;
+    let available = bytes.len() - header_len;
+    let body = usize::try_from(len)
+        .ok()
+        .and_then(|len| bytes.get(header_len..header_len.checked_add(len)?))
+        .ok_or_else(|| {
+            failure(GfxError::TagLength {
+                code,
+                offset,
+                len,
+                available,
+            })
+        })?;
+    let tag = Tag {
+        code,
+        body,
+        offset: body_offset,
+        header_start: offset,
+    };
+    Ok((tag, header_len + body.len()))
+}
+
+fn read_tag_header(reader: &mut TagReader<'_>) -> Result<(u16, u32), GfxError> {
     let code_and_length = reader.u16()?;
     let code = code_and_length >> 6;
     let short = code_and_length & LONG_LENGTH;
@@ -72,23 +123,7 @@ fn read_tag(bytes: &[u8], offset: usize) -> Result<(Tag<'_>, usize), GfxError> {
     } else {
         u32::from(short)
     };
-    let header_len = reader.offset() - offset;
-    let available = bytes.len() - header_len;
-    let body = usize::try_from(len)
-        .ok()
-        .and_then(|len| bytes.get(header_len..header_len.checked_add(len)?))
-        .ok_or(GfxError::TagLength {
-            code,
-            offset,
-            len,
-            available,
-        })?;
-    let tag = Tag {
-        code,
-        body,
-        offset: offset + header_len,
-    };
-    Ok((tag, header_len + body.len()))
+    Ok((code, len))
 }
 
 /// Returns the name of a SWF or GFx tag code, `None` for a code this crate does not know.

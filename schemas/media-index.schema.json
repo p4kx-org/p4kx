@@ -1,0 +1,836 @@
+{
+  "$defs": {
+    "Algorithm": {
+      "description": "Integrity algorithm, without conflating CRC checks with cryptographic hashes.",
+      "oneOf": [
+        {
+          "const": "sha256",
+          "description": "SHA-256 cryptographic hash.",
+          "type": "string"
+        },
+        {
+          "const": "crc32",
+          "description": "ZIP CRC-32 polynomial.",
+          "type": "string"
+        },
+        {
+          "const": "crc32c",
+          "description": "Castagnoli CRC-32C polynomial.",
+          "type": "string"
+        }
+      ]
+    },
+    "Artifact": {
+      "description": "A completed artifact described without loading its contents.",
+      "properties": {
+        "digest": {
+          "$ref": "#/$defs/Digest",
+          "description": "SHA-256 over all file bytes."
+        },
+        "path": {
+          "description": "Generation-relative artifact path.",
+          "type": "string"
+        },
+        "size": {
+          "description": "Length in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "size",
+        "digest"
+      ],
+      "type": "object"
+    },
+    "Availability": {
+      "description": "Whether a registered provider can execute in this build.",
+      "oneOf": [
+        {
+          "description": "The implementation can execute.",
+          "properties": {
+            "status": {
+              "const": "available",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Its required implementation or dependency is unavailable.",
+          "properties": {
+            "reason": {
+              "description": "Technical reason for refusing the requested kind.",
+              "type": "string"
+            },
+            "status": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "status",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "BuildProvenance": {
+      "description": "Public launcher Build fields without inferred values.",
+      "properties": {
+        "branch": {
+          "description": "Branch declaration.",
+          "type": "string"
+        },
+        "build_id": {
+          "description": "Build identifier declaration.",
+          "type": "string"
+        },
+        "change_number": {
+          "description": "Perforce change declaration.",
+          "type": "string"
+        },
+        "public_patch": {
+          "description": "Optional public patch supplied by the caller.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "version": {
+          "description": "Version declaration.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "branch",
+        "version",
+        "change_number",
+        "build_id"
+      ],
+      "type": "object"
+    },
+    "ByteScope": {
+      "description": "Exact byte scope of a computed or declared integrity value.",
+      "oneOf": [
+        {
+          "const": "root-archive-file",
+          "description": "Every byte streamed from the root Archive file.",
+          "type": "string"
+        },
+        {
+          "const": "stored-entry-payload",
+          "description": "Entry bytes before decryption and decompression.",
+          "type": "string"
+        },
+        {
+          "const": "decoded-entry-payload",
+          "description": "Entry bytes after decryption and decompression.",
+          "type": "string"
+        },
+        {
+          "const": "artifact-file",
+          "description": "Every byte of a generated artifact file.",
+          "type": "string"
+        }
+      ]
+    },
+    "Capability": {
+      "description": "Explicit provider version, availability and preservation scope.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/Availability",
+          "description": "Runtime availability."
+        },
+        "field_groups": {
+          "description": "Advertised typed field groups and unsupported groups.",
+          "items": {
+            "$ref": "#/$defs/FieldGroup"
+          },
+          "type": "array"
+        },
+        "id": {
+          "description": "Stable implementation identifier.",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/MediaKind",
+          "description": "Output kind."
+        },
+        "preservation": {
+          "description": "Exact source-preservation boundary, independent of typed projection.",
+          "type": "string"
+        },
+        "version": {
+          "description": "Provider's semantic version.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "id",
+        "version",
+        "availability",
+        "preservation",
+        "field_groups"
+      ],
+      "type": "object"
+    },
+    "Counts": {
+      "description": "Separate physical, metadata and converted-output accounting.",
+      "properties": {
+        "converted_outputs": {
+          "$ref": "#/$defs/Tally",
+          "description": "Converted output artifacts; retained source bytes are excluded."
+        },
+        "records": {
+          "$ref": "#/$defs/Tally",
+          "description": "Metadata and subresource records, including root metadata."
+        },
+        "source_entries": {
+          "$ref": "#/$defs/Tally",
+          "description": "Physical Entry callbacks; root metadata is not an Entry."
+        }
+      },
+      "required": [
+        "source_entries",
+        "records",
+        "converted_outputs"
+      ],
+      "type": "object"
+    },
+    "DecimalU64": {
+      "description": "Canonical unsigned 64-bit decimal text, from 0 through 18446744073709551615.",
+      "maxLength": 20,
+      "not": {
+        "pattern": "[^0-9]"
+      },
+      "pattern": "^(?:0|[1-9][0-9]{0,18}|1[0-7][0-9]{18}|18[0-3][0-9]{17}|184[0-3][0-9]{16}|1844[0-5][0-9]{15}|18446[0-6][0-9]{14}|184467[0-3][0-9]{13}|1844674[0-3][0-9]{12}|184467440[0-6][0-9]{10}|1844674407[0-2][0-9]{9}|18446744073[0-6][0-9]{8}|1844674407370[0-8][0-9]{6}|18446744073709[0-4][0-9]{5}|184467440737095[0-4][0-9]{4}|1844674407370955[0-0][0-9]{3}|18446744073709551[0-5][0-9]{2}|184467440737095516[0-0][0-9]{1}|1844674407370955161[0-4][0-9]{0}|18446744073709551615)$",
+      "type": "string"
+    },
+    "Digest": {
+      "description": "An explicitly scoped integrity value.",
+      "properties": {
+        "algorithm": {
+          "$ref": "#/$defs/Algorithm",
+          "description": "Algorithm name, including the CRC polynomial where relevant."
+        },
+        "hex": {
+          "description": "Lower-case hexadecimal spelling.",
+          "type": "string"
+        },
+        "scope": {
+          "$ref": "#/$defs/ByteScope",
+          "description": "Exact bytes over which the value was computed or declared."
+        }
+      },
+      "required": [
+        "algorithm",
+        "scope",
+        "hex"
+      ],
+      "type": "object"
+    },
+    "DirectoryIssue": {
+      "description": "One issue in the Archive reader's bounded directory sample.",
+      "properties": {
+        "archive_wide": {
+          "description": "Whether the issue affects the Archive inventory rather than one Entry.",
+          "type": "boolean"
+        },
+        "block_size": {
+          "description": "Raw encryption or hash block length when available.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "code": {
+          "description": "Stable namespaced diagnosis code.",
+          "type": "string"
+        },
+        "detail": {
+          "description": "Reader-provided technical description.",
+          "type": "string"
+        },
+        "encryption_value": {
+          "description": "Raw encryption value when available.",
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "entry_index": {
+          "description": "Physical index for an Entry issue; absent for a global Archive marker.",
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "code",
+        "archive_wide",
+        "detail"
+      ],
+      "type": "object"
+    },
+    "FieldGroup": {
+      "description": "Typed projection coverage for one advertised source field group.",
+      "properties": {
+        "name": {
+          "description": "Stable source-field group name.",
+          "type": "string"
+        },
+        "projected": {
+          "description": "Whether typed fields in this group are projected.",
+          "type": "boolean"
+        },
+        "scope": {
+          "description": "Precise supported scope or reason the group is not projected.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "projected",
+        "scope"
+      ],
+      "type": "object"
+    },
+    "KindSummary": {
+      "description": "One provider's stream, capability and actual counts.",
+      "properties": {
+        "artifact": {
+          "$ref": "#/$defs/Artifact",
+          "description": "Completed metadata stream."
+        },
+        "counts": {
+          "$ref": "#/$defs/Counts",
+          "description": "Actual counts with explicit units."
+        },
+        "provider": {
+          "$ref": "#/$defs/Capability",
+          "description": "Selected provider capability and version."
+        }
+      },
+      "required": [
+        "provider",
+        "counts",
+        "artifact"
+      ],
+      "type": "object"
+    },
+    "Limits": {
+      "description": "Bounds applied before reading or writing the next unit of work.",
+      "properties": {
+        "chunk_bytes": {
+          "description": "Bytes in one typed binary chunk or required source chunk read.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "depth": {
+          "description": "Ordered container chain length.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "entry_bytes": {
+          "description": "Decoded bytes of one Entry.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "metadata_work": {
+          "default": 100000000,
+          "description": "Metadata cursor/read, chunk table rows and cached path-index work across owning sources.",
+          "format": "uint64",
+          "maximum": 18446744073709551615,
+          "minimum": 1,
+          "type": "integer"
+        },
+        "output_bytes": {
+          "description": "Bytes written to payload artifacts, excluding the index and field-origin companion streams.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "record_bytes": {
+          "description": "Bytes in one serialised record, including its newline.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "records": {
+          "description": "Metadata and subresource records over all providers.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "reference_candidates": {
+          "description": "Actual candidates retained for one complete reference lookup.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "references": {
+          "description": "Reference queries across the generation.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "root_bytes": {
+          "description": "Bytes hashed from the complete root file.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_bytes": {
+          "description": "Decoded retention/container bytes and actual metadata-read bytes across owning sources.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sources": {
+          "description": "Physical Entries examined during traversal, including filtered Entries.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "value_depth": {
+          "description": "Maximum record JSON nesting, including its envelope.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "root_bytes",
+        "sources",
+        "source_bytes",
+        "entry_bytes",
+        "records",
+        "record_bytes",
+        "chunk_bytes",
+        "output_bytes",
+        "depth",
+        "value_depth",
+        "references",
+        "reference_candidates"
+      ],
+      "type": "object"
+    },
+    "MediaFormat": {
+      "description": "Exact discriminator of the media contract.",
+      "oneOf": [
+        {
+          "const": "p4kx-media",
+          "description": "The media export envelope.",
+          "type": "string"
+        }
+      ]
+    },
+    "MediaKind": {
+      "description": "A separately selectable provider output stream.",
+      "oneOf": [
+        {
+          "const": "archive",
+          "description": "Public Archive and Entry metadata.",
+          "type": "string"
+        },
+        {
+          "const": "model",
+          "description": "Model geometry and definitions.",
+          "type": "string"
+        },
+        {
+          "const": "material",
+          "description": "Material definitions.",
+          "type": "string"
+        },
+        {
+          "const": "texture",
+          "description": "Texture storage and images.",
+          "type": "string"
+        },
+        {
+          "const": "shader",
+          "description": "Shader source or compiled data.",
+          "type": "string"
+        },
+        {
+          "const": "animation",
+          "description": "Animation samples.",
+          "type": "string"
+        },
+        {
+          "const": "animation-definition",
+          "description": "Animation definitions and references.",
+          "type": "string"
+        },
+        {
+          "const": "audio",
+          "description": "Audio media and samples.",
+          "type": "string"
+        },
+        {
+          "const": "audio-control",
+          "description": "Audio control definitions.",
+          "type": "string"
+        }
+      ]
+    },
+    "MediaVersion": {
+      "description": "Exact media format version, independent of catalog schema versions.",
+      "oneOf": [
+        {
+          "const": "1.0",
+          "description": "Version 1.0 of the media index and record envelopes.",
+          "type": "string"
+        }
+      ]
+    },
+    "OriginProtocol": {
+      "description": "The closed field-origin transport contract.",
+      "oneOf": [
+        {
+          "const": "p4kx.field-origins/1",
+          "description": "Shared original inventories and occurrence-scoped immediate origins.",
+          "type": "string"
+        }
+      ]
+    },
+    "OriginReceipts": {
+      "description": "Hashed shared inventories and field origins bound into the generation identity.",
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/Artifact",
+          "description": "Occurrence, field, completion and EOF rows."
+        },
+        "protocol": {
+          "$ref": "#/$defs/OriginProtocol",
+          "description": "Closed transport capability."
+        },
+        "sources": {
+          "$ref": "#/$defs/Artifact",
+          "description": "Original shared `PhysicalSource` rows."
+        },
+        "streams": {
+          "description": "Complete multiplicities for every payload stream.",
+          "items": {
+            "$ref": "#/$defs/OriginStreamSummary"
+          },
+          "type": "array"
+        },
+        "uses": {
+          "$ref": "#/$defs/Artifact",
+          "description": "Original shared `SourceUseDescription` rows."
+        }
+      },
+      "required": [
+        "protocol",
+        "sources",
+        "uses",
+        "fields",
+        "streams"
+      ],
+      "type": "object"
+    },
+    "OriginStream": {
+      "description": "One payload stream whose individual occurrences have separate origins.",
+      "oneOf": [
+        {
+          "description": "One provider-kind JSONL stream.",
+          "properties": {
+            "kind": {
+              "$ref": "#/$defs/MediaKind",
+              "description": "Provider output kind."
+            },
+            "type": {
+              "const": "records",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Retained physical source rows.",
+          "properties": {
+            "type": {
+              "const": "sources",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Actual artifact-manifest row occurrences.",
+          "properties": {
+            "type": {
+              "const": "artifacts",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Canonical nullable Index.source.build projection, separately from the Index file.",
+          "properties": {
+            "type": {
+              "const": "indexBuild",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "OriginStreamSummary": {
+      "description": "Exact occurrence and field counts for one payload stream.",
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Actual addressed JSON nodes."
+        },
+        "occurrences": {
+          "$ref": "#/$defs/DecimalU64",
+          "description": "Actual emitted rows, including repeated equal artifacts."
+        },
+        "stream": {
+          "$ref": "#/$defs/OriginStream",
+          "description": "Payload stream being counted."
+        }
+      },
+      "required": [
+        "stream",
+        "occurrences",
+        "fields"
+      ],
+      "type": "object"
+    },
+    "RootSource": {
+      "description": "Root file provenance and the public Build declaration.",
+      "properties": {
+        "build": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BuildProvenance"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Build fields as declared by the adjacent launcher manifest."
+        },
+        "digest": {
+          "$ref": "#/$defs/Digest",
+          "description": "All-byte cryptographic identity."
+        },
+        "directory_issue_count": {
+          "description": "Total directory issues observed by the reader, including beyond its sample limit.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "directory_issue_samples_complete": {
+          "description": "Whether the samples include every issue counted by the reader.",
+          "type": "boolean"
+        },
+        "directory_issues": {
+          "description": "Reader-bounded issue samples in their exposed order.",
+          "items": {
+            "$ref": "#/$defs/DirectoryIssue"
+          },
+          "type": "array"
+        },
+        "enumeration_complete": {
+          "description": "Whether the reader has an intact source Entry inventory.",
+          "type": "boolean"
+        },
+        "installation_flags": {
+          "description": "Public source installation flags, absent when the layout provides none.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "path": {
+          "description": "Root file display path, using lossy Unicode conversion when needed.",
+          "type": "string"
+        },
+        "size": {
+          "description": "File size in bytes.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "path",
+        "digest",
+        "size",
+        "directory_issue_count",
+        "directory_issues",
+        "directory_issue_samples_complete",
+        "enumeration_complete"
+      ],
+      "type": "object"
+    },
+    "Tally": {
+      "description": "Actual observations in one explicitly named counting unit.",
+      "properties": {
+        "enumerated": {
+          "description": "Units considered by the operation.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "failed": {
+          "description": "Units that failed.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "partial": {
+          "description": "Units written with diagnosed projection loss.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "skipped": {
+          "description": "Units intentionally skipped by selection or provider applicability.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "written": {
+          "description": "Units written completely.",
+          "format": "uint64",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "enumerated",
+        "written",
+        "partial",
+        "failed",
+        "skipped"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "description": "The only root commit point of a complete media generation.",
+  "properties": {
+    "artifact_base": {
+      "description": "Artifact base relative to this index.",
+      "type": "string"
+    },
+    "artifact_manifest": {
+      "$ref": "#/$defs/Artifact",
+      "description": "Streaming manifest of raw and converted artifact hashes."
+    },
+    "complete": {
+      "description": "Whether all selected operations completed without projection loss.",
+      "type": "boolean"
+    },
+    "enumeration_complete": {
+      "description": "Whether traversal discovered every selected source in its configured scope.",
+      "type": "boolean"
+    },
+    "field_origins": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/OriginReceipts"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Hashed field origins; missing historical metadata has unknown coverage."
+    },
+    "format": {
+      "$ref": "#/$defs/MediaFormat",
+      "description": "Fixed media contract discriminator."
+    },
+    "format_version": {
+      "$ref": "#/$defs/MediaVersion",
+      "description": "Fixed media contract version, independently of catalog schemas."
+    },
+    "generation": {
+      "description": "SHA-256 content generation identifier.",
+      "type": "string"
+    },
+    "kinds": {
+      "description": "Selected provider streams in registration order.",
+      "items": {
+        "$ref": "#/$defs/KindSummary"
+      },
+      "type": "array"
+    },
+    "limits": {
+      "$ref": "#/$defs/Limits",
+      "description": "Applied safety bounds; the synchronous queue depth is one source."
+    },
+    "source": {
+      "$ref": "#/$defs/RootSource",
+      "description": "Root Archive provenance."
+    },
+    "source_entries": {
+      "$ref": "#/$defs/Tally",
+      "description": "Physical Entries seen and selected once across providers."
+    },
+    "source_manifest": {
+      "$ref": "#/$defs/Artifact",
+      "description": "Streaming identities and exact raw references for every selected retained source."
+    }
+  },
+  "required": [
+    "format",
+    "format_version",
+    "complete",
+    "enumeration_complete",
+    "source",
+    "generation",
+    "artifact_base",
+    "limits",
+    "source_entries",
+    "kinds",
+    "source_manifest",
+    "artifact_manifest"
+  ],
+  "title": "Index",
+  "type": "object"
+}

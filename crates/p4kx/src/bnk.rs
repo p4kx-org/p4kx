@@ -6,7 +6,9 @@ use std::path::Path;
 use std::process::ExitCode;
 
 use anyhow::Result;
-use p4kx_extraction::{Bank, BankExtraction, EmbeddedWem, MediaClass, WemFormat};
+use p4kx_extraction::{
+    Archive, Bank, BankExtraction, ConversionError, EmbeddedWem, MediaClass, WemFormat,
+};
 use serde::Serialize;
 
 use crate::cli::{BnkAction, BnkArgs, BnkFormat, BnkSource};
@@ -77,9 +79,25 @@ pub(crate) fn run(args: &BnkArgs, as_json: bool) -> Result<ExitCode> {
 }
 
 pub(crate) fn open(source: &BnkSource) -> Result<Bank> {
+    open_with(source, Bank::from_archive, Bank::from_file)
+}
+
+pub(crate) fn open_observed(source: &BnkSource) -> Result<Bank> {
+    open_with(
+        source,
+        Bank::from_archive_observed,
+        Bank::from_file_observed,
+    )
+}
+
+fn open_with(
+    source: &BnkSource,
+    archive: fn(&Archive, &str) -> Result<Bank, ConversionError>,
+    file: fn(&Path) -> Result<Bank, ConversionError>,
+) -> Result<Bank> {
     Ok(match &source.entry {
-        Some(entry) => Bank::from_archive(&crate::key::open(&source.path)?, entry)?,
-        None => Bank::from_file(&source.path)?,
+        Some(entry) => archive(&crate::key::open(&source.path)?, entry)?,
+        None => file(&source.path)?,
     })
 }
 

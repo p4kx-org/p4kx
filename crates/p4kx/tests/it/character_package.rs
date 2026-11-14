@@ -127,7 +127,10 @@ fn a_character_with_animations_is_a_package_of_one_skinned_glb() -> TestResult {
     )?;
 
     assert_eq!(run.code, Some(0), "{}{}", run.stdout, run.stderr);
-    assert_eq!(names(&out)?, ["meshes", "scene.json", "textures"]);
+    assert_eq!(
+        names(&out)?,
+        ["meshes", "receipt.json", "scene.json", "textures"]
+    );
     assert_eq!(names(&out.join("meshes"))?, ["m0001.glb"]);
     assert!(run.stdout.contains("on the male body"), "{}", run.stdout);
     assert!(run.stdout.contains("2 animations"), "{}", run.stdout);
@@ -311,5 +314,33 @@ fn an_earlier_character_package_is_replaced() -> TestResult {
     assert_eq!(first.code, Some(0), "{}", first.stderr);
     assert_eq!(second.code, Some(0), "{}", second.stderr);
     assert_eq!(names(dir.path())?, ["Data.p4k", "body"]);
+    Ok(())
+}
+
+#[test]
+fn the_character_package_vertex_map_flag_writes_the_rigged_sidecar() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(dir.path(), armour_entries())?;
+    let out = dir.path().join("body");
+    let run = package(
+        &archive,
+        &out,
+        &["--materials", "colours", "--vertex-maps"],
+        false,
+    )?;
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let document = manifest(&out)?;
+    let map = document
+        .pointer("/meshes/0/vertex_map")
+        .and_then(Value::as_str)
+        .ok_or("rigged vertex map path")?;
+    assert_eq!(
+        map, "meshes/m0001.vertex-map.jsonl",
+        "character sidecar reference"
+    );
+    assert!(
+        out.join(map).is_file(),
+        "character CLI writes the referenced sidecar"
+    );
     Ok(())
 }

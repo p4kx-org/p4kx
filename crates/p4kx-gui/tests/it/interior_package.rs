@@ -194,7 +194,10 @@ fn an_earlier_package_is_replaced_and_anything_else_is_left_alone() -> TestResul
         .assembly_export_setup_mut()
         .ok_or("no setup")?;
     setup.set_package_folder(other.clone());
-    assert_eq!(setup.package_problem(), Some(&PackageProblem::NotAPackage));
+    assert!(matches!(
+        setup.package_problem(),
+        Some(PackageProblem::NotAPackage)
+    ));
     assert!(!setup.is_ready());
     harness.run_steps(3);
     assert!(

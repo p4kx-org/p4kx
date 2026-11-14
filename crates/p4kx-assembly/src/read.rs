@@ -24,11 +24,21 @@ pub(crate) fn struct_items<'v, 'f>(
     structure: &'v StructValue<'f>,
     name: &str,
 ) -> impl Iterator<Item = &'v StructValue<'f>> {
+    indexed_struct_items(structure, name).map(|(_, structure)| structure)
+}
+
+pub(crate) fn indexed_struct_items<'v, 'f>(
+    structure: &'v StructValue<'f>,
+    name: &str,
+) -> impl Iterator<Item = (usize, &'v StructValue<'f>)> {
     let items = match structure.field(name) {
         Some(Value::Array(items)) => &items[..],
         _ => &[],
     };
-    items.iter().filter_map(as_struct)
+    items
+        .iter()
+        .enumerate()
+        .filter_map(|(index, item)| as_struct(item).map(|structure| (index, structure)))
 }
 
 /// Returns whether the array field `name` holds at least one element.
@@ -96,7 +106,11 @@ fn unsigned_value(value: &Value<'_>) -> Option<u32> {
 
 /// Returns a numeric field as `f64`, or `None` when it holds none.
 pub(crate) fn float(structure: &StructValue<'_>, name: &str) -> Option<f64> {
-    match structure.field(name)? {
+    value_float(structure.field(name)?)
+}
+
+pub(crate) fn value_float(value: &Value<'_>) -> Option<f64> {
+    match value {
         Value::Single(value) => Some(f64::from(*value)),
         Value::Double(value) => Some(*value),
         _ => None,

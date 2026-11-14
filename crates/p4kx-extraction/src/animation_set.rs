@@ -6,9 +6,9 @@ use std::path::{Path, PathBuf};
 use p4kx_model::Animation;
 use rayon::prelude::*;
 
-use crate::animation_load::{kind, load};
-use crate::animation_select::read;
-use crate::animation_sources::{disk_sources, open_entry, with_extras};
+use crate::animation_load::{kind, load, load_with_positions};
+use crate::animation_select::{Gathered, MatchEvidence, read, read_observing};
+use crate::animation_sources::{ArchiveAnimationRead, disk_sources, open_entry, with_extras};
 use crate::{CancelToken, ChunkSource, ConversionError, Entry, PathIndex};
 
 /// The largest `.caf` or `.dba` file read into memory, far above the largest of a real Archive.
@@ -250,18 +250,64 @@ impl AnimationSet {
         choice: &AnimationChoice,
         extra: &[String],
     ) -> Result<Self, ConversionError> {
+        Self::from_folders_with_archive_sources(index, folders, choice, extra)
+            .map(ArchiveAnimationRead::into_set)
+    }
+
+    /// Reads selected animations and retains the Archive Entry bound to each successful read.
+    ///
+    /// # Errors
+    /// As [`Self::from_folders`].
+    pub fn from_folders_with_archive_sources(
+        index: &PathIndex<'_>,
+        folders: &[&str],
+        choice: &AnimationChoice,
+        extra: &[String],
+    ) -> Result<ArchiveAnimationRead, ConversionError> {
+        Self::gather_sources(
+            index,
+            Self::folder_sources(index, folders),
+            choice,
+            extra,
+            None,
+        )
+        .map(ArchiveAnimationRead::from)
+    }
+
+    /// Reads selected animations and retains both Archive Entries and original clip coordinates.
+    ///
+    /// # Errors
+    /// As [`Self::from_folders`].
+    pub fn from_folders_with_clip_evidence(
+        index: &PathIndex<'_>,
+        folders: &[&str],
+        choice: &AnimationChoice,
+        extra: &[String],
+    ) -> Result<ArchiveAnimationRead, ConversionError> {
+        let sources = with_extras(index, Self::folder_sources(index, folders), choice, extra)?;
+        read_observing(
+            sources,
+            choice,
+            |label| open_entry(index, label, None),
+            |file, label, kind, _| load_with_positions(file, label, kind),
+            MatchEvidence::Capture,
+            |_, _| {},
+        )
+        .map(ArchiveAnimationRead::from)
+    }
+
+    fn folder_sources(index: &PathIndex<'_>, folders: &[&str]) -> Vec<Source> {
         let prefixes: Vec<String> = folders
             .iter()
             .map(|folder| format!("{}/", normalised(folder).trim_end_matches('/')))
             .collect();
-        let sources: Vec<Source> = index
+        index
             .archive()
             .entries()
             .par_iter()
             .filter(|entry| kind(entry.path()).is_some() && under_prefixes(entry.path(), &prefixes))
             .map(source_of)
-            .collect();
-        Self::from_sources(index, sources, choice, extra, None)
+            .collect()
     }
 
     fn from_sources(
@@ -271,6 +317,16 @@ impl AnimationSet {
         extra: &[String],
         cancel: Option<&CancelToken>,
     ) -> Result<Self, ConversionError> {
+        Self::gather_sources(index, sources, choice, extra, cancel).map(Self::from)
+    }
+
+    fn gather_sources(
+        index: &PathIndex<'_>,
+        sources: Vec<Source>,
+        choice: &AnimationChoice,
+        extra: &[String],
+        cancel: Option<&CancelToken>,
+    ) -> Result<Gathered<Animation>, ConversionError> {
         let sources = with_extras(index, sources, choice, extra)?;
         read(
             sources,
@@ -278,7 +334,6 @@ impl AnimationSet {
             |label| open_entry(index, label, cancel),
             |file, label, kind, _| load(file, label, kind),
         )
-        .map(Self::from)
     }
 
     /// Reads the animations `choice` selects from the `.caf` and `.dba` files in the folder of

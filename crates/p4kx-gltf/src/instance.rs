@@ -54,8 +54,8 @@ pub(crate) fn materials(
     textures: &TextureSet,
     image_textures: &[Index<json::Texture>],
 ) -> Vec<MaterialIds> {
-    let mut shared: HashMap<String, Index<json::Material>> = HashMap::new();
-    instances
+    let mut shared: HashMap<(String, bool), Index<json::Material>> = HashMap::new();
+    let ids = instances
         .iter()
         .enumerate()
         .map(|(part, instance)| {
@@ -73,7 +73,9 @@ pub(crate) fn materials(
                 } else {
                     let built = built_material(instance, (part, slot), textures, image_textures);
                     let index = if instances.len() > 1 {
-                        push_shared(root, &mut shared, built)
+                        let physical =
+                            slot == Slot::Default && instance.plan.has_physical_fallback();
+                        push_shared(root, &mut shared, built, physical)
                     } else {
                         root.push(built)
                     };
@@ -84,7 +86,17 @@ pub(crate) fn materials(
             }
             by_id
         })
-        .collect()
+        .collect();
+    if root.materials.iter().any(|material| {
+        material
+            .extensions
+            .as_ref()
+            .is_some_and(|extensions| extensions.emissive_strength.is_some())
+    }) {
+        root.extensions_used
+            .push("KHR_materials_emissive_strength".to_owned());
+    }
+    ids
 }
 
 /// Returns how many materials the instances ask for: one per distinct material slot of each
@@ -133,12 +145,13 @@ fn built_material(
 
 fn push_shared(
     root: &mut Root,
-    shared: &mut HashMap<String, Index<json::Material>>,
+    shared: &mut HashMap<(String, bool), Index<json::Material>>,
     material: json::Material,
+    physical_fallback: bool,
 ) -> Index<json::Material> {
     match serde_json::to_string(&material) {
         Ok(key) => *shared
-            .entry(key)
+            .entry((key, physical_fallback))
             .or_insert_with(|| root.push(material.clone())),
         Err(_) => root.push(material),
     }

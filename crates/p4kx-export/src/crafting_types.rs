@@ -3,6 +3,10 @@
 
 use p4kx_extraction::Guid;
 
+use crate::crafting_research::Research;
+
+pub use crate::quality_curve::QualityCurve;
+
 /// How the quality range of a gameplay-property modifier changes the property.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -85,8 +89,8 @@ pub struct Selection<'f> {
     pub slot_key: Option<&'f str>,
     /// What the game applies to the selection.
     pub context: CostContext<'f>,
-    /// The options in stored order.
-    pub options: Vec<Cost<'f>>,
+    /// The option indices in stored order in this tier.
+    pub options: Vec<CostIndex>,
 }
 
 impl Selection<'_> {
@@ -111,15 +115,70 @@ pub enum Cost<'f> {
     Item(ItemCost<'f>),
 }
 
+/// One cost position in its owning tier's arena.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CostIndex(usize);
+
+impl CostIndex {
+    pub(crate) const fn new(index: usize) -> Self {
+        Self(index)
+    }
+
+    /// Returns the position in the owning tier's cost slice.
+    #[must_use]
+    pub const fn index(self) -> usize {
+        self.0
+    }
+}
+
 /// One tier of a blueprint: its craft time and its costs.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Tier<'f> {
     /// The craft time in whole seconds, `None` without one.
     pub craft_time_seconds: Option<i64>,
-    /// The mandatory cost, `None` without one.
-    pub mandatory: Option<Cost<'f>>,
-    /// The optional costs in stored order.
-    pub optional: Vec<Cost<'f>>,
+    /// The mandatory cost position, `None` without one.
+    pub mandatory: Option<CostIndex>,
+    /// The optional cost positions in stored order.
+    pub optional: Vec<CostIndex>,
+    /// The actual research envelope and member states.
+    pub research: Research<'f>,
+    costs: Vec<Cost<'f>>,
+}
+
+impl<'f> Tier<'f> {
+    pub(crate) const fn new(
+        craft_time_seconds: Option<i64>,
+        mandatory: Option<CostIndex>,
+        optional: Vec<CostIndex>,
+        costs: Vec<Cost<'f>>,
+        research: Research<'f>,
+    ) -> Self {
+        Self {
+            craft_time_seconds,
+            mandatory,
+            optional,
+            research,
+            costs,
+        }
+    }
+
+    /// Returns all cost nodes in original depth-first order.
+    #[must_use]
+    pub const fn costs(&self) -> &[Cost<'f>] {
+        self.costs.as_slice()
+    }
+
+    /// Borrows a cost by its position in this tier.
+    #[must_use]
+    pub fn cost(&self, index: CostIndex) -> Option<&Cost<'f>> {
+        self.costs.get(index.index())
+    }
+
+    /// Borrows the mandatory cost when the tier has one.
+    #[must_use]
+    pub fn mandatory_cost(&self) -> Option<&Cost<'f>> {
+        self.mandatory.and_then(|index| self.cost(index))
+    }
 }
 
 /// A blueprint with all its tiers.
@@ -156,21 +215,6 @@ pub struct GameplayProperty<'f> {
     pub record_path: &'f str,
     /// The localisation key of the property name, `None` for none or a placeholder.
     pub name_key: Option<&'f str>,
-}
-
-/// A normal distribution of quality.
-#[derive(Debug, Clone, PartialEq)]
-pub struct QualityCurve<'f> {
-    /// The struct of the distribution, e.g. `CraftingQualityDistributionNormal`.
-    pub kind: &'f str,
-    /// The lowest quality.
-    pub min: Option<f32>,
-    /// The highest quality.
-    pub max: Option<f32>,
-    /// The mean.
-    pub mean: Option<f32>,
-    /// The standard deviation.
-    pub stddev: Option<f32>,
 }
 
 /// A distribution that replaces the default one at a location.
@@ -270,7 +314,7 @@ pub struct RewardSource<'f> {
     pub record_path: &'f str,
     /// The `id` of the nearest enclosing struct that has one, e.g. the contract.
     pub contract_id: Option<Guid>,
-    /// The `debugName` of the nearest enclosing struct that has one.
+    /// The `debugName` paired with the nearest enclosing `id`, or the nearest name without an id.
     pub contract_name: Option<&'f str>,
     /// The GUID of the `BlueprintPoolRecord` the Reference links to.
     pub pool: Guid,

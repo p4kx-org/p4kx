@@ -9,21 +9,46 @@ Run with ``blender --background --factory-startup --python blender_smoke.py`` or
 
 from __future__ import annotations
 
+import os
+import platform
+import struct
 import sys
 import tempfile
+from importlib import import_module
 from pathlib import Path
+from types import ModuleType
 
 import bpy
 import addon_utils
 from mathutils import Vector
 
 HERE = Path(__file__).resolve().parent
-sys.path[:0] = [str(HERE), str(HERE.parent)]
+INSTALLED_ROOT = os.environ.get("P4KX_TEST_INSTALLED_BLENDER_ROOT")
+ADDON = "bl_ext.user_default.p4kx_importer" if INSTALLED_ROOT else "p4kx_importer"
+sys.path.insert(0, str(HERE))
+if not INSTALLED_ROOT:
+    sys.path.insert(1, str(HERE.parent))
 
+import blender_collision_smoke  # noqa: E402
+import blender_soc_scene_smoke  # noqa: E402
 import synthetic  # noqa: E402
 import synthetic_character  # noqa: E402
 import synthetic_materials  # noqa: E402
-from p4kx_importer import importer, lights, package, register, unregister  # noqa: E402
+
+
+def addon_module(name: str) -> ModuleType:
+    """Imports a module from the selected add-on."""
+    return import_module(f"{ADDON}.{name}")
+
+
+extension = import_module(ADDON)
+importer = addon_module("importer")
+lights = addon_module("lights")
+package = addon_module("package")
+glass_tint = addon_module("glass_tint")
+materials = addon_module("materials")
+material_graph = addon_module("material_graph")
+material_model = addon_module("material_model")
 
 
 def check(condition: bool, message: str) -> None:
@@ -100,11 +125,31 @@ def check_interior_alone(folder: Path) -> None:
     check(abs(room.matrix_world.translation.y - 6.0) < 1e-4, f"room at {tuple(room.matrix_world.translation)}")
 
 
-def check_character(folder: Path) -> None:
+def reads_gltf_vertex_colour(socket: bpy.types.NodeSocket) -> bool:
+    """Checks the live colour inputs between the shader and the imported vertex attribute."""
+    pending = [socket]
+    seen = set()
+    while pending:
+        current = pending.pop()
+        if current in seen:
+            continue
+        seen.add(current)
+        for link in current.links:
+            source = link.from_node
+            if source.type == "VERTEX_COLOR":
+                return True
+            if source.type == "ATTRIBUTE" and source.attribute_type == "GEOMETRY" and source.attribute_name == "Color":
+                return True
+            if source.type in ("MIX", "MIX_RGB"):
+                pending.extend(item for item in source.inputs if item.enabled and item.type == "RGBA")
+    return False
+
+
+def check_character(folder: Path, base_colour: tuple[float, ...]) -> None:
     """Imports ``synthetic_character.character_manifest()`` and checks armature, shapes, actions."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     addon_utils.enable("io_scene_gltf2", default_set=False)
-    scene = synthetic_character.write_character_package(folder)
+    scene = synthetic_character.write_character_package(folder, base_colour=base_colour)
     loaded = package.load_package(scene)
     check(not loaded.warnings, f"loaded: {loaded.warnings}")
     rigged = next(mesh for mesh in loaded.meshes.values() if mesh.rig is not None)
@@ -112,16 +157,13 @@ def check_character(folder: Path) -> None:
     importer._run_gltf(bpy.context, package.resolve_file(loaded.root, rigged.file))
     plain = [m for m in bpy.data.materials if m not in before["materials"] and m.node_tree]
     check(plain, "the plain glTF import creates a material")
-    wired = False
-    for material in plain:
-        base = next(n for n in material.node_tree.nodes if n.type == "BSDF_PRINCIPLED").inputs["Base Color"]
-        mix = base.links[0].from_node if base.is_linked else None
-        wired = wired or (
-            mix is not None
-            and mix.type in ("MIX", "MIX_RGB")
-            and any(s.is_linked and s.links[0].from_node.type == "VERTEX_COLOR" for s in mix.inputs)
-        )
-    check(wired, "the glTF importer wires COLOR_0 into the base colour before the add-on drops it")
+    base_sockets = [
+        node.inputs["Base Color"]
+        for material in plain
+        for node in material.node_tree.nodes
+        if node.type == "BSDF_PRINCIPLED"
+    ]
+    check(any(reads_gltf_vertex_colour(socket) for socket in base_sockets), "glTF uses the original COLOR_0")
     importer._discard_new(before)
     result = importer.import_package(bpy.context, loaded)
     check(not result.warnings, f"warnings: {result.warnings}")
@@ -150,8 +192,12 @@ def check_character(folder: Path) -> None:
     check(len(body.data.color_attributes) == 1, "the vertex colours are kept as an attribute")
     bsdf = next(n for n in body.data.materials[0].node_tree.nodes if n.type == "BSDF_PRINCIPLED")
     base = bsdf.inputs["Base Color"]
-    tinting = base.is_linked and base.links[0].from_node.type in ("MIX", "MIX_RGB")
-    check(not tinting, "the vertex colours do not tint the base colour")
+    check(not reads_gltf_vertex_colour(base), "the vertex colours do not tint the base colour")
+    check(not base.is_linked, "the plain material keeps its base factor directly on the shader")
+    check(
+        all(abs(actual - expected) < 1e-6 for actual, expected in zip(base.default_value, base_colour)),
+        f"the authored base factor is preserved: {tuple(base.default_value)}",
+    )
 
     waves = [action for action in bpy.data.actions if "wave" in action.name]
     check(len(waves) >= 1, f"actions: {[action.name for action in bpy.data.actions]}")
@@ -165,8 +211,22 @@ def check_character(folder: Path) -> None:
     check(prop.parent is hero, "the prop is below the Character")
 
 
+def check_installed_extension() -> None:
+    """Verifies the host and the enabled add-on before changing the fixture scene."""
+    if not INSTALLED_ROOT:
+        return
+    check(platform.system() == "Darwin" and platform.machine() == "arm64", "native Apple Silicon Blender")
+    check(bpy.app.version[:2] == (5, 2) and bpy.app.version_cycle == "release", "Blender 5.2 LTS")
+    check(all(addon_utils.check(ADDON)), "installed add-on was enabled by Blender")
+    root = Path(INSTALLED_ROOT).resolve(strict=True)
+    location = Path(extension.__file__).resolve(strict=True)
+    check(location.is_relative_to(root), "loaded module belongs to the isolated extension installation")
+    print(f"native Blender {bpy.app.version_string} on arm64, extension installed and enabled")
+
+
 def main() -> None:
     """Runs the import and the checks."""
+    check_installed_extension()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     addon_utils.enable("io_scene_gltf2", default_set=False)
     with tempfile.TemporaryDirectory() as folder:
@@ -214,13 +274,16 @@ def main() -> None:
         check(spaces == {"sRGB", "Non-Color"}, f"colour spaces: {spaces}")
         check(not result.warnings, f"warnings: {result.warnings}")
 
+        blender_collision_smoke.run(Path(folder) / "collision", ADDON)
         check_interior(Path(folder) / "lit")
         check_interior_alone(Path(folder) / "interior_alone")
-        check_character(Path(folder) / "character")
+        blender_soc_scene_smoke.run()
+        check_character(Path(folder) / "character", synthetic_character.RIG_BASE_COLOUR)
+        check_character(Path(folder) / "character_white", (1.0, 1.0, 1.0, 1.0))
 
         bpy.ops.wm.read_factory_settings(use_empty=True)
         addon_utils.enable("io_scene_gltf2", default_set=False)
-        register()
+        extension.register()
         status = bpy.ops.import_scene.p4kx_package(filepath=str(scene))
         check(status == {"FINISHED"}, f"operator: {status}")
         check(len([o for o in bpy.data.objects if o.type == "MESH"]) == 2, "operator import")
@@ -233,26 +296,66 @@ def main() -> None:
             check("Update the P4KX Blender add-on" in str(error), f"message: {error}")
         else:
             check(False, "a newer package must be refused")
-        unregister()
+        extension.unregister()
 
+        check_invalid_package_mesh(Path(folder) / "invalid_mesh")
         check_layered_material(Path(folder) / "layered")
         check_glass_tint()
 
     print("smoke test passed")
 
 
+def check_invalid_package_mesh(folder: Path) -> None:
+    """Checks malformed mesh diagnostics, scene timing and import of intact meshes."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    addon_utils.enable("io_scene_gltf2", default_set=False)
+    scene = synthetic.write_package(folder)
+    broken = folder / "meshes/m0001.glb"
+    content = bytearray(broken.read_bytes())
+    struct.pack_into("<I", content, 4, 9)
+    broken.write_bytes(content)
+
+    loaded = package.load_package(scene)
+    original_preflight = importer.preflight_meshes
+    original_run = importer._run_gltf
+    collections_before = set(bpy.data.collections)
+    imports = []
+
+    def preflight(candidate):
+        check(set(bpy.data.collections) == collections_before, "preflight runs before scene creation")
+        result = original_preflight(candidate)
+        check(len(result.problems) == 1, "invalid GLB has a structured preflight result")
+        check(result.problems[0].mesh_id == "m0001", "preflight identifies invalid mesh")
+        return result
+
+    def run(context, path):
+        imports.append(path.name)
+        return original_run(context, path)
+
+    importer.preflight_meshes = preflight
+    importer._run_gltf = run
+    try:
+        result = importer.import_package(bpy.context, loaded)
+    finally:
+        importer.preflight_meshes = original_preflight
+        importer._run_gltf = original_run
+
+    check(imports == ["m0002.glb"], f"only the valid GLB reached Blender: {imports}")
+    check(result.meshes == 1 and result.instances == 1, "intact GLB still imports")
+    check(
+        any("m0001" in warning and "Unsupported GLB version" in warning for warning in result.warnings),
+        f"corrupt asset warning: {result.warnings}",
+    )
+
+
 def check_glass_tint() -> None:
     """Checks the vertex-colour tint of glass: kept with colours, plain without, kept by the drop."""
-    from p4kx_importer import glass_tint, materials
-    from p4kx_importer.material_graph import BuildContext, build_graph
-    from p4kx_importer.material_model import parse_materials
-
     bpy.ops.wm.read_factory_settings(use_empty=True)
     raw = synthetic_materials.description(
         "x0001", "GlassPBR", gen_mask=["PER_VERTEX_TINT"], diffuse=[0.5, 0.25, 1.0]
     )
-    descriptions = parse_materials([raw], [])
-    spec = build_graph(descriptions["x0001"], BuildContext(descriptions, None, {}))
+    descriptions = material_model.parse_materials([raw], [])
+    spec = material_graph.build_graph(descriptions["x0001"], material_graph.BuildContext(descriptions, None, {}))
 
     images = materials.ImageCache(package.parse_manifest(synthetic.manifest(), Path(".")))
 

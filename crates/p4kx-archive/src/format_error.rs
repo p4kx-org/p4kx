@@ -9,26 +9,29 @@ use p4kx_foundation::ParseError;
 use crate::{ArchiveError, Compression};
 
 /// A failure while reading Archive structures, before the Archive path is attached.
-#[derive(Debug)]
+#[derive(Debug, thiserror::Error)]
 pub(crate) enum FormatError {
+    #[error(transparent)]
     Io(io::Error),
+    #[error("no Archive end record found")]
     NotAnArchive,
-    UnsupportedLayout {
-        version: u16,
-    },
-    Corrupt {
-        offset: u64,
-        reason: String,
-    },
-    Truncated(ParseError),
+    #[error("Archive installation is incomplete (status {flags:#04x})")]
+    IncompleteInstallation { flags: u8 },
+    #[error("Archive layout v{version} is unsupported")]
+    UnsupportedLayout { version: u16 },
+    #[error("Archive structure is corrupt at offset {offset}: {reason}")]
+    Corrupt { offset: u64, reason: String },
+    #[error("Archive structure is truncated")]
+    Truncated(#[source] ParseError),
+    #[error("Archive limit exceeded: {0}")]
     LimitExceeded(String),
+    #[error("Entry {entry} uses unsupported compression {compression}")]
     UnsupportedCompression {
         entry: String,
         compression: Compression,
     },
-    KeyRequired {
-        entry: String,
-    },
+    #[error("Entry {entry} requires the Archive key")]
+    KeyRequired { entry: String },
 }
 
 impl FormatError {
@@ -46,6 +49,9 @@ impl FormatError {
         match self {
             Self::Io(source) => ArchiveError::Io { path, source },
             Self::NotAnArchive => ArchiveError::NotAnArchive { path },
+            Self::IncompleteInstallation { flags } => {
+                ArchiveError::IncompleteInstallation { path, flags }
+            }
             Self::UnsupportedLayout { version } => {
                 ArchiveError::UnsupportedLayout { path, version }
             }

@@ -9,11 +9,12 @@ use p4kx_assembly::{Assembly, Part};
 use p4kx_gltf::{GlbOptions, GlbSummary, MaterialMode, TextureLoader};
 
 use crate::build::assembly_issue;
+use crate::entity_classification::EntityClassifications;
 use crate::items::entity_ref;
 use crate::manifest::{Issue, IssueOrigin, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigPart, RigPartOrigin};
 use crate::rig_package::{RigScene, rig_manifest, write_rig_package};
-use crate::{PackageInfo, PackageResult, PackageSummary};
+use crate::{PackageInfo, PackageResult, PackageSummary, PackageWriteContext};
 
 /// Writes the creature `assembly` as a package: `meshes/m0001.glb` is the Assembly as
 /// [`Assembly::write_glb_with`] writes it, its skeleton as bone nodes with the skins bound to it,
@@ -27,7 +28,7 @@ pub(crate) fn write_creature_package(
     options: &GlbOptions,
     info: &PackageInfo,
     out: &Path,
-    cancelled: &(dyn Fn() -> bool + Sync),
+    context: &PackageWriteContext<'_>,
 ) -> PackageResult<PackageSummary> {
     let options = options.with_materials(MaterialMode::Textures);
     let name = assembly.root().map_or("", Part::class_name);
@@ -39,13 +40,29 @@ pub(crate) fn write_creature_package(
     } else {
         assembly
     };
+    let classifications = EntityClassifications::capture(assembly.root(), assembly.forge_origin())?;
     write_rig_package(
         out,
         name,
         &options,
-        cancelled,
-        |options, writer| assembly.write_glb_with(options, textures, writer),
-        |written| manifest(assembly, interior_left_out, info, &options, written),
+        context,
+        |options, writer, map| {
+            if let Some(map) = map {
+                assembly.write_glb_with_vertex_origins(
+                    options,
+                    textures,
+                    writer,
+                    &mut |row, model, sources| map.observe(&row, model, sources, context),
+                )
+            } else {
+                assembly.write_glb_with(options, textures, writer)
+            }
+        },
+        |written| {
+            let mut manifest = manifest(assembly, interior_left_out, info, &options, written);
+            classifications.apply(&mut manifest);
+            manifest
+        },
     )
 }
 
@@ -93,7 +110,13 @@ fn manifest(
         rig: rig(assembly, written),
         issues,
     };
-    rig_manifest(scene, info, options, written)
+    let mut manifest = rig_manifest(scene, info, options, written);
+    if written.default_material_ids > 0 {
+        manifest.default_material = assembly
+            .default_material(options.lod)
+            .map(p4kx_extraction::ArchiveDefaultMaterial::receipt);
+    }
+    manifest
 }
 
 fn rig(assembly: &Assembly, written: &GlbSummary) -> Rig {

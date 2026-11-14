@@ -14,6 +14,26 @@ Paths of files on disk are strings as the operating system displays them. Entry 
 as stored in the Archive, with `\` as separator. Sizes are byte counts. Snapshots of every shape
 live in [`crates/p4kx/tests/it/snapshots`](../crates/p4kx/tests/it/snapshots).
 
+## `p4kx media export <archive> --out <directory> --json`
+
+The successful response is `{"status":"published","index":{...}}`; `status` is `published`,
+`unchanged`, `skipped` or `incomplete`. The `index` is the exact versioned
+[media index contract](media-export.md), independent of the catalog schema. An incomplete response
+requires explicit `--diagnostic`, has `index.complete: false` and returns exit code 1. Failures
+before publication write no success response and leave the previous complete generation in place.
+A stdout reporting failure does not undo an already committed generation.
+
+`p4kx media schema` prints [media-index.schema.json](../schemas/media-index.schema.json).
+`--record`, `--reference` and `--source` print the corresponding
+[built-in record](../schemas/media-builtin-record.schema.json), [reference](../schemas/media-reference.schema.json)
+and [source](../schemas/media-source.schema.json) schemas. These schemas also describe the streamed
+files referenced by `index`; the JSONL streams and binary artifacts stay in the output directory.
+The library's [generic record envelope](../schemas/media-record.schema.json) stays available without
+built-in payload restrictions. Custom provider namespaces remain generic in the CLI schema as well.
+
+[WEM source metadata](media-audio-metadata.md) and [Soundbank metadata](media-bank-metadata.md)
+document the typed `audio.jsonl` records, their half-open raw ranges and the field-origin companion.
+
 ## Entry
 
 The shape of one Entry in `list` and `search`:
@@ -26,6 +46,13 @@ The shape of one Entry in `list` and `search`:
 | `compressed_size` | number | Size of the data in the Archive |
 | `size` | number | Size after decompression |
 | `parts` | array of string | Only on the header of a Texture group in `list`: the paths of its parts and Alpha tail; `compressed_size` and `size` are then those of the whole group |
+| `metadata` | object | Shared physical-owner, raw DOS and fixed directory facts described in [Archive Entry metadata](archive-entry-metadata.md) |
+
+`metadata.owner_entry_index` identifies the physical base Entry of a grouped Texture;
+the existing sizes remain group totals. Its `original_directory_ordinal` is a
+canonical unsigned decimal string, or explicit `null` after actual directory
+recovery. ZIP-only words and the v2 encryption word remain explicitly `null` in the
+other layout. `socpak list` and MCP Entry listings use this same metadata object.
 
 ## Build
 
@@ -62,7 +89,8 @@ when nothing matches.
 
 ```json
 {"archive": "…", "channel": "LIVE", "build": Build, "entry_count": 4, "encrypted_count": 1,
- "issue_count": 0, "compressed_size": 35, "size": 118}
+ "issue_count": 0, "compressed_size": 35, "size": 118, "metadata": ArchiveLayoutInfo,
+ "fieldOrigins": FieldOrigins, "provenance": SourceInventory}
 ```
 
 `issue_count` is the number of Entry issues found in the directory of the Archive (ADR-0025); `info`,
@@ -75,6 +103,15 @@ itself (two when a scan limit cut the scan short), which every command prints on
 `channel` is the name of the folder holding the Archive, or `null` when there is none; `build` is
 `null` when the Build is unknown.
 
+`metadata` is the shared cached `ArchiveLayoutInfo` object: `version`, decimal-string
+`sourceLength`, actual `layout`, `declarationState`, and mandatory `zip`/`v2` keys with explicit
+null for the absent layout. Nested ZIP/ZIP64/v2 declarations retain their original words and
+source-relative extents. This adds no body reads or lazy-row validation. MCP `archive_info`
+returns the same object. `fieldOrigins` addresses each layout field at `/metadata/…` in the CLI
+and `/structuredContent/metadata/…` in MCP. Resolve each field's `sourceUsesRefs` against
+`provenance`. The companion covers `metadata`. [Archive source layout](media-archive-layout.md)
+defines its contract.
+
 ## `p4kx dcb info <archive> --json`
 
 ```json
@@ -82,7 +119,13 @@ itself (two when a scan limit cut the scan short), which every command prints on
  "struct_count": 6696, "enum_count": 774}
 ```
 
-`entry` is the path of the DataForge Entry as the Archive stores it.
+`entry` is the path of the DataForge Entry as the Archive stores it or the standalone file name.
+The `fieldOrigins` map addresses `/version`, `/record_count`, `/struct_count` and
+`/enum_count` with their distinct original DataForge header fields. `/entry` uses the Archive
+directory or standalone file metadata. Its Archive marker follows the directory scope.
+`/archive` records the caller's input path with an empty, complete contributor set. Source
+references resolve in `provenance`, which preserves unknown original Archive lineage for
+standalone files.
 
 ## `p4kx dcb export <archive> --json`
 
@@ -305,6 +348,11 @@ which counts as often as its most frequent library lists it. Each library lists 
 `first_unresolved_layer` is the first such path, as the layer names it; it is absent when
 `unresolved_layers` is 0 (the example shows the case without any).
 
+`default_material` describes the physical Archive lookup when a drawable assignment needed a fallback.
+It reports the state, original Entry and effective encryption marker, decoded SHA-256 when read,
+and two original witnesses for an ambiguous lookup. Missing or unusable physical sources leave
+the synthetic fallback in use. Authored library failures remain in `issues`.
+
 `<entity>` is named as for `p4kx entity loadout`, with the same exit codes. `animations` is absent
 without any; for a creature it lists each clip the GLB writes or leaves out, shaped as in `p4kx
 model glb`: `name`, `duration_seconds`, `additive`, `channels`, `keys` and `skipped_tracks`. A
@@ -312,7 +360,15 @@ creature whose skins are bound to its skeleton gets, with `--animations`, the cl
 (`animDatabase3P` of `SAnimatedCharacterComponentParams`, a Mannequin `.adb` with the databases
 nested in it), looked for by file name without extension in the animation folders (`#filepath`) and
 the track databases of its skeleton's parameter file ([ADR-0307](adr/0307-the-clips-of-a-creature-are-those-its-animation-database-names-and-are-written-on-the-bones-of-its-skeleton.md));
-`--animations` asks for them, without it the GLB is static. Names no clip has, such as blend spaces, are skipped, additive
+`--animations` asks for them, without it the GLB is static. The optional `animation_sources` object
+reports the selected Entity's database and geometry, the skeleton selection and parameter file,
+and the physical clip path and original ordinal. Each `graph_selectors` item identifies an
+original ADB name occurrence that contributed to that clip's selection, including the traversed
+SubADB path. The report includes the source inventory and per-value encryption evidence.
+`selection_complete` is false when a preview limit or unread source leaves part of the scan
+unavailable. Observed clip contributors are retained in a partial scan. These
+are the clips selected before checking whether they fit the exported skeleton. Names no clip
+has, such as blend spaces, are skipped, additive
 clips and clips that move no bone are left out as `animation_not_used` (one Issue per reason,
 `skipped` false), and a database, parameter file or folder the Archive lacks is
 `animations_unavailable` (`skipped` false), as is a limit that dropped databases, names or folders. A docked vehicle is
@@ -532,6 +588,8 @@ or wrong exits with code 7.
 `unresolved_layers` and `first_unresolved_layer` (absent when there is none) are those of
 `p4kx entity glb`, for the material libraries of the parts.
 
+`default_material` is the same lookup receipt as in `entity glb`. The canonical fallback comes from the outer game Archive.
+
 `containers` are the Entry paths of the chain as for `p4kx socpak list`, with the same exit codes
 (an Entry the Archive lacks is 2, a container that cannot be opened 3). `parts` counts the root
 container, the `.soc` files, the nested containers, the placed models, the props and the lights;
@@ -557,6 +615,12 @@ part keeps the next choice), `too_many_parts`, `too_many_containers`,
 `too_many_vertices` and `too_deep`
 ([ADR-0081](adr/0081-an-interior-is-the-socpaks-soc-files-placed-in-nested-containers.md)). The
 file is written even when parts are skipped.
+
+## `p4kx interior source <archive> <container>... --out <file>`
+
+The JSON document is written to the requested file. It uses the independently versioned
+[authored SOC scene schema](../schemas/soc-scene.schema.json). See [SOC scene](soc-scene.md)
+for occurrence ownership, source coordinates and origin fields.
 
 ## `p4kx interior package <archive> <container>... --out <folder> --json`
 
@@ -847,7 +911,7 @@ or `cancelled` is true.
 
 With `--txtp`, the object has a `txtp` member, absent without it:
 `{"written": 1, "kept": 0, "skipped": 1, "files": [{"trigger": "Play_Multi", "event": "Play_Multi",
-"file": "…\\Play_Multi.txtp", "size": 120, "kept": false, "breaks": 0}, …], "skips": [{"trigger": "Play_Multi",
+"file": "…\\Play_Multi.txtp", "size": 120, "kept": false, "breaks": 0, "approximations": []}, …], "skips": [{"trigger": "Play_Multi",
 "event": "Play_Other", "reason": "plug-in source 9 has no file"}, …]}`. One `.txtp` file in
 vgmstream's TXTP syntax is written per Wwise event that leads to sounds, named after the event by
 the rule of the sound files (`event` for a name too long for a file) and holding the names of the exported files, which lie in the same
@@ -859,9 +923,18 @@ whole file (a source plug-in or external source, a WEM nothing holds, only the p
 a streamed WEM) is listed in `skips` and gets no file, as does an event whose file cannot be
 written, e.g. because its path exceeds the limit of ADR-0248. An event with broken links is written
 with the header comment `incomplete: <n> broken links`, and `breaks` of its file is `n`. A `group`
-line carries only the macro; the comment on the object is the line above it. `files` and `skips` do
-not change the exit code; the sounds without a file are in `failures` already. Not written when
-Ctrl+C cancelled the export.
+line carries only the macro; the comment on the object is the line above it.
+Each `files` row includes an `approximations` array for written or verified retained text.
+A choice with several rendered alternatives includes `"select-first-alternative"`, also written
+in the TXTP header. Rendered MusicTrack sources can add `omit-music-clip-timing`,
+`omit-music-clip-events` or `nonfinite-music-clip-timing` from their owning track's clip fields.
+A rendered path through a MusicPlaylist or MusicSwitch can add `omit-music-transition-fades`
+for nonzero original fade timing or `omit-music-transition-segments` for an allocated
+transition object with a nonzero segment ID.
+An empty array means the writer emitted no reported approximation code.
+A retained file has `"approximations": null` when its text was unverified or differed from the
+generated text. The sound export determines the exit code and reports missing audio files in
+`failures`. A cancellation stops TXTP generation.
 
 `p4kx entity audio --extract <folder>` writes the same files for every trigger of the Entity and
 adds an `extraction` object with exactly `target`, `format`, `written`, `kept`, `unconverted`,
@@ -918,17 +991,16 @@ otherwise the exit code is 2. Step kinds are
 step of a variant, its ID is the variant's `sound` and its WEM one of the track's sources. A Play
 action (`0x04xx`) is followed to its target, a PlayEvent action (`0x21xx`) to the Event it posts
 and a Trigger action (`0x1Bxx`) to the segments of the stingers that name its trigger. Where the
-target lies in another soundbank, the walk reads that one soundbank (at most one besides the one
-holding the event, ADR-0158) and the variant's `soundbank` is the one holding the sound.
+target lies in another soundbank, the walk follows its eligible indexed bank references, sharing
+loaded banks on the active path (ADR-0362). The variant's `soundbank` holds the sound.
 A **Break** has `event`, `soundbank` (or `null` when no soundbank holds the event), `object` (the
 step where the chain breaks, the last of `path`), `target` (for `missing`, `other_soundbank` and
 `cycle`, the ID the object refers to, otherwise `null`), `path`, `kind` and `message`. The kinds are
 `no_soundbank`, `unreadable` (a soundbank cannot be read again; the Break's `soundbank` is the
 one that cannot, which is the other soundbank when the walk was leaving the soundbank of the
 event), `missing` (the object refers to an ID the soundbank does not hold; for a Trigger action,
-a trigger no stinger names), `other_soundbank` (the target lies in a soundbank the walk does not
-enter: the Archive holds no soundbank of the ID a Play action names, or the walk has already read
-its one other soundbank), `chain_too_long` (more than 8 PlayEvent and Trigger actions in a row),
+a trigger no stinger names), `other_soundbank` (a Play action names no eligible indexed
+soundbank), `chain_too_long` (more than 8 PlayEvent and Trigger actions in a row),
 `malformed`, `unknown_layout` (an object of a bank version other than 154), `unsupported` (an
 object kind that is not followed, e.g. an actor-mixer), `cycle`,
 `too_deep` (a path of 32 objects), `too_many_children` (only the first 1024 children of a
@@ -984,7 +1056,7 @@ invalid input (exit code 2), as is a `<record>` no Record matches.
 ```
 
 `records` has one entry per Record `<record>` names. `reference_count` is the number of
-References listed in `references` and `record_count` the number of distinct Records among their
+References listed in `references` and `record_count` the number of distinct GUIDs among their
 other ends. In an entry, `record` is the Record the
 listing is about; in each of its `references`, `record` is the other end: the Record that holds
 the Reference for `incoming`, the Record it links to for `outgoing`. `location` is the place of
@@ -997,19 +1069,51 @@ GUIDs no Record has, with `"record": null` and the `guid` they name.
 [{"from": "libs/ships/alpha", "to": "libs/makers/aegis"}]}`, the files by record path, and
 `--unresolved --json` writes `{"archive": "…", "count": 880, "unresolved": [{"record": {…},
 "guid": "…", "location": "…", "field": "…", "indices": […]}]}` where `record` is the Record that
-holds the Reference. A DataForge that holds more than 8,388,608 References, or Records that
-cannot be read, give a warning on stderr; the index is then incomplete. It keeps the first
-8,388,608 References in the order of the Records.
+holds the Reference. `file_count` covers all files with a readable record path and `edge_count`
+counts the distinct returned pairs after any filter.
+
+The index attempts every Record without a fixed reference quota. Unreadable Records are
+reported on stderr. An allocation refusal reported by the canonical read or origin preparation
+fails the JSON command.
+
+All four JSON modes include the shared `provenance.sources` and `provenance.uses` inventory.
+A `fieldOrigins` map addresses values relative to its immediate listing, link, edge or
+count envelope. Each origin contains `sourceUsesRefs`, `sourceSetComplete` and
+`containsEncryptedSource`. A known encrypted contribution makes the last value true.
+False requires a complete set of known unencrypted contributors. Null preserves unknown
+origin, including the original Archive lineage of a standalone DCB.
+
+- A listing addresses `/record/guid`, `/record/record_path`, `/record/name`, `/record/type`,
+  `/reference_count`, `/record_count` and `/unresolved_count`. Incoming counts use the whole
+  reference scan and the physical Record selected for the listing. Outgoing counts use the
+  selected Record's body. An incoming `unresolved_count` is a fixed zero.
+- A link addresses `/record`, its present metadata fields, `/location`, `/field`,
+  `/indices`, each `/indices/<index>` and a present unresolved `/guid`. The
+  `dataforgeReferenceRoute` coordinates are the physical source Record index and zero-based
+  canonical preorder position, excluding the root Struct. An individual array index adds the
+  zero-based position among array steps, outermost first. The declaration and array-position
+  observations support the route. The Reference occurrence selects its related Record.
+  An unresolved GUID payload comes from the original `$error.guid`.
+- A file edge addresses `/from` and `/to`. Both retain the actual supporting Reference
+  occurrences, including distinct occurrences that give the same pair. Each displayed
+  endpoint retains its source path and any other member names and paths used to choose the
+  spelling. The envelope addresses `/file_count` and `/edge_count`.
+- The unresolved envelope addresses `/count` over the whole reference scan.
+
+Coverage for a count is incomplete when a read failure can conceal a contributor in its
+scan scope. An error in a field declared as a scalar string cannot conceal a Reference. A
+record body failure can make incoming counts incomplete while an outgoing count for a
+different, readable Record stays complete.
 
 ## `p4kx dcb tags <archive> [<tag>] [--tree] [--format table|json] --json`
 
 Lists the tag tree: the Tags of the `TagDatabase` with their tag paths. `<tag>` is a GUID or a tag
-path (ignoring case; sibling Tags may share one, so it can name several); with it only that Tag and
+path (ignoring ASCII case; sibling Tags may share one, so it can name several); with it only that Tag and
 everything below it is listed, without it every Tag. `--json` is `--format json`; with
 `--format table` it is invalid input (exit code 2), as is a `<tag>` no Tag has.
 
 ```json
-{"archive": "…", "tag_count": 18891, "shown_count": 3, "issues": {"unreadable": 0, "dangling": 0,
+{"archive": "…", "tag_count": 18891, "shown_count": 3, "issues": {"unclassified": 0, "unreadable": 0, "dangling": 0,
  "repeated": 0, "too_deep": 0, "too_long": 0, "duplicate": 0, "unlisted": 0}, "tree": false, "tags": [{"guid": "…", "name": "Gun",
  "path": "Weapon.Gun", "legacy_id": null, "parent": "…", "depth": 1, "children": ["…"]}]}
 ```
@@ -1021,11 +1125,10 @@ in the order the `TagDatabase` lists them, then the Tags it does not list. `name
 of Tags above it and `children` their GUIDs in the order the Tag lists them. `tag_count` is every Tag
 of the DataForge and `shown_count` the Tags listed, which differs with `<tag>`. `issues` counts what
 the tree could not take as the DataForge lists it, and each non-zero count is also a warning on
-stderr: `unreadable` Tag Records left out, `dangling` listed Tags that are no Tag Record,
+stderr: `unclassified` Records whose unreadable type prevents deciding Tag/TagDatabase membership; they are not counted as read Tags, `unreadable` Tag Records left out, `dangling` listed Tags that are no Tag Record,
 `repeated` Tags listed more than once (the first listing counts, which also cuts a cycle),
-`too_deep` Tags left out, with everything below each, below 64 levels, `too_long` Tags left out, with
-everything below each, whose name is over 256 bytes, whose path is over 1,024 bytes or that would
-take the paths of the tree over 64 MiB, `duplicate` Tag Records left out because an earlier one has
+`too_deep` and `too_long` are retained JSON keys and always zero,
+`duplicate` Tag Records left out because an earlier one has
 their GUID, and `unlisted` Tags no `TagDatabase` reaches, which stand as roots of their own.
 
 With `--tree` the document holds `"tree": true` and `tags` holds only the top of the listing, the
@@ -1037,6 +1140,37 @@ have no `parent` and `depth`, and `children` is no list of GUIDs:
  "children": [{"guid": "…", "name": "Gun", "path": "Weapon.Gun", "legacy_id": null,
  "children": []}]}]}
 ```
+
+Both JSON forms carry `provenance.sources` and `provenance.uses`, plus immediate
+`fieldOrigins` maps. Each origin entry contains `containsEncryptedSource`,
+`sourceUsesRefs` and `sourceSetComplete`. Its references resolve in the document's shared
+inventory. `true` proves an encrypted contributor or ancestor, `false` requires a complete
+set of unencrypted contributors, and null preserves unknown origin. A standalone DCB has
+unknown original Archive lineage.
+
+The envelope map addresses `/tag_count`, `/shown_count` and each `/issues/<key>`.
+Each Tag has its own relative map addressing `/guid`, `/name`, `/path`, `/legacy_id`,
+`/children` and each `/children/<index>`. Flat rows also address `/parent` and `/depth`.
+Nested child objects carry their own maps. Their parent's indexed child entry records
+the relationship that selected them. A GUID entry has this shape.
+
+```json
+{"/guid":{"containsEncryptedSource":true,"sourceUsesRefs":["u-guid"],"sourceSetComplete":true}}
+```
+
+Header identities, original array positions, name conversions and legacy-ID sentinel
+conversions retain their own use sets. A selected path includes the names and selected
+relationships of its ancestors, including ancestors hidden by a query. Depth uses the
+selected topology. Repeated original operands keep their own occurrence identity.
+
+Membership and diagnostic counts retain the actual classification survey and relevant
+read or relationship observations. Successful source-type intervals use
+`dataforgeRecordHeaderRange` with decimal inclusive-start/exclusive-end indices and
+`sourceType`. The original `dataforgeHeader.recordCount` bounds the survey. Failed
+reads remain attempted observations. The historical zero-valued limit counters have a
+complete empty set of contributors. Unlisted-root topology can have an incomplete
+contributor set when the observed walk supplies no selected incoming relationship.
+`archive` and `tree` are command inputs.
 
 ## `p4kx dcb fields <archive> [<type or Query>] [--path <glob>] [--format table|csv|json] --json`
 
@@ -1106,54 +1240,23 @@ printed as a note on stderr. An encrypted DataForge without the key is exit code
 
 ## `p4kx catalog <archive> --out <file> --json`
 
+The following excerpt shows the publication contract; other summary fields and the per-kind
+health and diagnostic lists are omitted. The complete health object is identical to the catalog's
+`exportHealth`; its nested keys retain camelCase inside the CLI's snake_case summary.
+
 ```json
-{"archive": "…", "out": "…", "schema_version": 2, "size": 131969336, "compressed_size": null,
- "upload_limit": 64000000, "decompressed_limit": 1000000000,
- "size_warning": "over_limit", "decompressed_warning": null, "kinds": [{"kind": "manufacturers", "count": 1201, "skipped": 2,
- "complete": true}, {"kind": "items", "count": 23280, "skipped": 1145, "complete": true},
- {"kind": "ships", "count": 1087, "skipped": 57, "complete": true},
- {"kind": "commodities", "count": 145, "skipped": 0, "complete": true},
- {"kind": "blueprints", "count": 1618, "skipped": 0, "complete": true},
- {"kind": "resourceGroups", "count": 19, "skipped": 0, "complete": true},
- {"kind": "blueprintCategories", "count": 21, "skipped": 0, "complete": true},
- {"kind": "gameplayProperties", "count": 29, "skipped": 0, "complete": true},
- {"kind": "qualityDistributions", "count": 21, "skipped": 1, "complete": true},
- {"kind": "qualityQuantizations", "count": 62, "skipped": 1, "complete": true},
- {"kind": "blueprintPools", "count": 160, "skipped": 0, "complete": true},
- {"kind": "dismantleProcesses", "count": 1, "skipped": 0, "complete": true},
- {"kind": "paints", "count": 1064, "skipped": 68, "complete": true},
- {"kind": "loadouts", "count": 10708, "skipped": 0, "complete": true},
- {"kind": "starmapObjects", "count": 2093, "skipped": 0, "complete": true},
- {"kind": "shops", "count": 1184, "skipped": 0, "complete": true}], "skipped": 1205,
- "failed": [{"guid": "…", "path": "libs/foundry/records/entities/scitem/odd", "error": "…"}],
- "warnings": [{"kind": "unreadable_reward_records", "count": 3}],
- "item_classes": {"classified": 347, "other": 408, "missing": 22525},
- "paints": {"paints": 1064, "assigned": 1039, "unassigned": 25, "ships": 1046, "unreadable_vehicles": 0},
- "loadouts": {"ships": 1087, "items": 9621, "ports": 293451, "attached": 152081,
- "docked_vehicles": 65, "unresolved": 505, "outside": 61, "with_issues": 193},
- "starmap": {"objects": 2093, "placed": 1239, "unplaced": 854, "ambiguous": 9, "systems": 3,
- "unreadable_containers": 0, "missing_containers": 2, "malformed_children": 0},
- "shops": {"shops": 1184, "registry_entries": 1184, "registry_missing": false, "registry_unreadable": false, "malformed": 0,
- "duplicate": 0, "containers_listed": 317, "containers_unreadable": 0, "containers_with_shop": 164,
- "other_containers_scanned": 8224, "other_containers_unreadable": 0, "other_containers_with_shop": 171,
- "prefabs_listed": 30, "prefabs_unreadable": 0, "prefab_entities": 8, "prefab_ambiguous": 1, "prefab_only_shops": 0,
- "with_kind": 590, "mixed_kind": 60, "without_container": 534, "with_items": 294, "inventory_ambiguous": 43,
- "inventory_placeholder": 399, "inventory_missing": 0, "inventory_unreadable": 1, "inventory_unscanned": 64,
- "soc_components": 320, "soc_paths_unattributed": 12, "inventories_unreadable": 1, "inventories_missing": 0, "inventories_named": 57,
- "inventories_in_archive": 119, "item_ids_dropped": 0, "commodity_exchanges": 16,
- "linked": 1000, "unlinked": 184, "ambiguous_link": 54, "unlinked_locations": ["…"]},
- "store_slugs": {"slugs": 256, "unmapped": 51, "mapped": 205, "resolved": 205, "retired": 0,
- "exported": 205, "stale": [], "stale_check_skipped": false},
- "playability": {"items": {"player": 7954, "ai": 0, "mission": 522, "special": 8570,
- "unclassified": 6234}, "ships": {"player": 324, "ai": 690, "mission": 25, "special": 35,
- "unclassified": 13}},
- "variants": {"items": {"groups": 1108, "variants": 4732},
- "ships": {"groups": 196, "variants": 850}},
- "quantizations": {"unused": 20, "unresolved_links": 0},
- "texts": [{"language": "en", "available": true, "resolved": 37963, "unresolved": 160,
- "placeholder": 23658}, {"language": "de", "available": true, "resolved": 25497,
- "unresolved": 12626, "placeholder": 23658}], "unresolved": 12786}
+{"archive": "Data.p4k", "out": "diagnostic.json.zst", "schema_version": 3,
+ "archive_key": "missing", "encrypted_entries_unread": 412,
+ "export_health": {"status": "incomplete", "read": "incomplete",
+   "projection": "complete", "publicationMode": "diagnosticPartial"},
+ "size": 12345, "compressed_size": 2345,
+ "failed": [{"guid": "90000000-0000-4000-8000-000000000009",
+   "path": "libs/foundry/records/crafting/blueprints/crafting/broken", "error": "source read failed"}]}
 ```
+
+`archive_key` is `given`, `missing` or `wrong` and `encrypted_entries_unread` counts the distinct
+encrypted Entries the export could not read for want of a usable Archive key, as in the catalog's
+`source`; the same count is printed as a note on stderr, and neither changes the exit code.
 
 `quantizations` counts two facts of the game data that do not affect the exit code: `unused`, the
 quality quantizations of the catalog that no `ResourceType` uses, and `unresolved_links`, the links
@@ -1175,12 +1278,18 @@ does the same for `size` against `decompressed_limit` (1,000,000,000). `kinds` l
 development leftovers `skipped` and whether the kind is `complete` (no `--filter`); `skipped` sums
 them. `failed` lists the selected Records that could not be read and are left out of the catalog,
 with GUID, record path (empty when it cannot be read) and the reason and its causes joined by
-`: `, ordered by GUID; the example shows one, a healthy Archive has none. The catalog is written
-all the same, and the exit code is 1 when `failed` or `warnings` is not empty. `warnings` lists what
+`: `, ordered by GUID; the synthetic diagnostic example shows one, a healthy export has none.
+Normal publication refuses incomplete read/projection health or blocking source warnings, with
+exit code 1, empty stdout and no destination creation or replacement. Use `--diagnostic-partial`
+explicitly to write an incomplete diagnostic artifact and its JSON summary; incomplete diagnostic
+output still exits with 1. Its `export_health.publicationMode` is `diagnosticPartial`, including
+when all selected sources happened to succeed. The same marker travels in the file's
+`exportHealth`, so a copied file retains the publication contract. Filter-only selection scope
+does not itself make health incomplete or require diagnostic permission. `warnings` lists what
 makes the crafting data incomplete or ambiguous although every Record was read, each as an object
 with a `kind`: `unreadable_reward_records` with a `count` (Records that cannot be read although
 their struct type is that of a Record with a reward source, so a source may be missing) and
-`unknown_modifier_ranges` with a `count` (modifier ranges of blueprints whose struct type the reader does not know, so they are missing from the modifiers) and `details` (the struct types, ordered, without repeats), `unknown_template_values` with a `count` (stored names in the contract templates and the mission broker entries that the catalog does not know, a state, a category, a comms timing or reason, a kind of objective property, a comparison, a month, a repeat type, a reaction or a licence type, each `null` in the catalog) and `details` (the kind, the value and the number of each, ordered),
+`unknown_modifier_ranges` with a `count` (modifier ranges of blueprints whose struct type the reader does not know, so they are missing from the modifiers) and `details` (the struct types, ordered, without repeats), `unknown_template_values` with a `count` (stored names in the contract templates and the mission broker entries that the catalog does not know, a state, a category, a comms timing or reason, a kind of objective property, a comparison, a month, a repeat type, a reaction or a licence type, each `null` in the catalog) and `details` (ordered category counts and unsupported declared struct names, with authored values retained in their sourced catalog records),
 `ambiguous_dismantle` with a `count` (several dismantle processes, so no blueprint links one),
 `unreadable_vehicle_files` with a `count` (ships whose vehicle file exists and cannot be read, so they have no paints; a file the Archive lacks is no such ship) and `details` (the path and the reason of each file, ordered, without repeats; the JSON lists every file, stderr the first eight) and
 `unplaced_starmap_containers` with a `count` (unreadable containers, malformed or out-of-range Children and walk
@@ -1188,7 +1297,7 @@ limits that left starmap objects without a position), `unreadable_harvest_contai
 `unreadable_loot_containers` with a `count` and `details` (containers or entity files that cannot be read, a `.soc` that cannot be counted, a placed container the Archive lacks, and the containers beyond the limit of the walk, so a multi config may be missing from `lootContainers` or a container has no counts; as above),
 `ambiguous_loot_entity_files` with a `count` and `details` (entity files of containers that name several different containers or multi configs, of which only the first of each is used; the container and file of each, ordered),
 `unreadable_harvestables` with a `count` and `details` (`HarvestablePreset` or entity Records that are missing or cannot be built, so the harvestables that name them lack their entity and composition; the role, GUID and reason of each, ordered),
-`harvest_locations_without_object` with a `count` and `details` (harvestable locations with no starmap object although one is recorded above their container: the object is not in the starmap objects, 64 or more mining claim markers lie above, or a marker has no object above it; one line per reason with its number; a container with no object recorded above is the normal case and is not counted),
+`harvest_locations_without_object` with a `count` and `details` (harvestable locations with no starmap object although one is recorded above their container: the object is not in the starmap objects, mining claim markers form a cycle above, or a marker has no object above it; one line per reason with its number; a container with no object recorded above is the normal case and is not counted),
 `unreadable_shop_registry` (the shop registry exists but
 cannot be read, so `shops` is empty), `missing_shop_registry` (starmap objects but no registry at the known path)
 `unreadable_shop_containers` with a `count` (shop containers that cannot be read) and
@@ -1304,13 +1413,17 @@ exports, and every folder has Entries that all convert.
 ## `p4kx ships <archive> --out <file> --json`
 
 ```json
-{"archive": "…", "out": "…", "format": "json", "ships": 1087, "skipped": 57, "mass": 1087,
+{"archive": "…", "out": "…", "format": "json", "archive_key": "missing",
+ "encrypted_entries_unread": 412, "ships": 1087, "skipped": 57, "mass": 1087,
  "hull": 1087, "cargo": 565, "issues": 3,
  "failed": [{"guid": "…", "path": "libs/foundry/records/entities/spaceships/odd", "error": "…"}]}
 ```
 
 The ship data itself goes to `out` ([ship-base-data.md](ship-base-data.md)). `format` is `json` or
-`ndjson`; `ships` counts the ships written, `skipped` the development leftovers; `mass`, `hull`
+`ndjson`; `archive_key` is `given`, `missing` or `wrong` and `encrypted_entries_unread` counts the
+distinct encrypted Entries the export could not read for want of a usable Archive key, as in the
+file's `source` (neither changes the exit code); `ships` counts the ships written, `skipped` the
+development leftovers; `mass`, `hull`
 and `cargo` count the ships with a mass, with a hull (a part that states hit points) and with at
 least one cargo grid in their Loadout; `issues` the ships whose
 `issues` list is not empty. `failed` lists the ships that could not be read and are left out, with
@@ -1325,6 +1438,10 @@ GUID, record path and reason, ordered by record path; the exit code is 1 when it
 `languages` lists the languages the Archive holds a `global.ini` for, in the order `en`, `de`,
 `fr`, `it`, `es-ES`, `es-419`, `pt-BR`, `ja`, `ko`, `zh-Hans`, `zh-Hant`.
 
+The `fieldOrigins` map addresses the original directory information for each
+language's `code`, `folder` and `entry`. Listing a language reads its Entry path,
+and its translation payload may have a different encryption state.
+
 ## `p4kx loc get <archive> <key> [--lang <language>] [--fallback <language>] --json`
 
 ```json
@@ -1337,6 +1454,15 @@ GUID, record path and reason, ordered by record path; the exit code is 1 when it
 `@LOC_UNINITIALIZED` and `@blank_space`, which stand for no text) or `missing`. `text_language`
 and `text` are `null` for the last two; `text` has `\n` decoded to a line feed. A `missing` key is
 printed and then ends the command with exit code 2.
+
+The `fieldOrigins` map and shared `provenance` inventory describe each output
+field. `/text` cites the winning value and its byte range in the decoded
+UTF-8 localization input. It also retains the selectors that chose the result.
+`/status` and `/text_language` cite those selectors. A missing or empty preferred
+value can select a fallback, so a plain translation can carry an encrypted
+selector. A UTF-16 Entry retains its original Archive evidence. A missing
+lookup uses the normalized key in the queried Entry. Placeholder results
+require no lookup.
 
 ## `p4kx loc export <archive> [--lang <language>,…] [--format json|csv] [--out <file>]`
 
@@ -1354,12 +1480,13 @@ rows, with an empty cell for either; cells with a comma, quote or line break are
 left out only when none of the chosen languages' `global.ini` holds a line for it; a key held
 only with an empty text stays.
 
-CSV cells are written as they are. A text that starts with `=`, `+`, `-` or `@` is read as a
-formula by a spreadsheet program, so open a table of untrusted texts as text, not as formulas, or
-use the JSON format.
+CSV neutralises spreadsheet formulas by default. `--csv-raw` writes the original cell text.
 
-With `--out` and `--json` the command prints `{"archive": "…", "out": "…", "format": "csv",
-"languages": ["en"], "keys": 101234}`.
+With `--out` and `--json`, the summary contains `archive`, `out`, `format`, `languages`,
+`keys`, `originReceipt`, `fieldOrigins` and `provenance`. The artifact itself retains the table
+shape shown above. The companion identifies each emitted table value and is saved beside the
+file. For stdout use `--origin-stderr` or `--origin-out <file>`. See
+[localisation origins](source-origin.md#localisation-tables).
 
 ## `p4kx actionmap export <archive> [--format json|csv] [--csv-raw] [--language <language>] [--out <file>]`
 
@@ -1388,9 +1515,9 @@ texts without the `'` and keeps the byte order mark; it is invalid input (exit c
 `--format json`.
 
 With `--out` and `--json` the command prints `{"archive": "…", "out": "…", "format": "csv",
-"language": "en", "action_maps": 50, "actions": 1103, "unresolved_labels": 1}`;
+"language": "en", "action_maps": 50, "actions": 1103, "unresolved_labels": 1, "origin_receipt": "actions.csv.p4kx-origin.jsonl"}`;
 `unresolved_labels` counts the label keys, of actions and of action maps, with no text in the
-language.
+language. The report also includes `fieldOrigins` and `provenance`.
 
 ## `p4kx key set|show|remove --json`
 
@@ -1422,6 +1549,8 @@ absolute path stored in the settings. `p4kx channels remove <path> --json` print
 
 Also `p4kx texture info <file> --json` for a header file on disk.
 
+The example below shows the compatible fields; successful output also includes `source_metadata`.
+
 ```json
 {"texture": "Data\\Textures\\hull_ddna.dds", "format": "BC7_UNORM_SRGB", "width": 64,
  "height": 32, "depth": 1, "mip_count": 7, "array_size": 1, "faces": 1, "cubemap": false,
@@ -1437,6 +1566,13 @@ of mip parts `.1` … `.N` the header needs, or `null` when the format's size is
 `alpha_tail` is `null` without an alpha or smoothness tail `.a`; otherwise it gives the tail's
 `format` and its number of `parts` `.1a` … `.Na`. A tail that cannot be read keeps the command
 working: `format` and `parts` are then `null` and `error` says what is wrong.
+
+`source_metadata` version 1 preserves the authored legacy and DX10 header words, including flags,
+reserved words, pitch, pixel masks and `miscFlags2`. Its `raw` fields retain source zeros and unknown
+bits; `normalized` describes the current reader's defaults and layout separately. Header-source byte
+lengths use canonical unsigned 64-bit decimal strings. Unknown format identifiers and absent DX10/layout
+values stay explicit; no image decode or material-specific alpha meaning is implied. See
+[DDS source metadata](dds-source-metadata.md) for the exact boundary and types.
 
 ## `p4kx texture merge <archive> <entry> --out <file> --json`
 
@@ -1472,6 +1608,16 @@ written image. `alpha_tail` says whether an alpha or smoothness tail was merged 
 channel. `--tone-map` on a texture that is not high-range writes the PNG as usual and prints a
 note on stderr. A format without a decoder fails with exit code 1 and a
 message naming the format; a level the texture does not have fails with exit code 2.
+
+PNG reports include the output transfer, channel transform and companion filenames.
+The JSON keys are `output_transfer`, `png_transform` and `origin_receipts`. Resolve each
+companion filename beside the corresponding image in `files`. Each companion binds the
+exact PNG bytes and their physical DDS sources. The `field_origins` and `provenance`
+members identify the header words used for the two report values. Linear RGB carries
+a `gAMA` value of 1.0, sRGB RGB carries an `sRGB` chunk, and unknown or data samples stay
+untagged. Floating-point tone mapping produces sRGB. The transfer tag leaves the encoded
+RGB and alpha samples unchanged.
+
 ## `p4kx audio info <archive> <entry> --json`
 
 Also `p4kx audio info <file> --json` for a WEM file on disk.
@@ -1479,15 +1625,25 @@ Also `p4kx audio info <file> --json` for a WEM file on disk.
 ```json
 {"sound": "Data\\Sounds\\wwise\\Media\\100.wem", "codec": "pcm", "codec_name": "PCM",
  "format_tag": 65534, "channels": 2, "sample_rate": 48000, "sample_count": 1200,
- "duration_seconds": 0.025}
+ "duration_seconds": 0.025, "loop": null}
 ```
 
 `sound` is the Entry path, or the path of the file on disk. `codec` is one of `pcm`,
 `ima_adpcm`, `vorbis`, `opus`, `ptadpcm`, `xwma`, `xma2`, `aac`, `dsp`, `hevag`, `atrac9` or
 `unknown`; `codec_name` is its readable name and `format_tag` the raw tag of the `fmt` chunk.
 `sample_count` is the number of frames (samples per channel) and `duration_seconds` the playing
-time; both are `null` when the header does not state them and the codec does not allow computing
-them.
+time. Both can be `null` when the selected header and codec leave the count unknown. A selected
+`loop` has `start`, `end` and `frames` in samples per channel. The `end` is exclusive. The example
+omits the additional `fieldOrigins` and `provenance` metadata.
+
+`fieldOrigins` maps each output path to the evidence used by that value. The sound name comes
+from input metadata. Format and derived values retain their original WEM inputs, including the
+last applicable format chunk before the first data chunk. For an encrypted top-level P4K Entry,
+the name can be unencrypted while the format payload is encrypted. A standalone file has unknown
+original Archive encryption. The source and use identifiers resolve in `provenance`.
+
+A Vorbis count is read within the selected `vorb` chunk. A chunk too short to supply a count uses
+the existing embedded-format fallback when available.
 
 ## `p4kx audio wav <archive> <entry> --out <file> --json`
 
@@ -1571,7 +1727,8 @@ the reader decodes them: `decoded` (the fields of the type were read; containers
 body, a sound, action or event is not checked for bytes after its fields), `undecoded` (a type the
 reader has no decoder for, e.g. actor-mixers, buses and states; the body is skipped),
 `unsupported` (a decoded type in a bank version whose layout is not known: Sound below version 150,
-containers and music objects below 154, any decoded type above 154) and `malformed` (the body does
+standalone State outside versions 128–145, containers and music objects below 154, or any
+decoded type above 154) and `malformed` (the body does
 not hold the fields of its type). `matched` counts the objects that pass `--type` and `--id`;
 `objects` holds `limit` of them from `offset` on, in bank order, and `next_offset` is where the
 next page starts, `null` on the last. A bank without a `HIRC` section has `total` 0.
@@ -1586,8 +1743,88 @@ ID of the parent node, `null` for a node at the top and for an object without a 
 `children` lists the IDs the object holds in bank order: the actions of an event, the children of
 a container, the tracks of a segment, the segments of a playlist and, for a music track, the media
 IDs of its sources. `detail` depends on the type and is `null` for an event (its actions are the
-children) and for undecoded, unsupported and malformed objects:
+children) and for undecoded, unsupported and malformed objects.
 
+DialogueEvent objects include `source_fields` with the checked original declaration. Its
+`layout` gives decoded, malformed or unsupported source coverage. The original object `status`
+describes the playback reader's coverage. The `fields` member includes authored header words and
+checked table extents. `rows` keeps original argument, node and property occurrences in order.
+A malformed declaration keeps every readable row prefix. A readable link word carries an
+`undetermined` interpretation. An unsupported layout reports its version and an empty row list.
+
+Source values carry `containsEncryptedSource`, `sourceUsesRefs` and `sourceSetComplete`. The
+object-local `source_inventory` resolves each reference to its physical input and exact half-open
+bank-relative byte span. A standalone file has unknown original Archive encryption lineage.
+The same object shape is returned by MCP `list_soundbank_objects` within its existing whole-object
+response budget. The CLI writes the complete checked rows for each selected object.
+
+Version-154 Random/Sequence objects include `source_fields` with original loop counts and
+modifiers, transition words, avoid-repeat count, mode codes, flags, child count and checked
+playlist extent. Finite transition values use milliseconds. The raw binary32 words also
+preserve nonfinite values. The playlist retains every readable original play ID and weight
+word in authored order. Its signed `weight` and unsigned `weight_bits` share the same original
+span. A short final weight keeps its play ID and checked row range. Source coverage distinguishes
+a complete declaration, a malformed prefix, an unreachable continuation and an unsupported
+version.
+
+Version-154 Switch objects include `source_fields` with original group and default values,
+continuous-validation byte, child extent, membership groups and child configurations.
+Group, member and configuration rows keep physical order and repeated IDs. Each fade
+retains its signed value and original 32-bit word. A readable member remains visible
+when the declared membership table is truncated. Known group codes identify Switch or
+State. Membership references carry unchecked resolution.
+
+Version-154 Blend objects include `source_fields` with original children, Layer and
+association counts, crossfade RTPC selectors and the continuous-validation byte.
+Rows carry physical Layer, curve, association and point positions. Initial RTPC data
+includes its checked complete curves. Crossfade points keep each readable binary32
+word and the original interpolation code. Association references carry unchecked
+resolution. Unknown and non-finite words remain available.
+
+Version-154 MusicTrack objects include `source_fields` with original track
+controls, source, clip, automation and switch-member rows. Clip records preserve
+their authored track IDs and exact 16-digit binary64 words. Finite clip start,
+trim and duration values are in milliseconds. Original automation
+points retain readable words when the final point is truncated. Switch transitions
+retain their original signed fade, synchronization and cue words. Each checked
+value links to its original byte range in the owning bank.
+
+Version-154 Sound, ActorMixer, Random/Sequence, Switch, Blend and music nodes also
+include `node_fields`. The document binds the object status, bank version, original
+parent ID (including zero), override bus ID and packed priority/MIDI byte to the owning
+bank. The ordinary and ranged property lists preserve authored order, original IDs,
+raw words and each list's checked counts. Qualified version-154 voice properties
+also include their property name and unit plus any readable finite number.
+Nonfinite values carry a null interpretation beside their exact raw bits.
+Effect and metadata slots retain their
+physical order, indices, reference IDs and raw flag bytes. Aux routing retains the
+four authored user send slots and reflections ID. Advanced settings preserve the
+original instance limit, behavior codes and flags. Positioning rows preserve original
+vertex, playlist and automation words and indicate a checked partial final row.
+Inline State includes the original binding, group and member sequence and its raw
+property words. RTPC includes the original curve count, checked complete curve
+prefix, and ordered raw curve and interpolation words. Fields and words are omitted when the reader
+has no complete source value. Each sourced value can be resolved through
+`node_fields.source_inventory` and includes its encryption marker. The same object
+shape is returned by MCP `list_soundbank_objects`.
+ActorMixer node fields also retain the original child count, checked child
+range and each readable child ID in physical order.
+
+Standalone State objects include sourced version, layout and raw body range in
+source_fields. A checked bundle adds original count, ordered property IDs and
+binary32 words, finite values, consumed and trailing ranges. Unsupported
+layouts retain the original body range. Action source fields include the
+original type and target when readable. Version-154 Play properties include
+the authored target and fade flags plus both original planar lists. The
+property layout distinguishes absent, unsupported and malformed observations.
+
+Other object details:
+
+- `state`: standalone State versions 128 through 145 expose `property_count`, `count_range`,
+  ordered `properties`, `consumed_range` and `trailing_range`. A property has its original RTPC
+  parameter `id`, binary32 `value_bits`, and `value`, which is null for nonfinite values.
+  Its `id_range` and `value_range` identify the original words. Ranges are half-open
+  bank-relative offsets written as unsigned decimal strings.
 - `sound`: `plugin_id`, `storage` (`embedded`, `prefetch-streamed`, `streamed` or `other`),
   `source_id` (the WEM ID), `in_memory_size`, `language_specific`, `source_plugin` (a plug-in
   generates the sound, no WEM holds it).
@@ -1720,9 +1957,26 @@ each a `style_change` (a `move_to` position and new style numbers), a `straight_
 `delta`, or a `curved_edge` with its `control` and `anchor` deltas. With `--json` failures are
 not repeated on stderr. The exit code is 1 when `failed` is not empty.
 
+`originReceipt` is the relative name `.p4kx-origin.jsonl` when this run wrote files,
+or null when it wrote none. `fieldOrigins` gives the immediate marker and source
+uses for exact pointers in the summary, such as `/extracted/0/id` and
+`/extracted/0/size`. The definition supplies the ID. The written length also
+depends on the actual decoded inputs, including a selected external DDS color
+or alpha part. The `provenance` inventory resolves those source-use references.
+
+The [directory companion](source-origin.md#directory-publication) binds each
+committed file by its relative name, byte length and SHA-256. Its PNGs have one
+opaque payload origin. Shape and morph JSON have a receipt for each JSON Pointer.
+A sub-image cites its crop declaration and the actual base bitmap inputs. A
+standalone input's original Archive encryption is unknown.
+
 ## `p4kx ui render <archive> <entry> --out <file.png> [--svg] [--size <W>x<H>|<W>] [--background …] [--lang <language>] --json`
 
 Also `p4kx ui render <file> --out <file.png> --json` for a GFx or SWF file on disk.
+
+The report carries `originReceipt` (the sibling companion basename),
+`artifactOrigin`, `fieldOrigins` and `provenance`. The artifact receipt
+binds the actual PNG or SVG bytes. See [source origins](source-origin.md#movie-rendering).
 
 `--lang` (only with an Archive and an Entry) resolves the localisation keys (`@key`) of text fields
 in the `global.ini` of that language; a key it does not hold is listed as `unlocalised`, and without
@@ -1787,8 +2041,9 @@ pixels, and a `--out` that is the movie file, print no JSON and fail with exit c
 `defaults` when it has none (a field of view of 10 degrees, a view angle of 60 and a distance
 factor of 1.5), and `… and options` when `--fov`, `--view-angle` or `--distance-scaler` replaced
 a value. The camera values are the ones used: values that are not finite fall back to the
-defaults and the rest are clamped, as the camera does. `drawn_parts` is the number of parts with
-geometry the picture shows, `triangles` the triangles they place, and `issues` the notes and
+defaults and the rest are clamped, as the camera does. `drawn_parts` counts the parts placed
+in the scene before camera culling. `triangles` counts the triangles of their meshes. `issues`
+contains the notes and
 skipped parts of the Assembly as `entity glb` lists them. `milliseconds` splits the run into
 reading and assembling, building the scene, drawing and reading the picture back, and writing
 the file. An Entity the Archive lacks, a bad option, a `--out` that is the Archive or lies in a
@@ -1797,6 +2052,19 @@ print no JSON and fail with exit code 2. A replacement that does not fit its por
 same and listed in `incompatible` (absent when empty), as for `entity loadout`; `--loadout-pick`
 works as there. A machine without
 a graphics adapter fails with `no graphics adapter` on stderr and exit code 1.
+
+`fieldOrigins` and `provenance` address the selected Entity and individual camera settings.
+Each setting uses the actual field of the selected `UIHoloVehicle_Config` Record or a command-line
+option. An explicit override is tool-authored even when its number equals the stored value.
+A readable Record with a missing setting retains the declaration survey that chose the fallback.
+`originReceipt` names the sibling `<file>.p4kx-origin.jsonl`. `artifactOrigin` addresses the
+committed PNG as one opaque payload and is also the origin of the measured `bytes`. It includes
+model and character-definition reads used for placed geometry, resolved material slots, authored
+port helper and offset fields, and the camera settings. Models that place scene bounds contribute
+even when the camera later culls them. An unused LOD or material library carries no contribution.
+The known contributors of `drawn_parts` and `triangles` come from the placed scene. An incomplete
+set can still have a positive encryption marker when a known contributor is encrypted. Other
+Assembly counters and diagnostics retain unknown origins where their inputs are unproved.
 
 ## `p4kx ui screens <archive> <entity> --json`
 
@@ -1831,6 +2099,20 @@ screen by type, `rendered` says whether `ui render --screen` draws the type. `mo
 `moviePath` of UI owner components. A canvas that cannot be read keeps its row with the GUID as
 `canvas`, size 0 and no assets. The exit code is 0.
 
+`fieldOrigins` and `provenance` describe the original DataForge declarations used by this listing.
+The receipt distinguishes a screen reference, its admitted canvas path, each read dimension, the
+authored field behind a deduplicated asset path, and every widget counted in an element group.
+Widget addresses record the physical canvas Record, the original `scene` or `library` field, its
+stored array position and, for an asset, the value's preorder position within the widget. The
+listed texture, SVG, movie and localization paths come from authored DataForge fields. Origins with
+unproved loadout port segments or nested canvas selection routes report an incomplete source set.
+Default port segments retain the original port `Name` and `defaultItem.entityClass` from the
+physical parent Entity Record. An explicit loadout name retains the evidence of other proven
+segments of its path.
+Direct nested canvases retain the actual `scene` or `library` widget `canvas` Reference used to
+reach each read. A style or operation route whose selector is unobserved retains an incomplete
+source set for dependent values.
+
 ## `p4kx ui render <archive> --screen <canvas> --out <file.png> [--svg] [--size <W>x<H>|<W>] [--background …] [--brand <code>] [--var <name>=<value>]… [--lang <language>] --json`
 
 Renders a `BuildingBlocks` canvas, by record path or GUID, instead of a movie; an ENTRY excludes
@@ -1838,6 +2120,12 @@ Renders a `BuildingBlocks` canvas, by record path or GUID, instead of a movie; a
 `uielements/buildingblocks` names (`fonts_en.gfx`) and their localisation keys resolve in `--lang`,
 English by default; when the font movie or the language cannot be read, a warning goes to stderr and
 the texts are left out.
+
+Screen PNG and SVG have a sibling `<file>.p4kx-origin.jsonl` companion.
+The JSON summary adds `originReceipt`, `artifactOrigin`, `fieldOrigins` and
+`provenance` as described in [Source origin](source-origin.md). An explicit
+width is an option. The derived height uses both original canvas size fields.
+An unknown diagnostic retains a null origin marker.
 
 `--var <name>=<value>` (repeatable, at most 64, only with `--screen`) sets a game variable before
 the bindings are evaluated (ADR-0259); every other variable stays at zero, the state at rest
@@ -1997,6 +2285,12 @@ any chunk, the chunk table or the end of the file, alignment padding included, s
 share an offset share their span; the table may list chunks in any order. A file that is no chunk
 file, has another container version or is truncated prints no JSON; it fails with exit code 3.
 
+The report also includes field-addressed origins in `fieldOrigins` and the referenced
+`provenance` inventory. Coordinates for stored words identify half-open decoded-file ranges.
+A table coordinate lists the row ordinal followed by the byte range. A derived `#ivo` size
+also links the offset column, table boundary and decoded extent. An Archive directory path
+has its own origin. A standalone file has unknown original Archive encryption.
+
 ## `p4kx chunks dump <archive> <entry> --chunk <index> --out <file> --json`
 
 Also `p4kx chunks dump <file> --chunk <index> --out <file> --json` for a chunk file on disk.
@@ -2013,6 +2307,14 @@ chunk (`0x0004`, `0x0014`) as XML, a `Json` or `ModelPaths` chunk (`0x0011`, `0x
 `size` stays the size of the chunk. An index the table does not have, an output that is the chunk
 file itself, or `--text` on a chunk of another type fails with exit code 2; `--text` on data that
 is no valid `CryXml` or UTF-8 text fails with exit code 3.
+
+The dump publishes a sibling `<output>.p4kx-origin.jsonl` bound to the written
+bytes. The JSON summary includes its basename in `originReceipt` and uses the
+same table-word origins as the listing at the `/chunk` paths in `fieldOrigins`.
+Unchanged bytes use one `opaquePayload` address. Converted CryXml uses
+`xmlBytes` addresses for the emitted fields. The embedded source coordinates
+start with the chunk's decoded byte offset, followed by the original CryXml
+ordinals. The dump file and its companion cannot alias the input.
 
 ## `p4kx model info <archive> <entry> [--anim-from <entry>]… --json`
 
@@ -2063,7 +2365,27 @@ what is wrong for the second and third; `single` is true when one material serve
 `id` of the material is `null`); `default_palette` is the library's default tint palette.
 `materials` lists the materials of a loaded library in ID order, with the colours as the file
 stores them (linear), `flags` the engine's `MtlFlags` and `textures` the slots with their paths as
-the file gives them. `nodes` keeps the order of the file;
+the file gives them. `default_material` reports the separate archive fallback lookup when
+a read model requires it. Its state distinguishes a resolved material from missing,
+ambiguous, unreadable, malformed or unsupported sources. An observed source includes
+its physical Entry and container coordinates and an encryption marker. The decoded
+SHA-256 is present when the candidate's original bytes were verified. An unreadable
+candidate is evidence of the attempted source.
+
+For a loaded library, `materialFieldOrigins` maps JSON Pointers in this result to the immediate
+encryption marker, source-set completeness and use references. Covered fields include the library
+mode and palette name, material slots and their scalar and colour fields, texture map and file
+tokens, public parameter names and values, and all raw layer attribute names and values.
+Under /library/authored, origins also reference canonical XML names, declared attributes,
+mixed content, child positions and original submaterial slots.
+`materialProvenance` resolves those references to the selected material Entry and the original model chunk
+that selected the library. XML coordinates count original element children and parsed attributes
+from zero. The marker includes the selector's encryption. Layer targets and textures named by
+these fields are references that the listing leaves untouched. With a standalone model, the
+covered values have a null marker and incomplete source sets. The library status reports
+a missing or unreadable library.
+
+`nodes` keeps the order of the file;
 `parent` is the index of the parent node or `null` for a root, and `transform` the 3×4 row-major
 matrix from the node's space to its parent's, translation last, in CryEngine axes (Z up) and
 metres. A model without a `NodeMeshCombo` chunk has one root node named after the file. `scale` is
@@ -2110,10 +2432,11 @@ without decoding a key (ADR-0157): one whose key format the reader refuses is li
 so such an animation in them is unread, as before. The `reason` of an unreadable file starts
 with the Entry path or file, then the cause, e.g. `Data\x\a.caf: the CafData chunk is corrupt`;
 the cause no longer repeats the file name.
-`chunks` lists every chunk of the model file and of its
-geometry companion (`file` is `model`, `geometry` or `lod<n>-geometry`) with `usage` `read` when
-the model was read from it, `skipped` for a known type the model does not read and `unknown` for
-an unknown type.
+`chunks` lists every chunk of actually read model and geometry files. `file` is `model`,
+`geometry`, `lod<n>-geometry` or `lod<n>-model`; the last role identifies a level-specific model
+file read for its skeleton. These roles do not independently prove physical source identity.
+`usage` is `read` when the model was read from it, `skipped` for a known type the model does not
+read and `unknown` for an unknown type.
 A geometry companion that does not exist exits with code 2, a corrupt or unreadable model or
 companion with 3. A `CrCh` model that is well-formed but has a layout the reader does not
 implement (a mesh in data streams, a big-endian chunk, a `Mesh` or physics data chunk of another
@@ -2210,6 +2533,14 @@ fields are absent. When `--convert` converted the DataForge Entry, the report al
 Record's file does not follow its name or record path, `renamed` as there
 (`{"guid", "path", "reason"}`); `skipped` lists
 the Record files relative to the folder of the DataForge Entry. Otherwise that field is absent.
+`texture_artifacts` contains the images published by this run when texture image conversion
+is enabled. Each texture groups its `images` with a shared `provenance` inventory. The group contains its declared `source_transfer`, encoded `output_transfer` and
+any `png_transform`, with their precise `field_origins`. Every image
+has a target-relative `path` with forward slashes, the measured `digest` of the written file,
+the selected `level`, `layer`, `face` and `slice`, and its own `containsEncryptedSource`,
+`sourceUsesRefs` and `sourceSetComplete`. Existing images retained by the conflict policy do
+not gain a receipt from this run. The field is omitted when no image was written.
+
 An Entry whose path has a part that is no valid file name on Linux and Windows, a path that is too
 long for Windows or that differs only in case from an earlier written Entry is listed in `failed`
 with the part and the rule it breaks
@@ -2387,6 +2718,13 @@ side holds at most 128 MiB of text and about 9 bytes of bookkeeping per line.
 unchanged; `byte_order` is `little`, `big`, or `null` for text XML. `--json` needs `--out`,
 because the XML would otherwise share stdout with the JSON; without it the exit code is 2.
 
+The summary also includes `originReceipt` with the sibling companion's filename,
+`fieldOrigins` keyed by JSON Pointer, and `provenance` with the physical sources and
+uses. A standalone file has unknown original P4K encryption. The chosen output and
+companion names are independent of the input bytes. The companion addresses each emitted
+binary CryXml datum and binds it to the final artifact by relative name, byte length and
+SHA-256. See [Standalone field origins](source-origin.md).
+
 ## `p4kx chf glb <archive> <file> --out <file> --json`
 
 ```json
@@ -2523,6 +2861,12 @@ order; the order of face parts and blends is their meaning and is compared by po
 code is 1 when the files differ (`identical` false) and 0 when not, as for `compare`; a file that
 is no CHF exits with 3.
 
+The report also carries `fieldOrigins` keyed by the exact report pointer and
+`provenance` for both files. Each change's `old` and `new` uses identify the
+original value or membership query on the corresponding side. Name lookups
+used in the readable path and order text can carry Archive sources. The raw
+hash path and comparison result derive from the CHF values.
+
 ## `p4kx chf to-json <file> --out <file> --json` and `p4kx chf from-json <file> --out <file> --json`
 
 ```json
@@ -2539,6 +2883,11 @@ with that line too. `to-json --json` needs `--out`, because
 the converted JSON would otherwise share stdout with the summary; without it the exit code is 2.
 An `--out` inside a Star Citizen installation, including a Channel's `user` folder, is refused with
 exit code 2; copy a CHF file into `CustomCharacters` by hand.
+
+The summaries add `originReceipt`, the companion basename, and immediate
+`fieldOrigins` and `provenance`. The companion binds the unchanged artifact
+bytes and addresses each emitted JSON datum or the opaque binary CHF.
+See [Standalone field origins](source-origin.md).
 
 ### The CHF JSON
 

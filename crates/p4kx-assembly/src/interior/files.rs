@@ -68,14 +68,14 @@ pub(super) fn file_name(path: &str) -> &str {
 }
 
 /// Returns the name of the file at `path` without folders and extension.
-pub(super) fn stem(path: &str) -> &str {
+pub(crate) fn stem(path: &str) -> &str {
     let name = path.rsplit(['/', '\\']).next().unwrap_or(path);
     name.rsplit_once('.').map_or(name, |(stem, _)| stem)
 }
 
 /// Returns whether `path` is a plain relative path: no empty, `.` or `..` component and no drive
 /// or stream marker.
-pub(super) fn is_plain(path: &str) -> bool {
+pub(crate) fn is_plain(path: &str) -> bool {
     path.split(['/', '\\'])
         .skip_while(|part| part.is_empty())
         .all(|part| {
@@ -86,25 +86,12 @@ pub(super) fn is_plain(path: &str) -> bool {
         })
 }
 
-/// The places a nested container's file is looked for, in order, as paths in one layer.
-pub(super) fn child_candidates(name: &str, outermost: bool) -> Vec<String> {
-    let name = name.trim().trim_start_matches(['/', '\\']);
-    let named = if name.to_ascii_lowercase().ends_with(".socpak") {
-        name.to_owned()
-    } else {
-        format!("{name}.socpak")
-    };
-    let mut candidates = vec![named.clone()];
-    if outermost {
-        candidates.push(format!("Data\\{named}"));
-        candidates.push(format!("Data\\ObjectContainers\\{named}"));
-    }
+/// Finds the first existing candidate within the current Archive.
+pub(super) fn find_first<'archive>(
+    index: &PathIndex<'archive>,
+    candidates: impl IntoIterator<Item: AsRef<str>>,
+) -> Option<&'archive Entry> {
     candidates
-}
-
-/// Finds the first of `candidates` among the Entries `index` covers.
-pub(super) fn find_first<'a>(index: &PathIndex<'a>, candidates: &[String]) -> Option<&'a Entry> {
-    candidates
-        .iter()
-        .find_map(|candidate| index.find(candidate))
+        .into_iter()
+        .find_map(|candidate| index.find(candidate.as_ref()))
 }

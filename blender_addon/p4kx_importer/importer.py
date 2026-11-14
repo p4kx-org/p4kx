@@ -12,8 +12,12 @@ from pathlib import Path
 import bpy
 from mathutils import Quaternion, Vector
 
+from . import collision_helpers as collisions
+from .collision_importer import import_helpers
 from .glass_tint import drop_tint_without_colours
 from .lights import gltf_to_blender_light_quaternion, light_settings
+from .material_surface import GLTF_COLOUR_ATTRIBUTE
+from .mesh_preflight import preflight_meshes
 from .materials import ImageCache, apply_materials
 from .light_model import Light
 from .package import (
@@ -22,12 +26,14 @@ from .package import (
     Package,
     PackageError,
     blender_name,
-    check_glb,
     gltf_to_blender_quaternion,
     gltf_to_blender_scale,
     gltf_to_blender_vector,
-    resolve_file,
 )
+
+
+from . import soc_scene
+from .soc_importer import import_soc_nodes
 
 
 @dataclass(slots=True)
@@ -42,11 +48,16 @@ class ImportResult:
     armatures: int = 0
     shape_keys: int = 0
     actions: int = 0
+    collision_helpers: int = 0
     warnings: list[str] = field(default_factory=list)
 
 
 def import_package(
-    context: bpy.types.Context, package: Package, light_strength: float = 1.0
+    context: bpy.types.Context,
+    package: Package,
+    light_strength: float = 1.0,
+    *,
+    collision_helpers: bool = False,
 ) -> ImportResult:
     """Imports ``package`` into the scene of ``context`` and returns what was created.
 
@@ -60,10 +71,18 @@ def import_package(
     """
     if not hasattr(bpy.ops.import_scene, "gltf"):
         raise PackageError("Enable Blender's 'glTF 2.0 format' add-on first.")
+    authored = soc_scene.load(package.root, package.authored_soc) if package.authored_soc else []
+    helpers = (
+        collisions.load(package.root, {node.index for node in package.nodes})
+        if collision_helpers and package.collision_helpers
+        else None
+    )
+    preflight = preflight_meshes(package)
     root = bpy.data.collections.new(blender_name(package.entity_name))
     context.scene.collection.children.link(root)
     result = ImportResult(root=root)
-    templates = _import_meshes(context, package, root, result)
+    result.warnings.extend(problem.message() for problem in preflight.problems)
+    templates = _import_meshes(context, package, root, result, preflight.paths)
     created: dict[int, bpy.types.Object] = {}
     for node in package.nodes:
         template = templates.get(node.mesh) if node.mesh else None
@@ -73,30 +92,35 @@ def import_package(
         else:
             created[node.index] = _create_object(node, template, created, root)
             mesh = package.meshes[node.mesh] if node.mesh else None
-            if mesh is not None and mesh.rig is not None:
-                _import_rigged(context, package, mesh, created[node.index], root, result)
+            if mesh is not None and mesh.rig is not None and mesh.id in preflight.paths:
+                _import_rigged(context, mesh, preflight.paths[mesh.id], created[node.index], root, result)
         result.objects += 1
         result.instances += template is not None
+    import_soc_nodes(root, authored)
+    result.collision_helpers = import_helpers(root, helpers, created)
     result.warnings.extend(package.warnings)
     return result
 
 
 def _import_meshes(
-    context: bpy.types.Context, package: Package, root: bpy.types.Collection, result: ImportResult
+    context: bpy.types.Context,
+    package: Package,
+    root: bpy.types.Collection,
+    result: ImportResult,
+    paths: dict[str, Path],
 ) -> dict[str, bpy.types.Collection]:
-    wanted = {
-        node.mesh for node in package.nodes if node.mesh and package.meshes[node.mesh].rig is None
-    }
     holder = bpy.data.collections.new(blender_name(f"{package.entity_name} meshes"))
     root.children.link(holder)
     holder_layer = _layer_collection(context.view_layer.layer_collection, holder)
     images = ImageCache(package)
     templates: dict[str, bpy.types.Collection] = {}
-    for mesh_id in sorted(wanted):
+    for mesh_id, path in paths.items():
         mesh = package.meshes[mesh_id]
+        if mesh.rig is not None:
+            continue
         template = bpy.data.collections.new(mesh_id)
         holder.children.link(template)
-        if _import_glb(context, package, mesh, template, images):
+        if _import_glb(context, package, mesh, path, template, images):
             templates[mesh_id] = template
             result.meshes += 1
         else:
@@ -110,17 +134,10 @@ def _import_glb(
     context: bpy.types.Context,
     package: Package,
     mesh: Mesh,
+    path: Path,
     template: bpy.types.Collection,
     images: ImageCache,
 ) -> bool:
-    try:
-        path = resolve_file(package.root, mesh.file)
-        if not path.is_file():
-            return False
-        check_glb(path)
-    except PackageError as error:
-        package.warnings.append(str(error))
-        return False
     layer = _layer_collection(context.view_layer.layer_collection, template)
     previous = context.view_layer.active_layer_collection
     context.view_layer.active_layer_collection = layer
@@ -142,21 +159,12 @@ def _import_glb(
 
 def _import_rigged(
     context: bpy.types.Context,
-    package: Package,
     mesh: Mesh,
+    path: Path,
     parent: bpy.types.Object,
     root: bpy.types.Collection,
     result: ImportResult,
 ) -> None:
-    try:
-        path = resolve_file(package.root, mesh.file)
-        if not path.is_file():
-            package.warnings.append(f"Mesh {mesh.id} could not be imported.")
-            return
-        check_glb(path)
-    except PackageError as error:
-        package.warnings.append(str(error))
-        return
     layer = _layer_collection(context.view_layer.layer_collection, root)
     previous = context.view_layer.active_layer_collection
     if layer is not None:
@@ -170,7 +178,7 @@ def _import_rigged(
         context.view_layer.active_layer_collection = previous
     if "FINISHED" not in status:
         _discard_new(before)
-        package.warnings.append(f"Mesh {mesh.id} could not be imported.")
+        result.warnings.append(f"Mesh {mesh.id} could not be imported.")
         return
     created = [obj for obj in bpy.data.objects if obj not in before["objects"]]
     for obj in created:
@@ -221,28 +229,59 @@ def _gltf_context(context: bpy.types.Context) -> AbstractContextManager[object]:
 
 
 def _drop_vertex_colour_tint(material: bpy.types.Material) -> None:
-    """Takes the vertex colours, which are the engine's masks, out of the base colour."""
+    """Removes the glTF vertex-colour mask from a rigged material's base colour."""
     tree = material.node_tree
     if tree is None or "p4kx_family" in material:
         return
-    for link in list(tree.links):
-        mix = link.from_node
-        if link.to_socket.name != "Base Color" or mix.bl_idname != "ShaderNodeMix":
+    for shader in tree.nodes:
+        if shader.bl_idname == "ShaderNodeBsdfPrincipled":
+            _drop_base_colour_mask(tree, shader.inputs["Base Color"])
+
+
+def _drop_base_colour_mask(tree: bpy.types.NodeTree, base: bpy.types.NodeSocket) -> None:
+    pending = [base]
+    seen = set()
+    while pending:
+        target = pending.pop()
+        if target in seen or not target.is_linked:
             continue
-        colours = [s for s in mix.inputs if s.enabled and s.type == "RGBA"]
-        tinted = [
-            s
-            for s in colours
-            if s.is_linked and s.links[0].from_node.bl_idname == "ShaderNodeVertexColor"
-        ]
-        if len(colours) != 2 or len(tinted) != 1:
-            continue
-        other = colours[1] if tinted[0] == colours[0] else colours[0]
-        if other.is_linked:
-            tree.links.new(other.links[0].from_socket, link.to_socket)
-        else:
-            link.to_socket.default_value = other.default_value
+        seen.add(target)
+        link = target.links[0]
+        if _is_gltf_colour(link.from_socket):
+            target.default_value = (1.0, 1.0, 1.0, 1.0)
             tree.links.remove(link)
+            continue
+        mix = link.from_node
+        if mix.bl_idname != "ShaderNodeMix" or mix.data_type != "RGBA" or mix.blend_type != "MULTIPLY":
+            continue
+        factor = mix.inputs[0]
+        if factor.is_linked or factor.default_value != 1.0:
+            continue
+        colours = [socket for socket in mix.inputs if socket.enabled and socket.type == "RGBA"]
+        if len(colours) != 2:
+            continue
+        masks = [socket for socket in colours if socket.is_linked and _is_gltf_colour(socket.links[0].from_socket)]
+        if len(masks) != 1:
+            pending.extend(colours)
+            continue
+        other = colours[1] if masks[0] == colours[0] else colours[0]
+        if other.is_linked:
+            tree.links.new(other.links[0].from_socket, target)
+        else:
+            target.default_value = other.default_value
+            tree.links.remove(link)
+
+
+def _is_gltf_colour(socket: bpy.types.NodeSocket) -> bool:
+    node = socket.node
+    return socket.name == "Color" and (
+        node.bl_idname == "ShaderNodeVertexColor"
+        or (
+            node.bl_idname == "ShaderNodeAttribute"
+            and node.attribute_type == "GEOMETRY"
+            and node.attribute_name == GLTF_COLOUR_ATTRIBUTE
+        )
+    )
 
 
 def _create_object(

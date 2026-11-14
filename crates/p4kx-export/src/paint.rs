@@ -6,6 +6,7 @@ use std::collections::{HashMap, HashSet};
 use p4kx_extraction::{CancelToken, DataForge, TagTree};
 use rayon::prelude::*;
 
+use crate::build::original_input::OriginalCatalogInput;
 use crate::contract::{Item, Paint};
 use crate::guid_text::CatalogGuid;
 use crate::paint_port::{PaintPort, VehicleFacts};
@@ -19,7 +20,9 @@ pub(crate) const fn is_paint_type(kind: &str) -> bool {
 }
 
 /// The paints of a catalog and what was counted deriving them.
-pub(crate) struct Paints {
+pub(crate) struct Paints<'f> {
+    pub(crate) ledger: crate::export_ledger::ExportLedger,
+    pub(crate) failures: Vec<crate::CatalogReadFailure<'f>>,
     pub(crate) list: Vec<Paint>,
     pub(crate) summary: PaintSummary,
     pub(crate) unreadable_files: Vec<String>,
@@ -37,18 +40,23 @@ pub(crate) struct Paints {
 /// # Errors
 ///
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
-pub(crate) fn paints(
-    forge: &DataForge<'_>,
+pub(crate) fn paints<'f>(
+    forge: &'f DataForge<'f>,
+    input: &OriginalCatalogInput<'_, 'f>,
     items: &[Item<'_>],
     vehicles: &[VehicleFacts],
+    sources: &crate::export_ledger::ExportLedger,
     cancel: Option<&CancelToken>,
-) -> Result<Paints, CatalogError> {
+) -> Result<Paints<'f>, CatalogError> {
     let candidates: Vec<&Item<'_>> = items
         .iter()
         .filter(|item| item.r#type.is_some_and(is_paint_type))
         .collect();
+    let mut ledger = crate::paint_ledger::inputs(sources, &candidates, vehicles)?;
     if candidates.is_empty() {
         return Ok(Paints {
+            ledger,
+            failures: Vec::new(),
             list: Vec::new(),
             summary: PaintSummary::default(),
             unreadable_files: Vec::new(),
@@ -58,8 +66,9 @@ pub(crate) fn paints(
     let unreadable = unreadable_files.len();
     unreadable_files.sort_unstable();
     unreadable_files.dedup();
-    let tags = TagTree::build(forge);
-    let index = TagIndex::new(&tags);
+    let tags = crate::export_tag_read::read(forge, crate::Kind::Paints, Some(input), cancel)?;
+    ledger.merge(tags.ledger);
+    let index = TagIndex::new(&tags.tree);
     let mut paints: Vec<Paint> = candidates
         .par_iter()
         .map(|item| {
@@ -83,6 +92,8 @@ pub(crate) fn paints(
     paints.sort_by_cached_key(|paint| paint.item_guid.text());
     let summary = summarise(&paints, unreadable);
     Ok(Paints {
+        ledger,
+        failures: tags.failures,
         list: paints,
         summary,
         unreadable_files,

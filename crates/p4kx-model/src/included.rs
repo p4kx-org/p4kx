@@ -1,38 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_chunks::{ByteOrder, ChunkFile, ChunkType, Container};
-use p4kx_foundation::{ByteReader, ParseError};
+use p4kx_chunks::ChunkFile;
+use p4kx_foundation::ParseError;
 use thiserror::Error;
 
 use crate::Transform;
-use crate::reader::to_usize;
-
-const INCLUDED_OBJECTS: ChunkType = ChunkType::new(Container::CrCh, 0x0010);
-const NAME_LEN: usize = 256;
-const MODEL_INDEX_AT: usize = 60;
-const TRANSFORM_AT: usize = 64;
-const PALETTE_AT: usize = 172;
-const MODEL_OBJECT: u32 = 1;
-const SKIPPED_OBJECT: u32 = 16;
-const SKIPPED_LEN: usize = 136;
-const HEADER_WORDS_LEN: usize = 28;
-
-/// The length of a record of a placed model for the layout word at the head of the object table,
-/// or `None` for a layout that is not known.
-///
-/// The layouts 8, 9, 10, 12, 13, 14 and 15 occur in the LIVE Archive; the transform, the model
-/// index and the palette sit at the same offsets in all of them.
-const fn model_record_len(layout: u32) -> Option<usize> {
-    match layout {
-        8..=10 => Some(176),
-        12 => Some(184),
-        13 => Some(192),
-        14 => Some(200),
-        15 => Some(208),
-        _ => None,
-    }
-}
+use crate::included_object_row::{self, IncludedObjectKind, IncludedPlacement};
+use crate::included_objects_chunk::{self, IncludedObjectTables};
 
 /// The most model paths one `.soc` file lists.
 pub const MAX_INCLUDED_MODELS: usize = 1 << 16;
@@ -127,12 +102,9 @@ impl IncludedObjects {
     pub fn read(bytes: &[u8]) -> Result<Option<Self>, IncludedObjectsError> {
         let file = ChunkFile::parse(bytes)?;
         let mut found: Option<Self> = None;
-        for (index, chunk) in file.chunks_of(INCLUDED_OBJECTS) {
-            if chunk.byte_order() == ByteOrder::Big {
-                return Err(IncludedObjectsError::BigEndian);
-            }
-            let data = file.chunk_data(index).unwrap_or_default();
-            let chunk = read_chunk(data)?;
+        for chunk in included_objects_chunk::chunks(&file) {
+            let tables = chunk.read_tables(Some(MAX_INCLUDED_MODELS))?;
+            let chunk = preview(&tables)?;
             found = Some(match found {
                 Some(first) => first.joined(chunk),
                 None => chunk,
@@ -159,79 +131,72 @@ impl IncludedObjects {
     }
 }
 
-fn read_chunk(data: &[u8]) -> Result<IncludedObjects, IncludedObjectsError> {
-    let mut reader = ByteReader::new(data);
-    reader.skip(4)?;
-    let model_count = to_usize(reader.read_u32()?);
-    check(model_count, MAX_INCLUDED_MODELS, "models")?;
-    let models = names(&mut reader, model_count)?;
-    let material_count = usize::from(reader.read_u16()?);
-    let palette_count = usize::from(reader.read_u16()?);
-    reader.skip(material_count.saturating_mul(NAME_LEN))?;
-    let palettes = names(&mut reader, palette_count)?;
-    let layout = reader.read_u32()?;
-    reader.skip(HEADER_WORDS_LEN - 4)?;
-    let declared = reader.read_u32()?;
-    let available = reader.remaining() as u64;
-    if u64::from(declared) > available {
+fn preview(tables: &IncludedObjectTables<'_>) -> Result<IncludedObjects, IncludedObjectsError> {
+    let declared = u64::from(tables.object_len_declared());
+    let available = tables.byte_len() as u64;
+    if declared > available {
         return Err(IncludedObjectsError::ObjectTable {
-            declared: u64::from(declared),
+            declared,
             available,
         });
     }
-    let table = reader.read_bytes(to_usize(declared))?;
+    let models = tables
+        .models()
+        .map(|slot| String::from_utf8_lossy(slot.path_bytes()).trim().to_owned())
+        .collect();
+    let palettes = tables
+        .palettes()
+        .map(|slot| String::from_utf8_lossy(slot.path_bytes()).trim().to_owned())
+        .collect();
     let mut result = IncludedObjects {
         models,
         palettes,
         ..IncludedObjects::default()
     };
-    if !table.is_empty() {
-        let stride =
-            model_record_len(layout).ok_or(IncludedObjectsError::RecordLayout { layout })?;
-        check(
-            table.len() / stride.min(SKIPPED_LEN),
-            MAX_INCLUDED_OBJECTS,
-            "objects",
-        )?;
-        walk(table, stride, &mut result);
+    if tables.byte_len() == 0 {
+        return Ok(result);
+    }
+    let layout = tables.layout();
+    let stride = included_object_row::placement_len(layout)
+        .ok_or(IncludedObjectsError::RecordLayout { layout })?;
+    check(
+        tables.byte_len() / stride.min(included_object_row::KIND_16_LEN),
+        MAX_INCLUDED_OBJECTS,
+        "objects",
+    )?;
+    for row in tables.rows() {
+        match row.kind() {
+            IncludedObjectKind::Placement(placement) => {
+                if let Some(object) =
+                    preview_object(placement, result.models.len(), result.palettes.len())
+                {
+                    result.objects.push(object);
+                } else {
+                    result.invalid += 1;
+                }
+            }
+            IncludedObjectKind::Kind16 => result.skipped += 1,
+            IncludedObjectKind::UnmeasuredKind { kind }
+                if row.bytes().len() >= stride.min(included_object_row::KIND_16_LEN) =>
+            {
+                result.unsupported = Some(kind);
+            }
+            IncludedObjectKind::Truncated { .. } | IncludedObjectKind::UnmeasuredKind { .. } => {
+                result.invalid += 1;
+            }
+            IncludedObjectKind::UnmeasuredLayout => {
+                return Err(IncludedObjectsError::RecordLayout { layout });
+            }
+        }
     }
     Ok(result)
 }
 
-fn walk(mut rest: &[u8], stride: usize, out: &mut IncludedObjects) {
-    let shortest = stride.min(SKIPPED_LEN);
-    while !rest.is_empty() {
-        let kind = match rest.first_chunk::<4>() {
-            Some(bytes) if rest.len() >= shortest => u32::from_le_bytes(*bytes),
-            _ => {
-                out.invalid += 1;
-                return;
-            }
-        };
-        let len = match kind {
-            MODEL_OBJECT => stride,
-            SKIPPED_OBJECT => SKIPPED_LEN,
-            other => {
-                out.unsupported = Some(other);
-                return;
-            }
-        };
-        let Some((record, tail)) = rest.split_at_checked(len) else {
-            out.invalid += 1;
-            return;
-        };
-        rest = tail;
-        if kind == SKIPPED_OBJECT {
-            out.skipped += 1;
-        } else if let Some(object) = read_object(record, out.models.len(), out.palettes.len()) {
-            out.objects.push(object);
-        } else {
-            out.invalid += 1;
-        }
-    }
-}
-
-const fn check(count: usize, limit: usize, what: &'static str) -> Result<(), IncludedObjectsError> {
+pub(crate) const fn check(
+    count: usize,
+    limit: usize,
+    what: &'static str,
+) -> Result<(), IncludedObjectsError> {
     if count > limit {
         Err(IncludedObjectsError::TooMany { what, limit })
     } else {
@@ -239,41 +204,23 @@ const fn check(count: usize, limit: usize, what: &'static str) -> Result<(), Inc
     }
 }
 
-fn names(reader: &mut ByteReader<'_>, count: usize) -> Result<Vec<String>, ParseError> {
-    let table = reader.read_bytes(count.saturating_mul(NAME_LEN))?;
-    Ok(table
-        .as_chunks::<NAME_LEN>()
-        .0
-        .iter()
-        .map(|field| {
-            let name = field.split(|&byte| byte == 0).next().unwrap_or(field);
-            String::from_utf8_lossy(name).trim().to_owned()
-        })
-        .collect())
-}
-
-fn read_object(record: &[u8], models: usize, palettes: usize) -> Option<IncludedObject> {
-    let index: [u8; 2] = record
-        .get(MODEL_INDEX_AT..MODEL_INDEX_AT + 2)?
-        .try_into()
-        .ok()?;
-    let model = usize::from(u16::from_le_bytes(index));
+fn preview_object(
+    placement: IncludedPlacement<'_>,
+    models: usize,
+    palettes: usize,
+) -> Option<IncludedObject> {
+    let model = usize::from(placement.model_index());
     if model >= models {
         return None;
     }
-    let mut reader = ByteReader::new(record.get(TRANSFORM_AT..)?);
-    let mut rows = [[0.0_f64; 4]; 3];
-    for value in rows.iter_mut().flatten() {
-        *value = f64::from_bits(reader.read_u64().ok()?);
-    }
+    let rows = placement
+        .transform_words()
+        .map(|row| row.map(f64::from_bits));
     let transform = Transform::from_rows_f64(rows).filter(Transform::is_plausible_placement)?;
-    let palette = record
-        .get(PALETTE_AT)
-        .map(|&index| usize::from(index))
-        .filter(|&index| index < palettes);
+    let palette = usize::from(placement.palette_byte());
     Some(IncludedObject {
         model,
         transform,
-        palette,
+        palette: (palette < palettes).then_some(palette),
     })
 }

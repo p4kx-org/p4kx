@@ -4,18 +4,19 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
+use p4kx_extraction::{ArchiveMaterialRead, ModelArchiveSource};
 use p4kx_gltf::MorphTarget;
-use p4kx_model::{MaterialStatus, Model};
+use p4kx_model::{MaterialStatus, Model, ModelFile};
 
 use super::face_build::{Face, Found, settled};
 use super::head_move::{HeadMove, Worn, check_follows, first_mesh_note, followed};
 use super::jobs::{Job, issue, planned};
-use super::materials::{drawn_with, read_libraries};
+use super::materials::{Library, drawn_with, read_libraries};
 use super::own_face::own_head;
 use super::read_models::{Loaded, choose, read_models};
 use super::shape::shaped;
 use super::zones::{Coverage, without_covered};
-use super::{Armour, ArmourPart, BodyVariant, Piece};
+use super::{Armour, ArmourPart, BodyVariant, Piece, ShapeArchiveSources};
 use crate::build_palettes::Palettes;
 use crate::{
     AssemblyError, AssemblyOptions, Issue, IssueKind, ModelFailure, ModelProvider, PaletteProvider,
@@ -28,6 +29,7 @@ const HEAD: &str = "head";
 struct Body {
     skeleton: Model,
     skeleton_file: String,
+    archive_source: Option<ModelArchiveSource>,
 }
 
 impl Armour {
@@ -53,6 +55,7 @@ impl Armour {
         options: &AssemblyOptions,
     ) -> Result<Self, AssemblyError> {
         Self::build_painted(variant, pieces, models, None, options)
+            .map(|built| built.with_default_material(models))
     }
 
     /// Builds the Armour as [`Self::build`] does, with the materials of each piece drawn with the
@@ -71,6 +74,7 @@ impl Armour {
         options: &AssemblyOptions,
     ) -> Result<Self, AssemblyError> {
         Self::build_painted(variant, pieces, models, Some(palettes), options)
+            .map(|built| built.with_default_material(models))
     }
 
     fn build_painted(
@@ -86,13 +90,11 @@ impl Armour {
         let loaded = read_models(&jobs, models, options)?;
         let chosen = choose(&jobs, &loaded, options.max_vertices, &mut issues);
         let libraries = read_libraries(&jobs, &chosen, models);
-        let unnamed = Arc::new(MaterialStatus::Unnamed);
+        let unnamed = Library::from(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed));
         let covering = covering(&jobs, &chosen, variant);
         let (mut reported, mut tints) = (HashSet::new(), Palettes::new(palettes));
         let mut parts = Vec::with_capacity(chosen.len());
-        let mut head: Option<HeadMove> = None;
-        let mut heads = Vec::new();
-        let mut part_jobs = Vec::new();
+        let (mut head, mut heads, mut part_jobs) = (None::<HeadMove>, Vec::new(), Vec::new());
         for (job, found) in jobs.iter().zip(&chosen) {
             let Some(found) = found else { continue };
             let Some(mut dressed) = worn(job, found, models, &mut head, &mut issues) else {
@@ -115,9 +117,11 @@ impl Armour {
             );
             parts.push(part_of(
                 job,
+                found,
                 (model, materials),
                 dressed.morphs,
                 dressed.follows,
+                dressed.shape_sources,
             ));
         }
         let skeleton = settled(
@@ -133,7 +137,9 @@ impl Armour {
             variant,
             skeleton: Arc::new(skeleton),
             skeleton_file: body.skeleton_file,
+            skeleton_archive_source: body.archive_source,
             parts,
+            default_material: None,
             issues,
             lod: options.lod,
         })
@@ -144,16 +150,32 @@ impl Armour {
 /// with and the vertices that follow the head.
 fn part_of(
     job: &Job,
-    (model, materials): (Arc<Model>, Arc<MaterialStatus>),
+    found: &Loaded,
+    (model, materials): (Arc<Model>, Library),
     morphs: Vec<MorphTarget>,
     follows: Vec<usize>,
+    shape_sources: Vec<Arc<ShapeArchiveSources>>,
 ) -> ArmourPart {
     ArmourPart {
         name: job.part.clone(),
         origin: job.origin,
         file: job.path.clone(),
         model,
-        materials,
+        archive_sources: Arc::clone(&found.archive_sources),
+        definition_origin: found.definition_origin.clone(),
+        geometry_selector: job.geometry_selector.clone(),
+        material_selector: job.material_selector.clone().or_else(|| {
+            if job.material.is_none() && found.model.material_library.is_some() {
+                job.geometry_selector.clone()
+            } else {
+                None
+            }
+        }),
+        materials: materials.status,
+        look_sources: materials.look_sources,
+        material_archive_origins: materials.origins,
+        palette: materials.palette,
+        shape_sources,
         morphs,
         follows,
         face: None,
@@ -183,30 +205,26 @@ fn worn(
     head: &mut Option<HeadMove>,
     issues: &mut Vec<Issue>,
 ) -> Option<Worn> {
-    let (model, morphs, face) = fitted(job, found, models, issues)?;
+    let fitted = fitted(job, found, models, issues)?;
     if job.shape.is_some() && job.part == HEAD && head.is_none() {
         *head = Some(HeadMove {
             before: Arc::clone(&found.model),
-            after: Arc::clone(&model),
-            morphs: morphs.clone(),
+            after: Arc::clone(&fitted.model),
+            morphs: fitted.morphs.clone(),
+            shape_sources: fitted.shape_sources.first().cloned(),
         });
     }
     Some(match head {
         Some(moved) if job.follows_head => {
-            let mut dressed = followed(&model, moved);
+            let mut dressed = followed(&fitted.model, moved);
+            dressed.shape_sources.extend(fitted.shape_sources);
             issues.extend(dressed.kinds.drain(..).map(|kind| issue(job, kind)));
             if let Some(kind) = first_mesh_note(&dressed) {
                 issues.push(issue(job, kind));
             }
             dressed
         }
-        _ => Worn {
-            model,
-            morphs,
-            face,
-            follows: Vec::new(),
-            kinds: Vec::new(),
-        },
+        _ => fitted,
     })
 }
 
@@ -218,9 +236,10 @@ fn fitted(
     found: &Loaded,
     models: &dyn ModelProvider,
     issues: &mut Vec<Issue>,
-) -> Option<(Arc<Model>, Vec<MorphTarget>, Option<Face>)> {
+) -> Option<Worn> {
     let Some(dna) = &job.shape else {
-        return Some(unshaped(job, found, models, issues));
+        let (model, morphs, face) = unshaped(job, found, models, issues);
+        return Some(Worn::fitted(model, morphs, face, None));
     };
     let head = job.part == HEAD;
     let shaped = match shaped(&found.model, &job.path, dna, &job.expressions, models, head) {
@@ -233,7 +252,16 @@ fn fitted(
     let worn = shaped.into_parts();
     issues.extend(worn.kinds.into_iter().map(|kind| issue(job, kind)));
     let face = head.then(|| Face::made(worn.face, worn.numbers));
-    Some((Arc::new(worn.model), worn.targets, face))
+    Some(Worn::fitted(
+        Arc::new(worn.model),
+        worn.targets,
+        face,
+        Some(Arc::new(ShapeArchiveSources {
+            model: Arc::clone(&found.archive_sources),
+            rig: worn.rig,
+            lower_morphs: worn.lower_morphs,
+        })),
+    ))
 }
 
 /// Returns the model of a job without a DNA as it is worn: unchanged. The head of a story
@@ -276,11 +304,19 @@ fn load_body(
     lod: u32,
 ) -> Result<Body, AssemblyError> {
     let skeleton_file = variant.skeleton();
-    let ProvidedModel { model, .. } = models
+    let ProvidedModel {
+        model,
+        archive_sources,
+        ..
+    } = models
         .model(skeleton_file, lod)
         .map_err(|failure| provider_failure(skeleton_file, variant, failure))?;
     Ok(Body {
         skeleton: model,
         skeleton_file: skeleton_file.to_owned(),
+        archive_source: archive_sources
+            .iter()
+            .find(|source| source.file() == ModelFile::Model)
+            .cloned(),
     })
 }

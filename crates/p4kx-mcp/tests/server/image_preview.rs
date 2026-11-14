@@ -32,7 +32,7 @@ fn install() -> TestResult<Install> {
     Install::new(entries)
 }
 
-fn preview(server: &mut Server, arguments: &Value) -> TestResult<(Value, Vec<u8>)> {
+pub(super) fn preview(server: &mut Server, arguments: &Value) -> TestResult<(Value, Vec<u8>)> {
     let result = server.call("image_preview", arguments)?;
     assert_ne!(result.get("isError"), Some(&json!(true)), "{result}");
     let image = result

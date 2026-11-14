@@ -22,6 +22,13 @@ type TestResult = Result<(), Box<dyn Error>>;
 
 const EXPORTED_AT: Duration = Duration::from_secs(1_792_000_000);
 
+fn catalog_options() -> CatalogOptions<'static> {
+    CatalogOptions {
+        publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+        ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
+    }
+}
+
 fn guid(value: u128) -> String {
     let text = format!("{value:032x}");
     format!(
@@ -43,7 +50,7 @@ fn build() -> Result<Built, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive =
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
+    let built = build_catalog(&archive, &catalog_options())?;
     let bases = build_ship_base(&archive, &ShipBaseOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
     Ok(Built {
         catalog: serde_json::from_slice(built.json())?,
@@ -194,7 +201,7 @@ fn a_temp_or_display_ship_is_left_out_everywhere_and_an_item_keeps_its_display_w
     let dir = tempfile::tempdir()?;
     let archive =
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
+    let built = build_catalog(&archive, &catalog_options())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let bases = build_ship_base(&archive, &ShipBaseOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
     let entry = DataForgeEntry::read(&archive)?;
@@ -202,14 +209,11 @@ fn a_temp_or_display_ship_is_left_out_everywhere_and_an_item_keeps_its_display_w
     let groups = read_variant_groups(&archive, &forge, &|| false).ok_or("stopped")?;
 
     let classes = |kind: &str| -> Vec<String> {
-        catalog[kind]
-            .as_array()
-            .map(|list| {
-                list.iter()
-                    .filter_map(|entity| entity["className"].as_str().map(str::to_owned))
-                    .collect()
-            })
-            .unwrap_or_default()
+        catalog[kind].as_array().map_or_default(|list| {
+            list.iter()
+                .filter_map(|entity| entity["className"].as_str().map(str::to_owned))
+                .collect()
+        })
     };
     let ships = classes("ships");
     for class in ["ACME_Alpha_Temp", "ACME_Beta_Display"] {

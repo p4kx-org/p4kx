@@ -1,20 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The colours of the layered materials of real ships: how many materials are drawn dark with
-//! and without the colours of their layers.
+//! Generic layered-material cases keep their lighting-effect requirement.
 
-use std::collections::{BTreeMap, BTreeSet};
-use std::error::Error;
+use std::collections::BTreeSet;
+use std::sync::Arc;
 
-use p4kx_assembly::{ArchiveModels, Assembly, AssemblyOptions, ForgePalettes, LoadoutResolver};
-use p4kx_extraction::{Archive, DataForgeEntry};
-use p4kx_gltf::base_colour_factor;
-use p4kx_testkit::{real_archive_key, real_archive_path};
+use p4kx_assembly::{ArchiveModels, Assembly, AssemblyOptions, Entities, ForgePalettes};
+use p4kx_model::Material;
+use p4kx_testkit::media_fixture::{CaseOutcome, RunReport};
 
-type TestResult = Result<(), Box<dyn Error>>;
+use crate::media_fixtures::{self, Case, Check, DockedVehicles, Family, Index, Requirements};
 
-const SHIPS: [&str; 3] = ["RSI_Polaris", "AEGS_Gladius", "RSI_Constellation_Andromeda"];
+const FAMILIES: [Family; 3] = [Family::Polaris, Family::Gladius, Family::Constellation];
 const DARK: f32 = 0.05;
 const BLACK: f32 = 0.005;
 
@@ -36,15 +34,35 @@ struct Census {
     layered_dark_before: usize,
     layered_dark_after: usize,
     unresolved: BTreeSet<String>,
-    still_dark: BTreeMap<String, f32>,
 }
 
-#[expect(
-    clippy::too_many_lines,
-    reason = "one pass counts every column of the report"
-)]
+impl Census {
+    fn material(&mut self, material: &Material) {
+        let mut plain = material.clone();
+        plain.layers.clear();
+        let shade_before = luminance(p4kx_gltf::base_colour_factor(&plain));
+        let shade_after = luminance(p4kx_gltf::base_colour_factor(material));
+        let before = shade_before < DARK;
+        let after = shade_after < DARK;
+        self.black_before += usize::from(shade_before < BLACK);
+        self.black_after += usize::from(shade_after < BLACK);
+        self.materials += 1;
+        self.dark_before += usize::from(before);
+        self.dark_after += usize::from(after);
+        self.lightened += usize::from(before && !after);
+        self.darkened += usize::from(after && !before);
+        if !material.layers.is_empty() {
+            self.layered += 1;
+            self.layered_dark_before += usize::from(before);
+            self.layered_dark_after += usize::from(after);
+            self.layers_resolved +=
+                usize::from(material.layers.iter().all(|layer| layer.surface.is_some()));
+        }
+    }
+}
+
 fn census(assembly: &Assembly) -> Census {
-    let mut seen: BTreeSet<(usize, usize, usize)> = BTreeSet::new();
+    let mut seen = BTreeSet::new();
     let mut found = Census::default();
     for part in assembly.parts() {
         let (Some(model), Some(library)) = (part.model(), part.materials().library()) else {
@@ -80,34 +98,7 @@ fn census(assembly: &Assembly) -> Census {
                 continue;
             }
             let tinted = part.palette().and_then(|palette| palette.apply(material));
-            let material = tinted.as_ref().unwrap_or(material);
-            let mut plain = material.clone();
-            plain.layers.clear();
-            let shade_before = luminance(base_colour_factor(&plain));
-            let shade_after = luminance(base_colour_factor(material));
-            let before = shade_before < DARK;
-            let after = shade_after < DARK;
-            found.black_before += usize::from(shade_before < BLACK);
-            found.black_after += usize::from(shade_after < BLACK);
-            let layered = !material.layers.is_empty();
-            found.materials += 1;
-            found.dark_before += usize::from(before);
-            found.dark_after += usize::from(after);
-            found.lightened += usize::from(before && !after);
-            found.darkened += usize::from(after && !before);
-            if layered {
-                found.layered += 1;
-                found.layered_dark_before += usize::from(before);
-                found.layered_dark_after += usize::from(after);
-                found.layers_resolved +=
-                    usize::from(material.layers.iter().all(|layer| layer.surface.is_some()));
-            }
-            if after {
-                found.still_dark.insert(
-                    material.name.clone(),
-                    luminance(base_colour_factor(material)),
-                );
-            }
+            found.material(tinted.as_ref().unwrap_or(material));
         }
     }
     found
@@ -115,56 +106,68 @@ fn census(assembly: &Assembly) -> Census {
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn the_layers_lighten_the_dark_materials_of_the_ships() {
+    media_fixtures::run(verify);
+}
+
+fn verify() -> media_fixtures::Result<()> {
+    media_fixtures::with_source(|archive, forge, files| {
+        let index = Index::new(Arc::new(Entities::new(forge)), files)?;
+        let models = ArchiveModels::new(archive);
+        let palettes = ForgePalettes::new(forge);
+        let mut report = RunReport::default();
+        let cases = FAMILIES.into_iter().enumerate();
+        for (ordinal, family) in cases {
+            let case = Case::from_family(
+                "layered_material",
+                family,
+                Requirements {
+                    geometry_lod: Some(0),
+                    item_size: None,
+                    requires_interior: false,
+                    requires_audio: false,
+                    docked: DockedVehicles::Expand,
+                },
+            );
+            report.run(format!("layered_{ordinal}"), || {
+                let Some(choice) = index.choose(archive, &case)? else {
+                    return Ok(media_fixtures::absent());
+                };
+                media_fixtures::selected(&case, &choice);
+                let assembly = Assembly::build_with_palettes(
+                    choice.capabilities.node()?,
+                    &models,
+                    &palettes,
+                    &AssemblyOptions::default(),
+                )?;
+                let found = census(&assembly);
+                measurements(&found);
+                media_fixtures::require(found.lightened > 0, Check::LayerEffect)?;
+                Ok(CaseOutcome::Completed(()))
+            });
+        }
+        media_fixtures::finish(&report)
+    })
+}
+
 #[expect(
     clippy::print_stdout,
-    reason = "the share of dark materials is the measurement, printed in one run"
+    reason = "only aggregate material-effect measurements are reported"
 )]
-fn the_layers_lighten_the_dark_materials_of_the_ships() -> TestResult {
-    let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
-    let entry = DataForgeEntry::read(&archive)?;
-    let forge = entry.open()?;
-    let models = ArchiveModels::new(&archive);
-    let palettes = ForgePalettes::new(&forge);
-    let mut measured = 0;
-    for name in SHIPS {
-        let mut resolver = LoadoutResolver::new(&forge);
-        let Ok(record) = resolver.entities().find(name) else {
-            println!("{name}: not in this Archive");
-            continue;
-        };
-        let tree = resolver.resolve(&record)?;
-        let assembly =
-            Assembly::build_with_palettes(&tree, &models, &palettes, &AssemblyOptions::default())?;
-        let found = census(&assembly);
-        println!(
-            "{name}: {} materials; dark (luminance under {DARK}) {} before, {} after; \
-             {} layered, of which dark {} before, {} after; {} with all layers read; \
-             {} layer files missing; near black (under {BLACK}) {} before, {} after; {} dark materials lightened, {} others darkened",
-            found.materials,
-            found.dark_before,
-            found.dark_after,
-            found.layered,
-            found.layered_dark_before,
-            found.layered_dark_after,
-            found.layers_resolved,
-            found.unresolved.len(),
-            found.black_before,
-            found.black_after,
-            found.lightened,
-            found.darkened
-        );
-        for path in found.unresolved.iter().take(10) {
-            println!("  missing layer file: {path}");
-        }
-        for (material, shade) in found.still_dark.iter().take(60) {
-            println!("  still dark: {material} {shade:.3}");
-        }
-        assert!(
-            found.lightened > 0,
-            "{name}: the layers lighten some materials"
-        );
-        measured += 1;
-    }
-    assert!(measured > 0, "a ship is in the Archive");
-    Ok(())
+fn measurements(found: &Census) {
+    println!(
+        "media layer totals: materials={} dark_before={} dark_after={} layered={} layered_dark_before={} layered_dark_after={} layers_resolved={} unresolved_files={} black_before={} black_after={} lightened={} darkened={}",
+        found.materials,
+        found.dark_before,
+        found.dark_after,
+        found.layered,
+        found.layered_dark_before,
+        found.layered_dark_after,
+        found.layers_resolved,
+        found.unresolved.len(),
+        found.black_before,
+        found.black_after,
+        found.lightened,
+        found.darkened
+    );
 }

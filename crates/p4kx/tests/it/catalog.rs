@@ -12,7 +12,8 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
-use catalog_support::{EXPORTED_AT, english, write_archive, write_archive_with};
+use catalog_support::{EXPORTED_AT, english, origins, write_archive, write_archive_with};
+use p4kx_extraction::Language;
 use p4kx_testkit::TestEntry;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -57,6 +58,45 @@ fn redact_version(text: &str) -> String {
     )
 }
 
+fn manufacturer_name(
+    catalog: &serde_json::Value,
+    index: usize,
+) -> Result<&serde_json::Value, Box<dyn Error>> {
+    let row = catalog
+        .pointer("/definitions/manufacturers/rows")
+        .and_then(|rows| rows.get(index))
+        .ok_or("manufacturer")?;
+    assert_eq!(
+        row.pointer("/localization/state")
+            .and_then(serde_json::Value::as_str),
+        Some("present"),
+        "the selected Manufacturer has an authored localization"
+    );
+    let reference = row
+        .pointer("/localization/value/name")
+        .ok_or("name carrier")?;
+    assert_eq!(
+        reference.get("state").and_then(serde_json::Value::as_str),
+        Some("present"),
+        "the Manufacturer name has a canonical reference"
+    );
+    let target = reference
+        .get("value")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("name reference")?;
+    catalog
+        .pointer("/texts/publicNames")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("public names")?
+        .iter()
+        .find(|text| {
+            text.pointer("/id/value")
+                .and_then(serde_json::Value::as_str)
+                == Some(target)
+        })
+        .ok_or_else(|| "canonical manufacturer name".into())
+}
+
 #[test]
 fn catalog_schema_prints_the_checked_in_schema() -> TestResult {
     let checked_in = fs::read_to_string(
@@ -87,6 +127,15 @@ fn catalog_writes_a_catalog_that_the_schema_accepts() -> TestResult {
         .map(|error| error.to_string())
         .collect();
     assert!(errors.is_empty(), "valid against the schema: {errors:?}");
+    assert!(instance.get("manufacturers").is_none());
+    assert_eq!(
+        instance["definitions"]["manufacturers"]["availability"],
+        "available"
+    );
+    assert_eq!(
+        manufacturer_name(&instance, 1)?["key"]["value"],
+        "@manufacturer_NameACAS"
+    );
     insta::assert_snapshot!("catalog_file", redact_version(&text));
     insta::assert_snapshot!("catalog_summary", summary);
     Ok(())
@@ -171,6 +220,30 @@ fn catalog_with_a_filter_marks_the_kind_partial_and_prints_json() -> TestResult 
         serde_json::json!({"status": "partial", "filter": "*/acas"}),
         "partial with the Filter"
     );
+    assert_eq!(
+        catalog.get("schemaVersion"),
+        Some(&serde_json::json!(3)),
+        "filtered output uses the current catalog version"
+    );
+    assert!(
+        catalog.get("commodities").is_none() && catalog.get("manufacturers").is_none(),
+        "filtered output has no legacy commodity array"
+    );
+    for pointer in [
+        "/definitions/commodities/rows",
+        "/projections/commodityPresentation/rows",
+    ] {
+        assert_eq!(
+            catalog.pointer(pointer),
+            Some(&serde_json::json!([])),
+            "the manufacturer filter excludes commodity rows at {pointer}"
+        );
+    }
+    assert_eq!(
+        catalog.pointer("/declarations/shopInventoryResolution"),
+        Some(&serde_json::json!({"availability": "unavailable", "rows": []})),
+        "the Record filter omits the shop registry scan",
+    );
     insta::assert_snapshot!("catalog_filter_json", summary);
     Ok(())
 }
@@ -223,14 +296,35 @@ fn catalog_without_a_german_global_ini_leaves_german_null_and_counts_it() -> Tes
     let dir = tempfile::tempdir()?;
     let archive = write_archive_with(dir.path(), &[english()])?;
     let out = dir.path().join("english-only.json");
+    origins::assert_input_encryption(&archive, Language::English)?;
 
     let summary = catalog(&archive, &out, &[])?;
 
     let catalog: serde_json::Value = serde_json::from_str(&fs::read_to_string(&out)?)?;
-    assert_eq!(
-        catalog["manufacturers"][1]["name"],
-        serde_json::json!({"key": "@manufacturer_NameACAS", "en": "Ace Astrogation", "de": null}),
-        "English only"
+    let name = manufacturer_name(&catalog, 1)?;
+    assert_eq!(name["key"]["value"], "@manufacturer_NameACAS");
+    for field in ["sourceText", "displayText"] {
+        let form = &name["translations"]["value"]["en"][field];
+        assert_eq!(
+            form["value"], "Ace Astrogation",
+            "both forms retain the original unpadded English fixture text"
+        );
+        assert_eq!(
+            form["state"], "present",
+            "the original English winner remains present"
+        );
+        assert_eq!(
+            form["sourceSetComplete"], true,
+            "each form retains its complete original input set"
+        );
+        assert_eq!(
+            form["containsEncryptedSource"], true,
+            "the original localization key is selected from the encrypted DataForge Entry"
+        );
+    }
+    assert!(
+        name["translations"]["value"].get("de").is_none(),
+        "no German input"
     );
     insta::assert_snapshot!("catalog_summary_without_german", summary);
     Ok(())
@@ -245,6 +339,7 @@ fn catalog_reads_a_german_global_ini_with_invalid_bytes_lossily() -> TestResult 
     );
     let archive = write_archive_with(dir.path(), &[english(), damaged])?;
     let out = dir.path().join("damaged.json");
+    origins::assert_input_encryption(&archive, Language::German)?;
     let output = p4kx(&["catalog"])?
         .arg(&archive)
         .arg("--out")
@@ -263,9 +358,25 @@ fn catalog_reads_a_german_global_ini_with_invalid_bytes_lossily() -> TestResult 
         "the clean Entry is not named: {stderr}"
     );
     let catalog: serde_json::Value = serde_json::from_str(&fs::read_to_string(out)?)?;
-    assert_eq!(
-        catalog["manufacturers"][1]["name"]["de"], "Ace\u{fffd}",
-        "the bad byte is replaced, the text kept"
-    );
+    let name = manufacturer_name(&catalog, 1)?;
+    for field in ["sourceText", "displayText"] {
+        let form = &name["translations"]["value"]["de"][field];
+        assert_eq!(
+            form["value"], "Ace\u{fffd}",
+            "the actual invalid source byte is decoded in both forms"
+        );
+        assert_eq!(
+            form["state"], "present",
+            "lossy decoding retains the winning value"
+        );
+        assert_eq!(
+            form["sourceSetComplete"], true,
+            "known contributors remain complete despite lossy decoding"
+        );
+        assert_eq!(
+            form["containsEncryptedSource"], true,
+            "the original encrypted key contributes independently of lossy decoding"
+        );
+    }
     Ok(())
 }

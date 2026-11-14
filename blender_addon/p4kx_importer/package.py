@@ -11,10 +11,15 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
+from itertools import chain
 from pathlib import Path
 from typing import Any
 
+from . import collision_helpers as collisions
+from . import material_source, palette_provenance
+from . import ddna_pair
+from .glb_preflight import check_glb as check_glb
 from .manifest_fields import (
     PackageError,
     PackageTooNewError,
@@ -26,23 +31,27 @@ from .manifest_fields import (
 )
 from .material_model import MaterialDesc, Palette, parse_materials, parse_palettes
 from .node_model import Node, parse_nodes
+from .package_digests import is_sha256
+from .package_paths import require_exact_asset_case
+from .package_paths import resolve_file as resolve_file
 from .rig_model import Rig, RigError, parse_rig
+from .soc_scene import parse_ref as parse_soc_ref
 
 FORMAT_NAME = "p4kx-blender-package"
 SUPPORTED_MAJOR = 1
-SUPPORTED_MINOR = 8
+SUPPORTED_MINOR = 20
 MANIFEST_NAME = "scene.json"
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
-MAX_GLB_JSON_BYTES = 16 * 1024 * 1024
 BLENDER_NAME_BYTES = 63
 
 _VERSION = re.compile(r"^([0-9]+)\.([0-9]+)$")
 _MESH_ID = re.compile(r"^m[0-9]{4,}$")
 _TEXTURE_ID = re.compile(r"^t[0-9]{4,}$")
 _MESH_FILE = re.compile(r"^meshes/m[0-9]{4,}\.glb$")
-_TEXTURE_FILE = re.compile(r"^textures/t[0-9]{4,}\.png$")
+_TEXTURE_FILE = re.compile(r"^textures/t[0-9]{4,}\.(png|dds)$")
 _ROLES = ("diffuse", "normal", "specular")
 _COLOUR_SPACES = frozenset({"srgb", "linear"})
+_TEXTURE_ENCODINGS = frozenset({"srgb", "linear_colour", "data"})
 _ALPHA_MEANINGS = frozenset({"none", "opacity", "smoothness"})
 
 @dataclass(frozen=True, slots=True)
@@ -64,16 +73,28 @@ class Mesh:
     materials: tuple[MeshMaterial, ...]
     palette_id: str | None = None
     rig: Rig | None = None
+    bytes: int | None = None
+    vertices: int | None = None
+    triangles: int | None = None
+    vertex_map: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class Texture:
-    """One PNG file of the package."""
+    """One PNG or DDS texture file of the package."""
 
     id: str
     file: str
     colour_space: str
     alpha: str
+    encoding: str | None = None
+    format: str = "png"
+    dimensions: tuple[int, int] | None = None
+    byte_length: int | None = None
+    sha256: str | None = None
+    ddna: ddna_pair.Pair | None = None
+    dds_pixel_format: str | None = None
+    dds_mip: int | None = None
 
 
 @dataclass(slots=True)
@@ -89,6 +110,9 @@ class Package:
     warnings: list[str] = field(default_factory=list)
     material_descriptions: dict[str, MaterialDesc] = field(default_factory=dict)
     palettes: dict[str, Palette] = field(default_factory=dict)
+    authored_soc: str | None = None
+    collision_helpers: str | None = None
+    material_sources: dict[int, str] = field(default_factory=dict)
 
 
 def load_package(location: Path) -> Package:
@@ -106,7 +130,11 @@ def load_package(location: Path) -> Package:
         data = json.loads(manifest_path.read_text(encoding="utf-8"))
     except (OSError, RecursionError, ValueError) as error:
         raise PackageError(f"{MANIFEST_NAME} is not valid JSON: {error}") from error
-    return parse_manifest(data, manifest_path.parent)
+    package = parse_manifest(data, manifest_path.parent)
+    assets = chain(package.meshes.values(), package.textures.values())
+    maps = (mesh.vertex_map for mesh in package.meshes.values() if mesh.vertex_map is not None)
+    require_exact_asset_case(package.root, chain((asset.file for asset in assets), maps, package.material_sources.values()))
+    return package
 
 
 def parse_manifest(data: object, root: Path) -> Package:
@@ -116,11 +144,13 @@ def parse_manifest(data: object, root: Path) -> Package:
         raise PackageError(f"Not a P4KX Blender package: format is not {FORMAT_NAME}.")
     version, warnings = _check_version(manifest.get("version"))
     _check_coordinates(read_object(manifest.get("coordinates"), "coordinates"))
-    textures = _parse_textures(read_array(manifest.get("textures"), "textures"), warnings)
-    meshes = _parse_meshes(read_array(manifest.get("meshes"), "meshes"), textures)
+    textures = _parse_textures(read_array(manifest.get("textures"), "textures"), version, warnings)
+    ddna_pair.validate_pairs(textures)
+    meshes = _parse_meshes(read_array(manifest.get("meshes"), "meshes"), textures, version)
     nodes = parse_nodes(
         manifest.get("nodes"), {mesh_id: mesh.rig is not None for mesh_id, mesh in meshes.items()}, warnings
     )
+    palette_provenance.validate(manifest.get("palette_provenance"), manifest)
     return Package(
         root=root,
         version=version,
@@ -131,49 +161,10 @@ def parse_manifest(data: object, root: Path) -> Package:
         warnings=warnings,
         material_descriptions=parse_materials(manifest.get("materials"), warnings),
         palettes=parse_palettes(manifest.get("palettes"), warnings),
+        authored_soc=parse_soc_ref(manifest.get("authored_soc")),
+        collision_helpers=collisions.parse_ref(manifest.get("collision_helpers"), version[1]),
+        material_sources=material_source.parse_refs(manifest.get("material_libraries")),
     )
-
-
-def resolve_file(root: Path, relative: str) -> Path:
-    """Returns the absolute path of a package file, refusing anything outside ``root``."""
-    base = root.resolve()
-    path = (base / relative).resolve()
-    if not path.is_relative_to(base):
-        raise PackageError(f"File {relative!r} lies outside the package folder.")
-    return path
-
-
-def check_glb(path: Path) -> None:
-    """Refuses a GLB whose header is wrong or whose JSON names an external ``uri``.
-
-    Only the 12-byte header and the JSON chunk (at most ``MAX_GLB_JSON_BYTES``) are read. The
-    GLBs of a package embed everything, so a ``uri`` on a buffer or image is never legitimate.
-    """
-    try:
-        with path.open("rb") as stream:
-            header = stream.read(20)
-            if len(header) < 20 or header[:4] != b"glTF":
-                raise PackageError(f"{path.name} is not a GLB file.")
-            length = int.from_bytes(header[12:16], "little")
-            if header[16:20] != b"JSON" or length > MAX_GLB_JSON_BYTES:
-                raise PackageError(f"{path.name} has no usable JSON chunk.")
-            raw = stream.read(length)
-    except OSError as error:
-        raise PackageError(f"Cannot read {path.name}: {error.strerror}.") from error
-    if len(raw) != length:
-        raise PackageError(f"{path.name} is truncated.")
-    try:
-        document = json.loads(raw)
-    except (RecursionError, ValueError) as error:
-        raise PackageError(f"{path.name} has invalid JSON.") from error
-    if not isinstance(document, dict):
-        raise PackageError(f"{path.name} has invalid JSON.")
-    for key in ("buffers", "images"):
-        entries = document.get(key)
-        if isinstance(entries, list) and any(
-            isinstance(entry, dict) and "uri" in entry for entry in entries
-        ):
-            raise PackageError(f"{path.name} refers to an external file in {key}.")
 
 
 def blender_name(name: str, limit: int = BLENDER_NAME_BYTES) -> str:
@@ -260,7 +251,9 @@ def _entity_name(manifest: dict[str, Any]) -> str:
     return name if isinstance(name, str) and name else "P4KX package"
 
 
-def _parse_textures(items: list[Any], warnings: list[str]) -> dict[str, Texture]:
+def _parse_textures(
+    items: list[Any], version: tuple[int, int], warnings: list[str]
+) -> dict[str, Texture]:
     textures: dict[str, Texture] = {}
     for position, item in enumerate(items):
         where = f"textures[{position}]"
@@ -270,22 +263,80 @@ def _parse_textures(items: list[Any], warnings: list[str]) -> dict[str, Texture]
             raise PackageError(f"{where}: id {texture_id!r} is not a texture id.")
         if texture_id in textures:
             raise PackageError(f"{where}: duplicate texture id {texture_id}.")
-        if entry.get("format") != "png":
+        image_format = entry.get("format")
+        if image_format != "png" and (image_format != "dds" or version < (1, 14)):
             warnings.append(f"Texture {texture_id} has a format this add-on does not read.")
             continue
         file = read_text(entry, "file", where)
-        if not _TEXTURE_FILE.fullmatch(file):
-            raise PackageError(f"{where}: file {file!r} is not a package texture path.")
+        matched = _TEXTURE_FILE.fullmatch(file)
+        if not matched or matched.group(1) != image_format:
+            raise PackageError(f"{where}: file {file!r} does not match its texture format.")
         colour_space = read_text(entry, "colour_space", where)
         alpha = read_text(entry, "alpha", where)
         if colour_space not in _COLOUR_SPACES or alpha not in _ALPHA_MEANINGS:
             warnings.append(f"Texture {texture_id} has a colour space or alpha this add-on does not know.")
             continue
-        textures[texture_id] = Texture(texture_id, file, colour_space, alpha)
+        encoding = entry.get("encoding")
+        if encoding is not None and (
+            not isinstance(encoding, str) or encoding not in _TEXTURE_ENCODINGS
+        ):
+            warnings.append(f"Texture {texture_id} has an unknown input encoding.")
+            encoding = None
+        pair = ddna_pair.pairing(entry, where, version)
+        if pair is not None and image_format != "dds":
+            raise PackageError(f"{where}: a DDNA pair must use DDS.")
+        if image_format == "dds":
+            textures[texture_id] = _parse_dds_texture(
+                                entry,
+                where,
+                Texture(texture_id, file, colour_space, alpha, encoding, ddna=pair),
+            )
+        else:
+            textures[texture_id] = Texture(texture_id, file, colour_space, alpha, encoding)
     return textures
 
 
-def _parse_meshes(items: list[Any], textures: dict[str, Texture]) -> dict[str, Mesh]:
+def _parse_dds_texture(entry: dict[str, Any], where: str, texture: Texture) -> Texture:
+    if texture.file != f"textures/{texture.id}.dds" or entry.get("dds_fallback") is not None:
+        raise PackageError(f"{where}: invalid DDS texture identity or fallback.")
+    asset = read_object(entry.get("dds_asset"), f"{where}.dds_asset")
+    artifact = read_object(asset.get("artifact"), f"{where}.dds_asset.artifact")
+    digest = artifact.get("sha256")
+    byte_length = artifact.get("byteLength")
+    width, height = entry.get("width"), entry.get("height")
+    if not is_sha256(digest) or not _valid_dds_length(byte_length):
+        raise PackageError(f"{where}: invalid DDS artifact digest or byte length.")
+    if type(width) is not int or type(height) is not int or min(width, height) < 1:
+        raise PackageError(f"{where}: invalid DDS texture dimensions.")
+    original = asset.get("dds")
+    normalized = original.get("normalized") if isinstance(original, dict) else None
+    pixel_format = normalized.get("format") if isinstance(normalized, dict) else None
+    mip = asset.get("mip_level")
+    return replace(
+        texture,
+        format="dds",
+        dimensions=(width, height),
+        byte_length=int(byte_length),
+        sha256=digest,
+        dds_pixel_format=pixel_format if isinstance(pixel_format, str) else None,
+        dds_mip=mip if type(mip) is int and mip >= 0 else None,
+    )
+
+
+def _valid_dds_length(value: object) -> bool:
+    return (
+        isinstance(value, str)
+        and 1 <= len(value) <= 20
+        and value.isascii()
+        and value.isdecimal()
+        and value[0] != "0"
+        and int(value) <= (1 << 64) - 1
+    )
+
+
+def _parse_meshes(
+    items: list[Any], textures: dict[str, Texture], version: tuple[int, int]
+) -> dict[str, Mesh]:
     meshes: dict[str, Mesh] = {}
     for position, item in enumerate(items):
         where = f"meshes[{position}]"
@@ -309,8 +360,27 @@ def _parse_meshes(items: list[Any], textures: dict[str, Texture]) -> dict[str, M
             materials,
             palette_id if isinstance(palette_id, str) else None,
             _rig(entry.get("rig"), f"{where}.rig"),
+            _mesh_count(entry, "bytes", where),
+            _mesh_count(entry, "vertices", where),
+            _mesh_count(entry, "triangles", where),
+            _vertex_map(entry.get("vertex_map"), file, version, where),
         )
     return meshes
+
+
+def _vertex_map(value: Any, glb: str, version: tuple[int, int], where: str) -> str | None:
+    if value is None:
+        return None
+    if version < (1, 19) or value != glb.removesuffix(".glb") + ".vertex-map.jsonl":
+        raise PackageError(f"{where}: invalid mesh vertex map path or format version.")
+    return value
+
+
+def _mesh_count(entry: dict[str, Any], key: str, where: str) -> int | None:
+    value = entry.get(key)
+    if value is not None and (type(value) is not int or value < 0):
+        raise PackageError(f"{where}: {key} is not a non-negative integer.")
+    return value
 
 
 def _parse_material(item: Any, where: str, textures: dict[str, Texture]) -> MeshMaterial:

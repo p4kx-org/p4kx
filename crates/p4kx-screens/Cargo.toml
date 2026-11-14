@@ -14,6 +14,7 @@ layer = "service"
 [dependencies]
 p4kx-assembly.workspace = true
 p4kx-dataforge.workspace = true
+p4kx-extraction.workspace = true
 p4kx-gfx.workspace = true
 p4kx-texture.workspace = true
 roxmltree.workspace = true
@@ -21,7 +22,6 @@ serde.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-p4kx-extraction.workspace = true
 p4kx-testkit.workspace = true
 png.workspace = true
 tempfile.workspace = true

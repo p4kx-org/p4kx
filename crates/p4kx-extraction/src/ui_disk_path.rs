@@ -2,12 +2,26 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
-use crate::disk_case::CaseIndex;
+use crate::DiskTextures;
 
 const DDS: &str = "dds";
 const DATA: &str = "Data";
+
+/// Distinguishes confined image-path refusals from filesystem failures.
+#[derive(Debug, thiserror::Error)]
+pub(crate) enum DiskPathError {
+    #[error("external image leaves {}", root.display())]
+    Outside { root: PathBuf },
+    #[error("could not read {}: {source}", path.display())]
+    Read {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
+}
 
 /// Returns `file_name` with the extension `.dds` instead of its own, or `None` when it already
 /// ends in `.dds`; the game ships the textures the GFx exporter refers to as DDS.
@@ -45,15 +59,19 @@ pub(crate) fn image_root(folder: &Path) -> PathBuf {
 ///
 /// # Errors
 ///
-/// Returns the root when the path is absolute, carries a drive or leaves the root.
-pub(crate) fn resolve_on_disk(movie: &Path, relative: &str) -> Result<Option<PathBuf>, PathBuf> {
+/// Returns a confinement refusal or the original filesystem failure.
+pub(crate) fn resolve_on_disk(
+    movie: &Path,
+    relative: &str,
+    files: &DiskTextures,
+) -> Result<Option<PathBuf>, DiskPathError> {
     let folder = std::path::absolute(movie)
-        .ok()
-        .and_then(|movie| movie.parent().map(Path::to_path_buf))
-        .unwrap_or_default();
+        .map_err(|source| read_error(movie, source))?
+        .parent()
+        .map_or_default(Path::to_path_buf);
     let root = image_root(&folder);
     if relative.contains(':') || relative.starts_with(['/', '\\']) {
-        return Err(root);
+        return Err(DiskPathError::Outside { root });
     }
     let mut path = folder;
     for part in relative.split(['/', '\\']) {
@@ -61,30 +79,34 @@ pub(crate) fn resolve_on_disk(movie: &Path, relative: &str) -> Result<Option<Pat
             "" | "." => {}
             ".." => {
                 if path == root || !path.pop() {
-                    return Err(root);
+                    return Err(DiskPathError::Outside { root });
                 }
             }
             part => path.push(part),
         }
     }
     if !path.starts_with(&root) {
-        return Err(root);
+        return Err(DiskPathError::Outside { root });
     }
-    if !path.is_file() {
-        if cfg!(windows) {
-            return Ok(None);
-        }
-        match CaseIndex::default().variant(&path) {
-            Some(found) if found.is_file() => path = found,
-            _ => return Ok(None),
-        }
-    }
-    let canonical = fs::canonicalize(&path).map_err(|_| root.clone())?;
-    let canonical_root = fs::canonicalize(&root).map_err(|_| root.clone())?;
+    let Some(path) = files
+        .resolve_path(&path)
+        .map_err(|source| read_error(&path, source))?
+    else {
+        return Ok(None);
+    };
+    let canonical = fs::canonicalize(&path).map_err(|source| read_error(&path, source))?;
+    let canonical_root = fs::canonicalize(&root).map_err(|source| read_error(&root, source))?;
     if canonical.starts_with(&canonical_root) {
         Ok(Some(canonical))
     } else {
-        Err(root)
+        Err(DiskPathError::Outside { root })
+    }
+}
+
+fn read_error(path: &Path, source: io::Error) -> DiskPathError {
+    DiskPathError::Read {
+        path: path.to_path_buf(),
+        source,
     }
 }
 
@@ -93,7 +115,15 @@ mod tests {
     use std::fs;
     use std::path::Path;
 
-    use super::{dds_candidate, resolve_on_disk};
+    use super::{DiskPathError, dds_candidate};
+    use crate::DiskTextures;
+
+    fn resolve_on_disk(
+        movie: &Path,
+        relative: &str,
+    ) -> Result<Option<std::path::PathBuf>, DiskPathError> {
+        super::resolve_on_disk(movie, relative, &DiskTextures::default())
+    }
 
     #[test]
     fn the_dds_candidate_replaces_the_last_extension() {
@@ -128,9 +158,11 @@ mod tests {
             matches!(&found, Ok(Some(path)) if path.ends_with("x.dds")),
             "{found:?}"
         );
-        assert_eq!(
-            resolve_on_disk(&movie, "../../Textures/missing.dds"),
-            Ok(None),
+        assert!(
+            matches!(
+                resolve_on_disk(&movie, "../../Textures/missing.dds"),
+                Ok(None)
+            ),
             "missing"
         );
         let root = fs::canonicalize(&data).ok();
@@ -143,7 +175,8 @@ mod tests {
         ] {
             let result = resolve_on_disk(&movie, refused);
             assert!(
-                matches!(&result, Err(found) if fs::canonicalize(found).ok() == root),
+                matches!(&result, Err(DiskPathError::Outside { root: found })
+                    if fs::canonicalize(found).ok() == root),
                 "{refused}: {result:?}"
             );
         }
@@ -179,6 +212,44 @@ mod tests {
             matches!(&found, Ok(Some(path)) if path.ends_with("Textures/Button.dds")),
             "{found:?}"
         );
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_unusable_directory_is_an_io_error_instead_of_outside_or_missing() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let movie = dir.path().join("m.gfx");
+        touch(&movie)?;
+        let parent = dir.path().join("plain");
+        touch(&parent)?;
+        let requested = parent.join("x.dds");
+        let expected = fs::metadata(&requested).expect_err("file in directory position");
+
+        let result = resolve_on_disk(&movie, "plain/x.dds");
+
+        assert!(
+            matches!(&result, Err(DiskPathError::Read { path, source })
+            if path == &requested && source.raw_os_error() == expected.raw_os_error()),
+            "{result:?}"
+        );
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_symlink_cannot_leave_the_image_root() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let movie = dir.path().join("Data/m.gfx");
+        touch(&movie)?;
+        let outside = dir.path().join("outside.dds");
+        touch(&outside)?;
+        std::os::unix::fs::symlink(&outside, dir.path().join("Data/link.dds"))?;
+
+        assert!(matches!(
+            resolve_on_disk(&movie, "link.dds"),
+            Err(DiskPathError::Outside { .. })
+        ));
         Ok(())
     }
 }

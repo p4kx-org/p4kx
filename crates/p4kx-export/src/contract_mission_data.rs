@@ -61,8 +61,7 @@ pub(crate) struct ContractScenario<'a> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct ScenarioFactionTiers<'a> {
-    /// The GUID of the `Faction` Record, `null` for a null or dangling Reference. No kind lists
-    /// `Faction` Records; `factionReputationGuid` is the link into the catalog.
+    /// The authored `Faction` GUID, including dangling or filtered targets of `definitions.factions`.
     pub(crate) faction_guid: Option<CatalogGuid>,
     /// The `factionReputationRef` of the `Faction` Record, an entry of `factionReputations`;
     /// `null` when the Record is missing, unreadable or names none.

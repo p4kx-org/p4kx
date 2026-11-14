@@ -1,26 +1,30 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::File;
-use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
 use p4kx_assembly::{Assembly, Issue as AssemblyIssue, ModelProvider};
+use p4kx_extraction::ArchiveDefaultMaterial;
 use p4kx_gltf::{AnimationSummary, GlbOptions, TextureLoader};
 
 use crate::build::{Inputs, manifest};
 use crate::collect::Collected;
 use crate::creature::write_creature_package;
+use crate::entity_classification::EntityClassifications;
 use crate::finite::sanitise;
 use crate::items::{Item, entity_ref, items};
-use crate::manifest::{
-    BuildInfo, EntityRef, Issue, MANIFEST_FILE, MESHES_FOLDER, NodeKind, Replacement,
-    TEXTURES_FOLDER,
-};
+use crate::manifest::{BuildInfo, EntityRef, Issue, MESHES_FOLDER, Replacement, TEXTURES_FOLDER};
+use crate::package_receipt::{self, PackageFile};
 use crate::plan::MeshPlan;
 use crate::stage::Staging;
-use crate::textures::{self, Outcome};
-use crate::{Cancelled, PackageError, PackageResult, meshes};
+use crate::textures;
+use crate::{PackageResult, PackageWriteContext, meshes};
+
+#[path = "write_summary.rs"]
+mod summary;
+
+use self::summary::summarise;
 
 /// What the package records about where the Assembly comes from and how it was chosen.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -85,7 +89,7 @@ pub struct PackageSummary {
     pub materials: usize,
     /// The number of tint palettes.
     pub palettes: usize,
-    /// The number of files in the package: the manifest, the meshes and the textures.
+    /// The number of files in the package, including metadata and optional companions.
     pub files: usize,
     /// The size of all files in bytes.
     pub bytes: u64,
@@ -139,8 +143,8 @@ impl PackageSummary {
 ///
 /// Everything is written into a temporary folder next to `out`, which replaces `out` once the
 /// package is complete. `out` must not exist, or be an empty folder, or hold a package an earlier
-/// run wrote; an earlier package stays when the new one fails. `cancelled` is polled between the
-/// files and stops the run with [`PackageError::Cancelled`].
+/// run wrote; an earlier package stays when the new one fails. `cancelled` is polled between
+/// files and during GLB output. Cancellation returns [`PackageError::Cancelled`].
 ///
 /// A texture that cannot be loaded does not fail the package: its materials keep their plain
 /// colours and the manifest lists it among the issues.
@@ -161,18 +165,51 @@ pub fn write_package(
     out: &Path,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> PackageResult<PackageSummary> {
+    let observed = AtomicBool::new(false);
+    write_package_with_context(
+        assembly,
+        models,
+        textures,
+        options,
+        info,
+        out,
+        &PackageWriteContext::standalone(cancelled, &observed),
+    )
+}
+
+/// Writes an Assembly package with source protection at every output boundary.
+///
+/// # Errors
+/// Returns protection, cancellation, package validation, mesh or file failures.
+pub fn write_package_with_context(
+    assembly: &Assembly,
+    models: &dyn ModelProvider,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    info: &PackageInfo,
+    out: &Path,
+    context: &PackageWriteContext<'_>,
+) -> PackageResult<PackageSummary> {
     if assembly
         .creature_skins()
         .is_some_and(|mut skins| skins.next().is_some())
     {
-        return write_creature_package(assembly, textures, options, info, out, cancelled);
+        if context.collision_source.is_some() {
+            return Err(crate::collision_helper_model::error(std::io::Error::other(
+                "collision helpers require a decomposed Assembly package",
+            )));
+        }
+
+        return write_creature_package(assembly, textures, options, info, out, context);
     }
     let scene = Scene {
         entity: entity_ref(assembly.root()),
         items: items(assembly),
         issues: assembly.issues(),
+        authored_soc: None,
+        classification: Some(assembly),
     };
-    write_scene(&scene, models, textures, options, info, out, cancelled)
+    write_scene(&scene, models, textures, options, info, out, context)
 }
 
 /// The nodes of a package before the files are written, and where they come from.
@@ -180,6 +217,8 @@ pub(crate) struct Scene<'a> {
     pub(crate) entity: EntityRef,
     pub(crate) items: Vec<Item<'a>>,
     pub(crate) issues: &'a [AssemblyIssue],
+    pub(crate) authored_soc: Option<&'a crate::SocScene>,
+    pub(crate) classification: Option<&'a Assembly>,
 }
 
 pub(crate) fn write_scene(
@@ -189,33 +228,61 @@ pub(crate) fn write_scene(
     options: &GlbOptions,
     info: &PackageInfo,
     out: &Path,
-    cancelled: &(dyn Fn() -> bool + Sync),
+    context: &PackageWriteContext<'_>,
 ) -> PackageResult<PackageSummary> {
-    let cancelled = Cancelled::new(cancelled);
-    let staging = Staging::create(out)?;
+    let staging = Staging::create(out, *context)?;
+    let result = write_scene_files(
+        scene,
+        models,
+        textures,
+        options,
+        info,
+        staging.path(),
+        context,
+    );
+    staging.complete(result)
+}
+
+fn write_scene_files(
+    scene: &Scene<'_>,
+    models: &dyn ModelProvider,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    info: &PackageInfo,
+    staging: &Path,
+    context: &PackageWriteContext<'_>,
+) -> PackageResult<PackageSummary> {
     let items = &scene.items;
     let plan = MeshPlan::of(items);
-    let collected = Collected::of(items, &plan, options.lod, models);
-    cancelled.check()?;
-    let outcomes = if collected.wanted.is_empty() {
-        Vec::new()
-    } else {
-        textures::write_all(
-            &collected.wanted,
-            textures,
-            options.texture_mip,
-            &staging.path().join(TEXTURES_FOLDER),
-            &cancelled,
-        )?
-    };
+    let fallback = crate::package_default_material::select(items, &plan, options.lod, models);
+    let mut collected = Collected::of(
+        items,
+        &plan,
+        options.lod,
+        models,
+        fallback.as_deref(),
+        context,
+    )?;
+    context.check()?;
+    let outcomes = textures::write_all(
+        &collected.wanted,
+        textures,
+        options.texture_mip,
+        &staging.join(TEXTURES_FOLDER),
+        context,
+    )?;
     let written = meshes::write_all(
         items,
         &plan,
         options,
-        &staging.path().join(MESHES_FOLDER),
-        &cancelled,
+        &staging.join(MESHES_FOLDER),
+        context,
+        fallback
+            .as_deref()
+            .and_then(ArchiveDefaultMaterial::material),
     )?;
-    cancelled.check()?;
+    context.check()?;
+    let mut authored_files = collected.library_sources.write_authored(staging, context)?;
     let mut manifest = manifest(&Inputs {
         entity: scene.entity.clone(),
         assembly_issues: scene.issues,
@@ -227,88 +294,68 @@ pub(crate) fn write_scene(
         outcomes: &outcomes,
         meshes: &written,
     });
-    sanitise(&mut manifest);
-    let manifest_len = write_manifest(&staging.path().join(MANIFEST_FILE), &manifest)?;
-    let summary = summarise(&manifest, &outcomes, &written, manifest_len);
-    cancelled.check()?;
-    staging.commit()?;
+    let authored_soc_file =
+        complete_manifest(&mut manifest, scene, fallback.as_deref(), staging, context)?;
+    manifest.palette_provenance =
+        crate::package_palette_provenance::capture(items, &plan, &collected, context)?;
+    let summary = summarise(&manifest, &outcomes, &written);
+    let mut files = package_receipt::scene_files(written, &outcomes, authored_soc_file);
+    files.append(&mut authored_files);
+    finish_scene(
+        &mut manifest,
+        scene,
+        options,
+        staging,
+        context,
+        files,
+        summary,
+    )
+}
+
+fn finish_scene(
+    manifest: &mut crate::Manifest,
+    scene: &Scene<'_>,
+    options: &GlbOptions,
+    staging: &Path,
+    context: &PackageWriteContext<'_>,
+    mut files: Vec<PackageFile>,
+    mut summary: PackageSummary,
+) -> PackageResult<PackageSummary> {
+    files.extend(crate::collision_helpers::write(
+        manifest,
+        scene.classification,
+        options.lod,
+        staging,
+        context,
+    )?);
+    let totals = package_receipt::write_metadata(staging, manifest, files, context)?;
+    summary.files = totals.files;
+    summary.bytes = totals.bytes;
+    context.check()?;
     Ok(summary)
 }
 
-pub(crate) fn write_manifest(path: &Path, manifest: &crate::Manifest) -> PackageResult<u64> {
-    let file = File::create_new(path).map_err(|source| PackageError::write(path, source))?;
-    let mut writer = BufWriter::new(file);
-    serde_json::to_writer_pretty(&mut writer, manifest)
-        .map_err(|error| PackageError::write(path, error.into()))?;
-    writer
-        .write_all(b"\n")
-        .and_then(|()| writer.flush())
-        .map_err(|source| PackageError::write(path, source))?;
-    let file = writer
-        .into_inner()
-        .map_err(|error| PackageError::write(path, error.into_error()))?;
-    file.sync_all()
-        .map_err(|source| PackageError::write(path, source))?;
-    let len = file
-        .metadata()
-        .map_err(|source| PackageError::write(path, source))?
-        .len();
-    Ok(len)
-}
-
-fn count(manifest: &crate::Manifest, kind: NodeKind) -> usize {
-    manifest
-        .nodes
-        .iter()
-        .filter(|node| node.kind == kind)
-        .count()
-}
-
-fn summarise(
-    manifest: &crate::Manifest,
-    outcomes: &[Outcome],
-    meshes: &[p4kx_gltf::GlbSummary],
-    manifest_len: u64,
-) -> PackageSummary {
-    let mut summary = PackageSummary {
-        nodes: manifest.nodes.len(),
-        containers: count(manifest, NodeKind::Container),
-        objects: count(manifest, NodeKind::Object),
-        lights: count(manifest, NodeKind::Light),
-        drawn_nodes: manifest
-            .nodes
-            .iter()
-            .filter(|node| node.mesh.is_some())
-            .count(),
-        meshes: manifest.meshes.len(),
-        textures: manifest.textures.len(),
-        materials: manifest.materials.len(),
-        palettes: manifest.palettes.len(),
-        files: 1 + manifest.meshes.len() + manifest.textures.len(),
-        bytes: manifest_len,
-        issues: manifest.issues.clone(),
-        ..PackageSummary::default()
-    };
-    summary.shared_meshes = summary.drawn_nodes.saturating_sub(summary.meshes);
-    for mesh in meshes {
-        summary.bytes += mesh.bytes;
-        summary.vertices += mesh.vertices;
-        summary.triangles += mesh.triangles;
-        summary.lod_fallbacks += mesh.lod_fallbacks;
+fn complete_manifest(
+    manifest: &mut crate::Manifest,
+    scene: &Scene<'_>,
+    fallback: Option<&ArchiveDefaultMaterial>,
+    staging: &Path,
+    context: &PackageWriteContext<'_>,
+) -> PackageResult<Option<PackageFile>> {
+    let authored_soc = scene
+        .authored_soc
+        .map(|authored| crate::package_soc_scene::write(staging, authored, context))
+        .transpose()?;
+    if authored_soc.is_some() {
+        manifest.authored_soc = Some(crate::package_soc_scene::ManifestSocScene::new());
     }
-    for outcome in outcomes {
-        match outcome {
-            Outcome::Written {
-                width,
-                height,
-                bytes,
-                ..
-            } => {
-                summary.bytes += bytes;
-                summary.texture_pixels += u64::from(*width) * u64::from(*height);
-            }
-            Outcome::Failed(_) => summary.texture_failures += 1,
-        }
+    manifest.default_material = fallback.map(ArchiveDefaultMaterial::receipt);
+    if let Some(assembly) = scene.classification {
+        EntityClassifications::capture(assembly.parts(), assembly.forge_origin())?.apply(manifest);
+        manifest.light_placements =
+            crate::package_light_placements::capture(assembly, &scene.items, context)?;
+        crate::package_glow::attach(manifest, assembly, context)?;
     }
-    summary
+    sanitise(manifest);
+    Ok(authored_soc)
 }

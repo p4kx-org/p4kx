@@ -1,0 +1,70 @@
+name: Install pinned Rust tools
+description: Install and verify the repository compiler and optional test runner
+
+inputs:
+  target:
+    description: Native target from the platform contract
+    default: ""
+  components:
+    description: Extra toolchain components
+    default: ""
+  nextest:
+    description: Install cargo-nextest
+    default: "false"
+
+outputs:
+  target:
+    description: Native Rust target selected by the platform contract
+    value: ${{ steps.pins.outputs.target }}
+  rust-version:
+    description: Exact compiler release
+    value: ${{ steps.pins.outputs.rust-version }}
+  nextest-version:
+    description: Exact nextest release
+    value: ${{ steps.pins.outputs.nextest-version }}
+  cache-platform:
+    description: Native target and any deployment floor
+    value: ${{ steps.pins.outputs.cache-platform }}
+
+runs:
+  using: composite
+  steps:
+    - name: Read repository tool pins
+      id: pins
+      shell: pwsh
+      env:
+        P4KX_TARGET: ${{ inputs.target }}
+      run: .github/scripts/check-build-tools.ps1 -Target $env:P4KX_TARGET
+    - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      with:
+        toolchain: ${{ steps.pins.outputs.rust-toolchain }}
+        components: ${{ inputs.components }}
+    - name: Select the native pinned toolchain
+      shell: pwsh
+      env:
+        NATIVE_TARGET: ${{ steps.pins.outputs.target }}
+      run: .github/scripts/check-build-tools.ps1 -Target $env:NATIVE_TARGET -SelectEnvironment toolchain
+    - name: Set the native macOS deployment target
+      if: runner.os == 'macOS'
+      shell: pwsh
+      env:
+        NATIVE_TARGET: ${{ steps.pins.outputs.target }}
+      run: .github/scripts/check-build-tools.ps1 -Target $env:NATIVE_TARGET -SelectEnvironment deployment
+    - name: Install cargo-nextest
+      if: inputs.nextest == 'true'
+      env:
+        CARGO_BUILD_TARGET: ${{ steps.pins.outputs.target }}
+      uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+      with:
+        tool: nextest@${{ steps.pins.outputs.nextest-version }}
+    - name: Verify compiler and test-runner releases
+      shell: pwsh
+      env:
+        INSTALL_NEXTEST: ${{ inputs.nextest }}
+        P4KX_TARGET: ${{ steps.pins.outputs.target }}
+      run: .github/scripts/check-build-tools.ps1 -Verify -Nextest:($env:INSTALL_NEXTEST -eq 'true') -Target $env:P4KX_TARGET
+    - name: Verify bounded build environment selection
+      shell: pwsh
+      env:
+        NATIVE_TARGET: ${{ steps.pins.outputs.target }}
+      run: .github/scripts/test-build-environment.ps1 -Target $env:NATIVE_TARGET -Directory (Join-Path $env:RUNNER_TEMP 'build-environment-contract')

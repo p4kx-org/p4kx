@@ -11,7 +11,7 @@ use p4kx_assembly::{
 };
 use p4kx_extraction::{
     ConversionError, DataForgeEntry, GlbOptions, GlbSummary, GltfError, MaterialMode, is_same_file,
-    write_replacing,
+    write_replacing_protected,
 };
 use thiserror::Error;
 
@@ -33,10 +33,14 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
     }
     let changes = args.changes.changes()?;
     let archive = crate::key::open(&args.archive)?;
+    let cancel = crate::extract::cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = ArchiveFiles::new(&archive);
-    let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
+    let mut resolver = LoadoutResolver::new(&forge)
+        .with_forge_entry(&entry)
+        .with_files(&files);
     if !args.expand_docked_vehicles {
         resolver = resolver.stopping_at_docked_vehicles();
     }
@@ -46,11 +50,11 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
     let tree = applied.node();
     let models = ArchiveModels::new(&archive);
     let options = AssemblyOptions::default().with_lod(args.lod);
-    let palettes = ForgePalettes::new(&forge);
+    let palettes = ForgePalettes::new(&forge).with_entry(&entry);
     let assembly = Assembly::build_with_palettes(tree, &models, &palettes, &options)?;
     crate::entity_root::check(&assembly)?;
     let assembly = if args.interior {
-        crate::interior_forge::with_interior(assembly, (&archive, &forge), tree, args.lod)?
+        crate::interior_forge::with_interior(assembly, (&archive, &entry, &forge), tree, args.lod)?
     } else {
         assembly
     };
@@ -60,7 +64,7 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
         CreatureClips::default()
     };
     let animated = assembly.animate(&found.set.animations);
-    let summary = write(&assembly, &animated, &models, args)?;
+    let summary = write(&assembly, &animated, &models, args, &protection, &cancel)?;
     if as_json {
         return GlbReport {
             archive: archive.path(),
@@ -87,6 +91,8 @@ fn write(
     animated: &CreatureAnimations<'_>,
     models: &ArchiveModels<'_>,
     args: &EntityGlbArgs,
+    protection: &p4kx_extraction::ArchiveWriteProtection,
+    cancel: &p4kx_extraction::CancelToken,
 ) -> Result<GlbSummary> {
     let mode = match args.materials {
         EntityMaterialsArg::Colours => MaterialMode::Colours,
@@ -104,15 +110,20 @@ fn write(
         .map_or_else(String::new, |root| root.class_name().to_owned());
     let out: &Path = &args.out;
     let textures = models.textures();
-    Ok(write_replacing(out, |writer| {
-        assembly
-            .write_glb_animated_with(animated, &options, &textures, writer)
-            .map_err(|error| match error {
-                GltfError::Write(source) => ConversionError::Write {
-                    path: out.to_path_buf(),
-                    source,
-                },
-                source => ConversionError::Glb { file: name, source },
-            })
-    })?)
+    Ok(write_replacing_protected(
+        out,
+        Some(protection),
+        Some(cancel),
+        |writer| {
+            assembly
+                .write_glb_animated_with(animated, &options, &textures, writer)
+                .map_err(|error| match error {
+                    GltfError::Write(source) => ConversionError::Write {
+                        path: out.to_path_buf(),
+                        source,
+                    },
+                    source => ConversionError::Glb { file: name, source },
+                })
+        },
+    )?)
 }

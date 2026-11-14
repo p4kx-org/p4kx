@@ -9,6 +9,28 @@ expression: json
       "compressed_size": 6,
       "compression": "deflate",
       "encrypted": false,
+      "metadata": {
+        "dos_timestamp": {
+          "calendar": {
+            "state": "invalid"
+          },
+          "raw_date": 0,
+          "raw_time": 0
+        },
+        "original_directory_ordinal": "1",
+        "owner_entry_index": 1,
+        "raw_compression_method": 8,
+        "raw_v2_encryption_word": null,
+        "record_format": "zip_central_directory",
+        "zip_header": {
+          "disk_start": 65535,
+          "external_attributes": 0,
+          "general_purpose_flags": 0,
+          "internal_attributes": 0,
+          "raw_version_made_by": 45,
+          "raw_version_needed": 45
+        }
+      },
       "path": "Data\\Libs\\a.xml",
       "size": 4
     },
@@ -16,6 +38,28 @@ expression: json
       "compressed_size": 16,
       "compression": "zstd",
       "encrypted": true,
+      "metadata": {
+        "dos_timestamp": {
+          "calendar": {
+            "state": "invalid"
+          },
+          "raw_date": 0,
+          "raw_time": 0
+        },
+        "original_directory_ordinal": "2",
+        "owner_entry_index": 2,
+        "raw_compression_method": 100,
+        "raw_v2_encryption_word": null,
+        "record_format": "zip_central_directory",
+        "zip_header": {
+          "disk_start": 65535,
+          "external_attributes": 0,
+          "general_purpose_flags": 0,
+          "internal_attributes": 0,
+          "raw_version_made_by": 45,
+          "raw_version_needed": 45
+        }
+      },
       "path": "Data\\Libs\\secret.xml",
       "size": 100
     }

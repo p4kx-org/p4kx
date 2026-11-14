@@ -8,6 +8,9 @@ use p4kx_assembly::Entities;
 use p4kx_extraction::{Archive, CancelToken, DataForge, Guid};
 
 use crate::broker_entry_read::BrokerEntries;
+use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_v3::tag_catalog::{CapturedTags, TagDependencies};
 use crate::collected::Collected;
 use crate::contract_loadout::EntityKind;
 use crate::contract_template_read::ContractTemplates;
@@ -16,40 +19,83 @@ use crate::crafting_warning::CraftingWarning;
 use crate::loadout::{Wanted, loadouts};
 use crate::missions;
 use crate::paint::paints;
-use crate::texts::Texts;
 use crate::{CatalogError, CatalogOptions, LoadoutSummary, PaintSummary};
+
+/// The captured tag inputs used by the mission projection.
+pub(crate) struct MissionTags<'context, 'source> {
+    context: CapturedTags<'context, 'source>,
+    dependencies: Option<TagDependencies<'source>>,
+}
+
+/// Reads original tags and applies their rows and diagnostics to the catalog.
+pub(crate) fn add_tags<'context, 'source>(
+    forge: &'source DataForge<'source>,
+    input: &'context OriginalCatalogInput<'context, 'source>,
+    options: &CatalogOptions<'_>,
+    collected: &mut Collected<'source>,
+) -> Result<MissionTags<'context, 'source>, CatalogError> {
+    let need_mission_tags =
+        crate::mission_index::MissionIndex::needs_index(forge, options.filter, options.cancel)?;
+    let mut tags =
+        crate::catalog_v3::tag_catalog::read(forge, input, options.cancel, need_mission_tags)?;
+    tags.rows.entity_tags = std::mem::take(&mut collected.tags.entity_tags);
+    collected.tags = tags.rows;
+    collected.ledger.merge(tags.ledger);
+    collected.add_failures(tags.failures);
+    Ok(MissionTags {
+        context: tags.context,
+        dependencies: tags.dependencies,
+    })
+}
 
 /// Reads the contracts and sub contracts into `collected`.
 pub(crate) fn add_contracts<'f>(
     forge: &'f DataForge<'f>,
-    texts: &Texts<'f>,
+    projection: &CatalogProjection<'_, 'f>,
+    tags: MissionTags<'_, 'f>,
     options: &CatalogOptions<'_>,
     collected: &mut Collected<'f>,
 ) -> Result<(), CatalogError> {
+    let texts = projection.legacy_texts();
     let missions = missions::read(
         forge,
-        texts,
+        projection,
+        (&tags.context, tags.dependencies),
         &collected.starmap_objects,
         options.filter,
         options.cancel,
     )?;
+    collected.ledger.merge(missions.ledger);
     collected.add_contracts(missions.contracts, missions.skipped, missions.failures);
+    collected.contract_generators = missions.generators;
+    collected.local_contract_generators =
+        crate::catalog_v3::mission_sources::local_contract_generator_configuration::table(
+            forge,
+            missions.local_generators,
+        );
+    collected.contract_scenario_requirements = missions.scenario_requirements;
+    collected.mission_property_sets = missions.property_sets.into_rows();
     let ContractTemplates {
         read,
         pools: template_pools,
+        mut configurations,
         unknowns,
     } = missions.siblings.contract_templates;
     let BrokerEntries {
         read: broker_read,
         pools: broker_pools,
+        definitions: broker_definitions,
+        flows: broker_flows,
+        properties: broker_properties,
     } = missions.siblings.broker_entries;
     let mut pools = missions.pools;
     pools.merge(template_pools);
     pools.merge(broker_pools);
     collected.add_spawns(missions.siblings.location_templates, pools, texts);
-    collected.add_broker_entries(broker_read);
-    collected.add_contract_templates(read, unknowns);
-    Ok(())
+    collected.add_broker_entries(broker_read, broker_definitions);
+    configurations.flows.extend(broker_flows);
+    configurations.properties.extend(broker_properties);
+    collected.add_contract_templates(read, configurations, unknowns)
 }
 
 /// Derives the paints of `collected`, warns about unreadable vehicle files and returns the counts.
@@ -57,12 +103,22 @@ pub(crate) fn add_contracts<'f>(
 /// # Errors
 ///
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
-pub(crate) fn add_paints(
-    forge: &DataForge<'_>,
-    collected: &mut Collected<'_>,
+pub(crate) fn add_paints<'f>(
+    forge: &'f DataForge<'f>,
+    input: &OriginalCatalogInput<'_, 'f>,
+    collected: &mut Collected<'f>,
     cancel: Option<&CancelToken>,
 ) -> Result<PaintSummary, CatalogError> {
-    let derived = paints(forge, &collected.items, &collected.vehicles, cancel)?;
+    let derived = paints(
+        forge,
+        input,
+        &collected.items,
+        &collected.vehicles,
+        &collected.ledger,
+        cancel,
+    )?;
+    collected.ledger.merge(derived.ledger);
+    collected.add_failures(derived.failures);
     collected.paints = derived.list;
     let count = derived.summary.unreadable_vehicles;
     if count > 0 {
@@ -75,23 +131,22 @@ pub(crate) fn add_paints(
 
 /// Resolves the Default Loadout of every ship and of every item that may have ports, stores the
 /// loadouts in `collected` and returns the counts.
-pub(crate) fn add_loadouts(
+pub(crate) fn add_loadouts<'f>(
     archive: &Archive,
-    entities: &Arc<Entities<'_>>,
-    collected: &mut Collected<'_>,
+    entities: &Arc<Entities<'f>>,
+    collected: &mut Collected<'f>,
+    input: &OriginalCatalogInput<'_, 'f>,
     cancel: Option<&CancelToken>,
 ) -> Result<LoadoutSummary, CatalogError> {
     let wanted: Vec<Wanted> = collected
         .ships
         .iter()
         .map(|ship| Wanted {
+            record_index: ship.source_record_index,
             guid: ship.guid,
             kind: EntityKind::Ship,
         })
-        .chain(collected.port_items.iter().map(|guid| Wanted {
-            guid: *guid,
-            kind: EntityKind::Item,
-        }))
+        .chain(collected.port_items.iter().copied())
         .collect();
     let known: HashSet<Guid> = collected
         .items
@@ -99,7 +154,19 @@ pub(crate) fn add_loadouts(
         .map(|item| item.guid.0)
         .chain(collected.ships.iter().map(|ship| ship.guid.0))
         .collect();
-    let built = loadouts(archive, entities, &wanted, &known, cancel)?;
+    let built = loadouts(
+        archive,
+        entities,
+        &wanted,
+        &known,
+        crate::loadout::SelectedSources {
+            ledger: &collected.ledger,
+            alignment: &collected.entity_configurations.alignment,
+        },
+        input,
+        cancel,
+    )?;
+    collected.ledger.merge(built.ledger);
     collected.loadouts = built.entries;
     link_hosts(&mut collected.crafters, &collected.loadouts);
     collected.add_failures(built.failures);

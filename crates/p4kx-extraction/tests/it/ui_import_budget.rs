@@ -201,3 +201,44 @@ fn a_movie_with_a_header_too_short_to_declare_a_length_is_unreadable() -> TestRe
     }
     Ok(())
 }
+
+#[test]
+fn ranked_fallback_is_still_bounded_by_the_existing_movie_budget() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let url = "ranked.gfx";
+    let wanted = "$Wanted";
+    let paths: Vec<_> = (0..=MAX_IMPORTED_MOVIES)
+        .map(|rank| format!("Data\\UI\\Rank\\{rank:02}\\{url}"))
+        .collect();
+    let mut entries = vec![TestEntry::zstd(
+        CLIENT,
+        client_of(stage(), &[(url, 9, wanted)], &[(9, 0)]),
+    )];
+    for (rank, path) in paths.iter().enumerate() {
+        let name = if rank == MAX_IMPORTED_MOVIES {
+            wanted
+        } else {
+            "$Other"
+        };
+        entries.push(TestEntry::zstd(path, font_file(4, name)));
+    }
+    let archive = archive(dir.path(), entries)?;
+    let render = UiMovie::from_archive(&archive, CLIENT)?.render(&options())?;
+    assert_eq!(
+        render.imports.movies,
+        paths[..MAX_IMPORTED_MOVIES],
+        "the resolver reads the permitted candidates in ranking order"
+    );
+    let unresolved = render
+        .imports
+        .unresolved
+        .first()
+        .ok_or("budget diagnostic")?;
+    assert_eq!(render.imports.unresolved.len(), 1);
+    assert_eq!(
+        unresolved.issue,
+        ImportIssue::OverBudget,
+        "the matching export is outside the read budget"
+    );
+    Ok(())
+}

@@ -7,12 +7,18 @@ expression: "pretty(&manifest[\"meshes\"][0], \"materials\")?"
     "index": 0,
     "material": "x0001",
     "name": "hull",
+    "source_material_ids": [
+      1
+    ],
     "textures": {}
   },
   {
     "index": 1,
     "material": "x0005",
     "name": "decal",
+    "source_material_ids": [
+      2
+    ],
     "textures": {
       "diffuse": "t0008"
     }
@@ -21,6 +27,9 @@ expression: "pretty(&manifest[\"meshes\"][0], \"materials\")?"
     "index": 2,
     "material": "x0006",
     "name": "canopy",
+    "source_material_ids": [
+      3
+    ],
     "textures": {
       "normal": "t0009"
     }
@@ -29,6 +38,9 @@ expression: "pretty(&manifest[\"meshes\"][0], \"materials\")?"
     "index": 3,
     "material": "x0007",
     "name": "mystery",
+    "source_material_ids": [
+      4
+    ],
     "textures": {}
   }
 ]

@@ -5,161 +5,326 @@ use std::collections::HashMap;
 
 use p4kx_extraction::{Archive, Entry};
 
-use crate::container_read::{MAX_SOC_LEN, read_limited, soc_entries};
+use crate::CatalogError;
+use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
+use crate::container_read::{MAX_SOC_LEN, soc_entries};
+use crate::entry_source::EntrySource;
+use crate::export_diagnostic::ExportDiagnosticCode;
+use crate::export_entry_ledger::EntryOperation;
+use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::shop_container_xml;
 use crate::shop_containers::{Component, Inventory, verdict};
+use crate::shop_entry_read;
+use crate::shop_inventory_observations::InventoryObservations;
 use crate::shop_soc::{self, Anchors};
 use crate::starmap_index::key;
-use crate::starmap_xml::{Document, Node, attribute};
 
 const SHOP_METADATA: &str = "\\metadata\\entitycomponentshop.xml";
 const EDITOR_SUFFIX: &str = "_editor.xml";
-const SHOP_TYPE: &str = "SCShop";
 const MAX_METADATA_LEN: u64 = 1 << 20;
 const MAX_EDITOR_LEN: u64 = 256 << 20;
 
-/// The `CryGUID`s of a container with what its `.soc` files say of each one's component.
 pub(crate) type Shops = Vec<(String, Component)>;
 
-/// Returns the `CryGUID`s `entitycomponentshop.xml` of the container `socpak` names, lower case,
-/// each with what the `.soc` files of the container say of its component; `None` when the
-/// container or its `entitycomponentshop.xml` cannot be read, and how many inventory paths of its
-/// `.soc` files no Entity could be told for. A `.soc` that cannot be read only
-/// leaves the component `NotFound`: kind and brand do not depend on it.
-pub(crate) fn shop_entities(archive: &Archive, socpak: &Entry) -> Option<(Shops, usize)> {
-    let container = archive.open_container(socpak).ok()?;
+type ObjectNames = HashMap<String, (String, Vec<AuthoredEntryPath>)>;
+
+/// The container projection and the actual Entry operations that produced it.
+#[derive(Default)]
+pub(crate) struct Scanned {
+    pub(crate) entities: Option<(Shops, usize)>,
+    pub(crate) observations: HashMap<String, InventoryObservations>,
+    pub(crate) unattributed_declarations: bool,
+    pub(crate) ledger: ExportLedger,
+}
+
+#[derive(Default)]
+struct PreparedShops {
+    shops: Shops,
+    rejected: usize,
+    observations: HashMap<String, InventoryObservations>,
+    unattributed_declarations: bool,
+}
+
+pub(crate) fn shop_entities(
+    archive: &Archive,
+    socpak: &Entry,
+    capture: &EntryCapture<'_>,
+) -> Result<Scanned, CatalogError> {
+    let mut ledger = ExportLedger::default();
+    let Some(prepared) = scan(archive, socpak, &mut ledger, capture)? else {
+        return Ok(Scanned {
+            ledger,
+            ..Scanned::default()
+        });
+    };
+    Ok(Scanned {
+        entities: Some((prepared.shops, prepared.rejected)),
+        observations: prepared.observations,
+        unattributed_declarations: prepared.unattributed_declarations,
+        ledger,
+    })
+}
+
+fn scan(
+    archive: &Archive,
+    socpak: &Entry,
+    ledger: &mut ExportLedger,
+    capture: &EntryCapture<'_>,
+) -> Result<Option<PreparedShops>, CatalogError> {
+    let source = EntrySource::outer(capture, archive, socpak)?.dependency();
+    source.receipt().attempted_payload()?;
+    let Ok(container) = archive.open_container(socpak) else {
+        ledger.incomplete_inventory(crate::Kind::Shops);
+        source.record(ledger, crate::Kind::Shops, SourceDisposition::ReadFailed);
+        return Ok(None);
+    };
+    source.record(ledger, crate::Kind::Shops, SourceDisposition::Projected);
     let Some(metadata) = container.entries().iter().find(|inner| {
         let name = key(inner.path());
         name.ends_with(SHOP_METADATA) || name == SHOP_METADATA.trim_start_matches('\\')
     }) else {
-        return Some((Vec::new(), 0));
+        return Ok(Some(PreparedShops::default()));
     };
-    let guids = entities(&read_limited(&container, metadata, MAX_METADATA_LEN)?)?;
-    let anchors = Anchors::new(&guids, object_names(&container).unwrap_or_default());
-    let mut found: HashMap<String, Vec<Component>> = HashMap::new();
-    let mut rejected = 0;
-    for inner in soc_entries(&container) {
-        let Some(bytes) = read_limited(&container, inner, MAX_SOC_LEN) else {
+    let source = EntrySource::inner(capture, archive, socpak, &container, metadata)?
+        .operation(EntryOperation::ShopMetadata)
+        .dependency();
+    let Some(bytes) = read(
+        &container,
+        metadata,
+        MAX_METADATA_LEN,
+        &source,
+        ledger,
+        capture,
+    )?
+    else {
+        return Ok(None);
+    };
+    let Ok(xml) = EntryXml::parse(&bytes, capture)? else {
+        ledger.incomplete_inventory(crate::Kind::Shops);
+        rejected(source, ledger, "Entity.CryGUID");
+        return Ok(None);
+    };
+    let entities = shop_container_xml::captured_guids(&xml)?;
+    projected(source, ledger, entities.malformed, "Entity.CryGUID");
+    finish(archive, socpak, &container, entities.guids, ledger, capture).map(Some)
+}
+
+fn finish(
+    archive: &Archive,
+    socpak: &Entry,
+    container: &Archive,
+    guids: Vec<(String, AuthoredEntryPath)>,
+    ledger: &mut ExportLedger,
+    capture: &EntryCapture<'_>,
+) -> Result<PreparedShops, CatalogError> {
+    // Output order includes repeated declarations; the anchor index consumes their receipts.
+    let mut entity_ids = Vec::with_capacity(guids.len());
+    entity_ids.extend(guids.iter().map(|(guid, _)| guid.clone()));
+    let anchors = Anchors::captured(
+        guids,
+        object_names(archive, container, socpak, ledger, capture)?.unwrap_or_default(),
+    );
+    let mut components = scan_components(archive, container, socpak, &anchors, ledger, capture)?;
+    let mut shops = Vec::with_capacity(entity_ids.len());
+    for guid in entity_ids {
+        let state = components.resolve(&guid, &anchors)?;
+        shops.push((guid, state));
+    }
+    Ok(PreparedShops {
+        shops,
+        rejected: components.rejected,
+        observations: components.observations,
+        unattributed_declarations: components.unattributed_declarations,
+    })
+}
+
+#[derive(Default)]
+struct Components {
+    found: HashMap<String, Vec<Component>>,
+    observations: HashMap<String, InventoryObservations>,
+    unattributed_declarations: bool,
+    rejected: usize,
+}
+
+impl Components {
+    fn resolve(&mut self, guid: &str, anchors: &Anchors) -> Result<Component, CatalogError> {
+        let states = self.found.get(guid).map_or(&[][..], Vec::as_slice);
+        let result = if states.is_empty() {
+            Component::NotFound
+        } else {
+            combined(states)?
+        };
+        match &result {
+            Component::Conflict => {
+                let original = self.observations.entry(guid.to_owned()).or_default();
+                for state in states {
+                    if let Component::File(stem) = state {
+                        original.conflict(stem.declarations())?;
+                    }
+                }
+            }
+            Component::NotFound => self
+                .observations
+                .entry(guid.to_owned())
+                .or_default()
+                .missing_component(anchors.guid_receipts(guid))?,
+            Component::NoFile | Component::File(_) => {}
+        }
+        Ok(result)
+    }
+}
+
+fn scan_components(
+    archive: &Archive,
+    container: &Archive,
+    socpak: &Entry,
+    anchors: &Anchors,
+    ledger: &mut ExportLedger,
+    capture: &EntryCapture<'_>,
+) -> Result<Components, CatalogError> {
+    let mut components = Components::default();
+    for inner in soc_entries(container) {
+        let source = EntrySource::inner(capture, archive, socpak, container, inner)?
+            .operation(EntryOperation::ShopSoc)
+            .dependency();
+        let Some(bytes) = read(container, inner, MAX_SOC_LEN, &source, ledger, capture)? else {
             continue;
         };
-        let scan = shop_soc::components(&bytes, &anchors);
-        rejected += scan.rejected;
+        let observed = shop_soc::read_components(&bytes, capture, anchors)?;
+        let scan = observed.scan;
+        components.unattributed_declarations |=
+            observed.unattributed_declarations || scan.rejected > 0;
+        for (entity, rejected) in observed.rejected {
+            components
+                .observations
+                .entry(entity)
+                .or_default()
+                .merge(InventoryObservations {
+                    rejected,
+                    ..InventoryObservations::default()
+                })?;
+        }
+        for (entity, no_file) in observed.no_file {
+            components
+                .observations
+                .entry(entity)
+                .or_default()
+                .merge(InventoryObservations {
+                    no_file,
+                    ..InventoryObservations::default()
+                })?;
+        }
+        projected(
+            source,
+            ledger,
+            scan.rejected > 0 || scan.malformed,
+            "offlineInventory",
+        );
+        components.rejected += scan.rejected;
         for component in scan.components {
-            found.entry(component.entity).or_default().push(
+            components.found.entry(component.entity).or_default().push(
                 component
                     .inventory
                     .map_or(Component::NoFile, Component::File),
             );
         }
     }
-    let shops = guids
-        .into_iter()
-        .map(|guid| {
-            let state = found
-                .get(&guid)
-                .map_or(Component::NotFound, |states| combined(states));
-            (guid, state)
-        })
-        .collect();
-    Some((shops, rejected))
+    Ok(components)
 }
 
-fn combined(states: &[Component]) -> Component {
+fn combined(states: &[Component]) -> Result<Component, CatalogError> {
     match verdict(states) {
-        Inventory::None => Component::NoFile,
-        Inventory::One(stem) => Component::File(stem.to_owned()),
-        Inventory::Ambiguous => Component::Conflict,
-        Inventory::Unknown => Component::NotFound,
+        Inventory::None => Ok(Component::NoFile),
+        Inventory::Ambiguous => Ok(Component::Conflict),
+        Inventory::Unknown => Ok(Component::NotFound),
+        Inventory::One(value) => combine_files(states, value),
     }
 }
 
-fn entities(bytes: &[u8]) -> Option<Vec<String>> {
-    Some(guids(Document::parse(bytes).ok()?.root()))
+fn combine_files(states: &[Component], value: &str) -> Result<Component, CatalogError> {
+    let mut selected = states.iter().filter_map(|state| match state {
+        Component::File(stem) if stem.as_str() == value => Some(stem),
+        _ => None,
+    });
+    let Some(first) = selected.next() else {
+        return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
+    };
+    let mut stem = first.clone();
+    for other in selected {
+        stem.merge(other)?;
+    }
+    Ok(Component::File(stem))
 }
 
-fn guids<'d, N: Node<'d>>(root: N) -> Vec<String> {
-    root.children()
-        .filter(|child| child.name().eq_ignore_ascii_case("Entity"))
-        .filter_map(|entity| attribute(entity, "CryGUID"))
-        .map(str::to_ascii_lowercase)
-        .collect()
-}
-
-fn object_names(container: &Archive) -> Option<HashMap<String, String>> {
-    let editor = container.entries().iter().find(|inner| {
+fn object_names(
+    archive: &Archive,
+    container: &Archive,
+    socpak: &Entry,
+    ledger: &mut ExportLedger,
+    capture: &EntryCapture<'_>,
+) -> Result<Option<ObjectNames>, CatalogError> {
+    let Some(editor) = container.entries().iter().find(|inner| {
         let path = inner.path();
         !path.contains(['\\', '/']) && key(path).ends_with(EDITOR_SUFFIX)
-    })?;
-    let bytes = read_limited(container, editor, MAX_EDITOR_LEN)?;
-    Some(shop_objects(Document::parse(&bytes).ok()?.root()))
+    }) else {
+        return Ok(None);
+    };
+    let source = EntrySource::inner(capture, archive, socpak, container, editor)?
+        .operation(EntryOperation::ShopEditor)
+        .dependency();
+    let Some(bytes) = read(container, editor, MAX_EDITOR_LEN, &source, ledger, capture)? else {
+        return Ok(None);
+    };
+    let Ok(xml) = EntryXml::parse(&bytes, capture)? else {
+        ledger.incomplete_inventory(crate::Kind::Shops);
+        rejected(source, ledger, "SCShop.name/guid");
+        return Ok(None);
+    };
+    let objects = shop_container_xml::captured_objects(&xml)?;
+    projected(source, ledger, objects.malformed, "SCShop.name/guid");
+    Ok(Some(objects.names))
 }
 
-fn shop_objects<'d, N: Node<'d>>(root: N) -> HashMap<String, String> {
-    let mut named: HashMap<&str, Option<String>> = HashMap::new();
-    let mut pending = vec![root];
-    while let Some(node) = pending.pop() {
-        if node.name().eq_ignore_ascii_case("Object")
-            && attribute(node, "type") == Some(SHOP_TYPE)
-            && let (Some(name), Some(guid)) = (attribute(node, "name"), attribute(node, "guid"))
-        {
-            let guid = guid.to_ascii_lowercase();
-            named
-                .entry(name)
-                .and_modify(|held| {
-                    if held.as_ref() != Some(&guid) {
-                        *held = None;
-                    }
-                })
-                .or_insert(Some(guid));
+fn read(
+    container: &Archive,
+    entry: &Entry,
+    limit: u64,
+    source: &EntrySource,
+    ledger: &mut ExportLedger,
+    capture: &EntryCapture<'_>,
+) -> Result<Option<EntryRead>, CatalogError> {
+    match shop_entry_read::read(capture, source, container, entry, limit)? {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) => {
+            ledger.incomplete_inventory(crate::Kind::Shops);
+            source.clone().diagnosed(
+                ledger,
+                crate::Kind::Shops,
+                SourceDisposition::ReadFailed,
+                error.diagnosis(),
+            );
+            Ok(None)
         }
-        pending.extend(node.children());
     }
-    named
-        .into_iter()
-        .filter_map(|(name, guid)| guid.map(|guid| (name.to_owned(), guid)))
-        .collect()
+}
+
+fn rejected(source: EntrySource, ledger: &mut ExportLedger, field: &'static str) {
+    source.diagnosed(
+        ledger,
+        crate::Kind::Shops,
+        SourceDisposition::ProjectionFailed,
+        shop_entry_read::diagnosis(ExportDiagnosticCode::MalformedSource, field),
+    );
+}
+
+fn projected(source: EntrySource, ledger: &mut ExportLedger, malformed: bool, field: &'static str) {
+    if malformed {
+        rejected(source, ledger, field);
+    } else {
+        source.record(ledger, crate::Kind::Shops, SourceDisposition::Projected);
+    }
 }
 
 #[cfg(test)]
-mod tests {
-    use p4kx_testkit::{CryXmlByteOrder, CryXmlSignature, TestElement};
-
-    use super::*;
-
-    const METADATA: &str =
-        r#"<Entities><Entity CryGUID="AB-1"/><Other/><Entity CryGUID="cd-2"/></Entities>"#;
-
-    #[test]
-    fn the_shop_entities_are_read_from_text_xml_with_or_without_a_byte_order_mark() {
-        let expected = Some(vec!["ab-1".to_owned(), "cd-2".to_owned()]);
-        assert_eq!(entities(METADATA.as_bytes()), expected);
-        assert_eq!(entities(format!("\u{feff}{METADATA}").as_bytes()), expected);
-    }
-
-    #[test]
-    fn the_shop_entities_are_read_from_cryxml() {
-        let cry = TestElement::new("Entities")
-            .child(TestElement::new("Entity").attribute("CryGUID", "AB-1"))
-            .to_cryxml(CryXmlSignature::CryXmlB, CryXmlByteOrder::Little);
-        assert_eq!(entities(&cry), Some(vec!["ab-1".to_owned()]));
-    }
-
-    #[test]
-    fn bytes_that_are_no_xml_give_no_shop_entities() {
-        assert_eq!(entities(b"not xml"), None);
-        assert_eq!(entities(b"<a b=\"\xff\"/>"), None);
-        assert_eq!(entities(b"<a><b></a>"), None);
-    }
-
-    #[test]
-    fn a_shop_object_name_that_two_guids_claim_is_dropped_in_text_xml_with_a_mark() {
-        let editor = "\u{feff}<Root><Object type=\"SCShop\" name=\"one\" guid=\"A\"/>\
-            <Object type=\"SCShop\" name=\"two\" guid=\"B\"/>\
-            <Object type=\"SCShop\" name=\"two\" guid=\"C\"/>\
-            <Object type=\"Other\" name=\"three\" guid=\"D\"/></Root>";
-        let document = Document::parse(editor.as_bytes()).expect("text XML");
-        let named = shop_objects(document.root());
-        assert_eq!(named.get("one").map(String::as_str), Some("a"));
-        assert!(!named.contains_key("two"), "ambiguous");
-        assert!(!named.contains_key("three"), "not a shop");
-    }
-}
+#[path = "shop_container_scan_tests.rs"]
+mod tests;

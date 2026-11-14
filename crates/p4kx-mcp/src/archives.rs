@@ -8,8 +8,8 @@ use std::time::SystemTime;
 use p4kx_assembly::audio::{ArchiveAudio, AudioIndex};
 use p4kx_channels::ChannelKind;
 use p4kx_extraction::{
-    Archive, DataForge, DataForgeSource, EntryTree, FileStamp, PathIndex, PathKeys,
-    is_dataforge_file,
+    Archive, DataForge, DataForgeOrigin, DataForgeSource, EntryTree, FileStamp, PathIndex,
+    PathKeys, is_dataforge_file,
 };
 
 use crate::container::Containers;
@@ -17,8 +17,11 @@ use crate::error::ToolError;
 use crate::forge_file::{ForgeFile, ForgeSource};
 use crate::forge_state::ForgeState;
 use crate::gate::Gate;
+use crate::key_report;
+use crate::key_stamp::Replaceable;
 use crate::keys::KeyChoice;
 use crate::loadout_cache::LoadoutCache;
+use crate::query_selection_sources::SelectionReceipt;
 
 /// How many opened Archives stay in memory.
 const CAPACITY: usize = 2;
@@ -53,8 +56,7 @@ pub(crate) struct Opened {
     tree: OnceLock<EntryTree>,
     keys: OnceLock<PathKeys>,
     building: Mutex<()>,
-    audio: OnceLock<AudioIndex>,
-    building_audio: Mutex<()>,
+    audio: Replaceable<AudioIndex>,
     forge: ForgeState,
     containers: Containers,
     loadouts: LoadoutCache,
@@ -78,8 +80,7 @@ impl Opened {
             tree: OnceLock::new(),
             keys: OnceLock::new(),
             building: Mutex::new(()),
-            audio: OnceLock::new(),
-            building_audio: Mutex::new(()),
+            audio: Replaceable::default(),
             forge: ForgeState::default(),
             containers: Containers::new(decoders),
             loadouts: LoadoutCache::default(),
@@ -124,21 +125,17 @@ impl Opened {
     }
 
     /// Returns the audio index, reading every ATL definition and soundbank on first use; calls
-    /// meanwhile wait for that read.
-    pub(crate) fn audio_index(&self) -> &AudioIndex {
-        if let Some(index) = self.audio.get() {
-            return index;
-        }
-        let _turn = self
-            .building_audio
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner);
-        self.audio.get_or_init(|| AudioIndex::build(&self.archive))
+    /// meanwhile wait for that read. An index built with encrypted Entries unread is read again
+    /// once the Archive has another key; a call that reuses an index reports the key use of its
+    /// build.
+    pub(crate) fn audio_index(&self) -> Arc<AudioIndex> {
+        self.audio
+            .get_or_build(&self.archive, || AudioIndex::build(&self.archive))
     }
 
-    /// Returns the audio of the Archive over the kept audio index.
-    pub(crate) fn audio(&self) -> ArchiveAudio<'_> {
-        ArchiveAudio::with_index(&self.archive, self.audio_index())
+    /// Returns the audio of the Archive over `index`, which [`Opened::audio_index`] returned.
+    pub(crate) const fn audio<'a>(&'a self, index: &'a AudioIndex) -> ArchiveAudio<'a> {
+        ArchiveAudio::with_index(&self.archive, index)
     }
 
     /// Returns the Entries by path, hashing the paths on first use.
@@ -155,18 +152,33 @@ impl Opened {
         T: Send + 'static,
         F: FnOnce(&DataForge<'_>, String) -> Result<T, ToolError> + Send + 'static,
     {
+        self.with_dataforge_origin(move |forge, archive, _| work(forge, archive))
+    }
+
+    /// Runs work against the DataForge and its retained original input.
+    pub(crate) fn with_dataforge_origin<T, F>(&self, work: F) -> Result<T, ToolError>
+    where
+        T: Send + 'static,
+        F: FnOnce(&DataForge<'_>, String, &DataForgeOrigin) -> Result<T, ToolError>
+            + Send
+            + 'static,
+    {
         let archive = self.archive.path().display().to_string();
-        self.forge
-            .with(|| self.forge_source().load(), archive, work)
+        let carry = key_report::carry();
+        self.forge.with_origin(
+            || self.forge_source().load(),
+            archive,
+            move |forge, archive, origin| key_report::adopt(carry, || work(forge, archive, origin)),
+        )
     }
 
     /// Returns the selection of the last Query run if it was of `query`.
-    pub(crate) fn selection(&self, query: &str) -> Option<Arc<[u32]>> {
+    pub(crate) fn selection(&self, query: &str) -> Option<Arc<SelectionReceipt>> {
         self.forge.selection(query)
     }
 
     /// Keeps `records` as the selection of the last Query run, which was of `query`.
-    pub(crate) fn keep_selection(&self, query: &str, records: Arc<[u32]>) {
+    pub(crate) fn keep_selection(&self, query: &str, records: Arc<SelectionReceipt>) {
         self.forge.keep_selection(query, records);
     }
 
@@ -296,7 +308,7 @@ mod tests {
     use std::path::{Path, PathBuf};
     use std::sync::Arc;
 
-    use p4kx_testkit::{ArchiveBuilder, TestEntry};
+    use p4kx_testkit::{ArchiveBuilder, TestEntry, other_test_key, test_key};
 
     use super::Archives;
 
@@ -347,6 +359,24 @@ mod tests {
             archives.get(&a)?.archive().entries().len(),
             1,
             "opened anew"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_kept_audio_index_built_with_the_key_is_reused() -> Result<(), Box<dyn Error>> {
+        let dir = tempfile::tempdir()?;
+        let path = archive(dir.path(), "a.p4k")?;
+        let opened = Archives::default().get(&path)?;
+        opened.archive().set_key(test_key());
+
+        let first = opened.audio_index();
+        opened.archive().set_key(other_test_key());
+        let second = opened.audio_index();
+
+        assert!(
+            Arc::ptr_eq(&first, &second),
+            "complete, so never read again"
         );
         Ok(())
     }

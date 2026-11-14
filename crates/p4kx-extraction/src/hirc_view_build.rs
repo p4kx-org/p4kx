@@ -9,15 +9,18 @@ use p4kx_audio::{
     MusicStinger, MusicSwitch, MusicTrack, MusicTrackKind, MusicTrackSwitch, SoundSource,
 };
 
+use super::state as hirc_view_state;
 use crate::hirc_view::{
-    ActionDetail, ClipView, ContainerDetail, Detail, ItemView, MarkerView, PlaylistDetail,
-    SegmentDetail, SoundDetail, StingerView, SwitchDetail, TrackDetail, TrackSwitchView,
+    ActionDetail, ActorMixerDetail, ClipView, ContainerDetail, Detail, ItemView, MarkerView,
+    PlaylistDetail, SegmentDetail, SoundDetail, StateRange, StingerView, SwitchDetail, TrackDetail,
+    TrackSwitchView,
 };
 
 /// Returns the type-dependent fields of a decoded object; `None` for an Event, a raw body and a
 /// malformed one.
 pub(crate) fn detail(value: &HircValue) -> Option<Detail<'_>> {
     Some(match value {
+        HircValue::State(state) => Detail::State(hirc_view_state::detail(state)),
         HircValue::Sound(source) => Detail::Sound(sound(source)),
         HircValue::Action(action) => Detail::Action(ActionDetail {
             action_type: action.action_type,
@@ -26,6 +29,11 @@ pub(crate) fn detail(value: &HircValue) -> Option<Detail<'_>> {
         }),
         HircValue::Container(container) => Detail::Container(ContainerDetail {
             container_kind: container_kind(container.kind),
+        }),
+        HircValue::ActorMixer(actor) => Detail::ActorMixer(ActorMixerDetail {
+            node_range: StateRange::new(&actor.node_range),
+            child_count_range: StateRange::new(&actor.child_count_range),
+            children_range: StateRange::new(&actor.children_range),
         }),
         HircValue::MusicSegment(segment) => Detail::Segment(segment_detail(segment)),
         HircValue::MusicTrack(track) => Detail::Track(track_detail(track)),

@@ -1,26 +1,26 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::Arc;
+#[path = "observe.rs"]
+mod observation;
 
 use p4kx_assembly::{
-    Attachment, Entities, EntityNode, LoadoutEntry, LoadoutFiles, LoadoutResolver, OriginTally,
-    PartThreshold, PortNode, PortSource, UnreadableValue, ValueOrigin, VehicleImplementation,
-    VehicleTotals,
+    Attachment, EntityNode, LoadoutEntry, LoadoutResolver, OriginTally, PartThreshold, PortNode,
+    PortSource, UnreadableValue, ValueOrigin, VehicleImplementation, VehicleTotals,
 };
-use p4kx_extraction::{DataForge, Record, RecordTree, TreeBuilder};
+use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
 use super::cargo::{CargoReader, rounded};
 use super::model::{
     Hull, HullThreshold, Implementation, LoadoutPort, Mass, MassBasis, PartialPartValue, ShipBase,
     ShipRead, Source, SourceKind, SourceShare, Sourced, UnreadablePartValue, VehicleKind,
 };
-use crate::CatalogFailure;
 use crate::Kind;
 use crate::digest::Digest;
 use crate::paint_port::VehiclePorts;
 use crate::record_fields::{class_name, component, integer, number, structure, text};
 use crate::selection::starts_with_folder;
+use crate::{CatalogFailure, CatalogReadFailure};
 
 const SIZE_FIELD: &str = "Components/SAttachableComponentParams/AttachDef/Size";
 const PHYSICS_MASS_FIELD: &str = "Components/SEntityPhysicsControllerParams/PhysType/Mass";
@@ -47,28 +47,6 @@ impl std::fmt::Debug for ShipReader<'_> {
 }
 
 impl<'f> ShipReader<'f> {
-    /// Creates a reader over `forge` that reads the vehicle implementations and XML Loadouts from
-    /// `files`. Docked vehicles in a Loadout stay in their port, marked, and are not expanded.
-    #[must_use]
-    pub fn new(forge: &'f DataForge<'f>, files: &'f dyn LoadoutFiles) -> Self {
-        Self::with_entities(Arc::new(Entities::new(forge)), files)
-    }
-
-    /// Creates a reader like [`new`](Self::new) over the DataForge of `entities`, sharing its
-    /// index with every reader built from the same `Arc`, so that readers working in parallel
-    /// walk the Records once.
-    #[must_use]
-    pub fn with_entities(entities: Arc<Entities<'f>>, files: &'f dyn LoadoutFiles) -> Self {
-        let forge = entities.forge();
-        Self {
-            resolver: LoadoutResolver::with_entities(entities)
-                .with_files(files)
-                .stopping_at_docked_vehicles(),
-            trees: TreeBuilder::new(),
-            cargo: CargoReader::new(forge),
-        }
-    }
-
     /// Reads the base data of the ship `record`.
     ///
     /// # Errors
@@ -94,7 +72,9 @@ impl<'f> ShipReader<'f> {
         record: &Record<'f>,
         tree: &RecordTree<'f>,
     ) -> Result<ShipBase, CatalogFailure> {
-        self.read_with_digest(record, tree).map(|read| read.base)
+        self.read_with_digest(record, tree)
+            .map(|read| read.base)
+            .map_err(CatalogReadFailure::into_interpreted)
     }
 
     /// As [`read_tree`](Self::read_tree), with the digest of the vehicle implementation.
@@ -102,11 +82,11 @@ impl<'f> ShipReader<'f> {
         &mut self,
         record: &Record<'f>,
         tree: &RecordTree<'f>,
-    ) -> Result<ShipRead, CatalogFailure> {
+    ) -> Result<ShipRead, CatalogReadFailure<'f>> {
         let node = self
             .resolver
             .resolve_tree(record, tree)
-            .map_err(|error| CatalogFailure::of(record, &error))?;
+            .map_err(|error| CatalogReadFailure::of(record, &error))?;
         let vehicle = node.vehicle();
         let totals = vehicle.map(VehicleImplementation::totals);
         let mut issues: Vec<String> = node.issues().iter().map(ToString::to_string).collect();

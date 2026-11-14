@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
 use p4kx_assembly::{Armour, CharacterAnimations, PartOrigin};
 use p4kx_gltf::{GlbOptions, GlbSummary, TextureLoader};
@@ -68,11 +69,11 @@ impl<'a> CharacterScene<'a> {
 ///
 /// # Errors
 ///
-/// Returns [`PackageError::Refused`] when `out` lies inside a Star Citizen installation,
-/// [`PackageError::NotAPackage`] when `out` is something else than an empty folder or a package,
-/// [`PackageError::Mesh`] when the Character does not fit in a GLB file,
-/// [`PackageError::Write`] when a file or folder cannot be written and
-/// [`PackageError::Cancelled`] when `cancelled` returned true.
+/// Returns [`crate::PackageError::Refused`] when `out` lies inside a Star Citizen installation,
+/// [`crate::PackageError::NotAPackage`] when `out` is something else than an empty folder or a package,
+/// [`crate::PackageError::Mesh`] when the Character does not fit in a GLB file,
+/// [`crate::PackageError::Write`] when a file or folder cannot be written and
+/// [`crate::PackageError::Cancelled`] when `cancelled` returned true.
 pub fn write_character_package(
     character: &CharacterScene<'_>,
     textures: &dyn TextureLoader,
@@ -81,18 +82,53 @@ pub fn write_character_package(
     out: &Path,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> PackageResult<PackageSummary> {
+    let observed = AtomicBool::new(false);
+    write_character_package_with_context(
+        character,
+        textures,
+        options,
+        info,
+        out,
+        &crate::PackageWriteContext::standalone(cancelled, &observed),
+    )
+}
+
+/// Writes a Character package with source protection at every output boundary.
+///
+/// # Errors
+/// Returns protection, cancellation, package validation, mesh or file failures.
+pub fn write_character_package_with_context(
+    character: &CharacterScene<'_>,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    info: &PackageInfo,
+    out: &Path,
+    context: &crate::PackageWriteContext<'_>,
+) -> PackageResult<PackageSummary> {
     write_rig_package(
         out,
         character.name,
         options,
-        cancelled,
-        |options, writer| {
-            character.armour.write_glb_animated_with(
-                character.animations,
-                options,
-                textures,
-                writer,
-            )
+        context,
+        |options, writer, map| {
+            if let Some(map) = map {
+                character.armour.write_glb_with_vertex_origins(
+                    character.animations,
+                    options,
+                    textures,
+                    writer,
+                    &mut |row, part| {
+                        map.observe(&row, part.model(), part.model_archive_sources(), context)
+                    },
+                )
+            } else {
+                character.armour.write_glb_animated_with(
+                    character.animations,
+                    options,
+                    textures,
+                    writer,
+                )
+            }
         },
         |written| manifest(character, info, options, written),
     )
@@ -105,6 +141,7 @@ fn source(character: &CharacterScene<'_>, info: &PackageInfo) -> Source {
         entity: EntityRef {
             class_name: character.name.to_owned(),
             guid: String::new(),
+            classification: None,
         },
         character: Some(CharacterSource {
             name: character.name.to_owned(),
@@ -148,7 +185,13 @@ fn manifest(
             .map(assembly_issue)
             .collect(),
     };
-    rig_manifest(scene, info, options, written)
+    let mut manifest = rig_manifest(scene, info, options, written);
+    if written.default_material_ids > 0 {
+        manifest.default_material = armour
+            .default_material(options.lod)
+            .map(p4kx_extraction::ArchiveDefaultMaterial::receipt);
+    }
+    manifest
 }
 
 fn rig(armour: &Armour, written: &GlbSummary) -> Rig {

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::OnceLock;
+use std::ops::Range;
+use std::sync::{Mutex, OnceLock};
 
 use p4kx_foundation::ByteReader;
 
@@ -9,6 +10,7 @@ use crate::header::Header;
 use crate::issues::Issues;
 use crate::record_table::RecordTable;
 use crate::rows::{DataMapping, EnumDef, NO_PARENT, OptionName, PropertyDef, StructDef};
+use crate::source_layout_index::SourceLayoutIndex;
 use crate::strings::StringTable;
 use crate::table::{Table, take};
 use crate::{DataForgeError, ValueKind};
@@ -22,7 +24,7 @@ pub struct DataForge<'a> {
     pub(crate) version: u32,
     pub(crate) header_words: [u32; 2],
     pub(crate) issues: Issues,
-    pub(crate) byte_len: usize,
+    pub(crate) bytes: &'a [u8],
     pub(crate) structs: Table<'a, StructDef>,
     pub(crate) properties: Table<'a, PropertyDef>,
     pub(crate) enums: Table<'a, EnumDef>,
@@ -35,6 +37,8 @@ pub struct DataForge<'a> {
     pub(crate) instance_counts: Box<[u32]>,
     pub(crate) instance_starts: Box<[u64]>,
     pub(crate) instances: &'a [u8],
+    pub(crate) source_layout_index: OnceLock<SourceLayoutIndex>,
+    pub(crate) source_layout_turn: Mutex<()>,
     pub(crate) guid_index: OnceLock<Box<[u32]>>,
     pub(crate) path_index: OnceLock<Box<[u32]>>,
     pub(crate) root_index: OnceLock<Box<[(u32, u32, u32)]>>,
@@ -80,7 +84,7 @@ impl<'a> DataForge<'a> {
             version: header.version,
             header_words: header.words,
             issues,
-            byte_len: bytes.len(),
+            bytes,
             structs,
             properties,
             enums,
@@ -93,6 +97,8 @@ impl<'a> DataForge<'a> {
             instance_counts: counts,
             instance_starts: starts,
             instances,
+            source_layout_index: OnceLock::new(),
+            source_layout_turn: Mutex::new(()),
             guid_index: OnceLock::new(),
             path_index: OnceLock::new(),
             root_index: OnceLock::new(),
@@ -110,7 +116,26 @@ impl<'a> DataForge<'a> {
     /// Returns the number of bytes the DataForge was opened over.
     #[must_use]
     pub const fn byte_len(&self) -> usize {
-        self.byte_len
+        self.bytes.len()
+    }
+
+    /// Returns whether this database was opened over the supplied exact input slice.
+    #[must_use]
+    pub fn is_opened_over(&self, bytes: &[u8]) -> bool {
+        std::ptr::eq(self.bytes, bytes)
+    }
+
+    pub(crate) fn byte_span(&self, bytes: &[u8]) -> Option<Range<u64>> {
+        if bytes.is_empty() {
+            return None;
+        }
+        let start = bytes
+            .as_ptr()
+            .addr()
+            .checked_sub(self.bytes.as_ptr().addr())?;
+        let end = start.checked_add(bytes.len())?;
+        self.bytes.get(start..end)?;
+        Some(start as u64..end as u64)
     }
 
     /// Returns the number of Records.

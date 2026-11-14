@@ -9,8 +9,10 @@ main thruster of the M50 (`ORIG_M50_Main_Thruster_Nozzle.cdf`) and of the Gladia
 - **Reading.** An `Attachment` of type `CA_BONE` with a `BoneName` and a `Binding` is a bone
   attachment unless it is the drawn model. `RelPosition` (`x,y,z`, metres) and `RelRotation`
   (a quaternion `w,x,y,z`, `1,0,0,0` being none) default to no offset; a value that does not read as
-  numbers, a rotation without length, a binding that is another definition and the 65th and further
-  attachments are listed as left out. The numbers are read with the tolerant parser of ADR-0145.
+  numbers, a rotation without length or a binding that is another definition is listed as left
+  out. Every readable bone attachment is retained in source order; `left_out` retains every
+  original undrawn occurrence without a count prefix. The numbers are read with the tolerant
+  parser of ADR-0145. Source Entry admission and per-definition vertex admission are independent.
 - **Providing.** `ProvidedModel::attachments` holds one `ProvidedAttachment` per bone attachment
   that was read: its name, bone, offset, rotation, entry and model. A file that is missing or
   cannot be read is listed in `left_out`, so `attachments_left_out` names only what is not drawn.
@@ -31,6 +33,8 @@ main thruster of the M50 (`ORIG_M50_Main_Thruster_Nozzle.cdf`) and of the Gladia
 - **Budget.** The vertices of the attachments count with those of the part's skin against the
   vertex budget, in the wave check and the part-by-part check, and against the bound of the model
   cache.
+
+- **Storage.** Within one character read at one LOD, successful repeated attachment models share immutable storage by the actually selected canonical Entry and the exact parsed material override. Each instance still selects its current Entry first and keeps its own name, bone, transform and vertex charge. Missing, unreadable and fatal outcomes keep their existing handling; the local cache is discarded when that character read ends.
 
 ## Consequences
 

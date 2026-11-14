@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::GfxError;
-use crate::bitmap::{Bitmap, BitmapSource};
+use crate::bitmap::{Bitmap, BitmapSource, DecodedBitmap};
 use crate::font::Font;
 use crate::geometry::Rgba;
 use crate::image::RgbaImage;
@@ -158,8 +158,20 @@ impl Assets<'_> {
     /// [`GfxError::BitmapTooLarge`] above [`crate::MAX_BITMAP_PIXELS`], [`GfxError::Gif`] for a
     /// GIF, and another [`GfxError`] when the data is corrupt.
     pub fn decode_bitmap(&self, bitmap: &Bitmap<'_>) -> Result<RgbaImage, GfxError> {
+        self.decode_bitmap_observed(bitmap)
+            .map(|bitmap| bitmap.image)
+    }
+
+    /// Decodes an embedded bitmap and retains whether shared JPEG tables contributed.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of an embedded bitmap decode.
+    pub fn decode_bitmap_observed(&self, bitmap: &Bitmap<'_>) -> Result<DecodedBitmap, GfxError> {
         match &bitmap.source {
-            BitmapSource::Lossless(lossless) => decode_lossless(lossless),
+            BitmapSource::Lossless(lossless) => {
+                decode_lossless(lossless).map(DecodedBitmap::without_tables)
+            }
             BitmapSource::Jpeg(jpeg) => decode_jpeg(jpeg, self.jpeg_tables),
             BitmapSource::External(_) | BitmapSource::SubImage(_) => Err(GfxError::NotEmbedded),
         }

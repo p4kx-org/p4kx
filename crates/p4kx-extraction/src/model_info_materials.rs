@@ -4,14 +4,22 @@
 use p4kx_model::{Material, MaterialStatus, Model};
 use serde::Serialize;
 
+#[path = "model_material_receipt.rs"]
+pub(crate) mod receipt;
+
+use crate::material_source_info::{MaterialAuthoredInfo, MaterialLibrarySourceInfo};
+use crate::{ArchiveDefaultMaterial, DefaultMaterialReceipt};
+
 /// What reading a model's material library came to.
 #[derive(Debug, Serialize)]
 pub struct LibraryInfo<'a> {
     path: Option<&'a str>,
+    target: Option<&'a str>,
     status: &'static str,
     problem: Option<String>,
     single: Option<bool>,
     default_palette: Option<&'a str>,
+    authored: Option<MaterialLibrarySourceInfo<'a>>,
 }
 
 impl<'a> LibraryInfo<'a> {
@@ -21,6 +29,7 @@ impl<'a> LibraryInfo<'a> {
         let library = model.materials.library();
         Self {
             path: model.material_library.as_deref(),
+            target: model.materials.target(),
             status: match &model.materials {
                 MaterialStatus::Missing { .. } => "missing",
                 MaterialStatus::Unreadable { .. } => "unreadable",
@@ -30,6 +39,7 @@ impl<'a> LibraryInfo<'a> {
             problem: model.materials.problem(),
             single: library.map(|library| library.single),
             default_palette: library.and_then(|library| library.default_palette.as_deref()),
+            authored: library.map(MaterialLibrarySourceInfo::of),
         }
     }
 }
@@ -51,6 +61,7 @@ pub struct MaterialInfo<'a> {
     alpha_test: f32,
     glow: f32,
     textures: Vec<TextureInfo<'a>>,
+    authored: MaterialAuthoredInfo<'a>,
 }
 
 #[derive(Debug, Serialize)]
@@ -89,6 +100,7 @@ impl<'a> MaterialInfo<'a> {
             opacity: material.opacity,
             alpha_test: material.alpha_test,
             glow: material.glow,
+            authored: MaterialAuthoredInfo::of(material),
             textures: material
                 .textures
                 .iter()
@@ -97,6 +109,25 @@ impl<'a> MaterialInfo<'a> {
                     file: &texture.file,
                 })
                 .collect(),
+        }
+    }
+}
+
+/// Physical fallback lookup and its original source, separate from the authored library.
+#[derive(Debug, Serialize)]
+pub struct DefaultMaterialInfo<'a> {
+    #[serde(flatten)]
+    receipt: DefaultMaterialReceipt,
+    material: Option<MaterialInfo<'a>>,
+}
+
+impl<'a> DefaultMaterialInfo<'a> {
+    pub(crate) fn of(read: &'a ArchiveDefaultMaterial) -> Self {
+        Self {
+            receipt: read.receipt(),
+            material: read
+                .material()
+                .map(|material| MaterialInfo::of(material, Some(0))),
         }
     }
 }

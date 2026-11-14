@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{FieldOrigins, MaterialLibrarySourceInfo, SourceInventory};
+
+use crate::MaterialSourceReference;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -202,6 +205,9 @@ impl MaterialStencil {
 /// value as the file has them.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct MaterialDescription {
+    /// Source-library ordinal in `Manifest.material_libraries`, independent of renderer identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_library: Option<usize>,
     /// The material's id, e.g. `x0001`.
     pub id: String,
     /// The material's name in its file; empty when the file gives none.
@@ -240,6 +246,9 @@ pub struct MaterialDescription {
     pub alpha_test: f32,
     /// The glow amount the emissive colour is multiplied by.
     pub glow: f32,
+    /// Exact authored emission and coverage controls with an explicit static preview disposition.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub emission_source: Option<crate::PackageMaterialEmission>,
     /// How the material is blended, derived from `opacity`, `alpha_test` and the shader.
     pub alpha_mode: AlphaMode,
     /// Whether the material reads the vertex colours of its mesh (1.4): glass with
@@ -315,4 +324,38 @@ pub struct Palette {
     /// the palette states none and in a package before 1.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decal: Option<[[f32; 3]; 3]>,
+}
+
+/// One authored library root retained independently of its interpreted child materials.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[non_exhaustive]
+pub struct MaterialLibrarySourceDescription {
+    /// Library path exposed by the model reader, without a unique physical-source claim.
+    pub path: String,
+    /// Streamed authored source data and original field positions of this library.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authored_file: Option<MaterialSourceReference>,
+    /// Inline authored source root of an earlier manifest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authored: Option<MaterialLibrarySourceInfo<'static>>,
+    /// Inline source evidence of an earlier manifest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authored_origin: Option<AuthoredMaterialOrigin>,
+    /// Physical sources and exact use references for this library's emission fields.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<p4kx_extraction::SourceInventory>")]
+    pub emission_provenance: Option<serde_json::Value>,
+}
+
+/// Source-local evidence for the retained authored library fields.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+#[non_exhaustive]
+pub struct AuthoredMaterialOrigin {
+    /// Origins addressed by JSON Pointers relative to the enclosing material-library row.
+    #[serde(deserialize_with = "crate::material_emission_origins::read")]
+    pub field_origins: FieldOrigins,
+    /// Physical inputs and observed source uses of the authored library values.
+    #[schemars(with = "SourceInventory")]
+    pub provenance: serde_json::Value,
 }

@@ -7,34 +7,65 @@ mod archives;
 mod audio;
 mod audio_convert;
 mod audio_excerpt;
+mod audio_excerpt_origin;
 mod audio_objects;
 mod audio_params;
 mod audio_shapes;
 mod audio_tools;
 mod audio_wem;
+mod audio_wem_input;
 mod audio_wem_shapes;
 mod audio_window;
 mod budget;
+mod budget_text;
+mod chunk_pages;
 mod container;
 mod content;
+mod content_origin;
+mod content_text_origin;
 mod content_tools;
+mod definition_origins;
 mod definitions;
+mod discovery_notes;
 mod entries;
+mod entry_directory_origins;
+mod entry_search_origins;
 mod error;
+mod folder_listing_origins;
 mod forge_file;
+mod forge_origins;
 mod forge_params;
 mod forge_shapes;
 mod forge_state;
 mod gate;
 mod image;
+mod image_origin;
 mod image_tools;
+#[cfg(test)]
+mod key_fixture;
+mod key_report;
+mod key_stamp;
 mod keys;
 mod loadout;
 mod loadout_cache;
+mod loadout_error;
+mod loadout_shape;
+mod loadout_shapes;
 mod loadout_tools;
 mod locate;
 mod material;
+mod material_origin;
+mod material_shape;
+mod material_shapes;
 mod material_tools;
+mod model_animation_items;
+mod model_animation_navigation;
+mod model_animation_row_origins;
+mod model_animation_sites;
+mod model_bone_items;
+mod model_item_page;
+mod model_node_fields;
+mod model_node_items;
 mod model_params;
 mod model_shapes;
 mod model_tools;
@@ -46,12 +77,19 @@ mod page;
 mod params;
 mod picture;
 mod query;
+mod query_origins;
+mod query_selection_sources;
+mod query_source_uses;
 mod query_tools;
+mod record_origins;
+mod record_search;
+mod record_search_origins;
 mod record_tools;
 mod records;
 mod server;
 mod shapes;
 
+use std::io::{self, Write};
 use std::path::PathBuf;
 
 use anyhow::{Context, Result};
@@ -74,6 +112,9 @@ const KEY_FILE: &str = "archive.key";
     before_help = notice::BEFORE_HELP
 )]
 struct Args {
+    /// Checks GitHub for a newer release and prints its link instead of starting a session.
+    #[arg(long, exclusive = true)]
+    check_update: bool,
     /// The Archive tools use when a call names none: a Channel name such as `LIVE` or the
     /// absolute path of a `.p4k` file.
     #[arg(long)]
@@ -101,6 +142,10 @@ struct Args {
 
 fn main() -> Result<()> {
     let args = Args::parse();
+    if args.check_update {
+        return write_update_link();
+    }
+    p4kx_extraction::check_runtime_prerequisites()?;
     let settings_file = args
         .config_dir
         .as_ref()
@@ -118,7 +163,10 @@ fn main() -> Result<()> {
         .as_deref()
         .map(|archive| locations.resolve(archive, locate::Accepts::Archive))
         .transpose()
-        .map_err(|error| anyhow::anyhow!(error.message()))?;
+        .map_err(|error| anyhow::anyhow!(noted::take().error_message(&error)))?;
+    for note in noted::take().discovery {
+        writeln!(io::stderr().lock(), "{note}")?;
+    }
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -131,4 +179,12 @@ fn main() -> Result<()> {
         service.waiting().await.context("the MCP session failed")?;
         Ok(())
     })
+}
+
+fn write_update_link() -> Result<()> {
+    let release = p4kx_update::ReleaseCheck::github().newer_than(env!("CARGO_PKG_VERSION"))?;
+    if let Some(release) = release {
+        writeln!(io::stdout().lock(), "{}", release.link())?;
+    }
+    Ok(())
 }

@@ -1,17 +1,37 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+//! Bounded WEM reads and original input evidence.
+
+#[path = "wwise_path.rs"]
+pub mod wwise_path;
+
 use std::fs::File;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
-use p4kx_archive::Archive;
+use p4kx_archive::{Archive, Entry, EntryOrigin};
+pub use p4kx_audio::wwise_id;
 use p4kx_audio::{AudioError, OggReport, WavReport, Wem};
+pub use p4kx_audio::{
+    ByteOrder, WemChunkCursor, WemChunkEntry, WemCodecSource, WemCue, WemCuePoint, WemCueText,
+    WemCueTextRegion, WemInfoSource, WemInspection, WemList, WemListItem, WemListPayload,
+    WemLoopEnd, WemLoopSource, WemMetadata, WemOpusOgg, WemOpusRanges, WemOpusWav,
+    WemOpusWriteError, WemPcmWav, WemPcmWriteError, WemReadError, WemSampleCountSource, WemSource,
+    WemSourceChunk, WemTextUtf8, WemVorbisOgg, WemVorbisRanges, WemVorbisWav, WemVorbisWriteError,
+};
+
+#[path = "wem_origin_plan.rs"]
+mod wem_origin_plan;
+pub use wem_origin_plan::{
+    WemFormatField, WemOriginError, WemOriginField, WemOriginPlan, WemOriginSite,
+};
 
 use crate::entry_content::find_entry;
-use crate::output_file::{read_error, write_error, write_replacing};
+use crate::output_file::{read_error, write_error, write_replacing_protected};
+use crate::source_protection::SourceProtection;
 use crate::texture_parts::is_same_file;
-use crate::{ConversionError, UnknownEntries};
+use crate::{ConversionError, FileStamp, ObservedFileOrigin, SourceInput, UnknownEntries};
 
 /// The largest WEM read into memory, far above the largest sound of a real Archive.
 pub const MAX_SOUND_LEN: u64 = 512 << 20;
@@ -21,9 +41,17 @@ const MAX_UP_FRONT_RESERVATION: u64 = 64 << 20;
 /// A Wwise WEM sound read from an Entry of an Archive or from a file on disk.
 #[derive(Debug)]
 pub struct Sound {
+    protection: SourceProtection,
     name: String,
     file: Option<PathBuf>,
     wem: Wem<Vec<u8>>,
+    original: Option<SoundInput>,
+}
+
+#[derive(Debug)]
+enum SoundInput {
+    Archive(EntryOrigin),
+    File(ObservedFileOrigin),
 }
 
 impl Sound {
@@ -36,8 +64,51 @@ impl Sound {
     /// [`ConversionError::SoundTooLarge`] when it exceeds [`MAX_SOUND_LEN`], and another
     /// [`ConversionError`] when it cannot be read or is no valid WEM.
     pub fn from_archive(archive: &Archive, path: &str) -> Result<Self, ConversionError> {
+        Self::read_archive(archive, path, |_| None)
+    }
+
+    /// Reads the selected WEM Entry and retains its original physical source.
+    ///
+    /// # Errors
+    /// Returns the same errors as [`Self::from_archive`].
+    pub fn from_archive_observed(archive: &Archive, path: &str) -> Result<Self, ConversionError> {
+        Self::read_archive(archive, path, |entry| {
+            archive.entry_origin(entry).map(SoundInput::Archive)
+        })
+    }
+
+    /// Reads the exact Archive Entry position and retains its original physical source.
+    ///
+    /// # Errors
+    /// Returns the read and format errors of [`Self::from_archive`].
+    pub fn from_archive_position_observed(
+        archive: &Archive,
+        position: usize,
+    ) -> Result<Self, ConversionError> {
+        let entry = archive
+            .entries()
+            .get(position)
+            .ok_or_else(|| UnknownEntries(vec![format!("Entry position {position}")]))?;
+        let original = archive.entry_origin(entry).map(SoundInput::Archive);
+        Self::read_entry(archive, entry, original)
+    }
+
+    fn read_archive(
+        archive: &Archive,
+        path: &str,
+        observe: impl FnOnce(&Entry) -> Option<SoundInput>,
+    ) -> Result<Self, ConversionError> {
         let entry =
             find_entry(archive, path).ok_or_else(|| UnknownEntries(vec![path.to_owned()]))?;
+        Self::read_entry(archive, entry, observe(entry))
+    }
+
+    fn read_entry(
+        archive: &Archive,
+        entry: &Entry,
+        original: Option<SoundInput>,
+    ) -> Result<Self, ConversionError> {
+        let protection = SourceProtection::new(Some(archive.path()));
         let name = entry.path().to_owned();
         let reader = archive.open_entry(entry)?;
         let bytes =
@@ -47,7 +118,7 @@ impl Sound {
                     source,
                 }
             })?;
-        Self::parse(name, None, bytes)
+        Self::parse(name, None, bytes, protection, original)
     }
 
     /// Reads and parses the WEM file at `path`.
@@ -58,7 +129,19 @@ impl Sound {
     /// [`ConversionError::SoundTooLarge`] when it exceeds [`MAX_SOUND_LEN`], and another
     /// [`ConversionError`] when it cannot be read or is no valid WEM.
     pub fn from_file(path: &Path) -> Result<Self, ConversionError> {
-        let file = File::open(path).map_err(|source| {
+        Self::read_file(path, false)
+    }
+
+    /// Reads a WEM file with its original standalone identity.
+    ///
+    /// # Errors
+    /// Returns the same errors as [`Self::from_file`].
+    pub fn from_file_observed(path: &Path) -> Result<Self, ConversionError> {
+        Self::read_file(path, true)
+    }
+
+    fn read_file(path: &Path, observe: bool) -> Result<Self, ConversionError> {
+        let mut file = File::open(path).map_err(|source| {
             if source.kind() == io::ErrorKind::NotFound {
                 ConversionError::NoSuchFile {
                     path: path.to_path_buf(),
@@ -67,20 +150,38 @@ impl Sound {
                 read_error(path, source)
             }
         })?;
-        let len = file
-            .metadata()
-            .map_err(|source| read_error(path, source))?
-            .len();
+        let metadata = file.metadata().map_err(|source| read_error(path, source))?;
+        let len = metadata.len();
         let name = path.display().to_string();
-        let bytes =
-            read_capped(file, len, MAX_SOUND_LEN).map_err(|source| read_error(path, source))?;
-        Self::parse(name, Some(path.to_path_buf()), bytes)
+        let bytes = read_capped(&mut file, len, MAX_SOUND_LEN)
+            .map_err(|source| read_error(path, source))?;
+        let byte_length = bytes.as_ref().map_or(0, Vec::len);
+        let mut sound = Self::parse(
+            name,
+            Some(path.to_path_buf()),
+            bytes,
+            SourceProtection::new(None),
+            None,
+        )?;
+        if observe {
+            sound.original = ObservedFileOrigin::of_read(
+                path,
+                &file,
+                FileStamp::from_metadata(&metadata),
+                byte_length,
+            )
+            .map_err(|source| read_error(path, source))?
+            .map(SoundInput::File);
+        }
+        Ok(sound)
     }
 
     fn parse(
         name: String,
         file: Option<PathBuf>,
         bytes: Option<Vec<u8>>,
+        protection: SourceProtection,
+        original: Option<SoundInput>,
     ) -> Result<Self, ConversionError> {
         let Some(bytes) = bytes else {
             return Err(ConversionError::SoundTooLarge {
@@ -89,11 +190,27 @@ impl Sound {
             });
         };
         match Wem::parse(bytes) {
-            Ok(wem) => Ok(Self { name, file, wem }),
+            Ok(wem) => Ok(Self {
+                protection,
+                name,
+                file,
+                wem,
+                original,
+            }),
             Err(source) => Err(ConversionError::Audio {
                 sound: name,
                 source,
             }),
+        }
+    }
+
+    /// Borrows the original input of an observed WEM read.
+    #[must_use]
+    pub const fn source_input(&self) -> Option<SourceInput<'_>> {
+        match &self.original {
+            Some(SoundInput::Archive(entry)) => Some(SourceInput::Archive(entry)),
+            Some(SoundInput::File(file)) => Some(SourceInput::File(file)),
+            None => None,
         }
     }
 
@@ -119,7 +236,7 @@ impl Sound {
     /// [`ConversionError::Write`] when the file cannot be written.
     pub fn write_wav_to_file(&self, out: &Path) -> Result<WavReport, ConversionError> {
         self.refuse_input_as_output(out)?;
-        write_replacing(out, |writer| {
+        write_replacing_protected(out, self.protection.context()?, None, |writer| {
             self.wem
                 .write_wav(writer)
                 .map_err(|source| self.audio_error(out, source))
@@ -137,7 +254,7 @@ impl Sound {
     /// WEM file itself, and [`ConversionError::Write`] when the file cannot be written.
     pub fn write_ogg_to_file(&self, out: &Path) -> Result<OggReport, ConversionError> {
         self.refuse_input_as_output(out)?;
-        write_replacing(out, |writer| {
+        write_replacing_protected(out, self.protection.context()?, None, |writer| {
             self.wem
                 .write_ogg(writer)
                 .map_err(|source| self.audio_error(out, source))

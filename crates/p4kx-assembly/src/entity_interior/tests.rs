@@ -11,6 +11,7 @@ fn reference(position: [f32; 3]) -> ObjectContainerRef {
         position,
         rotation: [0.0; 3],
         source: ContainerSource::Vehicle,
+        coordinate: None,
     }
 }
 
@@ -20,7 +21,8 @@ fn a_non_finite_offset_is_the_identity_and_an_issue() {
 
     let placed = built.place(INTERIOR_NODE, &reference([f32::NAN, 0.0, 0.0]), None);
 
-    assert!(placed.is_identity());
+    assert!(placed.transform.is_identity());
+    assert!(placed.tile_owner.is_none());
     assert_eq!(built.issues.len(), 1);
     assert_eq!(built.issues[0].kind.code(), "invalid_offset");
 }
@@ -28,10 +30,12 @@ fn a_non_finite_offset_is_the_identity_and_an_issue() {
 #[test]
 fn an_assembly_without_parts_still_writes_the_interior_at_the_top() {
     let empty = Assembly {
+        forge_origin: None,
         parts: Vec::new(),
         issues: Vec::new(),
         lod: 0,
         interior: None,
+        default_material: None,
         containers: Vec::new(),
     };
     let mut interior = EntityInterior::default();
@@ -45,6 +49,7 @@ fn an_assembly_without_parts_still_writes_the_interior_at_the_top() {
             issues: Vec::new(),
             lod: 0,
             containers: 0,
+            default_material: None,
         },
     );
 
@@ -52,7 +57,7 @@ fn an_assembly_without_parts_still_writes_the_interior_at_the_top() {
     let mut scene = Scene::new();
     let written = assembly
         .interior()
-        .map(|interior| interior.add_to_scene(&mut scene, 0));
+        .map(|interior| interior.add_to_scene(&mut scene, 0, &mut |_, _| {}));
 
     assert!(matches!(written, Some(Ok(()))));
     let [group] = scene.nodes() else {

@@ -1,5 +1,8 @@
 # Contracts are a catalog kind with resolved titles and success-only reputation
 
+For catalog schema 3, the pickup-place length cap is superseded by
+[ADR-0359](0359-contract-pickup-places-retain-every-eligible-source-location.md). The original decision and recorded Build observations below remain historical evidence.
+
 Decided for issue #416 (VerseKit, an external consumer). Builds on ADR-0054 and ADR-0065.
 
 VerseKit rebuilds the contract chain itself from the format crates and finds that every tool has to

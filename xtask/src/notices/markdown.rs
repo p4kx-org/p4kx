@@ -13,13 +13,16 @@ pub(super) struct Crate {
     pub(super) name: String,
     pub(super) version: String,
     pub(super) repository: Option<String>,
+    pub(super) licence_source: Option<String>,
 }
 
 impl Crate {
-    /// The repository when the crate names one, else its page on crates.io.
+    /// The verified licence source, repository or crates.io page.
     fn link(&self) -> String {
-        self.repository
-            .clone()
+        self.licence_source
+            .as_ref()
+            .or(self.repository.as_ref())
+            .cloned()
             .unwrap_or_else(|| format!("https://crates.io/crates/{}/{}", self.name, self.version))
     }
 }
@@ -107,6 +110,7 @@ mod tests {
             name: name.to_owned(),
             version: version.to_owned(),
             repository: repository.map(str::to_owned),
+            licence_source: None,
         }
     }
 

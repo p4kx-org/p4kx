@@ -14,7 +14,6 @@ layer = "format"
 [dependencies]
 lewton.workspace = true
 opus-pure.workspace = true
-p4kx-foundation.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
 

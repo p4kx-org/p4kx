@@ -23,6 +23,7 @@ pub(crate) fn describe(
     default_palette: Option<&str>,
 ) -> MaterialDescription {
     MaterialDescription {
+        source_library: None,
         id,
         name: material.name.clone(),
         library: library.to_owned(),
@@ -45,6 +46,7 @@ pub(crate) fn describe(
         opacity: material.opacity,
         alpha_test: material.alpha_test,
         glow: material.glow,
+        emission_source: None,
         alpha_mode: alpha_mode(material),
         reads_vertex_colours: material.reads_vertex_colours(),
         layer_shares: layer_shares(material, |_| false),

@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_character::Dna;
+use p4kx_extraction::SourceLocation;
 
-use super::{Expressions, Look, Wearable};
+use super::{Expressions, HeadMaterial, Look, Wearable};
 use crate::PortTransform;
 use crate::bespoke::Bespoke;
 
@@ -87,6 +88,7 @@ pub struct Piece {
     pub(crate) expressions: Expressions,
     pub(crate) look: Option<Look>,
     pub(crate) material: Option<String>,
+    pub(crate) material_source: Option<SourceLocation>,
     pub(crate) follows_head: bool,
     pub(crate) notes: Vec<Note>,
     pub(crate) selecting: Vec<String>,
@@ -105,6 +107,7 @@ impl Piece {
             expressions: Expressions::None,
             look: None,
             material: None,
+            material_source: None,
             follows_head: false,
             notes: Vec::new(),
             selecting: Vec::new(),
@@ -152,7 +155,7 @@ impl Piece {
         self
     }
 
-    /// Chooses the Entity's material library by `tags`, see [`MaterialVariant::resolve`]; the
+    /// Chooses the Entity's material library by `tags`, see [`MaterialVariant::resolve`](crate::MaterialVariant::resolve); the
     /// body variant's tag is always among them.
     #[must_use]
     pub fn with_material_tags(mut self, tags: Vec<String>) -> Self {
@@ -224,8 +227,13 @@ impl Piece {
     /// Draws the piece with the material library at `path`, a path below `Data`, instead of the
     /// one its Record or its model names.
     #[must_use]
-    pub fn with_material(mut self, path: impl Into<String>) -> Self {
-        self.material = Some(path.into());
+    pub fn with_material(self, path: impl Into<String>) -> Self {
+        self.with_material_source(HeadMaterial::new(path.into(), None))
+    }
+
+    pub(super) fn with_material_source(mut self, material: HeadMaterial) -> Self {
+        self.material = Some(material.path);
+        self.material_source = material.source;
         self
     }
 

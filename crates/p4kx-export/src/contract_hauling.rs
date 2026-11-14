@@ -27,7 +27,7 @@ pub(crate) struct HaulingOrder<'a> {
 /// entry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum HaulingSource {
     /// A hauling orders property in the overrides of the sub contract.
     SubContract,
@@ -84,7 +84,7 @@ pub(crate) struct HaulingItem {
 /// What a hauling item stands for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum HaulingItemKind {
     /// A commodity in SCU (`…_Resource`, `…_ResourceUnlimitedDropOff`).
     Resource,

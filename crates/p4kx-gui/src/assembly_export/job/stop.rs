@@ -8,7 +8,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use p4kx_assembly::{ArchiveModels, ModelFailure, ModelProvider, ProvidedModel};
 use p4kx_extraction::model::{LayerBudget, MaterialStatus};
 use p4kx_extraction::{
-    CancelToken, ConversionError, LoadedTexture, TextureLoadError, TextureLoader,
+    ArchiveDefaultMaterial, ArchiveMaterialRead, CancelToken, ConversionError, EntryOrigin,
+    LoadedTexture, TextureLoadError, TextureLoader,
 };
 
 pub(crate) struct Stoppable<'a, 'b> {
@@ -28,12 +29,28 @@ impl ModelProvider for Stoppable<'_, '_> {
         self.models.library(entry, name)
     }
 
+    fn library_observed(&self, entry: &str, name: &str) -> ArchiveMaterialRead {
+        self.models.library_observed(entry, name)
+    }
+
+    fn default_material(&self) -> Option<Arc<ArchiveDefaultMaterial>> {
+        self.models.default_material()
+    }
+
     fn layer_budget(&self) -> LayerBudget {
         self.models.layer_budget()
     }
 
     fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
         self.models.layer_library(path, budget)
+    }
+
+    fn layer_library_observed(
+        &self,
+        path: &str,
+        budget: &mut LayerBudget,
+    ) -> (Arc<MaterialStatus>, Option<EntryOrigin>) {
+        self.models.layer_library_observed(path, budget)
     }
 
     fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {

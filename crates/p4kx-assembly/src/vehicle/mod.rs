@@ -5,17 +5,22 @@
 //! Modification the Entity selects applied.
 
 mod elem;
+mod file_read;
 mod gear;
 mod item_port;
+mod light_ports;
 mod locate;
 mod origin;
 mod patch;
+mod paths;
 mod read;
+mod request;
 mod structure;
 mod totals;
 
 use std::collections::HashMap;
 
+use crate::gear_placement_source::GearDeclaration;
 use crate::merge::port_key;
 use crate::{LoadoutError, LoadoutFiles};
 
@@ -23,7 +28,8 @@ pub use elem::ElemOverride;
 pub(crate) use gear::gears;
 pub(crate) use item_port::flags_contain;
 pub use item_port::{VehicleItemPort, VehicleItemType};
-pub(crate) use locate::load;
+pub use light_ports::{VehicleLightAttachment, VehicleLightPort};
+pub(crate) use locate::{load, load_observed};
 pub use origin::ValueOrigin;
 pub use patch::ModificationReport;
 pub use totals::{OriginTally, PartThreshold, PartialValue, UnreadableValue, VehicleTotals};
@@ -72,6 +78,7 @@ pub enum PartKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VehiclePart {
     pub(crate) name: String,
+    pub(crate) name_proof: Option<crate::LoadoutPath>,
     pub(crate) class: String,
     pub(crate) kind: PartKind,
     pub(crate) mass: Option<f64>,
@@ -170,11 +177,18 @@ impl VehiclePart {
 }
 
 /// One landing gear of the `VehicleLandingGearSystem` Record an Entity's vehicle component names.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct LandingGear {
     pub(crate) bone: String,
     pub(crate) geometry: String,
     pub(crate) mass: Option<f64>,
+    pub(crate) source: GearDeclaration,
+}
+
+impl PartialEq for LandingGear {
+    fn eq(&self, other: &Self) -> bool {
+        self.bone == other.bone && self.geometry == other.geometry && self.mass == other.mass
+    }
 }
 
 impl LandingGear {
@@ -201,6 +215,7 @@ impl LandingGear {
 #[derive(Debug, Clone, PartialEq)]
 pub struct VehicleImplementation {
     pub(crate) path: String,
+    declarations: origin::DeclarationOrigins,
     pub(crate) patch_path: Option<String>,
     pub(crate) modification: Option<String>,
     pub(crate) report: Option<ModificationReport>,
@@ -225,8 +240,8 @@ impl VehicleImplementation {
     ///
     /// # Errors
     ///
-    /// Returns [`LoadoutError::VehicleImplementation`] when no file holds the implementation or
-    /// it is no readable `Vehicle` document.
+    /// Returns [`LoadoutError::MissingVehicleImplementation`] when no candidate file exists and
+    /// [`LoadoutError::VehicleImplementation`] for unreadable or invalid `Vehicle` documents.
     pub fn read(
         files: &dyn LoadoutFiles,
         class_name: &str,
@@ -282,6 +297,18 @@ impl VehicleImplementation {
             .iter()
             .rev()
             .find(|elem| elem.id_ref == id && elem.name.eq_ignore_ascii_case(attribute))
+    }
+
+    /// Returns the original archive input supplying the effective declaration.
+    #[must_use]
+    pub const fn declaration_origin(
+        &self,
+        origin: ValueOrigin,
+    ) -> Option<&p4kx_extraction::EntryOrigin> {
+        match origin {
+            ValueOrigin::Base | ValueOrigin::Elem => self.declarations.base.as_ref(),
+            ValueOrigin::Patch => self.declarations.patch.as_ref(),
+        }
     }
 
     /// Returns the path of the file a value with `origin` was read from: the implementation file
@@ -354,8 +381,7 @@ impl VehicleImplementation {
     pub fn port_visibility(&self, name: &str) -> PortVisibility {
         self.port_part(name)
             .and_then(|part| part.item_port.as_ref())
-            .map(VehicleItemPort::visibility)
-            .unwrap_or_default()
+            .map_or_default(VehicleItemPort::visibility)
     }
 
     /// Returns the first part named `name` that holds an item port, ignoring ASCII case.

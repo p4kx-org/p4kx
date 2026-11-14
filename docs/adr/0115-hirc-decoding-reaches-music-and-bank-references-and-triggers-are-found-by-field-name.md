@@ -1,8 +1,8 @@
 # HIRC decoding reaches music objects, bank references and node parents; triggers are found by field name
 
 Decided for issue #278, on top of ADR-0021 (the bounded `HIRC` walk) and ADR-0018 (the audio index). The resolution rules
-below are amended by ADR-0158: the walk now enters one other soundbank and follows Trigger
-actions.
+below are amended by ADR-0158 for Trigger actions and ADR-0362 for indexed bank references,
+active ownership and per-event failure retention.
 
 ## Decoding
 

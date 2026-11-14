@@ -1,23 +1,25 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "animate_origins.rs"]
+mod origins;
+
 use std::collections::HashSet;
 use std::io::Write;
 
-use p4kx_character::{Dna, DnaRig, FaceRig, RigLogic};
 use p4kx_gltf::{
-    GlbOptions, GlbSummary, GltfError, RigAnimation, RigPiece, SampledAnimation, SampledWeights,
-    TextureLoader, write_rigged_glb_animated, write_rigged_glb_animated_with,
+    GlbOptions, GlbSummary, GltfError, SampledAnimation, SampledWeights, TextureLoader,
+    write_rigged_glb_animated, write_rigged_glb_animated_with,
 };
 use p4kx_model::Animation;
 
-use super::facial::{FaceLink, FaceSource};
+use super::animate_rig::{Loaded, load};
+use super::facial::FaceLink;
 use super::sample::{Control, evaluate, joint_samples, reduced, values_of, weight_samples};
-use super::shape::MAX_DNA_RIG_LEN;
 use super::unused::summarise;
-use super::{Armour, ArmourPart};
+use super::{Armour, ArmourPart, RigArchiveRead};
 use crate::animation_budget::{KeyFit, ValueBudget, limit_reason};
-use crate::{Issue, IssueKind, ModelFailure, ModelProvider};
+use crate::{Issue, IssueKind, ModelProvider};
 
 /// The most values, floats of key times and poses, the animations of one Character may write: 32
 /// Mi values, 128 MiB. The 141 facial animations of one head together hold about 150 Mi.
@@ -33,8 +35,10 @@ const MAX_SAMPLES: usize = 1 << 15;
 /// [`Armour::animate`].
 #[derive(Debug, Clone, Default)]
 pub struct CharacterAnimations<'a> {
-    keys: Vec<(&'a Animation, Vec<u32>)>,
+    keys: Vec<(usize, &'a Animation, Vec<u32>)>,
     sampled: Vec<SampledAnimation>,
+    sampled_indices: Vec<usize>,
+    sampled_rigs: Vec<Option<RigArchiveRead>>,
     issues: Vec<Issue>,
     values: usize,
 }
@@ -74,16 +78,12 @@ impl CharacterAnimations<'_> {
     }
 }
 
-/// The rig logic of one head, loaded once for all animations.
-struct Loaded {
-    face: FaceRig,
-}
-
 /// A facial animation evaluated, with the controller IDs of its controls and its cost.
 struct Fitted {
     sampled: SampledAnimation,
     driven: Vec<u32>,
     cost: usize,
+    rig: Option<RigArchiveRead>,
 }
 
 /// Why an animation has no facial part.
@@ -141,35 +141,6 @@ fn refused(
     }
 }
 
-fn load(link: &FaceLink, models: &dyn ModelProvider) -> Result<Loaded, String> {
-    let face = match &link.source {
-        FaceSource::Dna { rig, dna } => dna_face(rig, dna, &link.logic, models)?,
-        FaceSource::Own => FaceRig::from_logic(&link.logic).map_err(|error| error.to_string())?,
-    };
-    Ok(Loaded { face })
-}
-
-/// Makes the face rig of a head shaped by `dna` from the DNA rig at `rig_path` and the rig logic
-/// `logic` of its skin.
-fn dna_face(
-    rig_path: &str,
-    dna: &Dna,
-    logic: &RigLogic,
-    models: &dyn ModelProvider,
-) -> Result<FaceRig, String> {
-    let bytes = models
-        .file(rig_path, MAX_DNA_RIG_LEN)
-        .map_err(|failure| match failure {
-            ModelFailure::Missing => format!("the DNA rig {rig_path} does not exist"),
-            other => format!("the DNA rig {rig_path} cannot be read: {other}"),
-        })?;
-    let rig = DnaRig::read(&bytes).map_err(|error| format!("{rig_path}: {error}"))?;
-    let matrix = rig
-        .matrix(dna)
-        .map_err(|error| format!("{rig_path}: {error}"))?;
-    FaceRig::new(&rig, &matrix, logic).map_err(|error| format!("{rig_path}: {error}"))
-}
-
 impl Armour {
     /// Returns the part with the rig that animates the face, and its index among the parts.
     fn face_part(&self) -> Option<(usize, &ArmourPart, &FaceLink)> {
@@ -210,7 +181,7 @@ impl Armour {
         let mut out = CharacterAnimations::default();
         let mut loaded: Option<Result<Loaded, String>> = None;
         let mut budget_left = ValueBudget::new(budget);
-        for animation in animations {
+        for (index, animation) in animations.iter().enumerate() {
             let bound = animation.bind(&self.skeleton.bones);
             let ids: HashSet<u32> = bound
                 .bound
@@ -231,20 +202,22 @@ impl Armour {
                 Ok(Some(fitted)) => {
                     budget_left.spend(fitted.cost);
                     driven = fitted.driven;
-                    sampled = Some(fitted.sampled);
+                    sampled = Some((fitted.sampled, fitted.rig));
                 }
                 Ok(None) => {}
                 Err(failed) => refusal = Some(failed),
             }
             let mut used = sampled.is_some();
-            if let Some(sampled) = sampled {
+            if let Some((sampled, rig)) = sampled {
                 out.sampled.push(sampled);
+                out.sampled_indices.push(index);
+                out.sampled_rigs.push(rig);
             }
             let mut reported = false;
             match budget_left.fit_keys(animation, !bound.bound.is_empty()) {
                 KeyFit::Fits(cost) => {
                     budget_left.spend(cost);
-                    out.keys.push((animation, driven));
+                    out.keys.push((index, animation, driven));
                     used = true;
                 }
                 KeyFit::OverBudget(reason) => {
@@ -334,6 +307,7 @@ impl Armour {
             sampled: SampledAnimation::new(animation.name.clone(), times, moved, weights, skipped),
             driven,
             cost,
+            rig: rig.origin.clone(),
         }))
     }
 
@@ -375,13 +349,8 @@ impl Armour {
         textures: Option<&dyn TextureLoader>,
         out: &mut impl Write,
     ) -> Result<GlbSummary, GltfError> {
-        let pieces: Vec<RigPiece<'_>> = self.parts.iter().map(ArmourPart::rig_piece).collect();
-        let list: Vec<RigAnimation<'_>> = animations
-            .keys
-            .iter()
-            .map(|(animation, driven)| RigAnimation::Keys(animation, driven))
-            .chain(animations.sampled.iter().map(RigAnimation::Sampled))
-            .collect();
+        let pieces = self.rig_pieces();
+        let list = animations.rig_animations();
         let bones = &self.skeleton.bones;
         match textures {
             Some(textures) => {

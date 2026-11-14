@@ -7,9 +7,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from .glb_material_slots import INDEX_PROPERTY
 from .package import pair_materials
-
-INDEX_PROPERTY = "p4kx_index"
 
 
 def index_of(value: object) -> int | None:

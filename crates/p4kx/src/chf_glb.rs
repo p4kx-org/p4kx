@@ -8,70 +8,31 @@ use anyhow::Result;
 use p4kx_assembly::character::{CHF_SIZE, Chf};
 use p4kx_assembly::{
     AnimationFolders, ArchiveModels, Armour, AssemblyOptions, CharacterAnimations, Expressions,
-    ForgeItems, ForgePalettes, Head, IssueKind, LoadoutResolver, PartOrigin, character_animations,
+    ForgeItems, ForgePalettes, Head, IssueKind, LoadoutResolver, PartOrigin,
+    character_animations_with_archive_sources,
 };
 use p4kx_extraction::{
-    AnimationSet, ConversionError, DataForgeEntry, GlbOptions, GlbSummary, GltfError, MaterialMode,
-    is_same_file, write_replacing,
+    AnimationSet, ArchiveWriteProtection, DataForgeEntry, GlbOptions, GlbSummary, MaterialMode,
+    is_same_file,
 };
-use serde::Serialize;
 use thiserror::Error;
 
-use crate::chf::{InvalidChf, read_capped};
+use crate::chf::{InvalidChf, read_capped_observed};
 use crate::cli::ChfGlbArgs;
 use crate::cli_chf::ChfMaterialsArg;
 use crate::entity_glb::GlbOutputIsArchive;
-use crate::entity_glb_json::IssueJson;
 use crate::entity_glb_report::{print_issues, print_textures};
-use crate::json;
-use crate::model_animations::{WrittenJson, write_notes};
+use crate::model_animations::write_notes;
 use crate::query_table::one_line;
 
-#[derive(Serialize)]
-struct PartJson<'a> {
-    name: &'a str,
-    origin: &'static str,
-    file: &'a str,
-    morph_targets: usize,
-}
+#[path = "chf_glb_sources.rs"]
+mod origin;
 
-#[derive(Serialize)]
-struct FallbackJson<'a> {
-    material: &'a str,
-    role: &'static str,
-    file: &'a str,
-    reason: &'a str,
-}
+#[path = "chf_glb_report.rs"]
+mod report;
 
-#[derive(Serialize)]
-struct GlbJson<'a> {
-    archive: String,
-    chf: String,
-    body: &'static str,
-    rig: &'static str,
-    skeleton: &'a str,
-    out: String,
-    lod: u32,
-    parts: Vec<PartJson<'a>>,
-    nodes: usize,
-    bones: usize,
-    meshes: usize,
-    skinned_meshes: usize,
-    primitives: usize,
-    materials: usize,
-    morph_targets: usize,
-    textured_materials: usize,
-    textures: usize,
-    texture_pixels: u64,
-    texture_fallbacks: Vec<FallbackJson<'a>>,
-    default_material_ids: usize,
-    vertices: usize,
-    triangles: usize,
-    bytes: u64,
-    skipped: usize,
-    animations: Vec<WrittenJson>,
-    issues: Vec<IssueJson<'a>>,
-}
+use origin::Export;
+use report::Outcome;
 
 /// Parts of the head of the character could not be shaped by its DNA, so the file lacks them.
 #[derive(Debug, Error)]
@@ -146,12 +107,15 @@ pub(crate) fn run(args: &ChfGlbArgs, as_json: bool) -> Result<()> {
     if is_same_file(&args.out, &args.archive) {
         return Err(GlbOutputIsArchive(args.out.clone()).into());
     }
-    let bytes = read_capped(&args.file, CHF_SIZE as u64)?;
-    let chf = Chf::read(&bytes).map_err(|source| InvalidChf {
+    let input = read_capped_observed(&args.file, CHF_SIZE as u64)?;
+    let chf = Chf::read(input.bytes()).map_err(|source| InvalidChf {
         path: args.file.clone(),
         source,
     })?;
     let archive = crate::key::open(&args.archive)?;
+    let cancel = crate::extract::cancel_on_interrupt()?;
+    let sources = [archive.path(), args.file.as_path()];
+    let write_guard = ArchiveWriteProtection::for_sources(&sources, cancel.flag())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let mut resolver = LoadoutResolver::new(&forge);
@@ -161,29 +125,26 @@ pub(crate) fn run(args: &ChfGlbArgs, as_json: bool) -> Result<()> {
     let armour = armour_of(&head, &models, ForgePalettes::new(&forge), args.lod)?;
 
     let glb = glb_options(args);
-    let name = head.variant().code().to_owned();
-    let textures = models.textures();
-    let found = character_animations(
+    let textures = models.textures().observed();
+    let found = character_animations_with_archive_sources(
         &models,
         head.variant(),
         (&args.animations, &args.animation_sources),
         &AnimationFolders::default(),
     )?;
-    let animated = armour.animate(&found.animations, &models);
-    let summary = write_replacing(&args.out, |writer| {
-        armour
-            .write_glb_animated_with(&animated, &glb, &textures, writer)
-            .map_err(|error| match error {
-                GltfError::Write(source) => ConversionError::Write {
-                    path: args.out.clone(),
-                    source,
-                },
-                source => ConversionError::Glb {
-                    file: name.clone(),
-                    source,
-                },
-            })
-    })?;
+    let animated = armour.animate(&found.set().animations, &models);
+    let export = Export {
+        name: head.variant().code(),
+        armour: &armour,
+        animated: &animated,
+        found: &found,
+        options: &glb,
+        textures: &textures,
+        input: &input,
+        dna: chf.character.dna.as_ref(),
+        forge: entry.origin(),
+    };
+    let (summary, projection, receipt) = origin::publish(args, &write_guard, &cancel, &export)?;
 
     if as_json {
         let outcome = Outcome {
@@ -191,9 +152,15 @@ pub(crate) fn run(args: &ChfGlbArgs, as_json: bool) -> Result<()> {
             animated: &animated,
             summary: &summary,
         };
-        json::print(&report(archive.path(), args, &head, &outcome))?;
+        report::print(
+            archive.path(),
+            args,
+            &head,
+            &outcome,
+            projection.summary(receipt),
+        )?;
     } else if let Err(error) = print_report(&armour, &head, &summary, args)
-        .and_then(|()| print_animations(&summary, &found, &animated))
+        .and_then(|()| print_animations(&summary, found.set(), &animated))
         && error.kind() != io::ErrorKind::BrokenPipe
     {
         return Err(error.into());
@@ -243,81 +210,6 @@ pub(crate) fn failure(armour: &Armour, out: &Path) -> Option<anyhow::Error> {
             )
         })
         .then(|| ExpressionsNotMade(out.to_path_buf()).into())
-}
-
-/// What was built and written.
-struct Outcome<'a> {
-    armour: &'a Armour,
-    animated: &'a CharacterAnimations<'a>,
-    summary: &'a GlbSummary,
-}
-
-fn report<'a>(
-    archive: &Path,
-    args: &ChfGlbArgs,
-    head: &Head,
-    outcome: &Outcome<'a>,
-) -> GlbJson<'a> {
-    let Outcome {
-        armour,
-        animated,
-        summary,
-    } = *outcome;
-    GlbJson {
-        archive: json::path(archive),
-        chf: json::path(&args.file),
-        body: head.variant().code(),
-        rig: head.rig(),
-        skeleton: armour.skeleton_file(),
-        out: json::path(&args.out),
-        lod: args.lod,
-        parts: armour
-            .parts()
-            .iter()
-            .map(|part| PartJson {
-                name: part.name(),
-                origin: origin_code(part.origin()),
-                file: part.file(),
-                morph_targets: part.morphs().len(),
-            })
-            .collect(),
-        nodes: summary.nodes,
-        bones: summary.bones,
-        meshes: summary.meshes,
-        skinned_meshes: summary.skinned_meshes,
-        primitives: summary.primitives,
-        materials: summary.materials,
-        morph_targets: summary.morph_targets,
-        textured_materials: summary.textured_materials,
-        textures: summary.textures,
-        texture_pixels: summary.texture_pixels,
-        texture_fallbacks: summary
-            .texture_fallbacks
-            .iter()
-            .map(|fallback| FallbackJson {
-                material: &fallback.material,
-                role: fallback.role.name(),
-                file: &fallback.file,
-                reason: &fallback.reason,
-            })
-            .collect(),
-        default_material_ids: summary.default_material_ids,
-        vertices: summary.vertices,
-        triangles: summary.triangles,
-        bytes: summary.bytes,
-        skipped: armour
-            .issues()
-            .iter()
-            .filter(|issue| issue.kind().skips())
-            .count(),
-        animations: summary.animations.iter().map(WrittenJson::of).collect(),
-        issues: armour
-            .issues()
-            .iter()
-            .chain(animated.issues())
-            .map(IssueJson::from)
-            .collect(),
-    }
 }
 
 fn print_report(

@@ -5,18 +5,6 @@
 
 use serde_json::json;
 
-/// An embedded objective property named `variable` that holds `value`.
-pub(super) fn embedded_property(variable: &str, value: &serde_json::Value) -> serde_json::Value {
-    json!({
-        "kind": "embedded",
-        "variable": variable,
-        "token": null,
-        "contractProperty": null,
-        "value": value,
-        "linkedOutput": null
-    })
-}
-
 pub(super) fn npc_spawns() -> serde_json::Value {
     json!([{
         "guid": "e5000000-0000-4000-8000-000000000001",

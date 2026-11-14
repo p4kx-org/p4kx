@@ -293,3 +293,5 @@ fn chunk_sizes_beyond_the_file_are_rejected_without_overflow() {
         "a fmt chunk of 4 GiB"
     );
 }
+
+mod vorb_short;

@@ -73,8 +73,7 @@ impl<'f> Entities<'f> {
         } else if text.contains(['/', '\\']) {
             self.forge.records_at_path(text).filter(is_entity).collect()
         } else {
-            let class = strip_prefix_ignoring_case(text).unwrap_or(text);
-            self.class_candidates(class).to_vec()
+            self.named_class_candidates(text).to_vec()
         };
         match matches.as_slice() {
             [record] => Ok(*record),
@@ -93,6 +92,12 @@ impl<'f> Entities<'f> {
     #[must_use]
     pub fn by_class_name(&self, name: &str) -> Option<Record<'f>> {
         self.class_candidates(name).first().copied()
+    }
+
+    /// Returns all original Entity Records for an exact class name in definition order.
+    #[must_use]
+    pub fn named_class_candidates(&self, text: &str) -> &[Record<'f>] {
+        self.class_candidates(strip_prefix_ignoring_case(text).unwrap_or(text))
     }
 
     /// Returns every Entity with the class name `name` in definition order, ignoring ASCII case.

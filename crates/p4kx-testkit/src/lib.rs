@@ -35,6 +35,7 @@ mod entity_assembly;
 mod entity_assortment;
 mod entity_bone;
 mod entity_cargo;
+mod entity_cargo_grid_sample;
 mod entity_clothing;
 mod entity_creature;
 mod entity_creature_animated;
@@ -53,6 +54,7 @@ mod entity_npc;
 mod entity_npc_face;
 mod entity_npc_generic;
 mod entity_npc_zones;
+mod entity_package;
 mod entity_painted;
 mod entity_port;
 mod entity_prop_rig;
@@ -84,6 +86,9 @@ mod interior_lit;
 mod interior_sample;
 mod layout_v1;
 mod layout_v2;
+mod material_identity;
+mod material_reference;
+pub mod media_fixture;
 mod mesh_streams;
 mod model;
 mod model_crch;
@@ -95,9 +100,11 @@ mod model_skeleton;
 mod model_skin;
 mod model_zoned;
 mod mtl;
+pub mod offline_seam;
 mod opus;
 mod opus_encode;
 mod prefab;
+pub mod query_selection_sample;
 mod real_archive;
 mod reference_output;
 mod rig_logic;
@@ -147,18 +154,22 @@ pub use dna::{TestCell, TestControl, TestDeltaRecord, TestDna};
 pub use entity::TestEntity;
 pub use entity_armour::{armour_entries, armour_female_skeleton, armour_male_skeleton};
 pub use entity_armour_loadout::{ARMOUR_XML_LOADOUT, armour_xml_loadout};
-pub use entity_assembly::{ASSEMBLY_GUN_PAINT, assembly_entries, hologram_entries};
+pub use entity_assembly::{
+    ASSEMBLY_GUN_PAINT, assembly_entries, hologram_entries, hologram_suppression_entries,
+};
 pub use entity_assortment::{TestGroup, assortment_record, assortment_record_requiring};
 pub use entity_bone::{
     BONE_THRUSTER, bone_thruster_definition, bone_thruster_entries, bone_thruster_housing,
 };
 pub use entity_cargo::{TestCapacity, closed_container_record, open_container_record};
+pub use entity_cargo_grid_sample::cargo_grid_facility_database;
 pub use entity_clothing::{TestClothingCondition, TestZoneChunk, clothing_component};
 pub use entity_creature::{
     CREATURE, CREATURE_ANIMATED, CREATURE_ANIMATION_DATABASE_LOST, CREATURE_ANIMATION_NESTED_LOST,
-    CREATURE_ANIMATION_PARAMS_LOST, CREATURE_ASSORTED, CREATURE_COLLAR_LOST, CREATURE_COLLAR_NODED,
-    CREATURE_COLLARED, CREATURE_DEFINITION, CREATURE_HORNED, CREATURE_LOADOUT_LOST,
-    CREATURE_NO_SKELETON, CREATURE_SHORT_SKELETON, RIGGED_PROP, creature_entries,
+    CREATURE_ANIMATION_PARAMS_LOST, CREATURE_ANIMATION_SCOPED, CREATURE_ASSORTED,
+    CREATURE_COLLAR_LOST, CREATURE_COLLAR_NODED, CREATURE_COLLARED, CREATURE_DEFINITION,
+    CREATURE_HORNED, CREATURE_LOADOUT_LOST, CREATURE_NO_SKELETON, CREATURE_SHORT_SKELETON,
+    RIGGED_PROP, creature_entries,
 };
 pub use entity_dressed::{
     DRESSED_BROWS, DRESSED_EYES, DRESSED_EYES_MATERIAL, DRESSED_GONE_HAIR, DRESSED_HAIR,
@@ -204,6 +215,7 @@ pub use entity_npc_generic::{
 pub use entity_npc_zones::{
     NPC_ZONE_CLASS, NpcExtra, NpcZoneOptions, npc_jacketed_entries, npc_zone_entries,
 };
+pub use entity_package::check_entity_package_sources;
 pub use entity_painted::{
     PAINTED_FEMALE_PALETTE_GUID, PAINTED_LIBRARY_PALETTE, PAINTED_PALETTE_GUID, PAINTED_SUIT,
     painted_entries,
@@ -250,6 +262,8 @@ pub use interior_lit::{LIT_ROOM, lit_room_entries};
 pub use interior_sample::{
     INTERIOR_LAMP, INTERIOR_ROOT, INTERIOR_ROOT_NAME, interior_entries, lit_interior_entries,
 };
+pub use material_identity::material_identity_entries;
+pub use material_reference::{MATERIAL_REFERENCE_MODEL, material_reference_entries};
 pub use mesh_streams::{MeshStream, MeshStreams, mesh_streams};
 pub use model::{
     CUBE_CAPS_MATERIAL, CUBE_MATERIAL_LIBRARY, CUBE_MESH_OFFSET, CUBE_SIDES_MATERIAL, TestModel,
@@ -298,3 +312,10 @@ pub use test_key::{other_test_key, test_key};
 pub use timing::{BENCH_VAR, Timing, bench, bench_enabled, bench_once};
 pub use vorbis::{TestCodebook, TestVorbis};
 pub use wem::{TestCodec, TestWem, test_signal};
+
+/// Returns whether a synthetic graphics test requires an actual adapter.
+#[must_use]
+pub fn render_adapter_required() -> bool {
+    std::env::var_os("P4KX_REQUIRE_RENDER_ADAPTER").is_some()
+        || std::env::var_os("P4KX_REQUIRE_SOFTWARE_ADAPTER").is_some()
+}

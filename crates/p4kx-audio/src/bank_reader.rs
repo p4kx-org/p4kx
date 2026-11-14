@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::bank_object_fields::ObjectFields;
 use crate::{BankError, SectionId};
-
-const MAX_VARIABLE_LENGTH_BYTES: usize = 5;
 
 /// Reads little-endian fields from the body of one section, failing with a [`BankError`] that
 /// names the section.
@@ -32,31 +31,8 @@ impl<'a> SectionReader<'a> {
         Ok(byte)
     }
 
-    pub(crate) fn u16(&mut self) -> Result<u16, BankError> {
-        Ok(u16::from_le_bytes(self.array()?))
-    }
-
     pub(crate) fn u32(&mut self) -> Result<u32, BankError> {
         Ok(u32::from_le_bytes(self.array()?))
-    }
-
-    /// Reads a Wwise variable-length integer: 7 bits per byte, most significant first, the high
-    /// bit set on every byte but the last.
-    pub(crate) fn variable_length(&mut self) -> Result<u32, BankError> {
-        let mut value: u32 = 0;
-        for _ in 0..MAX_VARIABLE_LENGTH_BYTES {
-            let byte = self.u8()?;
-            value = value.checked_mul(0x80).ok_or_else(|| {
-                BankError::invalid(self.section, "a variable-length integer overflows")
-            })? | u32::from(byte & 0x7F);
-            if byte & 0x80 == 0 {
-                return Ok(value);
-            }
-        }
-        Err(BankError::invalid(
-            self.section,
-            "a variable-length integer is longer than 5 bytes",
-        ))
     }
 
     /// Skips `len` bytes and returns their range in the body.
@@ -74,22 +50,6 @@ impl<'a> SectionReader<'a> {
     pub(crate) fn bytes(&mut self, len: usize) -> Result<&'a [u8], BankError> {
         let range = self.skip(len)?;
         Ok(self.body.get(range).unwrap_or_default())
-    }
-
-    pub(crate) fn f64(&mut self) -> Result<f64, BankError> {
-        Ok(f64::from_le_bytes(self.array()?))
-    }
-
-    pub(crate) fn f32(&mut self) -> Result<f32, BankError> {
-        Ok(f32::from_le_bytes(self.array()?))
-    }
-
-    pub(crate) fn i32(&mut self) -> Result<i32, BankError> {
-        Ok(i32::from_le_bytes(self.array()?))
-    }
-
-    pub(crate) fn i16(&mut self) -> Result<i16, BankError> {
-        Ok(i16::from_le_bytes(self.array()?))
     }
 
     /// Takes the bytes up to the next zero byte and skips that byte.
@@ -124,5 +84,27 @@ impl<'a> SectionReader<'a> {
             self.body.len(),
             self.position as u64 + len as u64,
         )
+    }
+}
+
+impl ObjectFields for SectionReader<'_> {
+    type Error = BankError;
+
+    fn offset(&self) -> u64 {
+        self.position as u64
+    }
+
+    fn remaining_bytes(&self) -> u64 {
+        self.remaining() as u64
+    }
+
+    fn read_array<const N: usize>(&mut self) -> Result<[u8; N], Self::Error> {
+        self.array()
+    }
+
+    fn skip_bytes(&mut self, len: u64) -> Result<(), Self::Error> {
+        let len = usize::try_from(len)
+            .map_err(|_| BankError::invalid(self.section, "a list is longer than its body"))?;
+        self.skip(len).map(|_| ())
     }
 }

@@ -3,7 +3,13 @@
 
 use std::sync::Arc;
 
+use p4kx_extraction::{
+    ArchiveMaterialRead, EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource,
+};
 use p4kx_model::{MaterialStatus, Model, Transform};
+
+use crate::placement::BoneSelection;
+use crate::{Assembly, CdfAttachmentSite};
 
 /// A rigid model a part carries at a bone of its skeleton: a bone attachment of the character
 /// definition the part's geometry is, e.g. the housing of a thruster.
@@ -13,9 +19,14 @@ pub struct AttachedModel {
     pub(crate) bone: String,
     pub(crate) local: Transform,
     pub(crate) found: bool,
+    pub(crate) bone_selection: Option<BoneSelection>,
+    pub(crate) cdf_sources: Option<Arc<[CdfAttachmentSite]>>,
+    pub(crate) offset_used: bool,
     pub(crate) entry: String,
     pub(crate) model: Arc<Model>,
-    pub(crate) materials: Arc<MaterialStatus>,
+    pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) definition_origin: Option<EntryOrigin>,
+    pub(crate) materials: Arc<ArchiveMaterialRead>,
 }
 
 impl AttachedModel {
@@ -57,9 +68,58 @@ impl AttachedModel {
         &self.model
     }
 
+    /// Returns the original Archive reads of the model retained by this attachment.
+    #[must_use]
+    pub fn model_archive_sources(&self) -> &[ModelArchiveSource] {
+        &self.archive_sources
+    }
+
+    /// Returns the actual character definition that selected this attachment, if observed.
+    #[must_use]
+    pub const fn model_definition_origin(&self) -> Option<&EntryOrigin> {
+        self.definition_origin.as_ref()
+    }
+
+    /// Returns original CDF attributes retained for this attachment.
+    #[must_use]
+    pub fn cdf_sources(&self) -> &[CdfAttachmentSite] {
+        self.cdf_sources.as_deref().unwrap_or_default()
+    }
+
+    /// Returns whether the authored relative transform contributed to placement.
+    #[must_use]
+    pub const fn offset_used(&self) -> bool {
+        self.offset_used
+    }
+
+    /// Returns the original observations of the material library used by this attachment.
+    #[must_use]
+    pub fn material_archive_origins(&self) -> &MaterialArchiveOrigins {
+        &self.materials.origins
+    }
+
     /// Returns the material library the model is drawn with.
     #[must_use]
     pub fn materials(&self) -> &MaterialStatus {
-        &self.materials
+        &self.materials.status
+    }
+}
+
+impl Assembly {
+    /// Returns the bone attachments of all parts, each with the index of its part.
+    pub fn attached_models(&self) -> impl Iterator<Item = (usize, &AttachedModel)> {
+        self.indexed_attachments()
+            .map(|(part, _, attachment)| (part, attachment))
+    }
+
+    /// Returns each bone attachment with its owning part and local attachment ordinal.
+    pub fn indexed_attachments(&self) -> impl Iterator<Item = (usize, usize, &AttachedModel)> {
+        self.parts.iter().enumerate().flat_map(|(part, owner)| {
+            owner
+                .attachments()
+                .iter()
+                .enumerate()
+                .map(move |(ordinal, attachment)| (part, ordinal, attachment))
+        })
     }
 }

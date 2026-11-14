@@ -3,16 +3,21 @@
 
 use p4kx_extraction::cryxml;
 
-use crate::starmap_transform::Rotation;
+use crate::starmap_transform::{Rotation, Transform};
 
 /// An element of text XML or `CryXml`, read alike.
 pub(crate) trait Node<'d>: Copy {
+    fn original(self) -> Root<'d>;
     fn name(self) -> &'d str;
     fn attributes(self) -> impl Iterator<Item = (&'d str, &'d str)>;
     fn children(self) -> impl Iterator<Item = Self>;
 }
 
 impl<'d> Node<'d> for cryxml::Element<'d> {
+    fn original(self) -> Root<'d> {
+        Root::Cry(self)
+    }
+
     fn name(self) -> &'d str {
         cryxml::Element::name(self)
     }
@@ -27,6 +32,10 @@ impl<'d> Node<'d> for cryxml::Element<'d> {
 }
 
 impl<'d> Node<'d> for roxmltree::Node<'d, '_> {
+    fn original(self) -> Root<'d> {
+        Root::Text(self)
+    }
+
     fn name(self) -> &'d str {
         self.tag_name().name()
     }
@@ -83,6 +92,19 @@ impl<'b> Document<'b> {
         }
     }
 
+    /// Returns the original node position only for a node of this actual parse.
+    pub(crate) fn original_index(&self, node: Root<'_>) -> Option<u32> {
+        match (self, node) {
+            (Self::Cry(document), Root::Cry(element)) if element.is_from(document) => {
+                Some(element.index())
+            }
+            (Self::Text(document), Root::Text(node)) if std::ptr::eq(document, node.document()) => {
+                Some(node.id().get())
+            }
+            _ => None,
+        }
+    }
+
     /// Returns the root element.
     pub(crate) fn root(&self) -> Root<'_> {
         match self {
@@ -102,6 +124,10 @@ pub(crate) enum Root<'d> {
 }
 
 impl<'d> Node<'d> for Root<'d> {
+    fn original(self) -> Self {
+        self
+    }
+
     fn name(self) -> &'d str {
         match self {
             Self::Cry(element) => Node::name(element),
@@ -172,18 +198,41 @@ pub(crate) fn first_below<'d, N: Node<'d>>(node: N, name: &str) -> Option<N> {
     None
 }
 
-/// Returns the position and the rotation of a Child: `pos` as `x,y,z` (zero when absent) and
-/// `rot` as the quaternion `w,x,y,z` (none when absent); `None` for a value that is malformed.
-pub(crate) fn pose<'d>(child: impl Node<'d>) -> Option<([f64; 3], Rotation)> {
+/// The original Child coordinates and the transform used by the walk.
+#[derive(Clone, Copy)]
+pub(crate) struct AuthoredPose {
+    pub(crate) position: Option<[f64; 3]>,
+    pub(crate) rotation: Option<[f64; 4]>,
+    unit: Rotation,
+}
+
+impl AuthoredPose {
+    pub(crate) fn transform(self) -> Transform {
+        Transform {
+            position: self.position.unwrap_or([0.0; 3]),
+            rotation: self.unit,
+        }
+    }
+}
+
+/// Reads Child positions as x, y, z metres and quaternion rotations as w, x, y, z.
+pub(crate) fn pose<'d>(child: impl Node<'d>) -> Option<AuthoredPose> {
     let position = match attribute(child, "pos") {
-        Some(text) => numbers::<3>(text)?,
-        None => [0.0; 3],
+        Some(text) => Some(numbers::<3>(text)?),
+        None => None,
     };
-    let rotation = match attribute(child, "rot") {
-        Some(text) => Rotation::from_parts(numbers::<4>(text)?)?,
-        None => Rotation::IDENTITY,
+    let (rotation, unit) = match attribute(child, "rot") {
+        Some(text) => {
+            let parts = numbers::<4>(text)?;
+            (Some(parts), Rotation::from_parts(parts)?)
+        }
+        None => (None, Rotation::IDENTITY),
     };
-    Some((position, rotation))
+    Some(AuthoredPose {
+        position,
+        rotation,
+        unit,
+    })
 }
 
 fn numbers<const N: usize>(text: &str) -> Option<[f64; N]> {

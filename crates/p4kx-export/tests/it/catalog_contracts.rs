@@ -5,14 +5,40 @@
 
 use crate::contracts_fixture;
 
+#[path = "catalog_faction_identity.rs"]
+mod faction_identity;
+#[path = "catalog_local_contract_generators.rs"]
+mod local_generators;
+
+#[path = "catalog_location_configuration.rs"]
+mod location_configuration;
+#[path = "catalog_location_vocabulary.rs"]
+mod location_vocabulary;
+#[path = "catalog_mission_scenario_definitions.rs"]
+mod mission_scenario_definitions;
+#[path = "catalog_npc_spawn_definitions.rs"]
+mod npc_spawn_definitions;
+
+#[path = "catalog_mission_boards.rs"]
+mod mission_boards;
+
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, Filter, Kind, build_catalog};
+use p4kx_export::{
+    BuiltCatalog, CatalogOptions, CatalogPublicationMode, Filter, Kind, build_catalog,
+};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
-pub(crate) type TestResult = Result<(), Box<dyn Error>>;
+#[path = "catalog_contract_scenarios.rs"]
+mod scenarios;
+#[path = "catalog_contract_success_rewards.rs"]
+mod success_rewards;
+#[path = "../contract_v3/mod.rs"]
+pub(crate) mod v3;
+
+pub(crate) type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 pub(crate) fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
@@ -21,6 +47,7 @@ pub(crate) fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Bo
         Some(p4kx_testkit::test_key()),
     )?;
     let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
     let built = build_catalog(&archive, &options)?;
     let json = serde_json::from_slice(built.json())?;
@@ -31,16 +58,27 @@ pub(crate) fn entry<'a>(
     catalog: &'a Value,
     contract: &str,
     sub: Option<&str>,
-) -> Result<&'a Value, String> {
-    catalog["contracts"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|entry| {
-            entry["guid"] == contract
-                && entry["subContractGuid"] == sub.map_or(Value::Null, Value::from)
-        })
-        .ok_or_else(|| format!("{contract} {sub:?}"))
+) -> TestResult<&'a Value> {
+    let mut found = None;
+    for row in v3::rows(catalog)? {
+        if v3::identity(row)? == (contract, sub) && found.replace(row).is_some() {
+            return Err(format!("duplicate contract {contract} {sub:?}").into());
+        }
+    }
+    found.ok_or_else(|| format!("missing contract {contract} {sub:?}").into())
+}
+
+pub(crate) fn text<'a>(catalog: &'a Value, row: &Value, field: &str) -> TestResult<v3::Text<'a>> {
+    v3::Projections::read(catalog)?.text(row, field)
+}
+
+pub(crate) fn entry_by_level(catalog: &Value, sub: bool) -> TestResult<&Value> {
+    for row in v3::rows(catalog)? {
+        if v3::identity(row)?.1.is_some() == sub {
+            return Ok(row);
+        }
+    }
+    Err("missing contract entry for the requested level".into())
 }
 
 pub(crate) const A: &str = "20000000-0000-4000-8000-000000000001";
@@ -57,17 +95,10 @@ const SUB_TWO: &str = "30000000-0000-4000-8000-000000000002";
 #[test]
 fn a_contract_and_each_sub_contract_is_an_entry_ordered_by_guid() -> TestResult {
     let (built, catalog) = build(None)?;
-    let keys: Vec<(&str, Option<&str>)> = catalog["contracts"]
-        .as_array()
-        .ok_or("contracts")?
+    let keys = v3::rows(&catalog)?
         .iter()
-        .map(|entry| {
-            (
-                entry["guid"].as_str().unwrap_or_default(),
-                entry["subContractGuid"].as_str(),
-            )
-        })
-        .collect();
+        .map(v3::identity)
+        .collect::<TestResult<Vec<_>>>()?;
     assert_eq!(
         keys,
         [
@@ -96,9 +127,10 @@ fn a_contract_and_each_sub_contract_is_an_entry_ordered_by_guid() -> TestResult 
 #[test]
 fn a_pair_a_later_generator_record_repeats_is_skipped_and_the_first_record_wins() -> TestResult {
     let (_, catalog) = build(None)?;
+    let projections = v3::Projections::read(&catalog)?;
     for sub in [None, Some(SUB_ONE)] {
         assert_eq!(
-            entry(&catalog, A, sub)?["recordGuid"],
+            projections.header(entry(&catalog, A, sub)?, "guid")?,
             "10000000-0000-4000-8000-000000000001",
             "{sub:?}"
         );
@@ -124,7 +156,8 @@ fn a_template_reference_that_resolves_to_nothing_leaves_the_template_data_out() 
         "a reference to no Record is not a template"
     );
     assert_eq!(
-        dangling["title"]["en"], "Handler Title",
+        text(&catalog, dangling, "title")?.en,
+        Some("Handler Title"),
         "the override still applies"
     );
     assert_eq!(dangling["missionTypeGuid"], Value::Null);
@@ -140,7 +173,7 @@ fn a_template_outside_the_template_folder_is_found_by_its_type() -> TestResult {
         stray["templateGuid"],
         "40000000-0000-4000-8000-000000000003"
     );
-    assert_eq!(stray["title"]["en"], "Plain Title");
+    assert_eq!(text(&catalog, stray, "title")?.en, Some("Plain Title"));
     assert_eq!(stray["missionType"]["en"], "Delivery");
     Ok(())
 }
@@ -149,8 +182,8 @@ fn a_template_outside_the_template_folder_is_found_by_its_type() -> TestResult {
 fn an_organisation_token_without_a_variant_takes_the_only_string_variant_else_none() -> TestResult {
     let (_, catalog) = build(None)?;
     assert_eq!(
-        entry(&catalog, I, None)?["title"]["en"],
-        "By [SEVERAL] and Solo Corp",
+        text(&catalog, entry(&catalog, I, None)?, "title")?.en,
+        Some("By [SEVERAL] and Solo Corp"),
         "an organisation with several variants states no choice"
     );
     Ok(())
@@ -161,8 +194,8 @@ fn a_replacement_that_holds_a_token_is_expanded_and_the_contractor_is_the_neares
 -> TestResult {
     let (_, catalog) = build(None)?;
     assert_eq!(
-        entry(&catalog, D, None)?["title"]["en"],
-        "Pre Wrapped [LOCATION]",
+        text(&catalog, entry(&catalog, D, None)?, "title")?.en,
+        Some("Pre Wrapped [LOCATION]"),
         "a token inside the text of a replacement is resolved too"
     );
     assert_eq!(
@@ -183,7 +216,7 @@ fn a_contract_without_a_template_takes_title_type_and_place_from_its_broker_entr
     let (_, catalog) = build(None)?;
     let brokered = entry(&catalog, E, None)?;
     assert_eq!(brokered["templateGuid"], Value::Null);
-    assert_eq!(brokered["title"]["en"], "Broker Haul");
+    assert_eq!(text(&catalog, brokered, "title")?.en, Some("Broker Haul"));
     assert_eq!(brokered["missionType"]["en"], "Delivery");
     assert_eq!(places(brokered), [("Planet", "Hurston")]);
     Ok(())
@@ -223,7 +256,7 @@ fn places(entry: &Value) -> Vec<(&str, &str)> {
 }
 
 #[test]
-fn the_pickup_places_put_the_system_and_planets_first_skip_stars_and_stop_at_five() -> TestResult {
+fn the_pickup_places_put_the_system_and_planets_first_and_keep_every_non_star() -> TestResult {
     let (_, catalog) = build(None)?;
     assert_eq!(
         places(entry(&catalog, A, None)?),
@@ -244,7 +277,11 @@ fn the_pickup_places_put_the_system_and_planets_first_skip_stars_and_stop_at_fiv
         entry(&catalog, A, None)?["pickupPlaces"],
         "a sub contract without places takes the contract's"
     );
-    assert_eq!(places(entry(&catalog, B, None)?).len(), 5, "at most five");
+    assert_eq!(
+        places(entry(&catalog, B, None)?).len(),
+        7,
+        "every eligible original place"
+    );
     assert_eq!(places(entry(&catalog, C, None)?), [], "none named");
     Ok(())
 }
@@ -252,24 +289,30 @@ fn the_pickup_places_put_the_system_and_planets_first_skip_stars_and_stop_at_fiv
 #[test]
 fn the_title_resolves_tokens_and_writes_placeholders_for_what_the_game_picks() -> TestResult {
     let (_, catalog) = build(None)?;
+    let projections = v3::Projections::read(&catalog)?;
+    let parent = projections.text(entry(&catalog, A, None)?, "title")?;
     assert_eq!(
-        entry(&catalog, A, None)?["title"],
-        json!({
-            "key": "@title_a",
-            "en": "Deliver Scrap to [LOCATION] for Acme Corp [MISSING]",
-            "de": "Liefere [CARGO] nach [LOCATION] fuer Acme GmbH",
-        }),
+        parent,
+        v3::Text {
+            key: Some("@title_a"),
+            en: Some("Deliver Scrap to [LOCATION] for Acme Corp [MISSING]"),
+            de: Some("Liefere [CARGO] nach [LOCATION] fuer Acme GmbH"),
+        },
         "the contract's property wins over the template's; the variant picks the tagged string; \
          an unknown token and a key without a text become [TOKEN]; blanks are trimmed"
     );
     assert_eq!(
-        entry(&catalog, A, Some(SUB_ONE))?["title"],
-        json!({"key": "@title_sub", "en": "Stop [TARGET] in [SHIP]", "de": null}),
+        projections.text(entry(&catalog, A, Some(SUB_ONE))?, "title")?,
+        v3::Text {
+            key: Some("@title_sub"),
+            en: Some("Stop [TARGET] in [SHIP]"),
+            de: None
+        },
         "the sub contract's own title"
     );
     assert_eq!(
-        entry(&catalog, A, Some(SUB_TWO))?["title"],
-        entry(&catalog, A, None)?["title"],
+        projections.text(entry(&catalog, A, Some(SUB_TWO))?, "title")?,
+        parent,
         "a sub contract without a title takes the contract's"
     );
     Ok(())
@@ -279,13 +322,17 @@ fn the_title_resolves_tokens_and_writes_placeholders_for_what_the_game_picks() -
 fn the_title_falls_back_to_the_handler_and_then_the_template() -> TestResult {
     let (_, catalog) = build(None)?;
     assert_eq!(
-        entry(&catalog, B, None)?["title"],
-        json!({"key": "@title_template", "en": "Plain Delivery", "de": null}),
+        text(&catalog, entry(&catalog, B, None)?, "title")?,
+        v3::Text {
+            key: Some("@title_template"),
+            en: Some("Plain Delivery"),
+            de: None
+        },
         "the template's first display string, trimmed"
     );
     assert_eq!(
-        entry(&catalog, C, None)?["title"]["en"],
-        "Handler Title",
+        text(&catalog, entry(&catalog, C, None)?, "title")?.en,
+        Some("Handler Title"),
         "the handler's title wins over the template's"
     );
     Ok(())
@@ -317,54 +364,16 @@ fn the_mission_type_is_the_nearest_override_else_the_template_type() -> TestResu
 }
 
 #[test]
-fn only_the_reputation_a_contract_grants_on_success_is_listed() -> TestResult {
-    let (_, catalog) = build(None)?;
-    assert_eq!(
-        entry(&catalog, A, None)?["reputationGains"],
-        json!([
-            {
-                "factionReputationGuid": "60000000-0000-4000-8000-000000000001",
-                "factionReputationName": "acme",
-                "scopeGuid": "60000000-0000-4000-8000-000000000002",
-                "scopeName": "faction",
-                "amount": 200,
-            },
-            {
-                "factionReputationGuid": "60000000-0000-4000-8000-000000000001",
-                "factionReputationName": "acme",
-                "scopeGuid": "60000000-0000-4000-8000-000000000003",
-                "scopeName": "affinity",
-                "amount": 50,
-            },
-        ]),
-        "faction and affinity scope; the failure result with -100 is not listed"
-    );
-    assert_eq!(entry(&catalog, B, None)?["reputationGains"], json!([]));
-    Ok(())
-}
-
-#[test]
-fn a_payout_the_contract_states_is_listed_as_stored_and_only_for_success() -> TestResult {
-    let (_, catalog) = build(None)?;
-    assert_eq!(
-        entry(&catalog, A, None)?["fixedRewards"],
-        json!([
-            {"currency": "UEC", "amount": 40000, "max": 0, "plusBonuses": false},
-            {"currency": null, "amount": 7, "max": null, "plusBonuses": null}
-        ]),
-        "the failure payout of 1000 is not listed; fields the reward lacks are null"
-    );
-    assert_eq!(entry(&catalog, B, None)?["fixedRewards"], json!([]));
-    Ok(())
-}
-
-#[test]
 fn an_entry_carries_its_record_template_handler_and_flags() -> TestResult {
     let (_, catalog) = build(None)?;
     let first = entry(&catalog, A, None)?;
-    assert_eq!(first["recordGuid"], "10000000-0000-4000-8000-000000000001");
+    let projections = v3::Projections::read(&catalog)?;
     assert_eq!(
-        first["recordPath"],
+        projections.header(first, "guid")?,
+        "10000000-0000-4000-8000-000000000001"
+    );
+    assert_eq!(
+        projections.header(first, "recordPath")?,
         "libs/foundry/records/contracts/contractgenerator/delivery"
     );
     assert_eq!(first["debugName"], "Deliver_A");
@@ -381,7 +390,7 @@ fn a_filter_that_matches_no_generator_leaves_no_contract_and_marks_the_kind_part
 {
     let filter = Filter::new("no_such_generator");
     let (built, catalog) = build(Some(&filter))?;
-    assert_eq!(catalog["contracts"], json!([]));
+    assert!(v3::rows(&catalog)?.is_empty(), "no contract projection");
     assert_eq!(
         built
             .summary()

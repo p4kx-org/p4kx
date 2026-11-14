@@ -2917,6 +2917,7 @@ dependencies = [
  "cfg-if",
  "cfg_aliases",
  "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -3500,6 +3501,7 @@ version = "0.4.2"
 dependencies = [
  "anyhow",
  "assert_cmd",
+ "base64",
  "clap",
  "crc32fast",
  "ctrlc",
@@ -3514,11 +3516,13 @@ dependencies = [
  "p4kx-comparison",
  "p4kx-export",
  "p4kx-extraction",
+ "p4kx-media",
  "p4kx-render",
  "p4kx-screens",
  "p4kx-search",
  "p4kx-settings",
  "p4kx-testkit",
+ "p4kx-update",
  "png",
  "predicates",
  "roxmltree",
@@ -3571,6 +3575,7 @@ dependencies = [
  "p4kx-testkit",
  "rayon",
  "roxmltree",
+ "serde_json",
  "sha2",
  "tempfile",
  "thiserror 2.0.21",
@@ -3582,7 +3587,6 @@ version = "0.4.2"
 dependencies = [
  "lewton",
  "opus-pure",
- "p4kx-foundation",
  "p4kx-testkit",
  "rayon",
  "thiserror 2.0.21",
@@ -3592,7 +3596,10 @@ dependencies = [
 name = "p4kx-blender"
 version = "0.4.2"
 dependencies = [
+ "base64",
+ "crc32c",
  "crc32fast",
+ "flate2",
  "jsonschema",
  "p4kx-assembly",
  "p4kx-chunks",
@@ -3619,6 +3626,7 @@ dependencies = [
  "p4kx-archive",
  "p4kx-settings",
  "p4kx-testkit",
+ "same-file",
  "serde_json",
  "tempfile",
 ]
@@ -3718,6 +3726,7 @@ dependencies = [
  "crc32c",
  "crc32fast",
  "exr",
+ "jsonschema",
  "lewton",
  "p4kx-archive",
  "p4kx-audio",
@@ -3735,9 +3744,11 @@ dependencies = [
  "png",
  "rayon",
  "roxmltree",
+ "same-file",
  "schemars",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror 2.0.21",
 ]
@@ -3746,6 +3757,7 @@ dependencies = [
 name = "p4kx-foundation"
 version = "0.4.2"
 dependencies = [
+ "dirs",
  "thiserror 2.0.21",
 ]
 
@@ -3786,10 +3798,15 @@ dependencies = [
 name = "p4kx-guard"
 version = "0.4.2"
 dependencies = [
+ "nix",
  "p4kx-channels",
+ "rustix 1.1.5",
  "same-file",
+ "serde",
  "tempfile",
  "thiserror 2.0.21",
+ "uds_windows",
+ "zbus",
 ]
 
 [[package]]
@@ -3853,9 +3870,11 @@ dependencies = [
  "clap",
  "p4kx-assembly",
  "p4kx-channels",
+ "p4kx-export",
  "p4kx-extraction",
  "p4kx-settings",
  "p4kx-testkit",
+ "p4kx-update",
  "rayon",
  "rmcp",
  "schemars",
@@ -3864,6 +3883,25 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
+]
+
+[[package]]
+name = "p4kx-media"
+version = "0.4.2"
+dependencies = [
+ "crc32fast",
+ "jsonschema",
+ "p4kx-assembly",
+ "p4kx-extraction",
+ "p4kx-gltf",
+ "p4kx-shader",
+ "p4kx-testkit",
+ "schemars",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
 ]
 
 [[package]]
@@ -3879,6 +3917,17 @@ dependencies = [
  "rayon",
  "roxmltree",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "p4kx-msi-path"
+version = "0.4.2"
+dependencies = [
+ "getrandom 0.4.3",
+ "serde",
+ "serde_json",
+ "windows-sys 0.61.2",
+ "winreg",
 ]
 
 [[package]]
@@ -3939,6 +3988,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "p4kx-shader"
+version = "0.4.2"
+dependencies = [
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "p4kx-testkit"
 version = "0.4.2"
 dependencies = [
@@ -3947,7 +4003,6 @@ dependencies = [
  "cbc",
  "crc32c",
  "crc32fast",
- "dirs",
  "flate2",
  "gltf",
  "half",
@@ -3956,6 +4011,8 @@ dependencies = [
  "p4kx-foundation",
  "png",
  "ruzstd",
+ "same-file",
+ "serde_json",
  "sha2",
  "tempfile",
 ]
@@ -3972,6 +4029,8 @@ dependencies = [
  "p4kx-testkit",
  "png",
  "rayon",
+ "schemars",
+ "serde",
  "thiserror 2.0.21",
 ]
 
@@ -3982,6 +4041,7 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
+ "tempfile",
  "thiserror 2.0.21",
  "ureq",
 ]
@@ -6477,6 +6537,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
 dependencies = [
  "memchr",
+]
+
+[[package]]
+name = "winreg"
+version = "0.56.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d6f32a0ff4a9f6f01231eb2059cc85479330739333e0e58cadf03b6af2cca10"
+dependencies = [
+ "cfg-if",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

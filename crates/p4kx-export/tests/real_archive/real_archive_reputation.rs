@@ -8,10 +8,13 @@ use std::collections::HashSet;
 use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
+
+use crate::catalog_v3_consumer;
+use crate::real_archive_verification::guids as canonical_guids;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -51,6 +54,51 @@ fn named<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, B
         .ok_or_else(|| format!("{kind} has no {class}").into())
 }
 
+fn faction<'catalog>(
+    catalog: &'catalog Value,
+    class: &str,
+) -> Result<&'catalog Value, Box<dyn Error>> {
+    catalog_v3_consumer::rows(catalog, Kind::FactionReputations)?
+        .iter()
+        .find(|row| {
+            text(row, "/className/value").is_some_and(|name| name.eq_ignore_ascii_case(class))
+        })
+        .ok_or_else(|| format!("faction reputation {class} is missing").into())
+}
+
+fn faction_lawful(owner: &Value) -> Option<bool> {
+    let property = owner
+        .pointer("/propertiesBb/value")?
+        .as_array()?
+        .iter()
+        .find(|slot| text(slot, "/value/name/value") == Some("entityLawful"))?;
+    let body = property.pointer("/value/dynamicProperty/value")?;
+    if text(body, "/kind") != Some("boolean") {
+        return None;
+    }
+    body.pointer("/value/value").and_then(Value::as_bool)
+}
+
+fn faction_name<'catalog>(catalog: &'catalog Value, owner: &Value) -> Option<&'catalog str> {
+    let id = text(owner, "/displayName/value")?;
+    let row = catalog
+        .pointer("/texts/gameTexts")?
+        .as_array()?
+        .iter()
+        .find(|row| text(row, "/id/value") == Some(id))?;
+    text(row, "/translations/value/en/displayText/value")
+}
+
+fn references<'owner>(owner: &'owner Value, field: &str) -> impl Iterator<Item = &'owner str> {
+    owner
+        .get(field)
+        .and_then(|carrier| carrier.get("value"))
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|slot| text(slot, "/value/guid/value"))
+}
+
 fn text<'c>(entry: &'c Value, pointer: &str) -> Option<&'c str> {
     entry.pointer(pointer).and_then(Value::as_str)
 }
@@ -80,25 +128,59 @@ fn assert_resolve<'c>(
 
 /// Asserts that the standings of every scope and the scopes of every context are kept Records.
 fn check_ladders(catalog: &Value, scopes: &HashSet<&str>, standings: &HashSet<&str>) -> TestResult {
-    for scope in list(catalog, "reputationScopes")? {
+    for scope in catalog_v3_consumer::rows(catalog, Kind::ReputationScopes)? {
         assert_resolve(
             "the standings of a scope",
-            strings(scope, "standingGuids"),
+            scope
+                .pointer("/standingMap/value/standings/value")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|link| text(link, "/value/guid/value")),
             standings,
         );
     }
-    for context in list(catalog, "reputationContexts")? {
+    for context in catalog_v3_consumer::rows(catalog, Kind::ReputationContexts)? {
         assert_resolve(
             "the scopes of a context",
-            strings(context, "scopeGuids"),
+            context
+                .pointer("/scopeContextList/value")
+                .and_then(Value::as_array)
+                .into_iter()
+                .flatten()
+                .filter_map(|slot| text(slot, "/value/scope/value/guid/value")),
             scopes,
         );
         assert_resolve(
             "the primary scope",
-            text(context, "/primaryScopeGuid"),
+            text(context, "/primaryScopeContext/value/scope/value/guid/value"),
             scopes,
         );
     }
+    Ok(())
+}
+
+fn check_faction_samples(catalog: &Value) -> TestResult {
+    let wikelo = faction(catalog, "FactionReputation_Wikelo")?;
+    assert_eq!(
+        faction_lawful(wikelo),
+        Some(true),
+        "the entityLawful property"
+    );
+    assert!(
+        faction_name(catalog, wikelo).is_some_and(|name| !name.is_empty()),
+        "a name"
+    );
+    let headhunters = faction(catalog, "FactionReputation_Unlawful_Headhunters")?;
+    assert_eq!(
+        faction_lawful(headhunters),
+        Some(false),
+        "the original entityLawful value"
+    );
+    assert!(
+        references(headhunters, "enemies").next().is_some(),
+        "the Headhunters have enemies"
+    );
     Ok(())
 }
 
@@ -106,11 +188,11 @@ fn check_ladders(catalog: &Value, scopes: &HashSet<&str>, standings: &HashSet<&s
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_factions_and_their_reputation_ladders_of_a_real_archive_are_linked() -> TestResult {
     let catalog = catalog()?;
-    let factions = list(&catalog, "factionReputations")?;
-    let scopes = guids(&catalog, "reputationScopes")?;
-    let standings = guids(&catalog, "reputationStandings")?;
-    let contexts = guids(&catalog, "reputationContexts")?;
-    let faction_guids = guids(&catalog, "factionReputations")?;
+    let factions = catalog_v3_consumer::rows(&catalog, Kind::FactionReputations)?;
+    let scopes = canonical_guids(&catalog, "reputationScopes")?;
+    let standings = canonical_guids(&catalog, "reputationStandings")?;
+    let contexts = canonical_guids(&catalog, "reputationContexts")?;
+    let faction_guids = canonical_guids(&catalog, "factionReputations")?;
     print_line(&format!(
         "{} factions, {} scopes, {} standings, {} contexts",
         factions.len(),
@@ -122,43 +204,37 @@ fn the_factions_and_their_reputation_ladders_of_a_real_archive_are_linked() -> T
     assert!(scopes.len() >= 30, "the scopes");
     assert!(standings.len() >= 300, "the standings");
 
-    let wikelo = named(&catalog, "factionReputations", "FactionReputation_Wikelo")?;
-    print_line(&format!("faction sample: {wikelo}"));
-    assert_eq!(wikelo["lawful"], true, "the entityLawful property");
-    assert!(
-        text(wikelo, "/displayName/en").is_some_and(|name| !name.is_empty()),
-        "a name"
-    );
-    let headhunters = named(
-        &catalog,
-        "factionReputations",
-        "FactionReputation_Unlawful_Headhunters",
-    )?;
-    assert_eq!(headhunters["lawful"], false);
-    assert!(
-        !strings(headhunters, "enemyGuids").is_empty(),
-        "the Headhunters have enemies"
-    );
+    check_faction_samples(&catalog)?;
 
     for faction in factions {
-        assert_resolve("the allies", strings(faction, "allyGuids"), &faction_guids);
+        assert_resolve("the allies", references(faction, "allies"), &faction_guids);
         assert_resolve(
             "the enemies",
-            strings(faction, "enemyGuids"),
+            references(faction, "enemies"),
             &faction_guids,
         );
-        assert_resolve("the context", text(faction, "/contextGuid"), &contexts);
-        for relation in ["hostility", "allied"] {
-            let scope = text(faction, &format!("/{relation}/scopeGuid"));
-            let standing = text(faction, &format!("/{relation}/standingGuid"));
+        assert_resolve(
+            "the context",
+            text(faction, "/reputationContextPropertiesUi/value/guid/value"),
+            &contexts,
+        );
+        for relation in ["hostilityParams", "alliedParams"] {
+            let scope = text(
+                faction,
+                &format!("/{relation}/value/scope/value/guid/value"),
+            );
+            let standing = text(
+                faction,
+                &format!("/{relation}/value/standing/value/guid/value"),
+            );
             assert_resolve("the scope of a relation", scope, &scopes);
             assert_resolve("the standing of a relation", standing, &standings);
         }
     }
     check_ladders(&catalog, &scopes, &standings)?;
-    let ranked = list(&catalog, "reputationStandings")?
+    let ranked = catalog_v3_consumer::rows(&catalog, Kind::ReputationStandings)?
         .iter()
-        .filter(|standing| standing["minReputation"].is_i64())
+        .filter(|standing| standing["minReputation"]["state"] == "present")
         .count();
     assert_eq!(ranked, standings.len(), "every standing has a minimum");
     Ok(())
@@ -191,11 +267,11 @@ fn check_requirement(requirement: &Value, [factions, scopes, standings]: [&HashS
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn a_contract_of_a_real_archive_names_its_type_and_standing_range() -> TestResult {
     let catalog = catalog()?;
-    let contracts = list(&catalog, "contracts")?;
+    let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let types = guids(&catalog, "missionTypes")?;
-    let standings = guids(&catalog, "reputationStandings")?;
-    let scopes = guids(&catalog, "reputationScopes")?;
-    let factions = guids(&catalog, "factionReputations")?;
+    let standings = canonical_guids(&catalog, "reputationStandings")?;
+    let scopes = canonical_guids(&catalog, "reputationScopes")?;
+    let factions = canonical_guids(&catalog, "factionReputations")?;
     let ranged: Vec<&Value> = contracts
         .iter()
         .filter(|entry| entry["minStandingGuid"].is_string())
@@ -234,8 +310,8 @@ fn a_contract_of_a_real_archive_names_its_type_and_standing_range() -> TestResul
         "reputation prerequisites: {requirements}"
     );
     let wikelo_guid = text(
-        named(&catalog, "factionReputations", "FactionReputation_Wikelo")?,
-        "/guid",
+        faction(&catalog, "FactionReputation_Wikelo")?,
+        "/guid/value",
     );
     let wikelo = contracts
         .iter()
@@ -271,9 +347,9 @@ fn mission_types_localities_and_scenarios_of_a_real_archive_are_linked() -> Test
     let types = list(&catalog, "missionTypes")?;
     let localities = list(&catalog, "missionLocalities")?;
     let scenarios = list(&catalog, "contractScenarios")?;
-    let objects = guids(&catalog, "starmapObjects")?;
+    let objects = canonical_guids(&catalog, "starmapObjects")?;
     let pools = guids(&catalog, "blueprintPools")?;
-    let factions = guids(&catalog, "factionReputations")?;
+    let factions = canonical_guids(&catalog, "factionReputations")?;
     print_line(&format!(
         "{} mission types, {} localities, {} scenarios",
         types.len(),

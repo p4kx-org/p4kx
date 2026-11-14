@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashMap;
+
+use p4kx_dataforge::Guid;
 use p4kx_extraction::{Archive, Entry, PathIndex};
 
 use super::EntityInterior;
 use super::budget::Budget;
 use super::lookup::{check_tree, find, node_path};
+use crate::interior::tile_light::TileLightOwner;
 use crate::{
-    Assembly, AssemblyError, EntityNode, Interior, InteriorForge, InteriorOptions,
-    InteriorProgress, InteriorWatch, IssueKind, ModelProvider, ObjectContainerRef,
+    Assembly, AssemblyError, Attachment, ContainerSource, EntityNode, Interior, InteriorForge,
+    InteriorOptions, InteriorProgress, InteriorWatch, IssueKind, ModelProvider, ObjectContainerRef,
 };
 
 impl EntityInterior {
@@ -92,6 +96,7 @@ impl EntityInterior {
         let index = PathIndex::new(archive);
         let mut built = Self::default();
         let budget = Budget::new(assembly, options);
+        let owners = vehicle_owners(tree);
         let total = assembly.containers.iter().map(|list| list.len()).sum();
         let named = assembly
             .containers
@@ -112,18 +117,32 @@ impl EntityInterior {
             let Some((entry, opened)) = built.open(archive, &index, &at, reference)? else {
                 continue;
             };
-            let model = owner.and_then(|owner| owner.model());
+            let model = owner.and_then(crate::Part::model);
+            let owner_path = owner.map_or("", crate::Part::path);
             let placement = built.place(&at, reference, model);
             let limited = budget.options(&built);
-            let interior = Interior::build_with_models(
+            let tile_owner =
+                (reference.source() == ContainerSource::Vehicle).then(|| TileLightOwner {
+                    frame: placement.tile_owner,
+                    container_helper_node: placement.helper_node,
+                    model,
+                    vehicle: owner.and_then(|part| {
+                        owners
+                            .get(owner_path)
+                            .and_then(|by_guid| by_guid.get(&part.guid()))
+                            .copied()
+                            .flatten()
+                    }),
+                });
+            let interior = Interior::build_owned(
                 &[archive, &opened],
                 entry.path(),
                 &limited,
                 watch,
                 (forge, models),
+                tile_owner,
             )?;
-            let owner_path = owner.map_or("", |owner| owner.path());
-            built.add(part, owner_path, reference, placement, interior);
+            built.add(part, owner_path, reference, placement.transform, interior);
         }
         Ok(built)
     }
@@ -163,4 +182,30 @@ impl EntityInterior {
             }
         }
     }
+}
+
+type VehicleOwners<'a> = HashMap<String, HashMap<Guid, Option<&'a crate::VehicleImplementation>>>;
+fn vehicle_owners(tree: &EntityNode) -> VehicleOwners<'_> {
+    let mut owners = HashMap::new();
+    if let Some(vehicle) = tree.vehicle() {
+        owners
+            .entry(String::new())
+            .or_insert_with(HashMap::new)
+            .insert(tree.guid(), Some(vehicle));
+    }
+    tree.visit_ports(|path, route| {
+        let Some(node) = route.last().and_then(|port| match port.attachment() {
+            Attachment::Entity(node) => Some(node.as_ref()),
+            _ => None,
+        }) else {
+            return;
+        };
+        owners
+            .entry(path.to_owned())
+            .or_insert_with(HashMap::new)
+            .entry(node.guid())
+            .and_modify(|selected| *selected = None)
+            .or_insert_with(|| node.vehicle());
+    });
+    owners
 }

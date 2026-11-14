@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_model::{Animation, AnimationError, AnimationHeader, Dba, DbaHeaders, SkippedAnimation};
+use p4kx_model::{
+    Animation, AnimationDatabaseSelection, AnimationError, AnimationHeader, Dba, DbaHeaders,
+    PositionedAnimation, SkippedAnimation,
+};
 
 use crate::{ChunkSource, ConversionError, UnreadAnimation};
 
@@ -30,6 +33,17 @@ pub(crate) fn kind(path: &str) -> Option<Kind> {
 pub(crate) struct Loaded<T> {
     pub(crate) animations: Vec<T>,
     pub(crate) unread: Vec<UnreadAnimation>,
+    pub(crate) database: Option<AnimationDatabaseSelection>,
+}
+
+impl<T> Loaded<T> {
+    const fn new(animations: Vec<T>, unread: Vec<UnreadAnimation>) -> Self {
+        Self {
+            animations,
+            unread,
+            database: None,
+        }
+    }
 }
 
 pub(crate) trait Described {
@@ -47,6 +61,20 @@ impl Described for Animation {
     }
     fn additive(&self) -> bool {
         self.additive
+    }
+}
+
+impl Described for PositionedAnimation {
+    fn name(&self) -> &str {
+        self.animation().name()
+    }
+
+    fn path(&self) -> &str {
+        self.animation().path()
+    }
+
+    fn additive(&self) -> bool {
+        self.animation().additive()
     }
 }
 
@@ -91,15 +119,36 @@ pub(crate) fn load(
 ) -> Result<Loaded<Animation>, ConversionError> {
     let name = file_name(label);
     match kind {
-        Kind::Caf => Ok(Loaded {
-            animations: vec![Animation::read_caf(name, source.file()).map_err(failed(label))?],
-            unread: Vec::new(),
-        }),
+        Kind::Caf => {
+            let clip = Animation::read_caf(name, source.file()).map_err(failed(label))?;
+            Ok(Loaded::new(vec![clip], Vec::new()))
+        }
         Kind::Dba => {
             let dba = Dba::read(name, source.file()).map_err(failed(label))?;
+            Ok(Loaded::new(dba.animations, skipped(label, dba.skipped)))
+        }
+    }
+}
+
+pub(crate) fn load_with_positions(
+    source: &ChunkSource,
+    label: &str,
+    kind: Kind,
+) -> Result<Loaded<PositionedAnimation>, ConversionError> {
+    let name = file_name(label);
+    match kind {
+        Kind::Caf => {
+            let clip =
+                Animation::read_caf_with_positions(name, source.file()).map_err(failed(label))?;
+            Ok(Loaded::new(vec![clip], Vec::new()))
+        }
+        Kind::Dba => {
+            let dba = Dba::read_with_positions(name, source.file()).map_err(failed(label))?;
+            let database = dba.selection().cloned();
             Ok(Loaded {
-                unread: skipped(label, dba.skipped),
                 animations: dba.animations,
+                unread: skipped(label, dba.skipped),
+                database,
             })
         }
     }
@@ -112,18 +161,13 @@ pub(crate) fn load_headers(
 ) -> Result<Loaded<AnimationHeader>, ConversionError> {
     let name = file_name(label);
     match kind {
-        Kind::Caf => Ok(Loaded {
-            animations: vec![
-                AnimationHeader::read_caf(name, source.file()).map_err(failed(label))?,
-            ],
-            unread: Vec::new(),
-        }),
+        Kind::Caf => {
+            let clip = AnimationHeader::read_caf(name, source.file()).map_err(failed(label))?;
+            Ok(Loaded::new(vec![clip], Vec::new()))
+        }
         Kind::Dba => {
             let dba = DbaHeaders::read(name, source.file()).map_err(failed(label))?;
-            Ok(Loaded {
-                unread: skipped(label, dba.skipped),
-                animations: dba.animations,
-            })
+            Ok(Loaded::new(dba.animations, skipped(label, dba.skipped)))
         }
     }
 }
@@ -138,14 +182,14 @@ pub(crate) fn load_listed(
         return load_headers(source, label, kind);
     }
     let loaded = load(source, label, kind)?;
-    Ok(Loaded {
-        animations: loaded
+    Ok(Loaded::new(
+        loaded
             .animations
             .iter()
             .map(AnimationHeader::of_animation)
             .collect(),
-        unread: loaded.unread,
-    })
+        loaded.unread,
+    ))
 }
 
 #[cfg(test)]

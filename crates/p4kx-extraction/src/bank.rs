@@ -1,18 +1,99 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::{self, File};
-use std::io::{self, Write};
+//! Bounded soundbank reads, source inspection, and extraction.
+
+#[path = "voice_property.rs"]
+mod voice_property;
+
+pub use self::voice_property::{VoiceProperty, VoicePropertyName};
+
+use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use p4kx_archive::Archive;
 use p4kx_audio::{AudioError, EmbeddedWem, MediaClass, Soundbank};
+pub use p4kx_audio::{
+    BankActionFields, BankActionRead, BankContainerChild, BankContainerChildren,
+    BankContainerFields, BankContainerRead, BankDeclaredLengthSource, BankDidx, BankDidxEntry,
+    BankEvent, BankEventAction, BankEventCountEncoding, BankEventRead, BankHirc, BankHircAction,
+    BankHircContainer, BankHircEvent, BankHircField, BankHircMusicSegment, BankHircMusicTrack,
+    BankHircObject, BankHircSemantic, BankHircSound, BankHircState, BankMediaClassSource,
+    BankMediaInfo, BankMediaSourceFields, BankMusicMarker, BankMusicNodeFields,
+    BankMusicSegmentFields, BankMusicSegmentRead, BankMusicSegmentRow, BankMusicSegmentRows,
+    BankMusicStinger, BankMusicStingerTail, BankMusicTrackClip, BankMusicTrackFields,
+    BankMusicTrackRead, BankMusicTrackRow, BankMusicTrackRows, BankMusicTrackSource,
+    BankMusicTrackSwitchFields, BankNodeParentFields, BankObservedHeader, BankPlayBankDecision,
+    BankPlayBankFields, BankPlayProperties, BankReadError, BankSectionCursor,
+    BankSoundContinuation, BankSoundFields, BankSoundNodeBase, BankSoundNodeFields, BankSoundRead,
+    BankSource, BankSourceSection, BankStateRead, BankStid, BankStidName, ContainerKind,
+    MediaStorage, MusicTrackKind, SoundSource, StateObject, StateProperties, StateProperty,
+};
+pub use p4kx_audio::{
+    BankActorMixerFields, BankHircActionProperties, BankHircActorMixer, BankHircContainerNode,
+    BankHircSoundNode, BankNodeAuxFields, BankNodeFxFields, BankNodeFxKind, BankNodeFxList,
+    BankNodeFxSlot, BankNodeFxSlots, BankNodePropertyExtent, BankNodePropertyExtents,
+    BankNodePropertyKind, BankNodePropertyRow, BankNodePropertyRows, BankNodePropertyValue,
+    BankNodeUserAuxBuses,
+};
+pub use p4kx_audio::{
+    BankBlendAssociation, BankBlendAssociationFields, BankBlendAssociations,
+    BankBlendContainerFields, BankBlendExtent, BankBlendLayer, BankBlendLayerFields,
+    BankBlendLayers, BankBlendPoint, BankBlendPointRows,
+};
+pub use p4kx_audio::{
+    BankDialogueEventFields, BankDialogueEventRow, BankDialogueEventRows, BankDialogueNode,
+    BankDialogueTree, BankDialogueTreeCoverage, BankHircDialogueEvent, BankHircMusicSwitch,
+    BankMusicSwitchBranch, BankMusicSwitchFields, BankMusicSwitchGroup, BankMusicSwitchNode,
+    BankMusicSwitchRead, BankMusicSwitchRow, BankMusicSwitchRows, BankMusicSwitchTarget,
+};
+pub use p4kx_audio::{
+    BankGraphPoint, BankGraphPointRows, BankMusicTrackAutomation, BankMusicTrackAutomationRows,
+    BankMusicTrackFadeFields, BankMusicTrackTransitionFields, BankTrackAutomationExtent,
+    BankTrackAutomationFields, BankTrackAutomationPoints,
+};
+pub use p4kx_audio::{
+    BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistFields, BankMusicPlaylistItem,
+    BankMusicPlaylistRead, BankMusicPlaylistRow, BankMusicPlaylistRows, BankMusicTransitionFields,
+    MusicPlayMode,
+};
+pub use p4kx_audio::{
+    BankHircRtpc, BankRtpcCurve, BankRtpcExtent, BankRtpcPoint, BankRtpcRead, BankRtpcRow,
+    BankRtpcRows, BankSharedNode,
+};
+pub use p4kx_audio::{
+    BankHircSoundStates, BankInlineStateRow, BankInlineStateRows, BankSoundStateRead,
+    BankStateBinding, BankStateGroup,
+};
+pub use p4kx_audio::{
+    BankMusicFadeFields, BankMusicTransitionDestinationFields, BankMusicTransitionId,
+    BankMusicTransitionIdRows, BankMusicTransitionIds, BankMusicTransitionObjectFields,
+    BankMusicTransitionRows, BankMusicTransitionRule, BankMusicTransitionRuleFields,
+    BankMusicTransitionSide, BankMusicTransitionSourceFields,
+};
+pub use p4kx_audio::{
+    BankNodeAdvancedFields, BankNodeParameters, BankNodePlaybackFields, BankNodePositioningFields,
+    BankPositioningModes, BankPositioningRow, BankPositioningRowFields, BankPositioningRows,
+    BankPositioningTableKind, BankPositioningVector,
+};
+pub use p4kx_audio::{
+    BankRandomSequenceFields, BankRandomSequenceItem, BankRandomSequencePlaylist,
+    BankRandomSequenceRows,
+};
+pub use p4kx_audio::{
+    BankSwitchConfiguration, BankSwitchConfigurationRows, BankSwitchContainerFields,
+    BankSwitchExtent, BankSwitchGroup, BankSwitchGroupRows, BankSwitchMember, BankSwitchMembership,
+};
 use rayon::prelude::*;
 
-use crate::entry_content::find_entry;
-use crate::output_file::{read_error, write_error, write_replacing};
-use crate::sound::read_capped;
-use crate::{ConversionError, UnknownEntries};
+#[path = "bank_read.rs"]
+mod read;
+
+use self::read::BankReadOrigin;
+
+use crate::ConversionError;
+use crate::output_file::{write_error, write_replacing_protected};
+use crate::source_protection::SourceProtection;
 
 /// The largest soundbank read into memory, far above the largest soundbank of a real Archive.
 pub const MAX_SOUNDBANK_LEN: u64 = 512 << 20;
@@ -75,62 +156,19 @@ pub struct BankExtraction {
 /// A Wwise BNK soundbank read from an Entry of an Archive or from a file on disk.
 #[derive(Debug)]
 pub struct Bank {
+    protection: SourceProtection,
     name: String,
     soundbank: Soundbank<Vec<u8>>,
+    origin: BankReadOrigin,
 }
 
 impl Bank {
-    /// Reads and parses the soundbank Entry at `path`, matched with either separator and ignoring
-    /// ASCII case.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ConversionError::UnknownEntry`] when no Entry has that path,
-    /// [`ConversionError::SoundTooLarge`] when it exceeds [`MAX_SOUNDBANK_LEN`],
-    /// [`ConversionError::Soundbank`] when it is no valid soundbank, and another
-    /// [`ConversionError`] when it cannot be read.
-    pub fn from_archive(archive: &Archive, path: &str) -> Result<Self, ConversionError> {
-        let entry =
-            find_entry(archive, path).ok_or_else(|| UnknownEntries(vec![path.to_owned()]))?;
-        let name = entry.path().to_owned();
-        let reader = archive.open_entry(entry)?;
-        let bytes = read_capped(reader, entry.uncompressed_size(), MAX_SOUNDBANK_LEN).map_err(
-            |source| ConversionError::ReadEntry {
-                entry: name.clone(),
-                source,
-            },
-        )?;
-        Self::parse(name, bytes)
-    }
-
-    /// Reads and parses the soundbank file at `path`.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ConversionError::NoSuchFile`] when the file does not exist,
-    /// [`ConversionError::SoundTooLarge`] when it exceeds [`MAX_SOUNDBANK_LEN`],
-    /// [`ConversionError::Soundbank`] when it is no valid soundbank, and another
-    /// [`ConversionError`] when it cannot be read.
-    pub fn from_file(path: &Path) -> Result<Self, ConversionError> {
-        let file = File::open(path).map_err(|source| {
-            if source.kind() == io::ErrorKind::NotFound {
-                ConversionError::NoSuchFile {
-                    path: path.to_path_buf(),
-                }
-            } else {
-                read_error(path, source)
-            }
-        })?;
-        let len = file
-            .metadata()
-            .map_err(|source| read_error(path, source))?
-            .len();
-        let bytes =
-            read_capped(file, len, MAX_SOUNDBANK_LEN).map_err(|source| read_error(path, source))?;
-        Self::parse(path.display().to_string(), bytes)
-    }
-
-    fn parse(name: String, bytes: Option<Vec<u8>>) -> Result<Self, ConversionError> {
+    fn parse(
+        name: String,
+        bytes: Option<Vec<u8>>,
+        protection: SourceProtection,
+        origin: BankReadOrigin,
+    ) -> Result<Self, ConversionError> {
         let Some(bytes) = bytes else {
             return Err(ConversionError::SoundTooLarge {
                 sound: name,
@@ -138,7 +176,12 @@ impl Bank {
             });
         };
         match Soundbank::parse(bytes) {
-            Ok(soundbank) => Ok(Self { name, soundbank }),
+            Ok(soundbank) => Ok(Self {
+                protection,
+                name,
+                soundbank,
+                origin,
+            }),
             Err(source) => Err(ConversionError::Soundbank { bank: name, source }),
         }
     }
@@ -166,7 +209,7 @@ impl Bank {
         folder: &Path,
         format: WemFormat,
     ) -> Result<BankExtraction, ConversionError> {
-        p4kx_guard::ensure_writable(folder)?;
+        crate::check_protected_output(folder, self.protection.context()?, None)?;
         fs::create_dir_all(folder).map_err(|source| write_error(folder, source))?;
         let wems: Vec<EmbeddedWem<'_>> = self.soundbank.wems().collect();
         let outcomes: Vec<(u32, Result<WrittenWem, ConversionError>)> = wems
@@ -208,24 +251,30 @@ impl Bank {
                 source,
             },
         };
-        let size = write_replacing(&path, |writer| match format {
-            WemFormat::Wem => {
-                writer
-                    .write_all(wem.bytes())
-                    .map_err(|source| write_error(&path, source))?;
-                Ok(wem.bytes().len() as u64)
-            }
-            WemFormat::Wav => wem
-                .parse()
-                .and_then(|parsed| parsed.write_wav(writer))
-                .map(|report| report.size)
-                .map_err(audio_error),
-            WemFormat::Ogg => wem
-                .parse()
-                .and_then(|parsed| parsed.write_ogg(writer))
-                .map(|report| report.size)
-                .map_err(audio_error),
-        })?;
+        let size =
+            write_replacing_protected(
+                &path,
+                self.protection.context()?,
+                None,
+                |writer| match format {
+                    WemFormat::Wem => {
+                        writer
+                            .write_all(wem.bytes())
+                            .map_err(|source| write_error(&path, source))?;
+                        Ok(wem.bytes().len() as u64)
+                    }
+                    WemFormat::Wav => wem
+                        .parse()
+                        .and_then(|parsed| parsed.write_wav(writer))
+                        .map(|report| report.size)
+                        .map_err(audio_error),
+                    WemFormat::Ogg => wem
+                        .parse()
+                        .and_then(|parsed| parsed.write_ogg(writer))
+                        .map(|report| report.size)
+                        .map_err(audio_error),
+                },
+            )?;
         Ok(WrittenWem {
             id: wem.id(),
             path,

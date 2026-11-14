@@ -21,6 +21,7 @@ fn build(radar: Radar, filter: Option<&Filter>) -> Result<(BuiltCatalog, Value),
         Some(p4kx_testkit::test_key()),
     )?;
     let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
     let built = build_catalog(&archive, &options)?;
     let json = serde_json::from_slice(built.json())?;

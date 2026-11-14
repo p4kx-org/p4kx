@@ -172,3 +172,28 @@ pub fn hologram_entries(camera: [f32; 3]) -> Vec<TestEntry> {
     }
     entries
 }
+
+/// Returns the synthetic assembly with whole-part and per-range material suppression.
+#[must_use]
+pub fn hologram_suppression_entries() -> Vec<TestEntry> {
+    assembly_entries()
+        .into_iter()
+        .map(|entry| {
+            let (first, second) = if entry.path().ends_with("ship.mtl") {
+                ("NoDraw", "Decal")
+            } else if entry.path().ends_with("gun_paint.mtl") {
+                ("Decal", "Illum")
+            } else {
+                return entry;
+            };
+            let material = |name, shader| TestMtlMaterial::new(name).shader(shader);
+            let bytes = TestMtl::multi(&[
+                material("unused", "NoDraw"),
+                material("caps", first),
+                material("sides", second),
+            ])
+            .cryxml();
+            TestEntry::stored(entry.path(), bytes)
+        })
+        .collect()
+}

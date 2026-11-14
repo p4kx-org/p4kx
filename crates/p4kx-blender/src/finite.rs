@@ -142,7 +142,7 @@ fn clean_option_value(value: &mut Option<f32>) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+pub(super) mod tests {
     use super::{clean_all, clean_each, clean_option, sanitise};
     use crate::build::{coordinates, generator};
     use crate::manifest::{
@@ -164,7 +164,7 @@ mod tests {
         }
     }
 
-    fn manifest(nodes: Vec<Node>) -> Manifest {
+    pub(crate) fn manifest(nodes: Vec<Node>) -> Manifest {
         Manifest {
             format: Format::P4kxBlenderPackage,
             version: FORMAT_VERSION.to_owned(),
@@ -175,6 +175,7 @@ mod tests {
                 entity: EntityRef {
                     class_name: String::new(),
                     guid: String::new(),
+                    classification: None,
                 },
                 character: None,
             },
@@ -190,7 +191,15 @@ mod tests {
             meshes: Vec::new(),
             textures: Vec::new(),
             materials: Vec::new(),
+            material_libraries: Vec::new(),
             palettes: Vec::new(),
+            palette_provenance: None,
+            authored_soc: None,
+            collision_helpers: None,
+            default_material: None,
+            entity_provenance: None,
+            light_placements: None,
+            entity_glow: None,
             issues: Vec::new(),
         }
     }

@@ -117,3 +117,6 @@ fn a_name_defined_twice_counts_as_left_out_and_is_a_difference() -> TestResult {
     assert!(diff.has_differences(), "a different number was left out");
     Ok(())
 }
+
+#[path = "schema_counts_inheritance.rs"]
+mod schema_counts_inheritance;

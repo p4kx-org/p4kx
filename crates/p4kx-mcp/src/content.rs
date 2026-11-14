@@ -4,9 +4,12 @@
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use p4kx_extraction::{
-    Archive, Entry, EntryReadError, MIN_TEXT_LEN, TextEncoding, find_entry, read_bytes, read_text,
+    Archive, Entry, EntryReadError, MIN_TEXT_LEN, TextEncoding, find_entry, read_bytes,
+    read_text_observed,
 };
 
+use crate::content_origin::BytesFieldOrigins;
+use crate::content_text_origin::TextFieldOrigins;
 use crate::error::ToolError;
 use crate::shapes::{BytesResult, TextResult};
 
@@ -55,10 +58,15 @@ pub(crate) fn text<G>(
 ) -> Result<TextResult, ToolError> {
     let length = Length::new(requested, DEFAULT_TEXT_LEN, MIN_TEXT_LEN, MAX_TEXT_LEN);
     let entry = entry(archive, path)?;
-    let range = read_text(archive, entry, offset, length.value, whole)
+    let observed = read_text_observed(archive, entry, offset, length.value, whole)
         .map_err(|error| failed(entry, error))?;
+    let (field_origins, provenance) =
+        TextFieldOrigins::capture(archive, entry, &observed).map_err(ToolError::EntryEvidence)?;
+    let range = observed.page;
     let next_offset = range.next_offset();
     Ok(TextResult {
+        field_origins,
+        provenance,
         archive: archive.path().display().to_string(),
         path: entry.path().to_owned(),
         encoding: encoding_name(range.encoding),
@@ -85,6 +93,8 @@ pub(crate) fn bytes(
     let range =
         read_bytes(archive, entry, offset, length.value).map_err(|error| failed(entry, error))?;
     let next_offset = range.next_offset();
+    let (field_origins, provenance) =
+        BytesFieldOrigins::capture(archive, entry, &range).map_err(ToolError::EntryEvidence)?;
     Ok(BytesResult {
         archive: archive.path().display().to_string(),
         path: entry.path().to_owned(),
@@ -97,6 +107,8 @@ pub(crate) fn bytes(
         next_offset,
         clamped: length.clamped,
         max_bytes: length.value,
+        field_origins,
+        provenance,
     })
 }
 

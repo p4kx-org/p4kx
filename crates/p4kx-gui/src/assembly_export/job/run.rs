@@ -7,12 +7,12 @@ use p4kx_assembly::{
     LoadoutChanges,
 };
 use p4kx_extraction::{
-    Archive, CancelToken, ConversionError, DataForge, GlbSummary, GltfError, Guid, PathIndex,
-    archive_error_in, write_replacing,
+    Archive, ArchiveWriteProtection, CancelToken, ConversionError, DataForge, DataForgeEntry,
+    GlbSummary, GltfError, Guid, PathIndex, write_replacing_protected,
 };
 
 use super::stop::{Observed, Stoppable, StoppableTextures};
-use super::{AssemblyExportStage, Ended, Request, Shared, Subject, package};
+use super::{AssemblyExportStage, Ended, Request, Shared, Subject, failure_of, package};
 use crate::assembly_export::{AssemblyExportForm, AssemblyExportSummary};
 use crate::entities::{ResolveFailure, resolve};
 use crate::forge_cache::ReadFailure;
@@ -146,12 +146,17 @@ fn assembled(
             return Err(Ended::Failed(ModelExportFailure::Failed(describe(&error))));
         }
     };
-    let assembly = hull(index, (&forge, tree), lod, (cancel, archive_models))?;
+    let assembly = hull(
+        index,
+        (&forge, &source.entry, tree),
+        lod,
+        (cancel, archive_models),
+    )?;
     if !interior {
         return Ok(assembly);
     }
     shared.enter(AssemblyExportStage::Interior);
-    let classes = InteriorForge::new(&forge);
+    let classes = InteriorForge::new(&forge).with_entry(&source.entry);
     let built = interior_of(index, (&assembly, tree), (lod, &classes), (cancel, shared))?;
     Ok(assembly.with_interior(built))
 }
@@ -162,21 +167,27 @@ fn write_glb(
     (assembly, archive_models): (&Assembly, &ArchiveModels<'_>),
     (changes, cancel, shared): (&LoadoutChanges, &CancelToken, &Shared),
 ) -> Ended {
-    let written = write_replacing(&request.file, |writer| {
-        let mut observed = Observed {
-            inner: writer,
-            cancel,
-            written: &shared.done,
-        };
-        let textures = archive_models.textures();
-        let textures = StoppableTextures {
-            textures: &textures,
-            cancel,
-        };
-        assembly
-            .write_glb_with(&request.options(), &textures, &mut observed)
-            .map_err(|error| glb_error(error, request, cancel))
-    });
+    let protection = match ArchiveWriteProtection::new(index.path(), cancel.flag()) {
+        Ok(protection) => protection,
+        Err(error) if error.is_cancelled() => return Ended::Cancelled,
+        Err(error) => return Ended::Failed(ModelExportFailure::Refused(error)),
+    };
+    let written =
+        write_replacing_protected(&request.file, Some(&protection), Some(cancel), |writer| {
+            let mut observed = Observed {
+                inner: writer,
+                cancel,
+                written: &shared.done,
+            };
+            let textures = archive_models.textures();
+            let textures = StoppableTextures {
+                textures: &textures,
+                cancel,
+            };
+            assembly
+                .write_glb_with(&request.options(), &textures, &mut observed)
+                .map_err(|error| glb_error(error, request, cancel))
+        });
     ended(index, written, |written| {
         AssemblyExportSummary::new(
             (request.file.clone(), request.name.clone()),
@@ -189,11 +200,11 @@ fn write_glb(
 /// Reads the models of the parts of `tree` and places them.
 fn hull(
     index: &EntryIndex,
-    (forge, tree): (&DataForge<'_>, &EntityNode),
+    (forge, entry, tree): (&DataForge<'_>, &DataForgeEntry, &EntityNode),
     lod: u32,
     (cancel, archive_models): (&CancelToken, &ArchiveModels<'_>),
 ) -> Result<Assembly, Ended> {
-    let palettes = ForgePalettes::new(forge);
+    let palettes = ForgePalettes::new(forge).with_entry(entry);
     let models = Stoppable {
         models: archive_models,
         cancel,
@@ -236,7 +247,7 @@ fn with_classes<T>(
     let Ok(forge) = source.entry.open() else {
         return Ok(build(None));
     };
-    let classes = InteriorForge::new(&forge);
+    let classes = InteriorForge::new(&forge).with_entry(&source.entry);
     Ok(build(Some(&classes)))
 }
 
@@ -292,21 +303,27 @@ fn container(
     if request.form == AssemblyExportForm::Package {
         return package::write_interior(index, request, &interior, (&archive_models, cancel));
     }
-    let written = write_replacing(&request.file, |writer| {
-        let mut observed = Observed {
-            inner: writer,
-            cancel,
-            written: &shared.done,
-        };
-        let textures = archive_models.textures();
-        let textures = StoppableTextures {
-            textures: &textures,
-            cancel,
-        };
-        interior
-            .write_glb_with(&request.options(), &textures, &mut observed)
-            .map_err(|error| glb_error(error, request, cancel))
-    });
+    let protection = match ArchiveWriteProtection::new(index.path(), cancel.flag()) {
+        Ok(protection) => protection,
+        Err(error) if error.is_cancelled() => return Ended::Cancelled,
+        Err(error) => return Ended::Failed(ModelExportFailure::Refused(error)),
+    };
+    let written =
+        write_replacing_protected(&request.file, Some(&protection), Some(cancel), |writer| {
+            let mut observed = Observed {
+                inner: writer,
+                cancel,
+                written: &shared.done,
+            };
+            let textures = archive_models.textures();
+            let textures = StoppableTextures {
+                textures: &textures,
+                cancel,
+            };
+            interior
+                .write_glb_with(&request.options(), &textures, &mut observed)
+                .map_err(|error| glb_error(error, request, cancel))
+        });
     ended(index, written, |written| {
         AssemblyExportSummary::of_interior(
             (request.file.clone(), request.name.clone()),
@@ -374,26 +391,4 @@ fn ended(
 
 pub(super) fn failed(index: &EntryIndex, error: &(dyn std::error::Error + 'static)) -> Ended {
     Ended::Failed(failure_of(index, error))
-}
-
-/// Returns why reading or writing an Assembly failed with `error`.
-pub(crate) fn failure_of(
-    index: &EntryIndex,
-    error: &(dyn std::error::Error + 'static),
-) -> ModelExportFailure {
-    if index.watch().check().is_err() {
-        return ModelExportFailure::ArchiveChanged;
-    }
-    if let Some(archive) = archive_error_in(error) {
-        if archive.is_key_required() {
-            return ModelExportFailure::KeyRequired;
-        }
-        if archive.is_wrong_key() {
-            return ModelExportFailure::KeyRejected;
-        }
-    }
-    if let Some(ConversionError::Installation(refused)) = error.downcast_ref::<ConversionError>() {
-        return ModelExportFailure::Refused(refused.clone());
-    }
-    ModelExportFailure::Failed(describe(error))
 }

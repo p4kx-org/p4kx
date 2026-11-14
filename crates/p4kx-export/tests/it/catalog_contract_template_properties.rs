@@ -1,90 +1,142 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The properties of the objectives of the contract templates, a nil tag, the records the catalog
-//! does not follow to their end and the stored names it does not know.
+//! Original objective-property source cells and contextual bindings.
+
+#[path = "catalog_mission_item_definitions.rs"]
+mod mission_item_definitions;
 
 use std::error::Error;
-use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, CraftingWarning, build_catalog};
-use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
-use crate::catalog_contract_templates::{build, template};
-use crate::spawns_fixture;
+use crate::catalog_contract_templates::{build, canonical};
+use crate::loot_v3_graph as raw;
+use crate::template_canonical_graph::Template;
+use crate::template_fixture_context as context;
+use crate::template_fixture_fields as fields;
+use crate::template_fixture_tags as tags;
+use crate::template_fixture_text as texts;
+
+#[path = "catalog_contract_template_property_diagnostics.rs"]
+mod diagnostics;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
 const OBJECTIVE_A: &str = "70000000-0000-4000-8000-000000000001";
-
-fn field<'c>(entry: &'c Value, pointer: &str) -> &'c Value {
-    entry.pointer(pointer).unwrap_or(&Value::Null)
-}
-
-fn properties(catalog: &Value, objective: usize) -> Result<&Vec<Value>, String> {
-    template(catalog)?
-        .pointer(&format!("/objectives/{objective}/objectiveProperties"))
-        .and_then(Value::as_array)
-        .ok_or_else(|| format!("properties of objective {objective}"))
-}
-
-fn kind_guids<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c str> {
-    catalog[kind]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|entry| entry["guid"].as_str())
-        .collect()
-}
+const OWNER: &str = "80000000-0000-4000-8000-000000000001";
 
 #[test]
 fn a_referenced_property_names_the_property_of_the_template_it_points_to() -> TestResult {
     let catalog = build()?;
-    let referenced = &properties(&catalog, 0)?[0];
-    assert_eq!(referenced["kind"], "referenced");
-    assert_eq!(referenced["variable"], "Cargo_BP");
-    assert_eq!(referenced["token"], "Cargo");
-    assert_eq!(referenced["contractProperty"], "Place_BP");
-    assert_eq!(referenced["value"], Value::Null);
-    assert_eq!(referenced["linkedOutput"], Value::Null);
+    let graph = canonical(&catalog)?;
+    let properties = context::properties(&graph, Some(0))?;
+    let referenced = *properties.first().ok_or("actual referenced property")?;
+    assert_eq!(
+        referenced.get("kind"),
+        Some(&json!("referenced")),
+        "actual objective-property kind"
+    );
+    assert_eq!(
+        context::binding_text(&graph, referenced, "variable")?,
+        Some("Cargo_BP"),
+        "caller variable"
+    );
+    assert_eq!(
+        context::binding_text(&graph, referenced, "token")?,
+        Some("Cargo"),
+        "caller token"
+    );
+    let caller = graph.owner.follow(
+        referenced
+            .get("contractProperty")
+            .ok_or("actual property weak slot")?,
+    )?;
+    context::property_target(&graph, caller, "Place_BP")?;
+    assert_eq!(
+        referenced.get("value"),
+        Some(&Value::Null),
+        "no invented owned value for a reference"
+    );
+    assert_eq!(
+        referenced.get("linkedOutput"),
+        Some(&Value::Null),
+        "no invented output link"
+    );
     Ok(())
 }
 
 #[test]
 fn output_and_embedded_properties_state_their_values_by_type() -> TestResult {
     let catalog = build()?;
-    let properties = properties(&catalog, 0)?;
-    assert_eq!(properties.len(), 11);
-    assert_eq!(properties[1]["kind"], "output");
-    assert_eq!(properties[1]["variable"], "Out_BP");
-    assert_eq!(properties[1]["value"], json!({"type": "object"}));
+    let graph = canonical(&catalog)?;
+    let properties = context::properties(&graph, Some(0))?;
     assert_eq!(
-        properties[2]["value"],
-        json!({"type": "boolean", "value": true})
+        properties.len(),
+        11,
+        "all original objective properties in order"
+    );
+    let output = *properties.get(1).ok_or("actual output property")?;
+    assert_eq!(
+        output.get("kind"),
+        Some(&json!("output")),
+        "output naming kind"
     );
     assert_eq!(
-        properties[3]["value"],
-        json!({"type": "stringHash", "options": [{
-            "displayName": {"key": "@place_name", "en": "Hijacked Ship", "de": null},
-            "value": "calm",
-            "weighting": 3,
-            "dependentProperties": ["Home_BP"]
-        }]})
+        context::binding_text(&graph, output, "variable")?,
+        Some("Out_BP"),
+        "original output name"
     );
-    assert_eq!(
-        properties[4]["value"],
-        json!({"type": "integer", "options": [{
-            "displayName": {"key": null, "en": null, "de": null},
-            "value": 5.0,
-            "variation": 1.0,
-            "weighting": 2,
-            "dependentProperties": []
-        }]})
-    );
-    assert_eq!(
-        properties[5]["value"],
-        json!({"type": "tags", "tags": ["Kill"], "negativeTags": []})
+    context::kind(&graph, output, "object")?;
+    let flag = *properties.get(2).ok_or("actual boolean property")?;
+    context::kind(&graph, flag, "boolean")?;
+    fields::scalar_fields(
+        &graph,
+        context::value(&graph, flag)?,
+        &[("value", "boolean", json!(true))],
+    )?;
+    let string = *properties.get(3).ok_or("actual StringHash property")?;
+    context::kind(&graph, string, "stringHash")?;
+    crate::template_fixture_options::string(&catalog, &graph, context::value(&graph, string)?)?;
+    let integer = *properties.get(4).ok_or("actual integer property")?;
+    assert_integer_property(&graph, integer)?;
+    let tag_property = *properties.get(5).ok_or("actual tag property")?;
+    context::kind(&graph, tag_property, "tags")?;
+    crate::template_fixture_options::tags(&graph, context::value(&graph, tag_property)?)?;
+    Ok(())
+}
+
+fn assert_integer_property(graph: &Template<'_>, integer: &Value) -> TestResult {
+    context::kind(graph, integer, "integer")?;
+    let options = fields::elements(
+        graph,
+        graph.field(context::value(graph, integer)?, "options")?,
+    )?;
+    assert_eq!(options.len(), 1, "one original integer option");
+    let option = *options.first().ok_or("actual integer option")?;
+    texts::no_lookup(
+        graph,
+        graph.field(option, "textId")?,
+        "@LOC_UNINITIALIZED",
+        "placeholder",
+    )?;
+    fields::numeric_fields(
+        graph,
+        option,
+        &[
+            ("value", json!(5)),
+            ("variation", json!(1)),
+            ("weighting", json!(2.0)),
+        ],
+    )?;
+    fields::scalar_fields(
+        graph,
+        option,
+        &[("DEBUG_forceChooseThisOption", "boolean", json!(false))],
+    )?;
+    assert!(
+        raw::elements(graph.field(option, "dependentProperties")?)?.is_empty(),
+        "original dependencies empty"
     );
     Ok(())
 }
@@ -92,64 +144,127 @@ fn output_and_embedded_properties_state_their_values_by_type() -> TestResult {
 #[test]
 fn npc_entity_and_organization_values_link_or_state_their_fields() -> TestResult {
     let catalog = build()?;
-    let properties = properties(&catalog, 0)?;
-    assert_eq!(field(&properties[6], "/value/type"), "npcSpawnDescriptions");
-    let npc = field(&properties[6], "/value/poolGuid")
-        .as_str()
-        .ok_or("npc pool guid")?;
-    assert!(kind_guids(&catalog, "contractNpcSpawns").contains(&npc));
+    let graph = canonical(&catalog)?;
+    let properties = context::properties(&graph, Some(0))?;
+    context::spawn(
+        &catalog,
+        &graph,
+        properties.get(6).ok_or("NPC property")?,
+        "npcSpawnDescriptions",
+        "contractNpcSpawns",
+    )?;
+    context::spawn(
+        &catalog,
+        &graph,
+        properties.get(9).ok_or("entity property")?,
+        "entitySpawnDescriptions",
+        "contractEntitySpawns",
+    )?;
+    let property = *properties.get(10).ok_or("organization property")?;
+    context::kind(&graph, property, "organization")?;
+    let value = context::value(&graph, property)?;
+    fields::reference(graph.field(value, "debugForceChosenOrganization")?, OWNER)?;
+    let conditions = fields::elements(&graph, graph.field(value, "matchConditions")?)?;
+    assert_eq!(conditions.len(), 1, "one original organization condition");
+    let condition = *conditions.first().ok_or("actual organization condition")?;
+    let meaning = context::context(&graph, "valueMeanings", "source", value)?;
+    let selected = raw::array(meaning, "conditions")?;
     assert_eq!(
-        field(&properties[9], "/value/type"),
-        "entitySpawnDescriptions"
+        selected.len(),
+        1,
+        "one recognized condition for this original occurrence"
     );
-    let entity = field(&properties[9], "/value/poolGuid")
-        .as_str()
-        .ok_or("entity pool guid")?;
-    assert!(kind_guids(&catalog, "contractEntitySpawns").contains(&entity));
     assert_eq!(
-        properties[10]["value"],
-        json!({
-            "type": "organization",
-            "conditions": [{
-                "condition": "specificOrganizations",
-                "organizationGuids": ["80000000-0000-4000-8000-000000000001"]
-            }],
-            "forcedOrganizationGuid": "80000000-0000-4000-8000-000000000001"
-        })
+        raw::present(
+            selected
+                .first()
+                .and_then(|row| row.get("kind"))
+                .ok_or("condition kind")?
+        )?,
+        &json!("specificOrganizations"),
+        "the exact condition interpretation"
     );
+    let organizations = fields::elements(&graph, graph.field(condition, "organizations")?)?;
+    assert_eq!(organizations.len(), 1, "the original organization list");
+    fields::reference(organizations.first().ok_or("original organization")?, OWNER)?;
     Ok(())
 }
 
 #[test]
 fn a_ship_spawn_or_location_value_links_to_the_shared_kinds() -> TestResult {
     let catalog = build()?;
-    let properties = properties(&catalog, 0)?;
-    let pool = field(&properties[7], "/value/poolGuid")
-        .as_str()
-        .ok_or("pool guid")?;
-    assert!(kind_guids(&catalog, "contractShipSpawns").contains(&pool));
-    assert_eq!(
-        field(&properties[7], "/value/type"),
-        "shipSpawnDescriptions"
-    );
-    let query = field(&properties[8], "/value/queryGuid")
-        .as_str()
-        .ok_or("query guid")?;
-    assert!(kind_guids(&catalog, "contractLocationQueries").contains(&query));
-    assert_eq!(field(&properties[8], "/value/type"), "location");
+    let graph = canonical(&catalog)?;
+    let properties = context::properties(&graph, Some(0))?;
+    context::spawn(
+        &catalog,
+        &graph,
+        properties.get(7).ok_or("ship property")?,
+        "shipSpawnDescriptions",
+        "contractShipSpawns",
+    )?;
+    context::spawn(
+        &catalog,
+        &graph,
+        properties.get(8).ok_or("location property")?,
+        "location",
+        "contractLocationQueries",
+    )?;
     Ok(())
 }
 
 #[test]
 fn an_input_property_names_the_output_and_the_objective_it_takes() -> TestResult {
     let catalog = build()?;
-    let input = &properties(&catalog, 1)?[0];
-    assert_eq!(input["kind"], "input");
-    assert_eq!(input["variable"], "In_BP");
-    assert_eq!(input["value"], json!({"type": "deliveryOrder"}));
+    let graph = canonical(&catalog)?;
+    let properties = context::properties(&graph, Some(1))?;
+    assert_eq!(properties.len(), 1, "the original phase input");
+    let input = *properties.first().ok_or("actual input property")?;
     assert_eq!(
-        input["linkedOutput"],
-        json!({"objectiveId": OBJECTIVE_A, "variable": "Out_BP"})
+        input.get("kind"),
+        Some(&json!("input")),
+        "the recognized objective-property kind"
+    );
+    assert_eq!(
+        context::binding_text(&graph, input, "variable")?,
+        Some("In_BP"),
+        "actual input name"
+    );
+    context::kind(&graph, input, "deliveryOrder")?;
+    let caller = graph
+        .owner
+        .follow(input.get("linkedOutput").ok_or("actual output weak slot")?)?;
+    let row = context::context(&graph, "linkedOutputs", "caller", caller)?;
+    assert_eq!(
+        row.get("selected"),
+        Some(&json!(true)),
+        "the actual output was selected"
+    );
+    let variable = row
+        .get("variable")
+        .ok_or("actual selected output variable")?;
+    assert_eq!(
+        variable.get("interpretation"),
+        Some(&json!("value")),
+        "usable output variable"
+    );
+    assert_eq!(
+        fields::text(graph.bound(variable.get("field").ok_or("actual output field")?)?)?,
+        "Out_BP",
+        "the selected original output name"
+    );
+    let objective = row.get("objective").ok_or("actual output objective")?;
+    assert_eq!(
+        objective.get("interpretation"),
+        Some(&json!("id")),
+        "usable output objective id"
+    );
+    assert_eq!(
+        fields::scalar(
+            graph.bound(objective.get("field").ok_or("actual objective id field")?)?,
+            "guid"
+        )?,
+        &json!(OBJECTIVE_A),
+        "the actual enclosing objective identity"
     );
     Ok(())
 }
@@ -157,146 +272,14 @@ fn an_input_property_names_the_output_and_the_objective_it_takes() -> TestResult
 #[test]
 fn a_nil_tag_is_no_tag_path_in_a_list_or_in_a_single_tag_field() -> TestResult {
     let catalog = build()?;
-    let templates = catalog["missionLocationTemplates"]
-        .as_array()
-        .ok_or("templates")?;
+    let templates = raw::array(&catalog, "missionLocationTemplates")?;
     assert_eq!(
-        templates[0]["tags"],
-        json!(["Missions.Hijacked"]),
+        templates.first().and_then(|row| row.get("tags")),
+        Some(&json!(["Missions.Hijacked"])),
         "the nil tag in the list is left out"
     );
-    let phase = field(template(&catalog)?, "/objectives/2/phaseTag");
-    assert_eq!(phase, &Value::Null, "the nil tag of a single tag field");
-    Ok(())
-}
-
-#[test]
-fn records_that_nest_phases_or_conditions_too_deep_fail_instead_of_being_cut() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let archive = Archive::open_with_key(
-        spawns_fixture::write_archive(dir.path())?,
-        Some(p4kx_testkit::test_key()),
-    )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
-    let built = build_catalog(&archive, &options)?;
-    let failed = failures(&built);
-    assert_eq!(failed.len(), UNKNOWN_STRUCTS.len() + TOO_DEEP, "{failed:?}");
-    assert_failures(
-        &failed,
-        &[
-            ("/deep_flow", "conditions nest deeper than 16"),
-            ("/deep_phases", "phases nest deeper than 32"),
-        ],
-    );
-    let catalog: Value = serde_json::from_slice(built.json())?;
-    assert_eq!(
-        catalog["contractTemplates"].as_array().map(Vec::len),
-        Some(2),
-        "no failed template is listed"
-    );
-    Ok(())
-}
-
-const ORGANIZATION: &str =
-    "organization condition holds the unknown struct DataSetMatchCondition_Mystery";
-const ITEM: &str = "item condition holds the unknown struct DataSetMatchCondition_Mystery";
-const LOCATION: &str = "location condition holds the unknown struct DataSetMatchCondition_Mystery";
-const VALUE: &str = "property value holds the unknown struct MissionPropertyValue_Mystery";
-
-/// The Records of the fixture that fail on an unknown struct: a record path suffix and what the
-/// reason states.
-const UNKNOWN_STRUCTS: [(&str, &str); 12] = [
-    ("/unknown_condition", ORGANIZATION),
-    (
-        "/unknown_flow",
-        "holds the unknown struct MissionFlowCondition_Unknown",
-    ),
-    (
-        "/unknown_modifier",
-        "modifiers holds the unknown struct MissionModifier",
-    ),
-    ("/unknown_value", VALUE),
-    ("/unknown_contract_property", VALUE),
-    ("/unknown_item_condition", ITEM),
-    ("/unknown_location_condition", LOCATION),
-    ("/unknown_location_after_known", LOCATION),
-    ("/contractgenerator/unknown_location", LOCATION),
-    (
-        "/missionbroker/bad",
-        "holds the unknown struct SReputationMissionRequirementsUnknown",
-    ),
-    ("/missionbroker/bad_property", VALUE),
-    ("/missionbroker/bad_location", LOCATION),
-];
-
-/// The Records that fail because they nest too deep.
-const TOO_DEEP: usize = 2;
-
-#[test]
-fn a_struct_the_catalog_does_not_know_fails_the_record_instead_of_hiding_behind_other() -> TestResult
-{
-    let dir = tempfile::tempdir()?;
-    let archive = Archive::open_with_key(
-        spawns_fixture::write_archive(dir.path())?,
-        Some(p4kx_testkit::test_key()),
-    )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
-    let built = build_catalog(&archive, &options)?;
-    assert_failures(&failures(&built), &UNKNOWN_STRUCTS);
-    Ok(())
-}
-
-/// The record path and reason of every failed Record.
-fn failures(built: &BuiltCatalog) -> Vec<(&str, &str)> {
-    let mut failed: Vec<(&str, &str)> = built
-        .summary()
-        .failures()
-        .iter()
-        .map(|failure| (failure.record_path.as_str(), failure.reason.as_str()))
-        .collect();
-    failed.sort_unstable();
-    failed
-}
-
-/// Asserts that a failed Record ends with each suffix and states each text in its reason.
-fn assert_failures(failed: &[(&str, &str)], expected: &[(&str, &str)]) {
-    for (suffix, text) in expected {
-        let found = failed
-            .iter()
-            .any(|(path, reason)| path.ends_with(suffix) && reason.contains(text));
-        assert!(found, "{suffix} {text}: {failed:?}");
-    }
-}
-
-#[test]
-fn stored_names_the_catalog_does_not_know_are_counted_in_a_warning() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let archive = Archive::open_with_key(
-        spawns_fixture::write_archive(dir.path())?,
-        Some(p4kx_testkit::test_key()),
-    )?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
-    let built = build_catalog(&archive, &options)?;
-    let warning = built
-        .summary()
-        .warnings()
-        .iter()
-        .find(|warning| warning.kind() == "unknown_template_values")
-        .ok_or("the warning")?;
-    assert_eq!(warning.count(), Some(5), "{:?}", warning.details());
-    assert_eq!(
-        warning.details(),
-        [
-            "comparison Sideways (1)",
-            "end comms reason Vanish (1)",
-            "flow state Sleeping (1)",
-            "month Smarch (1)",
-            "reaction Gloating (1)"
-        ]
-    );
-    assert!(matches!(
-        warning,
-        CraftingWarning::UnknownTemplateValues { .. }
-    ));
+    let graph = canonical(&catalog)?;
+    let phase = graph.field(context::objective(&graph, 2)?, "missionPhaseIdentifierTag")?;
+    tags::path(&graph, phase, None)?;
     Ok(())
 }

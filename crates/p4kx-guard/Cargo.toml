@@ -16,8 +16,19 @@ p4kx-channels.workspace = true
 same-file.workspace = true
 thiserror.workspace = true
 
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { workspace = true, features = ["socket"] }
+rustix.workspace = true
+serde.workspace = true
+zbus.workspace = true
+
 [dev-dependencies]
 tempfile.workspace = true
+serde.workspace = true
+zbus = { workspace = true, features = ["p2p"] }
+
+[target.'cfg(windows)'.dev-dependencies]
+uds_windows.workspace = true
 
 [lints]
 workspace = true

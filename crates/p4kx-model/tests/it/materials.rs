@@ -5,7 +5,7 @@
 
 use std::error::Error;
 
-use p4kx_model::{MAX_SUB_MATERIALS, MAX_TEXTURE_SLOTS, Material, MaterialError, MaterialLibrary};
+use p4kx_model::{MAX_SUB_MATERIALS, Material, MaterialError, MaterialLibrary};
 use p4kx_testkit::{CryXmlByteOrder, CryXmlSignature, TestElement, TestMtl, TestMtlMaterial};
 use proptest::prelude::*;
 type TestResult = Result<(), Box<dyn Error>>;
@@ -95,7 +95,29 @@ fn text_xml_and_every_cryxml_form_read_alike() -> TestResult {
     ] {
         for byte_order in [CryXmlByteOrder::Little, CryXmlByteOrder::Big] {
             let library = parse(&file.cryxml_as(signature, byte_order))?;
-            assert_eq!(library, expected, "{signature:?} {byte_order:?}");
+            assert_eq!(
+                (
+                    &library.path,
+                    &library.default_palette,
+                    library.single,
+                    library.unknown_entries,
+                    &library.unresolved_layers,
+                    &library.materials
+                ),
+                (
+                    &expected.path,
+                    &expected.default_palette,
+                    expected.single,
+                    expected.unknown_entries,
+                    &expected.unresolved_layers,
+                    &expected.materials
+                ),
+                "all pre-existing surface/library fields agree across {signature:?} {byte_order:?}"
+            );
+            assert_eq!(
+                library.authored.entries, expected.authored.entries,
+                "source positions and fallback dispositions agree across encodings"
+            );
         }
     }
     assert_eq!(expected.materials.len(), 2, "both sub-materials");
@@ -278,7 +300,9 @@ fn a_file_that_is_no_material_or_no_xml_is_a_typed_error() {
 }
 
 #[test]
-fn more_sub_materials_or_texture_slots_than_the_limits_are_refused() {
+fn sub_material_admission_and_complete_texture_slots_keep_their_contracts() {
+    const TEXTURES: usize = 65;
+
     let many = vec![glass(); MAX_SUB_MATERIALS + 1];
     assert!(matches!(
         parse(&TestMtl::multi(&many).cryxml()),
@@ -294,16 +318,19 @@ fn more_sub_materials_or_texture_slots_than_the_limits_are_refused() {
     );
 
     let mut crowded = TestMtlMaterial::new("crowded");
-    for slot in 0..=MAX_TEXTURE_SLOTS {
+    for slot in 0..TEXTURES {
         crowded = crowded.texture(&format!("TexSlot{slot}"), "a.tif");
     }
-    assert!(matches!(
-        parse(&TestMtl::single(&crowded).cryxml()),
-        Err(MaterialError::TooMany {
-            what: "texture slots in one material",
-            ..
-        })
-    ));
+    let library =
+        parse(&TestMtl::single(&crowded).cryxml()).expect("complete original texture slots");
+    assert_eq!(
+        library
+            .materials
+            .first()
+            .map(|material| material.textures.len()),
+        Some(TEXTURES),
+        "every original texture slot is retained"
+    );
 }
 
 #[test]

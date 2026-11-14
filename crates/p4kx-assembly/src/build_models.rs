@@ -4,10 +4,13 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+use p4kx_extraction::{EntryOrigin, ModelArchiveSource};
 use p4kx_model::{Lod, Model};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
+use crate::GearPoseSources;
 use crate::build::{file_key, issue};
+use crate::cdf_model_sources::CdfModelSources;
 use crate::flatten::Draft;
 use crate::geometry_choice::GeometryChoice;
 use crate::{
@@ -23,6 +26,10 @@ const WAVE: usize = 256;
 pub(crate) struct Loaded {
     pub(crate) entry: String,
     pub(crate) model: Arc<Model>,
+    pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) cdf_model_sources: Option<Arc<CdfModelSources>>,
+    pub(crate) gear_pose: Option<Arc<GearPoseSources>>,
+    pub(crate) definition_origin: Option<EntryOrigin>,
     pub(crate) left_out: Vec<String>,
     pub(crate) attachments: Vec<ProvidedAttachment>,
     pub(crate) skeleton: Option<SkeletonProblem>,
@@ -173,6 +180,10 @@ fn read_files(
                 let result = provider.model(path, lod).map(|provided| Loaded {
                     entry: provided.entry,
                     model: Arc::new(provided.model),
+                    archive_sources: provided.archive_sources,
+                    cdf_model_sources: provided.cdf_model_sources,
+                    gear_pose: None,
+                    definition_origin: provided.definition_origin,
                     left_out: provided.left_out,
                     attachments: provided.attachments,
                     skeleton: provided.skeleton,

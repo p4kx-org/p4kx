@@ -2,24 +2,21 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{BTreeMap, HashMap, HashSet};
-use std::io::ErrorKind;
-use std::path::Path;
 
 use p4kx_extraction::{Archive, CancelToken, Guid};
 use rayon::prelude::*;
 
+use crate::catalog_read::original::EntryCapture;
 use crate::contract::StarmapObject;
 use crate::contract_harvest::HarvestableLocation;
+use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
-use crate::soc_preset::PresetScan;
 use crate::starmap_walk::Opened;
-
-/// The most objects followed upwards from a container to find the object it belongs to.
-const MAX_CHAIN: usize = 64;
+use crate::{CatalogError, Kind};
 
 /// What the first `.soc` of a container says.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Soc {
+pub(crate) enum Soc {
     Preset(Guid),
     Plain,
     Unreadable(&'static str),
@@ -33,9 +30,8 @@ pub(crate) enum NoObject {
     NoneAbove,
     /// The object the container hangs below is not in the starmap objects.
     NotInCatalog,
-    /// [`MAX_CHAIN`] or more mining claim markers lie between the container and the first object
-    /// that is none.
-    ChainTooLong,
+    /// Mining claim markers form a cycle above the container.
+    MarkerCycle,
     /// A mining claim marker is the top of the chain, with no object above it.
     MarkerWithoutParent,
 }
@@ -48,7 +44,7 @@ impl NoObject {
             Self::NotInCatalog => {
                 "the object the container hangs below is not in the starmap objects"
             }
-            Self::ChainTooLong => "64 or more mining claim markers lie above the container",
+            Self::MarkerCycle => "mining claim markers form a cycle above the container",
             Self::MarkerWithoutParent => "a mining claim marker has no object above it",
         }
     }
@@ -64,6 +60,7 @@ impl NoObject {
 /// the reason, ordered by path, and how many locations lack an object for each reason that is a
 /// loss, ordered by reason.
 pub(crate) struct Located {
+    pub(crate) ledger: ExportLedger,
     pub(crate) locations: Vec<HarvestableLocation>,
     pub(crate) unreadable: Vec<String>,
     pub(crate) without_object: Vec<(NoObject, usize)>,
@@ -97,14 +94,28 @@ impl Objects {
     /// a mining claim marker; the reason when there is none.
     pub(crate) fn location(&self, under: Option<Guid>) -> Result<CatalogGuid, NoObject> {
         let mut at = under.ok_or(NoObject::NoneAbove)?;
-        for _ in 0..MAX_CHAIN {
+        let mut fast = Some(at);
+        loop {
             let &(mining_claim, above) = self.by_guid.get(&at).ok_or(NoObject::NotInCatalog)?;
             if !mining_claim {
                 return Ok(CatalogGuid(at));
             }
             at = above.ok_or(NoObject::MarkerWithoutParent)?;
+            // The fast cursor detects cycles; the main cursor classifies terminal failures.
+            fast = fast
+                .and_then(|node| self.marker_parent(node))
+                .and_then(|node| self.marker_parent(node));
+            if fast == Some(at) {
+                return Err(NoObject::MarkerCycle);
+            }
         }
-        Err(NoObject::ChainTooLong)
+    }
+
+    fn marker_parent(&self, at: Guid) -> Option<Guid> {
+        match self.by_guid.get(&at) {
+            Some(&(true, above)) => above,
+            _ => None,
+        }
     }
 }
 
@@ -117,15 +128,12 @@ pub(crate) fn locate(
     presets: &HashSet<Guid>,
     objects: &Objects,
     cancel: Option<&CancelToken>,
-) -> Located {
+    capture: &EntryCapture<'_>,
+) -> Result<Located, CatalogError> {
     let mut entries: Vec<usize> = opened.iter().map(|container| container.entry).collect();
     entries.sort_unstable();
     entries.dedup();
-    let read: HashMap<usize, Soc> = entries
-        .par_iter()
-        .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
-        .map(|&entry| (entry, soc_of(archive, entry)))
-        .collect();
+    let (read, mut ledger) = read_sources(archive, &entries, cancel, capture)?;
     let mut unreadable: Vec<String> = read
         .iter()
         .filter_map(|(&entry, soc)| match soc {
@@ -154,12 +162,40 @@ pub(crate) fn locate(
             })
         })
         .collect();
+    let authored_rows = rows.len();
     sort_unique(&mut rows);
-    Located {
+    ledger.skipped_rows(Kind::HarvestableLocations, authored_rows - rows.len());
+    if !cancel.is_some_and(CancelToken::is_cancelled) {
+        ledger.inventory(Kind::HarvestableLocations);
+    }
+    Ok(Located {
+        ledger,
         without_object: losses(&rows),
         locations: rows.into_iter().map(|(location, _)| location).collect(),
         unreadable,
+    })
+}
+
+fn read_sources(
+    archive: &Archive,
+    entries: &[usize],
+    cancel: Option<&CancelToken>,
+    capture: &EntryCapture<'_>,
+) -> Result<(HashMap<usize, Soc>, ExportLedger), CatalogError> {
+    let reads: Vec<_> = entries
+        .par_iter()
+        .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
+        .map(|&entry| {
+            crate::harvest_source::read(archive, entry, capture).map(|read| (entry, read))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let mut ledger = ExportLedger::default();
+    let mut sources = HashMap::with_capacity(reads.len());
+    for (entry, (soc, observed)) in reads {
+        ledger.merge(observed);
+        sources.insert(entry, soc);
     }
+    Ok((sources, ledger))
 }
 
 /// A location and why it has no object, `None` when it has one.
@@ -206,32 +242,6 @@ fn path_of(archive: &Archive, entry: usize) -> &str {
         .entries()
         .get(entry)
         .map_or("", p4kx_extraction::Entry::path)
-}
-
-fn soc_of(archive: &Archive, entry: usize) -> Soc {
-    let Some(socpak) = archive.entries().get(entry) else {
-        return Soc::Unreadable("no such entry");
-    };
-    let Ok(container) = archive.open_container(socpak) else {
-        return Soc::Unreadable("cannot be opened as a container");
-    };
-    let Some(soc) = container.entries().iter().find(|inner| {
-        Path::new(inner.path())
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case("soc"))
-    }) else {
-        return Soc::Plain;
-    };
-    let Ok(reader) = container.open_entry(soc) else {
-        return Soc::Unreadable("its .soc cannot be opened");
-    };
-    match PresetScan::read(reader) {
-        Ok(preset) => preset.map_or(Soc::Plain, Soc::Preset),
-        Err(error) if error.kind() == ErrorKind::FileTooLarge => {
-            Soc::Unreadable("its .soc is over the scan limit")
-        }
-        Err(_) => Soc::Unreadable("its .soc cannot be read"),
-    }
 }
 
 #[cfg(test)]
@@ -292,9 +302,13 @@ mod tests {
     }
 
     #[test]
-    fn sixty_four_markers_are_too_long() {
+    fn sixty_four_markers_reach_the_object_above() {
         let objects = markers_then_plain(64);
-        assert_eq!(objects.location(Some(guid(1))), Err(NoObject::ChainTooLong));
+        assert_eq!(
+            objects.location(Some(guid(1))),
+            Ok(CatalogGuid(guid(65))),
+            "all sixty-four original markers reach their terminal object"
+        );
         assert_eq!(objects.location(Some(guid(2))), Ok(CatalogGuid(guid(65))));
     }
 
@@ -334,3 +348,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "harvest_location_chain_tests.rs"]
+mod chain_tests;

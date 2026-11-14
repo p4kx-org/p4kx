@@ -6,7 +6,7 @@ use std::path::Path;
 use p4kx_extraction::{Archive, Guid};
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestElement, TestEntry, test_key};
 
-use crate::starmap_containers::{Limits, Placements};
+use crate::starmap_containers::{Limits, PlacementScope, Placements};
 use crate::starmap_index::Index;
 use crate::starmap_parse::read_all;
 
@@ -81,7 +81,16 @@ fn open(dir: &Path, entries: Vec<TestEntry>) -> Archive {
 
 fn read(dir: &Path, entries: Vec<TestEntry>, limits: Limits) -> Placements {
     let archive = open(dir, entries);
-    Placements::read_within(&archive, None, limits).expect("placements")
+    crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        Placements::read_within(
+            &archive,
+            None,
+            limits,
+            capture,
+            PlacementScope::RecordSelection,
+        )
+    })
+    .expect("placements")
 }
 
 fn system(xml: &str, others: &[(&str, String)]) -> Vec<TestEntry> {
@@ -270,14 +279,18 @@ fn a_container_instanced_several_times_is_parsed_once() {
     let index = Index::new(&archive);
     let roots: Vec<usize> = index.systems().iter().map(|(_, entry)| *entry).collect();
     let limits = Limits::default();
-    let read = read_all(
-        &archive,
-        &index,
-        &roots,
-        None,
-        limits.external,
-        (limits.depth, limits.children),
-    );
+    let read = crate::catalog_read::original::with_entry_capture(&archive, |capture| {
+        read_all(
+            &archive,
+            &index,
+            &roots,
+            None,
+            limits.external,
+            (limits.depth, limits.children),
+            capture,
+        )
+    })
+    .expect("original Entry capture");
     assert_eq!(read.parsed, 3, "the system, the ring and the leaf");
     assert_eq!(read.bodies.len(), 3, "each held once");
 }
@@ -307,21 +320,53 @@ fn a_container_without_the_main_xml_name_is_read_and_reported() {
 }
 
 #[test]
-fn a_second_child_list_is_reported() {
+fn all_direct_child_lists_are_read_in_document_order() {
     let dir = tempfile::tempdir().expect("a directory");
     let xml = TestElement::new("ObjectContainer")
         .child(TestElement::new("ChildObjectContainers").child(child("1,0,0", 1)))
-        .child(TestElement::new("ChildObjectContainers").child(child("2,0,0", 2)))
+        .child(
+            TestElement::new("ChildObjectContainers")
+                .child(child("1.001,0,0", 1))
+                .child(child("2,0,0", 2)),
+        )
+        .child(
+            TestElement::new("Wrapper")
+                .child(TestElement::new("ChildObjectContainers").child(child("3,0,0", 3))),
+        )
         .to_xml();
     let placements = read(dir.path(), system(&xml, &[]), Limits::default());
-    assert!(placed(&placements, 1).is_some(), "the first list is read");
-    assert_eq!(placed(&placements, 2), None, "the second is not");
-    assert!(
-        placements
-            .report
-            .issues
-            .iter()
-            .any(|line| line.contains("more than one ChildObjectContainers")),
-        "an issue line"
+    assert_eq!(
+        placed(&placements, 1),
+        Some([1.0, 0.0, 0.0]),
+        "the first direct list wins for an equivalent repeated position"
+    );
+    assert_eq!(
+        placed(&placements, 2),
+        Some([2.0, 0.0, 0.0]),
+        "the second direct list supplies its authored position"
+    );
+    assert_eq!(placed(&placements, 3), None, "direct list ownership wins");
+}
+
+#[test]
+fn a_legacy_wrapped_child_list_is_read_when_there_is_no_direct_list() {
+    let dir = tempfile::tempdir().expect("a directory");
+    let xml = TestElement::new("ObjectContainer")
+        .child(
+            TestElement::new("Wrapper")
+                .child(TestElement::new("ChildObjectContainers").child(child("1,0,0", 1))),
+        )
+        .to_xml();
+    let placements = read(dir.path(), system(&xml, &[]), Limits::default());
+    assert_eq!(
+        placed(&placements, 1),
+        Some([1.0, 0.0, 0.0]),
+        "a wrapped list is the fallback when no direct list exists"
     );
 }
+
+#[path = "starmap_child_path_tests.rs"]
+mod child_paths;
+
+#[path = "starmap_hcd_tests.rs"]
+mod hcd;

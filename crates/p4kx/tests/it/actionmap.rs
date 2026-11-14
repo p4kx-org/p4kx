@@ -11,6 +11,9 @@ use predicates::prelude::predicate;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "actionmap_origins.rs"]
+mod origins;
+
 const PROFILE: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
 <profile version="1">
   <actionmap name="seat_general" version="1" UILabel="@ui_CGSeatGeneral">

@@ -266,7 +266,7 @@ fn the_folder_holds_only_the_manifest_and_the_files_it_lists() -> TestResult {
 
     assert_eq!(
         names_in(&written.out)?,
-        ["meshes", "scene.json", "textures"]
+        ["meshes", "receipt.json", "scene.json", "textures"]
     );
     let meshes = names_in(&written.out.join("meshes"))?;
     assert_eq!(meshes.len(), written.manifest.meshes.len());

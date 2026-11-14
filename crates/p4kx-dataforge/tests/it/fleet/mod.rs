@@ -142,7 +142,7 @@ fn dock(guid: u128, name: &str, pilot: TestValue) -> TestRecord {
 /// unresolved References.
 pub(crate) fn rows(forge: &DataForge<'_>, text: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let compiled = Query::parse(text)?.compile(forge)?;
-    let run = compiled.run();
+    let run = compiled.run()?;
     let mut rows = Vec::new();
     for page in run.pages(NonZeroUsize::MIN.saturating_add(15)) {
         for row in page {

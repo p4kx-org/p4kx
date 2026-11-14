@@ -342,8 +342,7 @@ fn a_new_folder_is_named_after_the_chosen_side() -> TestResult {
     let name = summary
         .target()
         .file_name()
-        .map(|name| name.to_string_lossy().into_owned())
-        .unwrap_or_default();
+        .map_or_default(|name| name.to_string_lossy().into_owned());
     assert!(
         name.starts_with("SC-EXPORT-LIVE-4.3.1.10203-"),
         "named after the old side: {name}"

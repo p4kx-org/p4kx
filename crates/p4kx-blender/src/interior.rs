@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
 use p4kx_assembly::{Interior, ModelProvider};
 use p4kx_gltf::{GlbOptions, TextureLoader};
@@ -16,6 +17,7 @@ use crate::{PackageInfo, PackageResult, PackageSummary};
 pub struct InteriorScene<'a> {
     name: &'a str,
     interior: &'a Interior,
+    authored_soc: Option<&'a crate::SocScene>,
 }
 
 impl<'a> InteriorScene<'a> {
@@ -23,7 +25,18 @@ impl<'a> InteriorScene<'a> {
     /// puts `interior` in the scene.
     #[must_use]
     pub const fn new(name: &'a str, interior: &'a Interior) -> Self {
-        Self { name, interior }
+        Self {
+            name,
+            interior,
+            authored_soc: None,
+        }
+    }
+
+    /// Adds an authored SOC source document to the package.
+    #[must_use]
+    pub const fn with_authored_soc(mut self, scene: &'a crate::SocScene) -> Self {
+        self.authored_soc = Some(scene);
+        self
     }
 }
 
@@ -60,13 +73,41 @@ pub fn write_interior_package(
     out: &Path,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> PackageResult<PackageSummary> {
+    let observed = AtomicBool::new(false);
+    write_interior_package_with_context(
+        scene,
+        models,
+        textures,
+        options,
+        info,
+        out,
+        &crate::PackageWriteContext::standalone(cancelled, &observed),
+    )
+}
+
+/// Writes an Interior package with source protection at every output boundary.
+///
+/// # Errors
+/// Returns protection, cancellation, package validation, mesh or file failures.
+pub fn write_interior_package_with_context(
+    scene: &InteriorScene<'_>,
+    models: &dyn ModelProvider,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    info: &PackageInfo,
+    out: &Path,
+    context: &crate::PackageWriteContext<'_>,
+) -> PackageResult<PackageSummary> {
     let scene = Scene {
         entity: EntityRef {
             class_name: scene.name.to_owned(),
             guid: String::new(),
+            classification: None,
         },
         items: interior_items(scene.interior),
         issues: scene.interior.issues(),
+        classification: None,
+        authored_soc: scene.authored_soc,
     };
-    write_scene(&scene, models, textures, options, info, out, cancelled)
+    write_scene(&scene, models, textures, options, info, out, context)
 }

@@ -114,6 +114,12 @@ Schriftlizenz sind modal, mit flachem Scrim `rgba(0,0,0,0.8)`. „Extraktion lä
 weiter browsen und die Vorschau nutzen, das Archiv wird nur gelesen. Die drei
 Extraktionsaktionen und „Neu laden" sind gesperrt, bis die Extraktion endet.
 
+Ein Startfehler oder unerwartetes Ende des Systemdialogs erscheint als breites Gefahrenmodal
+mit der lokalisierten Überschrift „Auswahldialog fehlgeschlagen“, dem tatsächlichen Grund
+in einer Gefahrenmeldung und „Schließen“ als einziger Fußaktion. Kopf und Fuß stehen fest;
+lange Gründe verwenden den vorhandenen scrollbaren Körper. Ein regulärer Abbruch ist kein
+Fehler. Das Modal verwendet ausschließlich die bestehenden Dark-/Lato-Tokens.
+
 **D.4 Marke: Logo-Zeichen vor der Wortmarke, in Orange.** In der Kopfzeile steht das Logo-Zeichen
 (Datenklammern um ein X, [`logo.md`](logo.md), ADR-0075) 32 px groß (`brandMarkSize`), 8 px
 (`brandGap`) davor die Wortmarke „P4KX" Bold 700, 14,4 px, `color-primary`. Fenster, Taskleiste,
@@ -192,6 +198,8 @@ größere Mips scrollen. Mips, die größer sind, als die Vorschau zeigen kann (
 8192 × 8192 Pixel oder über der größten Texturgröße des Renderers), werden nicht angeboten;
 hat eine Textur kein solches Mip, sagt der Tab das. Einen Schachbrett-Hintergrund für Transparenz gibt es nicht, weil das DS dafür keine
 Farben hat; Alpha wird auf `surface-panel` gemischt.
+Das vorhandene Tooltip-Widget zeigt an Faktenleiste, Mip-Auswahl und Bild die
+Verschlüsselungsherkunft der jeweiligen Daten.
 
 **D.15 Abfrage als dritter Tab im Arbeitsbereich.** „Abfrage" folgt auf „Durchsuchen" und
 „Vergleich". Oben steht der Editor als `textarea` mit „Abfrage ausführen" als der einen CTA des
@@ -280,14 +288,20 @@ nach 64 MiB an einer Zeilengrenze gekürzt und trägt dann den Kürzungshinweis 
 wie der Tab „Text". Schlägt die Umwandlung fehl, steht der Grund in `color-danger-text` im Tab;
 „Text" und „Hex" zeigen die Daten weiter. „Kopieren" kopiert im Tab „XML" das umgewandelte XML.
 
-**D.20 Basetool-Katalog im Export-Menü ohne eigenen Dialog.** „Basetool-Katalog …" steht im
-Menü „Export" unter „Record-Export …" und ist gesperrt, solange das Archiv kein DataForge hat oder
-DataForge nicht geladen werden konnte, und während ein Katalog erstellt wird. Es gibt nichts zu
-entscheiden außer der Zieldatei, deshalb öffnet der Eintrag direkt den Speichern-Dialog des
-Systems mit `basetool-catalog.json` (D.3); erst die gewählte Datei startet den Katalog. Fortschritt
-und Ergebnis sind wie beim Record-Export nicht modal mit je genau einer Aktion im Fuß (D.7, D.17):
+**D.20 Basetool-Katalog im Export-Menü ohne eigenen Dialog.** „Basetool-Katalog …" und
+„Basetool-Diagnosekatalog …" stehen im Menü „Export" unter „Record-Export …". Beide sind gesperrt,
+solange das Archiv kein DataForge hat oder DataForge nicht geladen werden konnte, und während ein
+Katalog erstellt wird. Jeder Eintrag öffnet direkt den Speichern-Dialog des Systems (D.3), mit
+`basetool-catalog.json.zst` bzw. `basetool-catalog.diagnostic.json.zst`; erst die gewählte Datei
+startet den Katalog. Die Diagnosefreigabe gilt nur für diesen Auftrag und wird nicht gespeichert.
+Normale Exporte verweigern bei unvollständigen Quellen oder Projektionen das Erstellen oder Ersetzen
+der Datei; das Gefahrenfenster erläutert die separate Diagnoseaktion. Fortschritts- und Ergebnistitel
+benennen einen Diagnosekatalog ausdrücklich. Dessen Ergebnis zeigt zusätzlich einen Hinweis in
+`color-warning`. Fortschritt und Ergebnis sind wie beim Record-Export nicht modal mit je genau einer Aktion im Fuß (D.7, D.17):
 Spinner beim Lesen von DataForge und beim Schreiben, dazwischen der Balken mit geprüften Records.
-Die Zusammenfassung gliedert sich mit Gruppenlabels in „Arten" (je Art geschrieben, übersprungen,
+Die Zusammenfassung beginnt mit dem Exportzustand: vollständige Quellen und Projektionen in
+`color-gray-1`, unvollständige in `color-warning`. Sie gliedert sich mit Gruppenlabels in
+„Arten (Auswahlumfang)" (je Art geschrieben, übersprungen,
 vollständig oder teilweise, darunter die übersprungenen Entwicklungsreste) und „Texte" (je Sprache
 aufgelöst, fehlend, Platzhalter, darunter die fehlenden Texte), dann Größe mit Upload-Limit und
 Datei, alles in `color-gray-1`. Größe und Limit stehen in Dezimaleinheiten, das Limit wie in der
@@ -296,6 +310,22 @@ Dokumentation als „64 MB". Nahe am Upload-Limit steht oben `.alert-warning`, d
 lässt eine vorhandene unverändert; der Hinweis darauf steht in `color-warning`. Ist die gewählte
 Datei das offene Archiv, startet nichts, und das Gefahrenfenster sagt es in `color-danger-text`.
 Der Katalog liest DataForge aus dem einen Cache des offenen Archivs (D.22), also nur einmal.
+
+Unter Flatpak ersetzt eine gemeinsame Zielauswahl den Speichern-Dialog für Dateiexporte und
+die Zielordnerwahl für Blender-Pakete: Sie zeigt den übergeordneten Ordner, einen einzelnen
+Datei- oder Paketordnernamen und den vollständigen Zielpfad. „Ordner wählen …“ öffnet den
+Ordnerdialog des Systems für den übergeordneten Ordner; dessen Rückgabepfad bleibt erhalten.
+„Export starten“ bestätigt Katalog, Diagnosekatalog, Query, Vergleichsbericht oder UI-Bild und
+startet genau diesen Auftrag. Bei Modell-, Entity- und Charakter-Setups übernimmt „Ziel übernehmen“
+nur das Ziel in den bestehenden Exportdialog. Ohne gewählten Elternordner oder mit leerem Namen,
+Steuerzeichen, absolutem Pfad, Pfadtrennern oder den Komponenten `.` / `..` bleibt die Bestätigung
+gesperrt. Die Anzeige enthält dieselbe GLB- und Katalognamensnormalisierung wie der Schreiber.
+Die Diagnosefreigabe gilt weiterhin nur für diesen Auftrag; Abbrechen und Besitzerwechsel
+verwerfen sie. Verspätete Ordnerantworten einer verworfenen Auswahl werden ignoriert.
+Außerhalb Flatpaks bleibt der bisherige Systemdialog bestehen. Die gemeinsame Auswahl verwendet
+`modal--wide`, bestehende Feld-, Ghost- und CTA-Widgets, Lato und die vorhandenen Dark-Tokens;
+es entstehen keine neuen Maße. Eine Ordnerwahl ersetzt keine Schutz- oder Identitätsprüfung.
+
 
 Entscheidungen ab **D.22** (Record-Vorschau, Texturgruppen, Scrollflächen, Lokalisierung, Sprache der Record-Texte,
 Abfrage-Vervollständigung, Container als Ordner, Tonformat der Extraktion, 3D-Ansicht des Modells, Tags) stehen in

@@ -201,7 +201,7 @@ fn a_cubemap_mip_holds_every_face_from_its_part_or_the_header() -> Result<(), Te
         assert_eq!(mip.surfaces(), 6, "six faces of mip {level}");
         for face in 0..6 {
             assert_eq!(
-                mip.surface(face),
+                mip.surface(u64::from(face)),
                 Some(dds.surface_mip(face, level).as_slice()),
                 "face {face} of mip {level}"
             );

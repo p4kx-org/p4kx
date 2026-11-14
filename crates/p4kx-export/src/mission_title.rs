@@ -3,197 +3,75 @@
 
 use std::borrow::Cow;
 
-use crate::contract::LocalisedText;
-use crate::texts::Texts;
+use p4kx_extraction::CancelToken;
 
-const OPEN: &str = "~mission(";
-const MAX_DEPTH: usize = 3;
-const MAX_REPLACEMENTS: usize = 64;
-const MAX_OUTPUT: usize = 4096;
+use crate::CatalogError;
 
-/// What a `~mission(Token)` in a text is replaced by.
-pub(crate) enum Token<'a> {
-    /// The text of this localisation key, in the language being written.
-    Key(&'a str),
-    /// A value the game picks when the mission starts, written as `[NAME]`.
-    Placeholder(&'a str),
+#[path = "mission_title_graph.rs"]
+mod graph;
+#[path = "mission_title_key.rs"]
+mod key;
+#[path = "mission_title_plan.rs"]
+mod plan;
+#[path = "mission_title_render.rs"]
+mod render;
+
+pub(crate) use key::AsciiKey;
+
+type Resolve<'query, 'source> = dyn FnMut(&'source str, &str, Option<&str>) -> Result<Option<Token<'source>>, CatalogError>
+    + 'query;
+type Localise<'query, 'source> =
+    dyn FnMut(&'source str) -> Result<Option<Cow<'source, str>>, CatalogError> + 'query;
+
+/// What a mission token denotes in the selected property layer.
+pub(crate) enum Token<'source> {
+    /// The selected locale key for this property.
+    Key(&'source str),
+    /// A runtime value displayed with the authored bracket convention.
+    Placeholder(&'source str),
 }
 
-/// The text a token stands for in one language.
-enum Replacement<'a> {
-    Text(Cow<'a, str>),
-    Placeholder(&'a str),
-}
-
-type Lookup<'x, 'a> = dyn Fn(&str, Option<&str>) -> Option<Replacement<'a>> + 'x;
-
-/// Returns `key` as a [`LocalisedText`] whose texts have every `~mission(Token[|Variant])`
-/// replaced by what `resolve` says for the token and the variant. A token `resolve` returns
-/// `None` for, or whose key has no text in the language, becomes `[TOKEN]` in upper case. A
-/// replacement that holds tokens is expanded up to three levels deep; a text takes at most 64
-/// replacements and about 4 KiB, and a token past either limit becomes `[TOKEN]` too.
-pub(crate) fn expand_text<'a>(
-    key: Option<&'a str>,
-    texts: &Texts<'a>,
-    resolve: &dyn Fn(&str, Option<&str>) -> Option<Token<'a>>,
-) -> LocalisedText<'a> {
-    let mut expanded = texts.localised(key);
-    expanded.en = expanded
-        .en
-        .take()
-        .map(|text| render(text, texts, resolve, english));
-    expanded.de = expanded
-        .de
-        .take()
-        .map(|text| render(text, texts, resolve, german));
-    expanded
-}
-
-fn english<'x>(text: &'x LocalisedText<'_>) -> Option<&'x str> {
-    text.en.as_deref()
-}
-
-fn german<'x>(text: &'x LocalisedText<'_>) -> Option<&'x str> {
-    text.de.as_deref()
-}
-
-fn render<'a>(
-    text: Cow<'a, str>,
-    texts: &Texts<'a>,
-    resolve: &dyn Fn(&str, Option<&str>) -> Option<Token<'a>>,
-    pick: for<'x> fn(&'x LocalisedText<'a>) -> Option<&'x str>,
-) -> Cow<'a, str> {
-    if !text.contains(OPEN) {
-        return text;
+/// Expands one actual language with fallible source lookup and token selection.
+pub(crate) fn render_language<'source>(
+    key: &'source str,
+    text: Cow<'source, str>,
+    localise: &mut Localise<'_, 'source>,
+    resolve: &mut Resolve<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<Cow<'source, str>, CatalogError> {
+    if !text.contains(graph::OPEN) {
+        return Ok(text);
     }
-    let lookup = |name: &str, variant: Option<&str>| match resolve(name, variant)? {
-        Token::Key(key) => {
-            let found = texts.localised(Some(key));
-            pick(&found)
-                .filter(|found| !found.is_empty())
-                .map(|found| Replacement::Text(Cow::Owned(found.to_owned())))
-        }
-        Token::Placeholder(label) => Some(Replacement::Placeholder(label)),
-    };
-    Cow::Owned(expand_tokens(&text, &lookup))
+    render_key(key, text, localise, resolve, cancel).map(Cow::Owned)
 }
 
-/// Replaces the tokens of `text` through `lookup`, within the depth, count and size limits.
-fn expand_tokens(text: &str, lookup: &Lookup<'_, '_>) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut count = 0;
-    substitute(&mut out, text, 0, &mut count, lookup);
-    out
+fn render_key<'source>(
+    key: &'source str,
+    text: Cow<'source, str>,
+    localise: &mut Localise<'_, 'source>,
+    resolve: &mut Resolve<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<String, CatalogError> {
+    let graph = graph::Graph::build(key, text, localise, resolve, cancel)?;
+    let plan = plan::analyze(&graph, cancel)?;
+    render::write(&graph, &plan, cancel)
 }
 
-fn substitute(
-    out: &mut String,
-    text: &str,
-    depth: usize,
-    count: &mut usize,
-    lookup: &Lookup<'_, '_>,
-) {
-    let mut rest: &str = text;
-    while let Some((before, after)) = rest.split_once(OPEN) {
-        out.push_str(before);
-        if let Some((content, tail)) = after.split_once(')') {
-            let (name, variant) = match content.split_once('|') {
-                Some((name, variant)) => {
-                    (name, Some(variant).filter(|variant| !variant.is_empty()))
-                }
-                None => (content, None),
-            };
-            expand(out, (name, variant), depth, count, lookup);
-            rest = tail;
-        } else {
-            out.push_str(OPEN);
-            rest = after;
-        }
+pub(super) fn check_cancel(cancel: Option<&CancelToken>) -> Result<(), CatalogError> {
+    if cancel.is_some_and(CancelToken::is_cancelled) {
+        return Err(CatalogError::Cancelled);
     }
-    out.push_str(rest);
+    Ok(())
 }
 
-fn expand(
-    out: &mut String,
-    (name, variant): (&str, Option<&str>),
-    depth: usize,
-    count: &mut usize,
-    lookup: &Lookup<'_, '_>,
-) {
-    *count = count.saturating_add(1);
-    if *count <= MAX_REPLACEMENTS && out.len() < MAX_OUTPUT {
-        match lookup(name, variant) {
-            Some(Replacement::Placeholder(label)) => {
-                out.push('[');
-                out.push_str(label);
-                out.push(']');
-                return;
-            }
-            Some(Replacement::Text(found)) => {
-                let fits = out.len().saturating_add(found.len()) <= MAX_OUTPUT;
-                if !found.contains(OPEN) && fits {
-                    out.push_str(&found);
-                    return;
-                }
-                if depth < MAX_DEPTH && fits {
-                    substitute(out, &found, depth + 1, count, lookup);
-                    return;
-                }
-            }
-            None => {}
-        }
-    }
-    out.push('[');
-    out.push_str(&name.to_ascii_uppercase());
-    out.push(']');
+fn push<T>(items: &mut Vec<T>, value: T) -> Result<(), CatalogError> {
+    items
+        .try_reserve(1)
+        .map_err(CatalogError::MissionTextAllocation)?;
+    items.push(value);
+    Ok(())
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn run(text: &str, table: &[(&str, &str)]) -> String {
-        let lookup = |name: &str, _: Option<&str>| {
-            table
-                .iter()
-                .find(|(token, _)| *token == name)
-                .map(|(_, text)| Replacement::Text(Cow::Borrowed(*text)))
-        };
-        expand_tokens(text, &lookup)
-    }
-
-    #[test]
-    fn a_self_referencing_replacement_stops_at_the_depth_limit() {
-        let out = run("~mission(A)", &[("A", "x ~mission(A)")]);
-        assert_eq!(out, "x x x [A]");
-    }
-
-    #[test]
-    fn a_high_fan_out_is_bounded_by_count_and_size() {
-        let bomb = "~mission(A)".repeat(100);
-        let out = run(&bomb, &[("A", &bomb)]);
-        assert!(out.len() <= MAX_OUTPUT * 2, "{} bytes", out.len());
-        assert!(out.ends_with("[A]"));
-    }
-
-    #[test]
-    fn an_unterminated_token_stays_as_written() {
-        assert_eq!(run("a ~mission(B", &[("B", "b")]), "a ~mission(B");
-    }
-
-    #[test]
-    fn an_empty_token_becomes_empty_brackets() {
-        assert_eq!(run("a ~mission() b", &[]), "a [] b");
-    }
-
-    #[test]
-    fn an_unknown_token_is_written_in_upper_case() {
-        assert_eq!(run("~mission(cargo|x)", &[]), "[CARGO]");
-    }
-
-    #[test]
-    fn a_nested_replacement_is_expanded() {
-        let out = run("<~mission(A)>", &[("A", "in ~mission(B)"), ("B", "deep")]);
-        assert_eq!(out, "<in deep>");
-    }
-}
+#[path = "mission_title_tests.rs"]
+mod tests;

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
-
 use p4kx_dataforge::{DataForge, Guid, TAG_PATH_SEPARATOR, TagTree};
 
 use super::condition::{Condition, counted};
@@ -51,26 +49,21 @@ impl Subject {
 
 #[derive(Debug, Default)]
 pub(crate) struct TagPaths {
-    paths: HashMap<Guid, String>,
+    tree: TagTree,
 }
 
 impl TagPaths {
     pub(crate) fn build(forge: &DataForge<'_>) -> Self {
-        let tree = TagTree::build(forge);
         Self {
-            paths: tree
-                .iter()
-                .map(|tag| (tag.guid(), tag.path().to_owned()))
-                .collect(),
+            tree: TagTree::build(forge),
         }
     }
 
-    /// Returns the tag at `path`, ignoring case: an exact match first, then the lowest GUID.
+    /// Returns the tag at path, ignoring ASCII case: an exact match first, then the lowest GUID.
     pub(crate) fn guid_of(&self, path: &str) -> Option<Guid> {
-        self.paths
-            .iter()
-            .filter(|(_, own)| own.eq_ignore_ascii_case(path))
-            .map(|(guid, own)| (own.as_str() != path, *guid))
+        self.tree
+            .find_path(path)
+            .map(|tag| (!tag.path_view().eq_text(path), tag.guid()))
             .min()
             .map(|(_, guid)| guid)
     }
@@ -79,11 +72,26 @@ impl TagPaths {
         if tag == ancestor {
             return true;
         }
-        let (Some(path), Some(base)) = (self.paths.get(&tag), self.paths.get(&ancestor)) else {
+        let (Some(tag), Some(base)) = (self.tree.get(tag), self.tree.get(ancestor)) else {
             return false;
         };
-        path.strip_prefix(base.as_str())
-            .is_some_and(|rest| rest.starts_with(TAG_PATH_SEPARATOR))
+        if tag.is_within(&base) {
+            return true;
+        }
+        let base = base.path_view();
+        let path = tag.path_view();
+        if path.byte_len() <= base.byte_len() {
+            return false;
+        }
+        let Ok(prefix_bytes) = usize::try_from(base.byte_len()) else {
+            return false;
+        };
+        let joined = path.to_string();
+        joined
+            .split_at_checked(prefix_bytes)
+            .is_some_and(|(prefix, rest)| {
+                base.eq_text(prefix) && rest.starts_with(TAG_PATH_SEPARATOR)
+            })
     }
 
     fn has(&self, subject: &Subject, wanted: Guid) -> bool {

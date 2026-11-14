@@ -3,7 +3,7 @@
 
 use crate::query::operand::{Operand, OperandError};
 use crate::query::reader::Reader;
-use crate::query::state::WalkState;
+use crate::query::selection_control::{Control, EvaluationError};
 use crate::query::walk::Place;
 use crate::query::{Comparison, Condition, Operator, QueryError, QueryErrorKind};
 use crate::{DataForge, DataType};
@@ -63,49 +63,71 @@ impl Predicate {
         }
     }
 
-    /// Returns whether the instance at `place` meets the predicate, with `tests` of its struct;
-    /// `None` when that is unknown because a compared value is missing or unreadable. Each
-    /// comparison streams its values with a budget of its own, as it holds none of them.
-    ///
-    /// A comparison over a path that reaches several values holds when one of them compares
-    /// true; it is unknown when none does and one is unknown, and false otherwise.
-    pub(crate) fn eval<'f>(
+    /// Evaluates the condition with Kleene truth values and demanded reading failures.
+    pub(super) fn eval<'f>(
         &self,
         forge: &'f DataForge<'f>,
         tests: &[Option<Test>],
         place: Place<'f>,
-    ) -> Option<bool> {
-        match self {
+        control: &Control<'_>,
+    ) -> Result<Option<bool>, EvaluationError> {
+        if !control.proceed() {
+            return Err(EvaluationError::Stopped);
+        }
+        let result = match self {
             Self::Test(index, operator) => {
-                let test = tests.get(*index)?.as_ref()?;
+                let Some(test) = tests.get(*index).and_then(Option::as_ref) else {
+                    return Ok(None);
+                };
                 test.reader
-                    .any(forge, place, &mut WalkState::new(), |value| {
-                        test.operand.compare(*operator, value)
+                    .any(
+                        forge,
+                        place,
+                        &|| control.proceed(),
+                        control.observer(),
+                        |value| test.operand.compare(*operator, value),
+                    )
+                    .map_err(|source| EvaluationError::Read {
+                        comparison: *index,
+                        source,
                     })
             }
-            Self::Not(inner) => inner.eval(forge, tests, place).map(|holds| !holds),
-            Self::And(parts) => decide(parts, false, |part| part.eval(forge, tests, place)),
-            Self::Or(parts) => decide(parts, true, |part| part.eval(forge, tests, place)),
+            Self::Not(inner) => inner
+                .eval(forge, tests, place, control)
+                .map(|value| value.map(|holds| !holds)),
+            Self::And(parts) => {
+                decide(parts, false, |part| part.eval(forge, tests, place, control))
+            }
+            Self::Or(parts) => decide(parts, true, |part| part.eval(forge, tests, place, control)),
+        };
+        if control.proceed() {
+            result
+        } else {
+            Err(EvaluationError::Stopped)
         }
     }
 }
 
-/// Joins parts with Kleene logic: `decisive` from any part decides, otherwise an unknown part
-/// leaves the result unknown.
+/// Keeps provisional failures until another part proves the result without them.
 fn decide(
     parts: &[Predicate],
     decisive: bool,
-    mut eval: impl FnMut(&Predicate) -> Option<bool>,
-) -> Option<bool> {
+    mut eval: impl FnMut(&Predicate) -> Result<Option<bool>, EvaluationError>,
+) -> Result<Option<bool>, EvaluationError> {
     let mut result = Some(!decisive);
+    let mut failure = None;
     for part in parts {
         match eval(part) {
-            Some(holds) if holds == decisive => return Some(decisive),
-            Some(_) => {}
-            None => result = None,
+            Ok(Some(holds)) if holds == decisive => return Ok(Some(decisive)),
+            Ok(Some(_)) => {}
+            Ok(None) => result = None,
+            Err(EvaluationError::Stopped) => return Err(EvaluationError::Stopped),
+            Err(error) => {
+                failure.get_or_insert(error);
+            }
         }
     }
-    result
+    failure.map_or(Ok(result), Err)
 }
 
 /// Checks that the literal can compare with one of the `leaves`, the types of the scalars the

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use p4kx_foundation::ParseError;
 
 use crate::CorruptAnimation;
@@ -31,6 +33,24 @@ pub(crate) fn bytes_at(data: &[u8], start: usize, len: usize) -> Result<&[u8], C
         })
 }
 
+pub(crate) struct EncodedValues<T> {
+    pub(crate) values: Vec<T>,
+    pub(crate) bytes: usize,
+}
+
+fn decode_values<T>(
+    data: &[u8],
+    start: usize,
+    len: usize,
+    decode: impl FnOnce(&[u8]) -> Vec<T>,
+) -> Result<EncodedValues<T>, CorruptAnimation> {
+    let bytes = bytes_at(data, start, len)?;
+    Ok(EncodedValues {
+        values: decode(bytes),
+        bytes: bytes.len(),
+    })
+}
+
 fn u16_at(bytes: &[u8], at: usize) -> u16 {
     let pair = bytes
         .get(at..at + 2)
@@ -56,24 +76,26 @@ pub(crate) fn read_times(
     code: u8,
     count: usize,
     controller_id: u32,
-) -> Result<Vec<u16>, CorruptAnimation> {
-    let frames: Vec<u16> = match code {
-        TIME_BYTES => bytes_at(data, start, count)?
-            .iter()
-            .map(|&frame| u16::from(frame))
-            .collect(),
-        TIME_SHORTS => bytes_at(data, start, count.saturating_mul(2))?
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .map(|&pair| u16::from_le_bytes(pair))
-            .collect(),
+) -> Result<EncodedValues<u16>, CorruptAnimation> {
+    let frames = match code {
+        TIME_BYTES => decode_values(data, start, count, |bytes| {
+            bytes.iter().map(|&frame| u16::from(frame)).collect()
+        })?,
+        TIME_SHORTS => decode_values(data, start, count.saturating_mul(2), |bytes| {
+            bytes
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|&pair| u16::from_le_bytes(pair))
+                .collect()
+        })?,
         TIME_BITMAP => read_bitmap(data, start, count, controller_id)?,
         code => {
             return Err(CorruptAnimation::UnknownFormat { kind: "time", code });
         }
     };
     if frames
+        .values
         .windows(2)
         .any(|pair| matches!(pair, [before, after] if before >= after))
     {
@@ -82,12 +104,20 @@ pub(crate) fn read_times(
     Ok(frames)
 }
 
+pub(crate) const fn last_frame_bytes(frames: Range<u64>, encoding: u8) -> Range<u64> {
+    match encoding {
+        TIME_BYTES => frames.end - 1..frames.end,
+        TIME_SHORTS => frames.end - 2..frames.end,
+        _ => frames,
+    }
+}
+
 fn read_bitmap(
     data: &[u8],
     start: usize,
     count: usize,
     controller_id: u32,
-) -> Result<Vec<u16>, CorruptAnimation> {
+) -> Result<EncodedValues<u16>, CorruptAnimation> {
     let head = bytes_at(data, start, 4)?;
     let (first, last) = (u16_at(head, 0), u16_at(head, 2));
     if last < first {
@@ -122,7 +152,10 @@ fn read_bitmap(
             found: marked,
         });
     }
-    Ok(frames)
+    Ok(EncodedValues {
+        values: frames,
+        bytes: head.len() + bitmap.len(),
+    })
 }
 
 /// Reads `count` rotations stored in format `code` at `start` as unit quaternions in one
@@ -133,21 +166,27 @@ pub(crate) fn read_rotations(
     code: u8,
     count: usize,
     controller_id: u32,
-) -> Result<Vec<[f32; 4]>, CorruptAnimation> {
-    let mut rotations: Vec<[f32; 4]> = match code {
-        ROTATION_FLOAT => f32s::<4>(bytes_at(data, start, count.saturating_mul(16))?).collect(),
-        ROTATION_SMALL_TREE_48 => bytes_at(data, start, count.saturating_mul(6))?
-            .as_chunks::<6>()
-            .0
-            .iter()
-            .map(|key| small_tree(key, [15, 15, 15], 48))
-            .collect(),
-        ROTATION_SMALL_TREE_64 => bytes_at(data, start, count.saturating_mul(8))?
-            .as_chunks::<8>()
-            .0
-            .iter()
-            .map(|key| small_tree(key, [21, 21, 20], 64))
-            .collect(),
+) -> Result<EncodedValues<[f32; 4]>, CorruptAnimation> {
+    let mut rotations = match code {
+        ROTATION_FLOAT => decode_values(data, start, count.saturating_mul(16), |bytes| {
+            f32s::<4>(bytes).collect()
+        })?,
+        ROTATION_SMALL_TREE_48 => decode_values(data, start, count.saturating_mul(6), |bytes| {
+            bytes
+                .as_chunks::<6>()
+                .0
+                .iter()
+                .map(|key| small_tree(key, [15, 15, 15], 48))
+                .collect()
+        })?,
+        ROTATION_SMALL_TREE_64 => decode_values(data, start, count.saturating_mul(8), |bytes| {
+            bytes
+                .as_chunks::<8>()
+                .0
+                .iter()
+                .map(|key| small_tree(key, [21, 21, 20], 64))
+                .collect()
+        })?,
         code => {
             return Err(CorruptAnimation::UnknownFormat {
                 kind: "rotation",
@@ -156,7 +195,7 @@ pub(crate) fn read_rotations(
         }
     };
     let mut previous: Option<[f32; 4]> = None;
-    for rotation in &mut rotations {
+    for rotation in &mut rotations.values {
         if rotation.iter().any(|value| !value.is_finite()) {
             return Err(CorruptAnimation::NonFinite("rotation"));
         }
@@ -225,20 +264,24 @@ pub(crate) fn read_translations(
     start: usize,
     code: u8,
     count: usize,
-) -> Result<Vec<[f32; 3]>, CorruptAnimation> {
-    let translations: Vec<[f32; 3]> = match code {
-        POSITION_FLOAT => f32s::<3>(bytes_at(data, start, count.saturating_mul(12))?).collect(),
+) -> Result<EncodedValues<[f32; 3]>, CorruptAnimation> {
+    let translations = match code {
+        POSITION_FLOAT => decode_values(data, start, count.saturating_mul(12), |bytes| {
+            f32s::<3>(bytes).collect()
+        })?,
         POSITION_INTERLEAVED | POSITION_PLANAR => {
             let header = bytes_at(data, start, HEADER_LEN)?;
             let mut axes = f32s::<3>(header);
             let scale = axes.next().unwrap_or_default();
             let offset = axes.next().unwrap_or_default();
             let body = start + HEADER_LEN;
-            if code == POSITION_INTERLEAVED {
+            let mut decoded = if code == POSITION_INTERLEAVED {
                 interleaved(data, body, count, scale, offset)?
             } else {
                 planar(data, body, count, scale, offset)?
-            }
+            };
+            decoded.bytes += header.len();
+            decoded
         }
         code => {
             return Err(CorruptAnimation::UnknownFormat {
@@ -248,6 +291,7 @@ pub(crate) fn read_translations(
         }
     };
     if translations
+        .values
         .iter()
         .flatten()
         .any(|value| !value.is_finite())
@@ -267,24 +311,24 @@ fn interleaved(
     count: usize,
     scale: [f32; 3],
     offset: [f32; 3],
-) -> Result<Vec<[f32; 3]>, CorruptAnimation> {
-    let body = bytes_at(data, start, count.saturating_mul(6))?;
-    Ok(body
-        .as_chunks::<6>()
-        .0
-        .iter()
-        .map(|key| {
-            std::array::from_fn(|axis| {
-                let scale = scale.get(axis).copied().unwrap_or(0.0);
-                let offset = offset.get(axis).copied().unwrap_or(0.0);
-                if active(scale) {
-                    f32::from(u16_at(key.as_slice(), axis * 2)).mul_add(scale, offset)
-                } else {
-                    offset
-                }
+) -> Result<EncodedValues<[f32; 3]>, CorruptAnimation> {
+    decode_values(data, start, count.saturating_mul(6), |body| {
+        body.as_chunks::<6>()
+            .0
+            .iter()
+            .map(|key| {
+                std::array::from_fn(|axis| {
+                    let scale = scale.get(axis).copied().unwrap_or(0.0);
+                    let offset = offset.get(axis).copied().unwrap_or(0.0);
+                    if active(scale) {
+                        f32::from(u16_at(key.as_slice(), axis * 2)).mul_add(scale, offset)
+                    } else {
+                        offset
+                    }
+                })
             })
-        })
-        .collect())
+            .collect()
+    })
 }
 
 fn planar(
@@ -293,7 +337,7 @@ fn planar(
     count: usize,
     scale: [f32; 3],
     offset: [f32; 3],
-) -> Result<Vec<[f32; 3]>, CorruptAnimation> {
+) -> Result<EncodedValues<[f32; 3]>, CorruptAnimation> {
     let used = scale.iter().filter(|&&scale| active(scale)).count();
     let body = bytes_at(data, start, count.saturating_mul(2).saturating_mul(used))?;
     let mut translations = vec![offset; count];
@@ -315,5 +359,8 @@ fn planar(
             }
         }
     }
-    Ok(translations)
+    Ok(EncodedValues {
+        values: translations,
+        bytes: body.len(),
+    })
 }

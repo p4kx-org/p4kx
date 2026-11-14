@@ -3,11 +3,11 @@
 
 //! Streams the blocks of an IMA ADPCM or PTADPCM WEM through their decoders into 16-bit PCM.
 
-use std::io::Write;
+use std::io::{self, Write};
 
 use rayon::prelude::*;
 
-use crate::{AudioError, ByteOrder, Codec, ima, ptadpcm};
+use crate::{ByteOrder, Codec, ima, ptadpcm};
 
 const BATCH_BYTES: usize = 1 << 20;
 const MIN_BLOCKS_PER_TASK: usize = 16;
@@ -64,7 +64,7 @@ impl Layout {
 
     /// Returns the frames, samples per channel, that `data_len` bytes decode to.
     pub(crate) fn frames(self, data_len: u64) -> u64 {
-        let block = (self.sub_block * self.channels) as u64;
+        let block = self.block_len() as u64;
         let rest = usize::try_from(data_len % block).unwrap_or(0);
         let partial = self
             .partial_sub_block(rest)
@@ -72,34 +72,46 @@ impl Layout {
         data_len / block * self.kind.samples(self.sub_block) as u64 + partial as u64
     }
 
-    /// Decodes `data` and writes it to `out` as interleaved little-endian 16-bit samples.
+    /// Returns the source bytes in one complete ADPCM block.
+    pub(crate) const fn block_len(self) -> usize {
+        self.sub_block * self.channels
+    }
+
+    /// Returns the consumed complete-block and admitted partial-block bytes.
+    pub(crate) fn consumed_bytes(self, data_len: u64) -> u64 {
+        let remainder = data_len % self.block_len() as u64;
+        let admitted_tail = self
+            .partial_sub_block(usize::try_from(remainder).unwrap_or_default())
+            .map_or(0, |per_channel| per_channel * self.channels);
+        data_len - remainder + admitted_tail as u64
+    }
+
+    /// Decodes the supplied blocks using a reusable PCM buffer.
     pub(crate) fn write_pcm(
         self,
         data: &[u8],
         order: ByteOrder,
-        out: &mut impl Write,
-    ) -> Result<(), AudioError> {
-        let block = self.sub_block * self.channels;
+        pcm: &mut Vec<u8>,
+        out: &mut (impl Write + ?Sized),
+    ) -> io::Result<()> {
+        let block = self.block_len();
         let block_pcm = self.kind.samples(self.sub_block) * self.channels * 2;
         let (blocks, rest) = data
             .split_at_checked(data.len() - data.len() % block)
             .unwrap_or((data, &[]));
         let batch_blocks = (BATCH_BYTES / block_pcm).max(1);
-        let mut buffer = vec![0; block_pcm * batch_blocks.min(blocks.len() / block)];
         for batch in blocks.chunks(block * batch_blocks) {
-            let pcm = buffer
-                .get_mut(..batch.len() / block * block_pcm)
-                .unwrap_or_default();
+            pcm.resize(batch.len() / block * block_pcm, 0);
             pcm.par_chunks_mut(block_pcm)
                 .zip(batch.par_chunks(block))
                 .with_min_len(MIN_BLOCKS_PER_TASK)
                 .for_each(|(pcm, block)| self.decode_block(block, self.sub_block, order, pcm));
-            out.write_all(pcm).map_err(AudioError::Write)?;
+            out.write_all(pcm)?;
         }
         if let Some(sub_block) = self.partial_sub_block(rest.len()) {
-            let mut pcm = vec![0; self.kind.samples(sub_block) * self.channels * 2];
-            self.decode_block(rest, sub_block, order, &mut pcm);
-            out.write_all(&pcm).map_err(AudioError::Write)?;
+            pcm.resize(self.kind.samples(sub_block) * self.channels * 2, 0);
+            self.decode_block(rest, sub_block, order, pcm);
+            out.write_all(pcm)?;
         }
         Ok(())
     }

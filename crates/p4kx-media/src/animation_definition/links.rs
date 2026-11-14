@@ -1,0 +1,317 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use p4kx_extraction::SourceUseRole;
+use p4kx_extraction::cryxml::{
+    SourceAttributePosition, SourceDeclaration, SourceDeclarationKind, SourceElement,
+};
+
+use super::graph_source::GraphRole;
+use super::origins;
+use super::payload::{self as wire, DefinitionFamily, DefinitionLink, DefinitionPayload, LinkKind};
+use super::projection::DefinitionProjection;
+use super::sub_database_cycles::Edge;
+use super::sub_database_frontier::{self, FrontierReason};
+pub(super) use crate::animation::selection_path::{ReferenceSelection, archive_animation_path};
+use crate::audio_control_payload::AtlPosition;
+use crate::origin_contributions::OriginContributions;
+use crate::origin_prepared::PreparedRecordOrigins;
+use crate::xml_source_projection::declaration_position;
+use crate::{
+    Identity, MediaError, MediaKind, MediaWriter, Reference, ReferenceResolution, Status,
+    Subresource,
+};
+
+pub(super) struct LinkSelector {
+    pub(super) kind: LinkKind,
+    name_position: Option<SourceAttributePosition>,
+}
+
+pub(super) fn kind(
+    family: DefinitionFamily,
+    element: SourceElement<'_>,
+    parent: Option<&str>,
+    attribute: &SourceDeclaration<'_>,
+) -> Option<LinkSelector> {
+    if element.namespace().is_some()
+        || !matches!(
+            attribute.kind(),
+            SourceDeclarationKind::Attribute { namespace: None }
+        )
+    {
+        return None;
+    }
+    let tag = element.name();
+    let name = attribute.qualified_name();
+    if matches!(family, DefinitionFamily::Chrparams)
+        && tag.eq_ignore_ascii_case("Animation")
+        && parent.is_some_and(|name| name.eq_ignore_ascii_case("AnimationList"))
+        && name.eq_ignore_ascii_case("path")
+    {
+        let mut names = element.attributes().filter(|attribute| {
+            attribute.namespace().is_none() && attribute.name().eq_ignore_ascii_case("name")
+        });
+        let first = names.next()?;
+        if names.next().is_some() {
+            return None;
+        }
+        if first.value().eq_ignore_ascii_case("$TracksDatabase") {
+            return Some(LinkSelector {
+                kind: LinkKind::TracksDatabase,
+                name_position: Some(first.position().clone()),
+            });
+        }
+        if first.value().eq_ignore_ascii_case("$AnimEventDatabase") {
+            return Some(LinkSelector {
+                kind: LinkKind::EventDatabase,
+                name_position: Some(first.position().clone()),
+            });
+        }
+    }
+    if matches!(family, DefinitionFamily::Adb)
+        && let Some(kind) = mannequin_kind(tag, parent, name)
+    {
+        return Some(LinkSelector {
+            kind,
+            name_position: None,
+        });
+    }
+    if matches!(family, DefinitionFamily::Comb)
+        && tag.eq_ignore_ascii_case("BlendSpace")
+        && name.eq_ignore_ascii_case("AName")
+    {
+        return Some(LinkSelector {
+            kind: LinkKind::CombinedSpace,
+            name_position: None,
+        });
+    }
+    None
+}
+
+fn mannequin_kind(tag: &str, parent: Option<&str>, name: &str) -> Option<LinkKind> {
+    if parent.is_none() && tag.eq_ignore_ascii_case("AnimDB") {
+        if name.eq_ignore_ascii_case("TagDef") {
+            return Some(LinkKind::TagDefinition);
+        }
+        if name.eq_ignore_ascii_case("FragDef") {
+            return Some(LinkKind::FragmentDefinition);
+        }
+    }
+    (tag.eq_ignore_ascii_case("SubADB") && name.eq_ignore_ascii_case("File"))
+        .then_some(LinkKind::SubDatabase)
+}
+
+pub(super) struct SubDatabaseSelector {
+    file: SourceAttributePosition,
+    parent: AtlPosition,
+}
+
+impl SubDatabaseSelector {
+    pub(super) fn of(
+        role: Option<GraphRole>,
+        parent: Option<(GraphRole, AtlPosition)>,
+        element: SourceElement<'_>,
+        projection: &DefinitionProjection<'_, '_>,
+        site: (u64, AtlPosition),
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<Option<Self>, super::projection::Failure> {
+        if !matches!(role, Some(GraphRole::SubDatabase)) {
+            return Ok(None);
+        }
+        let Some((_, parent)) = parent else {
+            return Ok(None);
+        };
+        let mut files = element
+            .attributes()
+            .filter(|attr| attr.namespace().is_none() && attr.name().eq_ignore_ascii_case("File"));
+        let first = files.next();
+        if let (Some(first), None) = (&first, files.next()) {
+            return Ok(Some(Self {
+                file: first.position().clone(),
+                parent,
+            }));
+        }
+        let reason = if first.is_some() {
+            FrontierReason::DuplicateFile
+        } else {
+            FrontierReason::MissingFile
+        };
+        sub_database_frontier::write_attribute_issue(projection, site, reason, writer)?;
+        Ok(None)
+    }
+
+    pub(super) fn matches(&self, declaration: &SourceDeclaration<'_>) -> bool {
+        declaration.position() == &self.file
+    }
+
+    fn observe(
+        &self,
+        projection: &DefinitionProjection<'_, '_>,
+        indices: [u64; 2],
+        reference: &Reference,
+        prepared: &PreparedRecordOrigins,
+        writer: &MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        let ReferenceResolution::Resolved { target } = reference.resolution() else {
+            return Ok(());
+        };
+        let Identity::Entry { entry, .. } = &target.source else {
+            return Err(MediaError::Contract(
+                "SubADB target has no physical Entry".into(),
+            ));
+        };
+        let original = prepared
+            .visit("/data/payload/authored_path")
+            .ok_or_else(|| {
+                MediaError::Contract("SubADB reference lost its original declaration".into())
+            })?;
+        let proof = prepared
+            .visit("/data/payload/reference/resolution")
+            .ok_or_else(|| {
+                MediaError::Contract("SubADB reference has no observed resolution receipt".into())
+            })?;
+        let parent = origins::position(
+            projection.input,
+            self.parent,
+            SourceUseRole::Selector,
+            writer,
+        )?;
+        let mut evidence = writer.capture_origins();
+        evidence.include(proof, writer)?;
+        evidence.include(&parent, writer)?;
+        projection
+            .context
+            .directory
+            .index
+            .animation_sub_databases
+            .edge(
+                Edge {
+                    original: original.clone(),
+                    source: projection.context.entry.index(),
+                    target: entry.entry_index,
+                    indices,
+                    evidence: evidence.finish(),
+                },
+                writer,
+            )
+    }
+}
+
+pub(super) fn write(
+    projection: &DefinitionProjection<'_, '_>,
+    selector: &LinkSelector,
+    authored_path: &str,
+    position: AtlPosition,
+    indices: [u64; 2],
+    sub_database: Option<&SubDatabaseSelector>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let proof = origins::position(projection.input, position, SourceUseRole::Selector, writer)?;
+    let selection = selector.proof(projection.input, &proof, writer)?;
+    let mut prepared = origins::record(projection.input, proof.clone(), writer)?;
+    crate::audio_record_origins::field(
+        &mut prepared,
+        "/data/payload/kind",
+        selection.clone(),
+        writer,
+    )?;
+    crate::audio_record_origins::field(
+        &mut prepared,
+        "/data/payload/archive_path",
+        selection.clone(),
+        writer,
+    )?;
+    let kind = selector.kind;
+    let archive_path = target_path(kind, authored_path);
+    let reference = ReferenceSelection {
+        authored_path,
+        archive_path: archive_path.as_deref(),
+        kind: kind.target_kind(),
+        original: &proof,
+        selector: &selection,
+    }
+    .resolve(projection, &mut prepared, writer)?;
+    if let Some(sub_database) = sub_database {
+        sub_database.observe(projection, indices, &reference, &prepared, writer)?;
+    }
+    prepared.write(
+        writer,
+        &Subresource::new(wire::LINK, indices.to_vec()),
+        Status::Complete,
+        &DefinitionPayload::Link(DefinitionLink {
+            kind,
+            authored_path,
+            archive_path,
+            reference,
+        }),
+        &[],
+    )
+}
+
+impl ReferenceSelection<'_> {
+    pub(super) fn resolve(
+        &self,
+        projection: &DefinitionProjection<'_, '_>,
+        prepared: &mut PreparedRecordOrigins,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<Reference, MediaError> {
+        self.resolve_at(
+            projection.context.directory,
+            "/data/payload/reference",
+            prepared,
+            writer,
+        )
+    }
+}
+
+impl LinkSelector {
+    fn proof(
+        &self,
+        input: &crate::origin_input::MediaOriginInput,
+        path: &OriginContributions,
+        writer: &MediaWriter<'_>,
+    ) -> Result<OriginContributions, MediaError> {
+        let mut selection = writer.capture_origins();
+        selection.include(path, writer)?;
+        if let Some(position) = &self.name_position {
+            let position = declaration_position(position)
+                .map_err(|_| MediaError::Contract("invalid XML animation selector span".into()))?;
+            selection.include(
+                &origins::position(input, position, SourceUseRole::Selector, writer)?,
+                writer,
+            )?;
+        }
+        Ok(selection.finish())
+    }
+}
+
+impl LinkKind {
+    const fn target_kind(self) -> Option<MediaKind> {
+        match self {
+            Self::TracksDatabase => Some(MediaKind::Animation),
+            Self::EventDatabase | Self::SubDatabase | Self::CombinedSpace => {
+                Some(MediaKind::AnimationDefinition)
+            }
+            Self::TagDefinition | Self::FragmentDefinition => None,
+        }
+    }
+}
+
+pub(super) fn target_path(kind: LinkKind, path: &str) -> Option<String> {
+    let (_, extension) = path.rsplit_once('.')?;
+    let supported = match kind {
+        LinkKind::TracksDatabase => extension.eq_ignore_ascii_case("dba"),
+        LinkKind::EventDatabase => extension.eq_ignore_ascii_case("animevents"),
+        LinkKind::SubDatabase => extension.eq_ignore_ascii_case("adb"),
+        LinkKind::TagDefinition | LinkKind::FragmentDefinition => {
+            extension.eq_ignore_ascii_case("xml")
+        }
+        LinkKind::CombinedSpace => {
+            extension.eq_ignore_ascii_case("bspace") || extension.eq_ignore_ascii_case("comb")
+        }
+    };
+    if !supported {
+        return None;
+    }
+    archive_animation_path(path)
+}

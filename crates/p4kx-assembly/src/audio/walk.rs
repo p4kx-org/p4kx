@@ -3,9 +3,12 @@
 
 use std::rc::Rc;
 
-use p4kx_audio::{HircKind, HircObject, HircValue, SoundSource, Soundbank};
+use p4kx_audio::{
+    HircKind, HircObject, HircValue, MusicTransitionFeatures, SoundSource, Soundbank,
+};
 
 use super::locate::locate;
+use super::music_clip_features::MusicClipFeatures;
 use super::walk_banks::{Banks, Loaded, Via, select_holders};
 use super::{
     AudioIndex, BreakReason, BrokenLink, IndexedSoundbank, LanguageChoice, MAX_ACTION_CHAIN,
@@ -20,7 +23,7 @@ pub(crate) struct Found<'i> {
 }
 
 /// Follows the Wwise event `event` through the `HIRC` section of the start soundbank of `banks`
-/// to its sounds, and from there into at most one other soundbank.
+/// to its sounds through indexed bank references.
 pub(crate) fn event<'i>(banks: Banks<'_, 'i>, event: &'i WwiseEvent, budget: usize) -> Found<'i> {
     let mut walk = Walk {
         index: banks.index,
@@ -29,6 +32,7 @@ pub(crate) fn event<'i>(banks: Banks<'_, 'i>, event: &'i WwiseEvent, budget: usi
         banks,
         event,
         path: Vec::new(),
+        shared_path_prefix: 0,
         objects: 0,
         budget,
         chain: 0,
@@ -39,13 +43,20 @@ pub(crate) fn event<'i>(banks: Banks<'_, 'i>, event: &'i WwiseEvent, budget: usi
     walk.found
 }
 
+struct ResolvedPathStep<'index> {
+    owner: Loaded<'index>,
+    step: PathStep,
+    transition_features: MusicTransitionFeatures,
+}
+
 struct Walk<'w, 'i> {
     index: &'i AudioIndex,
     choice: &'w LanguageChoice,
     banks: Banks<'w, 'i>,
     current: Loaded<'i>,
     event: &'i WwiseEvent,
-    path: Vec<PathStep>,
+    path: Vec<ResolvedPathStep<'i>>,
+    shared_path_prefix: usize,
     objects: usize,
     budget: usize,
     chain: usize,
@@ -80,15 +91,20 @@ impl<'i> Walk<'_, 'i> {
             });
             return;
         }
-        if self.path.iter().any(|step| step.id == id) {
-            self.broke(BreakReason::Cycle { id });
-            return;
-        }
         let wanted = wanted.or_else(|| self.path.is_empty().then_some(HircKind::Event));
-        let (bank, entered) = if find(&self.current.bank, id, wanted).is_some() {
+        let in_current = match via {
+            Via::At(position) => position == self.current.position,
+            Via::Local | Via::Bank(_) | Via::PlayEvent => true,
+        };
+        let (bank, entered) = if in_current && find(&self.current.bank, id, wanted).is_some() {
             (Rc::clone(&self.current.bank), None)
         } else {
-            match self.banks.enter(self.current.position, id, via) {
+            match self.banks.enter(
+                self.current.position,
+                id,
+                via,
+                self.path.iter().map(|active| &active.owner),
+            ) {
                 Ok(next) => (Rc::clone(&next.bank), Some(next)),
                 Err(refused) => {
                     self.broke_in(refused.bank, refused.reason);
@@ -100,15 +116,53 @@ impl<'i> Walk<'_, 'i> {
             self.broke(BreakReason::Missing { id });
             return;
         };
+        let position = entered
+            .as_ref()
+            .map_or(self.current.position, |next| next.position);
+        #[cfg(test)]
+        self.banks.probe_selection(position, object.id, &bank);
+        if self
+            .path
+            .iter()
+            .any(|active| active.owner.position == position && active.step.id == id)
+        {
+            self.broke(BreakReason::Cycle { id });
+            return;
+        }
         let left = entered.map(|next| std::mem::replace(&mut self.current, next));
-        self.path.push(PathStep {
-            kind: node_kind(object),
-            id,
-        });
+        self.enter(object);
         self.visit(object);
+        self.leave(left);
+    }
+
+    fn enter(&mut self, object: &HircObject) {
+        let authored = match &object.value {
+            HircValue::MusicPlaylist(playlist) => playlist.transition_features,
+            HircValue::MusicSwitch(switch) => switch.transition_features,
+            _ => MusicTransitionFeatures::default(),
+        };
+        let transition_features = self.transition_features().combine(authored);
+        self.path.push(ResolvedPathStep {
+            owner: self.current.clone(),
+            step: PathStep {
+                kind: node_kind(object),
+                id: object.id,
+            },
+            transition_features,
+        });
+    }
+
+    fn transition_features(&self) -> MusicTransitionFeatures {
+        self.path
+            .last()
+            .map_or_default(|step| step.transition_features)
+    }
+
+    fn leave(&mut self, previous: Option<Loaded<'i>>) {
         self.path.pop();
-        if let Some(left) = left {
-            self.current = left;
+        self.shared_path_prefix = self.shared_path_prefix.min(self.path.len());
+        if let Some(previous) = previous {
+            self.current = previous;
         }
     }
 
@@ -134,11 +188,12 @@ impl<'i> Walk<'_, 'i> {
             HircValue::MusicSwitch(switch) => self.children(&switch.node.children),
             HircValue::MusicPlaylist(playlist) => self.children(&playlist.node.children),
             HircValue::MusicTrack(track) => {
+                let music_clips = MusicClipFeatures::observe(&track.clips);
                 for source in track.sources.iter().take(MAX_CONTAINER_CHILDREN) {
                     if !self.spend() {
                         break;
                     }
-                    self.sound(*source);
+                    self.sound(*source, music_clips);
                 }
                 if track.sources.len() > MAX_CONTAINER_CHILDREN {
                     self.broke(BreakReason::TooManyChildren {
@@ -147,8 +202,21 @@ impl<'i> Walk<'_, 'i> {
                     });
                 }
             }
-            HircValue::Sound(source) => self.sound(*source),
-            HircValue::Malformed(error) => self.broke(BreakReason::Malformed(error.clone())),
+            HircValue::Sound(source) => self.sound(*source, MusicClipFeatures::default()),
+            HircValue::ActorMixer(_)
+            | HircValue::State(_)
+            | HircValue::Malformed(_)
+            | HircValue::Raw => self.unresolved_object(object),
+        }
+    }
+
+    fn unresolved_object(&mut self, object: &HircObject) {
+        let reason = match &object.value {
+            HircValue::Malformed(error)
+                if !matches!(object.kind, HircKind::State | HircKind::ActorMixer) =>
+            {
+                BreakReason::Malformed(error.clone())
+            }
             HircValue::Raw
                 if matches!(
                     object.kind,
@@ -162,12 +230,13 @@ impl<'i> Walk<'_, 'i> {
                         | HircKind::MusicPlaylist
                 ) =>
             {
-                self.broke(BreakReason::UnknownLayout {
+                BreakReason::UnknownLayout {
                     version: self.current.bank.header().version,
-                });
+                }
             }
-            HircValue::Raw => self.broke(BreakReason::Unsupported),
-        }
+            _ => BreakReason::Unsupported,
+        };
+        self.broke(reason);
     }
 
     fn chained(&mut self, follow: impl FnOnce(&mut Self)) {
@@ -223,7 +292,7 @@ impl<'i> Walk<'_, 'i> {
         }
     }
 
-    fn sound(&mut self, source: SoundSource) {
+    fn sound(&mut self, source: SoundSource, music_clip_features: MusicClipFeatures) {
         let located = locate(self.index, self.current.soundbank, self.choice, &source);
         if located.missing_localisation {
             self.broke(self.choice.no_localisation());
@@ -231,14 +300,23 @@ impl<'i> Walk<'_, 'i> {
         self.found.variants.push(SoundVariant {
             event: self.event,
             soundbank: self.current.soundbank,
-            sound_id: self.path.last().map_or(0, |step| step.id),
-            path: self.path.as_slice().into(),
+            sound_id: self.path.last().map_or(0, |step| step.step.id),
+            path: self.public_path(),
+            shared_path_prefix: self.shared_path_prefix,
+            music_clip_features,
+            music_transition_features: self.transition_features(),
             source,
             location: located.location,
+            selection: located.selection,
             localised: located.localised,
             language: located.language,
             fallback: located.fallback,
         });
+        self.shared_path_prefix = self.path.len();
+    }
+
+    fn public_path(&self) -> Box<[PathStep]> {
+        self.path.iter().map(|active| active.step).collect()
     }
 
     fn broke(&mut self, reason: BreakReason) {
@@ -249,7 +327,7 @@ impl<'i> Walk<'_, 'i> {
         self.found.breaks.push(BrokenLink {
             event: self.event,
             soundbank: Some(soundbank.unwrap_or(self.current.soundbank)),
-            path: self.path.as_slice().into(),
+            path: self.public_path(),
             reason,
         });
     }

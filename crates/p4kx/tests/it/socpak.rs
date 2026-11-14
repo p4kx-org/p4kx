@@ -108,6 +108,7 @@ fn list_as_json_names_the_archive_and_the_containers() -> TestResult {
             .replace(&dir.path().display().to_string(), "[DIR]")
             .replace('\\', "/");
     }
+    crate::entry_listing_origins::remove_checked_origins_for_snapshot(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }

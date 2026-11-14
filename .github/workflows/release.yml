@@ -5,14 +5,35 @@ on:
     tags: ["v*"]
   pull_request:
     paths:
-      - ".github/workflows/release.yml"
+      - ".github/workflows/*release*.yml"
+      - ".github/actions/**"
+      - "rust-toolchain.toml"
+      - ".config/**"
       - ".github/scripts/**"
       - "crates/p4kx-gui/wix/**"
       - "crates/p4kx-gui/assets/p4kx.ico"
       - "crates/p4kx-gui/build.rs"
       - "crates/p4kx/build.rs"
+      - "crates/p4kx-testkit/examples/native_fixture.rs"
+      - "packaging/linux/**"
+      - "packaging/macos/**"
       - "blender_addon/**"
   workflow_dispatch:
+    inputs:
+      linux-only:
+        description: Validate native Linux packages without Windows, external scans or publication
+        type: boolean
+        default: false
+        required: false
+      windows-only:
+        description: Validate native Windows packages without Linux, external scans or publication
+        type: boolean
+        default: false
+        required: false
+
+concurrency:
+  group: release-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions: {}
 
@@ -20,104 +41,72 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  package:
-    name: Package
-    runs-on: windows-latest
+  prepare:
+    name: Release identity and package plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
+      msi-version: ${{ steps.version.outputs.msi-version }}
+      next-msi-version: ${{ steps.version.outputs.next-msi-version }}
+      matrix: ${{ steps.platforms.outputs.matrix }}
+      windows-matrix: ${{ steps.platforms.outputs.windows-matrix }}
+      linux-matrix: ${{ steps.platforms.outputs.linux-matrix }}
+      macos-matrix: ${{ steps.platforms.outputs.macos-matrix }}
     defaults:
       run:
         shell: pwsh
     steps:
-      - name: Validate the release tag
-        if: github.ref_type == 'tag'
+      - name: Validate manual package scope
         env:
-          REF_NAME: ${{ github.ref_name }}
+          LINUX_ONLY: ${{ inputs.linux-only }}
+          WINDOWS_ONLY: ${{ inputs.windows-only }}
         run: |
-          if ($env:REF_NAME -cnotmatch '^v\d+\.\d+\.\d+(-[0-9A-Za-z.]+)?$') {
-            throw "Refusing to release from tag '$env:REF_NAME': expected vMAJOR.MINOR.PATCH[-suffix]."
-          }
+          if ($env:LINUX_ONLY -eq 'true' -and $env:WINDOWS_ONLY -eq 'true') { throw 'Choose at most one native package scope.' }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3 # zizmor: ignore[cache-poisoning]
-        with:
-          lookup-only: ${{ github.ref_type == 'tag' }}
-      - name: Version
+      - uses: ./.github/actions/install-rust
+      - name: Read the authoritative native platform plan
+        id: platforms
+        run: |
+          $all = .github/scripts/read-platform-matrix.ps1
+          $windows = .github/scripts/read-platform-matrix.ps1 -Os windows
+          $linux = .github/scripts/read-platform-matrix.ps1 -Os linux
+          "matrix=$all" >> $env:GITHUB_OUTPUT
+          "windows-matrix=$windows" >> $env:GITHUB_OUTPUT
+          "linux-matrix=$linux" >> $env:GITHUB_OUTPUT
+      - name: Version and tag identity
         id: version
         run: |
           $metadata = cargo metadata --no-deps --format-version 1 --locked | ConvertFrom-Json
-          $version = ($metadata.packages | Where-Object name -eq 'p4kx-gui').version
-          $tag = if ($env:GITHUB_REF_TYPE -eq 'tag') { $env:GITHUB_REF_NAME } else { "v$version" }
-          $core = [version]($version -replace '-.*$', '')
+          if ($LASTEXITCODE -ne 0) { throw 'Release version query failed.' }
+          $versions = @($metadata.packages | Where-Object name -CIn @('p4kx', 'p4kx-gui', 'p4kx-mcp') | Select-Object -ExpandProperty version -Unique)
+          if ($versions.Count -ne 1) { throw 'Shipped application versions differ.' }
+          $version = $versions[0]
+          $tag = "v$version"
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -cne $tag) { throw 'Release tag and application version differ.' }
+          $core = [version]($version -replace '[-+].*$', '')
+          if ($core.Major -gt 255 -or $core.Minor -gt 255 -or $core.Build -ge 65535) { throw 'Version cannot be represented by the MSI upgrade test.' }
           "version=$version" >> $env:GITHUB_OUTPUT
-          "msi_version=$core" >> $env:GITHUB_OUTPUT
-          "next_msi_version=$($core.Major).$($core.Minor).$($core.Build + 1)" >> $env:GITHUB_OUTPUT
-          "tag=$tag" >> $env:GITHUB_OUTPUT
-      - name: Release notes
-        env:
-          TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          New-Item -ItemType Directory -Force target\package | Out-Null
-          cargo xtask release-notes $env:TAG target\package\release-notes.md
-      - name: Build
-        run: cargo build --release --locked -p p4kx-gui -p p4kx -p p4kx-mcp
-      - name: Portable ZIP
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          $name = "P4KX-$env:VERSION-x86_64"
-          $folder = "target\package\$name"
-          New-Item -ItemType Directory -Force $folder | Out-Null
-          Copy-Item target\release\p4kx-gui.exe, target\release\p4kx.exe, target\release\p4kx-mcp.exe, LICENSE-MIT, LICENSE-MIT.md, LICENSE-APACHE, LICENSE-APACHE.md, THIRD-PARTY-NOTICES.md, CHANGELOG.md $folder
-          Compress-Archive -Path $folder -DestinationPath "target\package\$name-portable.zip"
-      - name: Blender add-on version equals the Release version
+          "msi-version=$core" >> $env:GITHUB_OUTPUT
+          "next-msi-version=$($core.Major).$($core.Minor).$($core.Build + 1)" >> $env:GITHUB_OUTPUT
+          New-Item -ItemType Directory -Force target/package | Out-Null
+          cargo xtask release-notes $tag target/package/release-notes.md
+          if ($LASTEXITCODE -ne 0) { throw 'Release notes generation failed.' }
+      - name: Check Blender add-on release identity
         run: cargo xtask addon
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
         with:
           python-version: "3.13"
-      - name: Blender add-on ZIP
-        run: python blender_addon\build_zip.py target\package
-      - name: Install WiX Toolset
-        run: |
-          $toolPath = Join-Path $env:RUNNER_TEMP 'wix-tool'
-          dotnet tool install wix --version 7.0.0 --tool-path $toolPath
-          "WIX_EXE=$(Join-Path $toolPath 'wix.exe')" >> $env:GITHUB_ENV
-      - name: MSI
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-          MSI_VERSION: ${{ steps.version.outputs.msi_version }}
-        run: |
-          .github\scripts\build-msi.ps1 -Wix $env:WIX_EXE -Version $env:MSI_VERSION -Output "target\package\P4KX-$env:VERSION-x86_64.msi"
-      - name: Install, upgrade and uninstall
-        env:
-          VERSION: ${{ steps.version.outputs.version }}
-          NEXT_MSI_VERSION: ${{ steps.version.outputs.next_msi_version }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          New-Item -ItemType Directory -Force target\wix-check, target\wix-previous | Out-Null
-          gh release download v0.2.0 --repo p4kx-org/p4kx --pattern "*.msi" --dir target\wix-previous
-          $previous = (Get-ChildItem target\wix-previous -Filter *.msi | Select-Object -First 1).FullName
-          .github\scripts\build-msi.ps1 -Wix $env:WIX_EXE -Version $env:NEXT_MSI_VERSION -Output target\wix-check\next.msi
-          $upgradeCode = ([xml](Get-Content crates\p4kx-gui\wix\main.wxs)).Wix.Package.UpgradeCode
-          .github\scripts\check-msi.ps1 -Msi "target\package\P4KX-$env:VERSION-x86_64.msi" -NextMsi target\wix-check\next.msi -NextVersion $env:NEXT_MSI_VERSION -UpgradeCode $upgradeCode -PreviousMsi $previous
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: failure()
-        with:
-          name: msiexec-logs
-          path: target/wix-check/*.log
-          if-no-files-found: ignore
+      - name: Build architecture-neutral Blender add-on
+        run: python blender_addon/build_zip.py target/package
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: release
-          path: |
-            target/package/*.zip
-            target/package/*.msi
+          name: release-addon
+          path: target/package/*.zip
           if-no-files-found: error
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -125,61 +114,54 @@ jobs:
           path: target/package/release-notes.md
           if-no-files-found: error
 
-  sbom:
-    name: SBOM
-    runs-on: windows-latest
+  windows:
+    name: Native Windows packages
+    if: github.event_name != 'workflow_dispatch' || !inputs.linux-only
+    needs: prepare
     permissions:
       contents: read
-    needs: package
-    env:
-      VERSION: ${{ needs.package.outputs.version }}
-    defaults:
-      run:
-        shell: pwsh
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
-        with:
-          toolchain: stable
-      - name: Install cargo-cyclonedx
-        env:
-          CYCLONEDX_VERSION: 0.5.9
-          CYCLONEDX_SHA256: 8750e00775661dcb75bc482c1a298839fd94e8a0c033b49905ba0f246ffed202
-        run: |
-          $archive = Join-Path $env:RUNNER_TEMP 'cargo-cyclonedx.zip'
-          $url = "https://github.com/CycloneDX/cyclonedx-rust-cargo/releases/download/cargo-cyclonedx-$env:CYCLONEDX_VERSION/cargo-cyclonedx-x86_64-pc-windows-msvc.zip"
-          Invoke-WebRequest -Uri $url -OutFile $archive
-          $hash = (Get-FileHash -Path $archive -Algorithm SHA256).Hash
-          if ($hash -ne $env:CYCLONEDX_SHA256) { throw "cargo-cyclonedx archive hash $hash does not match the pinned $env:CYCLONEDX_SHA256." }
-          $folder = Join-Path $env:RUNNER_TEMP 'cargo-cyclonedx'
-          Expand-Archive -Path $archive -DestinationPath $folder -Force
-          $exe = Get-ChildItem -Path $folder -Recurse -Filter 'cargo-cyclonedx.exe' | Select-Object -First 1
-          if (-not $exe) { throw 'cargo-cyclonedx.exe is missing from the release archive.' }
-          $exe.DirectoryName >> $env:GITHUB_PATH
-          & $exe.FullName cyclonedx --version
-      - name: CycloneDX SBOM of each shipped binary
-        run: |
-          cargo cyclonedx --format json --spec-version 1.5 --describe binaries
-          New-Item -ItemType Directory -Force target\sbom | Out-Null
-          foreach ($crate in 'p4kx-gui', 'p4kx', 'p4kx-mcp') {
-            $source = Get-ChildItem -Path crates -Recurse -Filter "${crate}_bin.cdx.json" | Select-Object -First 1
-            if (-not $source) { throw "No SBOM was generated for $crate." }
-            Move-Item $source.FullName "target\sbom\P4KX-$env:VERSION-$crate.cdx.json"
-          }
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: sbom
-          path: target/sbom/*.cdx.json
-          if-no-files-found: error
+    uses: ./.github/workflows/release-windows.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      msi-version: ${{ needs.prepare.outputs.msi-version }}
+      next-msi-version: ${{ needs.prepare.outputs.next-msi-version }}
+      matrix: ${{ needs.prepare.outputs.windows-matrix }}
+
+  linux:
+    name: Linux native packages and execution
+    if: github.event_name != 'workflow_dispatch' || !inputs.windows-only
+    needs: prepare
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-linux.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      matrix: ${{ needs.prepare.outputs.linux-matrix }}
+
+  macos:
+    name: Native macOS DMG and execution
+    if: github.event_name != 'workflow_dispatch' || (!inputs.windows-only && !inputs.linux-only)
+    needs: prepare
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release-macos.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      matrix: ${{ needs.prepare.outputs.macos-matrix }}
+      dry-run: ${{ github.ref_type != 'tag' || github.event_name != 'push' }}
+    secrets:
+      macos-certificate-p12-base64: ${{ github.ref_type == 'tag' && github.event_name == 'push' && secrets.MACOS_CERTIFICATE_P12_BASE64 || '' }}
+      macos-certificate-password: ${{ github.ref_type == 'tag' && github.event_name == 'push' && secrets.MACOS_CERTIFICATE_PASSWORD || '' }}
+      macos-notary-key-base64: ${{ github.ref_type == 'tag' && github.event_name == 'push' && secrets.MACOS_NOTARY_KEY_BASE64 || '' }}
+      macos-notary-key-id: ${{ github.ref_type == 'tag' && github.event_name == 'push' && secrets.MACOS_NOTARY_KEY_ID || '' }}
+      macos-notary-issuer-id: ${{ github.ref_type == 'tag' && github.event_name == 'push' && secrets.MACOS_NOTARY_ISSUER_ID || '' }}
 
   scan:
-    name: VirusTotal scan
-    needs: package
-    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+    name: VirusTotal scan of package assets
+    needs: [prepare, windows, linux, macos]
+    if: github.ref_type == 'tag' || (github.event_name == 'workflow_dispatch' && !inputs.linux-only && !inputs.windows-only)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
     permissions:
       contents: read
     defaults:
@@ -191,97 +173,86 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          name: release
+          pattern: "{release-*-pc-windows-msvc,release-*-unknown-linux-gnu,release-*-apple-darwin}"
           path: assets
-      - name: Scan the MSI and the portable ZIP
-        continue-on-error: true
-        timeout-minutes: 55
+          merge-multiple: true
+      - name: Scan every required architecture-specific package
+        continue-on-error: ${{ github.ref_type != 'tag' }}
+        timeout-minutes: 140
         env:
           VIRUSTOTAL_API_KEY: ${{ secrets.VIRUSTOTAL_API_KEY }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          $files = @(Get-ChildItem assets/*.msi, assets/*-portable.zip | ForEach-Object FullName)
-          ./.github/scripts/virustotal-scan.ps1 -Path $files -NotePath virustotal.md
+          . .github/scripts/release-scan-evidence.ps1
+          $files = @(Get-P4kxReleaseScanAssets -AssetDirectory assets -Version $env:VERSION | Select-Object -ExpandProperty FullName)
+          $required = $env:GITHUB_REF_TYPE -ceq 'tag'
+          .github/scripts/virustotal-scan.ps1 -Path $files -NotePath virustotal.md -RequireComplete:$required -EvidencePath virustotal-evidence.json -Version $env:VERSION -Revision $env:GITHUB_SHA -RunId $env:GITHUB_RUN_ID
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }}
         with:
           name: virustotal-note
-          path: virustotal.md
-          if-no-files-found: ignore
+          path: |
+            virustotal.md
+            virustotal-evidence.json
+          if-no-files-found: ${{ github.ref_type == 'tag' && 'error' || 'ignore' }}
 
   attest:
-    name: Attest build provenance
-    needs: [package, sbom]
+    name: Attest (${{ matrix.target }})
+    needs: [prepare, windows, linux, macos]
     if: github.ref_type == 'tag'
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/release-attest.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      target: ${{ matrix.target }}
+
+  attest-addon:
+    name: Attest architecture-neutral add-on
+    needs: prepare
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read
       id-token: write
       attestations: write
-    env:
-      VERSION: ${{ needs.package.outputs.version }}
     steps:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: "{release,sbom}"
+          name: release-addon
           path: assets
-          merge-multiple: true
-      - name: Build provenance of every asset
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         id: provenance
-        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
-          subject-path: |
-            assets/*.zip
-            assets/*.msi
-            assets/*.cdx.json
-      - name: SBOM attestation of p4kx-gui
-        id: sbom-gui
-        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
-        with:
-          subject-path: |
-            assets/*-portable.zip
-            assets/*.msi
-          sbom-path: assets/P4KX-${{ env.VERSION }}-p4kx-gui.cdx.json
-      - name: SBOM attestation of p4kx
-        id: sbom-cli
-        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
-        with:
-          subject-path: |
-            assets/*-portable.zip
-            assets/*.msi
-          sbom-path: assets/P4KX-${{ env.VERSION }}-p4kx.cdx.json
-      - name: SBOM attestation of p4kx-mcp
-        id: sbom-mcp
-        uses: actions/attest-sbom@c604332985a26aa8cf1bdc465b92731239ec6b9e # v4.1.0
-        with:
-          subject-path: |
-            assets/*-portable.zip
-            assets/*.msi
-          sbom-path: assets/P4KX-${{ env.VERSION }}-p4kx-mcp.cdx.json
-      - name: Name the bundles after their files
+          subject-path: assets/*.zip
+      - name: Name add-on provenance
+        shell: pwsh
         env:
-          PROVENANCE: ${{ steps.provenance.outputs.bundle-path }}
-          SBOM_GUI: ${{ steps.sbom-gui.outputs.bundle-path }}
-          SBOM_CLI: ${{ steps.sbom-cli.outputs.bundle-path }}
-          SBOM_MCP: ${{ steps.sbom-mcp.outputs.bundle-path }}
+          BUNDLE: ${{ steps.provenance.outputs.bundle-path }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          mkdir bundles
-          cp "$PROVENANCE" "bundles/P4KX-${VERSION}-provenance.sigstore.json"
-          cp "$SBOM_GUI" "bundles/P4KX-${VERSION}-p4kx-gui.cdx.json.sigstore.json"
-          cp "$SBOM_CLI" "bundles/P4KX-${VERSION}-p4kx.cdx.json.sigstore.json"
-          cp "$SBOM_MCP" "bundles/P4KX-${VERSION}-p4kx-mcp.cdx.json.sigstore.json"
+          New-Item -ItemType Directory bundles | Out-Null
+          Copy-Item -LiteralPath $env:BUNDLE -Destination "bundles/P4KX-$env:VERSION-addon-provenance.sigstore.json"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: attestations
+          name: attestations-addon
           path: bundles/*.sigstore.json
           if-no-files-found: error
 
   assemble:
-    name: Hashes and release notes
-    needs: [package, sbom, scan, attest]
-    if: ${{ !cancelled() && needs.package.result == 'success' && needs.sbom.result == 'success' && (needs.attest.result == 'success' || github.ref_type != 'tag') }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    name: Complete matrix, hashes and release notes
+    needs: [prepare, windows, linux, macos, scan, attest, attest-addon]
+    if: ${{ !cancelled() && needs.prepare.result == 'success' && needs.windows.result == 'success' && needs.linux.result == 'success' && needs.macos.result == 'success' && (github.ref_type != 'tag' || (needs.scan.result == 'success' && needs.attest.result == 'success' && needs.attest-addon.result == 'success')) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
+      actions: read
       contents: read
     defaults:
       run:
@@ -292,7 +263,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          pattern: "{release,sbom,attestations}"
+          pattern: "{release-addon,release-*-pc-windows-msvc,release-*-unknown-linux-gnu,release-*-apple-darwin,attestations-*}"
           path: assets
           merge-multiple: true
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -300,19 +271,52 @@ jobs:
           pattern: "{changelog-notes,virustotal-note}"
           path: notes
           merge-multiple: true
-      - name: SHA256SUMS.txt, SHA3-512SUMS.txt and release notes
+      - name: Find the signed macOS device receipt for this candidate
+        if: github.ref_type == 'tag' && github.event_name == 'push'
+        id: macos-device-intake
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          . .github/scripts/macos-device-evidence-intake.ps1
+          $intake = Find-P4kxDeviceIntakeArtifact $env:GITHUB_RUN_ID
+          foreach ($key in $intake.Keys) {
+            Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "$key=$($intake[$key])" -Encoding utf8
+          }
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: github.ref_type == 'tag' && github.event_name == 'push'
+        with:
+          artifact-ids: ${{ steps.macos-device-intake.outputs.artifact-id }}
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.macos-device-intake.outputs.run-id }}
+          path: notes/device-intake
+          digest-mismatch: error
+      - name: Validate every required native asset before preparing checksums
         env:
           REPOSITORY: ${{ github.repository }}
+          VERSION: ${{ needs.prepare.outputs.version }}
           SCAN_RESULT: ${{ needs.scan.result }}
+          MACOS_CURRENT_VERSION: ${{ vars.P4KX_MACOS_CURRENT_STABLE }}
+          MACOS_INTAKE_RUN_ID: ${{ steps.macos-device-intake.outputs.run-id }}
+          GH_TOKEN: ${{ github.token }}
         run: |
+          $deviceEvidence = $null
+          $currentMacos = $null
+          if ($env:GITHUB_REF_TYPE -ceq 'tag') {
+            . .github/scripts/macos-device-evidence-intake.ps1
+            $device = Read-P4kxMacosDeviceIntake 'notes/device-intake' 'assets' $env:VERSION $env:GITHUB_RUN_ID $env:MACOS_INTAKE_RUN_ID $env:MACOS_CURRENT_VERSION
+            $deviceEvidence = $device.Path
+            $currentMacos = $device.CurrentVersion
+            . .github/scripts/release-scan-evidence.ps1
+            Assert-P4kxReleaseScanEvidence -EvidencePath notes/virustotal-evidence.json -AssetDirectory assets -Version $env:VERSION -Revision $env:GITHUB_SHA -RunId $env:GITHUB_RUN_ID
+            if (-not (Test-Path -LiteralPath notes/virustotal.md -PathType Leaf)) { throw 'The required VirusTotal report note is missing.' }
+          }
           if ($env:SCAN_RESULT -ne 'skipped' -and -not (Test-Path notes/virustotal.md)) {
-            New-Item -ItemType Directory -Force notes | Out-Null
-            Set-Content notes/virustotal.md -Encoding utf8NoBOM -Value "## Security check`n`nThe VirusTotal scan did not run for this release (the scan job ended without a result)."
+            "## Security check`n`nThe VirusTotal scan did not finish for this release." | Set-Content notes/virustotal.md -Encoding utf8NoBOM
           }
           $scan = if (Test-Path notes/virustotal.md) { 'notes/virustotal.md' }
-          ./.github/scripts/assemble-release.ps1 -AssetDirectory assets -NotesPath notes/release-notes.md `
-            -OutputNotesPath notes/final-notes.md -VirusTotalNotePath $scan -Repository $env:REPOSITORY
-          Get-ChildItem assets | Format-Table Name, Length
+          $tagAttestations = $env:GITHUB_REF_TYPE -ceq 'tag'
+          .github/scripts/assemble-release.ps1 -AssetDirectory assets -NotesPath notes/release-notes.md -OutputNotesPath notes/final-notes.md -VirusTotalNotePath $scan -Repository $env:REPOSITORY -Version $env:VERSION -Revision $env:GITHUB_SHA -TagAttestations:$tagAttestations -RequireMacosDeviceEvidence:$tagAttestations -MacosCurrentVersion $currentMacos -MacosDeviceEvidencePath $deviceEvidence
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-assets
@@ -326,21 +330,16 @@ jobs:
 
   publish:
     name: Publish
-    needs: [package, assemble]
+    needs: [prepare, assemble]
     if: github.ref_type == 'tag'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
+    defaults:
+      run:
+        shell: pwsh
     steps:
-      - name: Validate the release tag
-        env:
-          REF_NAME: ${{ github.ref_name }}
-        run: |
-          if ! [[ "$REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
-            echo "Refusing to release from tag '$REF_NAME': expected vMAJOR.MINOR.PATCH[-suffix]." >&2
-            exit 1
-          fi
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: release-assets
@@ -354,9 +353,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           REF_NAME: ${{ github.ref_name }}
-          VERSION: ${{ needs.package.outputs.version }}
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
-          prerelease=()
-          case "$VERSION" in *-*) prerelease=(--prerelease) ;; esac
-          gh release create "$REF_NAME" --verify-tag --title "P4KX $VERSION" \
-            --notes-file notes/final-notes.md --generate-notes "${prerelease[@]}" assets/*
+          if ($env:REF_NAME -cne "v$env:VERSION") { throw 'Release tag and prepared version differ.' }
+          $arguments = @('release', 'create', $env:REF_NAME, '--verify-tag', '--title', "P4KX $env:VERSION", '--notes-file', 'notes/final-notes.md', '--generate-notes')
+          if ($env:VERSION.Contains('-')) { $arguments += '--prerelease' }
+          $arguments += @(Get-ChildItem -LiteralPath assets -File | ForEach-Object FullName)
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) { throw 'GitHub release creation failed.' }

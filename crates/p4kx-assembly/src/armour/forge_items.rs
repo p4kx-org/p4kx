@@ -4,10 +4,12 @@
 use std::collections::HashMap;
 
 use p4kx_dataforge::{DataForge, Guid, Value};
+use p4kx_extraction::SourceLocation;
 
-use super::{HeadItems, Wearable};
+use super::{HeadItems, HeadMaterial, Wearable};
 use crate::LoadoutResolver;
-use crate::read::{as_struct, struct_items, text};
+use crate::read::{as_struct, indexed_struct_items, text};
+use crate::spec::PortSpec;
 
 const GENERATION_PARAMS: &str = "SCharacterGenerationParams";
 
@@ -17,7 +19,13 @@ const GENERATION_PARAMS: &str = "SCharacterGenerationParams";
 /// stand for, which the `materialLookupTable` of the Character generation parameters lists.
 pub struct ForgeItems<'r, 'f> {
     resolver: &'r mut LoadoutResolver<'f>,
-    materials: HashMap<Guid, String>,
+    materials: HashMap<Guid, MaterialTarget>,
+}
+
+pub(crate) struct MaterialTarget {
+    pub(crate) path: String,
+    pub(crate) record: u32,
+    pub(crate) index: usize,
 }
 
 impl std::fmt::Debug for ForgeItems<'_, '_> {
@@ -42,11 +50,26 @@ impl<'r, 'f> ForgeItems<'r, 'f> {
 
     /// Returns the names of the item ports the Entity `item` defines, empty when it has no Record.
     pub fn port_names(&mut self, item: Guid) -> Vec<String> {
+        let mut names = Vec::new();
+        self.visit_port_names(item, |_, port| names.push(port.name.clone()));
+        names
+    }
+
+    pub(crate) fn visit_port_names(
+        &mut self,
+        item: Guid,
+        mut visit: impl FnMut(Option<u32>, &PortSpec),
+    ) {
         let spec = self.resolver.spec(item);
-        let Ok(spec) = spec.as_ref() else {
-            return Vec::new();
-        };
-        spec.ports.iter().map(|port| port.name.clone()).collect()
+        if let Ok(spec) = spec.as_ref() {
+            for port in &spec.ports {
+                visit(spec.record_index, port);
+            }
+        }
+    }
+
+    pub(crate) fn material_target(&self, material: Guid) -> Option<&MaterialTarget> {
+        self.materials.get(&material)
     }
 
     /// Returns how many material libraries the lookup table lists.
@@ -56,7 +79,7 @@ impl<'r, 'f> ForgeItems<'r, 'f> {
     }
 }
 
-fn lookup(forge: &DataForge<'_>) -> HashMap<Guid, String> {
+fn lookup(forge: &DataForge<'_>) -> HashMap<Guid, MaterialTarget> {
     let mut materials = HashMap::new();
     for record in forge.records() {
         if !record
@@ -69,12 +92,16 @@ fn lookup(forge: &DataForge<'_>) -> HashMap<Guid, String> {
         let Some(table) = tree.field("materialLookupTable").and_then(as_struct) else {
             continue;
         };
-        for entry in struct_items(table, "materials") {
+        for (index, entry) in indexed_struct_items(table, "materials") {
             let path = text(entry, "filePath");
             if let Some(Value::Guid(guid)) = entry.field("guid")
                 && !path.is_empty()
             {
-                materials.entry(*guid).or_insert_with(|| path.to_owned());
+                materials.entry(*guid).or_insert_with(|| MaterialTarget {
+                    path: path.to_owned(),
+                    record: record.index(),
+                    index,
+                });
             }
         }
     }
@@ -91,6 +118,16 @@ impl HeadItems for ForgeItems<'_, '_> {
     }
 
     fn material_path(&self, material: Guid) -> Option<String> {
-        self.materials.get(&material).cloned()
+        self.material_target(material)
+            .map(|target| target.path.clone())
+    }
+
+    fn material_observed(&self, material: Guid) -> Option<HeadMaterial> {
+        let target = self.material_target(material)?;
+        let source = SourceLocation::DataForge {
+            record_index: target.record,
+            field: format!("materialLookupTable.materials[{}].filePath", target.index),
+        };
+        Some(HeadMaterial::new(target.path.clone(), Some(source)))
     }
 }

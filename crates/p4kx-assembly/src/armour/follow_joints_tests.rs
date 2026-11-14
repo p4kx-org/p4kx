@@ -133,6 +133,7 @@ fn more_bones_than_joint_indices_are_refused() -> TestResult {
 
 fn move_of(head: &Arc<Model>) -> HeadMove {
     HeadMove {
+        shape_sources: None,
         before: Arc::clone(head),
         after: Arc::clone(head),
         morphs: Vec::new(),

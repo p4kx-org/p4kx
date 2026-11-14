@@ -66,7 +66,7 @@ fn the_cli_and_the_export_write_the_same_bytes() -> TestResult {
             .output()?;
         export_query(
             &compiled,
-            &compiled.run(),
+            &compiled.run()?,
             (&window, format),
             &archive,
             &QueryExportOptions::default(),

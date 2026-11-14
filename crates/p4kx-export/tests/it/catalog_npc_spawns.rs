@@ -7,38 +7,26 @@ use std::error::Error;
 
 use serde_json::{Value, json};
 
-use crate::catalog_contract_templates::{build, template};
+use crate::catalog_contract_templates::{build, canonical};
+use crate::template_canonical_graph::{BrokerContext, Context};
+use crate::template_fixture_context as context;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
 const BROKER: &str = "b0000000-0000-4000-8000-000000000001";
 const OWNER: &str = "80000000-0000-4000-8000-000000000001";
 
-fn contract(catalog: &Value, sub: bool) -> Result<&Value, String> {
-    catalog["contracts"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|entry| entry["subContractGuid"].is_null() != sub)
-        .ok_or_else(|| "the contract entry".to_owned())
-}
-
-fn broker(catalog: &Value) -> Result<&Value, String> {
-    catalog["missionBrokerEntries"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|entry| entry["guid"] == BROKER)
-        .ok_or_else(|| "the broker entry".to_owned())
-}
-
 fn pool<'c>(catalog: &'c Value, kind: &str, link: &Value) -> Result<&'c Value, String> {
+    pool_id(catalog, kind, &link["poolGuid"])
+}
+
+fn pool_id<'c>(catalog: &'c Value, kind: &str, identifier: &Value) -> Result<&'c Value, String> {
     catalog[kind]
         .as_array()
         .into_iter()
         .flatten()
-        .find(|pool| pool["guid"] == link["poolGuid"])
-        .ok_or_else(|| format!("{kind} {link}"))
+        .find(|pool| pool.get("guid") == Some(identifier))
+        .ok_or_else(|| format!("{kind} {identifier}"))
 }
 
 /// The variable, the level and the name of the first group of every link in `field`.
@@ -72,15 +60,27 @@ fn the_nearest_level_that_states_a_variable_wins_and_an_empty_description_is_lef
     let catalog = build()?;
     let expected = ["Crew_BP@contract Squad", "Guard_BP@template Guards"];
     assert_eq!(
-        links(&catalog, contract(&catalog, false)?, "npcSpawns")?,
+        links(
+            &catalog,
+            crate::catalog_contracts::entry_by_level(&catalog, false)?,
+            "npcSpawns"
+        )?,
         expected
     );
     assert_eq!(
-        links(&catalog, contract(&catalog, true)?, "npcSpawns")?,
+        links(
+            &catalog,
+            crate::catalog_contracts::entry_by_level(&catalog, true)?,
+            "npcSpawns"
+        )?,
         expected
     );
     assert_eq!(
-        links(&catalog, contract(&catalog, false)?, "entitySpawns")?,
+        links(
+            &catalog,
+            crate::catalog_contracts::entry_by_level(&catalog, false)?,
+            "entitySpawns"
+        )?,
         ["Loot_BP@handler Crate"],
         "the handler's entity description hides the template's"
     );
@@ -90,25 +90,47 @@ fn the_nearest_level_that_states_a_variable_wins_and_an_empty_description_is_lef
 #[test]
 fn a_template_and_a_broker_entry_link_their_own_descriptions() -> TestResult {
     let catalog = build()?;
-    let template = template(&catalog)?;
+    let template = canonical(&catalog)?;
     assert_eq!(
-        links(&catalog, template, "npcSpawns")?,
+        mission_links(&catalog, &template, "npcs")?,
         ["Guard_BP@template Guards", "Spare_BP@template Spares"]
     );
     assert_eq!(
-        links(&catalog, template, "entitySpawns")?,
+        mission_links(&catalog, &template, "entities")?,
         ["Loot_BP@template Template crate"]
     );
-    let broker = broker(&catalog)?;
+    let broker = BrokerContext::new(&catalog, BROKER)?;
     assert_eq!(
-        links(&catalog, broker, "npcSpawns")?,
+        mission_links(&catalog, &broker, "npcs")?,
         ["Crew_BP@broker Squad"]
     );
     assert_eq!(
-        links(&catalog, broker, "entitySpawns")?,
+        mission_links(&catalog, &broker, "entities")?,
         ["Loot_BP@broker Crate"]
     );
     Ok(())
+}
+
+fn mission_links(
+    catalog: &Value,
+    graph: &dyn Context<'_>,
+    family: &str,
+) -> Result<Vec<String>, Box<dyn Error>> {
+    let table = if family == "npcs" {
+        "contractNpcSpawns"
+    } else {
+        "contractEntitySpawns"
+    };
+    context::pools(graph, family)?
+        .iter()
+        .map(|row| {
+            let name = pool_id(catalog, table, row.identifier)?
+                .pointer("/groups/0/name")
+                .and_then(Value::as_str)
+                .ok_or("actual original selected pool name")?;
+            Ok(format!("{}@{} {name}", row.variable, row.level))
+        })
+        .collect()
 }
 
 #[test]
@@ -150,7 +172,7 @@ fn an_npc_description_states_every_field_of_the_records() -> TestResult {
     let squad = pool(
         &catalog,
         "contractNpcSpawns",
-        &contract(&catalog, false)?["npcSpawns"][0],
+        &crate::catalog_contracts::entry_by_level(&catalog, false)?["npcSpawns"][0],
     )?;
     assert_eq!(
         squad["groups"][0]["options"][0],
@@ -208,7 +230,7 @@ fn a_name_property_pointer_is_the_variable_of_the_property_it_points_to() -> Tes
     let guards = pool(
         &catalog,
         "contractNpcSpawns",
-        &contract(&catalog, false)?["npcSpawns"][1],
+        &crate::catalog_contracts::entry_by_level(&catalog, false)?["npcSpawns"][1],
     )?;
     assert_eq!(
         guards["groups"][0]["options"][0]["namePropertyVariable"],
@@ -227,7 +249,7 @@ fn an_entity_description_states_groups_slots_and_options() -> TestResult {
     let crate_pool = pool(
         &catalog,
         "contractEntitySpawns",
-        &contract(&catalog, false)?["entitySpawns"][0],
+        &crate::catalog_contracts::entry_by_level(&catalog, false)?["entitySpawns"][0],
     )?;
     assert_eq!(
         crate_pool["groups"],

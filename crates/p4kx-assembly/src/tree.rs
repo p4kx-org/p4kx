@@ -4,20 +4,28 @@
 use std::sync::Arc;
 
 use p4kx_dataforge::Guid;
+use p4kx_extraction::DataForgeOrigin;
 
-use crate::LoadoutEntry;
 use crate::bespoke::OwnSkin;
 use crate::entities::class_name_of;
 use crate::geometry_choice::GeometryChoice;
 use crate::spec::LoadoutOrigin;
 use crate::{
-    Geometry, Incompatibility, ItemFacts, LandingGear, LoadoutError, ObjectContainerRef,
-    PortConstraints, PortDefinition, PortVisibility, VehicleImplementation, ZoneChunk,
+    Geometry, Incompatibility, ItemFacts, LandingGear, LoadoutError, LoadoutTargetGuid,
+    ObjectContainerRef, PortConstraints, PortDefinition, PortVisibility, VehicleImplementation,
+    ZoneChunk,
 };
+use crate::{ItemClassification, LoadoutEntry};
+
+#[path = "loadout_target.rs"]
+mod loadout_target;
+
+pub use self::loadout_target::{Target, Unresolved};
 
 /// One Entity in a Loadout tree: its Record and its ports with what they hold.
 #[derive(Debug, Clone, PartialEq)]
 pub struct EntityNode {
+    pub(crate) record_index: Option<u32>,
     pub(crate) guid: Guid,
     pub(crate) record_path: String,
     pub(crate) name: String,
@@ -32,16 +40,18 @@ pub struct EntityNode {
     pub(crate) own_skin: Option<OwnSkin>,
     pub(crate) vehicle: Option<Arc<VehicleImplementation>>,
     pub(crate) landing_gear: Arc<[LandingGear]>,
+    pub(crate) landing_system_component: Option<usize>,
     pub(crate) docked_vehicle: bool,
     pub(crate) loadout_file: Option<Arc<str>>,
     pub(crate) expanded: bool,
-    pub(crate) attach_type: String,
-    pub(crate) attach_sub_type: String,
+    pub(crate) classification: ItemClassification,
+    pub(crate) forge_origin: Option<Arc<DataForgeOrigin>>,
+    pub(crate) attachment_target: Option<LoadoutTargetGuid>,
     pub(crate) size: Option<u32>,
     pub(crate) container: Option<Guid>,
     pub(crate) object_containers: Arc<[ObjectContainerRef]>,
     pub(crate) zones: Arc<[ZoneChunk]>,
-    pub(crate) animation_database: Option<Arc<str>>,
+    pub(crate) animation_database: Option<crate::creature_animation::AnimationDatabase>,
     pub(crate) hidden_ports: Arc<[String]>,
 }
 
@@ -59,8 +69,8 @@ impl EntityNode {
     pub fn item_facts(&self) -> ItemFacts {
         ItemFacts {
             class_name: self.class_name().to_owned(),
-            item_type: self.attach_type.clone(),
-            sub_type: self.attach_sub_type.clone(),
+            item_type: self.classification.item_type_text().to_owned(),
+            sub_type: self.classification.subtype_text().to_owned(),
             size: self.size,
         }
     }
@@ -69,7 +79,13 @@ impl EntityNode {
     /// Record has none.
     #[must_use]
     pub fn attach_type(&self) -> &str {
-        &self.attach_type
+        self.classification.item_type_text()
+    }
+
+    /// Returns the authored item classification selected for this Entity.
+    #[must_use]
+    pub const fn classification(&self) -> &ItemClassification {
+        &self.classification
     }
 
     /// Returns the GUID of the `InventoryContainer` Record the Entity's
@@ -129,6 +145,24 @@ impl EntityNode {
         self.geometry.as_ref()
     }
 
+    /// Returns the physical Entity Record index, when supplied by DataForge.
+    #[must_use]
+    pub const fn record_index(&self) -> Option<u32> {
+        self.record_index
+    }
+
+    /// Returns the ordinal of the first attachable component selected in this Record.
+    #[must_use]
+    pub const fn attachable_component_ordinal(&self) -> Option<usize> {
+        self.classification.component()
+    }
+
+    /// Returns the original selection of this Entity when attached through a port.
+    #[must_use]
+    pub const fn attachment_target(&self) -> Option<&LoadoutTargetGuid> {
+        self.attachment_target.as_ref()
+    }
+
     /// Returns the GUID of the Entity's Record.
     #[must_use]
     pub const fn guid(&self) -> Guid {
@@ -178,8 +212,17 @@ impl EntityNode {
     #[must_use]
     pub fn walk(&self) -> Vec<(String, &PortNode)> {
         let mut ports = Vec::new();
-        walk(self, "", &mut ports);
+        self.visit_ports(|path, route| {
+            if let Some(&port) = route.last() {
+                ports.push((path.to_owned(), port));
+            }
+        });
         ports
+    }
+
+    /// Visits ports in depth-first order with their exact path and containing ports.
+    pub fn visit_ports<'node>(&'node self, visit: impl FnMut(&str, &[&'node PortNode])) {
+        crate::tree_walk::visit(&self.ports, visit);
     }
 
     /// Returns the default Loadout as one entry per port holding something, an Entity or an
@@ -206,29 +249,11 @@ impl EntityNode {
     }
 }
 
-fn walk<'n>(node: &'n EntityNode, prefix: &str, ports: &mut Vec<(String, &'n PortNode)>) {
-    walk_ports(&node.ports, prefix, ports);
-}
-
-fn walk_ports<'n>(list: &'n [PortNode], prefix: &str, ports: &mut Vec<(String, &'n PortNode)>) {
-    for port in list {
-        let path = if prefix.is_empty() {
-            port.name.clone()
-        } else {
-            format!("{prefix}/{}", port.name)
-        };
-        ports.push((path.clone(), port));
-        walk_ports(&port.nested, &path, ports);
-        if let Attachment::Entity(child) = &port.attachment {
-            walk(child, &path, ports);
-        }
-    }
-}
-
 /// One port of an Entity in a Loadout tree.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PortNode {
     pub(crate) name: String,
+    pub(crate) name_proof: Option<crate::LoadoutPath>,
     pub(crate) source: PortSource,
     pub(crate) definition: Option<Arc<PortDefinition>>,
     pub(crate) constraints: Option<Arc<PortConstraints>>,
@@ -239,6 +264,12 @@ pub struct PortNode {
 }
 
 impl PortNode {
+    /// Borrows the original selection of the published port name.
+    #[must_use]
+    pub const fn name_proof(&self) -> Option<&crate::LoadoutPath> {
+        self.name_proof.as_ref()
+    }
+
     /// Returns what supplied the port's attachment: the Record or XML Loadout file of the
     /// Loadout entry, or the Record of the port definition for a port default. `None` for a port
     /// no entry or default names, and for a port the changes excluded or replaced.
@@ -355,36 +386,4 @@ pub enum Attachment {
     Entity(Box<EntityNode>),
     /// An Entity that cannot be resolved, with the reason.
     Unresolved(Unresolved),
-}
-
-/// An attachment that cannot be resolved: what was named and why it fails.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Unresolved {
-    pub(crate) target: Target,
-    pub(crate) error: LoadoutError,
-}
-
-impl Unresolved {
-    /// Returns what the Loadout names.
-    #[must_use]
-    pub const fn target(&self) -> &Target {
-        &self.target
-    }
-
-    /// Returns why it cannot be resolved.
-    #[must_use]
-    pub const fn error(&self) -> &LoadoutError {
-        &self.error
-    }
-}
-
-/// What a Loadout names to attach to a port.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Target {
-    /// A Record by Reference.
-    Reference(Guid),
-    /// An Entity by class name.
-    ClassName(String),
-    /// A Reference that cannot be read.
-    Unreadable,
 }

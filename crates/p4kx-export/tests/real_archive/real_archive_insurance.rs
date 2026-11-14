@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The ship insurance and the item recovery rules of the Basetool catalog of a real Archive; runs
+//! The ship insurance of the Basetool catalog of a real Archive; runs
 //! with `--ignored` when `P4KX_DATA_P4K` names one.
 //!
 //! Run with `--nocapture` to see the counts. The anchors are the exact values of LIVE and follow
@@ -98,49 +98,5 @@ fn the_gladius_and_the_idris_carry_the_values_of_their_records() -> TestResult {
     let idris = ship(catalog, "AEGS_Idris_M")?;
     print_line(&format!("AEGS_Idris_M: {}", idris["insurance"]));
     assert_eq!(idris["insurance"]["expediteFee"], 150_990, "Idris-M fee");
-    Ok(())
-}
-
-#[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn the_recovery_rules_name_the_idris_in_a_group_of_multiplier_one() -> TestResult {
-    let catalog = catalog()?;
-    let idris = ship(catalog, "AEGS_Idris_M")?;
-    let recovery = &catalog["itemRecovery"];
-    print_line(&format!(
-        "item recovery: claim {} expedite {} overrides {}",
-        recovery["claimCostMultiplier"],
-        recovery["maxExpeditedClaimCostMultiplier"],
-        recovery["overrides"].as_array().map_or(0, Vec::len)
-    ));
-    assert_eq!(
-        recovery["recordPath"], "libs/foundry/records/entitlementpolicies/globalitemrecovery",
-        "the source path"
-    );
-    assert_eq!(
-        recovery["claimCostMultiplier"].as_f64(),
-        Some(0.003),
-        "claimCostMultiplier"
-    );
-    assert_eq!(
-        recovery["maxExpeditedClaimCostMultiplier"].as_f64(),
-        Some(0.0003),
-        "maxExpeditedClaimCostMultiplier"
-    );
-    let group = recovery["overrides"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|group| {
-            group["classGuids"]
-                .as_array()
-                .is_some_and(|guids| guids.contains(&idris["guid"]))
-        })
-        .ok_or("no override group names AEGS_Idris_M")?;
-    assert_eq!(
-        group["claimCostMultiplier"].as_f64(),
-        Some(1.0),
-        "the Idris-M group"
-    );
     Ok(())
 }

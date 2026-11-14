@@ -333,7 +333,7 @@ impl<'s, 'a, 'f, 't> Walk<'s, 'a, 'f, 't> {
                 "the Archive has no canvas for this standard widget",
                 &widget.name,
             );
-        } else if widget.canvas_dangling {
+        } else if widget.canvas.is_unreadable() {
             self.cx.report.missing_canvases.push(format!(
                 "{} (a reference that no Record answers)",
                 widget.name

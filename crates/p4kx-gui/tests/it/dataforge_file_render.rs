@@ -5,7 +5,7 @@
 //! drawn by wgpu and rendered headless by `egui_kittest`.
 //!
 //! The test needs a graphics adapter, a software one is enough, and returns early without one
-//! unless `P4KX_REQUIRE_SOFTWARE_ADAPTER` is set, which CI does. `P4KX_RENDER_DIR` names a folder
+//! unless `P4KX_REQUIRE_RENDER_ADAPTER` is set, which CI does. `P4KX_RENDER_DIR` names a folder
 //! the rendered windows are written to as PNG files.
 
 use crate::waiting::wait_for_model;
@@ -54,8 +54,8 @@ fn adapter() -> Option<RenderState> {
             .ok();
     if state.is_none() {
         assert!(
-            std::env::var_os("P4KX_REQUIRE_SOFTWARE_ADAPTER").is_none(),
-            "a software adapter is required"
+            !p4kx_testkit::render_adapter_required(),
+            "a graphics adapter is required"
         );
         eprintln!("no graphics adapter: the test checks nothing");
     }

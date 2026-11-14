@@ -7,9 +7,13 @@ use std::error::Error;
 
 use p4kx_chunks::ChunkFile;
 use p4kx_gltf::{
-    GlbOptions, GlbSummary, MaterialMode, RigPiece, write_rigged_glb, write_rigged_glb_with,
+    GlbOptions, GlbSummary, MaterialMode, RigPiece, write_rigged_glb,
+    write_rigged_glb_animated_observed, write_rigged_glb_with,
 };
-use p4kx_model::{CompanionError, CompanionPath, MaterialLibrary, MaterialStatus, Model};
+use p4kx_model::{
+    CompanionError, CompanionPath, MaterialLibrary, MaterialStatus, Model, PaletteSlot, TintEntry,
+    TintPalette,
+};
 use p4kx_testkit::gltf::material::AlphaMode;
 use p4kx_testkit::{
     CheckedGlb, TestBone, TestModel, TestMtl, TestMtlMaterial, TestSkeleton, check_glb,
@@ -290,5 +294,84 @@ fn the_plain_writer_ignores_the_material_mode_and_embeds_no_texture() -> TestRes
 
     assert_eq!(summary.textures, 0);
     assert_eq!(glb.document.textures().len(), 0);
+    Ok(())
+}
+
+fn painted_library() -> Result<MaterialStatus, Box<dyn Error>> {
+    let painted = skin_material().texture("TexSlot4", "Objects/Test/head_spec.tif");
+    let MaterialStatus::Loaded(mut library) = library(&painted)? else {
+        return Err("expected a material library".into());
+    };
+    let red = TintEntry {
+        tint: [0.8, 0.1, 0.2],
+        specular: [0.6; 3],
+        ..TintEntry::default()
+    };
+    let palette = TintPalette::new("paint", [red; 3], [1.0; 3]);
+    for material in &mut library.materials {
+        material.palette = Some(PaletteSlot::Primary);
+        *material = palette.apply(material).ok_or("applied palette")?;
+    }
+    Ok(MaterialStatus::Loaded(library))
+}
+
+#[test]
+fn a_shared_image_tracks_the_original_job_and_only_the_palette_values_it_uses() -> TestResult {
+    let status = painted_library()?;
+    let stub = Stub::default()
+        .with(
+            "objects/test/head_diff.dds",
+            &texture([200, 100, 50, 255], false)?,
+        )
+        .with(
+            "objects/test/head_ddna.dds",
+            &texture([128, 128, 255, 200], true)?,
+        )
+        .with(
+            "objects/test/head_spec.dds",
+            &texture([230, 230, 230, 255], false)?,
+        );
+    let (body, piece) = (body()?, piece()?);
+    let pieces = [
+        RigPiece::new("first", &piece, &status),
+        RigPiece::new("shared", &piece, &status),
+    ];
+    let options = GlbOptions::default().with_materials(MaterialMode::Textures);
+    let mut bytes = Vec::new();
+    let (summary, emission) =
+        write_rigged_glb_animated_observed(&body.bones, &pieces, &[], &options, &stub, &mut bytes)?;
+    let glb = check_glb(&bytes)?;
+    let head = material(&glb, "shader_head")?;
+    let pbr = head.pbr_metallic_roughness();
+    let base = pbr
+        .base_color_texture()
+        .ok_or("base colour texture")?
+        .texture();
+    let normal = head.normal_texture().ok_or("normal texture")?.texture();
+    let packed = pbr
+        .metallic_roughness_texture()
+        .ok_or("packed texture")?
+        .texture();
+    for (texture, uses_palette) in [(base, true), (normal, false), (packed, true)] {
+        let source = emission
+            .image_material(texture.source().index())
+            .ok_or("the original material job")?;
+        assert_eq!(
+            source.part, 0,
+            "the first registered part owns the deduplicated job"
+        );
+        assert!(
+            source.slot.is_some(),
+            "the source is an authored library slot"
+        );
+        assert_eq!(
+            source.uses_palette, uses_palette,
+            "only colour conversion uses the palette"
+        );
+    }
+    assert_eq!(
+        summary.textures, 3,
+        "the second part reuses all three images"
+    );
     Ok(())
 }

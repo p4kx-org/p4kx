@@ -25,11 +25,25 @@ to see a texture or to resolve a Loadout.
   is bounded: at most 2048x2048 pixels (counting every image of the mip it decodes), 128 MiB of
   texture data, 1 MiB of PNG and two decodes at a time. The description carries the ADR-0038 sentence that media must not be redistributed.
 - **Budgets:** `entity_loadout` and `mtl_summary` list in pages bounded by the page size and by
-  the 256 KiB cap on the whole response, the fields around the list included. Ports are at most 32
-  levels deep (16 by default). Texts are cut at 256 characters (a port path at 1024); the lists
-  inside one item are capped, with the full count beside them: 64 texture slots, shader parameters,
-  layers and Entity issues, 16 item types per port and 16 sub-types per item type. The caps keep
-  one item far below the response cap, so no item blocks paging. No tool runs code or changes state.
+  the 256 KiB cap on the whole response, including fields around the list. Ports are at most 32
+  levels deep (16 by default). Retained material and Loadout strings are complete. The existing
+  Budget admits each actual retained text occurrence before its output copy; one material or
+  port and its retained nested values share that item's budget. The response envelope has the
+  same raw-text admission. Actual display formatting runs once through a bounded writer;
+  independent formatter errors remain errors. Exact JSON admission still decides the page.
+  An oversized later item ends the page with a cursor that retries that item. An item that
+  cannot fit first is explicitly refused; other errors remain fatal.
+  All admitted Entity notes are retained through the same bounded display and envelope admission;
+  a note beyond the response budget causes an explicit refusal instead of disappearing.
+  Texture slots, shader parameters and layers are retained in full within the same item and
+  response admission. Typed layers are independent of the Model reader's unknown raw-fragment
+  budget; an unrelated raw-fragment cut does not hide or refuse complete advertised layer fields.
+  Remaining item lists retain their stated counts beside their previews: 64 Entity issues,
+  16 item types per port and 16 sub-types per item type.
+  These preview and depth limits require separate completeness/retrieval assessment; counts
+  alone do not establish their sufficiency. Texture paths remain relative to `Data`. Existing
+  input byte limits apply independently when returned names or paths are reused.
+  No tool runs code or changes state.
 
 ## Considered Options
 

@@ -3,16 +3,29 @@
 
 use std::collections::hash_map::Entry as MapEntry;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use std::time::Instant;
 
 use p4kx_extraction::{Archive, CancelToken, Guid};
 use rayon::prelude::*;
 
 use crate::CatalogError;
+use crate::catalog_read::original::EntryCapture;
+use crate::catalog_table::{CatalogTable, DatasetAvailability};
+use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, unreferenced};
-use crate::starmap_parse::read_all;
+use crate::starmap_parse::{Read, read_all};
 use crate::starmap_report::{ContainerCounts, Placement, StarmapReport, apart, clip};
 use crate::starmap_walk::{Opened, System, SystemRead};
+
+use self::instance::ContainerInstance;
+use self::proof::{PlacementEvidence, PlacementProof};
+
+#[path = "starmap_container_instance.rs"]
+pub(crate) mod instance;
+
+#[path = "starmap_placement_proof.rs"]
+pub(crate) mod proof;
 
 /// What bounds the walk through a star system.
 #[derive(Debug, Clone, Copy)]
@@ -35,20 +48,46 @@ impl Default for Limits {
     }
 }
 
+/// The catalog scope that requires reading system containers.
+#[derive(Clone, Copy)]
+pub(crate) enum PlacementScope {
+    RecordSelection,
+    ArchiveInventory,
+}
+
 /// The placements of the Starmap Records in the system containers of an Archive.
 #[derive(Debug, Default)]
 pub(crate) struct Placements {
+    pub(crate) ledger: ExportLedger,
     by_record: HashMap<Guid, Placement>,
+    ambiguous: HashMap<Guid, Arc<[PlacementProof; 2]>>,
     pub(crate) counts: ContainerCounts,
     pub(crate) report: StarmapReport,
+    instances: Vec<ContainerInstance>,
+    instance_availability: Option<DatasetAvailability>,
     /// Every container below the system folder: those the walk opened, each with the record it
     /// hangs below, then those it did not reach, with none.
     pub(crate) opened: Vec<Opened>,
 }
 
 impl Placements {
+    pub(crate) fn take_instances(&mut self) -> CatalogTable<ContainerInstance> {
+        CatalogTable {
+            availability: self
+                .instance_availability
+                .unwrap_or(DatasetAvailability::Unavailable),
+            rows: std::mem::take(&mut self.instances),
+        }
+    }
+
     pub(crate) fn get(&self, record: Guid) -> Option<&Placement> {
         self.by_record.get(&record)
+    }
+
+    pub(crate) fn ambiguity_proof(&self, record: Guid) -> Option<PlacementEvidence> {
+        self.ambiguous
+            .get(&record)
+            .map(|proof| PlacementEvidence::Ambiguous(Arc::clone(proof)))
     }
 
     /// Reads the container of every star system of `archive` and the external containers it
@@ -60,73 +99,118 @@ impl Placements {
     pub(crate) fn read(
         archive: &Archive,
         cancel: Option<&CancelToken>,
+        capture: &EntryCapture<'_>,
+        scope: PlacementScope,
     ) -> Result<Self, CatalogError> {
-        Self::read_within(archive, cancel, Limits::default())
+        Self::read_within(archive, cancel, Limits::default(), capture, scope)
     }
 
     pub(crate) fn read_within(
         archive: &Archive,
         cancel: Option<&CancelToken>,
         limits: Limits,
+        capture: &EntryCapture<'_>,
+        scope: PlacementScope,
     ) -> Result<Self, CatalogError> {
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
+        }
         let started = Instant::now();
         let index = Index::new(archive);
         let systems = index.systems();
+        if systems.is_empty() && matches!(scope, PlacementScope::ArchiveInventory) {
+            return Ok(Self {
+                instance_availability: Some(DatasetAvailability::Absent),
+                ..Self::default()
+            });
+        }
         let roots: Vec<usize> = systems.iter().map(|(_, entry)| *entry).collect();
-        let bodies = read_all(
+        let Read { bodies, ledger, .. } = read_all(
             archive,
             &index,
             &roots,
             cancel,
             limits.external,
             (limits.depth, limits.children),
-        )
-        .bodies;
+            capture,
+        )?;
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        let read: Vec<SystemRead> = systems
+        let read = systems
             .par_iter()
-            .map(|(name, entry)| System::run(&index, &bodies, name, *entry, cancel, limits))
-            .collect();
+            .map(|(name, entry)| {
+                System::run(
+                    &index,
+                    &bodies,
+                    name,
+                    *entry,
+                    cancel,
+                    limits,
+                    (archive, capture),
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        let mut placements = Self::default();
-        placements.counts.systems = systems.len();
-        let mut repeated: HashSet<Guid> = HashSet::new();
-        let mut opened: HashSet<usize> = HashSet::new();
-        let mut named = 0;
-        for system in read {
-            opened.extend(system.opened.iter().copied());
-            placements.report.deepest_external =
-                placements.report.deepest_external.max(system.deepest);
-            named += system.named;
-            placements.counts.unreadable += system.unreadable;
-            placements.counts.missing += system.missing;
-            placements.counts.malformed += system.malformed;
-            placements
-                .report
-                .containers
-                .extend(system.report.containers);
-            placements.report.issues.extend(system.report.issues);
-            placements.opened.extend(system.containers);
-            for (record, placement) in system.placed {
-                placements.add(record, placement, &mut repeated);
-            }
-        }
-        placements.counts.ambiguous = repeated.len();
-        placements
-            .report
-            .containers
-            .push(format!("{named} containers name starmap records"));
-        for record in &repeated {
-            placements.by_record.remove(record);
-        }
-        placements.report.unreferenced = unreferenced(&index, &opened);
-        placements.add_unreached(&index, &opened);
+        let mut placements = Self {
+            ledger,
+            ..Self::default()
+        };
+        placements.finish(&index, systems.len(), read, scope);
         placements.report.elapsed = started.elapsed();
         Ok(placements)
+    }
+
+    fn finish(
+        &mut self,
+        index: &Index<'_>,
+        roots: usize,
+        read: Vec<SystemRead>,
+        scope: PlacementScope,
+    ) {
+        self.counts.systems = roots;
+        self.instance_availability = Some(if roots == 0 {
+            DatasetAvailability::Absent
+        } else {
+            DatasetAvailability::Available
+        });
+        let mut opened = HashSet::new();
+        let named = self.merge_systems(read, &mut opened);
+        self.counts.ambiguous = self.ambiguous.len();
+        self.report
+            .containers
+            .push(format!("{named} containers name starmap records"));
+        for record in self.ambiguous.keys() {
+            self.by_record.remove(record);
+        }
+        self.report.unreferenced = unreferenced(index, &opened);
+        if matches!(scope, PlacementScope::RecordSelection) {
+            self.add_unreached(index, &opened);
+        } else {
+            self.opened.clear();
+        }
+    }
+
+    fn merge_systems(&mut self, systems: Vec<SystemRead>, opened: &mut HashSet<usize>) -> usize {
+        let mut named = 0;
+        for system in systems {
+            opened.extend(system.opened.iter().copied());
+            self.report.deepest_external = self.report.deepest_external.max(system.deepest);
+            named += system.named;
+            self.counts.unreadable += system.unreadable;
+            self.counts.missing += system.missing;
+            self.counts.malformed += system.malformed;
+            self.report.containers.extend(system.report.containers);
+            self.report.issues.extend(system.report.issues);
+            self.opened.extend(system.containers);
+            self.instances.extend(system.instances);
+            for (record, placement) in system.placed {
+                self.add(record, placement);
+            }
+        }
+        named
     }
 
     /// Adds the containers below the system folder that the walk did not open, each hanging below
@@ -145,16 +229,17 @@ impl Placements {
         );
     }
 
-    /// Keeps the first placement of `record`; a later one more than `SAME_PLACE` metres from it
-    /// puts the record into `repeated`, to be left unplaced.
-    fn add(&mut self, record: Guid, placement: Placement, repeated: &mut HashSet<Guid>) {
+    /// Retains the first placement and the first pair establishing an ambiguous position.
+    fn add(&mut self, record: Guid, placement: Placement) {
         let MapEntry::Occupied(held) = self.by_record.entry(record) else {
             self.by_record.insert(record, placement);
             return;
         };
         let moved = apart(held.get().position, placement.position);
         if moved {
-            repeated.insert(record);
+            self.ambiguous
+                .entry(record)
+                .or_insert_with(|| Arc::new([held.get().proof.clone(), placement.proof.clone()]));
         }
         if self.report.repeated.len() < 100 {
             self.report.repeated.push(format!(

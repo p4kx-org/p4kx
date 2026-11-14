@@ -123,6 +123,7 @@ fn with_parts(record: TestRecord) -> TestRecord {
                 parts::named(location("Place_BP", "Place", None), "bprop_place"),
                 npc::npcs("Crew_BP", "", Some(("Squad", NpcKind::Full))),
                 npc::entities("Loot_BP", "", Some("Crate")),
+                super::template_values::item_property(),
             ]),
         )
         .value("objectiveTokens", objectives())

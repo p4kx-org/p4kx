@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_channels::Channel;
-use p4kx_extraction::{Build, Entry};
+use p4kx_extraction::{ArchiveLayoutInfo, ArchiveLayoutOrigins, Build, Entry, EntryMetadataInfo};
 use schemars::JsonSchema;
 use serde::Serialize;
+
+use crate::entry_directory_origins::DirectoryOrigins;
 
 /// The detected Channels.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -79,6 +81,10 @@ pub(crate) struct ArchiveInfo {
     pub(crate) channel: Option<String>,
     /// The Build, absent when the manifest cannot be read.
     pub(crate) build: Option<BuildShape>,
+    /// Cached source-layout headers without a lazy-record validation claim.
+    pub(crate) metadata: ArchiveLayoutInfo,
+    #[serde(flatten)]
+    pub(crate) origins: ArchiveLayoutOrigins,
     /// The number of Entries.
     pub(crate) entry_count: usize,
     /// The number of encrypted Entries.
@@ -115,6 +121,8 @@ pub(crate) struct EntryShape {
     pub(crate) compressed_size: u64,
     /// The size in bytes.
     pub(crate) size: u64,
+    /// Directory facts owned by this exact physical Entry, including its admitted index.
+    pub(crate) metadata: EntryMetadataInfo,
 }
 
 impl From<&Entry> for EntryShape {
@@ -132,6 +140,7 @@ impl EntryShape {
             encrypted: entry.is_encrypted(),
             compressed_size: entry.compressed_size(),
             size: entry.uncompressed_size(),
+            metadata: EntryMetadataInfo::of(entry),
         }
     }
 }
@@ -139,6 +148,8 @@ impl EntryShape {
 /// The content of one folder of an Archive: its subfolders first, then its Entries.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct FolderResult {
+    #[serde(flatten)]
+    pub(crate) origins: DirectoryOrigins,
     /// The path of the Archive.
     pub(crate) archive: String,
     /// The folder listed; empty for the top level. Inside a container it begins with the
@@ -174,6 +185,8 @@ pub(crate) enum FolderItem {
 /// The Entries a Filter matched.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct SearchResult {
+    #[serde(flatten)]
+    pub(crate) origins: DirectoryOrigins,
     /// The path of the Archive.
     pub(crate) archive: String,
     /// The Filter.
@@ -207,6 +220,11 @@ pub(crate) struct TextResult {
     pub(crate) length: usize,
     /// The text read.
     pub(crate) text: String,
+    /// Original inputs of each structured result field.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: crate::content_text_origin::TextFieldOrigins,
+    /// Physical sources and decoded Entry ranges used by the response.
+    pub(crate) provenance: p4kx_extraction::SourceInventory,
     /// Whether more text follows.
     pub(crate) more: bool,
     /// The offset to continue at; absent at the end.
@@ -244,4 +262,9 @@ pub(crate) struct BytesResult {
     pub(crate) clamped: bool,
     /// The `max_bytes` used.
     pub(crate) max_bytes: usize,
+    /// Exact field origins for the structured response.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: crate::content_origin::BytesFieldOrigins,
+    /// Physical sources and byte ranges used by the response.
+    pub(crate) provenance: p4kx_extraction::SourceInventory,
 }

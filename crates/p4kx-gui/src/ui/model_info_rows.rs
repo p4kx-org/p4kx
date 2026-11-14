@@ -245,5 +245,50 @@ pub(crate) fn file_name(texts: &Texts, chunk: &ChunkNote) -> String {
         ChunkFile::LodGeometry(level) => {
             texts.format(T::FileLod, &[("level", level.to_string().into())])
         }
+        ChunkFile::LodModel(level) => {
+            texts.format(T::FileLodModel, &[("level", level.to_string().into())])
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::file_name;
+    use crate::{ChunkFile, ChunkNote, Language, Texts};
+
+    #[test]
+    fn level_model_and_geometry_files_have_distinct_localised_names() {
+        for (language, model, geometry) in [
+            (
+                Language::BritishEnglish,
+                "LOD 3 model file",
+                "LOD 3 geometry",
+            ),
+            (
+                Language::German,
+                "Modelldatei von LOD 3",
+                "Geometrie von LOD 3",
+            ),
+        ] {
+            let texts = Texts::new(language);
+            let mut note = ChunkNote {
+                file: ChunkFile::LodModel(3),
+                index: 0,
+                name: None,
+                type_id: "0xDEADBEEF".to_owned(),
+                unknown: true,
+            };
+            assert_eq!(
+                file_name(&texts, &note),
+                model,
+                "level model label resolves its Fluent argument"
+            );
+            note.file = ChunkFile::LodGeometry(3);
+            assert_eq!(
+                file_name(&texts, &note),
+                geometry,
+                "existing level geometry label is unchanged"
+            );
+        }
     }
 }

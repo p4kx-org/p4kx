@@ -14,28 +14,12 @@ use serde_json::Value;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-const BLOCKS: [(&str, &[&str]); 7] = [
+const BLOCKS: [(&str, &[&str]); 2] = [
     ("weapon", &["fireActions", "ammoCapacity", "ammo"]),
-    (
-        "shield",
-        &[
-            "maxHealth",
-            "maxRegen",
-            "downedRegenDelay",
-            "damagedRegenDelay",
-        ],
-    ),
-    (
-        "quantumDrive",
-        &["fuelRequirement", "jumpRange", "driveSpeed", "spoolUpTime"],
-    ),
-    ("powerPlant", &["powerOutput", "unit"]),
-    ("cooler", &["coolingRate", "unit"]),
     (
         "missile",
         &["damage", "explosionMaxRadius", "lockTime", "linearSpeed"],
     ),
-    ("resourceStates", &[]),
 ];
 
 const MIN_SHARE: f64 = 0.8;
@@ -102,16 +86,59 @@ fn every_stat_block_is_filled_for_the_items_that_have_it() -> TestResult {
             ));
         }
     }
+    check_shield_coverage(&catalog, &mut problems)?;
     assert!(problems.is_empty(), "blocks below 80 %: {problems:?}");
     Ok(())
 }
 
-fn stats_of<'c>(items: &'c [Value], class: &str) -> Result<&'c Value, String> {
+fn shields(catalog: &Value) -> Result<&[Value], Box<dyn Error>> {
+    catalog
+        .pointer("/configurations/shieldGenerators/rows")
+        .and_then(Value::as_array)
+        .map(Vec::as_slice)
+        .ok_or_else(|| "canonical shield generator rows".into())
+}
+
+fn check_shield_coverage(catalog: &Value, problems: &mut Vec<String>) -> TestResult {
+    let rows = shields(catalog)?;
+    report(&format!("shield generators: {} rows", rows.len()));
+    if rows.is_empty() {
+        problems.push("no canonical shield generator row".to_owned());
+        return Ok(());
+    }
+    for field in [
+        "maxHealth",
+        "maxRegen",
+        "downedRegenDelay",
+        "damagedRegenDelay",
+    ] {
+        let pointer = format!("/{field}/value/finite");
+        let filled = rows
+            .iter()
+            .filter(|row| row.pointer(&pointer).is_some_and(Value::is_number))
+            .count();
+        #[expect(clippy::cast_precision_loss, reason = "counts far below 2^52")]
+        let share = filled as f64 / rows.len() as f64;
+        report(&format!("  {field}: {filled} of {} filled", rows.len()));
+        if share < MIN_SHARE {
+            problems.push(format!(
+                "shieldGenerators.{field}: {filled} of {}",
+                rows.len()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn item_of<'c>(items: &'c [Value], class: &str) -> Result<&'c Value, String> {
     items
         .iter()
         .find(|item| item["className"] == class)
-        .map(|item| &item["stats"])
         .ok_or_else(|| format!("no item {class}"))
+}
+
+fn stats_of<'c>(items: &'c [Value], class: &str) -> Result<&'c Value, String> {
+    Ok(&item_of(items, class)?["stats"])
 }
 
 #[test]
@@ -119,20 +146,48 @@ fn stats_of<'c>(items: &'c [Value], class: &str) -> Result<&'c Value, String> {
 fn known_items_carry_their_known_values() -> TestResult {
     let catalog = catalog()?;
     let items = catalog["items"].as_array().ok_or("the items array")?;
-    let shield = stats_of(items, "SHLD_GODI_S01_FR66_SCItem")?;
-    assert_eq!(shield["shield"]["maxHealth"], 3168.0);
+    let item = item_of(items, "SHLD_GODI_S01_FR66_SCItem")?;
+    let guid = item.get("guid").ok_or("known shield item GUID")?;
+    let shield = shields(&catalog)?
+        .iter()
+        .find(|row| row.pointer("/ownerGuid/value") == Some(guid))
+        .ok_or("known shield generator configuration")?;
+    assert_eq!(
+        shield
+            .pointer("/maxHealth/value/finite")
+            .and_then(Value::as_f64),
+        Some(3_168.0),
+        "known original shield health in the canonical configuration"
+    );
     let missile = stats_of(items, "MISL_S07_IR_TALN_Hellion")?;
     assert_eq!(missile["missile"]["trackingSignalType"], "Infrared");
-    let cooler = stats_of(items, "COOL_JUST_S02_Snowpack_SCItem")?;
-    assert_eq!(cooler["cooler"]["coolingRate"], 46.0);
-    let plant = stats_of(items, "POWR_JUST_S03_Durango_SCItem")?;
-    assert_eq!(plant["powerPlant"]["powerOutput"], 24.0);
+    let cooler = item_of(items, "COOL_JUST_S02_Snowpack_SCItem")?;
+    assert_eq!(
+        crate::real_archive_resource_components::known_generation_amount(
+            &catalog, cooler, "Coolant"
+        ),
+        Some(46.0)
+    );
+    let plant = item_of(items, "POWR_JUST_S03_Durango_SCItem")?;
+    assert_eq!(
+        crate::real_archive_resource_components::known_generation_amount(&catalog, plant, "Power"),
+        Some(24.0)
+    );
     let laser = stats_of(items, "VNCL_LaserCannon_S1")?;
     assert_eq!(laser["weapon"]["fireActions"][0]["fireRate"], 350.0);
-    let drive = stats_of(items, "QDRV_WETK_S04_Idris_TEMP")?;
+    let item = item_of(items, "QDRV_WETK_S04_Idris_TEMP")?;
+    let guid = item.get("guid").ok_or("known quantum drive item GUID")?;
+    let drive = catalog
+        .pointer("/configurations/quantumDrives/rows")
+        .and_then(Value::as_array)
+        .ok_or("canonical quantum drives")?
+        .iter()
+        .find(|row| row.pointer("/ownerGuid/value") == Some(guid))
+        .ok_or("known quantum drive configuration")?;
     assert!(
-        drive["quantumDrive"]["jumpRange"]
-            .as_f64()
+        drive
+            .pointer("/jumpRange/value/finite")
+            .and_then(Value::as_f64)
             .is_some_and(|range| range > 3.4e38),
         "the stored f32::MAX"
     );

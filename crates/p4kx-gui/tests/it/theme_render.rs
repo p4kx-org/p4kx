@@ -228,7 +228,7 @@ fn the_comparison_tiles_take_the_bar_fill_inside_the_panel() -> TestResult {
             );
         let tab = harness.state_mut().comparison_mut();
         tab.set_archive(ComparisonSide::Old, pair.old.clone());
-        tab.set_archive(ComparisonSide::New, pair.new.clone());
+        tab.set_archive(ComparisonSide::New, pair.new);
         harness.run_quiet();
         harness.get_by_label(start).click();
         tagging::wait_until(

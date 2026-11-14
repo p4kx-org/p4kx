@@ -9,12 +9,15 @@ use std::thread;
 use std::time::SystemTime;
 
 use p4kx_export::{
-    CancelToken, CatalogError, CatalogFile, CatalogOptions, CatalogProgress, Compression,
-    write_catalog_from,
+    CancelToken, CatalogError, CatalogFile, CatalogOptions, CatalogProgress,
+    CatalogPublicationMode, CatalogSummary, Compression, ExportHealth, write_catalog_file_from,
 };
-use p4kx_extraction::is_same_file;
+use p4kx_extraction::{ArchiveWriteProtection, SourceInventory, is_same_file};
 
-use super::{CatalogExportProgress, CatalogExportStage, CatalogExportSummary, Shared};
+use super::refusal::Refusal;
+use super::{
+    CatalogExportOptions, CatalogExportProgress, CatalogExportStage, CatalogExportSummary, Shared,
+};
 use crate::EntryIndex;
 use crate::forge_cache::ReadFailure;
 use crate::model::describe;
@@ -32,12 +35,15 @@ pub enum CatalogExportStatus<'a> {
     IsArchive,
     /// The chosen file ends in `.gz`, which is not written; nothing was written.
     GzipNotSupported,
+    /// Selected data could not be read or projected; normal publication wrote nothing.
+    Incomplete(&'a ExportHealth),
     /// The catalog could not be created, for the reason given, or it stopped without a result.
     Failed(Option<&'a str>),
 }
 
 enum Outcome {
     Written(Box<CatalogExportSummary>),
+    Incomplete(Refusal),
     Cancelled,
     IsArchive,
 }
@@ -51,6 +57,7 @@ enum State {
     Cancelled,
     IsArchive,
     GzipNotSupported,
+    Incomplete(Refusal),
     Failed(Option<String>),
 }
 
@@ -62,11 +69,18 @@ pub struct CatalogExport {
     shown: String,
     cancel: CancelToken,
     shared: Arc<Shared>,
+    publication_mode: CatalogPublicationMode,
     state: State,
 }
 
 impl CatalogExport {
-    fn new(file: PathBuf, cancel: CancelToken, shared: Arc<Shared>, state: State) -> Self {
+    fn new(
+        file: PathBuf,
+        cancel: CancelToken,
+        shared: Arc<Shared>,
+        state: State,
+        publication_mode: CatalogPublicationMode,
+    ) -> Self {
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
         Self {
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
@@ -74,6 +88,7 @@ impl CatalogExport {
             file,
             cancel,
             shared,
+            publication_mode,
             state,
         }
     }
@@ -96,6 +111,12 @@ impl CatalogExport {
         &self.shown
     }
 
+    /// Returns the publication policy explicitly selected for this job.
+    #[must_use]
+    pub const fn publication_mode(&self) -> CatalogPublicationMode {
+        self.publication_mode
+    }
+
     /// Returns where the catalog stands.
     #[must_use]
     pub fn status(&self) -> CatalogExportStatus<'_> {
@@ -105,10 +126,24 @@ impl CatalogExport {
             State::Cancelled => CatalogExportStatus::Cancelled,
             State::IsArchive => CatalogExportStatus::IsArchive,
             State::GzipNotSupported => CatalogExportStatus::GzipNotSupported,
+            State::Incomplete(report) => CatalogExportStatus::Incomplete(report.health()),
             State::Failed(reason) => CatalogExportStatus::Failed(reason.as_deref()),
         }
     }
 
+    /// Borrows the immutable inventory retained by a completed or refused catalog result.
+    #[must_use]
+    pub fn source_inventory(&self) -> Option<&SourceInventory> {
+        match &self.state {
+            State::Finished(summary) => Some(summary.summary().source_inventory()),
+            State::Incomplete(report) => Some(report.inventory()),
+            State::Running(_)
+            | State::Cancelled
+            | State::IsArchive
+            | State::GzipNotSupported
+            | State::Failed(_) => None,
+        }
+    }
     /// Returns whether the catalog is still being created.
     #[must_use]
     pub const fn is_running(&self) -> bool {
@@ -168,6 +203,7 @@ fn ended(outcome: Option<RunResult>) -> State {
         Some(Ok(Outcome::Written(summary))) => State::Finished(summary),
         Some(Ok(Outcome::Cancelled)) => State::Cancelled,
         Some(Ok(Outcome::IsArchive)) => State::IsArchive,
+        Some(Ok(Outcome::Incomplete(report))) => State::Incomplete(report),
         Some(Err(reason)) => State::Failed(Some(reason)),
         None => State::Failed(None),
     }
@@ -179,17 +215,20 @@ fn ended(outcome: Option<RunResult>) -> State {
 pub(crate) fn start(
     index: &Arc<EntryIndex>,
     file: PathBuf,
+    options: CatalogExportOptions,
     wake: impl Fn() + Send + 'static,
     #[cfg(feature = "test-hooks")] pause: crate::hold::Pause,
 ) -> CatalogExport {
     let cancel = CancelToken::new();
     let shared = Arc::new(Shared::default());
     let (sender, result) = mpsc::channel();
+    let publication_mode = options.publication_mode;
     let job = Job {
         index: Arc::clone(index),
         file: file.clone(),
         cancel: cancel.clone(),
         shared: Arc::clone(&shared),
+        options,
         #[cfg(feature = "test-hooks")]
         pause,
     };
@@ -204,21 +243,28 @@ pub(crate) fn start(
         Ok(_handle) => State::Running(result),
         Err(error) => State::Failed(Some(describe(&error))),
     };
-    CatalogExport::new(file, cancel, shared, state)
+    CatalogExport::new(file, cancel, shared, state, publication_mode)
 }
 
 /// Returns the outcome of a catalog refused because `file` is the open Archive.
-pub(crate) fn refused(file: PathBuf) -> CatalogExport {
-    CatalogExport::new(file, CancelToken::new(), Arc::default(), State::IsArchive)
+pub(crate) fn refused(file: PathBuf, mode: CatalogPublicationMode) -> CatalogExport {
+    CatalogExport::new(
+        file,
+        CancelToken::new(),
+        Arc::default(),
+        State::IsArchive,
+        mode,
+    )
 }
 
 /// Returns the outcome of a catalog refused because `file` ends in `.gz`.
-pub(crate) fn refused_gzip(file: PathBuf) -> CatalogExport {
+pub(crate) fn refused_gzip(file: PathBuf, mode: CatalogPublicationMode) -> CatalogExport {
     CatalogExport::new(
         file,
         CancelToken::new(),
         Arc::default(),
         State::GzipNotSupported,
+        mode,
     )
 }
 
@@ -227,6 +273,7 @@ struct Job {
     file: PathBuf,
     cancel: CancelToken,
     shared: Arc<Shared>,
+    options: CatalogExportOptions,
     #[cfg(feature = "test-hooks")]
     pause: crate::hold::Pause,
 }
@@ -251,40 +298,57 @@ impl Job {
         let progress = |progress: CatalogProgress| self.shared.report(progress);
         let patches = crate::public_patches::current();
         let options = CatalogOptions {
-            filter: None,
+            filter: self.options.filter.as_ref(),
             exported_at: SystemTime::now(),
             cancel: Some(&self.cancel),
             progress: Some(&progress),
             public_patches: Some(&patches),
+            publication_mode: self.options.publication_mode,
         };
-        let created = write_catalog_from(
+        let protection = match ArchiveWriteProtection::new(archive.path(), self.cancel.flag()) {
+            Ok(protection) => protection,
+            Err(error) if error.is_cancelled() => return Ok(Outcome::Cancelled),
+            Err(error) => return Err(describe(&error)),
+        };
+        let created = write_catalog_file_from(
             archive,
             &source.entry,
             &options,
             Compression::for_path(&self.file),
             || {
                 self.shared.enter(CatalogExportStage::Writing);
-                crate::installation::refuse(&self.file)?;
-                CatalogFile::create(&self.file)
+                CatalogFile::create_protected(&self.file, &protection, &self.cancel)
             },
         );
         let (summary, file) = match created {
             Ok(created) => created,
             Err(CatalogError::Cancelled) => return Ok(Outcome::Cancelled),
+            Err(error) if crate::installation::guard_cancelled(&error) => {
+                return Ok(Outcome::Cancelled);
+            }
+            Err(CatalogError::IncompleteExport(report)) => {
+                return Ok(Outcome::Incomplete(Refusal::new(report)));
+            }
             Err(error) => return Err(describe(&error)),
         };
-        self.check_archive()?;
+        self.complete(summary, file)
+    }
+
+    fn complete(&self, summary: CatalogSummary, file: CatalogFile<'_>) -> RunResult {
+        if let Err(source) = self.index.watch().check() {
+            let primary = CatalogError::Write(std::io::Error::other(source));
+            return Err(describe(&super::output::discard(file, primary)));
+        }
         if self.cancel.is_cancelled() {
-            return Ok(Outcome::Cancelled);
+            return match super::output::discard(file, CatalogError::Cancelled) {
+                CatalogError::Cancelled => Ok(Outcome::Cancelled),
+                error => Err(describe(&error)),
+            };
         }
         file.commit().map_err(|error| describe(&error))?;
         Ok(Outcome::Written(Box::new(CatalogExportSummary {
             file: self.file.clone(),
             summary,
         })))
-    }
-
-    fn check_archive(&self) -> Result<(), String> {
-        self.index.watch().check().map_err(|error| describe(&error))
     }
 }

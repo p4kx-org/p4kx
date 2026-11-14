@@ -5,6 +5,7 @@
 //! `p4kx ui render` write, and the outcome names what was left out.
 
 use std::fs;
+use std::io::{self, Write as _};
 use std::path::Path;
 
 use egui::accesskit::Role;
@@ -12,13 +13,14 @@ use egui_kittest::kittest::Queryable;
 use p4kx_extraction::gfx::{Background, CanvasSize, Localise, RasterOptions};
 use p4kx_extraction::{
     Archive, ArchiveImages, DataForgeEntry, Language as TextLanguage, LocalizationEntry,
-    ScreenTexts, UiMovie, decode_line_breaks,
+    OriginDigestWriter, ScreenTexts, UiMovie, decode_line_breaks,
 };
 use p4kx_gui::ui::Dialog;
 use p4kx_gui::{Language, UiExportStatus, UiFormat};
 use p4kx_screens::{
     ImageSources, MAX_SVG_BYTES, ScreenComposer, Still, StillFormat, StillRequest, TextSources,
 };
+use serde_json::Value;
 
 use crate::tagging::wait_until;
 use crate::ui_tabbing::{
@@ -120,6 +122,7 @@ fn a_screen_is_exported_as_the_png_the_cli_writes() -> TestResult {
         screen_by_library(&window.archive, StillFormat::Png)?,
         "the same bytes as the library writes for the CLI"
     );
+    assert_screen_receipt(&out)?;
     let done = summary(&window)?;
     assert_eq!((done.width, done.height), (200, 100), "the size");
     assert!(
@@ -152,6 +155,81 @@ fn a_screen_is_exported_as_the_svg_the_cli_writes() -> TestResult {
         screen_by_library(&window.archive, StillFormat::Svg)?,
         "the same document as the library writes for the CLI"
     );
+    assert_screen_receipt(&out)
+}
+
+fn assert_screen_receipt(output: &Path) -> TestResult {
+    let name = output.file_name().ok_or("output basename")?;
+    let mut companion = name.to_os_string();
+    companion.push(".p4kx-origin.jsonl");
+    let receipt = fs::read_to_string(output.with_file_name(companion))?;
+    let rows: Vec<Value> = receipt
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<Result<_, _>>()?;
+    let header = rows.first().ok_or("companion header")?;
+    let mut digest = OriginDigestWriter::new(io::sink());
+    digest.write_all(&fs::read(output)?)?;
+    let expected = serde_json::to_value(digest.finish()?)?;
+    assert_eq!(
+        header
+            .pointer("/binding/path/value")
+            .and_then(Value::as_str),
+        name.to_str(),
+        "relative output name"
+    );
+    for field in ["sha256", "byteLength"] {
+        assert_eq!(
+            header.get("binding").and_then(|binding| binding.get(field)),
+            expected.get(field),
+            "committed output {field}"
+        );
+    }
+    assert_eq!(
+        rows.last()
+            .and_then(|row| row.get("type"))
+            .and_then(Value::as_str),
+        Some("end"),
+        "complete companion"
+    );
+    assert_screen_sources(&rows)
+}
+
+fn assert_screen_sources(rows: &[Value]) -> TestResult {
+    let artifact = rows
+        .iter()
+        .find(|row| row.pointer("/address/type").and_then(Value::as_str) == Some("opaquePayload"))
+        .ok_or("encoded artifact field")?;
+    let references = artifact
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("artifact use references")?;
+    for (namespace, path) in [
+        ("dataForgeBytes", "Data/Game2.dcb"),
+        ("gfxTag", "Data/UI/fonts/Shared/fonts_en.gfx"),
+        ("globalIniBytes", "Data/Localization/english/global.ini"),
+    ] {
+        let source_use = rows
+            .iter()
+            .filter_map(|row| row.get("sourceUse"))
+            .find(|usage| {
+                usage.pointer("/location/namespace").and_then(Value::as_str) == Some(namespace)
+                    && usage.get("id").is_some_and(|id| references.contains(id))
+            })
+            .ok_or_else(|| format!("artifact use {namespace}"))?;
+        let physical = rows
+            .iter()
+            .filter_map(|row| row.get("source"))
+            .find(|source| source.get("id") == source_use.get("source"))
+            .and_then(|source| source.pointer("/path/value"))
+            .and_then(Value::as_str)
+            .ok_or("observed Archive Entry path")?;
+        assert_eq!(
+            physical.replace('\\', "/"),
+            path,
+            "actual source of {namespace}"
+        );
+    }
     Ok(())
 }
 

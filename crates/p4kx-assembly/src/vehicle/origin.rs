@@ -24,3 +24,18 @@ impl ValueOrigin {
         }
     }
 }
+
+#[derive(Debug, Clone, Default)]
+pub(super) struct DeclarationOrigins {
+    pub(super) base: Option<p4kx_extraction::EntryOrigin>,
+    pub(super) patch: Option<p4kx_extraction::EntryOrigin>,
+}
+
+impl PartialEq for DeclarationOrigins {
+    fn eq(&self, other: &Self) -> bool {
+        let binding = |origin: &Option<p4kx_extraction::EntryOrigin>| {
+            origin.as_ref().map(p4kx_extraction::EntryOrigin::binding)
+        };
+        binding(&self.base) == binding(&other.base) && binding(&self.patch) == binding(&other.patch)
+    }
+}

@@ -1,0 +1,181 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::io::{Read, Seek};
+
+use p4kx_extraction::bank::{
+    BankHircMusicPlaylist, BankMusicPlaylistDepth, BankMusicPlaylistRead, BankMusicPlaylistRow,
+};
+
+use crate::audio_bank_inventory::VersionSite;
+use crate::audio_bank_music_node;
+use crate::audio_bank_music_segment::MusicChildField;
+use crate::audio_bank_music_stinger_schedule;
+use crate::audio_bank_music_transition_rules::{self, Owner as TransitionOwner};
+use crate::audio_bank_music_value::{MusicNodeChildRecord, MusicStingerRecord};
+use crate::audio_bank_projection::BankProjection;
+use crate::{MediaError, MediaIssue, MediaWriter, Severity, Status, Subresource};
+
+#[path = "audio_bank_music_playlist_origins.rs"]
+mod origins;
+#[path = "audio_bank_music_playlist_payload.rs"]
+mod payload;
+
+use self::origins::PlaylistSites;
+pub(crate) use self::payload::MusicPlaylistPayload;
+use self::payload::{PlaylistItemRecord, PlaylistLayout, PlaylistRecord};
+
+pub(crate) const NAMESPACE: &str = "audio-bank-music-playlist";
+pub(crate) const CHILD: &str = "audio-bank-music-playlist-child";
+pub(crate) const STINGER: &str = "audio-bank-music-playlist-stinger";
+pub(crate) const ITEM: &str = "audio-bank-music-playlist-item";
+
+pub(crate) fn project<R: Read + Seek>(
+    projection: &BankProjection<'_>,
+    version: VersionSite,
+    mut playlist: BankHircMusicPlaylist<'_, R>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let object = playlist.object;
+    let error = match &playlist.status {
+        BankMusicPlaylistRead::Decoded => Some(None),
+        BankMusicPlaylistRead::Malformed(error) => Some(Some(error.clone())),
+        BankMusicPlaylistRead::Unsupported(_) => None,
+        _ => {
+            return Err(MediaError::Contract(
+                "unexpected shared music node disposition".into(),
+            ));
+        }
+    };
+    if let Some(error) = error {
+        audio_bank_music_node::project(
+            projection,
+            version,
+            object,
+            playlist.shared_node(),
+            error.as_ref(),
+            writer,
+        )?;
+    } else {
+        audio_bank_music_node::unsupported(projection, version, &object, writer)?;
+    }
+    let sites = PlaylistSites::new(&playlist.object, version, &playlist.fields);
+    let (layout, status, issue) = interpretation(&playlist.status)?;
+    let payload = MusicPlaylistPayload::Playlist(PlaylistRecord::new(&playlist.fields, layout));
+    sites
+        .header(projection.input, issue.is_some(), writer)?
+        .write(
+            writer,
+            &Subresource::new(NAMESPACE, sites.node().object_indices().to_vec()),
+            status,
+            &payload,
+            issue.as_slice(),
+        )?;
+    let rows = &mut playlist.rows;
+    while let Some(row) = rows.next() {
+        let row = row.map_err(|cause| projection.replay_failure(cause))?;
+        emit(projection, &sites, row, rows.current_item_depth(), writer)?;
+    }
+    audio_bank_music_stinger_schedule::tail(
+        projection.input,
+        sites.node(),
+        playlist.fields.node.stinger_tail.as_ref(),
+        writer,
+    )?;
+    audio_bank_music_transition_rules::project(
+        projection,
+        version,
+        TransitionOwner::Playlist(&mut playlist),
+        writer,
+    )
+}
+
+fn emit(
+    projection: &BankProjection<'_>,
+    sites: &PlaylistSites<'_>,
+    row: BankMusicPlaylistRow,
+    depth: Option<&BankMusicPlaylistDepth>,
+    writer: &mut MediaWriter<'_>,
+) -> Result<(), MediaError> {
+    let input = projection.input;
+    let (namespace, ordinal, data, prepared) = match row {
+        BankMusicPlaylistRow::Child { ordinal, id } => {
+            let ordinal = u64::from(ordinal);
+            (
+                CHILD,
+                ordinal,
+                MusicPlaylistPayload::Child(MusicNodeChildRecord::new(ordinal, &id)),
+                sites
+                    .node()
+                    .child(input, ordinal, &id.range, MusicChildField::Child, writer)?,
+            )
+        }
+        BankMusicPlaylistRow::Stinger { ordinal, value } => {
+            let ordinal = u64::from(ordinal);
+            audio_bank_music_stinger_schedule::complete(
+                input,
+                sites.node(),
+                ordinal,
+                &value,
+                writer,
+            )?;
+            (
+                STINGER,
+                ordinal,
+                MusicPlaylistPayload::Stinger(MusicStingerRecord::new(ordinal, &value)),
+                sites.node().stinger(input, ordinal, &value, writer)?,
+            )
+        }
+        BankMusicPlaylistRow::Item { ordinal, value } => {
+            let ordinal = u64::from(ordinal);
+            let depth = depth.ok_or_else(|| {
+                MediaError::Contract("MusicPlaylist item has no nesting receipt".into())
+            })?;
+            (
+                ITEM,
+                ordinal,
+                MusicPlaylistPayload::Item(PlaylistItemRecord::new(ordinal, &value, depth.value)),
+                sites.item(input, ordinal, &value, depth, writer)?,
+            )
+        }
+        _ => return Err(MediaError::Contract("unexpected MusicPlaylist row".into())),
+    };
+    prepared.write(
+        writer,
+        &sites.node().subresource(namespace, ordinal),
+        Status::Complete,
+        &data,
+        &[],
+    )
+}
+
+fn interpretation(
+    status: &BankMusicPlaylistRead,
+) -> Result<(PlaylistLayout, Status, Option<MediaIssue>), MediaError> {
+    match status {
+        BankMusicPlaylistRead::Decoded => Ok((PlaylistLayout::Decoded, Status::Complete, None)),
+        BankMusicPlaylistRead::Malformed(error) => Ok((
+            PlaylistLayout::Malformed,
+            Status::Partial,
+            Some(MediaIssue::new(
+                "audio.bank.invalid-music-playlist",
+                "HIRC",
+                Severity::Error,
+                error.to_string(),
+            )),
+        )),
+        BankMusicPlaylistRead::Unsupported(error) => Ok((
+            PlaylistLayout::Unsupported,
+            Status::Complete,
+            Some(MediaIssue::new(
+                "audio.bank.unsupported-music-playlist",
+                "HIRC",
+                Severity::Info,
+                error.to_string(),
+            )),
+        )),
+        _ => Err(MediaError::Contract(
+            "unexpected MusicPlaylist read state".into(),
+        )),
+    }
+}

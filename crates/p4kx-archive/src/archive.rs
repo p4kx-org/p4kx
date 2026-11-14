@@ -4,20 +4,28 @@
 use std::ffi::OsString;
 use std::io::{self, Read};
 use std::path::{MAIN_SEPARATOR_STR, Path, PathBuf};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use p4kx_foundation::ArchiveKey;
 
+use crate::archive_metadata::ArchiveMetadata;
+use crate::build::{self, ObservedBuild};
 use crate::container::{self, MAX_CONTAINER_DEPTH, MAX_CONTAINER_ENTRIES, MAX_CONTAINER_LEN};
+use crate::entry_identity::ContainerChain;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog};
 use crate::key_slot::KeySlot;
+use crate::origin_ancestor::OriginAncestor;
 use crate::source::Source;
 use crate::{
-    ArchiveError, Build, Entry, EntryIssue, EntryReader, OpenOptions, entry_reader, layout,
+    ArchiveError, ArchiveInputOrigin, Build, BuildManifestObservation, Entry, EntryIssue,
+    EntryReader, InstallationStatus, OpenOptions, entry_reader, layout,
 };
 
 mod key;
+mod metadata;
+mod origin;
 
 /// The most decoded bytes [`Archive::open_entry_at`] skips in a compressed Entry to reach an offset.
 pub const MAX_DECODED_SKIP: u64 = 1 << 30;
@@ -27,6 +35,9 @@ pub const MAX_DECODED_SKIP: u64 = 1 << 30;
 pub struct Archive {
     path: PathBuf,
     location: PathBuf,
+    container_chain: ContainerChain,
+    origin_ancestors: Arc<[OriginAncestor]>,
+    input_origin: ArchiveInputOrigin,
     file_len: u64,
     file_modified: Option<SystemTime>,
     depth: usize,
@@ -34,11 +45,23 @@ pub struct Archive {
     source: Source,
     entries: Vec<Entry>,
     log: IssueLog,
+    installation_flags: Option<u8>,
+    metadata: ArchiveMetadata,
     build: Option<Build>,
+    build_manifest_observation: BuildManifestObservation,
     key: KeySlot,
 }
 
 impl Archive {
+    /// Returns the source installation declaration, independently of payload integrity.
+    #[must_use]
+    pub const fn installation_status(&self) -> InstallationStatus {
+        match self.installation_flags {
+            None => InstallationStatus::Unavailable,
+            Some(flags) => InstallationStatus::DeclaredComplete { flags },
+        }
+    }
+
     /// Opens the Archive at `path` and reads its central directory, in the v1 or the v2 layout.
     ///
     /// The file is opened read-only and stays readable and writable for other processes such as
@@ -72,13 +95,21 @@ impl Archive {
         } else {
             layout::read_entries(&source, None)
         };
-        let Directory { entries, log } = directory.map_err(|error| error.at(path))?;
-        let build = path
+        let Directory {
+            entries,
+            log,
+            installation_flags,
+            metadata,
+        } = directory.map_err(|error| error.at(path))?;
+        let observed = path
             .parent()
-            .and_then(|folder| Build::read_from(folder).ok().flatten());
+            .map_or_else(ObservedBuild::missing, build::read_observed);
         Ok(Self {
             path: path.to_path_buf(),
             location: path.to_path_buf(),
+            container_chain: ContainerChain::default(),
+            origin_ancestors: Arc::default(),
+            input_origin: ArchiveInputOrigin::new(),
             file_len: source.len(),
             file_modified: source.modified(),
             depth: 0,
@@ -86,7 +117,10 @@ impl Archive {
             source,
             entries,
             log,
-            build,
+            installation_flags,
+            metadata,
+            build: observed.build,
+            build_manifest_observation: observed.observation,
             key: KeySlot::with(options.key),
         })
     }
@@ -113,9 +147,21 @@ impl Archive {
                 .map_err(|error| error.at(&location))
         });
         match container {
-            Ok((source, decoded_budget, Directory { entries, log })) => Ok(Self {
+            Ok((
+                source,
+                decoded_budget,
+                Directory {
+                    entries,
+                    log,
+                    installation_flags,
+                    metadata,
+                },
+            )) => Ok(Self {
                 path: self.path.clone(),
                 location,
+                container_chain: self.container_chain.child(entry.index),
+                origin_ancestors: self.child_origins(entry),
+                input_origin: self.input_origin.clone(),
                 file_len: self.file_len,
                 file_modified: self.file_modified,
                 depth: self.depth + 1,
@@ -123,7 +169,10 @@ impl Archive {
                 source,
                 entries,
                 log,
+                installation_flags,
+                metadata,
                 build: self.build.clone(),
+                build_manifest_observation: self.build_manifest_observation.clone(),
                 key: self.key.clone(),
             }),
             Err(error) => Err(ArchiveError::Container {
@@ -219,6 +268,12 @@ impl Archive {
     #[must_use]
     pub const fn build(&self) -> Option<&Build> {
         self.build.as_ref()
+    }
+
+    /// Returns the eager original manifest-read observation shared by this Archive's containers.
+    #[must_use]
+    pub const fn build_manifest_observation(&self) -> &BuildManifestObservation {
+        &self.build_manifest_observation
     }
 
     /// Opens the decrypted and decompressed data of `entry`, which must be one of this Archive's

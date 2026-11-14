@@ -1,0 +1,312 @@
+# Standalone field origins
+
+`p4kx cryxml --out <file>` publishes XML with a sibling `<file>.p4kx-origin.jsonl`.
+The companion preserves per-datum encryption evidence without changing the XML.
+With raw XML on stdout, use `--origin-stderr` to receive the companion on stderr,
+`--origin-out <file>` to save a copy, or both. Read stderr as a companion only
+after a successful exit.
+
+## Companion records
+
+The [JSON Schema](../schemas/p4kx-source-origin.schema.json) describes each line.
+The stream starts with a `header` containing `format: "p4kx-source-origin"` and
+`formatVersion: "1.0"`. The binding identifies the file or stdout and carries the
+actual SHA-256 digest and decimal-string byte length. A file binding records one
+relative basename. It uses `utf8` for portable names, `unixBytes` for native Unix
+bytes, or `windowsUtf16` for native Windows code units. Treat native encodings as
+basenames on their originating platform.
+
+`source` and `sourceUse` rows define the physical inputs and contributor
+references. Each `field` row carries an artifact address, `sourceUsesRefs`,
+`sourceSetComplete`, and `containsEncryptedSource`. The encryption value is
+`true` when an encrypted contribution is proved, `false` when complete evidence
+proves there is no encrypted contribution, and `null` when the answer is unknown.
+Standalone CryXml input has unknown original P4K encryption.
+
+Binary CryXml uses `xmlBytes` addresses with half-open output byte ranges,
+including zero-length attribute values. Addresses distinguish element names,
+closing names, attribute names, attribute values and text. Source coordinates
+retain the original node and attribute table indices. A suffixed attribute name
+also identifies the preceding name range consulted by the serializer. Text XML
+retains its original bytes as one `opaquePayload` datum. The same wire format
+provides `jsonField` addresses for exact JSON Pointers.
+
+A final `end` row carries decimal-string counts of source, use and field rows.
+Consumers should require this row, check the counts and references, and verify
+the binding against the consumed artifact before relying on any marker. The
+companion describes the tool's observation of the input and output.
+
+## File publication
+
+Cooperating writers use `.p4kx-origin.lock` to serialize publication in each
+destination directory. Receipt writers that create the lock retain it there.
+The tool stages each file independently. Once the artifact is ready
+to replace its previous version, the tool removes the previous companion before
+replacing the artifact, even when the emitted bytes are identical. An interruption
+can leave an artifact with unknown origin until a later successful run publishes
+its companion. File publication and companion publication are separate operations.
+
+Explicit stdout companion paths may replace a prior stdout companion. Canonical
+file companion names, publication lock names and unrelated existing files are
+reserved. The write guards reject destinations that alias the observed input or
+lie inside a protected installation.
+
+Ordinary atomic replacements retire proven companions for the replaced file
+before rename and preserve unrelated files. A replacement shares an existing
+publication lock or creates a temporary lock in a fresh destination. The
+temporary lock is moved out of the shared name before it is removed. Successful
+ordinary writes leave only their requested outputs in fresh destinations.
+Existing receipt locks remain in place. If temporary lock retirement fails,
+the error says whether the artifact was committed. A counted write that keeps
+the existing bytes keeps their proof and needs no publication lock.
+
+An ordinary replacement of a symbolic link changes its directory entry. The
+writer preserves the referent and receipts proven to address other names.
+A directory receipt with an ambiguous lexical match is retired.
+
+## Directory publication
+
+A directory writer binds its committed files in the reserved
+`.p4kx-origin.jsonl`. The `header` binding type is `directory`. Each
+`artifact` row gives the exact relative basename, measured SHA-256 and
+decimal-string byte length. An `artifactTableEnd` row gives the number of
+artifact rows in their publication order. Source and use rows follow this
+table. Each `artifactField` row identifies a zero-based artifact ordinal
+as a decimal string and the address within that file. The final `end`
+row counts these fields. Readers verify both counts, every reference, and
+the named file's actual bytes before relying on its origin.
+
+Cooperating writers hold the same directory lock while publishing the
+artifacts and their companion. Each file retains its own staged-write
+commit. The first replacement invalidates the old directory companion
+before the artifact is renamed. A new companion identifies only files
+committed by that run, including the successfully written files of a
+partial run. A run that fails before replacing any file can keep the
+earlier companion. An interruption after invalidation can leave published
+bytes with unknown origin.
+
+A file replacement also invalidates any existing sibling or directory
+companion that covers the replaced name. A verified directory artifact
+table for disjoint names remains usable after a single-file replacement.
+
+## Action-map exports
+
+Action-map file exports publish a sibling `<file>.p4kx-origin.jsonl`. The raw
+JSON and CSV retain their existing fields and bytes. Use `--origin-out <file>`
+for a companion bound to stdout, or `--origin-stderr` for the JSONL block on
+stderr. Both switches can be used together. The stderr block starts at the
+`p4kx-source-origin` header and ends at its end record. Human diagnostics may
+appear outside that block. Require a successful exit and verify the binding,
+counts and references before using the proof.
+
+JSON addresses are pointers into the exported object. CSV addresses use
+`/rows/<index>/<column>` with zero-based data rows and the exact header name.
+Their half-open byte ranges include any CSV quotes and formula neutralisation.
+An empty cell has a zero-length range at its own logical address.
+
+The companion retains the selected profile's original text XML attribute
+range or binary CryXml node and attribute positions. A label records the
+authored selector and the language Entry consulted. The selected INI value
+uses its byte range in the decoded INI. An unresolved label records the
+lookup without a payload use. A placeholder that bypasses the lookup
+carries the profile selector alone. Bindings identify their own input and
+their inherited or overridden activation mode. A device cell uses the
+bindings actually joined into it.
+
+## Localisation tables
+
+`p4kx loc export --out <file>` publishes `<file>.p4kx-origin.jsonl` beside
+the table. JSON addresses use `/languages/<column>`, `/entries/<row>/key`
+and `/entries/<row>/texts/<language>`. CSV addresses carry the same logical
+fields and half-open byte ranges, including quotes or formula neutralisation
+as emitted. An empty CSV cell may have a zero-length address.
+
+The row key uses the exact decoded source spelling and the earlier language
+lookups that selected it. Translation cells retain the row-key selectors and
+the actual language's lookup, selected payload and conversion evidence. An
+authored empty value has a source payload with a zero-length range. An absent
+value has only lookup evidence. A language selected by an argument is a
+tool control. An automatically selected column comes from the Archive's
+directory survey. File summaries also include provenance for their key count
+and language values.
+
+Use `--origin-out <file>` for a durable stdout receipt or `--origin-stderr`
+for a JSONL block after any localisation notes. Both preserve the original
+JSON or CSV stdout bytes. Require the terminal record and verify the binding
+before using origin markers.
+
+## CHF conversion
+
+`p4kx chf to-json` addresses the exact scalar and empty-container JSON values
+with JSON Pointers. The original CHF values and its label hashes come from the
+observed standalone file. A label that uses an Archive name records the item
+Record's port or the material lookup and material Entry that supplied it. The
+material coordinate records the original material ID and, for parameter names,
+the attribute's ordinal across that material's `PublicParams` elements. Names
+that lose the lookup and unread optional Entries supply no label data.
+
+`p4kx chf from-json` records the emitted binary as one opaque datum and binds it
+to the observed JSON conversion. An earlier loose file receipt does not establish
+original P4K lineage for a later read. Both file-output commands add
+`originReceipt`, `fieldOrigins` and `provenance` to their `--json` summaries.
+
+With raw JSON on stdout, `chf to-json --origin-stderr` emits the JSONL companion
+from its header through its end row in place of the usual name-count line.
+Archive warnings may still appear before or after that block. Use
+`--origin-out <file>` for a companion file. Raw stdout retains its original JSON.
+
+Text `p4kx chf diff` uses `textBytes` addresses when requested with
+`--origin-stderr` or `--origin-out <file>`. Each address has a half-open byte
+range and a logical field such as `/changes/0/old`, `/changes/0/status` or
+`/identical`. The status describes an added or removed value. A completed
+comparison with changes exits with 1. Its receipt still ends with the same
+completion row and binds the exact stdout text.
+
+## Movie rendering
+
+`p4kx ui render` publishes a sibling `<file>.p4kx-origin.jsonl` for PNG and SVG.
+The companion binds the committed bytes as one opaque payload. It records the
+actual movie geometry, bitmap mips, font outlines, layout metrics and language
+values used by the renderer. SVG also records the input to its document title.
+Partial render reports retain known inputs and mark an unresolved contributor
+set as incomplete.
+
+`--json` adds `originReceipt`, `artifactOrigin`, `fieldOrigins` and
+`provenance`. The stage and explicit size options have independent origins.
+A diagnostic field whose contributing inputs cannot be established carries an
+unknown marker.
+
+## Screen rendering
+
+`p4kx ui render --screen` and the UI tab publish the same sibling companion for
+PNG and SVG Screen exports.
+Its artifact use includes the measured DataForge payload and the texture
+mips, vector files, font definitions and winning language values used by
+composition and drawing. A PNG records sources used by actual paints.
+An SVG also records sources embedded in its document. Screen dimension
+values identify the exact canvas Record fields used to derive them.
+Explicit dimensions and command options have their own tool-authored origins.
+A report value whose contributors cannot be established has a null marker.
+
+## Hologram rendering
+
+`p4kx ui hologram` publishes `<file>.p4kx-origin.jsonl` alongside the PNG.
+The opaque payload row binds the committed filename, byte length and SHA-256.
+Its uses include the placed and drawn model reads, selected material slots,
+authored port placement and camera settings. Model and character-definition
+files without retained internal coordinates carry an explicit opaque use.
+The model and material selectors retain independent DataForge Record and
+array positions. A selected sub-geometry can inherit a material from its
+main geometry, and the two uses preserve their own original fields.
+When an admitted piece uses a model node for its placement, the original
+helper name, local matrices and parent links are bound to the actual
+primary model Entry. The `modelNodePlacementBytes` indices give the chunk
+ordinal, node ordinal and half-open range in the decoded Entry. They include
+CrCh parent target chunk IDs when the route uses them. The model selector
+also contributes when the helper's own mesh is absent from the scene.
+Successful child offset inversions also retain their node route. Bone and
+animation inputs outside these routes keep the artifact's contributor set
+incomplete.
+A port anchored to a parent model bone uses `modelBonePlacementBytes`.
+Its indices identify the physical skeleton chunk, bone ordinal and byte
+range in the selected Entry. The selected name and the parent and
+relative-pose fields belong to the effective main or LOD skeleton.
+Equipment anchored through a parent skin uses the original character-root
+rig when that rig supplied its placement.
+
+For a landing gear used by the scene, the receipt records the Entity's
+`landingSystem` reference and the original `gears` array slot's
+`geometry.path`. The authored `bone` contributes when placement
+evaluates it against the parent model, including when the name chooses
+the origin fallback.
+
+A deployed landing gear contributes animation origins only where its keys
+supply a used bounds vertex or an admitted visible triangle range. The
+receipt identifies the physical CAF or DBA Entry, original clip and
+controller ordinals, and last key ordinal in each used channel through
+`gearDeployClip`, `gearDeployController` and `gearDeployKey`. It includes
+the original CDF skeleton `File` and the effective `.chrparams` clip and
+winning folder or database selectors when used. Parameter locators use
+`gearParameterTextBytes` for half-open original text byte ranges and
+`gearParameterCryXmlAttribute` for the original node and global attribute
+ordinals.
+
+The actual CDF main model selection is recorded as the winning attachment
+`Binding` or fallback `Model.File`. A `CA_SKIN` preference also records the
+winning attachment's `Type`. A CDF `Material` attribute contributes when
+that override supplies a used surface or suppression after applying
+loadout and Entity geometry overrides. Main model attributes use
+`cdfModelTextBytes` for original half-open text byte ranges and
+`cdfModelCryXmlAttribute` for original node and global attribute ordinals.
+These selectors also apply when the main model supplies a consumed node
+or bone transform.
+
+CDF bone attachments retain the type and binding that selected the
+model. A placed attachment retains its bone name and the authored
+relative transform it used. Text attributes use the half-open original
+byte range in `cdfAttachmentTextBytes`. CryXml attributes use the original
+node ordinal and global attribute table ordinal in
+`cdfAttachmentCryXmlAttribute`. A material attribute contributes when
+its selected library supplies a used surface or suppression. A placed
+attachment with a resolved bone also contributes the original skeleton
+pose fields.
+
+Direct mesh conversion uses `modelMeshNodeBytes` for the node matrices,
+parent links and CrCh parent IDs that supply the bounds of an admitted
+piece or the vertices of a visible draw range. The first two indices
+identify the actual LOD and decoded mesh ordinal, followed by the chunk
+ordinal, node ordinal and decoded-Entry range. A suppressed mesh counts
+only where it sets an admitted bound. A mesh that uses its skin skips its
+node matrix.
+
+The receipt also records the original library slots that suppress a piece
+or a visible range. A whole-piece suppression affects the scene bounds and
+counts. Suppressing one range of a drawn piece affects the PNG.
+Unobserved inputs keep the contributor set incomplete. A known encrypted
+input still gives the artifact a positive marker.
+
+## CHF GLB
+
+`p4kx chf glb` writes a sibling `<output>.p4kx-origin.jsonl` companion. Its
+file binding records the final GLB basename, byte length and SHA-256. The
+opaque payload row links the character input and the model, rig, material,
+palette, texture and animation reads used by the written model. The same
+companion identifies glTF data in the JSON and binary chunks. A
+`glbJsonField` path is a JSON Pointer within the GLB JSON chunk. A
+`glbBinaryBytes` path identifies the written `/bufferViews/N` entry and
+provides its absolute, half-open byte range in the file, excluding alignment
+padding. Each addressed datum carries its own contributing source set. A
+DataForge selector identifies the original Record and stored array positions
+used to choose an item model or material library. A selected encrypted
+DataForge field can mark the result when the chosen model and texture files
+are clear. Shaped surface and morph values also identify the actual CHF
+face blend coordinates they consume. UV and index ranges have independent
+origins. The receipt also identifies CHF colour and numeric values actually
+used by a material factor or a baked image.
+
+The `--json` report adds `originReceipt`, `fieldOrigins`, `provenance` and
+`textureImageOrigins`. Field origins use JSON Pointers into the report. The
+texture array gives the origin of each embedded image by its zero-based GLB
+image index. A normal image can use a clear color mip while a roughness image
+from the same texture uses an encrypted alpha mip. The image origin also
+includes the selected material, any contributing layers and an applied
+palette when their values affect the image.
+
+Original P4K lineage for the standalone CHF remains unknown. Report values
+whose contributing reads cannot be proved carry an incomplete origin. A
+successfully written partial model has a companion for its actual bytes and
+retains its existing issue and exit-code behavior.
+
+## Bulk texture conversion
+
+The `texture_artifacts` field in `p4kx extract --convert --json` and
+`p4kx convert --json` binds each written PNG or OpenEXR image to its
+target-relative path, byte length and SHA-256. Its direct encryption marker
+and source-use references describe the decoded bytes for that particular
+mip, array layer, cubemap face or volume slice. References resolve in the
+texture's shared inventory. A `ddsMipPayload` use records the original
+decoded Entry's mip level, byte offset, span length, stride and span count.
+PNG uses the observed alpha tail when merged. OpenEXR uses the colour mip.
+Unused sibling parts are outside the image's contributor set. For a folder
+without proof of original P4K lineage, the marker is unknown. A conflict
+policy that retains a file leaves its origin outside the current report.

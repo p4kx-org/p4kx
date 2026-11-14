@@ -7,6 +7,7 @@ use crate::colour::{ColorSpec, Palette};
 use crate::images::Images;
 use crate::paint::Painter;
 use crate::report::Report;
+use crate::still_inputs::TrackedInputs;
 use crate::text::Texts;
 use crate::widget::Widget;
 
@@ -17,6 +18,7 @@ pub(crate) struct Context<'t> {
     pub(crate) report: Report,
     pub(crate) texts: Texts<'t>,
     pub(crate) images: Images<'t>,
+    pub(crate) inputs: Option<TrackedInputs>,
 }
 
 impl Context<'_> {

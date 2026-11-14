@@ -7,6 +7,7 @@ use std::error::Error;
 use std::sync::Arc;
 
 use p4kx_chunks::ChunkFile;
+use p4kx_extraction::ArchiveMaterialRead;
 use p4kx_model::{CompanionError, CompanionPath, MaterialStatus, Model, Transform};
 use p4kx_testkit::{TestModel, TestNode};
 
@@ -117,9 +118,11 @@ fn part(
         world: at,
         model_path: path.map(str::to_owned),
         model,
-        materials: Arc::new(MaterialStatus::Unnamed),
+        model_archive_sources: Arc::default(),
+        materials: Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed)),
         palette: None,
         light: None,
+        light_placement: None,
     }
 }
 
@@ -132,6 +135,7 @@ fn container_of(parts: Vec<InteriorPart>) -> EntityContainer {
             position: [0.0; 3],
             rotation: [0.0; 3],
             source: ContainerSource::Vehicle,
+            coordinate: None,
         },
         placement: moved(0.0, 0.0, 5.0),
         interior: Interior {
@@ -139,6 +143,7 @@ fn container_of(parts: Vec<InteriorPart>) -> EntityContainer {
             issues: Vec::new(),
             lod: 0,
             containers: 1,
+            default_material: None,
         },
     }
 }

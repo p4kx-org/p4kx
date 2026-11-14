@@ -6,7 +6,7 @@ Model:       Data\Objects\Test\cube.cgf
 Geometry:    cube.cgfm
 Nodes:       2
 LODs:        1
-Materials:   objects/test/cube (3 sub-materials), IDs 1, 2
+Materials:   objects/test/cube -> Data\objects\test\CUBE.mtl (3 sub-materials), IDs 1, 2
 Bones:       0
 Animations:  0 (from 0 files)
 Chunks:      7 (3 read, 3 skipped, 1 unknown)

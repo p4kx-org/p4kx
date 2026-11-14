@@ -7,7 +7,9 @@
 use std::error::Error;
 use std::path::Path;
 
-use p4kx_extraction::{Archive, ArchiveImages, ConversionError};
+use p4kx_extraction::{
+    Archive, ArchiveImages, ConversionError, SourceEncryptionState, SourceLocation, SourceUses,
+};
 use p4kx_testkit::{ArchiveBuilder, SplitDds, TestEntry, TestTextureFormat};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -81,5 +83,111 @@ fn a_vector_graphic_is_read_up_to_its_limit() -> TestResult {
         matches!(missing, Err(ConversionError::UnknownEntry(_))),
         "{missing:?}"
     );
+    Ok(())
+}
+
+fn split_screen_mip_fixture(folder: &Path) -> Result<Archive, Box<dyn Error>> {
+    let path = folder.join("Data.p4k");
+    let dds = SplitDds::new(TestTextureFormat::LegacyBgra8, 32, 16)
+        .split(3)
+        .alpha(TestTextureFormat::R8);
+    let selected_alpha = format!("{HEADER}.1a");
+    let unused_alpha = format!("{HEADER}.3a");
+    let entries = dds.entries(HEADER).into_iter().map(|entry| {
+        if entry.path() == selected_alpha || entry.path() == unused_alpha {
+            entry.encrypted()
+        } else {
+            entry
+        }
+    });
+    entries
+        .fold(ArchiveBuilder::new(), ArchiveBuilder::entry)
+        .write_to(&path)?;
+    Ok(Archive::open_with_key(
+        &path,
+        Some(p4kx_testkit::test_key()),
+    )?)
+}
+
+#[test]
+fn screen_mip_receipts_name_only_the_decoded_color_and_alpha_spans() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = split_screen_mip_fixture(dir.path())?;
+    let images = ArchiveImages::new(&archive);
+    let name = "ui/textures/test/quad.dds";
+    let observed = images.texture_observed(name, 8, u64::MAX)?;
+    assert_eq!(observed.image(), &images.texture(name, 8, u64::MAX)?);
+    let uses = SourceUses::new();
+    let evidence = observed.evidence(&uses)?;
+    let mut pixels = Vec::new();
+    evidence.append_pixel_uses(&mut pixels)?;
+    let inventory = uses.freeze()?;
+    let mut parts = Vec::new();
+    for usage in inventory.uses() {
+        let SourceLocation::Subresource {
+            namespace, indices, ..
+        } = usage.location()
+        else {
+            continue;
+        };
+        if namespace != "ddsMipPayload" {
+            continue;
+        }
+        let source = inventory
+            .sources()
+            .iter()
+            .find(|source| source.id() == usage.source())
+            .ok_or("mip source in inventory")?;
+        let source = serde_json::to_value(source)?;
+        let name = source
+            .pointer("/path/value")
+            .and_then(serde_json::Value::as_str)
+            .ok_or("mip Entry path")?;
+        assert_eq!(indices.first(), Some(&2), "selected mip level");
+        assert_eq!(indices.get(1), Some(&0), "split Entry offset");
+        parts.push((
+            name.to_owned(),
+            indices.get(2).copied().ok_or("mip length")?,
+            usage.effective_encryption(),
+        ));
+    }
+    parts.sort_unstable_by(|left, right| left.0.cmp(&right.0));
+    assert_eq!(
+        parts,
+        [
+            (
+                format!("{HEADER}.1"),
+                128,
+                SourceEncryptionState::Unencrypted
+            ),
+            (format!("{HEADER}.1a"), 32, SourceEncryptionState::Encrypted),
+        ],
+        "the other encrypted sibling cannot mark this screen mip",
+    );
+    Ok(())
+}
+
+#[test]
+fn screen_vector_receipt_keeps_the_first_physical_match_under_data() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::zstd(SVG, BOX.to_vec()).encrypted())
+        .entry(TestEntry::stored(
+            SVG.to_ascii_lowercase(),
+            b"later".to_vec(),
+        ))
+        .entry(TestEntry::stored(
+            "UI/Textures/Vector/Test/box.svg",
+            b"without data".to_vec(),
+        ))
+        .write_to(&path)?;
+    let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
+    let images = ArchiveImages::new(&archive);
+    let observed = images.vector_observed("UI/Textures/Vector/Test/BOX.svg", 1024)?;
+    assert_eq!(observed.bytes(), BOX);
+    let origin = observed.origin().ok_or("physical SVG Entry")?;
+    assert_eq!(origin.entry_index(), 0, "first matching directory row");
+    assert_eq!(origin.entry().path(), SVG, "stored name");
     Ok(())
 }

@@ -95,11 +95,11 @@ pub(super) fn cooler_resources(standard: f32) -> TestValue {
     )
 }
 
-pub(super) fn shield() -> TestValue {
+pub(super) fn shield(max_health: f32) -> TestValue {
     instance(
         "SCItemShieldGeneratorParams",
         vec![
-            single("MaxShieldHealth", 8000.0),
+            single("MaxShieldHealth", max_health),
             single("MaxShieldRegen", 160.0),
             single("DecayRatio", 0.25),
             single("DownedRegenDelay", 5.0),

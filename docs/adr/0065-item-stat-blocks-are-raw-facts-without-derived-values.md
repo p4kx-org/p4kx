@@ -76,3 +76,77 @@ values, if any, `p4kx` computes.
 - Nesting each value as `{value, source}`: rejected as in ADR-0063.
 - Exporting every component of the item as raw trees: rejected; that is the Record export, and
   the Basetool needs a stable typed shape, not the DataForge's.
+
+## Catalog schema 3 durability
+
+Schema 3 publishes item Health, Degradation and Distortion in independent configuration tables
+under ADR-0356. An owning item Record and its original component ordinal identify each row.
+The component model preserves repeated components and makes Health available on selected items
+without a specialist stat block. Every authored field follows ADR-0357. A separate row per
+physical component preserves these identities without duplicating the item or choosing one
+component to represent the others.
+
+The retained specialist projection obtains finite `stats.health` from the first original Health
+component. The independent durability rows retain exact Single bits and all selected component
+occurrences. Explosion payloads use the shared authored explosion model. Linked Records retain
+their own identity and scope. Item resource self-repair, vehicle hull health and vehicle armour
+tuning remain distinct source families.
+
+## Catalog schema 3 quantum drive configuration
+
+Schema 3 follows ADR-0356 with one `configurations.quantumDrives` row per original
+`SCItemQuantumDriveParams` occurrence. Each row identifies its physical item and component slot.
+The standard and spline parameter Classes have separate source states and values. Their declared
+types, optional heat and boost Classes, state/effect subtrees and other authored members carry
+their own source evidence. The row preserves original numeric widths and representations.
+
+The previous compact flat values continue to feed variant identity in their original byte order.
+Their mode-specific meanings map to the standard block sourced from `params`. The public
+configuration is the source-typed row. Source paths and units are documented in
+[Quantum drive configurations](../catalog-quantum-drives.md).
+
+## Catalog schema 3 missile configuration
+
+Schema 3 publishes the original missile guidance, targeting and shake in
+`configurations.missileConfigurations`. Join the inherited ordnance data in
+`configurations.explosives` by the same physical owner Record and component ordinal.
+The shared reader retains original explosion parameters, launch settings and emissions once.
+The missile row keeps independent phase vectors, PID terms and targeting labels with per-value
+source evidence. The older item stat fields retain their original meanings.
+[Missile configurations](../catalog-missiles.md) describes the source declarations and units.
+
+## Catalog schema 3 fuel and resource capacity
+
+Under ADR-0356, fuel tanks, fuel intakes and ResourceContainer components have independent
+configuration tables keyed by their physical owning Record and component slot. A capacity
+retains the concrete unit and its stored member. A new unit retains its original type and
+members so no canonical unit or magnitude is inferred.
+
+Commodity authoring links each original ResourceContainer slot to the canonical row. Its
+first-entry presentation choice still reads the original authored order. Resolved loadouts
+join by the actual selected target Record index and keep one placement for each port.
+[Fuel and resource capacity](../catalog-fuel-capacity.md) specifies the field paths.
+
+## Catalog schema 3 resource components
+
+Under ADR-0356, one physical ItemResourceComponentParams occurrence owns
+its states, deltas and control settings. Resource-only items expose these
+facts independently of specialist statistics. The source delta supplies
+the pairing of input and output, original position and unit declarations.
+
+The compact power, coolant and flat state bytes remain private variant
+identity inputs. Consumer field mapping and the original ordering and
+numeric projection are documented in [Resource components](../catalog-resource-components.md).
+
+Global resource rules have their own GameMode-owned rows. The original
+`params.resourceNetworkParams` declaration supplies the typed settings and
+their per-value origin. Component and placement rows continue to describe
+their own authored settings.
+
+## Catalog schema 3 vehicle armour
+
+Each original SCItemVehicleArmorParams occurrence owns its configuration
+row. Vehicle armour shares the raw damage and curve readers while preserving
+its own physical component identity. An installed attachment uses the
+resolved loadout's physical target Record index.
+[Vehicle armour](../catalog-vehicle-armor.md) lists the original fields.

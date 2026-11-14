@@ -4,6 +4,12 @@
 //! The Basetool catalog entry of the Export menu and its windows driven headless through
 //! `egui_kittest`.
 
+#[path = "catalog_category_lists_window.rs"]
+mod category_lists;
+
+#[path = "catalog_entry_health_window.rs"]
+mod entry_health;
+
 use crate::cataloging;
 use crate::waiting::{RunQuiet, wait_for};
 
@@ -11,8 +17,9 @@ use cataloging::{TestResult, files_in, makers, opened};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
+use p4kx_export::CatalogPublicationMode;
 use p4kx_gui::ui::{self, Dialog};
-use p4kx_gui::{CatalogExportStage, CatalogExportStatus, Language, Model};
+use p4kx_gui::{CatalogExportOptions, CatalogExportStage, CatalogExportStatus, Language, Model};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 struct Window {
@@ -80,6 +87,39 @@ fn the_export_menu_asks_for_the_catalog_file_only_with_a_dataforge() -> TestResu
 }
 
 #[test]
+fn the_diagnostic_menu_requests_a_separate_save_dialog() -> TestResult {
+    let (_dir, model, _) = opened(&makers())?;
+    let mut harness = harness(model);
+
+    pick(&mut harness, "Export", "Diagnostic Basetool catalog…");
+
+    assert_eq!(
+        harness.state().dialog,
+        Some(Dialog::DiagnosticCatalogFile),
+        "diagnostic permission is an explicit menu choice"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_normal_incomplete_job_explains_the_refusal_without_a_success_window() -> TestResult {
+    let (_dir, mut model, out) = opened(&cataloging::unreadable())?;
+    model.start_catalog(out.join("catalog.json"), || {});
+    let mut harness = harness(model);
+
+    wait_for_the_end(&mut harness)?;
+
+    harness.get_by_label("Basetool catalog failed");
+    harness.get_by_label_contains("No file was created or replaced.");
+    assert!(
+        harness.query_by_label("Basetool catalog created").is_none(),
+        "the refusal cannot look like successful publication"
+    );
+    assert!(files_in(&out)?.is_empty(), "nothing was published");
+    Ok(())
+}
+
+#[test]
 fn the_summary_shows_the_kinds_the_texts_the_size_and_the_file() -> TestResult {
     let (_dir, mut model, out) = opened(&makers())?;
     let file = out.join("basetool-catalog.json");
@@ -89,7 +129,12 @@ fn the_summary_shows_the_kinds_the_texts_the_size_and_the_file() -> TestResult {
     wait_for_the_end(&mut harness)?;
 
     harness.get_by_label("Basetool catalog created");
+    harness
+        .get_by_label("Export health: all selected sources were read and projected successfully.");
     harness.get_by_label("Manufacturers: 2 written, 1 skipped, complete");
+    harness.get_by_label("Resource types: 0 written, 0 skipped, complete");
+    harness.get_by_label("Global tags: 0 written, 0 skipped, complete");
+    harness.get_by_label("Mission property sets: 0 written, 0 skipped, complete");
     harness.get_by_label("Records skipped as development leftovers: 1");
     harness.get_by_label("Playability");
     harness.get_by_label("Items: 0 player, 0 AI, 0 mission, 0 special, 0 unclassified");
@@ -117,15 +162,23 @@ fn the_summary_shows_the_kinds_the_texts_the_size_and_the_file() -> TestResult {
 }
 
 #[test]
-fn an_unreadable_record_is_listed_in_the_summary_and_the_catalog_is_written() -> TestResult {
+fn an_unreadable_record_is_listed_in_an_explicit_diagnostic_summary() -> TestResult {
     let (_dir, mut model, out) = opened(&cataloging::unreadable())?;
     let file = out.join("basetool-catalog.json");
-    model.start_catalog(file.clone(), || {});
+    model.start_catalog_with_options(
+        file.clone(),
+        CatalogExportOptions {
+            publication_mode: CatalogPublicationMode::DiagnosticPartial,
+            ..CatalogExportOptions::default()
+        },
+        || {},
+    );
     let mut harness = harness(model);
 
     wait_for_the_end(&mut harness)?;
 
-    harness.get_by_label("Basetool catalog created");
+    harness.get_by_label("Diagnostic Basetool catalog written");
+    harness.get_by_label_contains("Export health: incomplete.");
     harness.get_by_label_contains("Records that could not be read and were left out (1)");
     harness.get_by_label_contains(
         "libs/foundry/records/crafting/blueprints/crafting/broken (90000000-0000-4000-8000-000000000009)",
@@ -157,6 +210,7 @@ fn a_compressed_catalog_shows_both_sizes_in_german() -> TestResult {
 
     wait_for_the_end(&mut harness)?;
 
+    harness.get_by_label("Globale Tags: 0 geschrieben, 0 übersprungen, vollständig");
     harness.get_by_label_contains(" komprimiert (vom Upload-Limit 64 MB), ");
     harness.get_by_label_contains(" unkomprimiert");
     Ok(())
@@ -180,7 +234,7 @@ fn a_plain_catalog_shows_one_size() -> TestResult {
 
 #[test]
 fn a_catalog_near_the_upload_limit_shows_the_warning() -> TestResult {
-    let (_dir, mut model, out) = opened(&cataloging::wordy(30, 1_000_000))?;
+    let (_dir, mut model, out) = opened(&cataloging::near_upload_limit())?;
     model.start_catalog(out.join("catalog.json"), || {});
     let mut harness = harness(model);
 

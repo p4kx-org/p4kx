@@ -10,6 +10,10 @@ use std::path::{Path, PathBuf};
 use assert_cmd::Command;
 use p4kx_testkit::{ArchiveBuilder, SplitDds, TestEntry, TestTextureFormat};
 use predicates::prelude::{PredicateBooleanExt, predicate};
+use serde_json::Value;
+
+#[path = "extract_texture_origins.rs"]
+mod origins;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -198,7 +202,7 @@ fn the_json_report_lists_textures_that_were_not_converted() -> TestResult {
         .stdout
         .clone();
 
-    let report: serde_json::Value = serde_json::from_slice(&output)?;
+    let report: Value = serde_json::from_slice(&output)?;
     assert_eq!(
         report["converted"], 3,
         "the Entries of the converted texture"

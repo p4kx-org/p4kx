@@ -6,9 +6,9 @@ use std::path::Path;
 use p4kx_gltf::{GlbOptions, GlbSummary, GltfError, TextureLoader};
 
 use crate::model_observed::{Observed, is_cancelled};
-use crate::model_source::ModelSource;
+use crate::model_source::{ArchiveDefaultMaterial, ModelSource};
 use crate::model_textures::ArchiveTextures;
-use crate::output_file::{write_error, write_replacing};
+use crate::output_file::{write_error, write_replacing_protected};
 use crate::path_index::PathIndex;
 use crate::texture_parts::is_same_file;
 use crate::{AnimationSet, CancelToken, ConversionError};
@@ -122,23 +122,19 @@ impl ModelSource {
         if cancel.is_cancelled() {
             return Err(ConversionError::Cancelled);
         }
-        write_replacing(out, |writer| {
+        write_replacing_protected(out, self.protection.context()?, Some(cancel), |writer| {
             let mut observed = Observed::new(writer, cancel, progress);
-            let written = match textures {
-                Some(textures) => p4kx_gltf::write_glb_animated_with(
-                    self.model(),
-                    &animations.animations,
-                    options,
-                    textures,
-                    &mut observed,
-                ),
-                None => p4kx_gltf::write_glb_animated(
-                    self.model(),
-                    &animations.animations,
-                    options,
-                    &mut observed,
-                ),
-            };
+            let fallback = self
+                .default_material()
+                .and_then(ArchiveDefaultMaterial::material);
+            let written = p4kx_gltf::write_glb_animated_with_fallback(
+                self.model(),
+                &animations.animations,
+                options,
+                textures,
+                fallback,
+                &mut observed,
+            );
             written.map_err(|error| match error {
                 GltfError::Write(source) if is_cancelled(&source) => ConversionError::Cancelled,
                 GltfError::Write(source) => write_error(out, source),

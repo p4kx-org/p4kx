@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_audio::HircKind;
+use p4kx_audio::{HircKind, MusicTransitionFeatures};
 
+use crate::audio::music_clip_features::MusicClipFeatures;
 use crate::audio::{NodeKind, PathStep, SoundVariant, SourceKind};
 
 /// How the children of a group play together.
@@ -36,6 +37,8 @@ pub(super) struct Leaf {
     /// The media ID the Sound object states.
     pub(super) source_id: u32,
     pub(super) kind: SourceKind,
+    pub(super) music_clip_features: MusicClipFeatures,
+    pub(super) music_transition_features: MusicTransitionFeatures,
 }
 
 /// A child of a group: a sound or another group.
@@ -62,22 +65,21 @@ impl Group {
         }
     }
 
-    /// Adds `leaf` below the objects `steps`, reusing the group the last child already is when it
-    /// is the same object; the variants of one Wwise event come in depth-first order, so only
-    /// the last child can still be open.
-    fn insert(&mut self, steps: &[PathStep], leaf: Leaf) {
+    /// Adds a leaf in visit order, reusing only the groups still open in the source walk.
+    fn insert(&mut self, steps: &[PathStep], shared_prefix: usize, leaf: Leaf) {
         let Some((step, rest)) = steps.split_first() else {
             self.children.push(Node::Leaf(leaf));
             return;
         };
-        if let Some(Node::Group(last)) = self.children.last_mut()
+        if shared_prefix > 0
+            && let Some(Node::Group(last)) = self.children.last_mut()
             && last.step == *step
         {
-            last.insert(rest, leaf);
+            last.insert(rest, shared_prefix - 1, leaf);
             return;
         }
         let mut group = Self::new(*step);
-        group.insert(rest, leaf);
+        group.insert(rest, 0, leaf);
         self.children.push(Node::Group(group));
     }
 }
@@ -88,8 +90,22 @@ impl Group {
 /// A Sound object is a leaf; the last object of a music variant's path, a music track, holds its
 /// sources as leaves. Returns `None` for no variants.
 pub(super) fn build(variants: &[SoundVariant<'_>]) -> Option<Group> {
-    let root = variants.first()?.path().first()?;
-    let mut tree = Group::new(*root);
+    let root = *variants.first()?.path().first()?;
+    let mut holders = variants
+        .chunk_by(|_, next| next.shared_path_prefix > 0)
+        .map(|holder| build_holder(root, holder));
+    let first = holders.next()?;
+    let Some(second) = holders.next() else {
+        return Some(first);
+    };
+    let mut tree = Group::new(root);
+    tree.children
+        .extend([first, second].into_iter().chain(holders).map(Node::Group));
+    Some(tree)
+}
+
+fn build_holder(root: PathStep, variants: &[SoundVariant<'_>]) -> Group {
+    let mut tree = Group::new(root);
     for variant in variants {
         let path = variant.path();
         let below = path.get(1..).unwrap_or_default();
@@ -99,12 +115,15 @@ pub(super) fn build(variants: &[SoundVariant<'_>]) -> Option<Group> {
         };
         tree.insert(
             owners,
+            variant.shared_path_prefix.saturating_sub(1),
             Leaf {
                 wem_id: variant.wem_id(),
                 source_id: variant.source().source_id,
                 kind: variant.source_kind(),
+                music_clip_features: variant.music_clip_features,
+                music_transition_features: variant.music_transition_features,
             },
         );
     }
-    Some(tree)
+    tree
 }

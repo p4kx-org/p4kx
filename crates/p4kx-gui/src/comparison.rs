@@ -179,9 +179,16 @@ pub struct ComparisonTab {
     key_wanted: bool,
     kinds: [Option<ChannelKind>; 2],
     test_channels: Option<TestChannels>,
+    discovery_issues: Vec<p4kx_channels::DiscoveryIssue>,
 }
 
 impl ComparisonTab {
+    /// Returns the latest background-open installation-protection diagnostics.
+    #[must_use]
+    pub fn discovery_issues(&self) -> &[p4kx_channels::DiscoveryIssue] {
+        &self.discovery_issues
+    }
+
     /// Returns the test Channels the picked Archives live in, or `None` when neither lives in
     /// one.
     #[must_use]
@@ -293,22 +300,22 @@ impl ComparisonTab {
     /// whether something changed.
     pub fn poll(&mut self) -> bool {
         match &mut self.state {
-            State::Running(run) => match run.poll() {
-                None => false,
-                Some(Outcome::Failed(reason)) => {
-                    self.key_wanted |= run.key_asked();
-                    self.state = State::Failed(reason);
-                    true
-                }
-                Some(Outcome::Finished(view)) => {
-                    self.state = State::Finished(view);
-                    true
-                }
-                Some(Outcome::Cancelled) => {
-                    self.state = State::Cancelled;
-                    true
-                }
-            },
+            State::Running(run) => {
+                let Some(completed) = run.poll() else {
+                    return false;
+                };
+                let key_asked = run.key_asked();
+                self.discovery_issues = completed.issues;
+                self.state = match completed.outcome {
+                    Outcome::Failed(reason) => {
+                        self.key_wanted |= key_asked;
+                        State::Failed(reason)
+                    }
+                    Outcome::Finished(view) => State::Finished(view),
+                    Outcome::Cancelled => State::Cancelled,
+                };
+                true
+            }
             State::Finished(view) => view.poll(),
             State::Idle | State::Cancelled | State::Failed(_) => false,
         }

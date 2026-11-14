@@ -55,6 +55,7 @@ fn a_random_container_is_a_selectable_group_over_its_sounds() -> TestResult {
         assert_eq!(
             read(folder, "Play_X.txtp")?,
             "# P4KX: event Play_X of trigger Play_X\n\
+             # approximation: select-first-alternative\n\
              \x20 Play_X_7001.wav\n  Play_X_7002.wav\n  Play_X_7003.wav\n\
              # random 20: plays the first of 3, change >1 to pick another\n\
              group = -R3>1\n"
@@ -214,6 +215,7 @@ fn a_music_track_layers_its_sources_below_a_playlist_and_segment() -> TestResult
         assert_eq!(
             read(folder, "Play_X.txtp")?,
             "# P4KX: event Play_X of trigger Play_X\n\
+             # approximation: omit-music-clip-timing\n\
              \x20 Play_X_7001.wav\n  Play_X_7002.wav\n\
              # music_track 32\n\
              group = -L2 #@layer-v\n"

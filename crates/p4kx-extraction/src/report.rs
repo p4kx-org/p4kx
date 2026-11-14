@@ -9,11 +9,25 @@ use p4kx_cryxml::CryXmlError;
 use p4kx_dataforge::DataForgeError;
 use thiserror::Error;
 
-use crate::{ConversionError, NameRule, PathLimit, RecordExportReport};
+use crate::{
+    ConversionError, NameRule, PathLimit, RecordExportReport, SourceEvidenceError, TextureArtifacts,
+};
 
 /// Why one Entry of an Extraction was not written.
 #[derive(Debug, Error)]
 pub enum ExtractionError {
+    /// Ownership capture or verified cleanup failed without losing its typed cause.
+    #[error(transparent)]
+    OwnedOutput(Box<p4kx_guard::OwnedOutputError>),
+    /// An unpublished output could not be removed after completion or failure.
+    #[error("owned output cleanup failed: {cleanup}")]
+    CleanupFailed {
+        /// The original failure when one preceded cleanup.
+        #[source]
+        primary: Option<Box<dyn std::error::Error + Send + Sync>>,
+        /// The separate cleanup failure.
+        cleanup: Box<p4kx_guard::OwnedOutputCleanupError>,
+    },
     /// The path would leave the target folder, or a folder on the way is a link.
     #[error("the path would leave the target folder")]
     UnsafePath,
@@ -52,9 +66,9 @@ pub enum ExtractionError {
         #[source]
         source: io::Error,
     },
-    /// The target lies inside a Star Citizen installation; nothing is written there.
+    /// Source or target protection refused the write.
     #[error(transparent)]
-    Installation(#[from] p4kx_guard::WriteRefused),
+    Installation(#[from] p4kx_guard::WriteProtectionError),
     /// The Entry is `CryXml` that could not be converted.
     #[error("cannot convert the CryXml")]
     Convert(#[source] CryXmlError),
@@ -69,6 +83,9 @@ pub enum ExtractionError {
     /// The texture could not be converted.
     #[error("cannot convert the texture")]
     Texture(#[source] ConversionError),
+    /// The converted image's contributor inventory could not be built.
+    #[error("cannot record texture contributors")]
+    TextureEvidence(#[from] SourceEvidenceError),
     /// The sound, or a WEM the soundbank embeds, could not be converted, naming its codec when no
     /// decoder exists, or the soundbank could not be read.
     #[error("cannot convert the sound")]
@@ -150,6 +167,12 @@ impl EntryFailure {
         &self.error
     }
 
+    /// Returns the original typed failure without copying or decoding the source again.
+    #[must_use]
+    pub fn into_error(self) -> ExtractionError {
+        self.error
+    }
+
     /// Returns the stored and the computed checksum when the Entry failed because its data does
     /// not match the checksum of the directory.
     #[must_use]
@@ -175,9 +198,16 @@ pub struct ExtractionReport {
     pub(crate) records: Option<RecordExportReport>,
     pub(crate) records_entry: Option<String>,
     pub(crate) dataforge_left_out: Vec<String>,
+    pub(crate) texture_artifacts: Vec<TextureArtifacts>,
 }
 
 impl ExtractionReport {
+    /// Returns receipts of the converted images this extraction committed.
+    #[must_use]
+    pub fn texture_artifacts(&self) -> &[TextureArtifacts] {
+        &self.texture_artifacts
+    }
+
     /// Returns the number of Entries written.
     #[must_use]
     pub const fn extracted(&self) -> usize {
@@ -202,6 +232,12 @@ impl ExtractionReport {
     #[must_use]
     pub fn failures(&self) -> &[EntryFailure] {
         &self.failures
+    }
+
+    /// Returns the owned Entry failures, preserving their original typed causes.
+    #[must_use]
+    pub fn into_failures(self) -> Vec<EntryFailure> {
+        self.failures
     }
 
     /// Returns the Entries among the [`failures`](Self::failures) whose data did not match the

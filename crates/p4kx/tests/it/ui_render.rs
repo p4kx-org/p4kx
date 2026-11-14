@@ -109,6 +109,18 @@ fn the_json_report_lists_what_was_left_out() -> TestResult {
         "the PNG"
     );
     redacted["target"] = Value::from("[DIR]/panel.png");
+    let fields = redacted.as_object_mut().ok_or("render report object")?;
+    for key in [
+        "originReceipt",
+        "artifactOrigin",
+        "fieldOrigins",
+        "provenance",
+    ] {
+        assert!(
+            fields.remove(key).is_some(),
+            "missing source evidence {key}"
+        );
+    }
     insta::assert_snapshot!(serde_json::to_string_pretty(&redacted)?);
     assert_matches_reference(&out, "panel.png")
 }

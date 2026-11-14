@@ -9,7 +9,7 @@ use crate::{BankError, HircKind, HircObject, HircValue, SoundSource};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum HircLayout {
     /// The fields of the type were read; containers and music objects must also use the whole
-    /// body, a Sound, Action or Event is not checked for bytes after its fields.
+    /// body. State objects report the remaining body range.
     Decoded,
     /// The reader has no decoder for the type, so the body is kept raw.
     Undecoded,
@@ -23,12 +23,14 @@ pub enum HircLayout {
 pub(crate) const fn has_decoder(kind: HircKind) -> bool {
     matches!(
         kind,
-        HircKind::Sound
+        HircKind::State
+            | HircKind::Sound
             | HircKind::Action
             | HircKind::Event
             | HircKind::RandomSequenceContainer
             | HircKind::SwitchContainer
             | HircKind::LayerContainer
+            | HircKind::ActorMixer
             | HircKind::MusicSegment
             | HircKind::MusicTrack
             | HircKind::MusicSwitch
@@ -130,6 +132,7 @@ impl HircObject {
         match &self.value {
             HircValue::Sound(source) => source.parent_id,
             HircValue::Container(container) => Some(container.parent_id),
+            HircValue::ActorMixer(actor) => Some(actor.parent_id),
             HircValue::MusicSegment(segment) => Some(segment.node.parent_id),
             HircValue::MusicTrack(track) => Some(track.parent_id),
             HircValue::MusicSwitch(switch) => Some(switch.node.parent_id),
@@ -145,6 +148,7 @@ impl HircObject {
         let (ids, sources): (&[u32], &[SoundSource]) = match &self.value {
             HircValue::Event(actions) => (actions, &[]),
             HircValue::Container(container) => (&container.children, &[]),
+            HircValue::ActorMixer(actor) => (&actor.children, &[]),
             HircValue::MusicSegment(segment) => (&segment.node.children, &[]),
             HircValue::MusicSwitch(switch) => (&switch.node.children, &[]),
             HircValue::MusicPlaylist(playlist) => (&playlist.node.children, &[]),

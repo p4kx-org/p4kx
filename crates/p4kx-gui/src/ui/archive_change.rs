@@ -16,8 +16,7 @@ use crate::{Extraction, Model, Text};
 fn archive_path(model: &Model) -> String {
     model
         .browser()
-        .map(|browser| browser.archive_index().path().display().to_string())
-        .unwrap_or_default()
+        .map_or_default(|browser| browser.archive_index().path().display().to_string())
 }
 
 /// Compares the open Archive with the disk when due, keeps the window repainting so that this

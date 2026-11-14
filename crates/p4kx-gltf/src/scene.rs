@@ -5,17 +5,18 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::io::Write;
 
-use p4kx_model::{Animation, Bone, MaterialStatus, Model, TintPalette, Transform};
+use p4kx_model::{Animation, Bone, Material, MaterialStatus, Model, TintPalette, Transform};
 
 use crate::GltfError;
 use crate::glb::{GlbOptions, GlbSummary, MaterialMode, write_instances};
 use crate::instance::{Content, Instance, Wrapper};
 use crate::materials::MaterialPlan;
+use crate::mesh_vertex_map::ObserveMesh;
 use crate::scene_light::{LIGHT_FRAME, SceneLight};
 use crate::scene_rig::SceneRig;
 use crate::texture_loader::{NoTextures, TextureLoader};
 
-type SharingKey = (usize, usize, usize, usize);
+type SharingKey = (usize, usize, usize, usize, usize);
 
 /// A model placed in a [`Scene`] with the material library its material IDs index.
 ///
@@ -32,6 +33,8 @@ pub struct ScenePart<'m> {
     /// The tint palette whose colours the materials that take one are drawn with, or `None` for
     /// the colours of the library.
     pub palette: Option<&'m TintPalette>,
+    /// Optional resolved source fallback for missing or empty authored slots.
+    pub fallback: Option<&'m Material>,
 }
 
 impl<'m> ScenePart<'m> {
@@ -42,7 +45,15 @@ impl<'m> ScenePart<'m> {
             model,
             materials,
             palette: None,
+            fallback: None,
         }
+    }
+
+    /// Sets the physical fallback material for this part's missing assignments.
+    #[must_use]
+    pub const fn with_fallback(mut self, material: &'m Material) -> Self {
+        self.fallback = Some(material);
+        self
     }
 
     /// Draws the part with the colours of `palette`.
@@ -185,8 +196,8 @@ impl<'m> Scene<'m> {
     }
 }
 
-/// Writes the models of `scene` as one GLB file to `out`, like [`write_glb`]; `out` should be
-/// buffered.
+/// Writes the models of `scene` as one GLB file to `out`, like [`write_glb`](crate::write_glb);
+/// `out` should be buffered.
 ///
 /// Every scene node becomes a glTF node with its transform, and the nodes of its model hang below
 /// it. The materials are plain colours whatever [`GlbOptions::materials`] says, and the models are
@@ -235,6 +246,16 @@ pub fn write_scene_glb_with(
     options: &GlbOptions,
     textures: &dyn TextureLoader,
     out: &mut impl Write,
+) -> Result<GlbSummary, GltfError> {
+    write_scene(scene, options, textures, out, None)
+}
+
+pub(crate) fn write_scene(
+    scene: &Scene<'_>,
+    options: &GlbOptions,
+    textures: &dyn TextureLoader,
+    out: &mut impl Write,
+    visitor: Option<&mut ObserveMesh<'_>>,
 ) -> Result<GlbSummary, GltfError> {
     let nodes = scene.nodes();
     let splits = light_splits(nodes);
@@ -290,7 +311,7 @@ pub fn write_scene_glb_with(
         rig: rig.as_ref(),
         animations: &scene.animations,
     };
-    write_instances(&content, options, textures, fallbacks, out)
+    write_instances(&content, options, textures, fallbacks, out, visitor)
 }
 
 /// Returns for each node whether it holds a light and also a model or children, so that the
@@ -331,6 +352,8 @@ fn instances_of<'m>(scene: &Scene<'m>, options: &GlbOptions) -> (Vec<Instance<'m
                 std::ptr::from_ref(part.materials).addr(),
                 part.palette
                     .map_or(0, |palette| std::ptr::from_ref(palette).addr()),
+                part.fallback
+                    .map_or(0, |material| std::ptr::from_ref(material).addr()),
             );
             match first_of.entry(key) {
                 Entry::Occupied(first) => Some(*first.get()),
@@ -341,7 +364,7 @@ fn instances_of<'m>(scene: &Scene<'m>, options: &GlbOptions) -> (Vec<Instance<'m
             }
         });
         let plan = lod.map_or_else(MaterialPlan::empty, |lod| {
-            let plan = MaterialPlan::new(part.materials.library(), lod);
+            let plan = MaterialPlan::with_fallback(part.materials.library(), lod, part.fallback);
             if twin.is_some() {
                 plan
             } else {

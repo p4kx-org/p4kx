@@ -33,8 +33,13 @@ pub(crate) fn giver<'f>(
     }
     let from_result = gains
         .iter()
-        .filter(|gain| gain.amount.is_some_and(|amount| amount > 0))
-        .find_map(|gain| Some((gain.faction_reputation_guid?, gain.faction_reputation_name?)));
+        .filter(|gain| gain.amount.value().is_some_and(|amount| amount.get() > 0))
+        .find_map(|gain| {
+            Some((
+                *gain.faction_reputation_guid.value()?,
+                *gain.faction_reputation_name.value()?,
+            ))
+        });
     if let Some(link) = from_result {
         return Some(GiverFaction {
             source: GiverSource::ReputationResult,

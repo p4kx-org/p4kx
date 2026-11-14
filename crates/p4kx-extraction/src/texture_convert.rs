@@ -13,7 +13,7 @@ use crate::texture_job::TextureJob;
 use crate::texture_outputs::Counted;
 use crate::texture_parts::Parts;
 use crate::write::{EntryWriter, Outcome};
-use crate::{ConversionError, EntryFailure, ExtractionError, Texture};
+use crate::{ConversionError, EntryFailure, ExtractionError, Texture, TextureArtifacts};
 
 /// How one output of a texture ended.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -33,6 +33,7 @@ struct Done {
     merged_tail: Option<Step>,
     png: Option<Step>,
     counted: Counted,
+    artifacts: Option<TextureArtifacts>,
 }
 
 impl Done {
@@ -152,6 +153,7 @@ impl EntryWriter<'_> {
         Ended::Texture {
             entries,
             unconverted,
+            artifacts: done.artifacts.map(|artifacts| (job.header.0, artifacts)),
         }
     }
 
@@ -191,7 +193,8 @@ impl EntryWriter<'_> {
         let Some(level) = level else {
             return self.write_merged_tail(job, &source, buffers, done);
         };
-        done.png = Some(self.write_images(&source, &destination, level, buffers)?);
+        done.png =
+            Some(self.write_images(&source, &destination, level, buffers, &mut done.artifacts)?);
         Ok(())
     }
 

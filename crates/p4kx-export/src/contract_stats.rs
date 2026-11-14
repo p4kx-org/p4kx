@@ -10,27 +10,44 @@ use crate::contract_stats_gear::{
 };
 use crate::contract_stats_mining::{MiningLaserStats, MiningModifierStats};
 
-/// The typed stat blocks of an item, raw facts of the Archive (ADR-0065, ADR-0072).
-///
-/// Every block is `null` for an item that does not have it; the item has `stats` only when it
-/// has at least one block: `weapon`, `shield`, `quantumDrive`, `powerPlant`, `cooler`, `missile`,
-/// `armor`, `clothing`, `radar`, `tractorBeam`, `weaponModifier`, `miningLaser` or
-/// `miningModifier`. No value is derived: a number is what the Archive states, in the unit the
-/// game stores it; a value that is not a finite number is `null`.
+/// Item stats in the compact order used by variant identity (ADR-0356).
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ItemStats<'a> {
+    pub(crate) weapon: Option<WeaponStats<'a>>,
+    pub(crate) shield: Option<ShieldStats>,
+    pub(crate) quantum_drive: Option<QuantumDriveStats>,
+    #[serde(flatten)]
+    pub(crate) fields: ItemStatsFields<'a>,
+}
+
+/// Published item stat blocks and health.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(rename = "ItemStats", transform = every_field_required)]
+pub(crate) struct PublishedItemStats<'a> {
+    /// The weapon block, from `SCItemWeaponComponentParams`.
+    weapon: Option<WeaponStats<'a>>,
+    #[serde(flatten)]
+    fields: ItemStatBlocks<'a>,
+}
+
+/// Remaining private variant identity fields in compact serialization order.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ItemStatsFields<'a> {
+    pub(crate) power_plant: Option<PowerPlantStats<'a>>,
+    pub(crate) cooler: Option<CoolerStats<'a>>,
+    #[serde(flatten)]
+    pub(crate) blocks: ItemStatBlocks<'a>,
+    pub(crate) resource_states: Vec<ResourceState<'a>>,
+}
+
+/// Shared specialist blocks in their public serialization order.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ItemStats<'a> {
-    /// The weapon block, from `SCItemWeaponComponentParams`.
-    pub(crate) weapon: Option<WeaponStats<'a>>,
-    /// The shield generator block, from `SCItemShieldGeneratorParams`.
-    pub(crate) shield: Option<ShieldStats>,
-    /// The quantum drive block, from `SCItemQuantumDriveParams`.
-    pub(crate) quantum_drive: Option<QuantumDriveStats>,
-    /// The power plant block, for an item of the type `PowerPlant`.
-    pub(crate) power_plant: Option<PowerPlantStats<'a>>,
-    /// The cooler block, for an item of the type `Cooler`.
-    pub(crate) cooler: Option<CoolerStats<'a>>,
+pub(crate) struct ItemStatBlocks<'a> {
     /// The missile block, from `SCItemMissileParams`.
     pub(crate) missile: Option<MissileStats<'a>>,
     /// The suit armour block, from `SCItemSuitArmorParams`.
@@ -52,8 +69,41 @@ pub(crate) struct ItemStats<'a> {
     pub(crate) mining_modifier: Option<MiningModifierStats<'a>>,
     /// The hit points, from `SHealthComponentParams.Health`.
     pub(crate) health: Option<f32>,
-    /// The states of `ItemResourceComponentParams` in stored order: signatures and resource flows.
-    pub(crate) resource_states: Vec<ResourceState<'a>>,
+}
+
+impl<'a> ItemStats<'a> {
+    pub(crate) const fn has_specialist(&self) -> bool {
+        self.weapon.is_some()
+            || self.shield.is_some()
+            || self.quantum_drive.is_some()
+            || self.fields.has_specialist()
+    }
+
+    pub(crate) fn into_published(self) -> Option<PublishedItemStats<'a>> {
+        let Self { weapon, fields, .. } = self;
+        let fields = fields.blocks;
+        (weapon.is_some() || fields.has_specialist() || fields.health.is_some())
+            .then_some(PublishedItemStats { weapon, fields })
+    }
+}
+
+impl ItemStatsFields<'_> {
+    const fn has_specialist(&self) -> bool {
+        self.power_plant.is_some() || self.cooler.is_some() || self.blocks.has_specialist()
+    }
+}
+
+impl ItemStatBlocks<'_> {
+    const fn has_specialist(&self) -> bool {
+        self.missile.is_some()
+            || self.armor.is_some()
+            || self.clothing.is_some()
+            || self.radar.is_some()
+            || self.tractor_beam.is_some()
+            || self.weapon_modifier.is_some()
+            || self.mining_laser.is_some()
+            || self.mining_modifier.is_some()
+    }
 }
 
 /// One state of the resource component: its signatures and the resources it generates and uses.
@@ -175,7 +225,7 @@ pub(crate) struct Spread {
 }
 
 /// The ammunition of a weapon.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct AmmoStats {
@@ -194,7 +244,7 @@ pub(crate) struct AmmoStats {
 }
 
 /// Damage by type, as the Archive states it.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct Damage {
@@ -212,10 +262,9 @@ pub(crate) struct Damage {
     pub(crate) stun: Option<f32>,
 }
 
-/// A shield generator.
-#[derive(Debug, Serialize, JsonSchema)]
+/// The shield block used by item variant identity.
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct ShieldStats {
     /// `MaxShieldHealth`.
     pub(crate) max_health: Option<f32>,
@@ -229,10 +278,9 @@ pub(crate) struct ShieldStats {
     pub(crate) damaged_regen_delay: Option<f32>,
 }
 
-/// A quantum drive.
-#[derive(Debug, Serialize, JsonSchema)]
+/// The compact quantum values consumed by variant identity.
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct QuantumDriveStats {
     /// `quantumFuelRequirement`, as stored.
     pub(crate) fuel_requirement: Option<f32>,

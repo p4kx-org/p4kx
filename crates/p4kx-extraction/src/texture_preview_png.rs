@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_texture::{TextureError, write_png};
+mod evidence;
+pub(crate) mod input;
 
-use crate::{ConversionError, Texture};
+use p4kx_texture::{DdsAlphaTransform, DdsPngEncoding, MipByteSpans, write_png_with_transfer};
+
+use self::input::PreviewInputs;
+use crate::{ConversionError, SourceEvidenceError, SourceUses, Texture};
+
+pub use self::evidence::{PreviewPngEvidence, PreviewTextureEvidence};
 
 /// A preview of one mip of a texture, encoded as an 8-bit RGBA PNG.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,7 +24,43 @@ pub struct PreviewPng {
     pub png: Vec<u8>,
 }
 
-impl Texture<'_> {
+/// A PNG preview with the actual DDS inputs used to produce it.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ObservedPreviewPng<'a> {
+    image: PreviewPng,
+    encoding: DdsPngEncoding,
+    alpha_transform: DdsAlphaTransform,
+    inputs: PreviewInputs<'a, MipByteSpans>,
+}
+
+impl ObservedPreviewPng<'_> {
+    /// Returns the encoded image and its dimensions.
+    #[must_use]
+    pub const fn image(&self) -> &PreviewPng {
+        &self.image
+    }
+
+    /// Takes the encoded image and its dimensions.
+    #[must_use]
+    pub fn into_image(self) -> PreviewPng {
+        self.image
+    }
+
+    /// Registers the selected color and alpha inputs in an output evidence inventory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the evidence inventory was interrupted.
+    pub fn evidence(&self, uses: &SourceUses) -> Result<PreviewPngEvidence, SourceEvidenceError> {
+        let mut evidence = self.inputs.register(uses, self.image.level)?;
+        evidence.png_encoding = Some(self.encoding);
+        evidence.alpha_transform = self.alpha_transform;
+        Ok(evidence)
+    }
+}
+
+impl<'a> Texture<'a> {
     /// Decodes mip `level` with its alpha tail merged in and encodes it as one PNG: the image
     /// [`Texture::decode_preview`] gives, or with `face` the one face of a cubemap, counted in DDS
     /// order +X, −X, +Y, −Y, +Z, −Z.
@@ -26,36 +68,45 @@ impl Texture<'_> {
     /// # Errors
     ///
     /// Returns the errors of [`Texture::decode_preview`] and [`Texture::decode_surfaces`], and a
-    /// [`ConversionError`] wrapping [`TextureError::UnsupportedImage`] when the texture has no
-    /// such face.
+    /// [`ConversionError`] when the texture has no such face.
     pub fn preview_png(
         &self,
         level: u32,
         face: Option<usize>,
     ) -> Result<PreviewPng, ConversionError> {
-        let image = match face {
-            None => self.decode_preview(level)?,
-            Some(face) => {
-                let mut images = self.decode_surfaces(level)?;
-                if face >= images.len() || self.header().faces() < 2 {
-                    return Err(ConversionError::of_texture(
-                        self.name(),
-                        TextureError::UnsupportedImage {
-                            images: self.header().images(level),
-                        },
-                    ));
-                }
-                images.swap_remove(face)
-            }
-        };
+        self.preview_png_observed(level, face)
+            .map(ObservedPreviewPng::into_image)
+    }
+
+    /// Encodes one preview and retains its actual header and mip byte sources.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of a PNG preview.
+    pub fn preview_png_observed(
+        &self,
+        level: u32,
+        face: Option<usize>,
+    ) -> Result<ObservedPreviewPng<'a>, ConversionError> {
+        let (observed, alpha_transform) = self.decode_png_preview(level, face)?;
+        let image = observed.image;
         let mut png = Vec::new();
-        write_png(&image, &mut png)
+        let encoding = observed
+            .inputs
+            .png_encoding()
             .map_err(|error| ConversionError::of_texture(self.name(), error))?;
-        Ok(PreviewPng {
-            level,
-            width: image.width(),
-            height: image.height(),
-            png,
+        write_png_with_transfer(&image, encoding.transfer, &mut png)
+            .map_err(|error| ConversionError::of_texture(self.name(), error))?;
+        Ok(ObservedPreviewPng {
+            image: PreviewPng {
+                level,
+                width: image.width(),
+                height: image.height(),
+                png,
+            },
+            encoding,
+            alpha_transform,
+            inputs: observed.inputs,
         })
     }
 }

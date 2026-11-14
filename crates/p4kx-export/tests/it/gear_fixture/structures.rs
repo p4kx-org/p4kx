@@ -86,7 +86,7 @@ fn weapons() -> Vec<TestStruct> {
             ],
         )
         .parent("SWeaponActionParams"),
-        TestStruct::new("SWeaponActionWrapParams")
+        TestStruct::new("SWeaponActionToggleParams")
             .parent("SWeaponActionParams")
             .field("weaponAction", pointer("SWeaponActionParams")),
         TestStruct::new("SWeaponActionParallelParams")
@@ -97,8 +97,9 @@ fn weapons() -> Vec<TestStruct> {
             .field("hitType", TestType::String)
             .field("fullDamageRange", TestType::Single)
             .field("zeroDamageRange", TestType::Single)
-            .field("damagePerSecond", class("DamageInfo")),
-        singles("DamageInfo", &["DamagePhysical", "DamageEnergy"]),
+            .field("damagePerSecond", pointer("DamageBase")),
+        TestStruct::new("DamageBase"),
+        singles("DamageInfo", &["DamagePhysical", "DamageEnergy"]).parent("DamageBase"),
         component("EntityComponentAttachableModifierParams")
             .field("activationMethod", TestType::String)
             .field("charges", TestType::Int32)

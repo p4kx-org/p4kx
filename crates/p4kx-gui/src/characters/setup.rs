@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::WriteRefused;
+use p4kx_extraction::WriteProtectionError;
 
 use crate::assembly_export::Output;
 use crate::{AssemblyExportForm, PackageProblem};
@@ -12,7 +12,7 @@ use crate::{AssemblyExportForm, PackageProblem};
 /// package folder, and where it is written.
 ///
 /// The level of detail and the materials are those of the view.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct CharacterExportSetup {
     name: String,
     folder: Option<PathBuf>,
@@ -21,6 +21,10 @@ pub struct CharacterExportSetup {
 }
 
 impl CharacterExportSetup {
+    pub(crate) fn output_owner(&self) -> crate::output_target::Witness {
+        self.output.owner()
+    }
+
     pub(super) fn new(
         name: String,
         folder: Option<PathBuf>,
@@ -110,10 +114,9 @@ impl CharacterExportSetup {
         self.output.package_replaces()
     }
 
-    /// Returns why the chosen file or package folder cannot be written, when it lies inside a Star
-    /// Citizen installation.
+    /// Returns the protection refusal for the chosen output.
     #[must_use]
-    pub fn refusal(&self) -> Option<&WriteRefused> {
+    pub fn refusal(&self) -> Option<&WriteProtectionError> {
         self.output.refusal()
     }
 

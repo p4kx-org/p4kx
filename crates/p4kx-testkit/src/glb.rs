@@ -199,16 +199,13 @@ fn check_floats(glb: &CheckedGlb, accessor: &Accessor<'_>) -> Result<(), String>
             clippy::cast_possible_truncation,
             reason = "the bound is compared as the f32 the data holds"
         )]
-        let declared: Vec<f32> = declared
-            .as_array()
-            .map(|values| {
-                values
-                    .iter()
-                    .filter_map(gltf::json::Value::as_f64)
-                    .map(|value| value as f32)
-                    .collect()
-            })
-            .unwrap_or_default();
+        let declared: Vec<f32> = declared.as_array().map_or_default(|values| {
+            values
+                .iter()
+                .filter_map(gltf::json::Value::as_f64)
+                .map(|value| value as f32)
+                .collect()
+        });
         if declared != actual {
             return Err(format!(
                 "accessor {index} declares {bound} {declared:?}, its data has {actual:?}"

@@ -7,6 +7,14 @@ Measured on LIVE, that rule saw only part of what the files say, and it opened o
 folders. This ADR keeps the rule (every place that names the Entity must name the same existing
 file) and widens what counts as a place.
 
+## Catalog v3 amendment
+
+Placeholder and orphan inventory files are retained as physical offline definitions. A shop that
+names a placeholder still has null `inventory` and `itemGuids`. The physical definition preserves
+its authored values and original provenance independently of the shop's projection.
+`declarations.shopInventoryResolution` records the status, original component or prefab
+candidates and physical target identities for each emitted shop.
+
 ## Decision
 
 - **The `.soc` stores each string once.** A container file is a pool of strings in order of first

@@ -9,10 +9,11 @@ use p4kx_assembly::{
     LoadoutChanges, LoadoutResolver,
 };
 use p4kx_blender::{
-    BuildInfo, Issue, PackageInfo, PackageSummary, Replacement, check_output, write_package,
+    BuildInfo, Issue, PackageInfo, PackageSummary, PackageWriteContext, Replacement,
+    check_output_with_context, write_package_with_context,
 };
-use p4kx_channels::{PublicPatches, channel_name};
-use p4kx_extraction::{Archive, DataForgeEntry, GlbOptions, is_same_file};
+use p4kx_channels::channel_name;
+use p4kx_extraction::{Archive, DataForgeEntry, is_same_file};
 use serde::Serialize;
 
 use crate::cli_entity::EntityPackageArgs;
@@ -74,41 +75,41 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
     if is_same_file(&args.out, &args.archive) {
         return Err(GlbOutputIsArchive(args.out.clone()).into());
     }
-    check_output(&args.out)?;
     let changes = args.changes.changes()?;
     let archive = crate::key::open(&args.archive)?;
+    let cancel = cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let context = PackageWriteContext::new(&protection, cancel.flag());
+    check_output_with_context(&args.out, &context)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = ArchiveFiles::new(&archive);
     let mut resolver = LoadoutResolver::new(&forge)
+        .with_forge_entry(&entry)
         .with_files(&files)
         .stopping_at_docked_vehicles();
     let record = resolver.entities().find(&args.entity)?;
     let applied = resolver.resolve_changed(&record, &changes)?;
     crate::entity_ignored::warn(&applied)?;
     let tree = applied.node();
-    let models = ArchiveModels::new(&archive);
-    let palettes = ForgePalettes::new(&forge);
-    let options = AssemblyOptions::default().with_lod(args.lod);
+    let models = ArchiveModels::new(&archive).with_model_node_sources();
+    let palettes = ForgePalettes::new(&forge).with_entry(&entry);
+    let options = AssemblyOptions::default().with_lod(args.mesh.lod);
     let assembly = Assembly::build_with_palettes(tree, &models, &palettes, &options)?;
     crate::entity_root::check(&assembly)?;
     let assembly = if args.interior {
-        crate::interior_forge::with_interior(assembly, (&archive, &forge), tree, args.lod)?
+        crate::interior_forge::with_interior(
+            assembly,
+            (&archive, &entry, &forge),
+            tree,
+            args.mesh.lod,
+        )?
     } else {
         assembly
     };
-    let cancel = cancel_on_interrupt()?;
-    let mut glb = GlbOptions::default()
-        .with_lod(args.lod)
-        .with_texture_mip(args.texture_mip);
-    if args.no_vertex_colours {
-        glb = glb.without_vertex_colours();
-    }
-    let info = info_of(&archive, &changes);
-    let loader = models.textures();
-    let summary = write_package(&assembly, &models, &loader, &glb, &info, &args.out, &|| {
-        cancel.is_cancelled()
-    })?;
+    let info = info_of(&archive, &changes)?;
+    let context = context.with_entity_effects_source(&entry, &forge);
+    let summary = write(args, &info, &archive, &models, &assembly, context)?;
     if as_json {
         json::print(&PackageJson::of(
             &json::path(archive.path()),
@@ -125,6 +126,35 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
     }
 }
 
+fn write<'a>(
+    args: &EntityPackageArgs,
+    info: &PackageInfo,
+    archive: &'a Archive,
+    models: &'a ArchiveModels<'a>,
+    assembly: &Assembly,
+    context: PackageWriteContext<'a>,
+) -> Result<PackageSummary> {
+    let glb = args.mesh.glb_options();
+
+    let loader = models.textures();
+    let context = context
+        .with_texture_container(args.mesh.texture_container())
+        .with_archive_texture_source(&loader);
+    let context = if args.collision_helpers {
+        context.with_collision_helpers(archive)
+    } else {
+        context
+    };
+    let context = if args.mesh.vertex_maps {
+        context.with_vertex_maps()
+    } else {
+        context
+    };
+    Ok(write_package_with_context(
+        assembly, models, &loader, &glb, info, &args.out, &context,
+    )?)
+}
+
 impl<'a> PackageJson<'a> {
     fn of(
         archive: &str,
@@ -138,8 +168,8 @@ impl<'a> PackageJson<'a> {
             entity: tree.class_name(),
             guid: tree.guid().to_string(),
             out: json::path(&args.out),
-            lod: args.lod,
-            texture_mip: args.texture_mip,
+            lod: args.mesh.lod,
+            texture_mip: args.mesh.texture_mip,
             nodes: summary.nodes,
             drawn_nodes: summary.drawn_nodes,
             containers: summary.containers,
@@ -177,20 +207,22 @@ impl<'a> PackageJson<'a> {
 }
 
 /// Returns the Build of `archive` as a package records it.
-pub(crate) fn build_info(archive: &Archive) -> Option<BuildInfo> {
-    let build = archive.build()?;
-    let patches = PublicPatches::standard();
-    Some(BuildInfo {
+pub(crate) fn build_info(archive: &Archive) -> io::Result<Option<BuildInfo>> {
+    let Some(build) = archive.build() else {
+        return Ok(None);
+    };
+    let patches = crate::launcher_discovery::patches()?;
+    Ok(Some(BuildInfo {
         branch: build.branch().to_owned(),
         version: build.version().to_owned(),
         public_patch: patches.of(build).map(str::to_owned),
         change_number: build.change_number().to_owned(),
         build_id: build.build_id().to_owned(),
-    })
+    }))
 }
 
-fn info_of(archive: &Archive, changes: &LoadoutChanges) -> PackageInfo {
-    let build = build_info(archive);
+fn info_of(archive: &Archive, changes: &LoadoutChanges) -> io::Result<PackageInfo> {
+    let build = build_info(archive)?;
     let replace = changes
         .replacements()
         .iter()
@@ -199,8 +231,8 @@ fn info_of(archive: &Archive, changes: &LoadoutChanges) -> PackageInfo {
             entity: entity.clone(),
         })
         .collect();
-    PackageInfo::new(channel_name(archive.path()), build)
-        .with_changes(changes.exclusions().to_vec(), replace)
+    Ok(PackageInfo::new(channel_name(archive.path()), build)
+        .with_changes(changes.exclusions().to_vec(), replace))
 }
 
 fn print_changes(out: &mut impl Write, info: &PackageInfo) -> io::Result<()> {
@@ -267,7 +299,7 @@ fn print_report(
         writeln!(
             out,
             "{} models lack LOD{} and are written at the nearest lower level",
-            summary.lod_fallbacks, args.lod
+            summary.lod_fallbacks, args.mesh.lod
         )?;
     }
     if summary.texture_failures > 0 {

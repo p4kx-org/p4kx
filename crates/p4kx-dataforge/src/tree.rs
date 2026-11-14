@@ -1,21 +1,48 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::{Field, Guid, Location, Step, StructValue, Value, ValueError};
+use crate::tree_cursor::Cursor;
+use crate::tree_owner::TreeOwner;
+use crate::{
+    Field, Guid, Location, Record, RecordMetadata, Struct, StructValue, Value, ValueError,
+};
 
 /// The canonical tree of one Record: its GUID, record path, name and root struct with the fields.
 ///
 /// It is the single model every output is made from; text is borrowed from the DataForge.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct RecordTree<'f> {
+    pub(crate) record_index: u32,
+    pub(crate) metadata: RecordMetadata<'f>,
     pub(crate) guid: Guid,
     pub(crate) record_path: &'f str,
     pub(crate) name: &'f str,
     pub(crate) tag: Option<&'f str>,
     pub(crate) root: StructValue<'f>,
+    pub(crate) owner: TreeOwner<'f>,
 }
 
 impl<'f> RecordTree<'f> {
+    /// Returns whether this tree was built from this exact original Record owner and position.
+    ///
+    /// Equal values, GUIDs or indices do not establish original ownership.
+    #[must_use]
+    pub fn is_from(&self, record: &Record<'_>) -> bool {
+        self.record_index == record.index() && self.owner.is_from(record)
+    }
+
+    /// Returns original borrowed metadata independently of normalized legacy header getters.
+    #[must_use]
+    pub const fn metadata(&self) -> RecordMetadata<'f> {
+        self.metadata
+    }
+
+    /// Returns the owning Record position in source definition order.
+    #[must_use]
+    pub const fn record_index(&self) -> u32 {
+        self.record_index
+    }
+
     /// Returns the name of the Record's struct, e.g. `EntityClassDefinition`.
     #[must_use]
     pub const fn type_name(&self) -> &'f str {
@@ -47,6 +74,12 @@ impl<'f> RecordTree<'f> {
         self.tag
     }
 
+    /// Returns a struct definition by its index in the original DataForge.
+    #[must_use]
+    pub fn struct_at(&self, index: u32) -> Option<Struct<'f>> {
+        self.owner.struct_at(index)
+    }
+
     /// Returns the Record's own struct, to walk it like any nested struct.
     #[must_use]
     pub const fn root(&self) -> &StructValue<'f> {
@@ -65,77 +98,52 @@ impl<'f> RecordTree<'f> {
         self.root.field(name)
     }
 
-    /// Returns every error value in the tree, nested ones included, with the name of the field
-    /// that holds it, in the order the tree lists them.
+    /// Returns each error with its actual containing field name in declaration order.
     pub fn errors(&self) -> impl Iterator<Item = (&'f str, &ValueError)> {
-        self.located_errors().map(|(location, error)| {
-            let name = location.steps().iter().rev().find_map(|step| match step {
-                Step::Field(name) => Some(*name),
-                Step::Element(_) => None,
-            });
-            (name.unwrap_or_default(), error)
+        let mut cursor = Cursor::new(&self.root.fields);
+        std::iter::from_fn(move || {
+            loop {
+                let visit = cursor.next()?;
+                if let Value::Error(error) = visit.value {
+                    return Some((visit.field, error));
+                }
+            }
         })
     }
 
-    /// Returns every error value in the tree, nested ones included, with its full location, in
-    /// the order the tree lists them.
+    /// Returns each error with its complete semantic location in declaration order.
     pub fn located_errors(&self) -> impl Iterator<Item = (Location<'f>, &ValueError)> {
-        let mut errors = Vec::new();
-        let mut steps = Vec::new();
-        collect_errors(&self.root.fields, &mut steps, &mut errors);
-        errors.into_iter()
+        let mut cursor = Cursor::new(&self.root.fields);
+        std::iter::from_fn(move || {
+            loop {
+                let visit = cursor.next()?;
+                if let Value::Error(error) = visit.value {
+                    return Some((Location::new(visit.steps), error));
+                }
+            }
+        })
     }
 
-    /// Returns the number of error values in the tree, nested ones included, without collecting
-    /// them.
+    /// Counts every error occurrence without collecting locations.
     #[must_use]
     pub fn error_count(&self) -> usize {
-        count_field_errors(&self.root.fields)
-    }
-}
-
-fn count_field_errors(fields: &[Field<'_>]) -> usize {
-    fields.iter().map(|field| count_errors(&field.value)).sum()
-}
-
-fn count_errors(value: &Value<'_>) -> usize {
-    match value {
-        Value::Error(_) => 1,
-        Value::Struct(structure) => count_field_errors(&structure.fields),
-        Value::Array(items) => items.iter().map(count_errors).sum(),
-        _ => 0,
-    }
-}
-
-type Located<'t, 'f> = Vec<(Location<'f>, &'t ValueError)>;
-
-fn collect_errors<'t, 'f>(
-    fields: &'t [Field<'f>],
-    steps: &mut Vec<Step<'f>>,
-    errors: &mut Located<'t, 'f>,
-) {
-    for field in fields {
-        steps.push(Step::Field(field.name));
-        collect_value_errors(&field.value, steps, errors);
-        steps.pop();
-    }
-}
-
-fn collect_value_errors<'t, 'f>(
-    value: &'t Value<'f>,
-    steps: &mut Vec<Step<'f>>,
-    errors: &mut Located<'t, 'f>,
-) {
-    match value {
-        Value::Error(error) => errors.push((Location::new(steps), error)),
-        Value::Struct(structure) => collect_errors(&structure.fields, steps, errors),
-        Value::Array(items) => {
-            for (index, item) in (0_u32..).zip(items.iter()) {
-                steps.push(Step::Element(index));
-                collect_value_errors(item, steps, errors);
-                steps.pop();
-            }
+        let mut cursor = Cursor::new(&self.root.fields);
+        let mut count = 0;
+        while let Some(visit) = cursor.next() {
+            count += usize::from(matches!(visit.value, Value::Error(_)));
         }
-        _ => {}
+        count
+    }
+}
+
+impl PartialEq for RecordTree<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_index == other.record_index
+            && self.metadata == other.metadata
+            && self.guid == other.guid
+            && self.record_path == other.record_path
+            && self.name == other.name
+            && self.tag == other.tag
+            && self.root == other.root
     }
 }

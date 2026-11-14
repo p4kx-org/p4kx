@@ -3,8 +3,12 @@
 
 use std::collections::HashSet;
 
+use p4kx_model::Material;
+
 use crate::materials::Slot;
+use crate::shading::shaded_layers;
 use crate::texture_make::Outcome;
+use crate::texture_origins::{TextureMaterialSource, TexturePaletteUse};
 use crate::texture_plan::{
     BaseImage, Failure, MetallicRoughnessImage, SlotImages, TextureSet, Wanted,
 };
@@ -61,10 +65,61 @@ fn slot_images(wish: &Wish, drawn: Option<usize>, made: &[(Option<usize>, Outcom
     }
 }
 
+fn image_material(
+    (part, slot, material): (usize, Slot, &Material),
+    outcome: &mut Outcome,
+) -> TextureMaterialSource {
+    let mut layers = std::mem::take(&mut outcome.material_layers);
+    let uses_palette = match outcome.palette_use {
+        TexturePaletteUse::None => false,
+        TexturePaletteUse::Decal => true,
+        TexturePaletteUse::DiffuseAndSpecular | TexturePaletteUse::Specular => {
+            layers.extend(
+                shaded_layers(material)
+                    .into_iter()
+                    .flatten()
+                    .filter(|layer| layer.share > 0.0)
+                    .map(|layer| layer.at),
+            );
+            if layers.is_empty() {
+                material.tinted
+            } else {
+                layer_palette(material, &layers)
+            }
+        }
+        TexturePaletteUse::Layers => layer_palette(material, &layers),
+    };
+    let uses_diffuse =
+        outcome.palette_use == TexturePaletteUse::DiffuseAndSpecular && layers.is_empty();
+    TextureMaterialSource {
+        part,
+        slot: match slot {
+            Slot::Library(position) => Some(position),
+            Slot::Default => None,
+        },
+        layers,
+        uses_palette,
+        uses_diffuse,
+    }
+}
+
+fn layer_palette(material: &Material, layers: &[usize]) -> bool {
+    layers.iter().any(|&position| {
+        material
+            .layers
+            .get(position)
+            .is_some_and(|layer| layer.palette_entry.is_some())
+    })
+}
+
 impl TextureSet {
     /// Makes the set of the images `outcomes` hold that the materials of `wanted` use, and lists
     /// what they could not use.
-    pub(crate) fn assemble(wanted: &[Wish], outcomes: Vec<Outcome>) -> Self {
+    pub(crate) fn assemble(
+        wanted: &[Wish],
+        outcomes: Vec<Outcome>,
+        authors: &[Option<(usize, Slot, &Material)>],
+    ) -> Self {
         let mut used = vec![false; outcomes.len()];
         let drawn: Vec<Option<usize>> = wanted
             .iter()
@@ -80,9 +135,17 @@ impl TextureSet {
         }
         let mut set = Self::default();
         let mut made: Vec<(Option<usize>, Outcome)> = Vec::with_capacity(outcomes.len());
-        for (mut outcome, used) in outcomes.into_iter().zip(&used) {
+        for (job, (mut outcome, used)) in outcomes.into_iter().zip(&used).enumerate() {
             let index = outcome.image.take().filter(|_| *used).map(|image| {
                 set.images.push(image);
+                let material = authors
+                    .get(job)
+                    .copied()
+                    .flatten()
+                    .map(|author| image_material(author, &mut outcome));
+                set.image_materials.push(material);
+                set.image_sources
+                    .push(std::mem::take(&mut outcome.texture_sources));
                 set.images.len() - 1
             });
             made.push((index, outcome));

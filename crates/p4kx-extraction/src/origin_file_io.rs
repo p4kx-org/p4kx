@@ -1,0 +1,213 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::fs::{self, File};
+use std::io::{self, BufWriter, Write};
+use std::path::{Path, PathBuf};
+use std::process;
+
+use crate::file_receipt::OrdinaryReplacement;
+use crate::output_file::StagedOutput;
+use crate::{ArchiveWriteProtection, CancelToken, WriteProtectionError, check_protected_output};
+
+/// Atomically writes an I/O stream under the job's source protection.
+/// A committed replacement retires owned origin companions under the directory lock.
+///
+/// # Errors
+///
+/// Returns write, output protection, or atomic replacement errors.
+pub fn write_replacing_io_protected<T>(
+    out: &Path,
+    protection: Option<&ArchiveWriteProtection>,
+    cancel: Option<&CancelToken>,
+    write: impl FnOnce(&mut BufWriter<File>) -> io::Result<T>,
+) -> io::Result<T> {
+    let mut held = None;
+    let result = write_replacing_before(out, protection, cancel, write, |staged| {
+        let replacement = held.insert(OrdinaryReplacement::new(out, protection, cancel)?);
+        staged.check().map_err(protection_error)?;
+        replacement.invalidate()
+    });
+    if let Some(replacement) = held {
+        replacement.finish_io(result)
+    } else {
+        result
+    }
+}
+
+/// Stages a replacement and runs one guarded action just before the final rename.
+pub(crate) fn write_replacing_before<T>(
+    out: &Path,
+    protection: Option<&ArchiveWriteProtection>,
+    cancel: Option<&CancelToken>,
+    write: impl FnOnce(&mut BufWriter<File>) -> io::Result<T>,
+    before_publish: impl FnOnce(&StagedOutput<'_>) -> io::Result<()>,
+) -> io::Result<T> {
+    let uncancelled = CancelToken::new();
+    let actual_cancel = cancel.unwrap_or(&uncancelled);
+    let check =
+        |path: &Path| check_protected_output(path, protection, cancel).map_err(protection_error);
+    check(out)?;
+    let temporary = temporary_path(out)?;
+    check(&temporary)?;
+    let (file, ownership) = crate::create_output_file(&temporary, protection, actual_cancel.flag())
+        .map_err(crate::OwnedOutputError::into_io_error)?
+        .into_parts();
+    let mut writer = BufWriter::new(file);
+    let result = write(&mut writer).and_then(|value| {
+        writer.flush()?;
+        writer
+            .into_inner()
+            .map_err(io::IntoInnerError::into_error)?
+            .sync_all()?;
+        let staged = StagedOutput::new(&temporary, out, &ownership, protection, cancel);
+        staged.check().map_err(protection_error)?;
+        before_publish(&staged)?;
+        staged.check().map_err(protection_error)?;
+        fs::rename(&temporary, out)?;
+        Ok(value)
+    });
+    if let Err(write) = result {
+        let cleanup = ownership.remove(&temporary, actual_cancel.flag());
+        return Err(match cleanup {
+            Ok(()) => write,
+            Err(cleanup) => crate::OwnedOutputError::Cleanup {
+                primary: Box::new(crate::OwnedOutputError::Io {
+                    path: out.to_path_buf(),
+                    source: write,
+                }),
+                cleanup,
+            }
+            .into_io_error(),
+        });
+    }
+    result
+}
+
+fn protection_error(error: WriteProtectionError) -> io::Error {
+    io::Error::new(io::ErrorKind::PermissionDenied, error)
+}
+
+/// Returns `<name>.p4kx-<process id>.part` next to `out`.
+fn temporary_path(out: &Path) -> io::Result<PathBuf> {
+    let name = out
+        .file_name()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "the output names no file"))?;
+    let mut name = name.to_os_string();
+    name.push(format!(".p4kx-{}.part", process::id()));
+    Ok(out.with_file_name(name))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+    use std::io::Write as _;
+
+    use crate::{ArchiveWriteProtection, CancelToken, WriteProtectionError};
+
+    use super::write_replacing_io_protected;
+
+    type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+    #[test]
+    fn an_archive_hard_link_created_before_commit_is_not_overwritten() -> TestResult {
+        let root = tempfile::tempdir()?;
+        let source = root.path().join("Data.p4k");
+        let out = root.path().join("report.txt");
+        fs::write(&source, b"synthetic source bytes")?;
+        let cancel = CancelToken::new();
+        let protection = ArchiveWriteProtection::new(&source, cancel.flag())?;
+        let failure =
+            write_replacing_io_protected(&out, Some(&protection), Some(&cancel), |writer| {
+                writer.write_all(b"output")?;
+                fs::hard_link(&source, &out)
+            })
+            .expect_err("final target is the source inode");
+        assert!(matches!(
+            failure
+                .get_ref()
+                .and_then(|cause| cause.downcast_ref::<WriteProtectionError>()),
+            Some(WriteProtectionError::SourceOverwrite { .. })
+        ));
+        assert_eq!(fs::read(&source)?, b"synthetic source bytes");
+        assert_eq!(fs::read(&out)?, b"synthetic source bytes");
+        assert_eq!(
+            fs::read_dir(root.path())?.count(),
+            2,
+            "owned temporary file is removed"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn the_original_source_name_is_refused_before_the_write_callback() -> TestResult {
+        let root = tempfile::tempdir()?;
+        let source = root.path().join("Data.p4k");
+        fs::write(&source, b"synthetic source bytes")?;
+        let cancel = CancelToken::new();
+        let protection = ArchiveWriteProtection::new(&source, cancel.flag())?;
+        let mut called = false;
+        let result =
+            write_replacing_io_protected(&source, Some(&protection), Some(&cancel), |_| {
+                called = true;
+                Ok(())
+            });
+        assert!(result.is_err());
+        assert!(!called);
+        assert_eq!(fs::read(&source)?, b"synthetic source bytes");
+        Ok(())
+    }
+
+    #[test]
+    fn an_ordinary_cancelled_write_cleans_its_owned_file_and_keeps_prior_output() -> TestResult {
+        let root = tempfile::tempdir()?;
+        let source = root.path().join("source.p4k");
+        let out = root.path().join("report.txt");
+        fs::write(&source, b"source")?;
+        fs::write(&out, b"prior")?;
+        let cancel = CancelToken::new();
+        let protection = ArchiveWriteProtection::new(&source, cancel.flag())?;
+        let result =
+            write_replacing_io_protected(&out, Some(&protection), Some(&cancel), |writer| {
+                writer.write_all(b"unpublished")?;
+                cancel.cancel();
+                Ok(())
+            });
+        let failure = result.expect_err("cancel before publication");
+        assert!(
+            failure
+                .get_ref()
+                .and_then(|error| error.downcast_ref::<WriteProtectionError>())
+                .is_some_and(WriteProtectionError::is_cancelled)
+        );
+        assert_eq!(fs::read(&out)?, b"prior");
+        assert_eq!(fs::read_dir(root.path())?.count(), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn a_cancelled_retarget_keeps_the_typed_cleanup_failure() -> TestResult {
+        let root = tempfile::tempdir()?;
+        let source = root.path().join("source.p4k");
+        let out = root.path().join("report.txt");
+        let temporary = super::temporary_path(&out)?;
+        fs::write(&source, b"source")?;
+        let cancel = CancelToken::new();
+        let protection = ArchiveWriteProtection::new(&source, cancel.flag())?;
+        let result = write_replacing_io_protected(&out, Some(&protection), Some(&cancel), |_| {
+            fs::rename(&temporary, root.path().join("retained.bin"))?;
+            fs::hard_link(&source, &temporary)?;
+            cancel.cancel();
+            Ok(())
+        });
+        let failure = result.expect_err("retained temporary");
+        assert!(matches!(
+            crate::owned_output_failure(&failure),
+            Some(crate::OwnedOutputError::Cleanup { .. })
+        ));
+        assert_eq!(fs::read(&source)?, b"source");
+        assert_eq!(fs::read(&temporary)?, b"source");
+        assert!(!out.exists());
+        Ok(())
+    }
+}

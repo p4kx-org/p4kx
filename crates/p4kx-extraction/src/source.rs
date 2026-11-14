@@ -5,8 +5,9 @@
 
 use std::fmt::Debug;
 use std::io::{self, Read};
+use std::path::Path;
 
-use p4kx_archive::{Archive, Checksum, Entry};
+use p4kx_archive::{Archive, Checksum, Entry, ObservedEntry};
 use rayon::prelude::*;
 
 use crate::ExtractionError;
@@ -63,6 +64,14 @@ impl<'a> SourceEntry<'a> {
         self.index
     }
 
+    pub(crate) fn archive_path(&self) -> Option<&Path> {
+        self.source.archive_path()
+    }
+
+    pub(crate) fn observed_entry(&self) -> Option<ObservedEntry<'a>> {
+        self.source.observed_entry(self.index)
+    }
+
     /// Returns the checksum its source states, or `None` when it states none.
     pub(crate) fn checksum(&self) -> Option<Checksum> {
         self.source.checksum(self.index)
@@ -80,6 +89,14 @@ pub(crate) type SourceReader<'a> = Box<dyn Read + 'a>;
 
 /// Where a run reads its files from; a file is addressed by its position in the source.
 pub(crate) trait EntrySource: Debug + Sync {
+    /// Returns the backing Archive's host path when this source is Archive-backed.
+    fn archive_path(&self) -> Option<&Path> {
+        None
+    }
+    fn observed_entry(&self, _index: usize) -> Option<ObservedEntry<'_>> {
+        None
+    }
+
     /// Opens the data of the file at `index`.
     fn open(&self, index: usize, verify: bool) -> Result<SourceReader<'_>, ExtractionError>;
 
@@ -97,6 +114,16 @@ pub(crate) trait EntrySource: Debug + Sync {
 }
 
 impl EntrySource for Archive {
+    fn archive_path(&self) -> Option<&Path> {
+        Some(self.path())
+    }
+
+    fn observed_entry(&self, index: usize) -> Option<ObservedEntry<'_>> {
+        self.entries()
+            .get(index)
+            .and_then(|entry| self.observed_entry(entry))
+    }
+
     fn open(&self, index: usize, verify: bool) -> Result<SourceReader<'_>, ExtractionError> {
         let entry = self.entries().get(index).ok_or_else(|| {
             ExtractionError::Read(io::Error::new(

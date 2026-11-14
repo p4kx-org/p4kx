@@ -162,17 +162,13 @@ pub(crate) fn pick(harness: &mut Harness<'_, State>, kind: ChooserKind, name: &s
 }
 
 pub(crate) fn part_names(model: &Model) -> Vec<String> {
-    model
-        .characters()
-        .armour()
-        .map(|armour| {
-            armour
-                .parts()
-                .iter()
-                .map(|part| part.name().to_owned())
-                .collect()
-        })
-        .unwrap_or_default()
+    model.characters().armour().map_or_default(|armour| {
+        armour
+            .parts()
+            .iter()
+            .map(|part| part.name().to_owned())
+            .collect()
+    })
 }
 
 /// Writes the CHF file of the test head to `dir`.

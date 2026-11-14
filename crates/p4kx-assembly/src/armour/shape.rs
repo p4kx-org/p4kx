@@ -7,8 +7,9 @@ use p4kx_model::{Mesh, Model};
 
 use super::expressions::{Expressions, Morphs, logic_of, morphs};
 use super::facial::{Facial, facial};
-use super::lod_morphs::from_level_zero;
+use super::lod_morphs::from_level_zero_observed;
 use super::normals::carry_normals;
+use super::shape_origins::{LowerMorphSources, RigArchiveRead};
 use crate::{IssueKind, ModelFailure, ModelProvider};
 
 /// The largest DNA rig that is read, 256 MiB; the rig of a human head is about 76 MB.
@@ -33,12 +34,16 @@ pub(super) struct Shaped {
     pub(super) model: Model,
     pub(super) morphs: Option<Result<Morphs, String>>,
     pub(super) face: Option<Result<(Facial, String), String>>,
+    rig: RigArchiveRead,
+    lower_morphs: Option<LowerMorphSources>,
 }
 
 /// What a shaped head contributes besides its model and morph targets: the joints of its face and
 /// the blendshape number of each morph target.
 pub(super) struct Worn {
     pub(super) model: Model,
+    pub(super) rig: RigArchiveRead,
+    pub(super) lower_morphs: Option<LowerMorphSources>,
     pub(super) targets: Vec<MorphTarget>,
     pub(super) kinds: Vec<IssueKind>,
     pub(super) face: Option<(Facial, String)>,
@@ -98,6 +103,8 @@ impl Shaped {
         let made = outcome(self.morphs, self.face);
         Worn {
             model: self.model,
+            rig: self.rig,
+            lower_morphs: self.lower_morphs,
             targets: made.targets,
             kinds: made.kinds,
             face: made.face,
@@ -125,12 +132,7 @@ pub(super) fn shaped(
         .map(|lod| lod.level)
         .ok_or("the model has no level of detail")?;
     let rig_path = rig_path(path, level).ok_or("the model is no skin, it has no DNA rig")?;
-    let bytes = models
-        .file(&rig_path, MAX_DNA_RIG_LEN)
-        .map_err(|failure| match failure {
-            ModelFailure::Missing => format!("the DNA rig {rig_path} does not exist"),
-            other => format!("the DNA rig {rig_path} cannot be read: {other}"),
-        })?;
+    let (bytes, rig_read) = rig_bytes(&rig_path, models)?;
     let rig = DnaRig::read(&bytes).map_err(|error| format!("{rig_path}: {error}"))?;
     if rig.header().rig_hash != dna.gender_hash {
         return Err(format!(
@@ -156,14 +158,21 @@ pub(super) fn shaped(
     let wants_morphs = *expressions != Expressions::None;
     let wants_face = face && level == 0;
     let logic = (level == 0 && (wants_morphs || wants_face)).then(|| logic_of(model, path));
-    let morphs = if level == 0 {
-        logic.as_ref().filter(|_| wants_morphs).map(|logic| {
-            with_logic(logic, |logic| {
-                morphs(&rig, &matrix, mesh, logic, expressions)
-            })
-        })
+    let (morphs, lower_morphs) = if level == 0 {
+        (
+            logic.as_ref().filter(|_| wants_morphs).map(|logic| {
+                with_logic(logic, |logic| {
+                    morphs(&rig, &matrix, mesh, logic, expressions)
+                })
+            }),
+            None,
+        )
     } else {
-        wants_morphs.then(|| lower_morphs(path, dna, (mesh, expressions), models))
+        match wants_morphs.then(|| lower_morphs(path, dna, (mesh, expressions), models)) {
+            Some(Ok((morphs, sources))) => (Some(Ok(morphs)), Some(sources)),
+            Some(Err(error)) => (Some(Err(error)), None),
+            None => (None, None),
+        }
     };
     let face = logic.as_ref().filter(|_| wants_face).map(|logic| {
         with_logic(logic, |logic| {
@@ -174,7 +183,27 @@ pub(super) fn shaped(
         model: reshaped,
         morphs,
         face,
+        rig: rig_read,
+        lower_morphs,
     })
+}
+
+pub(super) fn rig_bytes(
+    rig_path: &str,
+    models: &dyn ModelProvider,
+) -> Result<(Vec<u8>, RigArchiveRead), String> {
+    let (origin, bytes) = models.file_observed(rig_path, MAX_DNA_RIG_LEN);
+    let bytes = bytes.map_err(|failure| match failure {
+        ModelFailure::Missing => format!("the DNA rig {rig_path} does not exist"),
+        other => format!("the DNA rig {rig_path} cannot be read: {other}"),
+    })?;
+    Ok((
+        bytes,
+        RigArchiveRead {
+            path: rig_path.to_owned(),
+            entry: origin,
+        },
+    ))
 }
 
 /// Makes the morph targets of a head at a level below 0, whose rig has no expression data, by
@@ -184,13 +213,20 @@ fn lower_morphs(
     dna: &Dna,
     (mesh, expressions): (&Mesh, &Expressions),
     models: &dyn ModelProvider,
-) -> Result<Morphs, String> {
-    from_level_zero(path, models, (mesh, expressions), |base| {
-        let made = shaped(&base, path, dna, expressions, models, false)?;
+) -> Result<(Morphs, LowerMorphSources), String> {
+    from_level_zero_observed(path, models, (mesh, expressions), |base| {
+        let made = shaped(&base.model, path, dna, expressions, models, false)?;
         let morphs = made
             .morphs
             .ok_or_else(|| "the head at level 0 made no morph targets".to_owned())??;
-        Ok((made.model, morphs))
+        Ok((
+            made.model,
+            morphs,
+            LowerMorphSources {
+                model: base.archive_sources,
+                rig: made.rig,
+            },
+        ))
     })
 }
 

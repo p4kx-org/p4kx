@@ -41,6 +41,7 @@ fn part(element: &Element) -> Option<VehiclePart> {
     let class = element.attribute("class").unwrap_or_default();
     let kind = kind_of(class);
     Some(VehiclePart {
+        name_proof: element.port_name.clone(),
         name: element.attribute("name").unwrap_or_default().to_owned(),
         class: class.to_owned(),
         kind,
@@ -107,6 +108,7 @@ fn item_port(element: &Element) -> VehicleItemPort {
             })
             .collect(),
         origins: element.origins.clone(),
+        light_attachments: super::light_ports::attachments(element),
     }
 }
 

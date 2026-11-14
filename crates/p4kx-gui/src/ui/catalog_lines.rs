@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::{CatalogSummary, Kind, Playability};
+use p4kx_export::{CatalogFailureView, CatalogSummary, Kind, Playability};
 
 use super::extraction::number;
 use crate::{CatalogText as T, Texts, format};
@@ -68,26 +68,19 @@ pub(super) fn sizes(texts: &Texts, summary: &CatalogSummary, limit: String) -> S
     }
 }
 
-/// Returns the line of every Record that could not be read and where its reason starts.
-pub(super) fn failure_lines(texts: &Texts, summary: &CatalogSummary) -> (Vec<String>, Vec<usize>) {
-    summary
-        .failures()
-        .iter()
-        .map(|failure| {
-            let line = texts.format(
-                T::SummaryFailure,
-                &[
-                    ("path", failure.record_path.clone().into()),
-                    ("guid", failure.guid.to_string().into()),
-                    ("reason", failure.reason.clone().into()),
-                ],
-            );
-            let reason = line.len().saturating_sub(failure.reason.len());
-            (line, reason)
-        })
-        .unzip()
+/// Formats one visible failure with the established catalogue text.
+pub(super) fn failure_line(texts: &Texts, failure: CatalogFailureView<'_>) -> (String, usize) {
+    let line = texts.format(
+        T::SummaryFailure,
+        &[
+            ("path", failure.record_path().into()),
+            ("guid", failure.guid().into()),
+            ("reason", failure.reason().into()),
+        ],
+    );
+    let reason = line.len().saturating_sub(failure.reason().len());
+    (line, reason)
 }
-
 /// Returns the line of every kind, and below the line of the loadouts what they hold.
 pub(super) fn kinds(texts: &Texts, summary: &CatalogSummary) -> Vec<String> {
     let mut lines = Vec::with_capacity(summary.kinds().len().saturating_add(1));

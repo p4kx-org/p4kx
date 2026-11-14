@@ -8,10 +8,12 @@
 use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
+
+use crate::catalog_v3_consumer;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -165,12 +167,12 @@ fn a_mining_laser_states_its_damage_per_second() -> TestResult {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn every_gameplay_property_is_traced_to_a_stat_field_or_listed_as_none() -> TestResult {
     let catalog = catalog()?;
-    let properties = catalog["gameplayProperties"]
-        .as_array()
-        .ok_or("the gameplayProperties array")?;
+    let properties = catalog_v3_consumer::rows(&catalog, Kind::GameplayProperties)?;
     let mut untraced = Vec::new();
     for property in properties {
-        let class = property["className"].as_str().ok_or("a className")?;
+        let class = catalog_v3_consumer::field(property, Kind::GameplayProperties, "className")?
+            .as_str()
+            .ok_or("a present className")?;
         let row = DOCS
             .lines()
             .find(|line| line.starts_with("| `") && line.contains(&format!("`{class}`")));

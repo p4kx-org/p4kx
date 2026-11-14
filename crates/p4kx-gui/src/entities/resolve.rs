@@ -48,6 +48,7 @@ pub(crate) fn resolve(
     let forge = open_forge(&source)?;
     let files = ArchiveFiles::new(index.entries_archive()?);
     let mut resolver = LoadoutResolver::new(&forge)
+        .with_forge_entry(&source.entry)
         .with_files(&files)
         .with_stop(stop)
         .stopping_at_docked_vehicles();

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::convert::Infallible;
+
 use rayon::slice::ParallelSliceMut;
 
 use super::ReferenceIndex;
@@ -61,9 +63,61 @@ impl ReferenceIndex {
     /// different files; `forge` is the DataForge the index was built from.
     #[must_use]
     pub fn file_graph<'f>(&self, forge: &'f DataForge<'f>) -> FileGraph<'f> {
+        let Ok(assignments) = FileAssignments::read(forge, |_| Ok::<(), Infallible>(()));
+        let mut edges: Vec<_> = self
+            .file_candidates(&assignments)
+            .map(|candidate| candidate.pair)
+            .collect();
+        edges.par_sort_unstable();
+        edges.dedup();
+        FileGraph {
+            paths: assignments.paths,
+            edges,
+        }
+    }
+
+    pub(super) fn file_candidates<'index>(
+        &'index self,
+        assignments: &'index FileAssignments<'_>,
+    ) -> impl Iterator<Item = FileCandidate> + 'index {
+        self.sources
+            .iter()
+            .zip(&self.targets)
+            .enumerate()
+            .filter_map(move |(entry, (source, target))| {
+                if *target == super::UNRESOLVED {
+                    return None;
+                }
+                let from = assignments.position(*source)?;
+                let to = assignments.position(*target)?;
+                (from != to).then_some(FileCandidate {
+                    pair: (from, to),
+                    entry,
+                })
+            })
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(super) struct FileCandidate {
+    pub(super) pair: (u32, u32),
+    pub(super) entry: usize,
+}
+
+#[derive(Debug)]
+pub(super) struct FileAssignments<'source> {
+    pub(super) paths: Vec<&'source str>,
+    file_of: Vec<u32>,
+}
+
+impl<'source> FileAssignments<'source> {
+    pub(super) fn read<E>(
+        forge: &'source DataForge<'source>,
+        mut group: impl FnMut(usize) -> Result<(), E>,
+    ) -> Result<Self, E> {
         let mut file_of = vec![NO_FILE; forge.record_count()];
-        let mut paths: Vec<&'f str> = Vec::new();
-        for &record in forge.path_order() {
+        let mut paths: Vec<&'source str> = Vec::new();
+        for (position, &record) in forge.path_order().iter().enumerate() {
             let Some(path) = forge.path_of(record) else {
                 continue;
             };
@@ -72,22 +126,19 @@ impl ReferenceIndex {
                 .is_none_or(|last| compare_paths(last, path).is_ne())
             {
                 paths.push(path);
+                group(position)?;
             }
             if let Some(slot) = file_of.get_mut(record as usize) {
                 *slot = u32::try_from(paths.len().saturating_sub(1)).unwrap_or(NO_FILE);
             }
         }
-        let file = |record: u32| file_of.get(record as usize).copied().unwrap_or(NO_FILE);
-        let mut edges: Vec<(u32, u32)> = self
-            .sources
-            .iter()
-            .zip(&self.targets)
-            .filter(|(_, target)| **target != super::UNRESOLVED)
-            .map(|(source, target)| (file(*source), file(*target)))
-            .filter(|(from, to)| from != to && *from != NO_FILE && *to != NO_FILE)
-            .collect();
-        edges.par_sort_unstable();
-        edges.dedup();
-        FileGraph { paths, edges }
+        Ok(Self { paths, file_of })
+    }
+
+    pub(super) fn position(&self, record: u32) -> Option<u32> {
+        self.file_of
+            .get(record as usize)
+            .copied()
+            .filter(|file| *file != NO_FILE)
     }
 }

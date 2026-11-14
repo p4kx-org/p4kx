@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::io;
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -12,7 +13,7 @@ use super::Model;
 /// How long a look at the process list stays valid.
 pub const GAME_CHECK_INTERVAL: Duration = Duration::from_secs(20);
 
-/// Whether `StarCitizen.exe` runs, looked up on a background thread now and then.
+/// Whether the background process check warrants a conservative game warning.
 #[derive(Debug)]
 pub(super) struct GameWatch {
     enabled: bool,
@@ -43,7 +44,7 @@ impl GameWatch {
             match pending.try_recv() {
                 Ok(running) => self.running = running,
                 Err(TryRecvError::Empty) => return,
-                Err(TryRecvError::Disconnected) => {}
+                Err(TryRecvError::Disconnected) => self.running = true,
             }
             self.pending = None;
             self.next = Some(Instant::now() + GAME_CHECK_INTERVAL);
@@ -60,9 +61,17 @@ impl GameWatch {
                     wake();
                 }
             });
-        if spawned.is_ok() {
-            self.pending = Some(result);
+        self.probe_started(spawned.map(|_handle| result));
+    }
+}
+
+impl GameWatch {
+    fn probe_started(&mut self, result: io::Result<Receiver<bool>>) {
+        if let Ok(receiver) = result {
+            self.pending = Some(receiver);
         } else {
+            self.pending = None;
+            self.running = true;
             self.next = Some(Instant::now() + GAME_CHECK_INTERVAL);
         }
     }
@@ -86,7 +95,7 @@ impl Model {
         self.game.poll(wake);
     }
 
-    /// Returns whether the last look at the process list found `StarCitizen.exe` running.
+    /// Returns whether the enabled process check warrants a game warning.
     #[must_use]
     pub const fn game_running(&self) -> bool {
         self.game.enabled && self.game.running
@@ -98,3 +107,7 @@ impl Model {
         self.game.next = None;
     }
 }
+
+#[cfg(test)]
+#[path = "game_watch_tests.rs"]
+mod tests;

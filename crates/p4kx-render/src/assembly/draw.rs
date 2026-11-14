@@ -57,11 +57,57 @@ pub struct DrawList {
     small: usize,
 }
 
+/// A draw list and the physical positions of the scene parts selected for it.
+#[derive(Debug)]
+pub struct ObservedDrawList {
+    list: DrawList,
+    parts: Vec<usize>,
+}
+
+impl ObservedDrawList {
+    /// Returns the original accepted scene part positions in traversal order.
+    #[must_use]
+    pub fn parts(&self) -> &[usize] {
+        &self.parts
+    }
+
+    /// Consumes this observation and returns the draw list and accepted positions.
+    #[must_use]
+    pub fn into_parts(self) -> (DrawList, Vec<usize>) {
+        (self.list, self.parts)
+    }
+}
+
 impl DrawList {
     /// Picks the parts of `scene` that `view_proj` shows in a view `height` pixels high, leaving
     /// out those `hidden` marks, which has one entry per part of the scene.
     #[must_use]
     pub fn of(scene: &AssemblyScene, hidden: &[bool], view_proj: &Matrix, height: f32) -> Self {
+        Self::select(scene, hidden, view_proj, height).0
+    }
+
+    /// Builds the same draw list while retaining the accepted scene part positions.
+    #[must_use]
+    pub fn of_observed(
+        scene: &AssemblyScene,
+        hidden: &[bool],
+        view_proj: &Matrix,
+        height: f32,
+    ) -> ObservedDrawList {
+        let (list, selected) = Self::select(scene, hidden, view_proj, height);
+        let parts = selected
+            .into_iter()
+            .filter_map(|index| scene.draws().get(index).map(|draw| draw.part))
+            .collect();
+        ObservedDrawList { list, parts }
+    }
+
+    fn select(
+        scene: &AssemblyScene,
+        hidden: &[bool],
+        view_proj: &Matrix,
+        height: f32,
+    ) -> (Self, Vec<usize>) {
         let frustum = Frustum::of(view_proj, height);
         let mut list = Self {
             serial: next_serial(),
@@ -97,7 +143,7 @@ impl DrawList {
         }
         list.fill(scene, &chosen, &counts);
         list.append_blended(scene, blended);
-        list
+        (list, chosen)
     }
 
     fn fill(&mut self, scene: &AssemblyScene, chosen: &[usize], counts: &[u32]) {

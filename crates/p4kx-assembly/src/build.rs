@@ -4,25 +4,34 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use p4kx_model::{MaterialStatus, Transform};
+use p4kx_extraction::{ArchiveMaterialRead, ModelArchiveSource};
+use p4kx_model::{MaterialStatus, Model, Transform};
 use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
+use crate::assembly::ModelDefinition;
 use crate::build_attachments::attached;
 use crate::build_gear::load_models;
 use crate::build_hidden::hide_worn;
+use crate::build_library_name::{self, LibraryName};
 use crate::build_models::{Loaded, choose_models};
 use crate::build_palettes::Palettes;
 use crate::build_place::{place, under_skin};
 use crate::build_zones::BodyCut;
 use crate::creature_rig;
 use crate::flatten::{Draft, flatten};
+use crate::geometry::GeometrySelectors;
 use crate::placement::{is_character_item, is_unskinned};
 use crate::{
     Assembly, AssemblyError, AssemblyOptions, EntityNode, Issue, IssueKind, ModelProvider,
     ObjectContainerRef, PaletteProvider, Part, SkeletonProblem,
 };
 
-pub(crate) type Libraries = HashMap<String, Arc<MaterialStatus>>;
+#[path = "build_part.rs"]
+mod part;
+use part::build_part;
+
+pub(crate) type Library = Arc<ArchiveMaterialRead>;
+pub(crate) type Libraries = HashMap<String, Library>;
 
 impl Assembly {
     /// Builds the Assembly of the Loadout tree `tree`: the Entity's geometry and, for every
@@ -33,7 +42,7 @@ impl Assembly {
     /// and each library is read once. A part whose Entity or geometry cannot be resolved is left
     /// out or kept without a model, and the [`Issue`] says why. The number of parts, their depth
     /// and the vertices of their models are limited by [`MAX_ASSEMBLY_PARTS`](crate::MAX_ASSEMBLY_PARTS),
-    /// [`MAX_ASSEMBLY_DEPTH`](crate::MAX_ASSEMBLY_DEPTH) and [`MAX_ASSEMBLY_VERTICES`].
+    /// [`MAX_ASSEMBLY_DEPTH`](crate::MAX_ASSEMBLY_DEPTH) and [`MAX_ASSEMBLY_VERTICES`](crate::MAX_ASSEMBLY_VERTICES).
     ///
     /// # Errors
     ///
@@ -45,6 +54,7 @@ impl Assembly {
         options: &AssemblyOptions,
     ) -> Result<Self, AssemblyError> {
         Self::build_inner(tree, models, None, options)
+            .map(|built| built.with_default_material(models))
     }
 
     /// Builds the Assembly like [`Self::build`] and resolves the tint palette of each part with
@@ -66,6 +76,7 @@ impl Assembly {
         options: &AssemblyOptions,
     ) -> Result<Self, AssemblyError> {
         Self::build_inner(tree, models, Some(palettes), options)
+            .map(|built| built.with_default_material(models))
     }
 
     fn build_inner(
@@ -81,57 +92,97 @@ impl Assembly {
         let loaded = load_models(&mut drafts, models, options, &mut issues)?;
         let chosen = choose_models(&drafts, &loaded, options.max_vertices, &mut issues);
         let libraries = read_libraries(&drafts, &chosen, models);
-        let unnamed = Arc::new(MaterialStatus::Unnamed);
+        let unnamed = Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed));
         let shared = (&libraries, &unnamed);
         let mut reported = HashSet::new();
         let mut characters = HashSet::new();
-        let mut palettes = Palettes::new(palettes);
+        let mut palettes = Palettes::new(palettes).with_geometry_origin(tree.forge_origin.as_ref());
         let cut = BodyCut::of(tree, &drafts, &chosen, &mut issues);
         let mut parts: Vec<Part> = Vec::with_capacity(drafts.len());
         for (index, (draft, model)) in drafts.iter().zip(&chosen).enumerate() {
-            let materials = materials_of(draft, *model, shared, &mut reported, &mut issues);
+            let library = materials_of(draft, *model, shared, &mut reported, &mut issues);
             note_character(draft, *model, &mut characters, &mut issues);
             let attachments = attached(draft, *model, shared, &mut reported, &mut issues);
-            let (palette, unresolved) = palettes.of_part(draft, *model, &materials);
+            let (palette, unresolved) = palettes.of_part(index, draft, *model, &library.materials);
             issues.extend(unresolved.into_iter().map(|kind| issue(draft, kind)));
             let rig = under_skin(draft, &parts)
-                .then(|| creature_rig::anchor_bones_of(&parts, &issues, options.lod))
+                .then(|| creature_rig::anchor_skeleton(&parts, &issues, options.lod))
                 .flatten();
             let prop = is_prop(draft, *model, options.lod);
-            let (local, placement) = place(draft, &parts, *model, rig, prop, &mut issues);
-            let world = world_of(draft, &parts, &local);
-            parts.push(Part {
-                name: draft.name.clone(),
-                path: draft.path.clone(),
-                guid: draft.node.guid(),
-                class_name: draft.class_name().to_owned(),
-                landing_gear: draft.gear.is_some(),
-                parent: draft.parent,
-                local,
-                world,
+            let placement = place(draft, &parts, *model, rig, prop, &mut issues);
+            let world = world_of(draft, &parts, &placement.local);
+            let geometry = rendered_geometry(cut.as_ref(), index, draft, *model, &mut issues);
+            parts.push(build_part(
+                draft,
                 placement,
-                geometry: draft.geometry_path().map(str::to_owned),
-                model: model.map(|loaded| {
-                    cut.as_ref().map_or_else(
-                        || Arc::clone(&loaded.model),
-                        |cut| cut.model_of(index, draft, loaded, &mut issues),
-                    )
-                }),
-                materials,
+                world,
+                geometry,
+                (library.materials, library.from_model),
                 palette,
                 attachments,
-                hidden: draft.hidden,
-            });
+            ));
         }
         creature_rig::note_fit(&parts, options.lod, &mut issues);
         creature_rig::note_loadout(tree, &mut issues);
+
         Ok(Self {
             parts,
+            forge_origin: tree.forge_origin.clone(),
             issues,
             lod: options.lod,
             interior: None,
+            default_material: None,
             containers: containers_of(&drafts),
         })
+    }
+}
+
+#[derive(Default)]
+struct RenderedGeometry {
+    model: Option<Arc<Model>>,
+    sources: Arc<[ModelArchiveSource]>,
+    definition: ModelDefinition,
+    selectors: GeometrySelectors,
+}
+
+fn rendered_geometry(
+    cut: Option<&BodyCut>,
+    index: usize,
+    draft: &Draft<'_>,
+    model: Option<&Loaded>,
+    issues: &mut Vec<Issue>,
+) -> RenderedGeometry {
+    let Some(loaded) = model else {
+        return RenderedGeometry::default();
+    };
+    let rendered = cut.map_or_else(
+        || Arc::clone(&loaded.model),
+        |cut| cut.model_of(index, draft, loaded, issues),
+    );
+    let sources = model_inputs(loaded, &rendered);
+    let selectors = draft
+        .geometry
+        .map_or_else(GeometrySelectors::default, |geometry| {
+            geometry.selectors(draft.library.is_none())
+        });
+    RenderedGeometry {
+        definition: ModelDefinition::of(loaded, &rendered),
+        model: Some(rendered),
+        sources,
+        selectors,
+    }
+}
+
+fn model_inputs(loaded: &Loaded, rendered: &Model) -> Arc<[ModelArchiveSource]> {
+    if std::ptr::eq(loaded.model.as_ref(), rendered) {
+        Arc::clone(&loaded.archive_sources)
+    } else {
+        loaded
+            .archive_sources
+            .iter()
+            .filter(|source| source.supplies(rendered))
+            .cloned()
+            .collect()
     }
 }
 
@@ -150,33 +201,48 @@ fn world_of(draft: &Draft<'_>, parts: &[Part], local: &Transform) -> Transform {
         .map_or(*local, |parent| parent.world.then(local))
 }
 
+struct SelectedLibrary {
+    materials: Library,
+    from_model: bool,
+}
+
 /// Returns the materials a part draws with, noting a library that has a problem once.
 fn materials_of(
     draft: &Draft<'_>,
     model: Option<&Loaded>,
-    libraries: (&Libraries, &Arc<MaterialStatus>),
+    libraries: (&Libraries, &Library),
     reported: &mut HashSet<String>,
     issues: &mut Vec<Issue>,
-) -> Arc<MaterialStatus> {
-    let key = model.and_then(|loaded| library_key(draft, loaded));
-    materials_for(draft, key, libraries, reported, issues)
+) -> SelectedLibrary {
+    let name = model
+        .and_then(|loaded| build_library_name::choose(draft, loaded).map(|name| (loaded, name)));
+    let from_model = matches!(name, Some((_, LibraryName::Model(_))));
+    let key = name.map(|(loaded, name)| library_key_of(name.path(), &loaded.entry));
+    let materials = materials_for(draft, key, libraries, reported, issues);
+    SelectedLibrary {
+        materials,
+        from_model,
+    }
 }
 
 /// Returns the materials of the library cached under `key`, noting a problem of it once.
 pub(crate) fn materials_for(
     draft: &Draft<'_>,
     key: Option<String>,
-    (libraries, unnamed): (&Libraries, &Arc<MaterialStatus>),
+    (libraries, unnamed): (&Libraries, &Library),
     reported: &mut HashSet<String>,
     issues: &mut Vec<Issue>,
-) -> Arc<MaterialStatus> {
+) -> Library {
     let materials = key
         .as_ref()
         .and_then(|key| libraries.get(key))
         .map_or_else(|| Arc::clone(unnamed), Arc::clone);
     if let (Some(key), Some(reason)) = (
         key,
-        materials.problem().or_else(|| materials.layer_problem()),
+        materials
+            .status
+            .problem()
+            .or_else(|| materials.status.layer_problem()),
     ) && reported.insert(key)
     {
         issues.push(issue(draft, IssueKind::MaterialLibrary { reason }));
@@ -250,23 +316,11 @@ pub(crate) fn file_key(path: &str) -> String {
         .map_or_else(|| key.clone(), str::to_owned)
 }
 
-/// Returns the name of the library a part draws with: the one its Entity chooses, else the one
-/// its model names.
-fn library_name<'a>(draft: &'a Draft<'_>, loaded: &'a Loaded) -> Option<&'a str> {
-    draft
-        .library
-        .or_else(|| draft.geometry.and_then(|geometry| geometry.material()))
-        .or(loaded.model.material_library.as_deref())
-}
-
-/// Returns the key under which a part's library is cached: a bare name is relative to the
-/// model's folder, any other name is the same for every model.
-fn library_key(draft: &Draft<'_>, loaded: &Loaded) -> Option<String> {
-    Some(library_key_of(library_name(draft, loaded)?, &loaded.entry))
-}
-
 /// Returns the key under which the library `name` of the model at `entry` is cached.
 pub(crate) fn library_key_of(name: &str, entry: &str) -> String {
+    if name.trim_start().starts_with(['/', '\\']) {
+        return name.to_ascii_lowercase();
+    }
     let key = file_key(name);
     let key = key.strip_suffix(".mtl").unwrap_or(&key).to_owned();
     if key.contains('\\') {
@@ -291,9 +345,14 @@ fn read_libraries(
         .zip(chosen)
         .filter_map(|(draft, loaded)| Some((draft, (*loaded)?)))
         .flat_map(|(draft, loaded)| {
-            let part = library_name(draft, loaded)
-                .zip(library_key(draft, loaded))
-                .map(|(name, key)| (key, loaded.entry.as_str(), name));
+            let part = build_library_name::choose(draft, loaded).map(|selected| {
+                let name = selected.path();
+                (
+                    library_key_of(name, &loaded.entry),
+                    loaded.entry.as_str(),
+                    name,
+                )
+            });
             let attached = loaded.attachments.iter().filter_map(|attached| {
                 let name = attached.model.material_library.as_deref()?;
                 Some((
@@ -308,6 +367,11 @@ fn read_libraries(
         .collect();
     wanted
         .par_iter()
-        .map(|(key, entry, name)| (key.clone(), Arc::new(provider.library(entry, name))))
+        .map(|(key, entry, name)| {
+            (
+                key.clone(),
+                Arc::new(provider.library_observed(entry, name)),
+            )
+        })
         .collect()
 }

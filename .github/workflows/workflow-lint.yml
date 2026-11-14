@@ -10,6 +10,10 @@ on:
       - ".github/**"
   merge_group:
 
+concurrency:
+  group: workflow-lint-${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.pull_request.number) || format('run-{0}', github.run_id) }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions: {}
 
 jobs:
@@ -24,15 +28,17 @@ jobs:
         with:
           persist-credentials: false
       - name: Install actionlint
+        shell: pwsh
         env:
           ACTIONLINT_VERSION: 1.7.12
           ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
         run: |
-          set -euo pipefail
-          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-          curl -fsSL "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${archive}" -o "$RUNNER_TEMP/actionlint.tar.gz"
-          echo "${ACTIONLINT_SHA256}  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
-          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          . .github/scripts/pinned-download.ps1
+          $archive = "actionlint_$($env:ACTIONLINT_VERSION)_linux_amd64.tar.gz"
+          $download = Join-Path $env:RUNNER_TEMP 'actionlint.tar.gz'
+          Save-P4kxPinnedDownload "https://github.com/rhysd/actionlint/releases/download/v$($env:ACTIONLINT_VERSION)/$archive" $env:ACTIONLINT_SHA256 $download
+          tar -xzf $download -C $env:RUNNER_TEMP actionlint
+          if ($LASTEXITCODE -ne 0) { throw 'Pinned actionlint extraction failed.' }
       - name: actionlint
         run: '"$RUNNER_TEMP/actionlint" -color'
       - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0

@@ -95,7 +95,7 @@ impl EntityNode {
             });
         }
         let body = find_item(self.ports(), is_body_type)?;
-        let variant = BodyVariant::from_code(&body.attach_sub_type)
+        let variant = BodyVariant::from_code(body.classification.subtype_text())
             .or_else(|| BodyVariant::of_model_path(body.geometry()?.path()))?;
         Some(Naming {
             variant,
@@ -116,15 +116,23 @@ impl LoadoutResolver<'_> {
     /// world prop. The head of a story character then takes its own skins, see
     /// `EntityNode::wear_own_head_skins`. A tree without a body is left as it is.
     pub(crate) fn dress_body(&mut self, root: &mut EntityNode) {
+        if self.observation_stopped() {
+            return;
+        }
         let Some(body) = root.body_variant() else {
             return;
         };
         self.dress_ports(&mut root.ports, body);
-        root.wear_own_head_skins();
+        if !self.observation_stopped() {
+            root.wear_own_head_skins();
+        }
     }
 
     fn dress_ports(&mut self, ports: &mut [PortNode], body: BodyVariant) {
         for port in ports {
+            if self.observation_stopped() {
+                return;
+            }
             if let Attachment::Entity(child) = &mut port.attachment {
                 self.dress_entity(child, body);
                 self.dress_ports(&mut child.ports, body);
@@ -137,7 +145,9 @@ impl LoadoutResolver<'_> {
         if child.choice != GeometryChoice::Main || !is_character_item(child.attach_type()) {
             return;
         }
-        let spec = self.spec(child.guid);
+        let Some(spec) = self.spec_of(child) else {
+            return;
+        };
         let Ok(spec) = spec.as_ref() else {
             return;
         };
@@ -212,5 +222,5 @@ pub(crate) const fn is_body_type(item_type: &str) -> bool {
 
 /// Returns the body the sub-type of the head Entity `head` names.
 pub(crate) fn variant_of(head: &EntityNode) -> Option<BodyVariant> {
-    BodyVariant::from_code(&head.attach_sub_type)
+    BodyVariant::from_code(head.classification.subtype_text())
 }

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::{Kind, is_kind_leftover, is_leftover};
+use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 
 const LOOT_TABLES: &str = "libs/foundry/records/lootgeneration/loottables/x";
 
@@ -27,8 +28,17 @@ fn the_v3_and_the_older_loot_structs_of_one_folder_are_different_kinds() {
 }
 
 #[test]
-fn a_wrong_struct_under_a_prefix_or_a_path_outside_every_prefix_is_no_kind() {
-    assert_eq!(Kind::by_record(LOOT_TABLES, "Tag"), None);
+fn source_type_selects_the_global_taxonomy_independently_of_record_path() {
+    assert_eq!(Kind::by_record(LOOT_TABLES, "Tag"), Some(Kind::Tags));
+    assert_eq!(
+        Kind::by_record("synthetic/dev/tags.xml", "Tag"),
+        Some(Kind::Tags)
+    );
+    assert!(!is_kind_leftover(
+        Kind::Tags,
+        "synthetic/dev/tags.xml",
+        "Tag.Test"
+    ));
     assert_eq!(
         Kind::by_record("libs/foundry/records/other/x", "LootTable"),
         None
@@ -36,7 +46,7 @@ fn a_wrong_struct_under_a_prefix_or_a_path_outside_every_prefix_is_no_kind() {
 }
 
 #[test]
-fn every_kind_but_the_older_loot_kinds_and_the_crafters_is_found_alike_by_path_and_by_record() {
+fn record_types_disambiguate_kinds_that_share_a_path() {
     for kind in Kind::ALL {
         let Some(rule) = kind.rule().filter(|_| kind != Kind::Crafters) else {
             continue;
@@ -49,7 +59,44 @@ fn every_kind_but_the_older_loot_kinds_and_the_crafters_is_found_alike_by_path_a
             match kind {
                 Kind::LegacyLootTables => assert_eq!(by_path, Some(Kind::LootTables)),
                 Kind::LegacyLootArchetypes => assert_eq!(by_path, Some(Kind::LootArchetypes)),
-                Kind::MissionBrokerEntries => assert_eq!(by_path, Some(Kind::ContractTemplates)),
+                Kind::MissionBrokerEntries | Kind::MissionScenarios => {
+                    assert_eq!(by_path, Some(Kind::ContractTemplates));
+                }
+                Kind::ResourceTypes => assert_eq!(by_path, Some(Kind::ResourceGroups)),
+                Kind::BlueprintCategoryLists
+                | Kind::ExplosionDefinitions
+                | Kind::AmmoDefinitions
+                | Kind::Factions
+                | Kind::FactionIdentities
+                | Kind::ReputationPerks
+                | Kind::ReputationTriggerRecords
+                | Kind::ReputationRewardAmounts
+                | Kind::Infractions
+                | Kind::InfractionSets
+                | Kind::Jurisdictions
+                | Kind::SecurityNetworkManifests
+                | Kind::MissionModuleDeclarations
+                | Kind::MissionItems
+                | Kind::ContractScopes
+                | Kind::LocationClasses
+                | Kind::LocationFunctions
+                | Kind::LocationSizes
+                | Kind::LocationClassRegistries
+                | Kind::LocationFunctionRegistries
+                | Kind::LocationSizeRegistries
+                | Kind::NpcArchetypes
+                | Kind::NpcClassPools
+                | Kind::AutoSpawns
+                | Kind::AutoSpawnSets
+                | Kind::EncounterIndices
+                | Kind::InventoryContainers
+                | Kind::MedicalItemTierConfigs
+                | Kind::StarmapTypes
+                | Kind::StarmapPresets
+                | Kind::StarmapAmenities => assert_tag_path(by_path),
+                _ if LootDefinitionKind::of(kind).is_some_and(LootDefinitionKind::is_type_wide) => {
+                    assert_tag_path(by_path);
+                }
                 _ => assert_eq!(by_path, by_record, "{kind} by path at {path}"),
             }
         }
@@ -128,4 +175,12 @@ fn a_contract_template_is_no_leftover_for_the_word_template_but_for_the_other_to
     ));
     assert!(template(&format!("{folder}x"), "ContractTemplate.Debug"));
     assert!(is_leftover(&format!("{folder}handyman_template"), "x"));
+}
+
+fn assert_tag_path(kind: Option<Kind>) {
+    assert_eq!(
+        kind,
+        Some(Kind::Tags),
+        "type disambiguates an unrestricted path"
+    );
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::archive_metadata::ArchiveMetadata;
 use crate::format_error::FormatError;
 use crate::issue::Directory;
 use crate::source::Source;
@@ -77,8 +78,12 @@ fn read_v1_entries(source: &Source, max_entries: Option<u64>) -> Result<Director
         )
     })?;
     let directory = source.read_at(location.offset, size)?;
-    let mut directory =
-        central_directory::parse_entries(&directory, location.offset, location.entry_count)?;
+    let mut directory = central_directory::parse_entries(
+        &directory,
+        location.offset,
+        location.entry_count,
+        ArchiveMetadata::zip(source.len(), &location.metadata),
+    )?;
     if !location.zip64 {
         for entry in &mut directory.entries {
             if let Some(value) = entry.crc32c() {

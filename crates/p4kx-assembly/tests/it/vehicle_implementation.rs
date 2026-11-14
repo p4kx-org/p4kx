@@ -83,10 +83,17 @@ fn the_implementation_can_be_read_without_a_loadout_tree() -> TestResult {
         open.port_visibility("HARDPOINT_GUN"),
         PortVisibility::Visible
     );
-    let missing = VehicleImplementation::read(&files, "OTHER_Ship", "nope.xml", None);
+    let missing = VehicleImplementation::read(&files, "OTHER_Ship", "nope.xml", None)
+        .err()
+        .ok_or("the configured absent file was accepted")?;
     assert!(
-        matches!(missing, Err(LoadoutError::VehicleImplementation { .. })),
-        "{missing:?}"
+        matches!(&missing, LoadoutError::MissingVehicleImplementation { path } if path.value() == "nope.xml"),
+        "a missing configured implementation retains its typed cause and exact path"
+    );
+    assert_eq!(
+        missing.kind(),
+        "vehicle_implementation",
+        "the typed missing cause retains the public script code"
     );
     Ok(())
 }

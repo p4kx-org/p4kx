@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use fluent_bundle::{FluentArgs, FluentBundle, FluentResource, FluentValue};
-use unic_langid::LanguageIdentifier;
+use fluent_bundle::{FluentBundle, FluentResource, FluentValue};
+
+mod bundle_format;
+use bundle_format::{bundle, format_in};
 
 mod about_text;
 mod archive_key_text;
@@ -26,6 +28,8 @@ mod localization_text;
 mod model_export_text;
 mod model_info_text;
 mod model_text;
+mod output_target_text;
+mod protection_text;
 mod query_text;
 mod record_change_text;
 mod record_export_text;
@@ -63,6 +67,8 @@ pub(crate) use localization_text::language_name;
 pub use model_export_text::ModelExportText;
 pub use model_info_text::ModelInfoText;
 pub use model_text::ModelText;
+pub use output_target_text::OutputTargetText;
+pub use protection_text::ProtectionText;
 pub use query_text::QueryText;
 pub use record_change_text::RecordChangeText;
 pub use record_export_text::RecordExportText;
@@ -102,6 +108,10 @@ pub enum Text {
     ChannelsHeading,
     /// Shown in the Channel picker when no Channel was found.
     ChannelsNone,
+    /// Automatic discovery or installation protection did not complete.
+    ChannelsDiscoveryIncomplete,
+    /// A background Channel discovery worker ended without a result.
+    ChannelsDiscoveryStopped,
     /// The name of the button that shows the sidebar a narrow window hides.
     SidebarShow,
     /// The name of the button that hides the sidebar again.
@@ -234,6 +244,10 @@ pub enum Text {
     PreviewKeyRejected,
     /// A text of the Extraction windows.
     Extraction(ExtractionText),
+    /// A text of output protection and operational prerequisites.
+    Protection(ProtectionText),
+    /// A text of the shared parent-and-name target selection.
+    OutputTarget(OutputTargetText),
     /// A text of the Comparison tab.
     Comparison(ComparisonText),
     /// A text of the DataForge node and tab.
@@ -362,34 +376,6 @@ impl Texts {
             Language::BritishEnglish => &self.british_english,
         }
     }
-}
-
-fn bundle(language: Language, source: &str) -> FluentBundle<FluentResource> {
-    let id: LanguageIdentifier = language.tag().parse().unwrap_or_default();
-    let mut bundle = FluentBundle::new(vec![id]);
-    bundle.set_use_isolating(false);
-    let resource =
-        FluentResource::try_new(source.to_owned()).unwrap_or_else(|(partial, _)| partial);
-    let _overlaps = bundle.add_resource(resource);
-    bundle
-}
-
-fn format_in(
-    bundle: &FluentBundle<FluentResource>,
-    text: Text,
-    args: &[(&str, FluentValue<'_>)],
-) -> Option<String> {
-    let pattern = bundle.get_message(text.id())?.value()?;
-    let mut fluent_args = FluentArgs::new();
-    for (name, value) in args {
-        fluent_args.set(*name, value.clone());
-    }
-    let mut errors = Vec::new();
-    Some(
-        bundle
-            .format_pattern(pattern, Some(&fluent_args), &mut errors)
-            .into_owned(),
-    )
 }
 
 #[cfg(test)]

@@ -1,7 +1,7 @@
 # Blender package
 
 A Blender package is a folder that describes an Assembly in files any importer can read: a scene
-description, shared GLB meshes and PNG textures. It does not depend on Blender's file format, so
+description, shared GLB meshes and external textures. It does not depend on Blender's file format, so
 new Blender versions do not break it; the [Blender add-on](../blender_addon/README.md) imports it
 ([ADR-0093](adr/0093-the-blender-add-on-is-an-extension-that-reads-and-validates-a-package-without-blender.md)),
 and so can any other tool. `p4kx entity package` writes it ([ADR-0083](adr/0083-a-blender-package-is-a-versioned-manifest-with-shared-glb-meshes-and-png-textures.md)),
@@ -15,23 +15,84 @@ when the two differ (`P4KX_BLESS=1 cargo test -p p4kx-blender --test schema` reg
 A note on words: a **node** of the package is a placed Entity (a **Part** of the Assembly in the
 glossary); a **mesh** of the package is a GLB file with the geometry of one model.
 
+## Embedded GLB JSON budget
+
+The package exporter, standalone validator and Blender importer share a 16 MiB budget
+(16,777,216 bytes) for each GLB's padded JSON chunk. The exporter reports the required
+padded size and the budget if it cannot finish a mesh. A refused export leaves the
+previously published package in place. The validators report a budget refusal separately
+from malformed GLB headers or JSON. The structural checks stream past the binary chunk.
+Standalone GLB exports use the GLB format's own length bounds.
+
+The Windows Blender 5.3 validator used about 152 MiB of peak working set for a synthetic
+animation GLB whose JSON reached the budget. A package with about 66 MiB of binary data
+and 77 KiB of JSON used about 26 MiB in the structural and receipt validator. Metadata
+shape also affects memory use.
+
+## Authored item classification
+
+Assembly Entity nodes can include `entity.classification` with typed
+`item_type` and `subtype` values from the original selected Entity Record's
+`AttachDef.Type` and `AttachDef.SubType`. Text keeps its original spelling.
+An authored empty string has state `present`; an absent declaration, null,
+unreadable value or incompatible source shape has its own state.
+
+Each field carries `sourceUsesRefs`, `sourceSetComplete` and
+`containsEncryptedSource`. References resolve in the manifest's
+`entity_provenance` inventory. The owning DataForge Record and selected
+component field are tracked independently for every Entity, including nodes
+without meshes. For unreadable strings, an invalid offset contributes only
+when the DataForge decoder used the stored offset to produce the failure.
+The unread target adds no contribution. Synthetic gear, bone attachments and
+Interior groups do not carry an Entity classification. Shared mesh identities are unaffected.
+
+Package version 1.16 adds these optional fields. Older manifests remain
+readable, and Blender can import the scene independently of the metadata.
+
+## Baked vehicle light placement
+
+The optional v1.16 `light_placements` member contains one evidence row per supported
+baked light in a directly declared vehicle container. Each row references the exact
+light `node`, its `owner` entity node and the direct `container` node by ordinal in
+`nodes`. Repeated source containers may have separate rows and different results.
+Nested containers have no inherited vehicle owner.
+
+The matrices in this member are three row-major affine rows in original CryEngine
+Z-up coordinates and metres. `original_light` is the retained baked frame,
+`original_group` is the authored group transform, and `effective_light` is the
+frame used before the package's glTF basis and light-axis conversion.
+`anchor` retains the matched interaction offset and corrected group frame, or a
+specific unresolved status. `helper` retains the observed same-owner helper origin
+and its rest frame when the helper could be bound. `preview_state` records the
+selected state used by the existing static preview.
+
+Resolve each sourced datum's `sourceUsesRefs` in this member's `sourceInventory`.
+An encrypted contributing entry is reflected immediately in
+`containsEncryptedSource`. An incomplete contribution set without affirmative
+encryption evidence has an unknown marker. The rendering importer uses the
+ordinary `nodes` hierarchy and transforms.
+
 ## Layout
 
 ```text
 <package>/
   scene.json            the manifest
+  receipt.json          SHA-256 inventory for the package
   meshes/m0001.glb      one GLB per distinct mesh
   meshes/m0002.glb
-  textures/t0001.png    one PNG per distinct texture
+  textures/t0001.png    one PNG or DDS file per distinct texture
+  material-sources/s0000.jsonl.gz    optional authored companion for each retained material library
 ```
 
-- The folder holds nothing but these. Every file name is an id made by the writer (`m` or `t` and
+- When an Entity package retains authored material libraries, the manifest links each library to
+  its [material-source companion](#materials). The receipt covers the compressed companion files.
+- The mesh and texture file names are ids made by the writer (`m` or `t` and
   at least four digits); a name from the Archive never becomes a file name, so no name can lead
   out of the package. Mesh ids number the meshes from 1 in the order of their first node. Texture
   ids number the textures in the order of their first use, and a texture that could not be
   written leaves a gap, so ids are not always consecutive.
-- `scene.json` is written last. A folder with a `scene.json` whose `format` is
-  `p4kx-blender-package` is a complete package.
+- The writer records the manifest and receipt in staging before publishing the complete folder.
+  An authored SOC scene, when requested, adds `authored/soc-scene.json`.
 
 ## Writing a package
 
@@ -60,7 +121,8 @@ rules below apply to it as well.
 - The output is checked before the Archive is opened (`p4kx_blender::check_output`). The folder
   must not exist, or be empty, or hold a package an earlier run wrote: `scene.json` with the
   format name, a `meshes` folder holding only `m<digits>.glb` files and a `textures` folder
-  holding only `t<digits>.png` files. The earlier package is then replaced. Any other folder or
+  holding `t<digits>.png` or declared `t<digits>.dds` files. A package may also contain its
+  receipt and authored SOC companion. The earlier package is then replaced. Any other folder or
   file is refused with exit code 2 and left alone.
 - A folder inside a Star Citizen installation is refused with exit code 2.
 - Everything is written into a temporary folder `<name>.p4kx-<process id>.part` next to the
@@ -75,6 +137,59 @@ rules below apply to it as well.
   is still there. A second Ctrl+C ends the process at once and can leave the temporary folder
   behind.
 
+Mesh and texture paths use forward slashes and match the case of every directory and file in
+the package. The add-on reports the expected and actual spelling when an existing asset path
+has different case, including on case-insensitive filesystems.
+
+## Mesh validation before import
+
+The Blender add-on checks each mesh referenced by a supported scene node before it creates
+collections or objects. It checks the GLB version, file length, chunk order and bounds, embedded
+buffer ranges, and references used by geometry, materials, rigs and animations. The check bounds
+the JSON chunk to 16 MiB and seeks over the geometry payload. A GLB that refers to an external
+buffer or image is refused.
+
+If a mesh is missing or fails validation, Blender reports the mesh ID and the reason. The
+remaining valid meshes and scene nodes still import. The add-on checks any recorded nonzero
+file size and requires manifest material indices to be unique and within the GLB material
+array. It also compares reported geometry counts for triangle meshes. Shared position
+accessors count once per emitted mesh, and each primitive contributes its triangle count.
+Older packages may omit these counts. Blender's glTF importer still checks that it can read
+the assets.
+
+### Validate a package without Blender
+
+From the repository's `blender_addon` directory, run the validator with Python 3.13.
+
+```powershell
+python -B -m p4kx_importer.validate_package 'D:/exports/ship-package'
+```
+
+The command checks all declared mesh files, manifest textures and the format and hierarchy of
+any declared authored SOC companion. It prints
+JSON to standard output and leaves the package folder untouched. `structure.status` is
+`valid`, `partial` when the package has warnings or geometry counts could not be compared,
+or `failed`. The command exits with status 1 for a structural or digest failure.
+
+The validator discovers `receipt.json` at the package root. Pass
+`--receipt 'D:/exports/package-receipt.json'` to use an external inventory. A schema-1
+receipt has a `files` array of `path` and `sha256` pairs. Paths are relative to the
+package folder. The writer records `scene.json`, every mesh and texture, and any authored
+SOC companion in path order. An external receipt may list a subset of declared files.
+`digests.status` reports `absent`, `partial`, `verified` or `failed` independently of
+structural validation. A declared file that cannot be read is `unavailable`. A receipt
+row that the manifest does not declare is `unknown`. Older packages can be checked with
+an absent receipt.
+
+The built-in receipt records the generator name and version and the archive Build when
+available. A missing Build is `null`. Builds can supply an exact source revision through
+the compile-time `P4KX_SOURCE_REVISION` input, a full lowercase Git object ID. Official
+native builds take it from their checked-out source revision. The hash
+inventory establishes consistency of the package bytes. Its source metadata describes the
+exporting build and archive context. The source revision identifies the exporter code.
+Native release fixtures bind the complete package
+exchange separately to a workflow revision and the exporter binary digest.
+
 ## `scene.json`
 
 All lengths are metres, all transforms are relative to the parent node. Writers add fields in
@@ -84,16 +199,19 @@ written (there are no `null`s).
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.8` today. |
+| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.20` for current exports. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
 | `options` | What the package was made with: `lod`, `texture_mip`, `vertex_colours`, `exclude` (ports) and `replace` (`port`, `entity`). |
 | `nodes` | The scene hierarchy, see below. |
 | `meshes` | The GLB meshes, see below. |
-| `textures` | The PNG textures, see below. |
+| `textures` | The external textures, see below. |
 | `materials` | The material descriptions, see "Materials". Added in 1.1; absent in 1.0 packages. |
+| `material_libraries` | Original authored library-root descriptions (1.9), once per distinct retained reader path/root; optional and default-empty for older manifests. |
+| `default_material` | The optional physical Archive fallback lookup for material IDs that need one, see "Meshes". |
 | `palettes` | The tint palettes, see "Palettes". Added in 1.1; absent in 1.0 packages. |
+| `palette_provenance` | Optional source proof for palette fields and each node's selection. |
 | `issues` | What could not be resolved or written. |
 
 `format`, `basis`, `unit`, `Texture.format`, `colour_space`, `alpha`, `Node.kind`,
@@ -107,9 +225,9 @@ the game's Z-up axes to the same axes (`x` stays, `z` becomes `y`, `y` becomes `
 `basis` is `gltf_y_up` for everything in the package and an importer only maps glTF's axes to its
 own (Blender's glTF importer does exactly that).
 
-A node's local matrix is composed as in glTF: `M = T · R · S`, with the translation `T`, the
+A node's local matrix is composed as in glTF: `M = T ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· R ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· S`, with the translation `T`, the
 rotation `R` from the quaternion and the scale `S`. The matrix of a node in the scene is
-`M(parent) · M(node)`, from the root down. A mesh is placed by that matrix times the identity
+`M(parent) ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â· M(node)`, from the root down. A mesh is placed by that matrix times the identity
 transform of the root node of its GLB file; the mesh file's own nodes are in the space of that
 root. A negative X scale is a mirror; a reader that cannot mirror flips the winding of the mesh.
 A shear in the game's transform is not stored.
@@ -231,7 +349,7 @@ library entry point is `p4kx_blender::write_character_package`.
 
 `p4kx entity package` of a creature whose root geometry is a character file outside the human rigs
 and whose skeleton the Archive holds, with a skin bound to it (`Assembly::creature_skins` yields a
-part, ADR-0275), writes a package of version 1.8 with one mesh, the rig form of a Character
+part, ADR-0275), writes a package with one mesh, the rig form of a Character
 ([ADR-0316](adr/0316-a-creature-with-its-skeleton-is-packaged-as-one-skinned-rig-mesh.md)):
 
 - `nodes` has one node of the kind `entity`, the root Entity at the identity transform, with its
@@ -273,7 +391,7 @@ objects. The sharing is that of the Assembly ([ADR-0077](adr/0077-scene-meshes-a
 | `instances` | How many nodes draw the mesh. |
 | `bytes`, `vertices`, `triangles` | Size of the file and of its geometry. |
 | `rig` | The skeleton, parts, morph targets and animations of a Character's mesh (1.3) or of a creature's (1.8), see "Characters" and "Creatures"; absent for a static mesh. |
-| `materials` | The materials of the mesh in the order of the glTF materials in its file: `index` is the index in the file's `materials` array, `name` the glTF material's name, and `textures` the ids of the `diffuse`, `normal` and `specular` textures that were written for it, each absent when the material names none or it could not be written, and, from 1.1, `material`, the id of the material's description in `materials`, absent for the engine's default material. Match by `index`; names can repeat. |
+| `materials` | The materials of the mesh in the order of the glTF materials in its file: `index` is the index in the file's `materials` array, `name` the glTF material's name, and `textures` the ids of the `diffuse`, `normal` and `specular` textures that were written for it, each absent when the material names none or it could not be written, and, from 1.1, `material`, the id of the material's description in `materials`, absent for a synthetic fallback. Match by `index`; names can repeat. |
 
 The file is a plain GLB: one scene whose root node (named after the Entity's class name) has the
 identity transform, the nodes of the model below it, plain-colour materials with the tint palette
@@ -284,11 +402,24 @@ file's `materials` array, the `index` of the matching entry in the manifest's `m
 the mesh. Blender's glTF importer creates materials in first-use order and renames duplicates
 (`.001`), so an importer matches materials by this custom property, not by name. `p4kx entity
 glb` files do not carry it.
+The package preflight rejects a static mesh whose explicit slot tag differs from its GLB
+material array index. Older meshes with missing tags can still use the name fallback.
+
+Each material assignment records `source_material_ids`, the raw geometry material IDs mapped to its dense
+GLB index. A library with one authored material can serve several IDs. For defaulted IDs,
+`fallback_slots` explains the original assignment and `authored_library` links to the authored
+library root when it was readable. `archive_default` marks an
+assignment that uses the physical fallback identified by `default_material`. The receipt records the
+lookup state, original Entry path and ordinal, container chain, effective encryption marker,
+and the decoded SHA-256 when the source could be verified. Ambiguous lookups keep two original
+witnesses. A failed lookup keeps the receipt and uses the synthetic fallback where needed. An
+authored library failure remains in `issues`. This selection is P4KX's policy.
 
 ### Textures
 
-Each texture the materials of the meshes name is written once, whichever meshes and materials use
-it, as the pixels the Archive holds: no palette colour is baked in and the maps are not merged.
+Each case-insensitive Archive texture path and selected rendition is written once. Different
+renditions of the same path have separate texture IDs and files. The package writes the original
+texture content without baking in a palette colour or merging maps.
 From 1.1 these are the files of every texture slot of every described material, layer materials
 included (diffuse, normal, specular, blend, mask, detail, wear and the rest); 1.0 packages hold
 only the diffuse, normal and specular maps of the meshes' materials. The importer builds the
@@ -298,15 +429,88 @@ materials from them; the `textures` of a material description say which slot use
 | --- | --- |
 | `id`, `file` | The id and the file relative to the package folder (`textures/t0001.png`). |
 | `source` | The texture's path in the Archive, below `Data`. |
-| `format`, `bit_depth` | `png` and `8` in version 1. High-range textures (EXR, 16 bits) will be new `format` values in a later minor version. |
-| `colour_space` | `srgb` for a diffuse map, `linear` for normal and specular maps (and any data texture): the importer sets Blender's colour space of the image accordingly. The role is that of the first material that names the texture. |
+| `source_rendition` | The selected use of the original texture: `colour`, `specular`, `data`, `normal`, `normal_smoothness` or `separate_smoothness`. It identifies the rendition independently of the resulting `encoding` and is absent in older packages. |
+| `format`, `bit_depth` | `png` or `dds`. The supported package images use 8-bit decoded channels. |
+| `colour_space` | Compatibility setting for readers of earlier 1.x packages. |
+| `encoding` | Importer input for this image: `srgb`, `linear_colour` (Linear Rec.709) or `data` (Non-Color). The same source can supply different image files when its uses require different sampling or channel transforms. |
 | `alpha` | What the alpha channel holds: `none` (opaque, ignore it), `opacity`, or `smoothness` (the alpha channel of a `_ddna` normal map). |
 | `width`, `height` | Pixels of the mip level that was written (`options.texture_mip`, or the smallest the texture has). |
+| `source_metadata` | Optional same-read DDS header, actual `mip_level`, `field_origins` and source-use inventory. Origin paths are relative to this object. `/image` addresses the encoded PNG. |
 
 **Normal maps** are written for glTF and OpenGL, Y up (the green channel points up the image):
 the writer inverts the green channel of the engine's maps, exactly as the GLB writer does. The
 red channel and the reconstructed blue channel are as the Archive has them. A reader that wants
 the DirectX convention inverts green again.
+
+#### Optional collision helpers
+
+`p4kx entity package --collision-helpers` writes a package with an optional
+collision companion for supported decomposed Entity models. In Blender, enable **Collision
+helpers** when selecting `scene.json`. The add-on creates tagged wire objects in a separate
+nonrendering collection, using the original node-local triangle vertices and measured NMC
+affines. Identical physical source meshes share one helper definition across occurrences.
+The manifest node indexes place the resulting objects below their existing owners.
+
+`collision-helpers.json` records each source model and its original `StatObjPhysics` chunk
+and slot ordinals. It keeps the packed key, placement and triangulation with individual
+source contributions. `receipt.json` binds the companion bytes to the package. The CDF
+placement exposes the authored `Model.File` separately from the selected rig Entry,
+skeleton chunk and original bone used by the Assembly. CDF attachments with an unavailable
+bind pose and whole-object collider keys remain documented without a preview placement.
+The helper preview currently draws indexed triangles. Analytic primitives and other
+collision blob kinds retain their Media records and original bytes.
+
+The standard add-on import reads the render
+hierarchy. Render GLBs do not depend on the opt-in flag. The source companion has a
+separate `schemas/blender-collision-helpers.schema.json` contract.
+
+## Optional DDS textures
+
+`entity package` and `interior package` accept `--texture-container dds`. This is intended for
+the Blender 5.3 package importer. PNG is the default for package writers. GLB textures follow
+the glTF format as before.
+
+A DDS row identifies one 2D original mip in `dds_asset.mip_level`. The file is a standard
+single-mip DDS with a normalized layout header and the original payload bytes. Its source
+metadata preserves the original header, transfer declarations and normalized source topology.
+The artifact binding measures the written file's length and SHA-256. Header and selected split
+member checksums identify the verified archive entries. The source inventory records the exact
+header and selected payload ranges, including encryption provenance. Per-role sampling continues
+to use `encoding`.
+
+The Blender DDS capability accepts legacy DXT1, DXT5, ATI1, ATI2 and BC5U, plus supported
+legacy 32-bit RGBA/BGRA masks. It accepts DX10 RGBA8, BC1, BC3 and unsigned BC5 for 2D textures.
+Unsigned BC5 is emitted directly for data inputs. Signed BC5 uses PNG because Blender 5.3
+does not decode it. DDS rows with BC1 use the selected blocks to distinguish transparent samples
+from edge padding. Package format 1.17 supports a split DDNA normal and smoothness pair
+for 2D linear BC3 normals with a DXT5 or DX10 header and a DX10 BC4_UNORM tail. The files
+retain the same common original mip as the composed PNG. Both payloads are copied without
+re-encoding. A normal row's `ddna_pair` names the separate texture, the source normal's
+`cryengine_y_down` convention and its companion's `red` channel. The importer inverts green
+once and uses the companion's red value for the normal slot's existing smoothness calculation.
+Both inputs use the same texture coordinates and scaling in direct and layered materials.
+
+Each pair member has its own `dds_asset.copied_payload` digest, `normalized_header_bytes`
+and input provenance. The pair's joint origin covers both selected inputs and the common mip. The
+package receipt authenticates both complete files. Other normal conventions, separate alpha
+encodings and unsupported topologies use the usual PNG conversion when available. The
+row's `dds_fallback` records the reason.
+The direct DDS path requires unique, fully verified header and selected mip members. A failure
+to establish those inputs produces a texture issue and leaves the slot unbound.
+DDS alpha declarations remain distinct from selected alpha samples. Premultiplied opacity
+uses a straight PNG. The exporter divides RGB by alpha in linear light when the source
+transfer is known and in stored sample values when it is unknown. A zero-alpha colour
+becomes black. For split alpha, RGB uses the original embedded alpha and the output alpha
+comes from the separate texture. Normal and packed data retain their original channel
+processing. PNG fallback
+uses the regular PNG decoder, with its normal texture selection and source receipts. The
+[DDS alpha semantics investigation](https://github.com/p4kx-org/p4kx/issues/1137) covers legacy
+premultiplied formats and alpha projection across consumers.
+
+The optional texture container does not change texture ids, reuse of material inputs, or the
+selected mip policy. The standalone texture tools can export arrays, cubes and volumes. The
+Blender material slot uses a single 2D image. Older add-ons can read PNG packages and warn on
+the higher minor version. Use the matching add-on for DDS.
 
 ### Materials
 
@@ -330,7 +534,7 @@ shader still has every value the file holds.
 | `shininess`, `opacity`, `alpha_test`, `glow` | Scalars of the file (`shininess` from 0 to 255). |
 | `alpha_mode` | `opaque`, `mask` (`alpha_test` above 0) or `blend` (`opacity` below 1, or a glass or decal shader): derived from the fields above. |
 | `reads_vertex_colours` | (1.4) `true` when the material reads the vertex colours of its mesh: `GlassPBR` with `PER_VERTEX_TINT`, or a layered surface without a blend map (`_blend`, `_mask`, `_opac`) that has a layer to blend over its base ([ADR-0253](adr/0253-glass-with-per-vertex-tint-takes-its-colour-from-the-vertex-colours.md)). The GLB meshes of the package carry `COLOR_0` on the primitives of such materials only ([ADR-0318](adr/0318-the-glb-writes-vertex-colours-for-tinted-glass-only-and-the-package-also-for-layer-shares.md)); a plain GLB carries it for tinted glass only. Absent in 1.3 and older; the add-on then applies the rule it had before. |
-| `layer_shares` | (1.5) One number per entry of `layers`: the share the layer has without a blend map or vertex colours, by position and `WearBlendBase` (the rule the GLB shades by, [ADR-0097](adr/0097-layered-materials-are-drawn-as-the-blend-of-their-layer-files.md)). The first layer weighs `1 − WearBlendBase`, the others `WearBlendBase` between them; a layer without a `material` has 0 and the rest are renormalised. When nothing has weight, the first layer takes everything if it has a `material`, else all shares are 0 and the material keeps its own colours. Absent without layers and in 1.4 and older; the add-on then applies the same rule itself. |
+| `layer_shares` | (1.5) One number per entry of `layers`: the share the layer has without a blend map or vertex colours, by position and `WearBlendBase` (the rule the GLB shades by, [ADR-0097](adr/0097-layered-materials-are-drawn-as-the-blend-of-their-layer-files.md)). The first layer weighs `1 ÃƒÆ’Ã‚Â¢Ãƒâ€¹Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ WearBlendBase`, the others `WearBlendBase` between them; a layer without a `material` has 0 and the rest are renormalised. When nothing has weight, the first layer takes everything if it has a `material`, else all shares are 0 and the material keeps its own colours. Absent without layers and in 1.4 and older; the add-on then applies the same rule itself. |
 | `stencil` | (1.6) How a stencil decal, a `MeshDecal` with `STENCIL_MAP` in its `gen_mask`, is drawn: `drawn`, `colour` and `opacity`. The motif is the texture with the usage `stencil`, which exists only when no diffuse map is there. `drawn` is `false` when the decal has nothing to draw: its motif is a livery's emblem the game fills in at run time (`$TintPaletteDecal`), or its stencil and diffuse maps were not written; the GLB leaves the first kind out and the add-on draws nothing for both. `colour` (`StencilDiffuseColor`, linear; absent when the file gives none, and `diffuse` counts) and `opacity` (`StencilOpacity` from 0 to 1, 1 when absent), which multiplies the material's `opacity`, are stated for a decal drawn by its stencil map only; one with a diffuse map is drawn by that map, as any decal. Absent for any other material and in 1.5 and older, which draw a decal by its diffuse colour and map only. See [ADR-0100](adr/0100-the-add-on-builds-material-node-trees-from-the-package-descriptions-by-a-pure-mapping.md) and ADR-0298. |
 | `palette` | `primary`, `secondary`, `tertiary`, `glass` or `decal`: the palette entry the material takes (the first layer with a `PaletteTint` from 1 to 3, the tint-palette glass colour, or, for a stencil decal drawn by its stencil map, `primary` when its `StencilTintOverride` is above 0 and `decal` (1.7) when it rounds to 2). Absent when it takes none. |
 | `default_palette` | The Record path of the library's default palette. |
@@ -371,14 +575,26 @@ refer to each other's descriptions. A layer whose file is missing, unreadable (a
 Layers are followed through 8 files; the layers of the eighth stay without a `material` and one
 issue says so.
 
-The reader keeps at most 64 layers and 4096 raw elements per material (the attribute values are
-bounded by the 16 MiB cap on a material file). What is cut off is listed in `issues` (`origin`
-`material`, `kind` `material`), and the rest of the file is read.
+The reader retains every admitted texture slot and layer declaration in source order, including
+empty and repeated layers. Unknown raw fragments retain the independent 4096-element and
+depth-8 budgets; cuts are listed in `issues` (`origin` `material`, `kind` `material`). The package's
+material Entry reader keeps its existing 16 MiB input admission, while direct Model parsing uses
+its caller's supplied bytes. Companion-file, retained-syntax and output budgets remain separate.
 
 Decals and wear are not separate objects in the game's files; they are materials: a decal is a
 material with the shader `MeshDecal` (its stencil colours in `parameters`, the placeholder
 `$TintPaletteDecal` in a slot), wear is `wear` textures, `WearTint`/`WearGloss` on layers and
 `Wear*` parameters.
+
+Each `material_libraries[].authored_file` points to the matching library ordinal in
+`material-sources/sNNNN.jsonl.gz`. The package receipt hashes these compressed bytes.
+The version 1 stream retains the original library object, physical sources, source uses
+and field origins. Field paths are relative to that library row and include
+`/authored` and retained child declarations. Original positions are logical XML or
+CryXml coordinates. Unbound source fields carry an unknown encryption marker.
+Material selection, rendered values and emission evidence have their own relationships.
+Earlier versions can include `authored` and `authored_origin` directly in the library row.
+The [material source schema](../schemas/blender-material-source.schema.json) describes the stream.
 
 ### Palettes
 
@@ -399,6 +615,22 @@ opacity is the strongest of the three masks (before `stencil.opacity` and the ma
 `opacity`). Without a `decal` in the palette the decal keeps its `stencil.colour` and the red
 channel as its opacity. Which colour a decal with `StencilTintOverride` 1 takes, and the order of
 overlapping masks, are not settled by the game data, see ADR-0310.
+
+The optional `palette_provenance` object in 1.20 separates the origin of a palette value from
+the action of selecting it. Its `payloads` refer to `palettes` by ordinal. Each carries
+`fieldOrigins` keyed by JSON Pointers into that palette, including separate entries for each
+RGB channel and glossiness. The RGB uses point to the original DataForge fields converted from
+8-bit sRGB to linear values, and glossiness is the original unsigned value represented as a
+float. A missing coordinate stays incomplete. Equal rendered values may refer to different
+physical Records without duplicating their rendered palette.
+
+The `bindings` join an original `nodes` ordinal to `payloads` and `selections` by ordinal.
+An inherited binding identifies its supplying node with `inheritedFrom`. A selection has its
+own immediate origin and can identify a separate DataForge path lookup. The named geometry,
+original material root declaration, and palette payload may come from distinct inputs.
+The source-use references resolve in this object's shared `sourceInventory`. Readers can
+use the payload origins to filter numeric values and the selection origins to filter which
+palette was applied to a node.
 
 ### Issues
 
@@ -450,8 +682,9 @@ The bounds a package keeps, asserted by the real-Archive tests
 - The sharing, `1 - meshes / instances` (the sum of `instances` over all meshes is the number of
   drawing nodes), is at least 0.3, and the meshes take at most 85 % of the bytes they would take
   if every node had its own file. Every drawing node is an instance of exactly one mesh.
-- A ship package holds at least 100 textures, and every texture of the Archive is written once:
-  no two entries of `textures` have the same `source`.
+- A ship package holds at least 100 distinct Archive texture source paths. Each case-insensitive
+  `source` and `source_rendition` pair has one output, all texture IDs and files are unique, and
+  material and DDNA texture references resolve to emitted textures.
 
 ### What a Character package holds
 
@@ -480,7 +713,7 @@ makes the package much smaller.
 ## Verifying a package in Blender
 
 `blender_addon/tests/import_real_package.py <package folder>...` imports packages in headless
-Blender (the `bpy` 5.2.3 wheel in a virtual environment, or
+Blender (the `bpy` 5.2.3 or 5.3.0 wheel in a virtual environment, or
 `blender --background --factory-startup --python blender_addon/tests/import_real_package.py -- <package folder>...`)
 and prints one JSON line per package: objects, collections, armatures, shape keys, actions,
 materials, node groups, images, warnings and the time. The exit status is 1 when no folder is
@@ -516,6 +749,19 @@ field `decal` and the material `palette` value `decal`.
 with its skeleton); a reader of 1.7 expects a `body`, so it treats such a package as a higher minor
 version.
 
+**1.9** adds `material_libraries` and the optional material `source_library` ordinal.
+Original submaterial indices and existing rendering fields keep their meanings. The new
+source descriptions preserve authored roots without inheriting root values into children;
+they do not prove physical Archive identity. Media records provide that provenance.
+
+**1.10** adds optional texture `source_metadata`. Its `dds` object uses the same raw and normalized
+header contract as the CLI texture info and Media export. The loader binds the metadata to the
+actual texture read. The package keeps separate origin receipts for authored header fields,
+normalized topology, the selected mip and the PNG bytes.
+
+**1.11** adds the optional DDS transfer declarations inside texture source metadata.
+The original header words and existing texture colour-space field retain their meanings.
+
 The schema file is the schema of the version in `FORMAT_VERSION`: a change of the Rust types that
 changes the schema is a change of the format, and the checked-in schema changes with it. A schema
 of a later minor version can contain values (a texture `format`, a node `kind`) that an older
@@ -537,3 +783,117 @@ the rules above.
 
 A reader of a 1.0 package finds no `materials` and `palettes` (read them as empty) and builds
 from the glTF materials of the meshes and the `diffuse`, `normal` and `specular` textures.
+
+**1.12** adds an optional texture input encoding and captures the actual PNG transfer and
+channel transform in same-read source metadata. Older manifests use their authored
+compatibility colour-space field. Missing or conflicting declarations retain their
+role's compatibility sampling, with unknown actual transfer and an untagged PNG.
+**1.13** adds the optional authored SOC reference. **1.14** adds the optional selected-mip DDS
+asset and explicit PNG fallback reason. **1.15** adds selected BC1, BC2 and BC3 alpha
+counts to supported DDS rows and records alpha unassociation when applied to PNG.
+**1.16** adds optional entity classifications and light-placement evidence. **1.17** adds
+separate DDS normal and smoothness pairs with linked source and per-file evidence.
+**1.18** adds the optional collision-helper companion.
+**1.19** adds the optional vertex-map companion.
+**1.20** adds exact primitive bindings to that companion, identifies the texture rendition and
+stores authored material libraries and their field provenance in independent gzip JSONL files.
+
+### Authored Entity Glow
+
+Authored Glow links first appeared in format 1.18. The optional
+`entity_glow` member contains declarations and owners. Each declaration names the original
+DataForge record index and GUID. Its components retain their original array ordinals,
+canonical material-effect values and field origins, including disabled effects, trigger or
+tag references, and ordered modifiers. The component's field origins use paths relative to
+its `authored` value and resolve in the declaration's provenance inventory.
+
+Each owner names the package scene node and its declaration ordinal. Its links point to the
+original component, effect array, effect ordinal and link ordinal. An exact authored name can
+associate an observed model node and its original subsets. A repeated name remains ambiguous.
+An empty selector or `*` associates all drawable subsets of the direct owner. Each subset
+retains its model node, source node ID, LOD, subset ordinal and local triangle index range.
+Material assignments retain the original slot and the package mesh material index when that
+slot is represented. Source evidence for the observed model-node name and selected material
+belongs to the owner's independent provenance inventory. Material evidence records the observed
+library and source slots. Subset-byte and material-selection routes are partial when their
+original coordinates were unavailable.
+
+The declaration is available for inspection and tooling. The importer leaves trigger evaluation
+and runtime modifier execution to the original game logic.
+
+## Authored SOC scene
+
+An interior package written with `--authored-soc` has an `authored_soc` reference in
+`scene.json` (package format 1.13). It names the fixed file `authored/soc-scene.json` and its
+independent schema version. The add-on loads its non-rendering hierarchy alongside the visible
+scene. See [Authored SOC scene](soc-scene.md) for the sidecar contract.
+
+### Static material emission
+
+Materials with original emission declarations carry `emission_source`. Its original tokens
+and typed values link through `source_library` and the original element and attribute ordinals.
+That library retains the XML syntax, including original spelling, opaque parameters and source
+coverage. Zero, malformed and nonfinite input values are preserved independently.
+
+The emission description's `field_origins` map addresses individual output values through
+JSON Pointers relative to `emission_source`. Original attribute coordinates use the
+`materialXmlAttribute` namespace, whose indices hold the zero-based XML child ordinals followed
+by the attribute ordinal. Derived controls also identify their actual attribute or element uses.
+The references resolve in `material_libraries[source_library].emission_provenance`, which retains
+the actual observed library or layer Entry and any container ancestry. A known encrypted payload
+yields `containsEncryptedSource: true`. Complete unencrypted contributions yield `false`.
+Unobserved provider inputs and other incomplete contributions without an encrypted witness yield
+`null`. Equal XML from distinct physical Entries keeps its own material assignment and provenance.
+The marks on static preview parameters describe their authored XML inputs; the image asset
+retains its own independent origin.
+
+The optional `preview` is evaluated only for a complete material with an explicit emittance
+shader permutation, a unique named texture slot and finite authored colour and positive Glow.
+Blender samples that slot with its own UV transforms, multiplies the scene-linear RGB by the
+authored tint once, and supplies the Glow value to the shader's emission strength.
+The surface retains its normal alpha coverage rules. A missing image uses the ordinary flat
+material emission. Dynamic Entity links and shader-specific coverage controls such as
+`AlphaGlowCutoff` remain authored data.
+
+### Source vertex maps
+
+Use `--vertex-maps` with `entity package`, `interior package` or `character package` to include
+`meshes/mNNNN.vertex-map.jsonl` alongside each emitted GLB. In Rust, enable this
+option with `PackageWriteContext::with_vertex_maps`. The package declares each file
+as `mesh.vertex_map`, and `receipt.json` records its SHA-256. The package uses minor
+version 1.20 when it contains a map. A rigged GLB has one map with a row for each emitted mesh,
+linked to the Character part, creature part, or attachment that supplied it.
+When two instances share one GLB mesh, the source is the writer's first producer
+instance.
+
+Each JSONL file begins with the format and version. A `mesh` row identifies the actual GLB
+mesh and POSITION accessor, its element count, the requested level, the selected model
+level, and the original geometry level and chunk when observed. Map version 2 emits
+one `primitive` row for each GLB draw in mesh and primitive order before its mesh's
+vertex rows. The row gives the emitted index accessor and dense material index
+when present, the renderer's material choice, and the decoded model submesh ordinal.
+The renderer choice is a library slot, a supplied fallback, the built-in fallback,
+or unassigned. `sourceSubmesh` holds the authored row ordinal, node or skin-zone ID,
+and original material ID when the decoder can recover them. Each value identifies
+its own decoded geometry byte range and encryption state. Material selection is a
+renderer result. A `vertex` row links an output POSITION ordinal to its source-stream
+vertex ordinal. It includes original source uses for the first little-endian index word, its page base and the original submesh
+selectors. The GLB writer retains the POSITION order of the decoded mesh even when it
+omits individual material primitives. DNA shaping can move Character vertices while keeping this
+ordinal mapping. The map positions identify original index words and establish the mapping.
+After clothing removes body zones, that mesh's first-use mapping is unknown. Its original
+geometry identity and emitted accessor still appear in the mesh row.
+
+A `mapping` of `unknown` records a GLB mesh without a proved IVO mapping. A mapping can be
+present when the source file's physical Archive identity is unavailable. In that case
+the values carry an unknown encryption marker and incomplete source set. Batches of
+`sourceUse` rows resolve their immediately preceding field references. The original
+`source` rows follow, then the measured artifact binding and an `end` count row with
+a decimal `primitives` count in version 2. Version 1 maps contain vertex correspondence
+and have their own shorter count row. The [mesh vertex map schema](../schemas/blender-mesh-vertex-map.schema.json) describes each row.
+
+The package validator checks the mesh, POSITION accessor and vertex counts, primitive
+ordinals and their actual GLB index accessor and material index, source-use closure,
+GLB SHA-256 and receipt. Blender imports the same render geometry independently of the
+companion. The source-byte ranges for the selected geometry can be joined to the
+[Media model export](media-export.md) by physical Archive identity and chunk.

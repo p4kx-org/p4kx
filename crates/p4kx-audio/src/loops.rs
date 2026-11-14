@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::ByteOrder;
+use crate::read_at::ReadAt;
+use crate::{ByteOrder, WemLoopEnd, WemLoopSource, WemSourceChunk};
 
 const LOOP_COUNT_OFFSET: usize = 0x1C;
 const LOOPS_OFFSET: usize = 0x24;
@@ -42,31 +43,70 @@ impl Loop {
         self.start < self.end && self.end <= frames
     }
 
-    /// Returns the first forward loop of a `smpl` chunk body that fits `sample_count` frames;
-    /// `None` without one, for a truncated chunk or an unknown sample count.
-    pub(crate) fn from_smpl(
+    /// Reads the first fitting forward loop and retains the original decision prefix.
+    pub(crate) fn from_smpl<I: ReadAt>(
         order: ByteOrder,
-        smpl: &[u8],
+        input: &mut I,
+        selected: Option<WemSourceChunk>,
         sample_count: Option<u64>,
-    ) -> Option<Self> {
-        let frames = sample_count?;
-        let count = usize::try_from(order.u32_at(smpl, LOOP_COUNT_OFFSET)?).ok()?;
-        smpl.get(LOOPS_OFFSET..)?
-            .as_chunks::<LOOP_LEN>()
-            .0
-            .iter()
-            .take(count)
-            .find_map(|entry| {
-                if order.u32_at(entry, LOOP_KIND_OFFSET)? != FORWARD {
-                    return None;
-                }
-                let start = u64::from(order.u32_at(entry, LOOP_START_OFFSET)?);
-                let end = match order.u32_at(entry, LOOP_END_OFFSET)? {
-                    0 => frames,
-                    last => u64::from(last) + 1,
-                };
-                Some(Self { start, end }).filter(|found| found.fits(frames))
-            })
+    ) -> Result<(Option<Self>, WemLoopSource), I::Error> {
+        let Some(chunk) = selected else {
+            return Ok((None, WemLoopSource::NoSampleChunk));
+        };
+        let body_offset = chunk.body_offset;
+        let Some(frames) = sample_count else {
+            return Ok((None, WemLoopSource::NoSampleCount));
+        };
+        if chunk.body_len < LOOP_COUNT_OFFSET as u64 + 4 {
+            return Ok((None, WemLoopSource::MissingCount { body_offset }));
+        }
+        let mut count = [0; 4];
+        input.read_at(body_offset + LOOP_COUNT_OFFSET as u64, &mut count)?;
+        let count = u64::from(order.u32(count));
+        let Some(table_len) = chunk.body_len.checked_sub(LOOPS_OFFSET as u64) else {
+            return Ok((None, WemLoopSource::MissingEntries { body_offset }));
+        };
+        let available = (table_len / LOOP_LEN as u64).min(count);
+        let mut entry = [0; LOOP_LEN];
+        for ordinal in 0..available {
+            let entry_offset = body_offset + LOOPS_OFFSET as u64 + ordinal * LOOP_LEN as u64;
+            input.read_at(entry_offset, &mut entry)?;
+            if let Some((points, end)) = Self::fitting_entry(order, &entry, frames) {
+                return Ok((
+                    Some(points),
+                    WemLoopSource::Entries {
+                        body_offset,
+                        examined: ordinal + 1,
+                        end: Some(end),
+                    },
+                ));
+            }
+        }
+        Ok((
+            None,
+            WemLoopSource::Entries {
+                body_offset,
+                examined: available,
+                end: None,
+            },
+        ))
+    }
+
+    fn fitting_entry(
+        order: ByteOrder,
+        entry: &[u8; LOOP_LEN],
+        frames: u64,
+    ) -> Option<(Self, WemLoopEnd)> {
+        if order.u32_at(entry, LOOP_KIND_OFFSET)? != FORWARD {
+            return None;
+        }
+        let start = u64::from(order.u32_at(entry, LOOP_START_OFFSET)?);
+        let (end, source) = match order.u32_at(entry, LOOP_END_OFFSET)? {
+            0 => (frames, WemLoopEnd::SampleCount),
+            last => (u64::from(last) + 1, WemLoopEnd::LastFrame),
+        };
+        let found = Self { start, end };
+        found.fits(frames).then_some((found, source))
     }
 
     /// Returns a little-endian `smpl` chunk holding the loop as one infinite forward loop with

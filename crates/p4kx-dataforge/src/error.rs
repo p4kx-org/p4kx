@@ -8,6 +8,9 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum DataForgeError {
+    /// A canonical-read observer stopped the operation for its caller-owned reason.
+    #[error("the canonical-read observer stopped the operation")]
+    ObservationStopped,
     /// The header names a version this reader does not know.
     #[error(
         "DataForge version {version} is not supported; this version of P4KX reads versions 6 and 8"
@@ -75,25 +78,6 @@ pub enum DataForgeError {
         /// The struct whose parents were followed.
         struct_index: u32,
     },
-    /// A struct has more ancestors than [`MAX_INHERITANCE_DEPTH`](crate::MAX_INHERITANCE_DEPTH).
-    #[error("struct {struct_index} of the DataForge has more than {limit} ancestors")]
-    InheritanceTooDeep {
-        /// The struct whose parents were followed.
-        struct_index: u32,
-        /// The largest number of structs in one chain.
-        limit: usize,
-    },
-    /// A struct and its ancestors declare more fields than
-    /// [`MAX_RECORD_FIELDS`](crate::MAX_RECORD_FIELDS).
-    #[error("struct {struct_index} of the DataForge has {count} fields, more than {limit}")]
-    TooManyFields {
-        /// The struct whose fields were counted.
-        struct_index: u32,
-        /// The number of fields, inherited ones included.
-        count: usize,
-        /// The largest number of fields that is read.
-        limit: usize,
-    },
     /// The fields of a struct do not fill its declared instance size.
     #[error(
         "struct {struct_index} of the DataForge declares {declared} bytes per instance, but its fields take {fields}"
@@ -112,11 +96,36 @@ pub enum DataForgeError {
         /// The raw code.
         code: u16,
     },
-    /// A Record tree would hold more than [`MAX_RECORD_VALUES`](crate::MAX_RECORD_VALUES)
-    /// values.
-    #[error("the Record holds more than {limit} values")]
-    RecordTooLarge {
-        /// The most values one Record tree may hold.
-        limit: usize,
+    /// A caller's per-read materialization allowance cannot admit the next output slots.
+    #[error(
+        "Record materialization needs at least {required} Value slots, exceeding the caller budget of {limit}"
+    )]
+    MaterializationBudgetExceeded {
+        /// The caller's maximum retained Field and Array-element Value count.
+        limit: u64,
+        /// The minimum total slot count required by the next output container.
+        required: u64,
     },
+    /// The allocator refused addressable output storage.
+    #[error("cannot reserve {values} Value slots for {part}")]
+    MaterializationAllocationRefused {
+        /// The output container whose storage was requested.
+        part: &'static str,
+        /// The exact number of Value slots in this container.
+        values: u64,
+    },
+    /// The allocator refused addressable source layout metadata storage.
+    #[error("cannot reserve {elements} metadata elements for {part}")]
+    LayoutAllocationRefused {
+        /// The source layout index or cursor storage being reserved.
+        part: &'static str,
+        /// The exact number of metadata elements requested.
+        elements: u64,
+    },
+    /// The private source layout index and cursor are inconsistent.
+    #[error("the DataForge source layout index and cursor are inconsistent")]
+    LayoutInvariant,
+    /// The private canonical construction state is inconsistent.
+    #[error("the canonical Record tree construction state is inconsistent")]
+    CanonicalTreeInvariant,
 }

@@ -9,6 +9,12 @@ expression: "serde_json::to_string_pretty(&shaped)?"
     "Data\\ObjectContainers\\ships\\test\\ship_interior.socpak"
   ],
   "containers_opened": 4,
+  "default_material": {
+    "ambiguous_sources": [],
+    "decoded_sha256": null,
+    "source": null,
+    "state": "missing"
+  },
   "default_material_ids": 4,
   "hidden_primitives": 0,
   "issues": [
@@ -44,7 +50,7 @@ expression: "serde_json::to_string_pretty(&shaped)?"
       "kind": "material_library",
       "name": "lodded",
       "path": "ship_interior",
-      "reason": "the material library objects/test/cube does not exist",
+      "reason": "the material library objects/test/cube mapped to Data/objects/test/cube.mtl does not exist",
       "skipped": false
     },
     {
@@ -58,7 +64,7 @@ expression: "serde_json::to_string_pretty(&shaped)?"
       "kind": "material_library",
       "name": "cockpit_seat",
       "path": "ship_interior/cockpit",
-      "reason": "the material library objects/test/cube does not exist",
+      "reason": "the material library objects/test/cube mapped to Data/objects/test/cube.mtl does not exist",
       "skipped": false
     }
   ],

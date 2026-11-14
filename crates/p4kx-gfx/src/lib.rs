@@ -15,7 +15,7 @@
 //! `@key` texts. No system font is loaded.
 //!
 //! Every size is checked against the data left and the limits [`MAX_MOVIE_LEN`],
-//! [`MAX_BITMAP_PIXELS`], [`MAX_SHAPE_RECORDS`] and [`MAX_SPRITE_DEPTH`], a scene against
+//! [`MAX_BITMAP_PIXELS`] and [`MAX_SHAPE_RECORDS`], a scene against [`MAX_SPRITE_DEPTH`],
 //! [`MAX_SCENE_PLACEMENTS`], [`MAX_SCENE_PATHS`], [`MAX_SCENE_SEGMENTS`], [`MAX_SCENE_RECORDS`],
 //! [`MAX_SCENE_MASKS`], [`MAX_SCENE_GLYPHS`] and [`MAX_GRADIENT_STOPS`], the static texts of a
 //! movie against [`MAX_TEXT_GLYPHS`], a text field against [`MAX_TEXT_CHARS`], a canvas against [`MAX_CANVAS_SIDE`],
@@ -23,6 +23,7 @@
 //! against [`MAX_SVG_BYTES`];
 //! corrupt input yields a [`GfxError`] or a skipped element, never a panic.
 
+mod asset_origins;
 mod assets;
 mod bitmap;
 mod embedded_png;
@@ -43,12 +44,14 @@ mod lossless;
 mod morph;
 mod morph_frame;
 mod movie;
+mod movie_source;
 mod place;
 mod raster;
 mod raster_budget;
 mod raster_mask;
 mod raster_paint;
 mod reader;
+mod render_inputs;
 mod scene;
 mod scene_compose;
 mod scene_edit_text;
@@ -75,9 +78,14 @@ mod text_loc;
 mod timeline;
 mod walker;
 
+pub use asset_origins::{
+    AssetOrigins, FailureOrigin, FontOrigins, LabelOrigin, PlacementOrigins, SpanRun, SpanRuns,
+    SpriteOrigins, TimelineOrigins,
+};
 pub use assets::{Assets, OtherDefinition, TagCount, TagFailure, UnknownTag};
 pub use bitmap::{
-    Bitmap, BitmapSource, EmbeddedFormat, ExternalImage, ImageFileFormat, Jpeg, Lossless, SubImage,
+    Bitmap, BitmapSource, DecodedBitmap, EmbeddedFormat, ExternalImage, ImageFileFormat, Jpeg,
+    Lossless, SubImage,
 };
 pub use error::GfxError;
 pub use face::{FontFace, MISSING_GLYPH_EM, missing_glyph};
@@ -87,10 +95,12 @@ pub use header::{Compression, Header, MAX_MOVIE_LEN, Signature};
 pub use image::{MAX_BITMAP_PIXELS, RgbaImage};
 pub use import::{Import, ImportedAsset, MAX_IMPORTS, ScalingGrid, SymbolClass};
 pub use morph::MorphShape;
-pub use movie::Movie;
+pub use movie::{Movie, ObservedAssets};
+pub use movie_source::{MovieSource, MovieSpan, TagItemSite, TagSite};
 pub use place::{ColorTransform, Filter, FilterKind, Placement};
 pub use raster::{
-    Background, CanvasSize, MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE, Raster, RasterOptions,
+    Background, CanvasSize, MAX_CANVAS_PIXELS, MAX_CANVAS_SIDE, ObservedRaster, Raster,
+    RasterOptions,
 };
 pub use raster_budget::{MAX_COVERAGE_FACTOR, MAX_SVG_BYTES};
 pub use scene::{
@@ -99,11 +109,15 @@ pub use scene::{
     Origin, Paint, PathCommand, Scene, SceneItem, SceneMask, ScenePath, ScenePoint, SceneShape,
     ShapeLayer, Spread, StrokeStyle,
 };
-pub use scene_report::{SkipReason, Skipped};
+pub use scene_compose::{
+    ObservedScene, SceneDefinitionOrigin, SceneDrawOrigin, SceneGlyphOrigin, SceneMaskOrigin,
+    SceneOrigins, ScenePlacementOrigin, SceneTextMeasureOrigin,
+};
+pub use scene_report::{MAX_SPRITE_DEPTH, SkipReason, Skipped};
 pub use scene_text::MAX_SCENE_GLYPHS;
 pub use shape::{MAX_SHAPE_RECORDS, NewStyles, Shape, ShapeRecord, StyleChange};
 pub use style::{FillStyle, Gradient, GradientStop, LineStyle};
-pub use svg::SvgReport;
+pub use svg::{ObservedSvgReport, SvgReport};
 pub use tag::tag_name;
 pub use text::{EditLayout, EditText, GlyphEntry, MAX_TEXT_GLYPHS, StaticText, TextRecord};
 pub use text_fonts::{Localise, TextOptions};
@@ -112,4 +126,3 @@ pub use text_loc::{Localised, localise_text};
 pub use timeline::{
     Export, ExporterInfo, FrameLabel, MAX_FRAME_BYTES, MAX_FRAME_PLACEMENTS, Sprite, Timeline,
 };
-pub use walker::MAX_SPRITE_DEPTH;

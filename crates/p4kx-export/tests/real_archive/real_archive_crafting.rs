@@ -4,7 +4,7 @@
 //! Commodities and blueprints in the Basetool catalog of a real Archive; runs with `--ignored`
 //! when `P4KX_DATA_P4K` names one.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::error::Error;
 use std::time::SystemTime;
 
@@ -13,6 +13,10 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+use crate::real_archive_blueprints::Blueprints;
+use crate::real_archive_canonical_texts::{TextDomain, TextIndex, TextReferenceShape};
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const MIN_COMMODITIES: usize = 100;
@@ -20,9 +24,7 @@ const MIN_BLUEPRINTS: usize = 1_000;
 const MIN_LINKED: f64 = 0.95;
 
 fn list<'c>(catalog: &'c Value, kind: &str) -> Result<&'c Vec<Value>, String> {
-    catalog[kind]
-        .as_array()
-        .ok_or_else(|| format!("the {kind} array"))
+    catalog_v3_consumer::named_rows(catalog, kind).map_err(|error| error.to_string())
 }
 
 #[expect(
@@ -67,8 +69,8 @@ fn builds_commodities_and_blueprints_of_a_real_archive() -> TestResult {
         assert!(counts.complete, "{kind} complete without a Filter");
         let guids: Vec<&str> = list(&catalog, kind.name())?
             .iter()
-            .filter_map(|entity| entity["guid"].as_str())
-            .collect();
+            .map(|entity| catalog_v3_consumer::identity(entity, kind))
+            .collect::<Result<_, _>>()?;
         assert!(guids.is_sorted(), "{kind} ordered by GUID");
     }
     check_commodities(&catalog)?;
@@ -76,30 +78,25 @@ fn builds_commodities_and_blueprints_of_a_real_archive() -> TestResult {
 }
 
 fn check_commodities(catalog: &Value) -> TestResult {
-    let commodities = list(catalog, "commodities")?;
-    let gold = commodities
+    let commodities = catalog_v3_consumer::rows(catalog, Kind::Commodities)?;
+    let choices = catalog_v3_consumer::presentations(catalog)?;
+    let texts = TextIndex::new(catalog)?;
+    let mut gold = None;
+    for commodity in commodities {
+        let name = catalog_v3_consumer::field(commodity, Kind::Commodities, "className")?
+            .as_str()
+            .ok_or("Commodity className")?;
+        if gold.is_none() && name.eq_ignore_ascii_case("gold") {
+            gold = Some(commodity);
+        }
+    }
+    let id = catalog_v3_consumer::identity(gold.ok_or("the commodity Gold")?, Kind::Commodities)?;
+    let choice = choices
         .iter()
-        .find(|commodity| {
-            commodity["className"]
-                .as_str()
-                .is_some_and(|name| name.eq_ignore_ascii_case("gold"))
-        })
-        .ok_or("the commodity Gold")?;
-    assert_eq!(
-        gold.pointer("/name/en"),
-        Some(&Value::from("Gold")),
-        "English name"
-    );
-    assert!(gold["typeGuid"].is_string(), "type: the group");
-    assert!(gold["subtypeGuid"].is_string(), "subtype: the ResourceType");
-    let described = commodities
-        .iter()
-        .filter(|commodity| {
-            commodity
-                .pointer("/description/en")
-                .is_some_and(Value::is_string)
-        })
-        .count();
+        .find(|row| row.pointer("/commodityGuid/value").and_then(Value::as_str) == Some(id))
+        .ok_or("Gold presentation")?;
+    check_gold(choice, &texts)?;
+    let described = described_count(choices, &texts)?;
     assert!(
         ratio(described, commodities.len()) > 0.9,
         "most commodities have a description: {described} of {}",
@@ -108,22 +105,60 @@ fn check_commodities(catalog: &Value) -> TestResult {
     Ok(())
 }
 
-fn check_blueprints(catalog: &Value) -> TestResult {
-    let blueprints = list(catalog, "blueprints")?;
-    let mut resources: HashMap<&str, usize> = HashMap::new();
-    for subtype in list(catalog, "commodities")?
-        .iter()
-        .filter_map(|commodity| commodity["subtypeGuid"].as_str())
-    {
-        *resources.entry(subtype).or_default() += 1;
+fn check_gold(choice: &Value, texts: &TextIndex<'_>) -> TestResult {
+    let name = texts
+        .reference(
+            choice.get("name").ok_or("name carrier")?,
+            TextDomain::PublicName,
+            TextReferenceShape::Nullable,
+        )?
+        .ok_or("Gold name reference")?;
+    assert_eq!(name.shown("en")?, &Value::from("Gold"), "English name");
+    for field in ["typeGuid", "subtypeGuid"] {
+        let carrier = choice.get(field).ok_or("Gold link carrier")?;
+        assert!(
+            catalog_v3_consumer::nullable_guid(carrier)?.is_some(),
+            "Gold {field} reaches its selected group or ResourceType"
+        );
     }
+    Ok(())
+}
+
+fn described_count(choices: &[Value], texts: &TextIndex<'_>) -> Result<usize, Box<dyn Error>> {
+    let mut described = 0;
+    for choice in choices {
+        let text = texts.reference(
+            choice.get("description").ok_or("description carrier")?,
+            TextDomain::GameText,
+            TextReferenceShape::Nullable,
+        )?;
+        if let Some(text) = text
+            && text
+                .shown("en")?
+                .as_str()
+                .is_some_and(|text| !text.is_empty())
+        {
+            described += 1;
+        }
+    }
+    Ok(described)
+}
+
+fn check_blueprints(catalog: &Value) -> TestResult {
+    let blueprints = Blueprints::read(catalog)?;
     let items: HashSet<&str> = list(catalog, "items")?
         .iter()
         .filter_map(|item| item["guid"].as_str())
         .collect();
     let produced: Vec<&str> = blueprints
+        .rows()
         .iter()
-        .filter_map(|blueprint| blueprint["producedItemGuid"].as_str())
+        .filter_map(|blueprint| {
+            blueprint
+                .presentation
+                .pointer("/producedItem/value")
+                .and_then(Value::as_str)
+        })
         .collect();
     let known = produced.iter().filter(|guid| items.contains(*guid)).count();
     assert!(
@@ -131,63 +166,89 @@ fn check_blueprints(catalog: &Value) -> TestResult {
         "{known} of {} produced items are catalog items",
         produced.len()
     );
-    check_ingredients(catalog, &resources)?;
-    check_craft_times(blueprints);
+    check_ingredients(catalog, &blueprints)?;
+    check_craft_times(&blueprints);
     Ok(())
 }
 
-fn check_ingredients(catalog: &Value, resources: &HashMap<&str, usize>) -> TestResult {
-    let blueprints = list(catalog, "blueprints")?;
-    let lines: Vec<&Value> = blueprints
-        .iter()
-        .filter_map(|blueprint| blueprint["ingredients"].as_array())
-        .flatten()
-        .collect();
+fn check_ingredients(catalog: &Value, blueprints: &Blueprints<'_>) -> TestResult {
+    let mut lines = Vec::new();
+    for blueprint in blueprints.rows() {
+        lines.extend(blueprint.ingredients()?);
+    }
     assert!(!lines.is_empty(), "ingredient lines");
     let resource_lines: HashSet<&str> = lines
         .iter()
-        .filter_map(|line| line["resourceGuid"].as_str())
+        .filter_map(|line| {
+            line.pointer("/meaning/resourceGuid/value")
+                .and_then(Value::as_str)
+        })
         .collect();
-    let unjoined: Vec<&&str> = resource_lines
-        .iter()
-        .filter(|guid| resources.get(**guid) != Some(&1))
-        .collect();
+    check_resource_links(catalog, &resource_lines)?;
     assert!(
-        !resource_lines.is_empty() && unjoined.is_empty(),
-        "every resource GUID joins exactly one commodity: {unjoined:?}"
-    );
-    assert!(
-        lines.iter().any(|line| line["itemGuid"].is_string()),
+        lines.iter().any(|line| line
+            .pointer("/meaning/itemGuid/value")
+            .is_some_and(Value::is_string)),
         "some ingredient is an item"
     );
     assert!(
-        lines
-            .iter()
-            .all(|line| line["resourceGuid"].is_string() != line["itemGuid"].is_string()),
+        lines.iter().all(|line| line
+            .pointer("/meaning/resourceGuid/value")
+            .is_some_and(Value::is_string)
+            != line
+                .pointer("/meaning/itemGuid/value")
+                .is_some_and(Value::is_string)),
         "a line is a resource or an item"
     );
     assert!(
-        lines
-            .iter()
-            .any(|line| line["minQuality"].as_i64().is_some_and(|q| q > 0)),
+        lines.iter().any(|line| line
+            .pointer("/meaning/minQuality/value")
+            .and_then(Value::as_str)
+            .and_then(|q| q.parse::<i64>().ok())
+            .is_some_and(|q| q > 0)),
         "some ingredient has a minimum quality"
     );
     Ok(())
 }
 
-fn check_craft_times(blueprints: &[Value]) {
-    let timed = blueprints
+/// Validates source resource identity independently of zero, one or many packaging alternatives.
+pub(crate) fn check_resource_links(catalog: &Value, lines: &HashSet<&str>) -> TestResult {
+    let resources: HashSet<_> = catalog_v3_consumer::rows(catalog, Kind::ResourceTypes)?
+        .iter()
+        .map(|row| catalog_v3_consumer::identity(row, Kind::ResourceTypes))
+        .collect::<Result<_, _>>()?;
+    let missing: Vec<_> = lines
+        .iter()
+        .filter(|guid| !resources.contains(**guid))
+        .collect();
+    if lines.is_empty() || !missing.is_empty() {
+        return Err(
+            format!("every resource line must join a canonical ResourceType: {missing:?}").into(),
+        );
+    }
+    Ok(())
+}
+
+fn check_craft_times(blueprints: &Blueprints<'_>) {
+    let rows = blueprints.rows();
+    let timed = rows
         .iter()
         .filter(|blueprint| {
-            blueprint["craftTimeSeconds"]
-                .as_i64()
-                .is_some_and(|s| s > 0)
+            blueprint
+                .tiers
+                .first()
+                .and_then(|tier| {
+                    tier.pointer("/craftTimeSeconds/value")
+                        .and_then(Value::as_str)
+                })
+                .and_then(|seconds| seconds.parse::<i64>().ok())
+                .is_some_and(|seconds| seconds > 0)
         })
         .count();
     assert!(
-        ratio(timed, blueprints.len()) > 0.9,
+        ratio(timed, rows.len()) > 0.9,
         "most blueprints have a craft time: {timed} of {}",
-        blueprints.len()
+        rows.len()
     );
 }
 

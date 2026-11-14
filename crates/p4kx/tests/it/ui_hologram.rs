@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! `p4kx ui hologram` end to end over the synthetic ship of the testkit, drawn on the software
-//! adapter.
-//!
-//! The drawing tests need a software adapter (WARP on Windows, lavapipe on Linux) and return
-//! early with a printed reason without one, unless `P4KX_REQUIRE_SOFTWARE_ADAPTER` is set, as it
-//! is on CI.
+//! Draws the synthetic ship through the `p4kx ui hologram` command on a native graphics adapter.
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use p4kx_testkit::{ArchiveBuilder, TestEntry, assembly_entries, hologram_entries};
+use p4kx_testkit::{ArchiveBuilder, TestEntry, assembly_entries, hologram_entries, test_key};
 use serde_json::Value;
+
+#[path = "ui_hologram_png_origins.rs"]
+mod png_origins;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -32,19 +30,25 @@ fn write_archive(dir: &Path, entries: Vec<TestEntry>) -> Result<PathBuf, Box<dyn
 }
 
 fn hologram(archive: &Path, out: &Path, extra: &[&str], json: bool) -> Result<Run, Box<dyn Error>> {
+    hologram_for(archive, out, "TEST_Ship", extra, json)
+}
+
+fn hologram_for(
+    archive: &Path,
+    out: &Path,
+    class: &str,
+    extra: &[&str],
+    json: bool,
+) -> Result<Run, Box<dyn Error>> {
     let mut command = p4kx_testkit::p4kx()?;
     if json {
         command.arg("--json");
     }
-    let output = command
-        .args(["ui", "hologram"])
-        .arg(archive)
-        .arg("TEST_Ship")
-        .arg("--software")
-        .arg("--out")
-        .arg(out)
-        .args(extra)
-        .output()?;
+    command.args(["ui", "hologram"]).arg(archive).arg(class);
+    if !cfg!(target_os = "macos") {
+        command.arg("--software");
+    }
+    let output = command.arg("--out").arg(out).args(extra).output()?;
     Ok(Run {
         stdout: String::from_utf8(output.stdout)?,
         stderr: String::from_utf8(output.stderr)?,
@@ -61,8 +65,8 @@ fn skip(test: &str, run: &Run) -> bool {
         return false;
     }
     assert!(
-        std::env::var_os("P4KX_REQUIRE_SOFTWARE_ADAPTER").is_none(),
-        "{test}: a software adapter is required: {}",
+        !p4kx_testkit::render_adapter_required(),
+        "{test}: a graphics adapter is required: {}",
         run.stderr
     );
     #[expect(
@@ -70,7 +74,7 @@ fn skip(test: &str, run: &Run) -> bool {
         reason = "tells the test run why a test checked nothing"
     )]
     {
-        eprintln!("{test}: no software adapter, nothing checked");
+        eprintln!("{test}: no graphics adapter, nothing checked");
     }
     true
 }
@@ -238,5 +242,66 @@ fn an_output_inside_a_star_citizen_installation_is_refused() -> TestResult {
         run.stderr
     );
     assert!(!out.exists(), "nothing is written into the installation");
+    Ok(())
+}
+
+#[test]
+fn an_equal_camera_option_retains_tool_origin_with_an_encrypted_config() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let entries = hologram_entries([14.0, 45.0, 2.5])
+        .into_iter()
+        .map(|entry| {
+            if entry.path() == "Data\\Game2.dcb" {
+                entry.encrypted()
+            } else {
+                entry
+            }
+        })
+        .collect();
+    let archive = write_archive(dir.path(), entries)?;
+    let out = dir.path().join("ship.png");
+    let key = test_key().to_hex();
+    let run = hologram(
+        &archive,
+        &out,
+        &["--size", "64", "--fov", "14", "--key", &key],
+        true,
+    )?;
+    if skip("an_equal_camera_option_retains_tool_origin", &run) {
+        return Ok(());
+    }
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let report: Value = serde_json::from_str(&run.stdout)?;
+    assert_eq!(report["camera"]["fov_degrees"], 14.0);
+    let fields = &report["fieldOrigins"];
+    for (path, expected) in [
+        ("/camera/fov_degrees", false),
+        ("/camera/elevation_degrees", false),
+        ("/camera/view_angle_degrees", true),
+        ("/camera/distance_scaler", true),
+        ("/entity", true),
+    ] {
+        let encrypted = fields
+            .get(path)
+            .and_then(|origin| origin.get("containsEncryptedSource"))
+            .and_then(Value::as_bool);
+        assert_eq!(encrypted, Some(expected), "{path}");
+    }
+    assert_eq!(
+        fields["/camera/fov_degrees"]["sourceUsesRefs"],
+        serde_json::json!([]),
+    );
+    let uses = report["provenance"]["uses"]
+        .as_array()
+        .ok_or("original uses")?;
+    assert!(
+        uses.iter()
+            .any(|usage| usage["location"]["field"] == "ownDefaultViewAngle")
+    );
+    assert!(
+        !uses
+            .iter()
+            .any(|usage| usage["location"]["field"] == "cameraFOV")
+    );
     Ok(())
 }

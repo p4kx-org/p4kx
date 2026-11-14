@@ -150,13 +150,16 @@ fn a_cancelled_run_leaves_no_file_and_keeps_an_existing_one() -> TestResult {
     let dir = tempfile::tempdir()?;
     let file = dir.path().join("all.xml");
     let cancel = CancelToken::new();
+    let source_root = tempfile::tempdir()?;
+    let source = source_root.path().join("source.dcb");
+    fs::write(&source, &bytes)?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(&source, cancel.flag())?;
     cancel.cancel();
     let options = RecordExportOptions {
+        protection: Some(&protection),
         policy: ConflictPolicy::Overwrite,
         cancel: Some(&cancel),
-        progress: None,
-        texts: None,
-        tags: None,
+        ..RecordExportOptions::default()
     };
 
     let fresh = export_combined(&forge, &records, &file, &options)?;

@@ -7,7 +7,7 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use p4kx_testkit::{TestContainer, TestElement, TestEntry};
+use p4kx_testkit::{ArchiveBuilder, TestContainer, TestElement, TestEntry};
 
 use crate::shops_fixture::{CLOTHING, EXCHANGE, LOOSE, REGISTRY, registry};
 use crate::starmap_fixture;
@@ -140,11 +140,8 @@ fn inventory(items: &[&str]) -> Vec<u8> {
     format!(r#"{{"Inventory":[{}]}}"#, elements.join(",")).into_bytes()
 }
 
-/// Writes the Archive into `dir` and returns its path. The city container holds two shop
-/// components, the second without property name, the first tied to its Entity by object name
-/// only; the exchange names a placeholder inventory; the noodle shop is named by a prefab alone.
-pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
-    let path = dir.join("Data.p4k");
+/// Builds the Archive with the registry, city container, exchange and prefab shop inventories.
+pub(crate) fn builder() -> ArchiveBuilder {
     let mut builder = starmap_fixture::builder()
         .entry(TestEntry::stored(REGISTRY, registry()))
         .entry(TestEntry::stored(CITY, city()))
@@ -161,6 +158,12 @@ pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
             bytes,
         ));
     }
-    builder.write_to(&path)?;
+    builder
+}
+
+/// Writes the Archive into `dir` and returns its path.
+pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    let path = dir.join("Data.p4k");
+    builder().write_to(&path)?;
     Ok(path)
 }

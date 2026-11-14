@@ -36,6 +36,7 @@ pub(crate) enum UiAction {
     /// shape as `shape_<ID>.json` and morph shape as `morph_shape_<ID>.json`, in twips as the movie
     /// stores them. External images are decoded from the DDS texture they name, relative to the
     /// movie in the Archive or on disk, also with the extension .dds instead of the one given.
+    /// Writes .p4kx-origin.jsonl with the actual origin of each committed asset.
     #[command(after_help = EXIT_CODES_HELP)]
     Extract {
         /// The UI movie.

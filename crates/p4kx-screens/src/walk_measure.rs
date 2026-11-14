@@ -122,13 +122,15 @@ impl Walk<'_, '_, '_, '_> {
         let mut look = Look::of(widget, probe.style, self.pixel, font);
         look.bound_text = self.bound_text(probe.canvas, probe.index);
         let shaped = self.cx.texts.shape(widget, &look, parent);
-        let Some([width, height]) = shaped
-            .prepared
-            .as_ref()
-            .and_then(|prepared| self.cx.texts.measure(prepared, parent))
-        else {
+        let Some(prepared) = shaped.prepared.as_ref() else {
             return [None; 2];
         };
+        let Some([width, height]) = self.cx.texts.measure(prepared, parent) else {
+            return [None; 2];
+        };
+        if let (Some(inputs), Some(input)) = (self.cx.inputs.as_mut(), prepared.input.as_ref()) {
+            inputs.text_layout.insert(input.clone());
+        }
         if let Some(key) = keep {
             self.shaped.insert(key, shaped);
         }

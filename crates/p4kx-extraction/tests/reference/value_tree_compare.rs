@@ -149,6 +149,25 @@ pub(crate) fn compare_counting(
         resolve,
     };
     let found = walk(&ours.root, &theirs.root, &mut String::new(), &mut seen);
+    finish(found, seen)
+}
+
+/// Compares a manifest-selected embedded Record without inventing absent header fields.
+pub(crate) fn compare_embedded_counting(
+    guid: &str,
+    content: &Embedded,
+    resolve: &mut Resolve<'_>,
+) -> (Compared, u64) {
+    let mut seen = Observed {
+        allowed: Vec::new(),
+        embedded: 0,
+        resolve,
+    };
+    let found = walk_embedded(guid, content, &mut String::new(), &mut seen);
+    finish(found, seen)
+}
+
+fn finish(found: Option<String>, seen: Observed<'_>) -> (Compared, u64) {
     let compared = match found {
         Some(difference) => Compared::Different(difference),
         None if seen.allowed.is_empty() => Compared::Equal,
@@ -156,7 +175,6 @@ pub(crate) fn compare_counting(
     };
     (compared, seen.embedded)
 }
-
 /// Compares the Record P4KX holds under `guid` with the content the reference embedded.
 fn walk_embedded(
     guid: &str,

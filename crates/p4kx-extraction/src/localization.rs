@@ -3,7 +3,7 @@
 
 use std::io::{self, Read};
 
-use p4kx_archive::{Archive, ArchiveError, Entry};
+use p4kx_archive::{Archive, ArchiveError, Entry, EntryOrigin};
 use p4kx_localization::{GlobalIni, IniText, Language, LocalizationError, MAX_GLOBAL_INI_SIZE};
 use rayon::prelude::*;
 use thiserror::Error;
@@ -18,6 +18,8 @@ pub struct LocalizationEntry {
     language: Language,
     path: String,
     text: IniText<'static>,
+    original_byte_len: u64,
+    origin: Option<EntryOrigin>,
 }
 
 impl LocalizationEntry {
@@ -62,6 +64,7 @@ impl LocalizationEntry {
         if let Err(source) = read {
             return Err(LocalizationLoadError::Read { path, source });
         }
+        let original_byte_len = bytes.len() as u64;
         let text = IniText::decode_vec(bytes).map_err(|source| LocalizationLoadError::Decode {
             path: path.clone(),
             source,
@@ -70,6 +73,8 @@ impl LocalizationEntry {
             language,
             path,
             text,
+            original_byte_len,
+            origin: archive.entry_origin(entry),
         })
     }
 
@@ -108,6 +113,16 @@ impl LocalizationEntry {
     #[must_use]
     pub fn path(&self) -> &str {
         &self.path
+    }
+
+    /// Returns the actual language Entry and its complete containing-input context.
+    #[must_use]
+    pub const fn origin(&self) -> Option<&EntryOrigin> {
+        self.origin.as_ref()
+    }
+
+    pub(crate) const fn original_byte_len(&self) -> u64 {
+        self.original_byte_len
     }
 
     /// Returns the decoded text of the file.

@@ -82,7 +82,7 @@ pub(crate) struct TriggerHitShape {
     pub(crate) matched_trigger: bool,
     /// How many Wwise events the trigger posts.
     pub(crate) events_total: usize,
-    /// The first 25 Wwise events the trigger posts.
+    /// Every admitted Wwise event the trigger posts.
     pub(crate) events: Vec<EventShape>,
     /// Why the trigger leads to no soundbank; absent when it does.
     pub(crate) unmatched: Option<UnmatchedShape>,
@@ -142,7 +142,7 @@ pub(crate) struct EntityTriggerShape {
     pub(crate) definition: Option<String>,
     /// How many Wwise events the trigger posts.
     pub(crate) events_total: usize,
-    /// The first 25 Wwise events the trigger posts.
+    /// Every admitted Wwise event the trigger posts.
     pub(crate) events: Vec<EventShape>,
     /// Why the trigger leads to no soundbank; absent when it does.
     pub(crate) unmatched: Option<UnmatchedShape>,
@@ -199,7 +199,7 @@ pub(crate) struct TriggerShape {
     pub(crate) definition: Option<String>,
     /// How many events the trigger posts.
     pub(crate) events_total: usize,
-    /// The first 25 events the trigger posts.
+    /// Every admitted event the trigger posts.
     pub(crate) events: Vec<TriggerEventShape>,
 }
 

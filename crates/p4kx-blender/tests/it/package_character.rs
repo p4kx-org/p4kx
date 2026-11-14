@@ -25,6 +25,12 @@ use p4kx_testkit::{
 
 use crate::support::{TestResult, fixture, names_in, never};
 
+#[path = "package_character_default_material.rs"]
+mod default_material;
+#[path = "package_character_vertex_map.rs"]
+mod vertex_map;
+use default_material::write;
+
 fn head_path() -> String {
     format!("{MALE_HEAD_FOLDER}/{MALE_RIG}_head.skin")
 }
@@ -84,10 +90,12 @@ struct Written {
     summary: PackageSummary,
 }
 
-fn write(expressions: bool, animated: bool) -> Result<Written, Box<dyn Error>> {
-    let fixture = fixture(head_entries(Some(
-        head_rig(HEAD_VERTICES, MALE_RIG_HASH).build(),
-    )))?;
+fn write_with_entries(
+    expressions: bool,
+    animated: bool,
+    entries: Vec<p4kx_testkit::TestEntry>,
+) -> Result<Written, Box<dyn Error>> {
+    let fixture = fixture(entries)?;
     let archive = Archive::open(&fixture.path)?;
     let models = ArchiveModels::new(&archive);
     let piece = Piece::file("head", head_path(), None).shaped(dna());
@@ -142,7 +150,7 @@ fn a_character_is_a_folder_of_a_manifest_and_one_skinned_mesh() -> TestResult {
 
     assert_eq!(
         names_in(&written.out)?,
-        ["meshes", "scene.json", "textures"]
+        ["meshes", "receipt.json", "scene.json", "textures"]
     );
     assert_eq!(names_in(&written.out.join("meshes"))?, ["m0001.glb"]);
     assert_eq!(names_in(&written.out.join("textures"))?.len(), 0);
@@ -251,7 +259,7 @@ fn the_rig_lists_the_parts_morph_targets_and_animations_the_glb_holds() -> TestR
     assert_eq!(written.summary.animations(), 2);
     assert_eq!(written.summary.bones, rig.bones);
     assert_eq!(written.summary.morph_targets, rig.morph_targets);
-    assert_eq!(written.summary.files, 2);
+    assert_eq!(written.summary.files, 3);
     Ok(())
 }
 

@@ -39,6 +39,38 @@ pub fn create_default_target(
     build: Option<&str>,
     at: SystemTime,
 ) -> io::Result<PathBuf> {
+    create_checked_target(parent, channel, build, at, &|candidate| {
+        crate::ensure_writable(candidate)
+            .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))
+    })
+}
+
+/// Creates a default target while checking every candidate against its Archive job.
+///
+/// # Errors
+/// Returns a protection refusal or the I/O error of creating the folder.
+pub fn create_default_target_protected(
+    parent: &Path,
+    channel: Option<&str>,
+    build: Option<&str>,
+    at: SystemTime,
+    protection: &crate::ArchiveWriteProtection,
+    cancel: &crate::CancelToken,
+) -> io::Result<PathBuf> {
+    create_checked_target(parent, channel, build, at, &|candidate| {
+        protection
+            .ensure_writable(candidate, cancel.flag())
+            .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))
+    })
+}
+
+fn create_checked_target(
+    parent: &Path,
+    channel: Option<&str>,
+    build: Option<&str>,
+    at: SystemTime,
+    check: &dyn Fn(&Path) -> io::Result<()>,
+) -> io::Result<PathBuf> {
     let name = default_target_name(channel, build, at);
     for attempt in 1..=MAX_ATTEMPTS {
         let candidate = if attempt == 1 {
@@ -46,6 +78,7 @@ pub fn create_default_target(
         } else {
             parent.join(format!("{name}-{attempt}"))
         };
+        check(&candidate)?;
         match fs::create_dir(&candidate) {
             Ok(()) => return Ok(candidate),
             Err(error) if error.kind() == io::ErrorKind::AlreadyExists => {}

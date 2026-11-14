@@ -1,196 +1,76 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
+use p4kx_extraction::{CancelToken, DataForge, Filter};
 
-use p4kx_extraction::{CancelToken, DataForge, Filter, RecordTree, StructValue, TagTree};
-
-use crate::CatalogError;
-use crate::contract_hauling::{HaulingOrder, HaulingSource};
-use crate::contract_template::{ActiveSettings, AutoFinish, ContractTemplate};
-use crate::guid_text::CatalogGuid;
-use crate::mission_hauling::{objective_orders, property_orders};
-use crate::mission_hauling_levels::HaulingLevels;
-use crate::mission_index::title_key;
-use crate::mission_layers::one;
-use crate::record_fields::{boolean, class_name, integer, linked, text};
-use crate::record_read::{KindRead, ReadError, read_kind};
-use crate::selection::Kind;
-use crate::spawn_layers::Level;
-use crate::spawn_model::SpawnLevel;
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_v3::tag_catalog::CapturedTags;
+use crate::record_read::{KindRead, read_kind};
 use crate::spawn_pools::SpawnPools;
-use crate::spawn_read::Reader;
-use crate::template_extras::{end_comms, owner, partial_payout, start_comms};
-use crate::template_flow::FlowReader;
+use crate::template_canonical_read;
+use crate::template_definition::TemplateDefinition;
 use crate::template_issues::Unknowns;
-use crate::template_modifier::modifiers;
-use crate::template_objective::ObjectiveState;
-use crate::template_objective_read::ObjectiveReader;
-use crate::template_property_read::PropertyReader;
-use crate::texts::Texts;
+use crate::template_rows::TemplateConfigurations;
+use crate::{CatalogError, Kind};
 
-/// The contract templates of a DataForge, what was left out, the spawn descriptions and location
-/// queries their properties state and the stored names the catalog does not know.
-pub(crate) struct ContractTemplates<'f> {
-    pub(crate) read: KindRead<ContractTemplate<'f>>,
-    pub(crate) pools: SpawnPools<'f>,
+/// Physical Template definitions and their required context rows from the same original reads.
+pub(crate) struct ContractTemplates<'source> {
+    pub(crate) read: KindRead<'source, TemplateDefinition<'source>>,
+    pub(crate) configurations: TemplateConfigurations<'source>,
+    pub(crate) pools: SpawnPools<'source>,
     pub(crate) unknowns: Unknowns,
 }
 
-/// What a template is read with.
-struct Sources<'r, 'f> {
-    forge: &'r DataForge<'f>,
-    texts: &'r Texts<'f>,
-    tags: &'r TagTree,
-    unknowns: &'r Unknowns,
-}
-
-/// Reads the `ContractTemplate` Records `filter` matches, ordered by GUID; a development leftover
-/// is left out and counted. A Record that nests its phases or conditions too deep is a failure.
+/// Reads selected physical Template owners and their separate contextual interpretations.
 ///
 /// # Errors
-///
-/// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
-pub(crate) fn read<'f>(
-    forge: &'f DataForge<'f>,
-    texts: &Texts<'f>,
-    tags: &TagTree,
+/// Returns cancellation, original-input or source-accounting failures.
+pub(crate) fn read<'source>(
+    forge: &'source DataForge<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    tags: &CapturedTags<'_, 'source>,
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
-) -> Result<ContractTemplates<'f>, CatalogError> {
+) -> Result<ContractTemplates<'source>, CatalogError> {
     let unknowns = Unknowns::default();
-    let sources = Sources {
-        forge,
-        texts,
-        tags,
-        unknowns: &unknowns,
-    };
     let read = read_kind(
         forge,
+        projection.original(),
         Kind::ContractTemplates,
         (filter, cancel),
-        |tree| template(&sources, tree),
-        |(template, _)| template.guid,
+        |record, tree| {
+            template_canonical_read::read(projection, tags, record, tree, cancel, &unknowns)
+                .map_err(|error| Box::new(error) as crate::record_read::ReadError)
+        },
+        |built| built.definition.physical_guid,
     )?;
+    let KindRead {
+        items,
+        skipped,
+        mut failures,
+        mut ledger,
+    } = read;
+    let mut definitions = Vec::with_capacity(items.len());
+    let mut configurations = TemplateConfigurations::default();
     let mut pools = SpawnPools::default();
-    let items = read
-        .items
-        .into_iter()
-        .map(|(template, found)| {
-            pools.merge(found);
-            template
-        })
-        .collect();
+    for built in items {
+        definitions.push(built.definition);
+        configurations.templates.push(built.projection);
+        configurations.flows.extend(built.flows);
+        configurations.properties.extend(built.properties);
+        pools.merge(built.pools);
+        ledger.merge(built.ledger);
+        failures.extend(built.failures);
+    }
     Ok(ContractTemplates {
         read: KindRead {
-            items,
-            skipped: read.skipped,
-            failures: read.failures,
+            items: definitions,
+            skipped,
+            failures,
+            ledger,
         },
+        configurations,
         pools,
         unknowns,
     })
-}
-
-fn template<'f>(
-    sources: &Sources<'_, 'f>,
-    tree: &RecordTree<'f>,
-) -> Result<(ContractTemplate<'f>, SpawnPools<'f>), ReadError> {
-    let Sources {
-        forge,
-        texts,
-        tags,
-        unknowns,
-    } = *sources;
-    let root = Some(tree.root());
-    let display = one(root, "contractDisplayInfo");
-    let class = one(root, "contractClass");
-    let reader = Reader::new(tags, tree.root());
-    let pools = RefCell::new(SpawnPools::default());
-    let spawns = Level::read(
-        SpawnLevel::Template,
-        &reader,
-        (root, "contractProperties"),
-        (None, ""),
-        &mut pools.borrow_mut(),
-    )?
-    .resolved();
-    let objectives = ObjectiveReader::new(&reader, texts, unknowns, &pools).objectives(root)?;
-    let properties = PropertyReader::new(&reader, texts, unknowns, &pools);
-    let flow = FlowReader {
-        reader: &reader,
-        unknowns,
-    };
-    let template = ContractTemplate {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        not_for_release: boolean(root, "notForRelease"),
-        work_in_progress: boolean(root, "workInProgress"),
-        title: texts.localised(title_key(display)),
-        mission_type_guid: linked(display, "type"),
-        illegal: boolean(display, "illegal"),
-        show_life_time_in_mobi_glas: boolean(display, "showLifeTimeInMobiGlas"),
-        pre_show_objectives: boolean(display, "preShowObjectives"),
-        class_type: class.map(|class| class.type_name().to_owned()),
-        settings: one(class, "additionalParams").map(settings),
-        auto_finish: one(class, "autoFinishSettings").map(|finish| auto_finish(finish, unknowns)),
-        contract_properties: properties.mission_properties(root, "contractProperties")?,
-        ship_spawns: spawns.ship_spawns,
-        npc_spawns: spawns.npc_spawns,
-        entity_spawns: spawns.entity_spawns,
-        location_queries: spawns.location_queries,
-        hauling_orders: hauling_orders(root),
-        objectives,
-        partial_payout: partial_payout(root),
-        modifiers: modifiers(&reader, unknowns, root)?,
-        owner: owner(forge, root),
-        mission_flow: flow.triggers(root)?,
-        start_comms: start_comms(&reader, root),
-        end_comms: end_comms(&reader, unknowns, root),
-    };
-    Ok((template, pools.into_inner()))
-}
-
-/// Returns the hauling orders of the template `root`: its hauling properties and the orders of its
-/// hauling objectives.
-fn hauling_orders<'f>(root: Option<&StructValue<'f>>) -> Vec<HaulingOrder<'f>> {
-    let hauling = property_orders(root, "contractProperties");
-    let objective = objective_orders(root);
-    HaulingLevels {
-        properties: vec![(HaulingSource::Template, hauling.as_slice())],
-        template_objective: &objective,
-        broker_objective: &[],
-    }
-    .orders()
-}
-
-/// Reads the `ActiveContractSettings` flags of the struct `settings`.
-pub(crate) fn settings(settings: &StructValue<'_>) -> ActiveSettings {
-    let flag = |name: &str| boolean(Some(settings), name);
-    ActiveSettings {
-        can_be_shared: flag("canBeShared"),
-        has_complete_button: flag("hasCompleteButton"),
-        handles_abandon_request: flag("handlesAbandonRequest"),
-        display_allied_markers: flag("displayAlliedMarkers"),
-        only_owner_can_complete: flag("onlyOwnerCanComplete"),
-    }
-}
-
-fn auto_finish(settings: &StructValue<'_>, unknowns: &Unknowns) -> AutoFinish {
-    let flag = |name: &str| boolean(Some(settings), name);
-    let deadline = one(Some(settings), "contractDeadline");
-    AutoFinish {
-        fail_if_sent_to_prison: flag("failIfSentToPrison"),
-        fail_if_became_criminal: flag("failIfBecameCriminal"),
-        fail_if_leave_prison: flag("failIfLeavePrison"),
-        completion_time: integer(deadline, "missionCompletionTime"),
-        auto_end: boolean(deadline, "missionAutoEnd"),
-        result_after_timer_end: unknowns.parse(
-            "timer end result",
-            text(deadline, "missionResultAfterTimerEnd"),
-            ObjectiveState::parse,
-        ),
-        remaining_time_to_show_timer: integer(deadline, "remainingTimeToShowTimer"),
-    }
 }

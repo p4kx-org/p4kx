@@ -162,6 +162,7 @@ fn spawns() -> Vec<TestStruct> {
         TestStruct::new("SpawnDescription_Ship")
             .field("concurrentAmount", TestType::Int32)
             .field("includeLocationAISpawnTags", TestType::Bool)
+            .field("crewInheritsLocationFaction", TestType::Bool)
             .field("weight", TestType::Int32)
             .field("tags", class("TagList"))
             .field("negativeTags", class("TagList"))

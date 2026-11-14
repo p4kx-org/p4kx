@@ -2,34 +2,45 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
-use std::io::Read;
 use std::path::Path;
 
-use p4kx_extraction::cryxml::{self, Xml};
 use p4kx_extraction::{Archive, CancelToken, Entry};
 use rayon::prelude::*;
 
-use crate::shop_soc::inventory_stem;
+use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryXml};
+use crate::entry_source::EntrySource;
+use crate::export_diagnostic::ExportDiagnosticCode;
+use crate::export_entry_ledger::EntryOperation;
+use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::shop_entry_read;
+use crate::shop_inventory_name;
+use crate::shop_inventory_observations::RejectedInventoryPath;
+use crate::shop_inventory_path::InventoryStem;
 use crate::starmap_index::key;
 use crate::starmap_xml::{Node, attribute};
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 const FOLDER: &str = "data\\prefabs\\shops\\";
 const MAX_PREFAB_LEN: u64 = 64 << 20;
 const PROPERTY: &str = "offlineInventory";
 
-/// The inventory files that the shop prefabs of an Archive name, by the `CryGUID` of the Entity.
+/// Inventory selections from the original shop-prefab XML attributes.
 #[derive(Debug, Default)]
 pub(crate) struct Prefabs {
-    pub(crate) by_entity: HashMap<String, Vec<String>>,
+    pub(crate) ledger: ExportLedger,
+    pub(crate) by_entity: HashMap<String, Vec<InventoryStem>>,
+    pub(crate) rejected: HashMap<String, Vec<RejectedInventoryPath>>,
+    pub(crate) unattributed_declarations: bool,
     pub(crate) listed: usize,
     pub(crate) unreadable: usize,
 }
 
 impl Prefabs {
-    /// Reads every prefab library below `Data\Prefabs\Shops`. A shop Entity of a prefab has an
-    /// `Id` that is its `CryGUID` with the bytes reordered, which the containers that instance
-    /// the prefab carry in their `entitycomponentshop.xml`.
-    pub(crate) fn read(archive: &Archive, cancel: Option<&CancelToken>) -> Self {
+    pub(crate) fn read(
+        archive: &Archive,
+        cancel: Option<&CancelToken>,
+        capture: &EntryCapture<'_>,
+    ) -> Result<Self, CatalogError> {
         let listed: Vec<&Entry> = archive
             .entries()
             .iter()
@@ -41,89 +52,213 @@ impl Prefabs {
                         .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
             })
             .collect();
-        let read: Vec<Option<Vec<(String, String)>>> = listed
+        let read = listed
             .par_iter()
             .map(|entry| {
                 if cancel.is_some_and(CancelToken::is_cancelled) {
-                    return None;
+                    return Ok(ReadPrefab::default());
                 }
-                named(archive, entry)
+                named(archive, entry, capture)
             })
-            .collect();
+            .collect::<Result<Vec<_>, CatalogError>>()?;
         let mut prefabs = Self {
             listed: listed.len(),
             ..Self::default()
         };
-        for pairs in read {
-            let Some(pairs) = pairs else {
+        for read in read {
+            prefabs.ledger.merge(read.ledger);
+            let Some(pairs) = read.pairs else {
                 prefabs.unreadable += 1;
                 continue;
             };
             for (entity, stem) in pairs {
-                let stems = prefabs.by_entity.entry(entity).or_default();
-                if !stems.contains(&stem) {
-                    stems.push(stem);
-                }
+                insert(prefabs.by_entity.entry(entity).or_default(), stem)?;
             }
+            for (entity, path) in read.rejected {
+                prefabs.rejected.entry(entity).or_default().push(path);
+            }
+            prefabs.unattributed_declarations |= read.unattributed_declarations;
         }
-        prefabs
+        Ok(prefabs)
     }
 }
 
-fn named(archive: &Archive, entry: &Entry) -> Option<Vec<(String, String)>> {
-    if entry.uncompressed_size() > MAX_PREFAB_LEN {
-        return None;
+fn insert(stems: &mut Vec<InventoryStem>, stem: InventoryStem) -> Result<(), CatalogError> {
+    if let Some(held) = stems.iter_mut().find(|held| **held == stem) {
+        held.merge(&stem)?;
+    } else {
+        stems.push(stem);
     }
-    let mut bytes = Vec::new();
-    archive
-        .open_entry(entry)
-        .ok()?
-        .take(MAX_PREFAB_LEN)
-        .read_to_end(&mut bytes)
-        .ok()?;
-    match cryxml::read(&bytes).ok()? {
-        Xml::CryXml(document) => Some(pairs(document.root())),
-        Xml::Text(text) => {
-            let text = std::str::from_utf8(text)
-                .ok()?
-                .trim_start_matches('\u{feff}');
-            cryxml::check_text_depth(text).ok()?;
-            let document = roxmltree::Document::parse(text).ok()?;
-            Some(pairs(document.root_element()))
-        }
-    }
+    Ok(())
 }
 
-fn pairs<'d, N: Node<'d>>(root: N) -> Vec<(String, String)> {
-    let mut found = Vec::new();
-    let mut pending = vec![root];
+#[derive(Default)]
+struct ReadPrefab {
+    pairs: Option<Vec<(String, InventoryStem)>>,
+    rejected: Vec<(String, RejectedInventoryPath)>,
+    unattributed_declarations: bool,
+    ledger: ExportLedger,
+}
+
+fn named(
+    archive: &Archive,
+    entry: &Entry,
+    capture: &EntryCapture<'_>,
+) -> Result<ReadPrefab, CatalogError> {
+    let mut read = ReadPrefab::default();
+    let source = EntrySource::outer(capture, archive, entry)?
+        .operation(EntryOperation::ShopPrefab)
+        .dependency();
+    let bytes = match shop_entry_read::read(capture, &source, archive, entry, MAX_PREFAB_LEN)? {
+        Ok(bytes) => bytes,
+        Err(error) => {
+            read.ledger.incomplete_inventory(Kind::Shops);
+            source.diagnosed(
+                &mut read.ledger,
+                Kind::Shops,
+                SourceDisposition::ReadFailed,
+                error.diagnosis(),
+            );
+            return Ok(read);
+        }
+    };
+    let Ok(xml) = EntryXml::parse(&bytes, capture)? else {
+        read.ledger.incomplete_inventory(Kind::Shops);
+        source.diagnosed(
+            &mut read.ledger,
+            Kind::Shops,
+            SourceDisposition::ProjectionFailed,
+            shop_entry_read::diagnosis(ExportDiagnosticCode::MalformedSource, "PrefabLibrary"),
+        );
+        return Ok(read);
+    };
+    let projected = pairs(&xml, capture)?;
+    if let Some(field) = projected.failure {
+        source.diagnosed(
+            &mut read.ledger,
+            Kind::Shops,
+            SourceDisposition::ProjectionFailed,
+            shop_entry_read::diagnosis(ExportDiagnosticCode::MalformedSource, field),
+        );
+    } else {
+        source.record(&mut read.ledger, Kind::Shops, SourceDisposition::Projected);
+    }
+    read.pairs = Some(projected.files);
+    read.rejected = projected.rejected;
+    read.unattributed_declarations = projected.unattributed_declarations;
+    Ok(read)
+}
+
+#[derive(Default)]
+struct Pairs {
+    files: Vec<(String, InventoryStem)>,
+    rejected: Vec<(String, RejectedInventoryPath)>,
+    unattributed_declarations: bool,
+    failure: Option<&'static str>,
+}
+
+fn pairs(xml: &EntryXml<'_, '_, '_>, capture: &EntryCapture<'_>) -> Result<Pairs, CatalogError> {
+    let mut found = Pairs::default();
+    let mut pending = vec![xml.root()];
     while let Some(node) = pending.pop() {
-        if node.name().eq_ignore_ascii_case("Object")
-            && attribute(node, "Type") == Some("Entity")
-            && let Some(entity) = attribute(node, "Id").and_then(crypt_guid)
-        {
-            for stem in shop_stems(node) {
-                found.push((entity.clone(), stem));
+        if node.name().eq_ignore_ascii_case("Object") && attribute(node, "Type") == Some("Entity") {
+            let stems = shop_stems(node, xml)?;
+            if !stems.rejected.is_empty() {
+                found
+                    .failure
+                    .get_or_insert("EntityComponentShop.offlineInventory");
+            }
+            if !stems.files.is_empty() || !stems.rejected.is_empty() {
+                append(&mut found, stems, node, xml, capture)?;
             }
         }
         pending.extend(node.children());
     }
-    found
+    Ok(found)
 }
 
-fn shop_stems<'d, N: Node<'d>>(object: N) -> Vec<String> {
-    object
+fn append<'node>(
+    found: &mut Pairs,
+    stems: Stems,
+    node: impl Node<'node>,
+    xml: &EntryXml<'_, '_, '_>,
+    capture: &EntryCapture<'_>,
+) -> Result<(), CatalogError> {
+    let Some(entity) = attribute(node, "Id").and_then(crypt_guid) else {
+        found.failure.get_or_insert("Object.Id");
+        found.unattributed_declarations = true;
+        return Ok(());
+    };
+    let id = xml
+        .attribute(node, "Id")?
+        .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+    let kind = xml
+        .attribute(node, "Type")?
+        .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+    let name = xml.name(node)?;
+    let select = |path: AuthoredEntryPath| -> Result<AuthoredEntryPath, CatalogError> {
+        Ok(path
+            .selected_by(&id)?
+            .selected_by(&kind)?
+            .selected_by(&name)?)
+    };
+    for (path, stem) in stems.files {
+        let path = select(path)?;
+        found.files.push((
+            entity.clone(),
+            InventoryStem::captured(capture, &path, stem)?,
+        ));
+    }
+    for path in stems.rejected {
+        found
+            .rejected
+            .push((entity.clone(), RejectedInventoryPath::Text(select(path)?)));
+    }
+    Ok(())
+}
+
+#[derive(Default)]
+struct Stems {
+    files: Vec<(AuthoredEntryPath, String)>,
+    rejected: Vec<AuthoredEntryPath>,
+}
+
+fn shop_stems<'node>(
+    object: impl Node<'node>,
+    xml: &EntryXml<'_, '_, '_>,
+) -> Result<Stems, CatalogError> {
+    let mut found = Stems::default();
+    for properties in object
         .children()
         .filter(|child| child.name().eq_ignore_ascii_case("PropertiesDataCore"))
-        .flat_map(N::children)
-        .filter(|child| child.name().eq_ignore_ascii_case("EntityComponentShop"))
-        .flat_map(|component| component.attributes().collect::<Vec<_>>())
-        .filter(|(name, _)| {
-            name.get(..PROPERTY.len())
-                .is_some_and(|head| head.eq_ignore_ascii_case(PROPERTY))
-        })
-        .filter_map(|(_, value)| inventory_stem(value))
-        .collect()
+    {
+        for component in properties
+            .children()
+            .filter(|child| child.name().eq_ignore_ascii_case("EntityComponentShop"))
+        {
+            for (ordinal, (_, value)) in
+                component.attributes().enumerate().filter(|(_, (name, _))| {
+                    name.get(..PROPERTY.len())
+                        .is_some_and(|head| head.eq_ignore_ascii_case(PROPERTY))
+                })
+            {
+                if value.trim().is_empty() {
+                    continue;
+                }
+                let path = xml
+                    .attribute_at(component, ordinal)?
+                    .ok_or(ExportAccountingError::ConflictingSourceDatum)?
+                    .selected_by(&xml.name(properties)?)?
+                    .selected_by(&xml.name(component)?)?;
+                if let Some(stem) = shop_inventory_name::stem(value) {
+                    found.files.push((path, stem));
+                } else {
+                    found.rejected.push(path);
+                }
+            }
+        }
+    }
+    Ok(found)
 }
 
 /// Returns the lower-case `CryGUID` of the editor `Id` `{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}`:

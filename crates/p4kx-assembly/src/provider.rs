@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::error::Error;
-use std::io::Read;
 use std::sync::Arc;
 
 use p4kx_extraction::model::{
@@ -10,17 +9,24 @@ use p4kx_extraction::model::{
     PositionBox,
 };
 use p4kx_extraction::{
-    AnimationChoice, AnimationSet, Archive, ArchiveTextures, ConversionError, ModelSource,
-    PathIndex, TextureVerdicts, archive_error_in,
+    AnimationChoice, AnimationSet, Archive, ArchiveDefaultMaterial, ArchiveMaterialRead,
+    ArchiveMaterialReads, ArchiveModelRead, ArchiveTextures, ConversionError, EntryOrigin,
+    ModelArchiveSource, ModelSource, PathIndex, TextureVerdicts, archive_error_in,
 };
 use thiserror::Error;
 
-use crate::MAX_ASSEMBLY_VERTICES;
-use crate::cdf::is_character_definition;
+#[path = "provider_file.rs"]
+mod file;
+pub use file::archive_entry_candidates;
+
+use crate::cdf_model_sources::CdfModelSources;
 use crate::path_match::starts_with_path;
 use crate::skeleton::SkeletonProblem;
+use crate::{CdfAttachmentSite, DeployedGear, MAX_ASSEMBLY_VERTICES};
 
 mod character;
+#[path = "provider_dispatch.rs"]
+mod dispatch;
 
 /// A model a [`ModelProvider`] read and the Entry it was read from.
 #[derive(Debug, Clone)]
@@ -40,6 +46,9 @@ pub struct ProvidedModel {
     /// What is wrong with the skeleton file a character definition (`.cdf`) names; `None` when
     /// the file is fine, the definition names none, or the file is no character definition.
     pub skeleton: Option<SkeletonProblem>,
+    pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) cdf_model_sources: Option<Arc<CdfModelSources>>,
+    pub(crate) definition_origin: Option<EntryOrigin>,
 }
 
 /// A rigid model a character definition binds to a bone of its skeleton.
@@ -58,6 +67,8 @@ pub struct ProvidedAttachment {
     pub entry: String,
     /// The model, read without its material library.
     pub model: Arc<Model>,
+    pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) cdf_sources: Option<Arc<[CdfAttachmentSite]>>,
 }
 
 /// Why a [`ModelProvider`] cannot supply a model.
@@ -152,6 +163,16 @@ pub trait ModelProvider: Sync {
     /// the model first. A library that does not exist or cannot be read is a status.
     fn library(&self, entry: &str, name: &str) -> MaterialStatus;
 
+    /// Returns the library together with the original reads the provider can prove.
+    fn library_observed(&self, entry: &str, name: &str) -> ArchiveMaterialRead {
+        ArchiveMaterialRead::unobserved(self.library(entry, name))
+    }
+
+    /// Resolves the physical fallback when this provider owns an Archive.
+    fn default_material(&self) -> Option<Arc<ArchiveDefaultMaterial>> {
+        None
+    }
+
     /// Returns the budget of layer files one caller, such as one package, may read through
     /// [`Self::layer_library`]; the default has the default limits.
     fn layer_budget(&self) -> LayerBudget {
@@ -164,6 +185,15 @@ pub trait ModelProvider: Sync {
     /// the file like any library, with no entry to look beside.
     fn layer_library(&self, path: &str, _budget: &mut LayerBudget) -> Arc<MaterialStatus> {
         Arc::new(self.library("", path))
+    }
+
+    /// Returns a layer library and the original Entry when this provider can prove it.
+    fn layer_library_observed(
+        &self,
+        path: &str,
+        budget: &mut LayerBudget,
+    ) -> (Arc<MaterialStatus>, Option<EntryOrigin>) {
+        (self.layer_library(path, budget), None)
     }
 
     /// Reads the bytes of the file at `path`, a path below `Data`, such as the DNA rig a piece is
@@ -179,6 +209,15 @@ pub trait ModelProvider: Sync {
         Err(ModelFailure::Missing)
     }
 
+    /// Reads a file with the physical Archive Entry when the provider can prove it.
+    fn file_observed(
+        &self,
+        path: &str,
+        limit: u64,
+    ) -> (Option<EntryOrigin>, Result<Vec<u8>, ModelFailure>) {
+        (None, self.file(path, limit))
+    }
+
     /// Poses `model`, read from the landing gear's geometry `path`, at the end of the clip that
     /// deploys the gear, and returns the posed copy; `None` when the source has no such clip. The
     /// default has none.
@@ -190,6 +229,19 @@ pub trait ModelProvider: Sync {
     fn deployed(&self, path: &str, model: &Model) -> Result<Option<Model>, ModelFailure> {
         let _ = (path, model);
         Ok(None)
+    }
+
+    /// Poses a gear and retains original evidence when the provider can observe it.
+    ///
+    /// # Errors
+    /// As [`ModelProvider::deployed`].
+    fn deployed_observed(
+        &self,
+        path: &str,
+        model: &Model,
+    ) -> Result<Option<DeployedGear>, ModelFailure> {
+        self.deployed(path, model)
+            .map(|posed| posed.map(DeployedGear::from_model))
     }
 }
 
@@ -203,6 +255,8 @@ pub struct ArchiveModels<'a> {
     index: PathIndex<'a>,
     max_attachment_vertices: usize,
     layers: LayerCache,
+    material_reads: ArchiveMaterialReads,
+    observe_nodes: bool,
     verdicts: TextureVerdicts,
 }
 
@@ -210,13 +264,14 @@ impl<'a> ArchiveModels<'a> {
     /// Indexes the Entries of `archive`.
     #[must_use]
     pub fn new(archive: &'a Archive) -> Self {
-        Self {
-            archive,
-            index: PathIndex::new(archive),
-            max_attachment_vertices: MAX_ASSEMBLY_VERTICES,
-            layers: LayerCache::new(),
-            verdicts: TextureVerdicts::new(),
-        }
+        Self::from_path_index(PathIndex::new(archive))
+    }
+
+    /// Retains original model node and skeleton coordinates with the Entries read.
+    #[must_use]
+    pub const fn with_model_node_sources(mut self) -> Self {
+        self.observe_nodes = true;
+        self
     }
 
     /// Returns the provider with a limit of `max` vertices for the models of one character
@@ -273,87 +328,25 @@ impl<'a> ArchiveModels<'a> {
         choice: &AnimationChoice,
         extra: &[String],
     ) -> Result<AnimationSet, ConversionError> {
-        let folders: Vec<String> = folders
-            .iter()
-            .map(|folder| format!("Data/{}", folder.trim_start_matches(['/', '\\'])))
-            .collect();
-        let folders: Vec<&str> = folders.iter().map(String::as_str).collect();
-        AnimationSet::from_folders(&self.index, &folders, choice, extra)
-    }
-
-    pub(crate) fn entry_of(&self, path: &str) -> Option<String> {
-        let path = path.trim_start_matches(['/', '\\']);
-        [format!("Data\\{path}"), path.to_owned()]
-            .into_iter()
-            .find_map(|candidate| {
-                self.index
-                    .find(&candidate)
-                    .map(|entry| entry.path().to_owned())
-            })
-    }
-}
-
-impl ModelProvider for ArchiveModels<'_> {
-    fn model(&self, path: &str, lod: u32) -> Result<ProvidedModel, ModelFailure> {
-        let entry = self.entry_of(path).ok_or(ModelFailure::Missing)?;
-        if is_character_definition(&entry) {
-            return self.character(&entry, lod);
-        }
-        self.read_model(entry, lod, Vec::new())
-    }
-
-    fn library(&self, entry: &str, name: &str) -> MaterialStatus {
-        ModelSource::material_library(&self.index, entry, name, &self.layers, &self.verdicts)
-    }
-
-    fn layer_budget(&self) -> LayerBudget {
-        self.layers.budget()
-    }
-
-    fn layer_library(&self, path: &str, budget: &mut LayerBudget) -> Arc<MaterialStatus> {
-        ModelSource::layer_library(&self.index, path, &self.layers, &self.verdicts, budget)
-    }
-
-    fn file(&self, path: &str, limit: u64) -> Result<Vec<u8>, ModelFailure> {
-        let path = self.entry_of(path).ok_or(ModelFailure::Missing)?;
-        let entry = self.index.find(&path).ok_or(ModelFailure::Missing)?;
-        let size = entry.uncompressed_size();
-        if size > limit {
-            return Err(ModelFailure::Unreadable {
-                reason: format!("the file holds {size} bytes, more than the limit of {limit}"),
-            });
-        }
-        let reader = self.archive.open_entry(entry).map_err(read_failure)?;
-        let mut bytes = Vec::with_capacity(usize::try_from(size).unwrap_or_default());
-        reader
-            .take(limit)
-            .read_to_end(&mut bytes)
-            .map_err(read_failure)?;
-        Ok(bytes)
-    }
-
-    fn deployed(&self, path: &str, model: &Model) -> Result<Option<Model>, ModelFailure> {
-        self.pose_gear(path, model)
+        self.animations_with_archive_sources(folders, choice, extra)
+            .map(p4kx_extraction::ArchiveAnimationRead::into_set)
     }
 }
 
 impl ArchiveModels<'_> {
-    pub(crate) fn animations_of(
-        &self,
-        extra: &[String],
-        choice: &AnimationChoice,
-    ) -> Result<AnimationSet, ConversionError> {
-        AnimationSet::from_folders(&self.index, &[], choice, extra)
-    }
-
     fn read_model(
         &self,
         entry: String,
         lod: u32,
         left_out: Vec<String>,
     ) -> Result<ProvidedModel, ModelFailure> {
+        let read_model = if self.observe_nodes {
+            ModelSource::from_index_observing_model_sources
+        } else {
+            ModelSource::from_index_reading
+        };
         let read = |selection| {
-            ModelSource::from_index_reading(
+            read_model(
                 &self.index,
                 &entry,
                 selection,
@@ -370,19 +363,27 @@ impl ArchiveModels<'_> {
             other => other,
         }
         .map_err(failure)?;
-        let mut model = source.into_model();
+        let ArchiveModelRead {
+            mut model,
+            mut sources,
+            ..
+        } = source.into_model_with_archive_sources();
         keep_nearest_lod(&mut model, lod);
         if model.lods.is_empty() {
             return Err(ModelFailure::Unreadable {
                 reason: "the model has no level of detail".to_owned(),
             });
         }
+        sources.retain(|source| source.supplies(&model));
         Ok(ProvidedModel {
             entry,
             model,
             left_out,
             attachments: Vec::new(),
             skeleton: None,
+            archive_sources: sources.into(),
+            cdf_model_sources: None,
+            definition_origin: None,
         })
     }
 }

@@ -3,12 +3,13 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use p4kx_extraction::{DataForge, DataForgeLoadError, LoadedDataForge};
+use p4kx_extraction::{DataForge, DataForgeLoadError, DataForgeOrigin, LoadedDataForge};
 
 use crate::error::{ToolError, chain};
+use crate::query_selection_sources::SelectionReceipt;
 
-/// The selection of the last Query run: the Query text and the indexes of the Records it chose.
-type Selection = Option<(String, Arc<[u32]>)>;
+/// The last Query text and its selected Record positions and observed inputs.
+type Selection = Option<(String, Arc<SelectionReceipt>)>;
 
 /// The DataForge of one input, read on first use, and the selection of the last Query run over
 /// it.
@@ -21,7 +22,7 @@ pub(crate) struct ForgeState {
 impl ForgeState {
     /// Runs `work` against the DataForge with the input path as text, reading the DataForge with
     /// `read` on first use.
-    pub(crate) fn with<T, F>(
+    pub(crate) fn with_origin<T, F>(
         &self,
         read: impl FnOnce() -> Result<LoadedDataForge, DataForgeLoadError>,
         path: String,
@@ -29,10 +30,12 @@ impl ForgeState {
     ) -> Result<T, ToolError>
     where
         T: Send + 'static,
-        F: FnOnce(&DataForge<'_>, String) -> Result<T, ToolError> + Send + 'static,
+        F: FnOnce(&DataForge<'_>, String, &DataForgeOrigin) -> Result<T, ToolError>
+            + Send
+            + 'static,
     {
         self.dataforge(read)?
-            .with(move |forge| work(forge, path))
+            .with_origin(move |forge, origin| work(forge, path, origin))
             .map_err(|_| ToolError::Stopped)?
     }
 
@@ -46,7 +49,7 @@ impl ForgeState {
     }
 
     /// Returns the selection of the last Query run if it was of `query`.
-    pub(crate) fn selection(&self, query: &str) -> Option<Arc<[u32]>> {
+    pub(crate) fn selection(&self, query: &str) -> Option<Arc<SelectionReceipt>> {
         let selection = self
             .selection
             .lock()
@@ -58,7 +61,7 @@ impl ForgeState {
     }
 
     /// Keeps `records` as the selection of the last Query run, which was of `query`.
-    pub(crate) fn keep_selection(&self, query: &str, records: Arc<[u32]>) {
+    pub(crate) fn keep_selection(&self, query: &str, records: Arc<SelectionReceipt>) {
         *self
             .selection
             .lock()

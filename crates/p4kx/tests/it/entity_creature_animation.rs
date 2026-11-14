@@ -8,7 +8,8 @@ use std::error::Error;
 use std::path::Path;
 
 use p4kx_testkit::{
-    CREATURE_ANIMATED, CREATURE_ANIMATION_DATABASE_LOST, check_glb, creature_entries,
+    CREATURE_ANIMATED, CREATURE_ANIMATION_DATABASE_LOST, CREATURE_ANIMATION_SCOPED, check_glb,
+    creature_entries,
 };
 use serde_json::Value;
 
@@ -74,6 +75,85 @@ fn the_json_report_lists_the_written_animations_and_the_ones_left_out() -> TestR
         .count();
     assert_eq!(left_out, 2, "{report}");
     assert_eq!(report["skipped"], 0, "animations never skip a part");
+    Ok(())
+}
+
+#[test]
+fn the_report_binds_nested_selectors_to_the_selected_physical_clips() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = write_archive(dir.path(), creature_entries())?;
+    let out = dir.path().join("scoped.glb");
+    let output = glb(
+        &archive,
+        CREATURE_ANIMATION_SCOPED,
+        &out,
+        &["--animations", "--json"],
+    )?;
+    let report: Value = serde_json::from_str(&output)?;
+    let sources = &report["animation_sources"];
+    assert_eq!(sources["selection_complete"], true, "{sources}");
+    for field in ["database", "geometry", "skeleton", "parameters"] {
+        assert_eq!(
+            sources["owner"][field]["sourceSetComplete"], true,
+            "{sources}"
+        );
+    }
+    let clips = sources["clips"].as_array().ok_or("selected clips")?;
+    let [dba, caf] = clips.as_slice() else {
+        return Err("expected one in-scope CAF and one in-scope DBA clip".into());
+    };
+    assert_eq!(dba["ordinal"]["value"], 1);
+    assert_eq!(caf["ordinal"]["value"], 0);
+    assert!(
+        dba["entry"]["value"]
+            .as_str()
+            .is_some_and(|path| path.ends_with("scoped.dba"))
+    );
+    assert!(
+        caf["entry"]["value"]
+            .as_str()
+            .is_some_and(|path| path.ends_with("wave.caf"))
+    );
+    let selectors = dba["graph_selectors"].as_array().ok_or("ADB selectors")?;
+    assert_eq!(
+        selectors
+            .iter()
+            .map(|value| &value["value"])
+            .collect::<Vec<_>>(),
+        ["scoped", "SCOPED"]
+    );
+    for selector in selectors {
+        assert_eq!(selector["sourceSetComplete"], true, "{selector}");
+        assert_eq!(selector["containsEncryptedSource"], false, "{selector}");
+        assert_graph_uses(sources, selector)?;
+    }
+    Ok(())
+}
+
+fn assert_graph_uses(sources: &Value, selector: &Value) -> TestResult {
+    let refs = selector["sourceUsesRefs"]
+        .as_array()
+        .ok_or("field use references")?;
+    let uses = sources
+        .get("source_inventory")
+        .and_then(|inventory| inventory.get("uses"))
+        .ok_or("source use inventory")?
+        .as_array()
+        .ok_or("source uses")?;
+    let fields: Vec<_> = uses
+        .iter()
+        .filter(|usage| refs.contains(&usage["id"]))
+        .filter_map(|usage| usage.get("location")?.get("field")?.as_str())
+        .collect();
+    assert!(
+        fields
+            .iter()
+            .any(|field| field.ends_with(".animDatabase3P")),
+        "missing animated-character selector among {fields:?}"
+    );
+    for field in ["File", "name", "animationSources", "databasePath"] {
+        assert!(fields.contains(&field), "missing {field} among {fields:?}");
+    }
     Ok(())
 }
 

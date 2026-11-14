@@ -67,6 +67,16 @@ impl Folder {
     }
 }
 
+/// One consulted site in a folder lookup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum FolderLookupSite {
+    /// The folder whose child names are searched.
+    Children(FolderId),
+    /// The folder whose original name is compared.
+    Name(FolderId),
+}
+
 /// The folders of an Archive, built once after opening it.
 ///
 /// Folder names are compared ignoring ASCII case with `/` and `\` alike, so spellings that
@@ -153,15 +163,29 @@ impl EntryTree {
     /// either end; the empty path is the root.
     #[must_use]
     pub fn find_folder(&self, path: &str) -> Option<FolderId> {
+        self.find_folder_observed(path, |_| {})
+    }
+
+    /// Finds a folder and reports the child lists and names consulted during the lookup.
+    #[must_use]
+    pub fn find_folder_observed(
+        &self,
+        path: &str,
+        mut observe: impl FnMut(FolderLookupSite),
+    ) -> Option<FolderId> {
         let path = path.trim_matches(is_separator);
         if path.is_empty() {
             return Some(self.root());
         }
         path.split(is_separator)
             .try_fold(self.root(), |folder, name| {
+                observe(FolderLookupSite::Children(folder));
                 let children = self.folder(folder).children();
                 children
-                    .binary_search_by(|&child| compare_names(self.folder(child).name(), name))
+                    .binary_search_by(|&child| {
+                        observe(FolderLookupSite::Name(child));
+                        compare_names(self.folder(child).name(), name)
+                    })
                     .ok()
                     .and_then(|index| children.get(index).copied())
             })

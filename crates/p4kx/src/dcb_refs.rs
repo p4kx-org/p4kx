@@ -5,7 +5,7 @@ use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 
 use anyhow::Result;
-use p4kx_extraction::{DataForge, IndexedReference, ReferenceIndex};
+use p4kx_extraction::{DataForge, DataForgeError, IndexedReference, ReferenceIndex, SourceUseRole};
 use thiserror::Error;
 
 use crate::cli::{DcbRefsArgs, RefsFormat};
@@ -38,24 +38,46 @@ pub(crate) struct Info<'f> {
     pub(crate) record_path: &'f str,
     pub(crate) name: &'f str,
     pub(crate) type_name: &'f str,
+    original: HeaderReads,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct HeaderReads {
+    pub(crate) index: u32,
+    pub(crate) path: SourceUseRole,
+    pub(crate) name: SourceUseRole,
+    pub(crate) source_type: SourceUseRole,
+}
+
+impl Info<'_> {
+    pub(crate) const fn original(&self) -> HeaderReads {
+        self.original
+    }
 }
 
 /// One Reference of a listing.
 #[derive(Debug, Clone)]
-pub(crate) struct Link<'f> {
+pub(crate) struct Link<'index, 'f> {
     pub(crate) record: Option<Info<'f>>,
     pub(crate) guid: Option<String>,
     pub(crate) location: String,
     pub(crate) field: String,
     pub(crate) indices: Vec<u32>,
+    original: IndexedReference<'index>,
+}
+
+impl<'index> Link<'index, '_> {
+    pub(crate) const fn original(&self) -> IndexedReference<'index> {
+        self.original
+    }
 }
 
 /// The References to or from one Record.
 #[derive(Debug)]
-pub(crate) struct Listing<'f> {
+pub(crate) struct Listing<'index, 'f> {
     pub(crate) target: Info<'f>,
-    pub(crate) references: Vec<Link<'f>>,
-    pub(crate) unresolved: Vec<Link<'f>>,
+    pub(crate) references: Vec<Link<'index, 'f>>,
+    pub(crate) unresolved: Vec<Link<'index, 'f>>,
 }
 
 /// The edges between record files, as pairs of record paths.
@@ -88,49 +110,53 @@ pub(crate) fn run(args: &DcbRefsArgs, as_json: bool) -> Result<ExitCode> {
         (as_json, format) => as_json || format == Some(RefsFormat::Json),
     };
     let input = ForgeInput::open(&args.archive)?;
-    let forge = input.entry().open()?;
-    let targets = match args.target.as_deref() {
-        Some(text) => resolve(&forge, text)?,
-        None => Vec::new(),
-    };
-    let index = ReferenceIndex::build(&forge);
-    warn(&index);
     let mut out = BufWriter::new(io::stdout().lock());
-    let written = match args.mode() {
-        mode @ (Mode::Incoming | Mode::Outgoing) => {
-            let listings = listings(&forge, &index, &targets, mode);
-            if json {
-                dcb_refs_json::listings(&mut out, &args.archive, mode, &listings)
-            } else {
-                dcb_refs_table::listings(&mut out, mode, &listings)
-            }
-        }
-        Mode::Files => {
-            let edges = edges(&forge, &index, &targets);
-            if json {
-                dcb_refs_json::files(&mut out, &args.archive, &edges)
-            } else {
-                dcb_refs_table::files(&mut out, &edges)
-            }
-        }
-        Mode::Unresolved => {
-            let links = unresolved(&forge, &index);
-            if json {
-                dcb_refs_json::unresolved(&mut out, &args.archive, &links)
-            } else {
-                dcb_refs_table::unresolved(&mut out, &links)
-            }
-        }
+    let target = args.target.as_deref();
+    let written = if json {
+        dcb_refs_json::write(&mut out, &input, target, args.mode())
+    } else {
+        let forge = input.entry().open()?;
+        let targets = select(&forge, target)?;
+        let index = ReferenceIndex::build(&forge);
+        warn(&index);
+        write_table(&mut out, &forge, &index, &targets, args.mode()).map_err(Into::into)
     };
-    match written.and_then(|()| out.flush()) {
-        Err(error) if error.kind() != io::ErrorKind::BrokenPipe => Err(error.into()),
+    match written.and_then(|()| out.flush().map_err(Into::into)) {
+        Err(error)
+            if error
+                .downcast_ref::<io::Error>()
+                .is_none_or(|source| source.kind() != io::ErrorKind::BrokenPipe) =>
+        {
+            Err(error)
+        }
         _ => Ok(ExitCode::from(exit::SUCCESS)),
     }
 }
 
-/// Returns the indices of the Records `text` names: the one with that GUID, or those at that
-/// record path.
-fn resolve(forge: &DataForge<'_>, text: &str) -> Result<Vec<u32>, UnknownRecord> {
+fn write_table(
+    out: &mut impl Write,
+    forge: &DataForge<'_>,
+    index: &ReferenceIndex,
+    targets: &[u32],
+    mode: Mode,
+) -> io::Result<()> {
+    match mode {
+        Mode::Incoming | Mode::Outgoing => {
+            dcb_refs_table::listings(out, mode, &listings(forge, index, targets, mode))
+        }
+        Mode::Files => dcb_refs_table::files(out, &edges(forge, index, targets)),
+        Mode::Unresolved => dcb_refs_table::unresolved(out, &unresolved(forge, index)),
+    }
+}
+
+/// Returns the original Record indices named by the requested GUID or record path.
+pub(crate) fn select(
+    forge: &DataForge<'_>,
+    target: Option<&str>,
+) -> Result<Vec<u32>, UnknownRecord> {
+    let Some(text) = target else {
+        return Ok(Vec::new());
+    };
     let found = forge.records_named(text);
     if found.is_empty() {
         return Err(UnknownRecord(text.to_owned()));
@@ -138,13 +164,13 @@ fn resolve(forge: &DataForge<'_>, text: &str) -> Result<Vec<u32>, UnknownRecord>
     Ok(found)
 }
 
-fn warn(index: &ReferenceIndex) {
+pub(crate) fn warn(index: &ReferenceIndex) {
     let mut err = io::stderr().lock();
     if index.is_truncated() {
         let _unreported = writeln!(
             err,
-            "warning: the DataForge holds more than {} References; the index is incomplete",
-            p4kx_extraction::MAX_INDEXED_REFERENCES
+            "warning: the index contains only the first {} References",
+            index.len()
         );
     }
     if index.unreadable_records() > 0 {
@@ -156,36 +182,58 @@ fn warn(index: &ReferenceIndex) {
     }
 }
 
-fn info<'f>(forge: &'f DataForge<'f>, record: u32) -> Option<Info<'f>> {
-    let record = forge.record(record)?;
+fn info<'source>(forge: &'source DataForge<'source>, index: u32) -> Option<Info<'source>> {
+    let record = forge.record(index)?;
+    let (record_path, path) = display(record.record_path(), SourceUseRole::Conversion);
+    let (name, name_role) = record
+        .stored_name()
+        .map_or(("", SourceUseRole::Attempted), |name| {
+            name.fold(
+                || ("", SourceUseRole::Conversion),
+                || ("", SourceUseRole::Conversion),
+                |text| (text, SourceUseRole::Payload),
+            )
+        });
+    let (type_name, source_type) = display(record.type_name(), SourceUseRole::Payload);
     Some(Info {
         guid: record.guid().to_string(),
-        record_path: record.record_path().unwrap_or_default(),
-        name: record.name().unwrap_or_default(),
-        type_name: record.type_name().unwrap_or_default(),
+        record_path,
+        name,
+        type_name,
+        original: HeaderReads {
+            index: record.index(),
+            path,
+            name: name_role,
+            source_type,
+        },
     })
 }
 
-fn link<'f>(
-    forge: &'f DataForge<'f>,
-    reference: &IndexedReference<'_>,
+fn display(value: Result<&str, DataForgeError>, role: SourceUseRole) -> (&str, SourceUseRole) {
+    value.map_or(("", SourceUseRole::Attempted), |value| (value, role))
+}
+
+fn link<'index, 'source>(
+    forge: &'source DataForge<'source>,
+    reference: IndexedReference<'index>,
     other: Option<u32>,
-) -> Link<'f> {
+) -> Link<'index, 'source> {
     Link {
         record: other.and_then(|record| info(forge, record)),
         guid: reference.unresolved_guid().map(|guid| guid.to_string()),
         location: reference.location(),
         field: reference.field_path().to_owned(),
         indices: reference.indices().to_vec(),
+        original: reference,
     }
 }
 
-fn listings<'f>(
-    forge: &'f DataForge<'f>,
-    index: &ReferenceIndex,
+pub(crate) fn listings<'index, 'source>(
+    forge: &'source DataForge<'source>,
+    index: &'index ReferenceIndex,
     targets: &[u32],
     mode: Mode,
-) -> Vec<Listing<'f>> {
+) -> Vec<Listing<'index, 'source>> {
     targets
         .iter()
         .filter_map(|&target| {
@@ -198,17 +246,15 @@ fn listings<'f>(
                 for reference in index.incoming(target) {
                     listing
                         .references
-                        .push(link(forge, &reference, Some(reference.source())));
+                        .push(link(forge, reference, Some(reference.source())));
                 }
             } else {
                 for reference in index.outgoing(target) {
                     match reference.target() {
                         Some(other) => {
-                            listing
-                                .references
-                                .push(link(forge, &reference, Some(other)));
+                            listing.references.push(link(forge, reference, Some(other)));
                         }
-                        None => listing.unresolved.push(link(forge, &reference, None)),
+                        None => listing.unresolved.push(link(forge, reference, None)),
                     }
                 }
             }
@@ -217,10 +263,13 @@ fn listings<'f>(
         .collect()
 }
 
-fn unresolved<'f>(forge: &'f DataForge<'f>, index: &ReferenceIndex) -> Vec<Link<'f>> {
+pub(crate) fn unresolved<'index, 'source>(
+    forge: &'source DataForge<'source>,
+    index: &'index ReferenceIndex,
+) -> Vec<Link<'index, 'source>> {
     index
         .unresolved()
-        .map(|reference| link(forge, &reference, Some(reference.source())))
+        .map(|reference| link(forge, reference, Some(reference.source())))
         .collect()
 }
 

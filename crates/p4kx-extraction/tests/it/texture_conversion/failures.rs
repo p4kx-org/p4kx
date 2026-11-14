@@ -85,8 +85,7 @@ fn a_format_without_a_decoder_keeps_the_merged_dds_and_writes_the_raw_parts() ->
         .first()
         .and_then(|failure| Error::source(failure.error()))
         .and_then(Error::source)
-        .map(ToString::to_string)
-        .unwrap_or_default();
+        .map_or_default(ToString::to_string);
     assert!(source.contains("R32G32_SINT"), "names the format: {source}");
     assert_eq!(
         files(&fixture.target)?,

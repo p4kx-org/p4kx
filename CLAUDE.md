@@ -20,16 +20,18 @@ the build, architecture, or the rules below change.
 Real p4k files live under `C:\Program Files\Roberts Space Industries\StarCitizen\<channel>\Data.p4k`,
 one folder per channel (`LIVE`, `PTU`, `EPTU`, `HOTFIX`, `TECH-PREVIEW`). They are many gigabytes,
 read-only and game assets: never copy them or anything extracted from them into the repository, and
-never write into the game folders. Extraction output during development goes into the agent's
-task folder under `D:\Coding\Agents\Temp\<agent>\` (see "Rules").
+never write into the game folders. Development output and scratch files go under
+`D:\Coding\Agents\Temp\<agent>\<task>\`, using `codex` or `claude` for the agent folder.
 
 Never read `loginData.json` or other launcher credential files in the game folders. Tests against a
 real Archive are `#[ignore]`d and need `P4KX_DATA_P4K`; CI uses synthetic
-fixtures. Run them with `TMP` and `TEMP` in that task folder so the extracted subset lands there; the suite also uses the stored key (`P4KX_ARCHIVE_KEY`, else the
+fixtures. Run them with `TMP` and `TEMP` under that task's scratch folder so the
+extracted subset lands there; the suite also uses the stored key (`P4KX_ARCHIVE_KEY`, else the
 file named by `P4KX_KEY_FILE`, else `p4kx key set`'s file), so none is set by hand:
 
 ```powershell
-$env:TMP = 'D:\Coding\Agents\Temp\claude\<task>\tmp'; $env:TEMP = $env:TMP
+$env:TMP = 'D:\Coding\Agents\Temp\codex\real-archive\tmp'; $env:TEMP = $env:TMP
+New-Item -ItemType Directory -Force -Path $env:TMP | Out-Null
 $env:P4KX_DATA_P4K = 'C:\Program Files\Roberts Space Industries\StarCitizen\LIVE\Data.p4k'
 $env:P4KX_DATA_P4K_B = 'C:\Program Files\Roberts Space Industries\StarCitizen\PTU\Data.p4k'
 cargo test --release --workspace --locked -- --ignored
@@ -41,7 +43,15 @@ that group their tests (see "Test layout"), the real-Archive tests are the modul
 `cargo test --release -p <crate> --test real_archive -- <test_name> --ignored`. The CI suite
 runs faster with cargo-nextest: `cargo nextest run --workspace --locked`, then
 `cargo test --workspace --locked --doc` for the doctests nextest skips; `cargo test --workspace
---locked` stays valid. Prefer nextest for `p4kx-render` locally: its GPU tests run one process each
+--locked` stays valid. `rust-toolchain.toml` pins the compiler; `.config/nextest-version`
+pins cargo-nextest. `.github/scripts/check-build-tools.ps1 -Verify -Nextest` checks installed
+releases, and `cargo xtask toolchain` checks repository pin consistency.
+`.config/platforms.json` owns the native target matrix and package suffixes. CI and packaging use
+its common helpers; `docs/supported-platforms.md` defines target-bound archive/runtime evidence
+and the strict release preflight.
+Native GUI or package checks set an absolute `P4KX_FOLDERS_ROOT`; read `docs/profile-folders.md`
+before launching them. Windows known folders ignore `APPDATA` substitutions.
+Prefer nextest for `p4kx-render` locally: its GPU tests run one process each
 with a time limit (`.config/nextest.toml`), while one shared process can hang in a graphics driver.
 In a plain `cargo test` run, `p4kx_testkit::watchdog` ends a hung process with exit code 3 and
 names the running tests and their phases; `P4KX_TEST_DEADLINE_SECS` overrides its 600 s limit. The two concurrency stress tests need optimised code and run with
@@ -61,6 +71,9 @@ The differential tests of `crates/p4kx-extraction/tests/reference/` compare P4KX
 unp4k, unforge and StarBreaker, which the owner produces beforehand (never a test, never CI); they
 read it from `P4KX_REF_UNP4K`, `P4KX_REF_UNFORGE` and `P4KX_REF_STARBREAKER`
 (`p4kx_testkit::reference_unp4k_path` and its two siblings) and skip when a variable is unset.
+Configured roots require a source-bound pre-conversion `.p4kx-reference.json` and complete
+artifact/log inventory (ADR-0342); use the manual helpers in `docs/differential-verification.md`
+when preparing or migrating reference output.
 `docs/differential-verification.md` says how to produce the folders and holds the results of the
 first run; a difference not on its allow-list fails the test.
 
@@ -112,14 +125,15 @@ a new test file goes into `tests/it/` and `main.rs` gets its `mod` line.
 - Libraries are synchronous and parallelise with rayon; tokio only in `p4kx-mcp`. The one
   exception is Sound Conversion during Extraction, which runs on plain worker threads (ADR-0022).
 - `thiserror` in libraries, `anyhow` only in binaries; no `unwrap` / `expect` outside tests.
-- `unsafe_code = "forbid"` everywhere except the `cfg(windows)` DWM module in `p4kx-gui`, whose
-  manifest repeats the workspace lints with `unsafe_code = "deny"`; `cargo xtask lints` checks
-  that (ADR-0006).
+- `unsafe_code = "forbid"` except the `cfg(windows)` DWM leaf in `p4kx-gui` and the fixed,
+  bounded Environment-notification leaf in `p4kx-msi-path`. These frontends repeat the workspace
+  lints with only `unsafe_code = "deny"`; the MSI library explicitly forbids unsafe code.
+  `cargo xtask lints` checks the exact boundaries (ADR-0006, ADR-0354).
 - The look follows the P4KX theme strictly: dark only, Lato only (ADR-0006). See "GUI design
   (hard rule)" below.
 - The window opens Direct3D 12 first on Windows and falls back to the default wgpu backends;
-  `WGPU_BACKEND` overrides it, and the GUI's headless tests open only the software backend
-  (ADR-0317).
+  `WGPU_BACKEND` overrides it (ADR-0317). For GUI render tests, follow the native adapter
+  requirements in [docs/supported-platforms.md](docs/supported-platforms.md).
 - Source files stay below about 400 lines; split by responsibility before that.
 - One canonical Record tree serialised to XML and JSON; References are links, never embedded
   (ADR-0004).

@@ -17,8 +17,9 @@ fn bytes_come_as_base64_from_an_offset_with_a_maximum_length() -> TestResult {
         "read_entry_bytes",
         &json!({ "path": r"data\OBJECTS\ship.cgf", "offset": 2, "max_bytes": 5 }),
     )?;
+
     assert_eq!(
-        first,
+        payload_with_origins_removed(first)?,
         json!({
             "archive": install.archive().display().to_string(),
             "path": "Data/Objects/ship.cgf",
@@ -53,6 +54,17 @@ fn bytes_come_as_base64_from_an_offset_with_a_maximum_length() -> TestResult {
     Ok(())
 }
 
+fn payload_with_origins_removed(mut result: Value) -> TestResult<Value> {
+    let payload = result.as_object_mut().ok_or("structured read result")?;
+    for member in ["fieldOrigins", "provenance"] {
+        assert!(
+            payload.remove(member).is_some(),
+            "the result contains {member}"
+        );
+    }
+    Ok(result)
+}
+
 const SHIP_XML: &str = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
 <Ship name=\"Gladius\">\n  <Part class=\"wing\"/>\n</Ship>\n";
 
@@ -84,7 +96,7 @@ fn text_comes_from_an_offset_with_a_maximum_length_and_says_whether_more_follows
         &json!({ "path": "data/libs/NOTES.txt", "max_bytes": 5 }),
     )?;
     assert_eq!(
-        first,
+        payload_with_origins_removed(first)?,
         json!({
             "archive": install.archive().display().to_string(),
             "path": "Data/Libs/notes.txt",

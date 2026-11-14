@@ -9,7 +9,10 @@ use crate::starmap_fixture;
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, CraftingWarning, Filter, Kind, build_catalog};
+use p4kx_export::{
+    BuiltCatalog, CatalogOptions, CatalogPublicationMode, CraftingWarning, Filter, Kind,
+    build_catalog,
+};
 use p4kx_extraction::Archive;
 use serde_json::Value;
 
@@ -34,6 +37,7 @@ fn build(
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
     let mut options = CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT);
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
     let built = build_catalog(&archive, &options)?;
     let json = serde_json::from_slice(built.json())?;

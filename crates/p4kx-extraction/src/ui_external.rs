@@ -3,9 +3,39 @@
 
 use p4kx_gfx::ExternalImage;
 
-use crate::ui_disk_path::{dds_candidate, resolve_on_disk};
+use crate::ui_disk_path::{self, DiskPathError};
 use crate::ui_movie::Origin;
-use crate::{ConversionError, Texture, UiMovie};
+use crate::{ConversionError, DiskTextures, Texture, UiMovie};
+
+#[derive(Clone, Copy)]
+pub(crate) enum ExternalPath {
+    FileName,
+    ExportName,
+}
+
+impl ExternalPath {
+    pub(crate) const fn select(image: &ExternalImage) -> Self {
+        if image.file_name.is_empty() {
+            Self::ExportName
+        } else {
+            Self::FileName
+        }
+    }
+
+    pub(crate) const fn field(self) -> &'static str {
+        match self {
+            Self::FileName => "fileName",
+            Self::ExportName => "exportName",
+        }
+    }
+
+    const fn value(self, image: &ExternalImage) -> &String {
+        match self {
+            Self::FileName => &image.file_name,
+            Self::ExportName => &image.export_name,
+        }
+    }
+}
 
 /// Opens the DDS texture the external image `image` of the definition `id` names, looked up
 /// relative to the movie in its Archive or, confined to the movie's `Data` folder, on disk.
@@ -13,12 +43,9 @@ pub(crate) fn open_external<'a>(
     movie: &UiMovie<'a>,
     id: u16,
     image: &ExternalImage,
+    files: &DiskTextures,
 ) -> Result<Texture<'a>, ConversionError> {
-    let file_name = if image.file_name.is_empty() {
-        &image.export_name
-    } else {
-        &image.file_name
-    };
+    let file_name = ExternalPath::select(image).value(image);
     let missing = |tried| ConversionError::ExternalImageMissing {
         movie: movie.name().to_owned(),
         id,
@@ -28,7 +55,7 @@ pub(crate) fn open_external<'a>(
     match movie.origin() {
         Origin::Entry(archive) => {
             let named = [file_name.clone()];
-            let dds = dds_candidate(file_name);
+            let dds = ui_disk_path::dds_candidate(file_name);
             let candidates: Vec<&String> = named.iter().chain(dds.iter()).collect();
             let mut tried = Vec::new();
             let mut last_error = None;
@@ -46,19 +73,18 @@ pub(crate) fn open_external<'a>(
             Err(last_error.unwrap_or_else(|| missing(tried)))
         }
         Origin::File(file) => {
-            let name = dds_candidate(file_name).unwrap_or_else(|| file_name.clone());
-            let path = resolve_on_disk(file, &name).map_err(|root| {
-                ConversionError::ExternalImageOutside {
-                    movie: movie.name().to_owned(),
-                    id,
-                    file: file_name.clone(),
-                    root,
-                }
-            })?;
-            path.map_or_else(
-                || Err(missing(vec![name])),
-                |path| Texture::from_file(&path),
-            )
+            let name = ui_disk_path::dds_candidate(file_name).unwrap_or_else(|| file_name.clone());
+            let path =
+                ui_disk_path::resolve_on_disk(file, &name, files).map_err(|error| match error {
+                    DiskPathError::Outside { root } => ConversionError::ExternalImageOutside {
+                        movie: movie.name().to_owned(),
+                        id,
+                        file: file_name.clone(),
+                        root,
+                    },
+                    DiskPathError::Read { path, source } => ConversionError::Read { path, source },
+                })?;
+            path.map_or_else(|| Err(missing(vec![name])), |path| files.open(&path))
         }
     }
 }

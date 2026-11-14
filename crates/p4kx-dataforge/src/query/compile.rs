@@ -2,17 +2,20 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::borrow::Borrow;
+use std::collections::{HashMap, HashSet};
 
 use p4kx_foundation::PathPattern;
 
 use crate::query::path_plan::PathPlan;
 use crate::query::predicate::{self, Predicate, Test};
 use crate::query::reader::Reader;
+use crate::query::reference_selection;
 use crate::query::schema::{StructFields, ancestors_include};
 use crate::query::shared::Groups;
 use crate::query::suggest::closest;
-use crate::query::syntax::{Name, Query};
+use crate::query::syntax::{Name, Path, Query, Segment};
 use crate::query::{Comparison, QueryError, QueryErrorKind};
+use crate::record::NamedRecords;
 use crate::{DataForge, DataForgeError, DataType, ReferenceIndex};
 
 /// A Query checked against one DataForge and ready to run.
@@ -43,14 +46,38 @@ pub struct SharedPrefix {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ColumnKind {
     multi_valued: bool,
+    follows_references: bool,
     data_types: Box<[DataType]>,
 }
 
 impl ColumnKind {
+    fn of(path: &Path, plan: &PathPlan) -> Self {
+        let mut data_types: Vec<DataType> = Vec::new();
+        for leaf in plan.leaves() {
+            if !data_types.contains(&leaf) {
+                data_types.push(leaf);
+            }
+        }
+        Self {
+            multi_valued: path.is_multi_valued(),
+            follows_references: path
+                .tail()
+                .iter()
+                .any(|step| matches!(step, Segment::Follow { .. })),
+            data_types: data_types.into_boxed_slice(),
+        }
+    }
+
     /// Returns whether every cell is a list, for a path through `[*]` or `[TypeName]`.
     #[must_use]
     pub const fn is_multi_valued(&self) -> bool {
         self.multi_valued
+    }
+
+    /// Returns whether the selected path can follow a Reference or weak pointer.
+    #[must_use]
+    pub const fn follows_references(&self) -> bool {
+        self.follows_references
     }
 
     /// Returns the types of the scalars the path ends at: one with `from`, without `from` one per
@@ -121,6 +148,26 @@ impl<'f> CompiledQuery<'f> {
             .collect()
     }
 
+    /// Returns the original Struct positions in which the compiled column resolves.
+    pub fn column_structs(&self, column: usize) -> impl Iterator<Item = u32> + '_ {
+        self.plans
+            .iter()
+            .enumerate()
+            .filter_map(move |(index, plan)| {
+                let Plan::Read { columns, .. } = plan.as_ref()? else {
+                    return None;
+                };
+                columns.get(column)?.as_ref()?;
+                u32::try_from(index).ok()
+            })
+    }
+
+    /// Returns whether selection consults the DataForge Reference index.
+    #[must_use]
+    pub const fn has_reference_filter(&self) -> bool {
+        self.referrers.is_some()
+    }
+
     /// Returns the DataForge the Query was compiled for.
     #[must_use]
     pub const fn dataforge(&self) -> &'f DataForge<'f> {
@@ -170,21 +217,32 @@ impl Query {
         forge: &'f DataForge<'f>,
         references: impl FnOnce() -> Option<R>,
     ) -> Result<CompiledQuery<'f>, QueryError> {
-        let structs = StructFields::read_all(forge);
+        self.compile_with_lookup(forge, |targets| {
+            let index = references()?;
+            Some(reference_selection::ordinary(
+                &targets.positions,
+                index.borrow(),
+            ))
+        })
+    }
+
+    pub(super) fn compile_with_lookup<'f>(
+        &self,
+        forge: &'f DataForge<'f>,
+        lookup: impl FnOnce(&NamedRecords) -> Option<Box<[u32]>>,
+    ) -> Result<CompiledQuery<'f>, QueryError> {
+        let structs = StructFields::read_all(forge).map_err(|error| {
+            let span = self
+                .from
+                .as_ref()
+                .map_or(crate::query::Span::new(0, 0), Name::span);
+            QueryError::new(QueryErrorKind::DataForge(error), span)
+        })?;
         let selected = match &self.from {
             Some(name) => select_type(&structs, name)?,
             None => vec![true; structs.len()],
         };
-        let nominal = self
-            .from
-            .as_ref()
-            .and_then(|name| {
-                let index = structs.position_of(name.as_str())?;
-                Some(structs.fields(index).map(|_| index).map_err(|error| {
-                    QueryError::new(QueryErrorKind::DataForge(error.clone()), name.span())
-                }))
-            })
-            .transpose()?;
+        let nominal = nominal(&structs, self.from.as_ref())?;
         let from = self.from.as_ref();
         let columns = self
             .select
@@ -206,20 +264,9 @@ impl Query {
             .select
             .iter()
             .zip(&columns)
-            .map(|(path, plan)| {
-                let mut data_types: Vec<DataType> = Vec::new();
-                for leaf in plan.leaves() {
-                    if !data_types.contains(&leaf) {
-                        data_types.push(leaf);
-                    }
-                }
-                ColumnKind {
-                    multi_valued: path.is_multi_valued(),
-                    data_types: data_types.into_boxed_slice(),
-                }
-            })
+            .map(|(path, plan)| ColumnKind::of(path, plan))
             .collect();
-        let referrers = self.referrers(forge, references)?;
+        let referrers = self.referrers(forge, lookup)?;
         Ok(CompiledQuery {
             forge,
             kinds,
@@ -233,40 +280,18 @@ impl Query {
     }
 }
 
-impl Query {
-    /// Returns the sorted indices of the Records that refer to the Records `referencing` names.
-    fn referrers<R: Borrow<ReferenceIndex>>(
-        &self,
-        forge: &DataForge<'_>,
-        references: impl FnOnce() -> Option<R>,
-    ) -> Result<Option<Box<[u32]>>, QueryError> {
-        let Some(referent) = &self.referencing else {
-            return Ok(None);
-        };
-        let text = referent.as_str();
-        let targets = forge.records_named(text);
-        if targets.is_empty() {
-            return Err(QueryError::new(
-                QueryErrorKind::UnknownReferencedRecord {
-                    text: text.to_owned(),
-                },
-                referent.span(),
-            ));
-        }
-        let Some(index) = references() else {
-            return Err(QueryError::new(
-                QueryErrorKind::MissingReferenceIndex,
-                referent.span(),
-            ));
-        };
-        let mut found: Vec<u32> = targets
-            .iter()
-            .flat_map(|target| index.borrow().referrers(*target))
-            .collect();
-        found.sort_unstable();
-        found.dedup();
-        Ok(Some(found.into_boxed_slice()))
-    }
+/// Returns the first named layout position after validating its source.
+fn nominal(structs: &StructFields<'_>, from: Option<&Name>) -> Result<Option<usize>, QueryError> {
+    from.and_then(|name| {
+        let index = structs.position_of(name.as_str())?;
+        Some(
+            structs
+                .fields(index)
+                .map(|_| index)
+                .map_err(|error| QueryError::new(QueryErrorKind::DataForge(error), name.span())),
+        )
+    })
+    .transpose()
 }
 
 /// Resolves the path a comparison reads and checks that a value it reaches can compare with
@@ -292,18 +317,37 @@ fn plan(
 ) -> Plan {
     let fields = match structs.fields(index) {
         Ok(fields) => fields,
-        Err(error) => return Plan::Broken(error.clone()),
+        Err(error) => return Plan::Broken(error),
     };
+    let wanted: HashSet<&str> = columns
+        .iter()
+        .map(PathPlan::head)
+        .chain(compared.iter().map(|(_, path)| path.head()))
+        .collect();
+    let mut heads = HashMap::new();
+    for field in fields {
+        let field = match field {
+            Ok(field) => field,
+            Err(error) => return Plan::Broken(error),
+        };
+        if wanted.contains(field.name) {
+            heads.entry(field.name).or_insert(field);
+        }
+    }
     let columns: Box<[Option<Reader>]> = columns
         .iter()
-        .map(|column| column.reader(fields).map(|(reader, _)| reader))
+        .map(|column| {
+            column
+                .reader(heads.get(column.head()))
+                .map(|(reader, _)| reader)
+        })
         .collect();
     Plan::Read {
         shared: Groups::of(&columns),
         columns,
         tests: compared
             .iter()
-            .map(|(comparison, path)| Test::of(comparison, path.reader(fields)?))
+            .map(|(comparison, path)| Test::of(comparison, path.reader(heads.get(path.head()))?))
             .collect(),
     }
 }

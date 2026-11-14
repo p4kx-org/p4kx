@@ -127,6 +127,9 @@ pub(crate) fn read_physics_mesh(node: usize, chunk: &[u8]) -> Result<Option<Mesh
 
 fn bare_mesh(node: usize, positions: Vec<[f32; 3]>, indices: Vec<u32>) -> Mesh {
     Mesh {
+        origin: None,
+        index_width: None,
+        original_vertex_order_changed: false,
         node,
         source: (0..u32::try_from(positions.len()).unwrap_or(u32::MAX)).collect(),
         submeshes: vec![Submesh {
@@ -134,6 +137,7 @@ fn bare_mesh(node: usize, positions: Vec<[f32; 3]>, indices: Vec<u32>) -> Mesh {
             node_id: 0,
             first_index: 0,
             index_count: indices.len(),
+            origin: None,
         }],
         normals: (!indices.is_empty()).then(|| smooth_normals(&positions, &indices)),
         normals_computed: !indices.is_empty(),

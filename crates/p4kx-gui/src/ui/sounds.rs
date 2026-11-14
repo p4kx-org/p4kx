@@ -313,7 +313,7 @@ fn selected(ui: &mut Ui, model: &Model, list: &SoundList) -> Option<AudioAction>
         );
         return None;
     };
-    let id = variant.wem_id.map(|id| id.to_string()).unwrap_or_default();
+    let id = variant.wem_id.map_or_default(|id| id.to_string());
     let source = sounds_variants::source_name(texts, variant.kind);
     let detail = texts.format(
         SoundsText::Detail,

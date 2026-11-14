@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::{LoadoutError, LoadoutFileError, VehicleImplementation};
+use p4kx_assembly::{LoadoutError, VehicleImplementation};
+
+#[cfg(test)]
+mod tests;
 
 use crate::guid_text::CatalogGuid;
 use crate::variants::ShipKey;
@@ -38,6 +41,7 @@ fn tags(value: Option<&str>) -> Vec<String> {
 /// implementation the ship base data read.
 #[derive(Debug)]
 pub(crate) struct VehicleFacts {
+    pub(crate) source_record_index: Option<u32>,
     pub(crate) ship: CatalogGuid,
     pub(crate) tags: Vec<String>,
     pub(crate) paint_ports: Vec<PaintPort>,
@@ -55,9 +59,8 @@ pub(crate) struct VehiclePorts {
 
 /// Returns whether `issue` only says that the Archive lacks a vehicle implementation file or a
 /// patch file.
-fn is_missing_file(issue: &LoadoutError) -> bool {
-    matches!(issue, LoadoutError::VehicleImplementation { reason, .. }
-        if *reason == LoadoutFileError::NotFound.to_string())
+const fn is_missing_file(issue: &LoadoutError) -> bool {
+    matches!(issue, LoadoutError::MissingVehicleImplementation { .. })
 }
 
 /// Returns the first of `issues` that is more than a file the Archive lacks.
@@ -78,9 +81,13 @@ impl VehiclePorts {
     ) -> Self {
         let Some(implementation) = vehicle else {
             let own = || {
-                read_issues
-                    .iter()
-                    .filter(|issue| matches!(issue, LoadoutError::VehicleImplementation { .. }))
+                read_issues.iter().filter(|issue| {
+                    matches!(
+                        issue,
+                        LoadoutError::VehicleImplementation { .. }
+                            | LoadoutError::MissingVehicleImplementation { .. }
+                    )
+                })
             };
             let lacks_file = own().next().is_some() && own().all(is_missing_file);
             return Self {

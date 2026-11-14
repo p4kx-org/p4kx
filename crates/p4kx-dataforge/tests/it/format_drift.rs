@@ -196,7 +196,7 @@ fn pointer_indices_are_read_as_32_bits() -> TestResult {
         }),
         "an index above 16 bits is not cut to 0"
     );
-    let survey = forge.survey();
+    let survey = forge.survey()?;
     assert_eq!(survey.pointers.dangling, 1);
     assert_eq!(survey.pointers.narrow, 1);
     assert_eq!(survey.pointers.null, 1);
@@ -218,7 +218,7 @@ fn the_survey_reports_the_format_details_of_a_clean_database() -> TestResult {
         .build();
     let forge = DataForge::open(&bytes)?;
 
-    let survey = forge.survey();
+    let survey = forge.survey()?;
 
     assert_eq!(survey.header_words, [0, 0]);
     assert_eq!(survey.trailing.equals_struct_size, 2);
@@ -242,7 +242,7 @@ fn the_survey_sees_header_words_and_odd_trailing_values() -> TestResult {
     patch(&mut bytes, table - 2, &9_u16.to_le_bytes())?;
     let forge = DataForge::open(&bytes)?;
 
-    let survey = forge.survey();
+    let survey = forge.survey()?;
 
     assert_eq!(survey.header_words, [5, 6]);
     assert_eq!(survey.trailing.other, 1);

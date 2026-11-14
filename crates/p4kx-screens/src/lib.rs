@@ -48,6 +48,9 @@
 //! holds the PNG pixels or the SVG document of one canvas with its report, which
 //! [`Still::encode`] turns into the bytes of a file.
 
+mod archive_screen;
+mod archive_screen_images;
+mod archive_screen_origin;
 mod assets;
 mod bindings;
 mod boxes;
@@ -74,9 +77,12 @@ mod picture;
 mod reader;
 mod report;
 mod rest;
+mod screen_asset_inputs;
+mod screen_listing_inputs;
 mod screens;
 mod statics;
 mod still;
+mod still_inputs;
 mod style;
 mod svg;
 mod text;
@@ -93,16 +99,28 @@ mod walk_rest;
 mod walk_style;
 mod walk_text;
 mod widget;
+mod widget_canvas_ref;
 
+pub use archive_screen::{ArchiveScreen, ArchiveScreenError, ArchiveScreenRender};
+pub use archive_screen_origin::ScreenRenderOrigin;
 pub use assets::ScreenAssets;
 pub use compose::{Composed, ScreenComposer, TextSources};
 pub use error::ScreenError;
+pub use font_file::ScreenFontFile;
 pub use images::{ImageSources, LoadTexture, LoadVector};
 pub use inspect::ElementCount;
 pub use limits::Limits;
 pub use report::{Report, Unsupported, VariableInForce};
+pub use screen_asset_inputs::{
+    CanvasRouteInput, ScreenAssetInputs, WidgetAssetInput, WidgetInput, WidgetSection,
+};
+pub use screen_listing_inputs::{
+    AttachmentInput, CanvasInput, EntityScreenInputs, MovieInput, ObservedEntityScreens,
+    ScreenInput, ValueInput,
+};
 pub use screens::{EntityScreens, MovieUse, Screen};
-pub use still::{Still, StillFormat, StillRequest};
+pub use still::{ObservedStill, Still, StillFormat, StillRequest};
+pub use still_inputs::{StillInputs, StillTextInput};
 pub use svg::MAX_SVG_BYTES;
 pub use text::EDITOR_LABEL;
 pub use variables::{

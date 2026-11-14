@@ -30,6 +30,7 @@ pub(crate) use crate::cli_extract::ExtractArgs;
 pub(crate) use crate::cli_grep::{GrepArgs, GrepFormat};
 pub(crate) use crate::cli_key::{KeyAction, KeyArgs};
 use crate::cli_loc::LocArgs;
+use crate::cli_media::MediaArgs;
 use crate::cli_model::ModelArgs;
 pub(crate) use crate::cli_output::{AudioOutput, TextureOutput};
 pub(crate) use crate::cli_ships::{ShipsArgs, ShipsFormat};
@@ -78,6 +79,9 @@ pub(crate) struct Cli {
 /// The subcommands of `p4kx`.
 #[derive(Debug, Subcommand)]
 pub(crate) enum Command {
+    /// Checks GitHub for a newer release and prints a compatible link.
+    #[command(after_help = EXIT_CODES_HELP)]
+    CheckUpdate,
     /// Lists every Entry of an Archive, a split texture as one Entry.
     #[command(after_help = EXIT_CODES_HELP)]
     List(ListArgs),
@@ -117,6 +121,9 @@ pub(crate) enum Command {
         subcommand_negates_reqs = true
     )]
     Catalog(CatalogArgs),
+    /// Exports versioned media metadata and retained sources, or prints their schemas.
+    #[command(after_help = EXIT_CODES_HELP)]
+    Media(MediaArgs),
     /// Checks the game data a companion app reads against the Archive: whether each listed Record
     /// type, `EntityClassDefinition` component and vehicle folder exists, how many it has and
     /// whether it reads, exports and converts; exits with 1 when something listed fails.
@@ -209,7 +216,7 @@ pub(crate) enum TextureAction {
     #[command(after_help = EXIT_CODES_HELP)]
     Info(TextureSource),
     /// Merges the header and the mip parts of a texture into one standard DDS file; a cubemap
-    /// stays a cubemap. The alpha tail is not included; name <ENTRY>.a to merge it on its own.
+    /// stays a cubemap. The alpha tail is not included; name `<ENTRY>.a` to merge it on its own.
     #[command(after_help = EXIT_CODES_HELP)]
     Merge {
         /// The texture.
@@ -220,8 +227,8 @@ pub(crate) enum TextureAction {
         out: PathBuf,
     },
     /// Decodes one mip of a texture, with its alpha tail in the alpha channel, and writes it as an
-    /// 8-bit RGBA PNG; a cubemap becomes six face files <STEM>_posx … <STEM>_negz next to FILE, an
-    /// array one file per element <STEM>_layerN and a volume one per slice <STEM>_sliceN.
+    /// 8-bit RGBA PNG; a cubemap becomes six face files `<STEM>_posx` … `<STEM>_negz` next to FILE,
+    /// an array one file per element `<STEM>_layerN` and a volume one per slice `<STEM>_sliceN`.
     /// A high-range BC6H or floating-point texture is written as OpenEXR with 32-bit float RGB instead.
     #[command(after_help = EXIT_CODES_HELP)]
     Png {
@@ -249,12 +256,12 @@ pub(crate) enum TextureAction {
 #[derive(Debug, Args)]
 pub(crate) struct TextureSource {
     /// A Data.p4k Archive when ENTRY is given; otherwise the texture's header file, with its parts
-    /// <FILE>.1 … <FILE>.N and any alpha tail <FILE>.a, <FILE>.1a … next to it.
+    /// `<FILE>.1` … `<FILE>.N` and any alpha tail `<FILE>.a`, `<FILE>.1a` … next to it.
     #[arg(value_name = "ARCHIVE_OR_FILE")]
     pub(crate) path: PathBuf,
     /// Path of the texture's header Entry in the Archive, with `\` or `/` as separator, ignoring
-    /// case; its parts are the Entries <ENTRY>.1 … <ENTRY>.N and its alpha tail <ENTRY>.a with
-    /// <ENTRY>.1a … <ENTRY>.Na.
+    /// case; its parts are the Entries `<ENTRY>.1` … `<ENTRY>.N` and its alpha tail `<ENTRY>.a`
+    /// with `<ENTRY>.1a` … `<ENTRY>.Na`.
     pub(crate) entry: Option<String>,
 }
 

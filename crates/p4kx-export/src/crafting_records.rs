@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Guid, RecordTree, StructValue, Value};
+use p4kx_extraction::{CancelToken, Guid, RecordTree, StructValue, Value};
 
+use crate::CatalogError;
 use crate::blueprint::{as_struct, craft_time};
-use crate::crafting_tier::{TooDeep, tiers};
+use crate::crafting_tier;
 use crate::crafting_types::{
     BlueprintPool, BlueprintTiers, DismantleProcess, GameplayProperty, GlobalParams,
-    LocationOverride, PoolEntry, QualityCurve, QualityDistribution,
+    LocationOverride, PoolEntry, QualityDistribution, Tier,
 };
+use crate::quality_curve_read;
 use crate::record_fields::{class_name, elements, locale_key, number, reference, structure};
 use crate::selection::{Kind, KindRule, starts_with_folder};
+use crate::source_fields::{self, FieldError, Fields};
 
 const ROOT: &str = "libs/foundry/records/crafting/";
 const DISMANTLE_PROCESS: &str = "GenericCraftingProcess_Dismantle";
@@ -33,16 +36,33 @@ pub(crate) fn is_crafting_path(record_path: &str) -> bool {
     starts_with_folder(record_path, ROOT)
 }
 
-/// Returns the blueprint the Record describes.
-///
-/// # Errors
-///
-/// Returns [`TooDeep`] when a selection of a tier is nested deeper than the reader follows.
-pub(crate) fn blueprint<'f>(tree: &RecordTree<'f>) -> Result<BlueprintTiers<'f>, TooDeep> {
-    let blueprint = structure(Some(tree.root()), "blueprint");
-    let mut unknown_range_types = Vec::new();
-    let tiers = tiers(blueprint, &mut unknown_range_types)?;
-    Ok(BlueprintTiers {
+/// Reads the interpreted public Blueprint from its canonical Record.
+pub(crate) fn blueprint<'source>(
+    tree: &RecordTree<'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<BlueprintTiers<'source>, CatalogError> {
+    let source = blueprint_source(tree);
+    let mut unknown = Vec::new();
+    let tiers = crafting_tier::tiers(source, tree, &mut unknown, cancel)?
+        .into_iter()
+        .map(|tier| tier.tier)
+        .collect();
+    Ok(blueprint_metadata(tree, source, tiers, unknown))
+}
+
+pub(crate) fn blueprint_source<'read, 'source>(
+    tree: &'read RecordTree<'source>,
+) -> Option<&'read StructValue<'source>> {
+    structure(Some(tree.root()), "blueprint")
+}
+
+fn blueprint_metadata<'source>(
+    tree: &RecordTree<'source>,
+    blueprint: Option<&StructValue<'source>>,
+    tiers: Vec<Tier<'source>>,
+    unknown_range_types: Vec<&'source str>,
+) -> BlueprintTiers<'source> {
+    BlueprintTiers {
         guid: tree.guid(),
         class_name: class_name(tree),
         record_path: tree.record_path(),
@@ -52,7 +72,7 @@ pub(crate) fn blueprint<'f>(tree: &RecordTree<'f>) -> Result<BlueprintTiers<'f>,
             .map(|guid| guid.0),
         tiers,
         unknown_range_types,
-    })
+    }
 }
 
 /// Returns the dismantle process the Record describes, `None` for another process.
@@ -78,34 +98,72 @@ pub(crate) fn property<'f>(tree: &RecordTree<'f>) -> GameplayProperty<'f> {
     }
 }
 
-pub(crate) fn distribution<'f>(tree: &RecordTree<'f>) -> QualityDistribution<'f> {
-    let root = Some(tree.root());
-    let overrides = structure(root, "locationOverride");
-    QualityDistribution {
-        guid: tree.guid(),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        distribution: structure(root, "qualityDistribution").map(curve),
-        overrides: elements(overrides, "locationOverrideList")
-            .iter()
-            .filter_map(as_struct)
-            .map(|entry| LocationOverride {
-                location: reference(Some(entry), "location").map(|guid| guid.0),
-                distribution: structure(Some(entry), "qualityDistribution").map(curve),
-            })
-            .collect(),
-    }
+pub(crate) struct DistributionRead<'source> {
+    pub(crate) value: QualityDistribution<'source>,
+    pub(crate) notes: Vec<FieldError>,
 }
 
-fn curve<'f>(curve: &StructValue<'f>) -> QualityCurve<'f> {
-    let curve_ref = Some(curve);
-    QualityCurve {
-        kind: curve.type_name(),
-        min: number(curve_ref, "min"),
-        max: number(curve_ref, "max"),
-        mean: number(curve_ref, "mean"),
-        stddev: number(curve_ref, "stddev"),
+pub(crate) fn distribution<'source>(
+    tree: &RecordTree<'source>,
+) -> Result<DistributionRead<'source>, FieldError> {
+    let fields = Fields::new(tree.root(), "");
+    let mut notes = Vec::new();
+    let distribution = fields
+        .structure("qualityDistribution")?
+        .map(|source| quality_curve_read::read(source, "qualityDistribution", &mut notes))
+        .transpose()?;
+    let overrides = fields
+        .structure("locationOverride")?
+        .map(|source| quality_overrides(source, &mut notes))
+        .transpose()?
+        .unwrap_or_default();
+    Ok(DistributionRead {
+        value: QualityDistribution {
+            guid: tree.guid(),
+            class_name: class_name(tree),
+            record_path: tree.record_path(),
+            distribution,
+            overrides,
+        },
+        notes,
+    })
+}
+
+fn quality_overrides<'source>(
+    source: &StructValue<'source>,
+    notes: &mut Vec<FieldError>,
+) -> Result<Vec<LocationOverride<'source>>, FieldError> {
+    let fields = Fields::new(source, "locationOverride");
+    fields.check(&["locationOverrideList"], notes);
+    let mut overrides = Vec::new();
+    for (index, value) in fields
+        .array("locationOverrideList")?
+        .unwrap_or_default()
+        .iter()
+        .enumerate()
+    {
+        let path = format!("locationOverride.locationOverrideList[{index}]");
+        let entry = source_fields::entry(value, source.type_name(), &path)?.ok_or_else(|| {
+            fields.invalid(
+                &format!("locationOverrideList[{index}]"),
+                value,
+                "a non-null quality override entry",
+            )
+        })?;
+        let entry_fields = Fields::new(entry, &path);
+        entry_fields.check(&["location", "qualityDistribution"], notes);
+        let distribution = entry_fields
+            .structure("qualityDistribution")?
+            .map(|source| {
+                quality_curve_read::read(source, &format!("{path}.qualityDistribution"), notes)
+            })
+            .transpose()?;
+        overrides.push(LocationOverride {
+            location: entry_fields.reference("location")?.map(|link| link.guid.0),
+            distribution,
+        });
     }
+    Ok(overrides)
 }
 
 pub(crate) fn pool<'f>(tree: &RecordTree<'f>) -> BlueprintPool<'f> {

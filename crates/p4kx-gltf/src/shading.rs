@@ -96,12 +96,24 @@ fn luminance([red, green, blue]: [f32; 3]) -> f32 {
 /// A palette whose entry has a bright specular colour, such as the bare metal of the Prospector,
 /// paints a metal; the usual paints have a specular colour far below the threshold.
 pub(crate) fn is_metal(material: &Material) -> bool {
-    let named = material
+    luminance(material.specular) >= METAL_SPECULAR
+        && (is_named_metal(material) || luminance(material.diffuse) < DARK_DIFFUSE)
+}
+
+fn is_named_metal(material: &Material) -> bool {
+    material
         .surface_type
         .get(..5)
-        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("metal"));
-    luminance(material.specular) >= METAL_SPECULAR
-        && (named || luminance(material.diffuse) < DARK_DIFFUSE)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("metal"))
+}
+
+/// Returns whether the plain surface colour uses the material's own diffuse colour.
+pub(crate) fn uses_plain_diffuse(material: &Material) -> bool {
+    if luminance(material.specular) >= METAL_SPECULAR {
+        !is_named_metal(material)
+    } else {
+        stencil_colour(material).is_none()
+    }
 }
 
 /// What one layer gives without its textures, all colours linear and clamped to 0 to 1.

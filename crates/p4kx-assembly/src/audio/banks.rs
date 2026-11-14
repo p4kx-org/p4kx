@@ -3,8 +3,8 @@
 
 use p4kx_audio::{HircKind, HircValue, MusicStinger, Soundbank};
 
+use super::AudioFileError;
 use super::language::bank_language;
-use super::{AudioFileError, MAX_STINGERS};
 
 /// A soundbank Entry of the audio index.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -21,6 +21,12 @@ impl IndexedSoundbank {
     #[must_use]
     pub fn path(&self) -> &str {
         &self.path
+    }
+
+    /// Returns the position of the soundbank Entry in the owning Archive.
+    #[must_use]
+    pub const fn entry_position(&self) -> usize {
+        self.entry
     }
 
     /// Returns the file name of the soundbank Entry, e.g. `SSAM_ORIG_890J.bnk`.
@@ -100,7 +106,6 @@ pub(crate) fn read(path: &str, entry: usize, bytes: &[u8]) -> Result<BankContent
             _ => &[],
         })
         .filter(|stinger| stinger.segment_id != 0)
-        .take(MAX_STINGERS)
         .copied()
         .collect();
     let header = bank.header();

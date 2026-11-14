@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::dataforge::out_of_range;
-use crate::rows::{NO_STRING, RecordDef};
+use crate::rows::RecordDef;
 use crate::strings::{compare_ignoring_case, compare_paths, strip_xml};
+use crate::tree_owner::TreeOwner;
 use crate::{
     DataForge, DataForgeError, Guid, RecordTree, Reference, Struct, TreeBuilder, Value, ValueError,
 };
@@ -36,10 +37,7 @@ impl<'f> Record<'f> {
     ///
     /// Returns [`DataForgeError::InvalidString`] when the name offset is not a valid string.
     pub fn name(&self) -> Result<&'f str, DataForgeError> {
-        if self.def.name == NO_STRING {
-            return Ok("");
-        }
-        self.forge.blob.get(self.def.name)
+        Ok(self.stored_name()?.fold(|| "", || "", |name| name))
     }
 
     /// Returns the record path: the file the Record is defined in, without its `.xml` extension,
@@ -49,7 +47,7 @@ impl<'f> Record<'f> {
     ///
     /// Returns [`DataForgeError::InvalidString`] when the file name offset is not a valid string.
     pub fn record_path(&self) -> Result<&'f str, DataForgeError> {
-        self.forge.text.get(self.def.file_name).map(strip_xml)
+        self.stored_file_name().map(strip_xml)
     }
 
     /// Returns the Record tag version 8 stores with every Record, e.g. `SystemsDesign`, or `None` for
@@ -60,11 +58,7 @@ impl<'f> Record<'f> {
     ///
     /// Returns [`DataForgeError::InvalidString`] when the tag offset is not a valid string.
     pub fn tag(&self) -> Result<Option<&'f str>, DataForgeError> {
-        self.def
-            .tag
-            .filter(|tag| *tag != NO_STRING)
-            .map(|tag| self.forge.blob.get(tag))
-            .transpose()
+        Ok(self.stored_tag()?.fold(|| None, || None, Some))
     }
 
     /// Returns the struct the Record is an instance of.
@@ -105,11 +99,9 @@ impl<'f> Record<'f> {
     /// # Errors
     ///
     /// Returns a [`DataForgeError`] when the Record's instance, the layout of a struct in it or a
-    /// name cannot be read: a cycle or more than
-    /// [`MAX_INHERITANCE_DEPTH`](crate::MAX_INHERITANCE_DEPTH) structs in a parent chain, fields
+    /// name cannot be read: a cycle in a parent chain, fields
     /// that do not fill the declared size, an unknown data type or an inline struct that does not
-    /// exist; and when the tree would hold more than
-    /// [`MAX_RECORD_VALUES`](crate::MAX_RECORD_VALUES) values.
+    /// exist.
     pub fn tree(&self) -> Result<RecordTree<'f>, DataForgeError> {
         TreeBuilder::new().build(self)
     }
@@ -137,12 +129,29 @@ impl<'f> Record<'f> {
         );
         let def = def.ok_or(ValueError::DanglingReference { guid })?;
         Ok(Reference {
+            owner: TreeOwner::new(forge),
+            record_index: self.index(),
             guid,
             record_path: forge.text.value(self.def.file_name).map(strip_xml)?,
             type_name: forge.blob.value(def.name)?,
             location: None,
         })
     }
+}
+
+/// The original column that names a Record in a lookup.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum RecordNameKind {
+    /// The stored GUID.
+    Guid,
+    /// The stored file name.
+    Path,
+}
+
+pub(crate) struct NamedRecords {
+    pub(crate) kind: RecordNameKind,
+    pub(crate) positions: Vec<u32>,
 }
 
 impl<'a> DataForge<'a> {
@@ -158,13 +167,25 @@ impl<'a> DataForge<'a> {
     /// Returns the Record with `guid`, or `None` when there is none.
     #[must_use]
     pub fn record_by_guid(&self, guid: Guid) -> Option<Record<'_>> {
+        self.records_by_guid(guid).next()
+    }
+
+    /// Visits all Records with the GUID in definition order.
+    pub fn records_by_guid(&self, guid: Guid) -> impl Iterator<Item = Record<'_>> + '_ {
         let index = self.guid_index.get_or_init(|| self.build_guid_index());
-        let guid_of = |record: &u32| self.record_def(*record).map(|def| def.guid);
-        let first = index.partition_point(|record| guid_of(record) < Some(guid.stored()));
+        let stored = guid.stored();
+        let first = index.partition_point(|&record| {
+            self.record_def(record).map(|definition| definition.guid) < Some(stored)
+        });
         index
-            .get(first)
-            .and_then(|record| self.record(*record))
-            .filter(|record| record.def.guid == guid.stored())
+            .get(first..)
+            .into_iter()
+            .flatten()
+            .copied()
+            .map_while(move |record| {
+                self.record(record)
+                    .filter(|record| record.def.guid == stored)
+            })
     }
 
     /// Returns the Records at a record path in definition order, ignoring ASCII case, the kind of
@@ -186,17 +207,25 @@ impl<'a> DataForge<'a> {
     /// matches it; empty when no Record has it.
     #[must_use]
     pub fn records_named(&self, text: &str) -> Vec<u32> {
+        self.select_named_records(text).positions
+    }
+
+    pub(crate) fn select_named_records(&self, text: &str) -> NamedRecords {
         text.parse::<Guid>().map_or_else(
-            |_| {
-                self.records_at_path(text)
+            |_| NamedRecords {
+                kind: RecordNameKind::Path,
+                positions: self
+                    .records_at_path(text)
                     .map(|record| record.index())
-                    .collect()
+                    .collect(),
             },
-            |guid| {
-                self.record_by_guid(guid)
+            |guid| NamedRecords {
+                kind: RecordNameKind::Guid,
+                positions: self
+                    .record_by_guid(guid)
                     .map(|record| record.index())
                     .into_iter()
-                    .collect()
+                    .collect(),
             },
         )
     }

@@ -30,12 +30,12 @@ fn launch(pellets: i32, cost: i32) -> TestValue {
     )
 }
 
-fn rapid(rate: f32) -> TestValue {
+fn rapid(rate: i32) -> TestValue {
     instance(
         "SWeaponActionFireRapidParams",
         vec![
             ("name".to_owned(), TestValue::text("rapid")),
-            single("fireRate", rate),
+            ("fireRate".to_owned(), TestValue::Int32(rate)),
             single("heatPerShot", 0.5),
             ("launchParams".to_owned(), launch(1, 1)),
         ],
@@ -49,7 +49,7 @@ fn charged() -> TestValue {
             single("chargeTime", 1.5),
             single("overchargeTime", 3.0),
             single("cooldownTime", 0.25),
-            ("weaponAction".to_owned(), rapid(120.0)),
+            ("weaponAction".to_owned(), rapid(120)),
         ],
     )
 }
@@ -57,7 +57,7 @@ fn charged() -> TestValue {
 pub(super) fn weapon_component(magazine: Option<u128>) -> TestValue {
     let mut fields = vec![(
         "fireActions".to_owned(),
-        TestValue::Array(vec![rapid(600.0), charged()]),
+        TestValue::Array(vec![rapid(600), charged()]),
     )];
     if let Some(magazine) = magazine {
         fields.push((
@@ -137,7 +137,7 @@ pub(super) fn ammo(guid: u128) -> TestRecord {
     )
 }
 
-pub(super) fn unbuildable_ammo(guid: u128) -> TestRecord {
+pub(super) fn cyclic_ammo(guid: u128) -> TestRecord {
     TestRecord::new(
         guid,
         "AmmoParams",

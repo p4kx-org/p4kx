@@ -9,6 +9,30 @@ it.
 
 ## Versioning and consumers
 
+Version 3 is the only catalog output contract for 0.5.0 (ADR-0339). There is no version-2
+export mode, adapter or fallback. Consumers must accept version 3 before importing it. Tagged payload unions are closed: a new variant requires a version decision, unlike
+an unknown additive field or kind. The schema describes serialization, so emitted nullable payload
+fields are required even when their value is null. The previous released schema is retained as a
+historical version-boundary fixture. Moving ResourceTypes to their canonical table and adding typed value
+carriers is part of the breaking v3 migration, not an additive change to the released v2 shape.
+
+Every catalog kind and the shared CLI/GUI JSON and compressed catalog writers use version 3.
+Canonical definition tables cover Blueprints, BlueprintCategories, ContractGenerators,
+ContractTemplates, MissionBrokerEntries, LootPoolFilters, GameplayProperties, QualityDistributions,
+QualityQuantizations, Tags, ResourceGroups, ResourceTypes, Commodities and Manufacturers.
+Their authored values retain immediate source metadata. Entity GUID-tag declarations and
+documented memberships, presentation choices and text rows use their corresponding canonical tables.
+Generator logical identities and derived mission texts use sourced projections.
+Further contract facts and additional catalog and tool-output carriers remain in progress.
+The complete target is [ADR-0356](adr/0356-catalog-v3-uses-canonical-source-typed-tables.md).
+Other exported formats retain their independently documented versions.
+
+
+The implemented canonical families use the [shared eight-field Record header](catalog-record-headers.md),
+including exact fileName and separately stateful metadataTag. Header provenance uses the explicit
+dataforgeRecordHeader namespace; body paths keep their original DataForge coordinate. Consumers
+must resolve document-local SourceUse IDs in the accompanying inventory.
+
 The rule is ADR-0054 (amending ADR-0002):
 
 - **Additive changes keep `schemaVersion`:** a new kind, a new field on an entity, on `source` or
@@ -22,11 +46,14 @@ The rule is ADR-0054 (amending ADR-0002):
 - **Guarantees the Basetool relies on;** breaking one is a breaking change: an existing field never
   changes its type, its meaning or whether it can be `null`; a new kind never changes the
   selection or the ordering of an existing kind; the meaning of `completeness` stays.
-- **A new value in an existing closed value set is additive,** e.g. a new playability value or a
-  new `itemClass`. A reader maps an unknown value to `null`. The schema documents such a set but
-  keeps the type a string, so an older schema accepts the new value. A set derived from a Rust
-  enum lists its known values in the `x-values` annotation of the definition (`value` and
-  `description` per entry); a schema test rejects any `enum` or `oneOf` of constants.
+- **A new source-vocabulary value is additive,** e.g. a new playability value or a new
+  `itemClass`. A reader preserves it as unknown or maps it to `null`; it does not infer a known
+  meaning or precedence. A vocabulary derived from a Rust enum stays a string with documented
+  `x-values` (`value` and optional `description`) and `x-p4kx-vocabularyClass: "open"`.
+- **Fixed control states are closed in schema 3** (ADR-0339): publication mode, export/stage
+  health, source mode, diagnostic severity/stage/unit, source role and positive Reference-result
+  status types reject unknown values. Their definitions carry `x-p4kx-vocabularyClass: "control"`.
+  Unknown controls never become successful reads, resolved links or import/deletion permission.
 - **Loadouts (#393), paints, item stats and the starmap are kinds of the one catalog;** the size is
   handled by compression (`.json.zst`), not by a second Export. The Basetool accepts `.json`,
   `.json.gz` and `.json.zst`; the 64 MB limit applies to the compressed upload, the decompressed
@@ -34,7 +61,7 @@ The rule is ADR-0054 (amending ADR-0002):
 - **Version 2 (ADR-0161)** is breaking against version 1 in one respect: a paint also needs its own
   `RequiredTags` offered by the port or the ship (see "Paints"), so `paints[].shipGuids` lists
   fewer ships than version 1 did (40 fewer on LIVE 4.7). No field changed its name or type. The
-  Basetool import must accept version 2.
+  Historical artifacts from those releases use the version-2 schema.
   Version 2 also fixes a port whose name several parts of the vehicle file share (#677): the first
   such part gives the port its sizes, types and flags, as in the tree, so the `Radar_Helper` port
   of eight Ursa ships on LIVE 4.10 no longer lists `start_hidden` in its `flags`.
@@ -56,8 +83,8 @@ The rule is ADR-0054 (amending ADR-0002):
   (#898, ADR-0263), the kind `cargoManifests` with the contract field `haulingOrders` (#814,
   ADR-0265), and the kinds `missionLocationTemplates`, `contractShipSpawns` and
   `contractLocationQueries` with the contract fields `shipSpawns`, `locationQueries` and
-  `locationPrerequisites` (#902, ADR-0266). Later additions keep version 2 as long as they are
-  additive. The contract field `fixedRewards` (#888, ADR-0268) is one, and so is `cooldownLayers`
+  `locationPrerequisites` (#902, ADR-0266). The following fields also belong to the historical version-2 contract.
+  The contract field `fixedRewards` (#888, ADR-0268) is one, and so is `cooldownLayers`
   (#909, ADR-0271), and the contract fields `offeredAt`, `giverFaction` and `blueprintRewards`
   (#915, ADR-0273), and so are the kind `contractTemplates` (#812, ADR-0313) and the kind
   `missionBrokerEntries` with the contract field `brokerEntryGuid` (#813, ADR-0320), and the kinds
@@ -82,19 +109,37 @@ identifiers, short names or fact values. The catalog keeps the `description` fie
 Basetool's logged-in members; the Basetool keeps them, `displayType` and the contract texts away
 from third parties. Every such field carries
 `"x-gameText": true` in the JSON Schema, and no other field does; a test checks this.
-Every game text is trimmed of leading and trailing white space; see Texts.
+Display text is trimmed of leading and trailing white space; see Texts. Canonical text rows
+also retain their exact decoded source text. ResourceTypes, Commodities and Manufacturers use
+`texts.publicNames` and `texts.gameTexts` instead of inline `key`/`en`/`de` objects. Their description
+reference, GameTextRef type and complete gameTexts table protect both source and display forms
+through the reference. A shared key used as both a name and a description has separate rows in
+the two domains. Public short UI format templates use the existing public domain and stay inert.
+An unencrypted source marker does not remove `x-gameText` protection.
 
-A closed value set that the schema derives from a Rust enum is a definition of `"type": "string"`
+An extensible source vocabulary derived from a Rust enum is a definition of `"type": "string"`
 with the known values in `x-values`, one `{"value", "description"}` entry per value (`description`
 only where the value has one), e.g. for `FactLayer`:
 
 ```json
-{"type": "string", "x-values": [{"value": "subContract", "description": "The parameter overrides of the sub contract."}, {"value": "contract"}]}
+{"type": "string", "x-values": [{"value": "subContract", "description": "The parameter overrides of the sub contract."}, {"value": "contract"}], "x-p4kx-vocabularyClass": "open"}
 ```
 
-`x-values` documents the set; it does not validate. A reader treats a value it does not know as
-additive: it maps it to `null` or ignores it. A schema test rejects any `enum` or any `oneOf` or
-`anyOf` of constants.
+`x-values` documents the set; it does not validate. Unknown source labels, kind identifiers,
+Entry-operation identifiers, diagnostic codes and unresolved-reference reasons remain extensible.
+An unknown annotation does not establish a new precedence or positive resolution. Archive-key
+state is explanatory metadata; successful decryption and export health are separate evidence.
+
+The fixed control definitions include `CatalogPublicationMode`, `ExportHealthStatus`,
+`ExportStageStatus`, `ExportSourceMode`, `ExportDiagnosticSeverity`, `ExportDiagnosticStage`,
+`ExportDiagnosticUnit`, `ExportSourceRole`, `DefinitionStatus`, `OwnedReferenceStatus` and
+`PropertyReferenceStatus`. Resource origin adds `SourceValueState`, `SourceUseRole`, `InputScope`,
+`SourceEncryptionState`, `SourceRecordFormat`, `SourceDeclarationKind` and `ResourceAvailability`. They retain the finite string alternatives generated from their
+serializers and carry `x-p4kx-vocabularyClass: "control"`. New alternatives require contract review
+and a version decision when they change interpretation. The schema-policy tests require an
+explicit class, preserve unknown strings for open vocabularies and reject unknown control states.
+This class annotation does not replace counter reconciliation, physical target ownership,
+selection completeness or publication checks.
 
 ```powershell
 p4kx catalog <archive> --out basetool-catalog.json [--filter <filter>] [--exported-at <seconds>]
@@ -133,35 +178,69 @@ uncompressed size, the compressed size (`null` for plain JSON) and the warnings 
 ## Shape
 
 The file is UTF-8 JSON in one line, ending in a newline. Field names are camelCase and mean the
-same in every kind. Every field is always present; one that has no value is `null`.
+same in every kind. Listed fields are always present. Existing family shapes use nullable values;
+ResourceType source fields instead have the explicit state/value/origin carrier described below.
 
 | Field | Meaning |
 |-------|---------|
-| `schemaVersion` | The version of the shape, now `2`; an import rejects a version it does not know |
+| `schemaVersion` | The version of the shape, now `3`; an import rejects a version it does not know |
 | `source.channel` | The Channel: the folder holding the Archive, e.g. `LIVE` |
 | `source.build` | `branch`, `version`, `changeNumber` and `buildId` from the build manifest, or `null` |
 | `source.build.publicPatch` | The public patch version, e.g. `4.7.2`, from the RSI Launcher log line `SC <CHANNEL> <version>-<tag>.<change>` (`<version>`: two or three dot-separated numbers, kept as logged) whose change equals `changeNumber`; `null` when the log has no such line (never guessed from a neighbouring one) |
 | `source.archiveSize` | The size of the Archive file in bytes |
 | `source.archiveModified` | The modification time of the Archive file, UTC in RFC 3339 form |
+| `source.archiveKey` | Whether the Archive key was there for the encrypted Entries the export read: `given`, `missing` (no key was set) or `wrong` (the key did not fit). Without a usable key the file is valid but incomplete: vehicle implementations, XML Loadouts, shop inventories and the like are absent |
+| `source.encryptedEntriesUnread` | How many distinct encrypted Entries the export asked for and could not read because the key was missing or wrong; `0` when none was needed ([ADR-0353](adr/0353-exports-state-whether-the-archive-key-was-there.md)) |
 | `source.toolVersion` | The version of P4KX that wrote the catalog |
 | `source.exportedAt` | When the catalog was written, UTC in RFC 3339 form |
-| `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "…"}` when a Filter selected the Records |
-| `manufacturers` | The manufacturers, ordered by GUID |
+| `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "Ã¢â‚¬Â¦"}` when a Filter selected the Records; global `tags` remains complete independently of that Filter |
+| `exportHealth` | Measured source-read and projection health, directly sourced failed-Record and diagnostic-subject identities with shared text storage, separate Record/Archive Entry counters and bounded diagnostics; independent of Filter completeness ([contract](catalog-export-health.md)) |
+| `definitions.tags`, `declarations.tagRoots`, `declarations.entityTags`, `projections.tagPaths` | Global physical Tag definitions, original root/child/Entity GUID arrays, and separately named first-selected tree paths with exact per-value origin; the taxonomy stays complete under an Entity Filter ([contract](catalog-tags.md)) |
+| `definitions.missionItems` | Physical authored item definitions, ordered tags and localized variants, original weight and Entity reference ([contract](catalog-mission-items.md)) |
+| `definitions.manufacturers` | Source-family availability and directly sourced Manufacturer rows in GUID order, including typed Localization and canonical text references ([contract](catalog-manufacturer-types.md)) |
 | `items` | The items, ordered by GUID |
 | `ships` | The ships and ground vehicles, ordered by GUID |
-| `commodities` | The commodities, ordered by GUID |
-| `blueprints` | The crafting blueprints with their ingredients, all tiers, default availability and dismantle link, ordered by GUID |
-| `resourceGroups` | The groups of resource types, the targets of `typeGuid`, ordered by GUID |
-| `blueprintCategories` | The blueprint categories, the targets of `categoryGuid`, ordered by GUID |
-| `gameplayProperties` | The gameplay properties the quality modifiers refer to, ordered by GUID |
-| `qualityDistributions` | The quality distributions and their location overrides, ordered by GUID |
-| `qualityQuantizations` | The quantised quality steps per `ResourceType`, each linked to its `ResourceType`s by GUID, ordered by GUID |
+| `definitions.commodities`, `projections.commodityPresentation` | Commodity source identities/authored bindings and explicit derived choices, paired in existing GUID order; see [Commodity contract](catalog-commodity-types.md) |
+| `definitions.resourceTypes` | Closed source-family `availability` and canonical `rows`, independently selected and ordered by GUID; every source-backed field uses the typed value carrier ([contract](catalog-resource-types.md)) |
+| `texts.publicNames`, `texts.gameTexts` | Canonical sourced-definition short-name and protected-description rows, each with sourced `id`, `key` and per-language `translations` containing separate source and display forms |
+| `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the sourced definition carriers |
+| `definitions.ammoDefinitions` | Physical `AmmoParams` definitions with original projectile, physics and conversion fields and per-value source origin. [Ammunition definitions](catalog-ammo-definitions.md) |
+| `configurations.ammoContainers`, `declarations.ammoBindings` | Physical container settings and authored ammunition and magazine slots, including ordered secondary conditions. [Ammunition definitions](catalog-ammo-definitions.md) |
+| `projections.weaponMagazineResolutions` | Observed legacy primary selections, original magazine Record and container indices, and distinct target-read outcomes. [Ammunition definitions](catalog-ammo-definitions.md) |
+| `projections.weaponProjectileAmmoSelections` | Physical direct projectile actions with original primary/secondary ammunition for a proven own container and explicit unresolved outcomes. [Ammunition definitions](catalog-ammo-definitions.md#projectile-ammunition-selection) |
+| `configurations.weaponActions` | Physical weapon component owners, ordered action slots, launcher selectors, heat inputs, aim and operating modifiers, and original recoil and animation references. [Authored weapon actions and launchers](catalog-ammo-definitions.md#authored-weapon-actions-and-launchers) |
+| `definitions.blueprints` | Physical Blueprint Records and their complete original value arenas in GUID order |
+| `configurations.durability`, `configurations.degradation`, `configurations.distortion` | Original item component occurrences, raw values and provenance. [Item durability](catalog-durability.md) |
+| `configurations.missileConfigurations` | Authored missile guidance, targeting and shake. Join inherited settings by physical slot in `configurations.explosives`. [Missile configurations](catalog-missiles.md) |
+| `configurations.emp` | Original EMP timings, radii, effects and state links per physical component. [EMP configurations](catalog-emp.md) |
+| `configurations.jumpDrives`, `configurations.jumpDriveFlightTuning`, `configurations.jumpTunnelForces` | Original jump-drive item components with linked tuning and tunnel-force Records, device states and presentation parameters. [Jump drives](catalog-jump-drives.md) |
+| `configurations.quantumInterdiction` | Original jammer, pulse and visual graph configuration per physical component. [Quantum interdiction](catalog-quantum-interdiction.md) |
+| `configurations.quantumDrives` | Original quantum drive components with independent standard, spline, thermal and boost values. [Quantum drives](catalog-quantum-drives.md) |
+| `configurations.lootGeneration` | Original Entity loot components, ordered constraints, theme references and secondary-choice wrappers. [Loot source](catalog-loot-source.md) |
+| `configurations.shieldGenerators` | Original shield generator component occurrences, typed values and provenance. [Shield generators](catalog-shield-generators.md) |
+| `configurations.explosives` | Original sensor mine triggers and explosive ordnance settings by physical Item and component position. [Explosive components](catalog-explosives.md) |
+| `configurations.hackingChips` | Original chip charge counts and ordered removable modifier declarations by physical Item and component slot. [Hacking chips](catalog-hacking-chips.md) |
+| `configurations.blueprintTiers` | Every interpreted tier with cost relationships, normalized values and Research |
+| `projections.blueprintPresentation` | Source-backed name, category, product, default availability, dismantle and first-tier ingredient links |
+| `definitions.resourceGroups`, `declarations.resourceGroupMembers`, `projections.resourceGroupParents` | Physical group definitions, every ordered authored membership and the first-selected parent with direct per-value origins ([contract](catalog-resource-groups.md)) |
+| `definitions.blueprintCategories` | Source-family availability and physical fieldless category rows with the shared eight sourced header fields in GUID order |
+| `declarations.blueprintCategoryLists` | Physical `BlueprintCategoryDatabaseRecord` owners selected at every path by the ordinary Filter, with eight sourced headers and ordered sourced category-reference slots ([contract](catalog-blueprint-category-lists.md)) |
+| `definitions.gameplayProperties` | Physical gameplay-property definitions with shared eight-field headers, all four authored fields and local flat transformation trees ([contract](catalog-gameplay-properties.md)) |
+| `definitions.qualityDistributions` | Physical distribution and location-override source declarations with exact numbers and immediate per-field origins ([contract](catalog-quality.md)) |
+| `definitions.qualityQuantizations`, `projections.qualityQuantizationResources` | Ordered raw bands, explicit eligibility and the genuine first-eligible nominal-GUID resource inverse ([contract](catalog-quality.md)) |
 | `blueprintPools` | The blueprint pools with the places that reward them, ordered by GUID |
 | `dismantleProcesses` | The dismantle processes, ordered by GUID |
 | `paints` | The paints, each the `itemGuid` of an entry of `items` with the ships it fits, ordered by `itemGuid` |
 | `loadouts` | The ports of every ship and of every item that has ports, with the Entity the Default Loadout attaches to each, ordered by `entityGuid` |
-| `starmapObjects` | The starmap objects (star systems, planets, moons, stations, jump points) with type, parent, name and world position, ordered by GUID |
-| `contracts` | The contracts and sub contracts with resolved title, mission type, pickup places and the reputation granted on success, ordered by `guid` and then `subContractGuid` |
+| `definitions.starmapObjects` | Authored starmap objects with original links, presentation and navigation settings, ordered by GUID and physical Record index |
+| `placements.starmapPlacements` | The selected world placement of each physical starmap object |
+| `definitions.contractGenerators`, `projections.contracts`, `projections.missionTitles` | Physical Generator definitions, logical contract and sub-contract rows, and their sourced titles and descriptions ([contract](catalog-contract-generators.md)) |
+| `definitions.contractScopes` | Physical `ContractScopeGlobalParams` Records with seven individually sourced labels and icons. [Contract scope vocabulary](catalog-location-vocabulary.md#global-contract-scopes) |
+| `definitions.missionModuleDeclarations` | Physical `ModuleDeclaration` Records and authored location acquisition, spawned entities and variable bindings. [Mission module declarations](catalog-location-configuration.md#physical-module-declarations) |
+| `definitions.missionScenarios` | Physical `MissionScenario` Records with authored variables, cycles, schedule and flags. [Mission scenario definitions](catalog-contract-generators.md#physical-mission-scenario-definitions) |
+| `configurations.missionBoards` | Authored mission-board components with physical Entity and component identity, declared board type, and ordered faction reputation links. [Mission location vocabulary](catalog-location-vocabulary.md) |
+| `configurations.localContractGenerators` | Ordered authored Handler scope and mission-board availability. [Contract generator sources](catalog-contract-generators.md#local-generator-configuration) |
+| `declarations.contractScenarioRequirements` | Ordered authored scenario references at their original Generator, Handler and Contract slots. [Contract generator sources](catalog-contract-generators.md#authored-scenario-requirements) |
 | `mineableElements` | The mineable elements with their instability and other plain numbers, each linked to a `ResourceType`, ordered by GUID |
 | `refiningProcesses` | The refining processes (speed and quality pairs of a refinery), ordered by GUID |
 | `mineableCompositions` | The elements a rock or deposit is made of, with the range and chance of each, ordered by GUID |
@@ -170,10 +249,18 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `subHarvestableMultiConfigs` | What the slots of an object can hold by tag, ordered by GUID |
 | `harvestableLocations` | The containers whose `.soc` names a provider preset, with the starmap object each hangs below, ordered by preset, container, system and object |
 | `shops` | The shops of the shop registry with kind, brand, location and the link to a starmap object, ordered by `key` |
-| `factionReputations` | The factions of the reputation system with their allies, enemies and relation standings, ordered by GUID |
-| `reputationScopes` | The reputation scopes, each the ladder of standings one kind of reputation climbs, ordered by GUID |
-| `reputationStandings` | The reputation standings, the ranks of the scopes with their thresholds, ordered by GUID |
-| `reputationContexts` | The reputation contexts, the scopes a faction is shown with, ordered by GUID |
+| `definitions.factionReputations` | Physical faction reputation records, presentation, relations, blackboard values and original perk-list links |
+| `definitions.reputationScopes` | Physical reputation scope definitions with authored presentation and ordered standing maps |
+| `definitions.reputationStandings` | The physical reputation standings with authored presentation and progression fields, ordered by GUID and original Record index |
+| `definitions.reputationPerks` | The physical perk lists with ordered original scope/standing associations and owned reward or category data |
+| `definitions.reputationTriggerRecords` | Reusable physical sandbox trigger Records with ordered manual trigger definitions |
+| `definitions.reputationRewardAmounts` | Physical reputation reward Records with their authored names and signed amounts |
+| `definitions.infractions` | Physical infraction definitions with ordered source triggers and authored defaults. [Law definitions](catalog-law.md) |
+| `definitions.infractionSets` | Physical reusable sets of ordered infraction links and overrides. [Law definitions](catalog-law.md) |
+| `definitions.jurisdictions` | Physical jurisdictions with authored parent links, fines, limits, prison and penalty configuration. [Law definitions](catalog-law.md) |
+| `definitions.npcArchetypes`, `definitions.npcClassPools`, `definitions.autoSpawns`, `definitions.autoSpawnSets` and `definitions.encounterIndices` | Physical NPC and encounter definitions with ordered identity branches, weighted entries, class alternatives and declared References. [NPC spawn definitions](catalog-npc-spawn-definitions.md) |
+| `definitions.locationClasses`, `definitions.locationFunctions`, `definitions.locationSizes` and `definitions.locationRegistries` | Physical definitions and ordered registry members for mission location classification. [Location vocabulary](catalog-location-vocabulary.md) |
+| `definitions.reputationContexts` | Physical reputation contexts with authored scope order, original references and display properties |
 | `missionTypes` | The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID |
 | `missionLocalities` | The mission localities, named sets of starmap objects, ordered by GUID |
 | `contractScenarios` | The contract scenarios with the reward tiers of each faction, ordered by GUID |
@@ -185,9 +272,13 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `missionBrokerEntries` | The mission broker entries (`MissionBrokerEntry`), the targets of `contracts[].brokerEntryGuid`, ordered by GUID |
 | `contractNpcSpawns` | The distinct NPC spawn descriptions of the contracts, templates and broker entries, ordered by identifier |
 | `contractEntitySpawns` | The distinct entity spawn descriptions of the contracts, templates and broker entries, ordered by identifier |
+| `missionPropertySets` | The authored Generator property arrays, ordered by stable source identifier; contract rows join them through `propertySetGuids` |
 | `lootTables` | The loot tables (`LootTableV3Record`) with the weighted archetypes of each, ordered by GUID |
 | `lootArchetypes` | The loot archetypes (`LootArchetypeV3Record`) with the weighted selectors of each, ordered by GUID |
-| `lootPoolFilters` | The pool filters of the loot generation, ordered by GUID |
+| `definitions.lootPoolFilters` | Complete original pool-filter fields and values, ordered by physical source GUID |
+| `definitions.lootSecondaryChoiceSingleLayers`, `definitions.lootSecondaryChoiceMultiLayers`, `definitions.lootThemes` | Original ordered choices, layers and owned theme values with physical Record identities |
+| `definitions.hierarchicalContextualDataPresets`, `definitions.lootGenerationGlobalParams` | Original context arrays, selectors, category order and global parameter fields |
+| `definitions.subHarvestableConfigs`, `definitions.subHarvestableMultiConfigs` | Full physical harvestable configurations with original references and provenance |
 | `legacyLootTables` | The older loot tables (`LootTable`) with the weighted archetypes of each, ordered by GUID |
 | `legacyLootArchetypes` | The older loot archetypes (`LootArchetype`) with the weighted tags of each, ordered by GUID |
 | `lootContainers` | The containers placed with a multi config, with the starmap object each hangs below, ordered by config, container, system and object |
@@ -195,10 +286,60 @@ same in every kind. Every field is always present; one that has no value is `nul
 | `crafters` | The crafting stations (entities with a `CrafterComponentParams`) with the limits and accepted categories of their job queues, their crafting-time modifiers and the attach definition a port is matched against, ordered by GUID |
 | `shipStoreSlugs` | The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered by `slug` (curated data, ADR-0117) |
 | `craftingGlobal` | Not a kind: the global crafting parameters that apply to every dismantle |
-| `itemRecovery` | Not a kind: the item recovery multipliers and rates behind claims, with the override groups of entity classes, `null` without the Record; see "Item recovery rules" below |
+| `configurations.itemRecoveryEconomy`, `configurations.itemRecoveryOverrides` and `configurations.itemRecoveryPolicy` | The selected recovery policy's economy parameters and original override declarations. See [Item recovery rules](#item-recovery-rules). |
 
-A complete kind lists every Record of its kind in the Build, so the import may treat a Record it
-knows but no longer finds as removed. A partial kind lists only what the Filter selected.
+An unfiltered kind with complete catalog-wide `exportHealth` lists its successfully read sources,
+so an import can use absence as removal evidence within that kind's selection policy. A partial
+kind lists only what the Filter selected. Incomplete health, including global blocking diagnostics,
+cannot establish removal even when a kind's Filter scope is complete.
+
+### Per-value source origin for canonical definitions
+
+`definitions.resourceTypes.rows` replaces the root `resourceTypes` array. Commodity facts and choices
+use `definitions.commodities.rows` and `projections.commodityPresentation.rows`; the old root
+`commodities` view is removed. See [Commodity mapping](catalog-commodity-types.md). There is no duplicate legacy view. Its source-backed members and nested authored list elements carry five required keys:
+
+| Key | Meaning |
+| --- | --- |
+| `state` | `present`, `absent`, `null`, `unreadable`, `unsupported` or `invalid` |
+| `value` | Typed present payload, otherwise null; false, zero and empty values stay present |
+| `containsEncryptedSource` | True for any proven encrypted contributor/ancestor; false only for a complete all-unencrypted set; null otherwise |
+| `sourceUsesRefs` | Opaque document-local references to actual contributing `provenance.uses` rows |
+| `sourceSetComplete` | Completeness of this value's input set, independent of Filter and export health |
+
+A complete input set may have unknown encryption, and an incomplete set may contain a known
+encrypted contributor. Successful decoding, an Archive key or a plaintext standalone DCB does not
+prove an unencrypted original source. Payload, selector and conversion uses contribute; attempted
+reads and untouched reference targets do not. Sources keep distinct physical identity even when
+paths, GUIDs or decoded bytes are equal. Nested container ancestry affects the result. Directory
+metadata and Entry payload are separate scopes.
+
+Every `provenance.uses` row requires `effectiveEncryption`: `encrypted`, `unencrypted` or
+`unknown`, captured for that original use's byte domain. It includes the applicable containing
+Entries and can differ from the leaf's `storedEncryption`. Consumers can check a value's direct
+marker against these contributing-use facts; the inventory does not replace per-value markers.
+
+Fixed Single resource numbers retain `rawBits` (eight lowercase hexadecimal digits) plus nullable
+`finite`; Double payloads use sixteen digits. Infinity and NaN remain present, including their
+original bits. Generic numeric fields add the source-width `type` tag; Int64/UInt64 values use
+bounded canonical decimal strings. The exact payloads, states and reference contracts are in the
+[ResourceType contract](catalog-resource-types.md#immediate-value-and-origin-carrier).
+
+Name and description values reference separate canonical text tables. Their `translations.value`
+maps each actually available supported language directly to `TextForms`: independently sourced
+`sourceText` and `displayText`, without a redundant language-group carrier. Source text preserves
+the exact winning decoded INI value; display text keeps the existing escape decoding and trimming.
+An empty winner stays present in both forms; padding remains in source text while display text is
+present and empty. Missing keys and placeholders have two absent forms. A missing language Entry
+creates no map key. The [TextForms contract](catalog-text-forms.md) defines exact inputs, summary
+accounting and consumer paths. Game-text protection remains independent of source encryption;
+consumers cannot infer per-value proof from the global `source.archiveKey` or unread-entry counts.
+
+This coverage is implemented for ResourceTypes, Commodities and Manufacturers, their canonical
+text rows and Commodity presentation. Other families and
+structured/raw tool outputs still require their own migration under
+[#1125](https://github.com/p4kx-org/p4kx/issues/1125); the presence of `provenance` is not proof that
+all current output fields have origin metadata.
 
 ### Ordering Builds
 
@@ -234,7 +375,8 @@ lower number than the last applied one.
 
 ### Entities
 
-Every entity carries:
+The existing entity shapes below carry these fields. Manufacturers, ResourceTypes and Commodities
+use their canonical tables and sourced carriers instead of the inline text shape:
 
 | Field | Meaning |
 |-------|---------|
@@ -245,7 +387,8 @@ Every entity carries:
 
 A resource group and a blueprint category carry `name` and no `description`.
 
-A manufacturer adds `code`, e.g. `ACAS`.
+Manufacturers use [their canonical definition contract](catalog-manufacturer-types.md). The authored
+`Code` string and owned `Localization` retain their source states independently of resolved text.
 
 An item takes its fields from the components of its `EntityClassDefinition`:
 
@@ -261,7 +404,7 @@ An item takes its fields from the components of its `EntityClassDefinition`:
 | `itemClass` | `Civilian`, `Competition`, `Industrial`, `Military` or `Stealth`, or `null` |
 | `playability` | `player`, `mission` or `special`, or `null`; see "Playability" below |
 | `variantOf` | The `guid` of the base of the item's variant group, `null` for a base and an ungrouped item; see "Variant groups" below |
-| `stats` | The typed stat blocks of a weapon, shield, quantum drive, power plant, cooler, missile, suit armour, clothing, radar, tractor beam, attachment modifier, mining laser or mining module and gadget, `null` for any other item; see "Item stats" below |
+| `stats` | Item stat blocks, health and resource states. See "Item stats" below. |
 
 `itemClass` takes the options of the DataForge enum `EItemClass` (without `UNDEFINED`). No
 DataForge field carries it: it is read from the first line of the English `description` that
@@ -320,20 +463,25 @@ those parts too. No value is below 1 or above 7.
 
 `stats` holds raw facts of the Archive and no derived value (ADR-0065): every number is the stored
 field in the stored unit, `p4kx` computes no damage per second, no cycle time, no acceleration and
-no fuel rate. The Basetool owns those formulas. `stats` is `null` unless the item has at least one
-of the thirteen blocks; every block is `null` when the item does not have it, and a field inside a
-present block is `null` when the Archive does not state it, never 0. None of the fields is a game
-text. The additions are additive (ADR-0054); `kind` of a fire mode and
+no fuel rate. The Basetool owns those formulas. `stats` is present for items with any block below
+and for shield generators and quantum drives with health or resource states. Absent blocks and
+unstated fields are `null`. The physical device rows live in [`configurations.shieldGenerators`](catalog-shield-generators.md)
+and [`configurations.quantumDrives`](catalog-quantum-drives.md).
+The `kind` of a fire mode and
 `trackingSignalType` are closed sets that the schema keeps as strings. The blocks `armor`,
 `clothing`, `radar`, `tractorBeam` and `weaponModifier` and the fire-mode field `damagePerSecond`
 follow ADR-0072; the blocks `miningLaser` and `miningModifier` and the fire-mode fields `hitType`,
 `fullDamageRange` and `zeroDamageRange` follow ADR-0262.
 
+Owner-field and named-structure lookups inspect every materialized owned descendant,
+starting at the root and then following stored field and array order depth first. They
+use an iterative stack proportional to active depth. These lookups impose no separate
+16- or 32-level cutoff. They do not follow Reference links; ammunition and other domain
+links use their stated readers. Canonical reader failures remain failures and are not
+proof that an unexamined source field is absent.
 | Block | Present when | Fields and sources |
 |-------|--------------|--------------------|
 | `weapon` | the item has `Components[SCItemWeaponComponentParams]` (ship weapons and FPS weapons) | `fireActions`: per element of `fireActions`, in stored order, with a sequence (`sequenceEntries`) flattened to its entries: `kind` (the struct, e.g. `SWeaponActionFireRapidParams`), `name`, `fireRate` (rounds per minute), `pelletCount` (as `pellets`; `pellets` where a Record states that instead) and `ammoCost` of `launchParams`, `heatPerShot`, `chargeTime`, `overchargeTime`, `cooldownTime` (each of the fire mode, when stated), and `damagePerSecond` (the damage types of the beam's `damagePerSecond`, the power of a mining laser; `null` for a mode without one), and `spread` (see below); a beam also has `hitType`, `fullDamageRange` and `zeroDamageRange` (the two ranges in metres); a parallel mode (`weaponActions`) is listed as its entries; a charged or wrapped mode reads `fireRate`, `launchParams` and `name` from its `weaponAction` when it has none of its own. `ammoCapacity`: `maxAmmoCount` of the ammo container, the magazine's capacity (see below). `ammo`: the `AmmoParams` Record that the container's `ammoParamsRecord` links to, `null` without a readable one: `speed`, `lifetime`, `damage` (the damage types of `projectileParams.damage`), `detonationDamage`, `detonationMinRadius` and `detonationMaxRadius` (from `explosionParams`) |
-| `shield` | `Components[SCItemShieldGeneratorParams]` | `maxHealth` (`MaxShieldHealth`), `maxRegen` (`MaxShieldRegen`), `decayRatio` (`DecayRatio`), `downedRegenDelay` (`DownedRegenDelay`), `damagedRegenDelay` (`DamagedRegenDelay`) |
-| `quantumDrive` | `Components[SCItemQuantumDriveParams]` | `fuelRequirement` (`quantumFuelRequirement`, as stored), `jumpRange`, `disconnectRange`, and of `params`: `driveSpeed`, `cooldownTime`, `spoolUpTime`, `stageOneAccelRate`, `stageTwoAccelRate`, `engageSpeed` |
 | `powerPlant` | `AttachDef.Type` is `PowerPlant`, ignoring case | `powerOutput`: the `amount` of the first `generation` flow of `resourceStates` whose resource is `Power`, and `unit`: the `unit` of that flow |
 | `cooler` | `AttachDef.Type` is `Cooler`, ignoring case | `coolingRate` and `unit`: as for the power plant, for the resource `Coolant` (a cooler's flow is an `ItemResourceDeltaConversion`) |
 | `missile` | `Components[SCItemMissileParams]` | `damage` (the damage types of `explosionParams.damage`), `explosionMinRadius`, `explosionMaxRadius`, `trackingSignalType`, `lockTime`, `lockingAngle`, `lockRangeMin`, `lockRangeMax` (of `targetingParams`) and `linearSpeed` (of `GCSParams`) |
@@ -348,14 +496,15 @@ follow ADR-0072; the blocks `miningLaser` and `miningModifier` and the fire-mode
 ##### From a gameplay property to a stat field
 
 The Archive holds no link from a `CraftingGameplayPropertyDef` to the item field it changes: the
-Record has a name (`propertyName`), a unit format and a display transformation, nothing that names a
-field (ADR-0072). The catalog therefore states no link per entry of `gameplayProperties`; the
-consumer joins a modifier's `propertyGuid` to the `className` of that entry and takes the stat
-field from this table. The table covers the 29 properties of LIVE 4.10.2; `real_archive_gear_stats`
-checks that every `className` of `gameplayProperties` has a row. A multiplier-kind modifier scales
-the base value of the field, an additive one adds to it.
+Record has a name (`propertyName`), a unit format, a display transformation and ordered name
+overrides, none of which identifies an item stat field (ADR-0072). The catalog therefore states
+no stat link per entry of `definitions.gameplayProperties.rows`. Resolve a modifier's
+`propertyGuid` against those rows' sourced `guid.value`, then use that row's `className.value`
+as the key into the stat-field table below. The table covers the 29 properties of LIVE 4.10.2;
+`real_archive_gear_stats` checks that every catalogued `className.value` has a row. A multiplier-kind
+modifier scales the base value of the field; an additive one adds to it.
 
-| `className` | `stats` field the modifier changes | Items |
+| `className` | Catalog field the modifier changes | Items |
 |-------------|------------------------------------|-------|
 | `GPP_Armor_DamageMitigation` | `armor.damageResistance.<type>.multiplier` for all six types; the SC Wiki's physical value is `physical.multiplier` | armour |
 | `GPP_Armor_TemperatureMin` | `clothing.temperatureResistanceMin` | armour, clothing |
@@ -372,11 +521,11 @@ the base value of the field, an additive one adds to it.
 | `GPP_Weapon_Spread` | `weapon.fireActions[].spread` | personal weapons |
 | `GPP_ItemResource_PowerGeneration` | `powerPlant.powerOutput` | power plants |
 | `GPP_ItemResource_CoolantGeneration` | `cooler.coolingRate` | coolers |
-| `GPP_Shield_MaxHealth` | `shield.maxHealth` | shields |
+| `GPP_Shield_MaxHealth` | `configurations.shieldGenerators.rows[].maxHealth` | shields |
 | `GPP_Radar_MinAimAssistDistance` | `radar.aimAssistDistanceMin` | radars |
 | `GPP_Radar_MaxAimAssistDistance` | `radar.aimAssistDistanceMax` | radars |
-| `GPP_Quantum_Speed` | `quantumDrive.driveSpeed` | quantum drives |
-| `GPP_Quantum_FuelRequirement` | `quantumDrive.fuelRequirement` | quantum drives |
+| `GPP_Quantum_Speed` | `configurations.quantumDrives.rows[].standard.value.driveSpeed` | quantum drives |
+| `GPP_Quantum_FuelRequirement` | `configurations.quantumDrives.rows[].fuelRequirement` | quantum drives |
 | `GPP_Weapon_Tractor_Force` | `tractorBeam.maxForce` | tractor beams, salvage heads |
 | `GPP_Weapon_Tractor_MaxDist` | `tractorBeam.maxDistance` | tractor beams, salvage heads |
 | `GPP_Weapon_Tractor_FullStrengthDist` | `tractorBeam.fullStrengthDistance` | tractor beams, salvage heads |
@@ -424,10 +573,10 @@ Units differ between structs and are not converted. A delta without a `generatio
 
 Raw values that need care:
 
-- `quantumDrive.jumpRange` is `f32::MAX` (3.4028235e38) on a drive the Archive leaves unbounded (a
-  development drive of the Idris). It is exported as stored; a reader treats a value at that
-  magnitude as unlimited.
-- A number that is not finite (NaN, infinity) is `null`, never written.
+- A quantum drive range of `f32::MAX` retains its exact source bits in
+  `configurations.quantumDrives.rows[].jumpRange`.
+- A nonfinite number in a remaining flat stat block is `null`. Canonical numeric cells preserve
+  its bits and provide a null finite projection.
 - `weapon.ammoCapacity` is the capacity of the ammo container, which is the magazine and not the
   weapon body: a ship weapon holds `Components[SAmmoContainerComponentParams]` itself; a weapon
   without one (the personal weapons, ballistic and energy alike) links its magazine entity by
@@ -502,7 +651,7 @@ the Record, unchanged; the Basetool applies any scaling or rule of its own. The 
 placeholders, and are not exported.
 
 `expediteFee` is the only fee in aUEC the Archive holds for a ship; the multipliers that relate to
-claims are in `itemRecovery` (see "Item recovery rules"), which also states what the data does and
+claims are in the [item recovery configuration tables](#item-recovery-rules), which also state what the data does and
 does not say about a claim fee.
 
 On LIVE all 1,066 catalog ships carry `insurance`, each with a fee;
@@ -548,11 +697,22 @@ finds only `crewSize` (on `VehicleComponentParams` and on `StaticEntityClassData
 `crewManifest` (the NPC crew of AI variants, used by `playability`). No field named minimum, seat
 or crew minimum exists, so `crewSize` stays the only crew value.
 
-**Outer dimensions.** No field states the outer size of a ship in metres. The survey finds the
-item-inventory fields `AttachDef/inventoryOccupancyDimensions` and
-`inventoryOccupancyLocalBoundsMin` / `Max` on every ship Record, plus `maxBoundingBoxSize` and
-`hasLocalBounds`. They describe how a ship takes up inventory space, not its hull, and their values
-for ships are not verified, so the catalog exports no dimensions.
+**Inventory dimensions.** The [inventory storage and item bounds contract](catalog-inventory-storage.md)
+exports original AttachDef occupancy, vehicle box size and metadata bounds flags in
+`configurations.itemBounds`. These fields describe authored inventory and definition-space
+bounds. `definitions.inventoryContainers` and `configurations.inventoryConfigurations`
+expose source capacity and the physical item or vehicle components that select it.
+[Authored inventory interactions](catalog-inventory-interactions.md) are in
+`configurations.interactions`. Their original condition lists, tasks and state links retain
+physical owners and per-value provenance.
+
+[Ship facility configurations and placements](catalog-ship-facilities.md) link the authored
+seat, medical and cargo grid components and storage configurations to their resolved
+Loadout contexts and authored SOC entities in ship rooms and rooms on resolved attachments.
+Each placement row groups its configuration links in original component order. Room inspection
+records its container occurrences and coverage in
+`placements.facilityInteriorCoverage`. Medical tier and resource consumption definitions retain
+their own physical Record identity.
 
 #### Playability
 
@@ -663,214 +823,151 @@ to the same class (Mole editions, Carrack w/C8X) hides a base entry that is not.
 when a name-table class is no catalog ship and when a catalog ship or store slug entry cannot be
 read.
 
-A commodity is an `EntityClassDefinition` under `entities/commodities` or a `ResourceType` Record that
-a cost of any tier or a kept quality quantization uses and no commodity Record carries (see below). A commodity Record takes its fields
-from the entity:
+Commodity identity and authored facts are in `definitions.commodities.rows`; explicitly derived
+choices are in `projections.commodityPresentation.rows`. The root `commodities` array is removed.
+Both tables keep the existing Commodity selection, GUID identity, resource-only fallback and
+canonical ordering. Every source-backed value, including identity, text references, links and
+nested authored members, has its own immediate origin carrier.
 
-| Field | Source |
-|-------|--------|
-| `name` | `SCItemPurchasableParams.displayName` |
-| `description` | `EntityUIDisplayParams.displayDescription` in `StaticEntityClassData` |
-| `typeGuid` | The GUID of the `ResourceTypeGroup` Record that directly lists the `ResourceType` in its `resources` (19 groups on LIVE: Metal, Mineral, Gas, …), the `guid` of a `resourceGroups` entry; `null` without a `ResourceType` or a group |
-| `subtypeGuid` | The GUID of the `ResourceType` Record that the first entry of `ResourceContainer.defaultComposition` links to; `null` without one, e.g. `Special_HolidayLetter` |
-| `displayType` | A text: `SCItemPurchasableParams.displayType`, e.g. `@items_commodities_type_metal` |
-| `densityGramsPerCubicCentimetre` | The number `densityType.densityUnit.gramsPerCubicCentimeter` of the `ResourceType` holds (a fact, no game text); `null` without a `ResourceType`, a density or a density in another unit |
-| `refinedSubtypeGuid` | The GUID `refinedVersion` of the `ResourceType` links to; `null` without a `ResourceType` or a `refinedVersion`. It equals the `subtypeGuid` of the refined commodity only when the catalog has that commodity |
+`guid.value` in the definition remains the unique Commodity key. Nullable, non-unique
+`subtypeGuid.value` in the presentation is a ResourceType relationship. A `resourceGuid` join can
+return zero, one or several Commodity alternatives; never use `subtypeGuid` as a primary key.
+Independent resource facts join `definitions.resourceTypes.rows[].guid.value`.
 
-The refining fields are described in [commodity-refining.md](commodity-refining.md), with what the
-DataForge does not hold (instability per commodity, yields, counting in SCU or units). The refined
-`ResourceType` may have no commodity of its own; then `refinedSubtypeGuid` matches no `subtypeGuid`.
+The [Commodity contract](catalog-commodity-types.md) defines the authored bindings, canonical
+text domains, exact first-resource/first-group/name/density/refinement recipes and reconstruction
+of old nullable values. Each fallback records the actual contributing selection uses.
+The [source verification guide](resource-source-verification.md) records the unavailable historical
+Build baseline and the independently deferred real-Archive acceptance.
+A Blueprint (`CraftingBlueprintRecord`) uses the [Blueprint v3 contract](catalog-blueprints.md).
+Its independently sourced Record header and complete original `blueprint` body are in
+`definitions.blueprints`. `configurations.blueprintTiers` interprets the tiers and costs by
+physical owner and original occurrence. `projections.blueprintPresentation` keeps the established
+name, category, produced item, default availability and dismantle choices. Its `firstTier` and
+ordered `ingredients` navigate the canonical tier and costs.
 
-A name or description that is missing or a placeholder key is taken from the `ResourceType` Record
-`subtypeGuid` links to (`displayName`, `description`) instead. The game holds no field named type
-or subtype for a commodity; the groups of `ResourceType` Records are the types, the `ResourceType`
-is the subtype.
+A resource group (`ResourceTypeGroup`) is the type of a commodity: the commodity's `typeGuid`
+keeps the existing first selected group that lists its `ResourceType` directly. Schema v3 separates
+these source facts and choices:
 
-A `ResourceType` Record that the costs of a blueprint use in any tier (LIVE has one tier per
-blueprint: Aslarite, Ouratite, Iron, Stileron, Lindinium, Riccite, Tin, Torite, Savrilium and
-Pressurized Ice), selections opened, or that a kept quality quantization links to
-(`resourceTypeGuids`), and that no commodity Record carries is listed as a commodity as well, so
-that every resource of a cost and every `resourceTypeGuids` entry points at a catalog entry. A
-development leftover `ResourceType` never links to a quantization, so none is backfilled for one.
-These entries fall under the game-text policy above like every commodity: `name` is a short name,
-`description` is a game text (`x-gameText`). Its `guid` is the GUID of the `ResourceType`, `className`, `recordPath`, `name`
-and `description` are those of the `ResourceType`, `typeGuid` is its group, `subtypeGuid` is its own
-GUID and `displayType` has no key. With a `--filter`, such an entry is listed only when its record
-path matches.
+| Dataset | Fields and source |
+| --- | --- |
+| `definitions.resourceGroups` | Original physical header, declared `recordName`, className, recordPath, recordIndex and sourceType; name references from displayName, protected description references and exact thumbnail paths |
+| `declarations.resourceGroupMembers` | Each selected physical owner's original groups/resources arrays, retaining nulls, repetitions, wrong/missing targets, all parent edges and cycles in authored order |
+| `projections.resourceGroupParents` | The first selected parent with a different GUID in physical Record order; nominal child-GUID matching retains duplicate child definitions' shared choice and excludes same-GUID edges even across different physical Records |
 
-The join from an ingredient to its commodity is `resourceGuid` = `subtypeGuid`. A `ResourceType`
-that a commodity Record carries yields no second entry, so every `resourceGuid` of the catalog
-matches exactly one commodity (checked against LIVE). A `ResourceType` that several commodity
-Records share (on LIVE the Slam variants and the med pens) matches several; no recipe uses one.
+Every source-backed datum has its immediate encryption marker and actual source-use references.
+Names use `texts.publicNames`; descriptions and their references use protected `texts.gameTexts`.
+Missing/null/empty/unreadable/invalid facts stay distinct. Equal GUIDs do not merge physical Records.
+The parent choice retains its actual earlier selection inputs and original chosen slot; later unused
+parents do not taint it. Importers must guard cycles and must not assume a fixed depth or a forest.
+The authoritative membership arrays remain separate from singular convenience choices.
 
-A blueprint (`CraftingBlueprintRecord`) takes its fields from `blueprint`:
+Only selected groups affect these choices and `definitions.resourceTypes.rows[].groupGuids.value`;
+additional health-only reads do not create group rows or memberships. ResourceType group GUIDs keep
+all distinct selected direct memberships sorted by GUID. Thumbnail paths remain source facts;
+cataloging does not extract the media. No parallel root resourceGroups array is emitted. See the
+[ResourceGroup contract](catalog-resource-groups.md) for identity, provenance and health details.
 
-| Field | Source |
-|-------|--------|
-| `className`, `key` | The Record name without its type, e.g. `BP_CRAFT_behr_lmg_ballistic_01_mag`; both hold it |
-| `name` | `blueprintName` |
-| `categoryGuid` | The GUID `category` links to, the `guid` of a `blueprintCategories` entry; `null` without a category or when that Record is a left-out development leftover or unreadable |
-| `producedItemGuid` | The GUID `processSpecificData.entityClass` links to; `null` for a Reference to a Record the DataForge lacks |
-| `craftTimeSeconds` | `costs.craftTime` of the first tier (`days`, `hours`, `minutes`, `seconds`) in whole seconds, rounded |
-| `ingredients` | The costs of the first tier, see below |
-| `tiers` | Every tier in stored order, see "Tiers" below; the first one is the tier `craftTimeSeconds` and `ingredients` describe |
-| `defaultAvailable` | `true` when the blueprint is in `CraftingGlobalParams.defaultBlueprintSelection`, the blueprints a player has by default |
-| `dismantle` | What dismantling the produced item returns, see "Dismantle returns" below; `null` without one |
+`definitions.blueprintCategories` holds the selected readable physical `BlueprintCategoryRecord`
+definitions as an `availability`/`rows` table. A declared family with no selected rows is
+`available` with an empty list; a missing family is `absent`. Unavailable family metadata remains
+`unavailable`, independently of source-read failures reported in `exportHealth`. Categories use
+the existing path/type, Filter and development-leftover selection. Rows remain in GUID order;
+equal GUIDs retain their original physical order and distinct `recordIndex` values.
 
-`craftTimeSeconds` and `ingredients` keep their meaning; they are derived from the first tier, so
-the cost tree is read once. A blueprint with a `CraftingCost_Select` nested deeper than 32 levels is
-not cut off silently: it is left out of `blueprints` and counted as a failure (printed on stderr by
-`p4kx catalog`, under `failed` in `--json` and in the summary; the catalog file has no such field).
-`p4kx catalog` then exits with code 1, where an earlier build wrote the cut tree silently. No
-blueprint of LIVE is that deep, so no catalog of LIVE changes (a change of the selection, part of
-version 2).
+The Record declares no body fields. Each row therefore contains only the
+[shared eight-field Record header](catalog-record-headers.md), with the immediate per-datum
+origin marker on every field. There is no fabricated `name` or text-table row, parent or category
+rule. A readable unexpected body field is diagnosed and blocks normal publication; diagnostic
+publication retains the header row and the exact field diagnosis. A failed strict tree read
+produces no category row and remains a source-read failure.
 
-An ingredient is one `CraftingCost_Resource` or `CraftingCost_Item` leaf of `mandatoryCost` and
-`optionalCosts`. Nested `CraftingCost_Select` costs are flattened depth first in stored order:
+The old flat root list is absent. Its `guid`, `className` and `recordPath` values are now the
+corresponding sourced fields' `value` in `definitions.blueprintCategories.rows`. The additional
+raw name, exact filename, physical index, source type and metadata-tag state come from the actual
+header. `declarations.blueprintCategoryLists` independently retains each selected physical
+`BlueprintCategoryDatabaseRecord` and its ordered, sourced `categories` reference slots
+([contract](catalog-blueprint-category-lists.md)). These declarations do not change the category
+definitions' selection or GUID order and declare no category rules or hierarchy.
 
-| Field | Meaning |
-|-------|---------|
-| `resourceGuid` | The GUID of the `ResourceType` Record of a resource line, otherwise `null` |
-| `itemGuid` | The GUID of the entity of an item line, otherwise `null` |
-| `quantityScu` | `quantity.standardCargoUnits` of a resource line, otherwise `null` |
-| `quantityUnits` | `quantity` of an item line, otherwise `null` |
-| `minQuality` | `minQuality` |
-| `slot`, `slotKey` | `debugName` and `displayName` of the nearest enclosing selection that has a name; a placeholder `slotKey` is `null` |
-
-A resource group (`ResourceTypeGroup`, 19 on LIVE: Metal, Mineral, Gas, …) is the type of a
-commodity; a commodity's `typeGuid` is the `guid` of the group that lists its `ResourceType`. It
-takes its fields from the Record:
-
-| Field | Source |
-|-------|--------|
-| `className` | The Record name without its type, e.g. `Metal` |
-| `name` | `displayName`, e.g. `@items_commodities_type_metal`; a placeholder key (`@LOC_PLACEHOLDER`, 7 groups on LIVE) leaves `en` and `de` `null`, and the Basetool falls back to `className` |
-| `parentGuid` | The GUID of the group that lists this group in its `groups`, the `guid` of another `resourceGroups` entry; `null` for a top-level group; the first group in Record order wins when several list it. Only the groups of the kind list: a group left out as a development leftover or unreadable names no parent and no `ResourceType` |
-
-The groups form a forest, and `parentGuid` is the direct parent only. The import must not assume
-a fixed depth and must guard against a cycle: the catalog exports the lists as the game stores
-them, so a group that lists itself has no parent and two groups that list each other (A lists B, B
-lists A) are each other's parent, with no root.
-
-Groups nest one level on LIVE: Metal lists Alloy and UnrefinedOres, Mineral lists Raw_Minerals,
-Nonmetal lists Halogen, Organic lists Food, ProcessedGoods lists SyntheticMaterials, Vice and
-Bulk_Supplies. A commodity points at the group that lists its `ResourceType` directly, so a
-commodity of Alloy has the child as `typeGuid`, not Metal. `description`, the thumbnail paths and
-the lists `resources` and `groups` are not exported: the descriptions are game texts, the paths are
-media, and the membership is `typeGuid` of the commodities. All groups share one `recordPath`, the
-Record file `resourcetypedatabase`; `className` and `guid` tell them apart.
-
-A blueprint category (`BlueprintCategoryRecord`, 21 on LIVE) is the target of the `categoryGuid` of
-a blueprint. The Record holds no field at all, so the category has `guid`, `className` (e.g.
-`FPSArmours`, `VehicleComponentS2`), `recordPath` and a `name` without a key, which stays `null`
-until the game adds one; the game localises no category. Categories do not nest: the Record has no
-parent, and the `BlueprintCategoryDatabaseRecord` beside them only lists them. Some categories
-carry no blueprint on LIVE (`FuseBattery`, `Medical`, `Utility`, and the examples `Example1`,
-`Example2`, `DismantleExample1` and `RefiningExample1`); they stay, as the kind is complete by
-Record.
-
-Every `typeGuid` of a commodity and every `categoryGuid` of a blueprint resolves to a `guid` of
-`resourceGroups` or `blueprintCategories` (checked against LIVE; a commodity without a
-`ResourceType` or group, 1 on LIVE, and a blueprint without a category or whose category is a
-left-out leftover or unreadable have `null`; a commodity whose `ResourceType` only a leftover or
-unreadable group lists has a `null` `typeGuid`). The groups are found whatever the `--filter`; a
-category is only found missing when the `--filter` selects it, so under a `--filter` a
-`categoryGuid` may still name a leftover category outside it. With a
-`--filter`, a kind is partial and the references need not resolve.
+A Commodity's `typeGuid.value` joins `definitions.resourceGroups.rows[].guid.value`.
+A Blueprint's presentation `category.value` joins `definitions.blueprintCategories.rows[].guid.value`
+when the category is readable and selected. A selected leftover or unreadable category clears the
+presentation choice. Its authored reference remains in the Blueprint definition. A filtered export
+may contain a choice whose target lies outside the selection. Only selected groups affect group
+and Commodity membership.
 
 ### Tiers
 
-`tiers` lists every `CraftingBlueprintTier` in stored order. Every tier has:
+Each `configurations.blueprintTiers.rows[]` carries the physical Blueprint reference, the original
+tier occurrence, `craftTimeSeconds`, `mandatory`, `optional`, flat `costs` and `research`. A
+selection's `options` reference costs in stored order. The `meaning` union distinguishes
+`select`, `resource` and `item`. Resource and item quantities retain their original units before
+multipliers. The cost context retains the effective multiplier, original composition option,
+and the ordered modifiers and ranges it recognizes. All authored context and cost values are
+also available through the exact source arena. The reader follows complete valid selections
+iteratively.
 
-| Field | Meaning |
-|-------|---------|
-| `craftTimeSeconds` | `costs.craftTime` of the tier in whole seconds, rounded; `null` without one |
-| `mandatory` | The mandatory cost as a cost line, `null` without one |
-| `optional` | The optional costs as cost lines in stored order |
-
-The stored `research` of a tier (`CraftingResearch` with `researchCosts` and `unlockRequirements`,
-both strong pointers) is not exported: on LIVE 4.10 it exists on 926 of the 1,618 tiers and both
-pointers are empty on every one of them, so the Archive shows neither the type nor a field of what
-they would point to. A field typed without ever seeing a value would be a guess, and the type could
-not change later (ADR-0054). The field joins the tier as an additive change once a Build fills it
-(ADR-0243).
-
-A cost line is a selection, a resource line or an item line. The tree keeps what `ingredients`
-flattens, so a selection stays a selection:
-
-| Field | Meaning |
-|-------|---------|
-| `kind` | `select`, `resource` or `item`. A closed set the game may extend; the schema keeps it a string and a reader maps an unknown value to nothing |
-| `count` | `select`: how many options the player chooses ("choose n"); fewer than `options` offers means the player may leave options out (3 of the 1,618 LIVE blueprints) |
-| `slot`, `slotKey` | `select`: `debugName` and `displayName` of `nameInfo`; a placeholder `slotKey` is `null` |
-| `options` | `select`: the options as cost lines in stored order, otherwise `[]` |
-| `resourceGuid`, `quantityScu` | `resource`: the `ResourceType` Record and the quantity in SCU, before the quantity multiplier |
-| `itemGuid`, `quantityUnits` | `item`: the entity and the number of units, before the quantity multiplier |
-| `minQuality` | `resource` and `item`: `minQuality` |
-| `quantityMultiplier` | The factor of `CraftingCostContext_QuantityMultiplier` (1.15 on 3 lines of LIVE), `null` without one. The quantities stay the stored ones; the consumer applies the factor |
-| `compositionInclusion` | The option of `CraftingCostContext_ResultCompositionInclusion`, e.g. `Include`; `null` without one |
-| `modifiers` | `CraftingCostContext_ResultGameplayPropertyModifiers`: per modifier `propertyGuid` (a `gameplayProperties` entry) and `ranges`, each with `kind` (`multiplier` for factors, `additive` for summands; a closed set the game may extend), `startQuality`, `endQuality`, `atStart` and `atEnd`, linear in the quality between the two ends |
-
-A selection carries the context of the selection itself in the same fields.
-
-LIVE holds exactly one tier per blueprint on all five Channels, so the real-Archive test checks
-that tiers and first-tier fields agree, and the multi-tier case is covered by a synthetic
-Archive (`catalog_crafting_tiers`), which checks a blueprint with two tiers, selections,
-multipliers and modifiers.
+Research distinguishes an absent declaration, a null pointer, a readable envelope, an unsupported
+shape and an unreadable value. A readable envelope retains both original members and their
+declared strong-pointer bases. A populated exact fieldless base has a known present
+interpretation. Other populated payloads retain their original structure and get an unsupported
+diagnosis.
 
 ### Quality, pools and dismantle
 
-Five kinds hold what a blueprint or a resource refers to; each entry has `guid`, `className` and
-`recordPath`, and the ordering, completeness and leftover rules of every other kind apply (a `--filter` matches
-the record path and marks the kind partial).
+Five kinds hold what a blueprint or resource refers to. Canonical quality definitions use the
+shared sourced Record header; the other lists keep their own identity fields. A `--filter`
+matches the record path and marks selected-kind scope partial independently of source health.
 
 | Kind | Fields |
 |------|--------|
-| `gameplayProperties` | `name`: the localisation key `propertyName` and its texts; a placeholder key stays as `key` and leaves `en` and `de` `null`, as for `items` and `blueprints`. The target of a modifier's `propertyGuid` |
-| `qualityDistributions` | `distribution`: a normal distribution `kind`, `min`, `max`, `mean`, `stddev` (`null` for an override Record or a value beyond a 32-bit float), and `overrides`: per location a `locationGuid` and its `distribution` (empty for a default Record). Both Record types of `crafting/qualitydistribution` are listed |
-| `qualityQuantizations` | `bands` and `resourceTypeGuids`, described under "Quality quantizations" below |
-| `blueprintPools` | `entries`: per entry `blueprintGuid` and `weight`; `totalWeight`, the sum of the positive weights; `rewardSources`: every struct of any Record with a Reference to the pool (on LIVE the `BlueprintRewards` result of a contract) with `recordGuid`, `recordPath`, `contractId`, `contractName` (both from the nearest enclosing struct that has an `id`) and `chance`, ordered by `recordGuid` and then in stored order. A `blueprintGuid` may point at a blueprint that is left out of `blueprints` as a failure |
+| `definitions.gameplayProperties` | `propertyName` and `unitFormat` are sourced public-name references with source/display TextForms; `displayTransformation` preserves original operation occurrences through local links, and `nameOverrides` retains every ordered name/condition declaration. Scale numbers retain exact original width/bits. These definitions remain the targets of modifiers' nominal `propertyGuid` values; no transformation or condition is evaluated ([contract](catalog-gameplay-properties.md)) |
+| `definitions.qualityDistributions` | Shared sourced header, independent `qualityDistribution`/`locationOverride` declarations and ordered nullable override positions; exact numeric storage and inline/recordRef/emptyBase forms |
+| `definitions.qualityQuantizations`, `projections.qualityQuantizationResources` | Complete raw band definitions and a separate genuine inverse, described below |
+| `blueprintPools` | `entries`: per entry `blueprintGuid` and `weight`; `totalWeight`, the sum of the positive weights; `rewardSources`: every struct of any Record with a Reference to the pool (on LIVE the `BlueprintRewards` result of a contract) with `recordGuid`, `recordPath`, `contractId`, `contractName` (both from the nearest enclosing struct that has an `id`) and `chance`, ordered by `recordGuid` and then in stored order. A `blueprintGuid` may refer to a Blueprint outside the selection or missing due to a source-read failure |
 | `dismantleProcesses` | `efficiency` (0.5 on LIVE) and `timeSeconds` (15 on LIVE) of the `GenericCraftingProcess_Dismantle` |
 
 A blueprint's chance from a source is `chance` x the entry's `weight` / `totalWeight`; a source
 without a chance or with one outside 0 to 1, a pool without a positive weight and an entry with a
 weight of zero or less give none. The quality distributions carry no link to a blueprint or source:
-the Records do not hold one, so the catalog lists them as they are.
+the Records do not hold one, so the catalog lists them as they are. Resource-owned inline and
+linked forms preserve their source ownership in
+[`definitions.resourceTypes.rows[].properties`](catalog-resource-types.md#quality-source-wrappers-and-exact-curves).
+Standalone quality definitions and resource-owned declarations use the same typed exact-width
+numeric readers. The catalog preserves f32/f64 bits, wide integer widths, signed zero and
+nonfinite raw tokens. Separate declared Int32 and configured-range violations remain blocking
+field diagnoses without dropping a readable raw owner. The public Rust QualityCurve and
+read_crafting interfaces retain their independent finite f32 interpretation contract.
 
 #### Quality quantizations
 
-`qualityQuantizations` lists the `CraftingQualityQuantizationRecord` Records under
-`crafting/qualityquantization` (63 on LIVE, 62 after the `Quantization_TEMPLATE` leftover): the
-quantised quality steps of a resource (ADR-0177). Each entry has `guid`, `className`, `recordPath`
-and
+`definitions.qualityQuantizations` holds every selected readable physical quantization, including
+complete empty bands and field-invalid raw data. `projections.qualityQuantizationResources`
+contains only minimal original owner identity, explicit sourced eligibility and sorted unique
+inverse resource GUIDs. It preserves the first eligible nominal-GUID policy independently of a
+raw reference's physical target. Required resource dependencies remain outside the output Filter;
+the aggregate inverse retains all consulted original relationships. Each nested member and its Commodity fallback retain their own matching source inputs.
 
-| Field | Meaning |
-|-------|---------|
-| `bands` | `qualityQuantization.bands` in stored order: per band `start`, `end` (inclusive) and `mappedValue`, whole numbers. Every quality from `start` to `end` counts as `mappedValue`. LIVE has 8 bands per Record with the same ranges (0-399, 400-599, 600-699, 700-799, 800-899, 900-949, 950-998, 999-1000) that together cover the qualities 0 to 1000; only the `mappedValue`s differ per resource |
-| `resourceTypeGuids` | The GUIDs of the `ResourceType` Records whose crafting data link to the Record, without repeats and ordered by GUID. The link goes from the `ResourceType` (`properties[].qualityQuantization.qualityQuantizationRecord`); the quantization Record holds none. On LIVE 43 links reach 42 Records (`Carinite` and `CarinitePure` share one); every linked `ResourceType` is the `subtypeGuid` of a commodity of the catalog, because a `ResourceType` a kept quantization links to is backfilled as a commodity (ADR-0184); with a `--filter`, only those whose record path matches |
-
-The links are read from every `ResourceType` Record whatever the Filter, except those that are
-development leftovers: such a `ResourceType` neither links nor counts. A Record no `ResourceType`
-uses is ordinary game data and stays in the kind with an empty `resourceTypeGuids` (20 on LIVE);
-`CatalogSummary::quantizations().unused` and `quantizations.unused` of `p4kx catalog --json` count
-them, with no effect on the exit code. The same summary counts `unresolved_links`, the links to a
-Record that is no readable quantization of the catalog (another type, a failed Record or a
-leftover; a Reference to a GUID no Record has reads as null); it is 0 on LIVE. A Record without bands, or with a band that lacks a whole
-`start`, `end` or `mappedValue` or ends before it starts, cannot be read: it is left out and
-listed in the failures. No description, text or media is exported.
+`CatalogSummary::quantizations().unused` and the CLI summary count eligible unassigned results;
+`unresolved_links` retains its eligible-target/dedup/leftover scope. D row counts instead count
+all retained source definitions. No second flat quality list or reduced payload mirror is
+written. The [quality contract](catalog-quality.md) specifies source states, exact per-field
+capture proof, reference health, inverse contributors and publication behavior.
 
 #### Dismantle returns
 
-`dismantle` of a blueprint is `{"processGuid", "tierIndex"}`: the dismantle process that applies to
-the item the blueprint produces and the index into `tiers` of the tier whose costs the item
-returns, `null` for a blueprint without a tier. `craftingGlobal` holds
+A present `projections.blueprintPresentation.rows[].dismantle` has `processGuid` and `tier`.
+The process applies to the produced item. `tier` is the source occurrence of the first tier and
+is null when the Blueprint has no tier. `craftingGlobal` holds
 `dismantleExcludedResourceGuids` (the `ResourceType` Records a dismantle never returns) and
 `dismantleExcludedItemGuids` (the entities that cannot be dismantled; their blueprints have no
 `dismantle`). The contract:
 
 - The Build must hold exactly one dismantle process. With several, no blueprint gets a
   `dismantle`, the processes are still listed, and `p4kx catalog` warns and exits with code 1.
-- The item returns the share `efficiency` of the costs of the first tier (`tierIndex` 0), except
+- The item returns the share `efficiency` of the costs of the first tier, except
   the resources in `dismantleExcludedResourceGuids`.
 - A `select` is not resolved: the Records do not say which options a dismantle returns, so the
   consumer applies the `count` itself. The `quantityMultiplier` is not applied.
@@ -911,8 +1008,8 @@ ungrouped, because equality cannot be shown.
 **Items** share a group when all of these are equal:
 
 - `type`, `subType`, `size`, `grade` and `manufacturerGuid` of the `AttachDef`;
-- the stat blocks (`stats`, ADR-0065), including `resourceStates`; a laser whose beam range, or a
-  module whose modifier, differs from another is therefore no variant of it;
+- the original compact stat data, including shield fields and `resourceStates` (ADR-0065,
+  ADR-0356). A different beam range, module modifier or shield value separates variant groups.
 - the components: every component of the Record is compared with all its fields, including
   `SAttachableComponentParams` (without its `Tags`), the physics, the default loadout of an item
   that has ports (`SEntityComponentDefaultLoadoutParams`, unlike ships) and the geometry, whose
@@ -1086,11 +1183,13 @@ The tag tree rule of the paints (a tag below a required tag also counts) applies
 
 ### Contracts
 
-`contracts` lists every contract of the `ContractGenerator` Records and every sub contract of a
-contract, one entry each (issue #416). A contract with sub contracts has its own entry and one
-more per sub contract; the entries of a contract share its `guid`, a sub contract's entry names its
-`id` in `subContractGuid`. Entries are ordered by `guid`, then `subContractGuid` (`null` first),
-then `recordGuid`; of two entries with the same `guid` and `subContractGuid` the first is kept.
+`projections.contracts.rows` lists the logical contracts and sub contracts of selected
+`ContractGenerator` Records. A contract with sub contracts has its own row and one more per
+sub contract. The rows share the original contract `guid.value`, and each sub-contract row
+has its own `subContractGuid.value`. The parent row has an absent sub-contract ID. Rows
+are ordered by contract ID, sub-contract ID and Generator Record GUID, with the parent first
+and the first duplicate logical ID pair kept. Each `source` joins its original physical
+Generator and its actual handler, contract and sub-contract slots.
 
 A contract is an element of the arrays `contracts`, `introContracts`, `legacyContracts` and
 `PVPBountyContract` of a handler in `generators`. One without an `id` (or with a nil one), and one
@@ -1100,33 +1199,31 @@ that the rule on equal `guid` and `subContractGuid` above drops.
 
 | Field | Meaning |
 |-------|---------|
-| `guid`, `subContractGuid` | The `id` of the contract and of the sub contract |
-| `recordGuid`, `recordPath` | The `ContractGenerator` Record |
+| `guid`, `subContractGuid` | Sourced `id` of the contract and sub contract. The parent has an absent sub-contract ID |
+| `source` | Physical Generator reference and the original handler, contract and optional sub-contract sites. The definition carries the sourced Record GUID and path |
 | `debugName`, `handler` | The `debugName` of the contract and of its handler |
 | `templateGuid` | The `ContractTemplate` Record the contract names, an entry of `contractTemplates` |
 | `brokerEntryGuid` | The `MissionBrokerEntry` Record the contract names in `missionBrokerEntry`, an entry of `missionBrokerEntries`; `null` when it names none (on LIVE the 419 contracts that name one all resolve) |
 | `notForRelease`, `workInProgress` | The flags as stored, `null` when absent; the catalog does not filter on them |
-| `title` | The resolved title (game text) |
-| `description` | The resolved description (game text; must not be passed on to third parties) |
 | `missionTypeGuid`, `missionType` | The `MissionType` Record and its localised name (game text) |
 | `contractor` | The `Contractor` string parameter (game text) |
-| `pickupPlaces` | Up to five starmap objects the contract is offered at, each `starmapObjectGuid`, `objectType`, `place` (game text) |
+| `pickupPlaces` | Every eligible resolved starmap object the contract is offered at, each `starmapObjectGuid`, `objectType`, `place` (game text) |
 | `offeredAt` | Every place the contract is offered at, uncapped (see "Offered at"): `localityGuids` (entries of `missionLocalities`) and `locations` (starmap objects, each `starmapObjectGuid`, `objectType`, `place`), and `brokerFallback` (`true` when `locations` is the broker entry's location because no place is stated) |
 | `faction` | The `factionReputation` of the handler as stored: `guid`, Record `name` and `displayName` (game text), `null` when the handler names none |
 | `giverFaction` | The faction of the contract and where it was found: `source` (`handler`, `reputationResult` or `reputationPrerequisite`) and `faction` (`guid`, `name`, `displayName`), `null` when none names one (see "Giver faction") |
 | `blueprintRewards` | The blueprint pools the contract hands out, each `poolGuid` (an entry of `blueprintPools`), `source` (`result` or `temporaryModifier`) and `chance` as stored, `null` for a modifier (see "Blueprint rewards") |
-| `reputationGains` | The reputation granted on success; an amount may be negative |
-| `minStandingGuid`, `maxStandingGuid` | The `minStanding` and `maxStanding` of the contract: the standings between which it is offered, entries of `reputationStandings`; `null` when absent. A sub contract shares the contract's |
+| `reputationGains` | Sourced list of success reputation changes. The faction, scope and amount each have source evidence. `amount` is a signed decimal string. See [Reputation gains](catalog-contract-generators.md#reputation-gains). |
+| `minStandingGuid`, `maxStandingGuid` | The `minStanding` and `maxStanding` of the contract: the standings between which it is offered, rows of `definitions.reputationStandings`; `null` when absent. A sub contract shares the contract's |
 | `standingRequirements` | The reputation prerequisites (see "Standing") |
-| `cooldownLayer` | The nearest level that states any cooldown field: `subContract`, `contract` or `handler`; `null` when none is stated (see "Cooldowns") |
-| `cooldownLayers` | The level of each of the five cooldown fields, `hasPersonalCooldown`, `personalCooldownTime`, `personalCooldownTimeVariation`, `abandonedCooldownTime` and `abandonedCooldownTimeVariation`: `subContract`, `contract` or `handler`; `null` for a field no level states |
-| `hasPersonalCooldown` | The `hasPersonalCooldown` flag, `null` when absent |
-| `personalCooldownTime`, `personalCooldownTimeVariation` | The personal cooldown and its variation, as stored (unit: see "Cooldowns"); `null` when absent |
-| `abandonedCooldownTime`, `abandonedCooldownTimeVariation` | The cooldown after the contract was abandoned and its variation, as stored; `null` when absent |
-| `timeToComplete`, `buyInAmount` | The `timeToComplete` (floating point) and the `contractBuyInAmount` of the contract's `contractResults`, as stored; a sub contract shares the contract's. The Archive states no unit |
-| `canBeShared`, `illegal`, `onceOnly`, `maxPlayersPerInstance`, `availableInPrison`, `canReacceptAfterAbandoning`, `canReacceptAfterFailing`, `hideInMobiGlas` | Each `{value, layer}` with `layer` `subContract`, `contract`, `handler` or `template` (see "Contract facts"), `null` when no level states it |
-| `requiredIntros` | The completion tags the contract requires with the intro contracts that grant each (see "Contract facts") |
-| `fixedRewards` | The payouts the contract states itself on success (`ContractResult_Reward`), each `currency` (`currencyType`, e.g. `UEC`), `amount` (`reward`), `max` and `plusBonuses` as stored; empty for a contract that pays through a calculated reward (see "Reward") |
+| `cooldownLayer` | Sourced nearest level among the five cooldown choices (`subContract`, `contract` or `handler`) |
+| `cooldownLayers` | A sourced level for each of the five cooldown fields |
+| `hasPersonalCooldown` | Sourced personal cooldown flag |
+| `personalCooldownTime`, `personalCooldownTimeVariation` | Sourced personal cooldown and its variation |
+| `abandonedCooldownTime`, `abandonedCooldownTimeVariation` | Sourced cooldown after abandonment and its variation |
+| `timeToComplete`, `buyInAmount` | Sourced `timeToComplete` (floating point) and `contractBuyInAmount` (integer) from the parent contract's `contractResults`. Sub contracts share the same original inputs. The Archive states no unit |
+| `canBeShared`, `illegal`, `onceOnly`, `maxPlayersPerInstance`, `availableInPrison`, `canReacceptAfterAbandoning`, `canReacceptAfterFailing`, `hideInMobiGlas` | Each contains a sourced `value` and a sourced `layer`. The layer value is `subContract`, `contract`, `handler` or `template` when selected. See [Layered contract facts](catalog-contract-generators.md#layered-contract-facts). |
+| `requiredIntros` | Sourced ordered completion tag requirements and sourced lists of intro contracts that grant them. See [Intro prerequisites](catalog-contract-generators.md#intro-prerequisites). |
+| `fixedRewards` | Sourced list of stored success payouts. Each `currency`, `amount`, `max` and `plusBonuses` has its own sourced value. `amount` and `max` are signed decimal strings. See [Fixed payouts](catalog-contract-generators.md#fixed-payouts). |
 | `haulingOrders` | What the contract has to haul (see "Hauling orders"); empty for a contract that hauls nothing |
 
 **Layers.** Sub contract, contract and handler each override the template: the first of them that
@@ -1142,12 +1239,14 @@ handler only, on 215 of the 281; the `contractParams` of a handler and the `para
 contract have the same nine fields; a sub contract has no `debugName`. No handler `debugName` is a
 development leftover, so only the contract and the Record are checked for that.
 
-**Title.** The `Title` string parameter of the layers, else the first display string of the
-template's `contractDisplayInfo`. A `~mission(Token)` or `~mission(Token|Variant)` in it is
+**Title.** The `Title` string parameter of the layers, then the first display string of the
+template's `contractDisplayInfo`, then the Broker title. `projections.missionTitles.rows`
+holds both sourced game texts for the same physical contract occurrence. A `~mission(Token)`
+or `~mission(Token|Variant)` in it is
 replaced, in each language, by what the first layer (sub contract, contract, handler, template
 `contractProperties`) with that `extendedTextToken` says:
 
-- a string-hash property: the text of the first option's `textId`;
+- a string-hash property with the first usable authored `textId`;
 - an organisation property: the first organisation's `stringVariants` entry, with a variant the one
   whose tag's `tagName` equals it, without a variant the only entry of an organisation that has
   exactly one (on LIVE 31 of 69 organisations), else none, so the token stays unresolved: the first
@@ -1158,14 +1257,15 @@ replaced, in each language, by what the first layer (sub contract, contract, han
 - anything else, a token no layer states and a text the language lacks: the token in upper case in
   brackets, e.g. `[CARGO]`.
 
-A replacement that itself holds a `~mission(…)` is expanded up to three levels deep; below that,
-and past 64 replacements or about 4 KiB in one title, a token becomes `[TOKEN]`. Leading and
-trailing blanks are removed from the result; the `key` is that of the title text. The tokens are free text of the game, not facts of the Archive;
-the placeholders are the catalog's own convention.
+Nested readable replacements are fully expanded for the selected language. An active localization
+cycle leaves the bracketed token at the cyclic reference. Missing text and tokens supplied at
+mission start retain their placeholders. Leading and trailing blanks are removed from the result.
+The sourced key names the canonical GameText row. Each available language has its own derived
+value and exact origin. An allocation or cancellation failure stops publication.
 
 **Description (ADR-0264).** The `Description` string parameter of the first layer (sub contract,
 contract, handler), else the `description` of the broker entry; the template states none, its
-`displayString` slots carry no label. `~mission(…)` tokens, limits and trimming are those of the
+`displayString` slots carry no label. `~mission(Ã¢â‚¬Â¦)` expansion and trimming follow the rules for the
 title. It is a game text (`x-gameText`) like the title, and like every game text it must not be
 passed on to third parties: the Basetool keeps it for its logged-in members.
 
@@ -1179,19 +1279,17 @@ pickup place is left from the prerequisites (none named, or only stars or object
 template's `contractDisplayInfo`, else of the broker entry; `missionType` is the
 `LocalisedTypeName` of that Record.
 
-**Reputation.** Of the results of the contract (`contractResults.contractResults`), those of type
-`ContractResult_LegacyReputation` whose first `missionResults` entry (success) is set, one
-`reputationGains` entry per `contractResultReputationAmounts` element, in stored order: the
-faction and scope Records with their Record names (the last part of the record path) and the
-`reputationAmount` of the reward Record. A result that does not fire on success is not listed. An
-amount can be negative: on LIVE the 48 negative amounts (of 2,809 success amounts) all belong to
+**Reputation.** `reputationGains.value` lists the changes from successful
+`ContractResult_LegacyReputation` results in stored order. A sub contract uses its own result list
+when that list has entries and otherwise uses its parent's results. Each row has separately sourced
+faction and scope GUIDs and path basenames. `amount.value` is the exact signed decimal string of
+the selected Reward Record's `reputationAmount`. Amounts can be negative. On LIVE the 48 negative amounts (of 2,809 success amounts) all belong to
 the `CFP_OOS`, `CFP_OOS_Intro`, `HH_OOS` and `HH_OOS_Intro` handlers, twelve contracts each. In
 every one the success result names the rival faction (a `CFP_` handler deducts
 `factionreputation_unlawful_headhunters`, a `HH_` handler `factionreputation_lawful_citizensforprosperity`)
 with the reward `repuationrewardamount_negative_bigdrop` (-190500); they are listed as stored, next
 to the handler's own faction in `faction`. The catalog does not add the amounts up (ADR-0065): a
-faction scope and an affinity scope are separate entries. All sub contracts of a contract list the
-contract's results.
+faction scope and an affinity scope are separate entries.
 
 **Contractor.** The `Contractor` string parameter of the first layer (sub contract, contract,
 handler) that states one: the text the game shows as the giver, e.g. of an agency that has no
@@ -1203,12 +1301,12 @@ faction reputation (game text).
 `ContractPrerequisite_Locality` (a `MissionLocality` Record) and the object of each
 `ContractPrerequisite_Location`, in stored order, none twice. A star (`type` `Star`) is left out and
 what is not in `starmapObjects` is skipped. The list is ordered by rank, stably: the star system
-(`SolarSystem`) first, then planets and moons (`Planet`, `Moon`), then every other type, and holds
-at most **5** places (`MAX_PICKUP_PLACES`). Each place has the `starmapObjectGuid`, its `objectType`
-and the `place` name (game text). The places come from the starmap objects of the same build: a
+(`SolarSystem`) first, then planets and moons (`Planet`, `Moon`), then every other type. Every
+eligible resolved place is retained. Each has the `starmapObjectGuid`, its `objectType` and the
+`place` name (game text). The places come from the starmap objects of the same build: a
 Filter that leaves them out leaves `pickupPlaces` empty.
 
-**Offered at (ADR-0273).** The same prerequisites as the pickup places, read without the cap and
+**Offered at (ADR-0273).** The same prerequisites as the pickup places, read as authored and
 without a filter on the object type. `localityGuids` lists the `MissionLocality` Record of each
 `ContractPrerequisite_Locality`, in stored order and none twice; a consumer reads its places in
 `missionLocalities[].starmapObjectGuids` and their names in `starmapObjects`. `locations` lists the
@@ -1257,7 +1355,7 @@ elsewhere in the Archive:
   not exist and a type nowhere else.
 - 22 titles keep a token in upper case brackets: `[RACETYPE]` (14) and `[ITEM]` (2) are
   `MissionPropertyValue_MissionItem` properties (a `MissionItem` Record, e.g. the race type, or
-  an empty list the game fills in); the catalog does not read `MissionItem` Records;
+  an empty list the game fills in). The original item definitions appear in [`definitions.missionItems`](catalog-mission-items.md);
   `[CONTRACTOR]` (6) is an organisation property whose list of organisations is empty (chosen at
   start) or whose organisation has several string variants and the title names none. The tokens
   `[CARGOGRADETOKEN]` and `[REPUTATIONRANK]` (411 entries each), `[CLAIMNUMBER]` and `[TARGETNAME]`
@@ -1271,16 +1369,13 @@ elsewhere in the Archive:
   success, so no `blueprintRewards` entry lists them although `blueprintPools[].rewardSources`
   does (ADR-0273).
 
-**Reward (ADR-0268).** `fixedRewards` lists the `ContractResult_Reward` results (a
-`MissionReward`) that fire on success. Most contracts pay through `ContractResult_CalculatedReward`,
-which holds only `missionResults`: no amount, no reference, no rule. The game computes that
-payout outside the data, so the catalog does not state it and `fixedRewards` is empty for such a
-contract.
-
-Not exported: a computed reward (see above).
+**Reward (ADR-0268).** `fixedRewards.value` lists the parent contract's stored `MissionReward`
+payouts in source order. Each payout is selected by the first outcome of a `ContractResult_Reward`.
+Sub-contract rows share the parent's list. Calculated rewards are computed outside the stored
+data. A contract with only calculated rewards has an empty `fixedRewards.value` list.
 
 **Standing (ADR-0237).** `minStandingGuid` and `maxStandingGuid` are the `minStanding` and
-`maxStanding` References of the contract, entries of `reputationStandings`; a sub contract has none
+`maxStanding` References of the contract, rows of `definitions.reputationStandings`; a sub contract has none
 of its own and shares the contract's. `standingRequirements` lists the
 `ContractPrerequisite_Reputation` prerequisites, each with `level` (`handler`, `contract` or `subContract`; `handler`: the
 `defaultAvailability` of the handler; `contract` and `subContract`: their
@@ -1298,34 +1393,38 @@ of the same name (`HasPersonalCooldown`, `PersonalCooldownTime`, `PersonalCooldo
 `AbandonedCooldownTime`, `AbandonedCooldownTimeVariation`; case is ignored; the game states the
 times as integer overrides and the flag as a bool override), else the `defaultAvailability` of the
 handler (`ContractGeneratorHandler_*`, all handler types). The overrides are partial, so one entry
-can take its fields from different levels: `cooldownLayers` names the level of each, and
-`cooldownLayer` is the nearest of them, `null` when no level states any. On LIVE 4.10, 215 entries
+can take its fields from different levels. Each cooldown value, each level in `cooldownLayers`
+and the nearest level in `cooldownLayer` carry an immediate source state and provenance. The
+[ContractGenerator contract](catalog-contract-generators.md#cooldown-values-and-levels) describes
+the contributing inputs and fallback states. On LIVE 4.10, 215 entries
 take a field from the contract's overrides, 6 from the sub contract's, and 4,954 from the handler
 alone. The numbers are as stored, in floating point. The Archive does not state their unit: no
 type, attribute or game text shows it. The range (`personalCooldownTime` up to 2880 in a handler
 and 10080 in a contract override, `abandonedCooldownTime` up to 60 at every level) fits minutes,
 2880 being 48 hours and 10080 a week, but that is a reading, not a fact of the Archive. On LIVE 4.10 all 5,175 entries state a cooldown.
 
-**Contract facts (ADR-0263).** `timeToComplete` and `buyInAmount` are numbers as stored. Each of
-the other eight values is `{value, layer}`: the first level that states it, nearest first. A
-level states it through a boolean or integer parameter (`CanBeShared`, `Illegal`, `OnceOnly`,
+**Contract facts (ADR-0263).** The sourced `timeToComplete` and `buyInAmount` cells carry the
+original results block selection and each selected number's payload or conversion use. See the
+[ContractGenerator catalog contract](catalog-contract-generators.md#run-terms) for source states.
+Each of the other eight facts contains separate sourced cells for its value and selected layer.
+The nearest usable boolean or integer parameter wins (`CanBeShared`, `Illegal`, `OnceOnly`,
 `MaxPlayersPerInstance`, `AvailableInPrison`, `CanReacceptAfterAbandoning`,
 `CanReacceptAfterFailing`, `HideInMobiGlas`, matched without regard to case) of the sub contract,
-the contract (`paramOverrides`) or the handler (`contractParams`); when none does, the base value
-is the one of the Record that owns the default: the `defaultAvailability` of the handler (layer
-`handler`) for `onceOnly`, `maxPlayersPerInstance`, `availableInPrison`, the two re-accept flags
-and `hideInMobiGlas`; the template (layer `template`) for `illegal` (`contractDisplayInfo`) and
-`canBeShared` (`ActiveContractSettings` of the contract class). A contract without a template
-(the legacy `Covalex_HaulCargo_Career` contracts) has `null` for `illegal` and `canBeShared`
-unless a parameter states them. A negative `maxPlayersPerInstance` is as stored (-1 on 41 LIVE
-entries).
+the contract (`paramOverrides`) or the handler (`contractParams`). The handler's
+`defaultAvailability` provides the fallback for `onceOnly`, `maxPlayersPerInstance`,
+`availableInPrison`, the two re-accept flags and `hideInMobiGlas`. The Template supplies
+`illegal` from `contractDisplayInfo` and `canBeShared` from the contract class's additional
+parameters. A readable contract without a template or applicable overrides has absent cells
+for `illegal` and `canBeShared`. A negative `maxPlayersPerInstance` is retained as stored.
 
-`requiredIntros` lists the `ContractPrerequisite_CompletedContractTags` required tags of the handler
+`requiredIntros.value` lists the `ContractPrerequisite_CompletedContractTags` required tags of the handler
 (`defaultAvailability`), the contract and the sub contract (`additionalPrerequisites`), in that order
-and as stored: `level`, `tagGuid` and `introContracts`, the `id` of every contract in an
-`introContracts` array whose success result grants the tag (`ContractResult_CompletionTags`), ordered
-by `id`; empty when no intro contract grants it. The excluded tags are not exported, and the
-catalog does not decide how the levels combine. On LIVE 4.10 (2026-10-30) 2,464 of the 5,175 entries
+and as stored. Each row carries sourced `level` and `tagGuid` cells and a sourced `introContracts`
+list. The grant IDs come from the intro contracts whose success result grants the tag
+(`ContractResult_CompletionTags`). IDs are ordered and deduplicated by GUID. Each lookup and its grant
+IDs retain the authored tag occurrence that selected them. An empty list records that no matching
+grant was observed in the admitted scan. Relevant read failures make the list's source set
+incomplete. The excluded tags are not exported, and the catalog does not decide how the levels combine. On LIVE 4.10 (2026-10-30) 2,464 of the 5,175 entries
 have a required tag and 598 have one an intro contract grants; the facts are stated by the handler
 for most values (`onceOnly` 5,049 of 5,175), by the contract for 96 `onceOnly` and 365 `illegal`
 values, and by the template for 4,501 `canBeShared` values.
@@ -1365,33 +1464,93 @@ the template (53) and the sub contract (18); the items are 2,587 resources, 647 
 
 ### Factions, reputation and missions
 
-Seven kinds (ADR-0237, schema version 2, no bump) hold what the contracts refer to. Each is the
-Records of one type under one folder (see "Selection"), ordered by GUID, with `guid`, `className`
-(the Record name without its type) and `recordPath`. Facts only: identifiers, short names, numbers
-and links. A Reference to no Record is left out (`null`, or missing from the list); a GUID of an existing Record that the catalog does not list is kept, so `missionLocalities[].starmapObjectGuids` may name an object missing from `starmapObjects` under a Filter.
-Descriptions, perk texts, logos, icons and the faction property texts (headquarters, founding,
-leadership, focus) are not exported.
+Each reputation definition table keeps original Record identity and per-value origins.
+Record links preserve the original GUID and expose the state of unresolved source references.
+Catalog filters can omit a linked target while retaining its stored identity.
 
-On LIVE 4.10 (2026-10-28) the kinds hold 39 factions, 46 scopes, 380 standings, 27 contexts, 42
-mission types, 20 localities and 2 scenarios, none skipped.
+**Faction reputation.** The `definitions.factionReputations.rows` table holds physical
+`FactionReputation` Records in GUID and physical Record order. The technical `name`, the
+logo paths, the original flags and the decimal `geid` value are sourced fields. `background`
+retains its original String and carries `x-gameText`. `displayName` refers to the protected
+text registry. `description` distinguishes an authored Locale reference from literal String
+content and carries `x-gameText`.
 
-**Factions (`factionReputations`).** `displayName` is a game text (37 of 39 have an English text).
-`isNpc` is the Record's flag (false for all 39). `lawful` is the value of the boolean property
-`entityLawful` among the `propertiesBB` of the Record, `null` for a faction without it
-(`FactionReputation_IASI`): 29 are lawful, 9 not. It is a field and not the class name, so
-`FactionReputation_Wikelo` is lawful and `FactionReputation_Ruto` is not although neither name says
-so. `contextGuid` is the `reputationContextPropertiesUI`; `allyGuids` and `enemyGuids` are the
-References as stored (two factions have enemies on LIVE, none has allies); `hostility` and
-`allied` hold the `scopeGuid` and `standingGuid` of the `hostilityParams` and `alliedParams`, `null`
-when both are absent.
+The `allies`, `enemies`, `reputationContextPropertiesUi` and `perkReputationRewardList`
+fields retain their original Record links. Each `hostilityParams` and `alliedParams` body keeps
+its scope, standing and owned relation marker. The marker retains its protected description and
+icon path. In `propertiesBb`, the original `entityLawful` property carries a Boolean
+`dynamicProperty` value. The table preserves the other typed blackboard values in source order,
+including the exact Single bits and protected Locale references. Original unprojected fields
+remain in `authoredFields`.
 
-**Scopes, standings and contexts.** A scope (`reputationScopes`) has `scopeName`, `displayName` (a
-game text), `reputationCeiling`, `initialReputation` and `standingGuids`, its standings in stored
-order. A standing (`reputationStandings`) has `displayName` (the rank's name, a game text; 196 of
-380 have a text, the rest are placeholders), `minReputation`, `driftReputation`, `driftTimeHours`
-and `gated` (47 standings). A context (`reputationContexts`) has `primaryScopeGuid` and `scopeGuids`
-(the `scopeContextList`). The scope of a gain in `reputationGains` is an entry of
-`reputationScopes` (10 of the 46 are used by a contract).
+#### Faction definitions
+
+`definitions.factions` holds physical `Faction` Records keyed by GUID, in GUID and physical
+Record order. Its selection uses the exact owning type and the normal Record path Filter. The
+table's `availability` and `completeness.factions` describe source declaration and Filter
+coverage independently.
+
+Every row holds `defaultReaction`, `factionType`, the stored `alliedFactions` and
+`enemyFactions` Reference lists and `friendlyFireBehaviorOverrides` in source order. Each
+override gives its original reaction label and `shouldAllowFriendlyFire`. The source flags
+`ableToArrest`, `policesLawfulTrespass`, `policesCriminality` and `noLegalRights` keep
+false distinct from an absent declaration. `factionReputationRef` links the original independent
+reputation GUID and keeps unresolved identities. These are static Record facts.
+
+The sourced `name` and `description` hold a `localized` canonical text Reference or a
+`literal` authored String. The name uses the public short-name domain and the description uses
+the protected `x-gameText` domain. `authoredFields` holds remaining field occurrences with
+their source declarations and values. The same rules apply to each owned override body.
+
+**Scopes, standings and contexts.** A scope in `definitions.reputationScopes.rows` retains its
+physical Record identity, `scopeName`, protected `displayName` and `description` references, and
+`icon` path. The owned `standingMap` preserves the original `reputationCeiling` and
+`initialReputation` in their authored numeric widths and each `standings` reference in stored
+order. Filtered and dangling targets retain their original GUIDs. Source fields and links carry
+individual provenance. The standing definitions under `definitions.reputationStandings.rows` retain physical
+Record identity and join to stored standing GUIDs from scopes, scenarios and contracts.
+Each definition includes the original `name`, `description`, `displayName`, `perkDescription`,
+`icon` and `missionBoardIcon` fields. The rank name and perk text use the protected
+localization table. The literal description also carries `x-gameText`. Icon values are paths.
+The progression fields preserve `minReputation` and `driftReputation` with their original
+numeric widths and `gated` with its source state. `driftTimeHours` keeps the original
+Single in hours with exact IEEE bits and a nullable finite projection. Each sourced field
+has its original contributors. Additional fields remain in the shared source arena.
+Each row in `definitions.reputationContexts` preserves the authored `sortOrderScope`,
+`primaryScopeContext` and ordered `scopeContextList` with their original scope links and
+dynamic display properties. The scope of a gain in `reputationGains` is an entry of
+`definitions.reputationScopes`.
+
+**Reputation perks.** Each row of `definitions.reputationPerks` is an original
+`SPerkReputationListParams` Record. The `perks` array preserves the authored entry order,
+scope and standing References, and the concrete body of each `perk` pointer. Item perks
+retain their reward item Reference. Category perks retain their original selectors and
+the authored discount Single with its exact bits when present. The technical `name`
+and `icon` path are sourced strings. The literal `description` and localized
+`displayName` and `displayDescription` carry `x-gameText`. Unclassified concrete perk
+variants retain their original fields in the row's source arena.
+
+**Sandbox triggers.** The `configurations.reputationTriggers` table contains the ordered
+`sandboxTriggers` occurrences owned by each physical faction reputation Record. Join the
+sourced `owner.guid` and `owner.recordIndex` to the faction definition. A trigger
+can contain an inline manual definition or a Reference to a reusable trigger Record.
+Null slots and present empty lists retain their own source state. Unclassified variants
+retain their original fields and produce a coverage diagnostic.
+
+**Sandbox trigger definitions.** Each row in `definitions.reputationTriggerRecords` is a
+physical `SandboxTriggerRecord` with its ordered `triggerManualParams`. A manual trigger
+carries the original event label or infraction Reference, the `triggerOnInnocentsOnly`
+flag and ordered outcomes. Each outcome keeps its scope and reward amount References.
+Faction outcomes also keep the original faction reputation Reference. The
+`definitions.reputationRewardAmounts` table contains the physical
+`SReputationRewardAmount` rows, each with an authored `editorName` and a signed Int32
+`reputationAmount`. Each exported value carries its own source provenance.
+
+The ignored `original_reputation_owners_perks_and_triggers_match_the_scoped_catalog`
+source test reads the seven physical reputation definition families and their owned
+configuration from the installed DataForge. Its Record Filter is
+`libs/foundry/records/*reputation/*`. The test compares physical identity, authored order,
+field states, original values and selected source coordinates in one diagnostic export.
 
 **Mission types (`missionTypes`).** `typeName` is the `LocalisedTypeName`, a game text (41 of 42
 have an English one). Every `missionTypeGuid` of `contracts` (26 types on LIVE) is an entry.
@@ -1401,21 +1560,22 @@ stored order (218 on LIVE, all in `starmapObjects`). The game does not localise 
 locality; the `className` (`Pyro`) is the only name.
 
 **Contract scenarios (`contractScenarios`).** A `ScenarioProgress` Record. `factionRewardTiers`
-hold, per `Faction` Record (`factionGuid`, `factionName` the last part of its record path),
-`factionReputationGuid` (the `factionReputationRef` of that `Faction` Record, an entry of `factionReputations`; no kind lists the `Faction` Records themselves), `pointsAsPercent` and the `progressions` (`minMultiplierThreshold`, `completionType` the name of
+hold the authored `factionGuid`, which joins to `definitions.factions` when the row is present.
+`factionName` is the last part of the source Record path when resolved. `factionReputationGuid`
+is the independent link to `factionReputations` from that Record's `factionReputationRef`.
+The tiers also hold `pointsAsPercent` and the `progressions` (`minMultiplierThreshold`, `completionType` the name of
 the struct, `periodScenarioGuid`), each with `tiers`: `minPoints`, `badgeToAward` (an identifier;
 `null` for a tier without a badge, which the game stores as the text `None`), `globalPointsMultiplier` and
 `blueprintPoolGuids`, entries of `blueprintPools`. The progression texts and the multiplier rewards
 (empty on LIVE) are not exported.
 
-Not exported, for want of a consumer: the sandbox triggers and perks of the reputation Records.
 Contract templates are described in "Contract templates", mission broker entries in "Mission broker
 entries", ship spawns and the locations of contracts in "Ship spawns and location queries" and NPC
 and entity spawns in "NPC and entity spawns".
 
 ### Ship spawns and location queries
 
-Three kinds and three contract fields (#902, ADR-0266, additive, schema version 2, no bump) state
+Three kinds and three contract fields (#902, ADR-0266) state
 what a contract spawns and where it can take place, as the Archive stores it. The catalog never
 resolves what the game picks when the mission starts.
 
@@ -1439,6 +1599,7 @@ at a lower level and is itself left out.
 | `shipSpawns` | `variable`, `token` (`extendedTextToken`, `null` when empty), `level` and `poolGuid`, an entry of `contractShipSpawns`; ordered by variable |
 | `npcSpawns`, `entitySpawns` | The same links for the NPC and entity spawn descriptions (see "NPC and entity spawns"): `poolGuid` is an entry of `contractNpcSpawns` or `contractEntitySpawns` |
 | `locationQueries` | `variable`, `token`, `level` and `queryGuid`, an entry of `contractLocationQueries`; ordered by variable |
+| `propertySetGuids` | Links to `missionPropertySets` in handler, contract and sub-contract order, preserving source declarations without computing runtime precedence |
 | `locationPrerequisites` | The `ContractPrerequisite_LocationProperty` prerequisites of the handler, the contract and the sub contract, in that order, as stored: `level` (`handler`, `contract`, `subContract`), `variable` (the `propertyVariableName`, a `variable` of `locationQueries`; on LIVE 4 of the 479 name a variable no query states), `token` and `locationLevelType` |
 
 **Identifiers.** The Archive gives these inline structures no GUID, so equal content shares one
@@ -1481,17 +1642,31 @@ not part of the kind): `guid`, `className`, `recordPath`, `disabled`, `isSecurit
 `tags` (`generalTags`) a query matches, `producesTags`, `consumesTags` (`positiveTags` and
 `negativeTags`), `aiSpawnTags`, `names` (the `stringVariants`: `tag` and `displayName`, a game
 text; the German file lacks 3,246 of the 3,297 variants on LIVE, so `de` is `null` and the Basetool
-falls back to `en`) and `entityClusterMemberGuid`. Not exported of a location template: the NPC auto spawn settings of its
-`locationData` (not the NPC spawn descriptions of contracts, see "NPC and entity spawns"), the
-mission modules and limits and the security network manifest.
+falls back to `en`) and `entityClusterMemberGuid`. The sourced `classification` holds the three
+original location class, function and size References. See [the location vocabulary contract](catalog-location-vocabulary.md).
+The sourced location configuration retains authored NPC auto-spawn settings, mission limits and
+the default Reference to [security network manifests](catalog-security-network-manifests.md),
+plus authored mission modules and their initialization inputs.
+See [mission location configuration](catalog-location-configuration.md).
 
 Not exported: SCMDB's own pools, waves and region lists, which are derived and not stated by the
 Archive.
 
+### Authored mission property sets
+
+`missionPropertySets` preserves the complete typed `propertyOverrides` declarations of Generator
+handlers, contracts and sub-contracts. Each source array is emitted once and contract rows refer
+to it through ordered `propertySetGuids`. The owner GUID, Record path and struct, exact authored
+location and level remain available, along with ordered nullable declarations containing exact
+variable/token strings and the shared `PropertyValue` union. Empty strings stay empty in this
+source kind. Stable identifiers depend on the owner GUID and authored array position, so a value
+edit does not change identity. See [the full field and identity contract](mission-property-sets.md)
+and ADR-0345. Template and broker property fields keep their existing meanings.
+
 ### Contract templates
 
-`contractTemplates` lists the `ContractTemplate` Records (#812, ADR-0313, additive, schema version
-2, no bump), ordered by GUID. `contracts[].templateGuid` is the `guid` of an entry; every one
+`contractTemplates` lists the `ContractTemplate` Records (#812, ADR-0313) in Catalog schema 3,
+ordered by GUID. `contracts[].templateGuid` is the `guid` of an entry; every one
 resolves. A template is the structure a contract lays the overrides of its handler, itself and its
 sub contract over. The Records are selected by the struct, in any folder: on LIVE (2026-10-31)
 496 Records, 488 of them under `contracts/contracttemplates`, 335 named by a contract, none left
@@ -1519,7 +1694,7 @@ additive rule of ADR-0054 is not touched.
 | `shipSpawns`, `npcSpawns`, `entitySpawns`, `locationQueries` | The links of ADR-0266 and ADR-0324, one per variable the template states, with `level` always `template`, into `contractShipSpawns`, `contractNpcSpawns`, `contractEntitySpawns` and `contractLocationQueries` |
 | `haulingOrders` | The hauling orders of the template as in "Hauling orders": the properties (`source` `template`) and the orders of its hauling objectives (`templateObjective`) |
 | `objectives` | The objective tokens depth first, each phase after its parent (see "Objectives") |
-| `partialPayout` | The `PartialContractRewards`: `thresholds`, each `minPercentage`, `maxPercentage`, `currencyRewardMultiplier` and `reputationMultipliers` (`scopeGuid`, an entry of `reputationScopes`, and `reputationRewardMultiplier`); `null` without one |
+| `partialPayout` | The `PartialContractRewards`: `thresholds`, each `minPercentage`, `maxPercentage`, `currencyRewardMultiplier` and `reputationMultipliers` (`scopeGuid`, a row of `definitions.reputationScopes`, and `reputationRewardMultiplier`); `null` without one |
 | `modifiers` | The modifiers in stored order, tagged by `modifier`: `securityClearance` (`clearanceTokenGuid`), `requestRentShip` (`itemGuid`, `durationSeconds`, `clearRentalOnFail`), `shipKioskFilter` (`terms`, each `positiveTags` and `negativeTags`), `factionHostility` (`factionGuid`, a `Faction` Record no kind lists, `myReaction` and `theirReaction` as `friendly`, `neutral` or `hostile`, `ignoreCriminalHostility`), `hostileMission` and `ignoreMissionPlayerCriminality` (`brokerEntryGuid`, an entry of `missionBrokerEntries`; `legalToAttack` for the first) and `lawLicense` (`licenseType`: `illegalGoodsLicenseClassA`, `B` or `C`); each with the shared `modifierName`, `enabled` and `locationProperty`, the variable of the property the weak pointer names |
 | `owner` | The `DevOwner` Record: `guid` and `className` (e.g. `MDT`); `null` without one |
 | `missionFlow` | The triggers in stored order (see "Mission flow") |
@@ -1542,12 +1717,13 @@ the struct does not have is `null`: `module` (a mission scripting file), `module
 `disableTravelObjectives`, `disableReturnObjectives`, `travelRadiusKm`, `allPlayersLeftGracePeriod`,
 `locationProperty`, `organizationProperty`, `haulingLimitProperty` and `targetProperty` (the
 `missionVariableName` of the property the weak pointer names), `minDistance`, `maxDistance`,
-`hideMarkers`, `securityManifestGuid`, `navPoint` (`entityClassGuid`, `displayName`, a game text,
+`hideMarkers`, `navPoint` (`entityClassGuid`, `displayName`, a game text,
 and `extendedTextTokens`), `travelObjective` and `returnObjective` (displays as above), `hauling`
 (the `Hauling_ObjectiveSettings`: five extended text tokens and seven displays) and `instance`
 (`completePhaseOnPlayerEnter`, `enterTravelRadiusKm`, `hudObjectiveText`, a game text,
 `tagIdentifier`, `searchTags`, `objectiveMarker`). The orders of a hauling handler are
-`haulingOrders` of the template.
+`haulingOrders` of the template. The local handler's original `securityManifestToOverride`
+Reference joins the [canonical security network manifest](catalog-security-network-manifests.md#joining-an-objective-override).
 
 **Objective properties.** An entry of `objectiveProperties` has `kind` (`referenced`, `output`,
 `embedded` or `input`, the struct `ObjectiveProperty_*`), `variable` and `token` (the
@@ -1556,9 +1732,11 @@ referenced property the `missionVariableName` of the property of the template it
 `value` (for an output, embedded or input property) and `linkedOutput` (for an input: the
 `objectiveId` of the objective that holds the output and its `variable`). The `value` is tagged by
 `type`: `object` and `deliveryOrder` (no fields), `boolean` (`value`), `stringHash` (`options`, each
-`displayName`, a game text, `value`, `weighting` and `dependentProperties`, the variables of the
-properties the option makes dependent), `integer` and `float` (`options`, each `displayName`,
-`value`, `variation`, `weighting` and `dependentProperties`), `tags` (`tags` and `negativeTags`),
+`displayName`, a game text, `value`, fractional `weighting`, `debugForceChooseThisOption` and
+structured `dependentProperties` with the property and selected option links), `integer` and
+`float` (`options`, each with the same metadata and `value`/`variation`; integer fields retain
+exact `Int32` values), `tags` (`tags`, `negativeTags`, raw `sourceTags`/`sourceNegativeTags` and
+complete `options`),
 `shipSpawnDescriptions` (`poolGuid`, an entry of `contractShipSpawns`, `null` for a description
 without a group), `location` (`queryGuid`, an entry of `contractLocationQueries`),
 `npcSpawnDescriptions` and `entitySpawnDescriptions` (`poolGuid`, an entry of `contractNpcSpawns` or
@@ -1566,16 +1744,27 @@ without a group), `location` (`queryGuid`, an entry of `contractLocationQueries`
 the `matchConditions` as for a location query, and `forcedOrganizationGuid`, the
 `debugForceChosenOrganization`, a `MissionOrganization` Record no kind lists). The contract-level
 properties add `missionItem` (`conditions`, the `matchConditions` as for a location query,
-`forcedItemGuid`, the `debugForceChosenItem`, a `MissionItem` Record no kind lists, `minItemsToFind`
+`forcedItemGuid`, the original debug-only `debugForceChosenItem` reference to a `definitions.missionItems` row when selected, `minItemsToFind`
 and `maxItemsToFind`), `aiName` (the fields of an embedded NPC name, see "NPC and entity spawns":
 `randomName`, `randomLastName`, `randomNickName`, `givenName`, `givenLastName`, `givenNickName`,
 `chanceOfNickName` and `nameDataGuid`), `combinedDataSetEntries` (`entryProperties`, the variables
 of the `dataSetEntryProperties`), `haulingOrders` (`requirements` as in "Hauling orders"), `reward`
-(`reward`, the `rewardDef` as the `reward` of a broker entry, `null` without one), and `timeTrialRace`
-and `starMapLocation` (no fields). The spawn descriptions and location queries are read as for the
-contracts and added to their kinds. A value of any other struct fails the Record (on LIVE the
-values of all properties are of the types above); so does an organisation or a mission item whose
-condition is of a struct the catalog does not know.
+(`reward`, the `rewardDef` as the `reward` of a broker entry, `null` without one), `timeTrialRace`
+(`targetSplits`, ordered structures with `targetSplit`) and `starMapLocation` (no fields).
+`autoSpawns` retains its definition Reference and concrete closet-search options; `investigation`
+retains journal entries, suspects, locations and every clue/item subtype. Their complete fields,
+null conventions and owner-local weak references are described in
+[Typed mission property values](mission-property-values.md). The spawn descriptions and location
+queries are read as for contracts and added to their kinds. An unsupported value or data-set
+condition fails its owning Record instead of being represented as absent data.
+
+**Scoped location properties (schema 3).** `scopedLocation` retains all six optional source
+filters: `factionFilter`, `locationClassFilter`, `locationSizeFilter`, `locationFunctionFilter`,
+`otherLocationFilter` and `relativeLocationFilter`. Their concrete required/excluded/same/different
+variants, raw enum names, ordered definition References and owner-scoped weak links are described
+in [Scoped mission-location values](scoped-locations.md), including null/empty states, source
+identity and unresolved/error statuses. No runtime-selected location is calculated. These values
+use the same reader in objective, template, broker and Generator source-set mission properties.
 
 **Contract-level properties.** The `value` of an entry of `contractProperties` of a template and of
 `missionProperties` of a broker entry is read by the reader of the objective values and states the
@@ -1583,31 +1772,29 @@ same union; `valueType` stays. On LIVE every property that has a value struct st
 values grow the catalog from 208.5 MB to 214.1 MB decompressed and from 3.82 MB to 3.89 MB as
 `.json.zst`.
 
-**Mission flow.** A trigger has `note` (the developer's `description`), a `condition` and an
-`action`, either `null` when absent. A condition is tagged by `type`: `tokenState` (`objectiveId`,
-the `id` of an entry of `objectives`, and `tokenState`), `allTokensState` and `anyTokensState`
-(`tokenState`), `onMissionStart` (no fields), `and` and `or` (`conditions`), `not` (`condition`) and
-`propertyIsSet` (`propertyVariable`). An action is tagged by `type`: `stateChange` (`toState`),
-`tokenStateChange` (`objectiveId`, `toState`) and `pickRandomMissionPhase` (`phases`, each
-`objectiveId` and `probability`, and `toState`). A state is `active`,
-`completed`, `failed` or `abandoned`. A stored enum name the catalog does not know is `null`, like
-the values of every closed set, and is counted in the warning `unknown_template_values` of the
-build. A weak pointer that points to nothing, to a token without an `id` or to a struct outside the
-Record has a `null` link.
+**Mission flow.** Each `configurations.missionFlows` row points to the original Template or Broker
+owner and its flow declaration. The trigger, condition and action meanings are stored on nodes
+of that owner's `source.values` arena. References identify those owner-local nodes. Triggers retain
+the source description and the selected condition and action. Conditions and actions are tagged
+by `type`. A leaf action can be a `stateChange`, `tokenStateChange` or
+`pickRandomMissionPhase`. The last stores ordered phase references. Weak objective links carry
+the original resolution state and owner binding.
 
-A token without an `id` (or a nil one) and the phases below it are left out. A Record whose phases
-nest deeper than 32 levels or whose conditions nest deeper than 16 cannot be read, and so is one
-with a condition, an action or a modifier of a struct the catalog does not know: it is a failure of
-the build and not an entry (none on LIVE). A future Build that meets such a struct therefore
-lacks the whole Record: it is not in the kind, the summary counts it in the `failed` list of the
-build (`p4kx catalog` prints it, with the record path and the struct name as reason, and exits with
-code 1), and the contracts that name it keep a GUID that resolves to no entry, so a consumer must
-check the failure list before it relies on the links being complete.
+- `multipleActions` stores the original `actionsField` and its ordered `actions` references.
+- `pickRandomAction` stores the original `actionsField` and its ordered `entries`. A declared
+  entry links its original `value`, `actionField`, optional child `action` and
+  `probabilityField`. `probabilityInterpretation` describes the original Single value. Its
+  exact IEEE-754 bits and protection marker are read through the field reference.
+
+The arena preserves repeated occurrences, authored nulls and readable prefixes of malformed
+data. Action and condition graphs are traversed iteratively. Canonical reader resource-policy
+errors and unsupported required meanings prevent complete Normal publication. Diagnostic
+publication retains readable owner data and the original error in `exportHealth`.
 
 ### Mission broker entries
 
-`missionBrokerEntries` lists the `MissionBrokerEntry` Records (#813, ADR-0320, additive, schema
-version 2, no bump), ordered by GUID: the offers of the mission board. `contracts[].brokerEntryGuid`
+`missionBrokerEntries` lists the `MissionBrokerEntry` Records (#813, ADR-0320) in Catalog schema 3,
+ordered by GUID: the offers of the mission board. `contracts[].brokerEntryGuid`
 is the `guid` of an entry. The Records are selected by the struct, in any folder (on LIVE
 2026-10-31 all 2,584 lie under `missionbroker`); the 156 whose path or name holds a word of the
 usual leftover rule are left out, so 2,428 entries remain, 419 of them named by a contract, every
@@ -1657,7 +1844,7 @@ limit is 64,000,000 bytes.
 ### NPC and entity spawns
 
 Two kinds and the fields `npcSpawns` and `entitySpawns` of a contract, a contract template and a
-mission broker entry (#815, ADR-0324, additive, schema version 2, no bump) state the people and the
+mission broker entry (#815, ADR-0324) state the people and the
 objects a contract spawns, as the Archive stores them. The catalog never resolves which NPC or
 entity the game picks. The Archive has no Record for these descriptions: a
 `MissionPropertyValue_NPCSpawnDescriptions` or `_EntitySpawnDescriptions` sits in the properties of
@@ -1729,22 +1916,26 @@ Records) have no commodity in the catalog, and 2 spawn rules, both of one manife
 
 ### Starmap objects
 
-A starmap object (`starmapObjects`) is a `StarMapObject` Record under `starmap/pu` (ADR-0054: a
-new kind, so `schemaVersion` stays 1). The kind is facts only: no description, no lore, no media.
-The `name` is a game text, the localisation key with its English and German text, and carries
-`"x-gameText": true` like a description; the Basetool keeps it from third parties.
+`definitions.starmapObjects` owns the authored `StarMapObject` Record. The original type,
+parent, jurisdiction, affiliation, location hierarchy tag and ordered amenity links carry exact
+GUIDs and source states. Original flags, overrides, text and owned settings use independent
+source cells. The [starmap field map](catalog-starmap-definitions.md) lists the original fields.
 
-| Field | Source |
-|-------|--------|
-| `guid`, `className`, `recordPath` | The Record, as for every entity |
-| `name` | `name`, a localisation key |
-| `type`, `typeGuid` | The `StarMapObjectType` Record the Reference `type` links to: `type` is its `name` when that is a plain string, else its Record name without the type, and `typeGuid` its GUID; `null` for a null or dangling Reference. The schema keeps `type` a string, so a new type is additive |
-| `parentGuid` | The Reference `parent`, the `guid` of another entry unless that Record is missing or left out; `null` for none |
-| `hideInStarmap` | `hideInStarmap`; `null` when the Record states none |
-| `system` | The folder of the star system below `Data/ObjectContainers/PU/system` that places the object, e.g. `stanton`; `null` when no container places it |
-| `entityName` | The `entityName` of the Child element that places the object, e.g. `jumppoint_stanton_pyro`; `null` when it is not placed or the Child names none |
-| `placedUnderGuid` | The `guid` of the nearest object above this one in the container hierarchy; `null` when it is not placed or hangs directly below the system. It is a fact of the containers; `parentGuid` is the Record's own and the two need not agree |
-| `position` | `[x, y, z]` in metres in the frame of the system container, rounded to a millimetre; `null` when no container places the object |
+`placements.starmapPlacements` contains one row per selected object. `objectGuid.value` and
+`objectRecordIndex.value` identify the physical definition. The original definition's `parent`
+and the derived placement's `placedUnderGuid` can differ.
+
+| Placement field | Source |
+| --- | --- |
+| `system` | The star system folder under `Data/ObjectContainers/PU/system`. |
+| `entityName` | The name of the Child element that places the object. |
+| `placedUnderGuid` | The nearest starmap Record above the placement in the container hierarchy. |
+| `position` | `[x, y, z]` in metres in the frame of the system container, rounded to a millimetre. |
+
+The current placement traversal supplies these derived values without a complete per-field
+XML contribution chain. Their cells report an incomplete source set and unknown encryption
+origin. The physical owner identity has independent DataForge evidence.
+
 
 **Where a position comes from.** The main container of a star system is
 `Data/ObjectContainers/PU/system/<folder>/<folder>system.socpak` (else the first `*system.socpak`
@@ -1805,11 +1996,10 @@ position and 854 have none. Searching all 9,668 object containers of the Archive
   `Stanton4_L1_02`). Their own position in the star system is unknown, because no `external`
   Child of a system container names them, so the position of what they place cannot be composed.
 
-These objects keep `position` `null`; the catalog never guesses a place from the parent.
-The kind is selected by the prefix `libs/foundry/records/starmap/pu/` and the type `StarMapObject`
-like the others, with the development leftovers left out. The positions do not depend on the
-Filter: the containers are read whole. The `StarMapObjectType`, `Jurisdiction`, amenity and radar
-Records are not kinds; the type enters as `type` and `typeGuid`.
+These objects have an absent `position` cell. The existing container traversal reads a complete
+system scope for its position projection, independently of the object Filter. Selection uses
+`libs/foundry/records/starmap/pu/` and the exact `StarMapObject` type with the usual development
+leftover policy. The original `type` Reference targets a [canonical type](catalog-starmap-definitions.md).
 
 Size, measured on LIVE (2026-10-22): the 2,093 objects are about 1.2 MB of JSON (570 bytes each), 4.5 % of the 26.5 MB of the
 catalog, and a smaller share compressed.
@@ -1948,7 +2138,7 @@ object). `HPP_Stanton2c_Belt` is named by `stanton2c.socpak` and, a copy in the 
 No Record or container links the surface presets to a body: the Archive holds no planet container,
 and only the Hurston presets name a body in the folder of their `objectPresetPaths`, so they stay
 without a location (ADR-0236). When an object is recorded above a container but no object results
-(it is not in `starmapObjects`, 64 or more mining claim markers lie above, or a marker has no
+(it is not in `starmapObjects`, mining claim markers form a cycle above, or a marker has no
 object above it) the warning `harvest_locations_without_object` counts the rows with a line per
 reason. A container with no object recorded above it (no Child reaches it, or it is reached with
 no object above, as a system root) is the normal case and deliberately silent.
@@ -1980,14 +2170,37 @@ the name of its struct: `positiveTagGuids` and `negativeTagGuids` (`Tag` Records
 is informational. The tags are the `Tag` Records of the tag tree, not the free item tags of
 "Matching tags".
 
-**Pool filters (`lootPoolFilters`).** A `PoolFilterRecord` under `lootgeneration/filters` (15 on
-LIVE). `filter` is a node with the struct as stored in `nodeType`: a `PoolFilter_Sequence` holds
-`filters`, each an instance with `name`, `mode` (`Cumulative` or `Additive`) and a `filter` node
-(`null` for none); a `PoolFilter_RecordRef` names another Record in `filterGuid`; a
-`PoolFilter_Tags` holds `positiveTagGuids` and `negativeTagGuids`. Nodes nest at most 16 deep. The
-secondary choices Records (manufacturer weights, 25 on LIVE) are not exported. `nodeType` and
-`selectorType` (of the selectors of "Archetypes") state the struct as stored and are informational:
-a consumer selects by the fields (`filterGuid`, the tag lists, `filters`), never by those names.
+**Secondary choices and themes.** `definitions.lootSecondaryChoiceSingleLayers`
+keeps the original ordered Class entries. `definitions.lootSecondaryChoiceMultiLayers`
+keeps original ordered Reference slots to those layers. `definitions.lootThemes`
+keeps the authored theme type and its owned fields. Each table has independent
+availability, source-state and selection accounting. The [Loot source contract](catalog-loot-source.md)
+describes the provenance and field representation.
+
+**Pool filters (`definitions.lootPoolFilters`).** The canonical `CatalogTable` contains each
+selected physical `PoolFilterRecord` under `lootgeneration/filters`, with its independently
+sourced eight-field header. `fields` lists every original root declaration in stored order;
+`values` contains one flat entry for every actual owned value occurrence. A field holds its
+sourced `name` and exact `declaration.dataType`, `isArray` and `target`, plus a structural
+`valueIndex` reference encoded as a canonical unsigned decimal string. Struct payloads retain
+the actual sourced `sourceType` and ordered fields; Array payloads retain every ordered element
+reference, including null and unreadable slots. Equal subtrees and duplicate names are separate
+occurrences. References do not expand other Record bodies.
+
+`values[].value` is the immediate sourced cell for that original datum. Its typed scalar encoding
+retains widths, IEEE bits, exact strings/keys and GUIDs. Known designer labels/modes and enum
+labels remain public; unclassified String/Locale domains conservatively use `gameText` with
+`x-gameText`, retaining the original text without inventing a translation. This text-domain choice
+is independent of each datum's encryption marker. `originalError` is required and null for ordinary
+or null values. An unreadable value keeps its original typed error and every retained parameter
+outside its null semantic payload, independently of sampled Health examples. Every independent
+source-backed declaration, concrete type, target fact and error parameter has its own marker.
+
+The exporter adds no depth limit or recursive JSON value chain. Original canonical-reader resource
+failures remain explicit Health failures. The owner-local graph and original-preorder source ordinal
+are distinct concepts; serialized indices never establish physical source authority. Stored Reference
+GUIDs and pointer-derived Weak GUIDs retain their different original contributors. See
+[catalog-loot-source.md](catalog-loot-source.md) for the value graph and original-source contract.
 
 **Older loot Records (`legacyLootTables`, `legacyLootArchetypes`).** The `LootTable` (161 on LIVE)
 and `LootArchetype` (233) Records of the same folders, which 635 of the 1,958 slots with a
@@ -2002,7 +2215,7 @@ tag lists of `tagsToMatch`) and `secondaryGroups` (`groupName` and entries of `w
 **Slots (`lootConfig`).** A sub harvestable of a multi config has `lootConfig` when its Record
 states one (1,958 of 2,896 on LIVE): `lootTableV3Guid` (an entry of `lootTables`; 1,321 slots),
 `lootTableGuid` (an entry of `legacyLootTables`; 635 slots; a slot names one of the two),
-`poolFilterGuid` (an entry of `lootPoolFilters`), `totalResultsLimit`, `chanceToGenerate`,
+`poolFilterGuid` (an entry of `definitions.lootPoolFilters.rows`), `totalResultsLimit`, `chanceToGenerate`,
 `chanceToGenerateAdditionalInventories` and the `fullness` range of `fullnessFactorRange`.
 
 **Placed containers (`lootContainers`).** A container below `ObjectContainers/PU/system`, or one
@@ -2083,8 +2296,8 @@ it accepts:
 
 A rule (`blueprintCategoryAvailability` of a queue and `condition` of a modifier) has `kind`, the
 name of the struct as `structName` (`null` for `none`) and `blueprintCategoryGuids`, the `guid`s of
-the Records the struct's `categories` link to, in stored order; these are `blueprintCategories`
-entries, unless a Filter left the entry out of that kind. A rule that is `none` or `unknown` has
+the Records the struct's `categories` link to, in stored order; these are
+`definitions.blueprintCategories.rows` entries, unless a Filter left the entry out of that kind. A rule that is `none` or `unknown` has
 no GUIDs.
 
 #### Modifiers
@@ -2100,8 +2313,9 @@ blueprint categories it applies to.
 | `condition` | A rule for `modifierCondition`: `kind` is `blueprintCategory` for a `CraftingModifierCondition_BlueprintCategory`, whose `categories` are the blueprint categories the modifier applies to; `none` when the Record stores no condition; `unknown` for any other struct |
 
 A new modifier type adds a `type` value and its value fields, a new condition adds a `kind`; both
-are additive and keep `schemaVersion` 2 (ADR-0054). A reader treats an unknown `type` or `kind`
-as "not understood" and does not apply the modifier; nothing unknown is dropped from the list.
+are additive and keep the active `schemaVersion` 3 (ADR-0054, ADR-0339). A reader treats an unknown
+`type` or `kind` as "not understood" and does not apply the modifier; nothing unknown is dropped
+from the list.
 
 #### Ports for crafters
 
@@ -2129,7 +2343,7 @@ by folder, so a crafter fitted to a ship or vehicle or part of a building is fou
 
 A shop (`shops`) is one `ShopBackup` entry of the shop registry `Data\Libs\CosmoTools\
 LayerRecovery\LayerBackups.xml` (a CryXml file), one placement of an `SCShop` Entity in the world
-(ADR-0069; a new kind, so `schemaVersion` stays 1). The kind is facts only: identifiers, internal
+(Catalog schema 3, ADR-0069). The kind is facts only: identifiers, internal
 names and places. It carries no price, no stock and no description; the item GUIDs of a shop come only from an
 inventory file that its containers name (below). The names in it
 are names of containers and entities, not localisation keys, so no field is a game text.
@@ -2205,10 +2419,66 @@ stem; `.xml` and `.json` name the same file), the Archive holds it and it is no 
 `.soc` files of one container follow the same rule. A `.soc` that cannot be read leaves only the
 inventory of its container unknown; kind and brand do not depend on it.
 
+The selected inventory Entry is read to completion before parsing. Catalog export imposes no
+fixed byte limit on that inventory JSON. Archive read failures leave the inventory unresolved
+and are recorded in export health.
+
 | Field | Source |
 |-------|--------|
 | `inventory` | The lower-case stem of that file, e.g. `inv_admin_newbabbage`; `null` when no place names a file, the places disagree (or only some name one), the file is a placeholder, or the file is missing or unreadable |
-| `itemGuids` | The `ID.ID` GUIDs of the elements of the file (`Collection.Inventory`, or `Inventory` in the shape without `Collection`), lower case, ordered, without repeats, and possibly `[]` for a file without items; an `ID` value that is no GUID is left out and counted in `item_ids_dropped`; `null` exactly when `inventory` is. `BuyPrice`, `SellPrice`, `CurrentInventory`, `MaxInventory` and `RentalOfferings` are never read or exported |
+| `itemGuids` | The `ID.ID` GUIDs of the elements of the file (`Collection.Inventory`, or `Inventory` in the shape without `Collection`), lower case, ordered, without repeats, and possibly `[]` for a file without items; an `ID` value that is no GUID is left out and counted in `item_ids_dropped`; `null` exactly when `inventory` is. The file's exact design-time fields are in `definitions.shopInventories`. |
+
+### Physical offline shop inventories
+
+`definitions.shopInventories` has `meaning: "offlineDesignTime"`. It covers every direct
+`.json` Entry in `Data\\Scripts\\ShopInventories`, including orphan and placeholder files.
+This physical selection is global under a Record filter and independent of the shop registry.
+Rows are ordered by normalized path and physical directory index. The original `sourcePath`,
+normalized path, `inputRef` and `entryIndex` keep each file independently addressable.
+
+A present `document` holds the complete ordered, owner-local `source` arena and typed `fields`
+that reference it. The arena retains repeated members and lines, original array order, and every
+number as its exact authored token string. `fields.inventory` and
+`fields.collection.value.inventory` address the two inventory layouts. Line fields directly
+address each ID alternative, buy and sell prices, current and maximum inventory, and complete
+rental offering values. Absent, null, empty and invalid typed fields retain separate states.
+Unfamiliar rental variants and their nested values remain available in the same source arena.
+Valid GUID alternatives and GUID-only `ShopID` chains use the public text domain. Other
+authored string values, including malformed identifier text, use `x-gameText`. Encryption
+markers are independent and come from each actual source use.
+
+An unreadable Entry retains its directory identity and an unreadable document state. Invalid
+JSON, including a zero-byte file, retains its directory identity and an invalid document state.
+An authored empty `Inventory` array is a present, valid list. Archive-entry health reports
+the failed operation, and diagnostic publication retains the failed row. Price, stock and
+rental values describe offline design settings. Stored values and unit-bearing source fields
+retain their original form.
+
+### Shop inventory resolution
+
+`declarations.shopInventoryResolution` has one row for each emitted shop. Its `shopKey` is
+derived from the actual registry `ID` attribute. `candidates` retains the original declared
+paths and normalized stems. A readable component with no declaration and an unscanned
+component keep distinct original observations. A populated rejected path has its own candidate
+and protected authored text. An undecodable value has an unreadable path state. Rejected
+declarations make the candidate source set incomplete. `physicalTargets` links to actual directory
+occurrences by `inputRef` and `entryIndex`.
+
+| Status | Observed resolution |
+|---|---|
+| `resolved` | The component and prefab declarations agree on one readable inventory. An authored empty list resolves. |
+| `placeholder` | The agreed stem identifies a designer placeholder. |
+| `ambiguous` | The observed places disagree, or multiple physical files have the same normalized stem. |
+| `missing` | The actual agreed name has no physical target in the enumerated directory. |
+| `unreadable` | The actual target is present and its item list cannot be read or interpreted. |
+| `unscanned` | The available component or directory evidence cannot establish a declaration. |
+| `noDeclaredFile` | An observed readable component declares no inventory file. |
+
+Each candidate, target and status has its own source marker. A resolved status includes the
+consumed inventory content. An attempted unreadable payload remains in source health. Directory
+identity and the original authored path retain their independent origins. Source-set completeness
+describes the coverage of the actual contributors. A Record filter omits shop resolutions while
+the physical file definitions remain selected.
 
 The placeholders are `temp_outpost_shopinventory` (the same six commodities for bars, refineries,
 showrooms and an expo hall; 264 shops) and `inv_cryastro_dummy` (three GUIDs no Record has; 136
@@ -2236,12 +2506,10 @@ with the status `partial`.
 
 ### Crafting data
 
-`p4kx_export::read_crafting(&forge, filter, cancel)` returns a `Crafting` with everything the
-`blueprints` kind and the crafting kinds carry; the catalog is built from it, so library and
-catalog never drift. It reads the DataForge in parallel (0.3 s on LIVE, the scan for the reward sources included,
-against 14 s for the whole catalog) and leaves out a Record it cannot read, listing it under
-`failures`. Every list is ordered by Record GUID. The values are facts and identifiers only: no description, no
-lore, no media.
+`p4kx_export::read_crafting(&forge, filter, cancel)` returns the standalone interpreted
+`Crafting` datasets. It shares Blueprint selection and cost interpretation with the catalog
+and reads Records in parallel. A Record it cannot read is reported in `failures`. The catalog
+additionally retains the original source arena and per-datum provenance.
 
 The blueprints are selected by the one rule behind the `blueprints` kind (`selects_blueprint`:
 prefix, type, Filter, leftover tokens). A `Filter` keeps only the blueprints and pools it matches;
@@ -2269,7 +2537,7 @@ The Rust names of the library:
 
 | Field | Source |
 |-------|--------|
-| `blueprints` | The same set as the `blueprints` kind. Each has `produced_item` and `tiers`: per tier `craft_time_seconds`, `mandatory` and `optional` as a tree of `Cost` |
+| `blueprints` | Each Blueprint has `produced_item` and ordered `tiers`. Each tier has `craft_time_seconds`, `research` and a flat `Cost` arena. `mandatory` and `optional` are owner-local `CostIndex` values. Use `Tier::cost`, `Tier::costs` or `Tier::mandatory_cost` to read them. |
 | `Cost::Select` | `count` ("choose n") with its `options`, `slot` and `slot_key`; `chooses_fewer()` tells whether the player may choose fewer than offered |
 | `Cost::Resource`, `Cost::Item` | As an ingredient (`resource` / `item`, `quantity_scu` / `quantity`, `min_quality`), before the context |
 | `CostContext` | `quantity_multiplier` (`CraftingCostContext_QuantityMultiplier`), `composition_inclusion` (`Include` or `Exclude`) and `modifiers` (`CraftingCostContext_ResultGameplayPropertyModifiers`): per gameplay property the linear ranges `start_quality`, `end_quality`, `at_start`, `at_end` as a factor (`Multiplier`) or a summand (`Additive`) |
@@ -2329,8 +2597,8 @@ The mapping is made by name, manufacturer and variant against the ships of the `
 - the store name and the catalog `name` are compared after dropping the manufacturer, punctuation,
   case and the word "Edition";
 - when several player ships share the name, the one whose `className` carries none of the
-  suffixes of a display, test, event or reward variant (`_BIS…`, `_Display`, `_TEMP…`, `_Unmanned`,
-  `_AI_Super`, `_Tutorial`, `_Collector_…`, `_Prison`, `_NoInterior`, `_Hijacked…`, `_Exec_…` and the
+  suffixes of a display, test, event or reward variant (`_BISÃ¢â‚¬Â¦`, `_Display`, `_TEMPÃ¢â‚¬Â¦`, `_Unmanned`,
+  `_AI_Super`, `_Tutorial`, `_Collector_Ã¢â‚¬Â¦`, `_Prison`, `_NoInterior`, `_HijackedÃ¢â‚¬Â¦`, `_Exec_Ã¢â‚¬Â¦` and the
   like) is taken; if more than one is left, the slug stays unmapped;
 - a store name that is a part of exactly one catalog name (`M50` for "Origin M50 Interceptor", `C2
   Hercules`, `Mercury`, `Ares Ion`, `85X`, `C8R Pisces`) is accepted after review of each such slug,
@@ -2360,46 +2628,90 @@ committed.
 
 ### Item recovery rules
 
-`itemRecovery` is one object, not a kind and not in `completeness`: the
-`ItemRecoveryConfigurationParams` Record `entitlementpolicies/globalitemrecovery` (LIVE has
-exactly one), its `economyParams` (ADR-0218, #323). The Record is selected by the rule of a kind:
-the type `ItemRecoveryConfigurationParams` under `libs/foundry/records/entitlementpolicies/`, and,
-with a Filter, a record path the Filter matches. `itemRecovery` is `null` when no Record is
-selected or none can be read. With several readable Records the one with the smallest record path
-is taken. A selected Record that cannot be read is left out and listed in the failures of the
-summary, like any other Record, so `null` with a failure means an unreadable Record and `null`
-without one means there is none. `guid`, `className` and `recordPath` name the Record. Every other
-field carries the data name of the `economyParams` field, as the Record states it, as a number;
-it is `null` when the Record states none or states a value that is no number:
+`configurations.itemRecoveryEconomy` and `configurations.itemRecoveryOverrides` contain the
+economy and override declarations of the selected physical policy. A policy is a readable
+`ItemRecoveryConfigurationParams` Record under `libs/foundry/records/entitlementpolicies/`
+whose Record path matches the Filter when one is set. When several readable policies qualify,
+the smallest Record path wins. Rows are empty when none qualifies, with unreadable selected
+Records listed in export health. Dataset availability measures the declared Record family.
+The economy row has a canonical Record header. The override and policy rows identify the
+same physical owner by Record index and GUID.
 
-| Field | LIVE |
-|-------|------|
-| `globalBrickTimer`, `baseReclaimTime`, `baseDeliveryTime`, `scalingPriceFloor` | 10, 0, 0, 0 |
-| `aUECperSecond`, `deliverySecondsPerAUEC`, `expeditedDeliverySecondsPerAUEC` | 1e-6, 1e-6, 5e-7 |
-| `claimCostMultiplier`, `maxExpeditedClaimCostMultiplier` | 0.003, 0.0003 |
-| `defaultLoadoutCooldownMultiplier`, `defaultLoadoutDeliveryTimeMultiplier`, `defaultLoadoutExpeditedDeliveryTimeMultiplier` | 200, 200, 100 |
-| `vehicleChassisRepairCostMultiplier`, `vehicleComponentRepairCostMultiplier`, `vehicleRepairMissingItemCostMultiplier` | 1, 1, 1 |
-| `flatMinimumDeliveryTimerSeconds` | 10 |
-| `escalatingClaimsParams` | `escalatingClaimChainLimit` 1 and the multipliers `escalationTimerMultiplier`, `escalatingClaimCostMultiplier`, `escalatingDeliveryTimerMultiplier`, all 1 |
-| `overrides` | 7 groups, see below |
+The economy row's `economyParams` holds sourced values with exact original coordinates.
+The `legacy` object retains the following fields only where they are authored directly in the
+economy source.
 
-An override (`overrides[]`, an `ItemRecoveryOverrideGroupDef`) holds `classGuids`, the `guid` of
-each `EntityClassDefinition` in the group's `classes` (a ship is an entry of `ships`; on LIVE the 7
-groups hold 27, 7, 9, 29, 7, 10 and 10 classes, 99 in all, every one a ship of the catalog; a
-Reference that links to no Record is left out), and the group's multipliers
-`claimCooldownMultiplier`, `claimCostMultiplier`, `deliveryTimeMultiplier`,
-`maxExpediteCostMultiplier`, `expeditedDeliveryTimeMultiplier`,
-`flatMinimumDeliveryTimerSecondsMultiplier`, `escalationTimerMultiplier`,
-`escalatingClaimCostMultiplier` and `escalatingDeliveryTimerMultiplier`. The groups keep the order
-of the Record. That a class in no group uses the defaults of `economyParams` is an inference; the
-Record does not say so.
+| Direct source fields |
+|----------------------|
+| `globalBrickTimer`, `baseReclaimTime`, `baseDeliveryTime`, `scalingPriceFloor` |
+| `aUECperSecond`, `deliverySecondsPerAUEC`, `expeditedDeliverySecondsPerAUEC` |
+| `claimCostMultiplier`, `maxExpeditedClaimCostMultiplier` |
+| `defaultLoadoutCooldownMultiplier`, `defaultLoadoutDeliveryTimeMultiplier`, `defaultLoadoutExpeditedDeliveryTimeMultiplier` |
+| `vehicleChassisRepairCostMultiplier`, `vehicleComponentRepairCostMultiplier`, `vehicleRepairMissingItemCostMultiplier` |
+| `flatMinimumDeliveryTimerSeconds` |
 
-No fee in aUEC. The Record holds multipliers and rates and no fee in aUEC, and no field named
-like a price was found in the `EntityClassDefinition` Records of ships and items. The only fee in
-aUEC next to it is `insurance.expediteFee`. The catalog therefore exports no claim fee, and no
-formula over the exported facts is documented as one (ADR-0218).
+The nested groups remain independent even where their source member names match.
+
+| Sourced group | Original members |
+|---------------|------------------|
+| `cooldownParams` | `baseTime`, `scalingPriceFloor`, `aUECperSecond`, `defaultLoadoutMultiplier` |
+| `deliveryParams` | `baseTime`, `scalingPriceFloor`, `aUECperSecond`, `defaultLoadoutMultiplier`, `expeditedTimeMultiplier`, `expeditedDefaultTimeMultiplier` |
+| `repairParams` | `vehicleChassisRepairCostMultiplier`, `vehicleComponentRepairCostMultiplier`, `vehicleRepairMissingItemCostMultiplier` |
+| `escalatingClaimsParams` | `escalatingClaimChainLimit`, `escalationTimerMultiplier`, `escalatingClaimCostMultiplier`, `escalatingDeliveryTimerMultiplier` |
+
+The first three groups retain original Single bits and a nullable finite number. Older direct,
+escalating and override scalars retain their authored numeric storage. Missing, explicit null,
+unreadable, unsupported and invalid source values have separate states. Invalid known fields and
+unsupported concrete groups appear in diagnostic exports with their original field receipts. The
+nominal source declaration is checked for owned recovery blocks and empty override arrays.
+
+The sourced `overrides` array retains each `ItemRecoveryOverrideGroupDef` in authored order.
+Its sourced `classes` links keep their original positions, including explicit null and
+unresolved references. The remaining members are `claimCooldownMultiplier`,
+`claimCostMultiplier`, `deliveryTimeMultiplier`, `maxExpediteCostMultiplier`,
+`expeditedDeliveryTimeMultiplier`, `flatMinimumDeliveryTimerSecondsMultiplier`,
+`escalationTimerMultiplier`, `escalatingClaimCostMultiplier` and
+`escalatingDeliveryTimerMultiplier`. A source that removed the flat minimum multiplier has
+an absent cell. The catalog preserves source rates and multipliers as authored. The fee stated
+directly in ship source data remains `insurance.expediteFee`.
+
+The policy row retains the seven independent ordered condition arrays `Insurable`,
+`ReplenishOnRearm`, `ReplenishOnClaimAndRepair`, `NeverRepair`, `NeverLTP`, `ForceLTP` and
+`DontEquipWhenBricked`. Each original slot has its own source state and preserves its concrete
+condition type. An entity-class condition contains its authored class reference. An entity-tag
+condition retains the original `TagList` and its ordered tag links. An item-type condition
+retains both original enum names. A fieldless base condition remains explicit.
+
+The sourced `notificationParams` block preserves all ten authored locale-key fields as
+protected game-text references. These are `itemBricked_Title`, `itemBricked_Body`,
+`vehicleBrickedWithItems_Body`, `itemBricking_Title`, `itemBricking_Body`,
+`vehicleBrickingWithItems_Body`, `onBrickedItemUsed_Title`, `onBrickedItemUsed_CannotEquip`,
+`onBrickedItemUsed_CannotFire` and `onBrickedItemUsed_CannotUse`. The keys and available
+translations use the canonical
+`texts.gameTexts` table. The original `onBrickedItemUseNotificationBuffer` Single retains
+its own exact bits and source receipt. Source arrays and notification values are preserved
+without evaluating a policy.
+
+The ignored `item_recovery_cooldown_delivery_and_repair_match_original_source_fields` check
+opens the selected Archive and compares the filtered catalog against the original DataForge
+source. Set `P4KX_EXPECT_NESTED_RECOVERY=1` for an Archive that must exercise all three
+nested groups. The legacy and nested source generations can be checked in separate runs.
 
 ### Texts
+
+The inline `key`/`en`/`de` rules below describe the existing non-migrated family shapes.
+Manufacturers, ResourceTypes and Commodity text fields use canonical `texts.publicNames`/`texts.gameTexts`
+rows and all supported languages whose Entries are available. Each row retains its authored key,
+even if empty. Each language has direct `sourceText` and `displayText` sourced values. The source
+form preserves the winning decoded RHS, including whitespace and literal backslash-n; the display
+form applies the existing line-break decoding and trimming. Both preserve present empty values.
+Placeholders retain their key and have two absent forms without locale contributions; missing keys
+retain their actual lookup selectors. Bare keys and plain/suffix winners keep the existing lookup
+rules. Provenance references the actual DataForge key selector and winning language Entry, without
+putting protected key text in global source-use IDs. See [TextForms](catalog-text-forms.md) for the
+direct origin rules and the unchanged display-based summary accounting.
+
+#### Inline family texts
 
 `key` is the localisation key as the Record holds it, e.g. `@manufacturer_NameACAS`; an empty key
 is `null`. `en` and `de` are its texts from the Archive's `global.ini` of that language:
@@ -2449,10 +2761,11 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `manufacturers` | `libs/foundry/records/scitemmanufacturer/` | `SCItemManufacturer` |
 | `items` | `libs/foundry/records/entities/scitem/`, `libs/foundry/records/entities/legacyitems/` | `EntityClassDefinition` |
 | `ships` | `libs/foundry/records/entities/spaceships/`, `libs/foundry/records/entities/groundvehicles/` | `EntityClassDefinition` |
-| `commodities` | `libs/foundry/records/entities/commodities/` | `EntityClassDefinition` |
+| `definitions.commodities`, `projections.commodityPresentation` | Commodity source identities/authored bindings and explicit derived choices, paired in existing GUID order; see [Commodity contract](catalog-commodity-types.md) |
 | `blueprints` | `libs/foundry/records/crafting/blueprints/crafting/` | `CraftingBlueprintRecord` |
 | `resourceGroups` | `libs/foundry/records/resourcetypedatabase/` | `ResourceTypeGroup` |
 | `blueprintCategories` | `libs/foundry/records/crafting/blueprintcategories/` | `BlueprintCategoryRecord` |
+| `blueprintCategoryLists` | Every original path, subject to the ordinary Filter | `BlueprintCategoryDatabaseRecord` |
 | `gameplayProperties` | `libs/foundry/records/crafting/craftedproperties/` | `CraftingGameplayPropertyDef` |
 | `qualityDistributions` | `libs/foundry/records/crafting/qualitydistribution/` | `CraftingQualityDistributionRecord` and `CraftingQualityLocationOverrideRecord` |
 | `qualityQuantizations` | `libs/foundry/records/crafting/qualityquantization/` | `CraftingQualityQuantizationRecord` |
@@ -2467,27 +2780,52 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `mineableCompositions` | `libs/foundry/records/mining/rockcompositionpresets/` | `MineableComposition` |
 | `miningGlobalParams` | `libs/foundry/records/mining/miningglobalparams` | `MiningGlobalParams` |
 | `harvestableProviderPresets` | `libs/foundry/records/harvestable/providerpresets/` | `HarvestableProviderPreset` |
-| `subHarvestableMultiConfigs` | `libs/foundry/records/harvestable/slotpresets/` | `SubHarvestableMultiConfigRecord` |
+| `subHarvestableConfigs` | Any Record path | `SubHarvestableConfigRecord` |
+| `subHarvestableMultiConfigs` | Any Record path. The top-level convenience projection uses `libs/foundry/records/harvestable/slotpresets/`. | `SubHarvestableMultiConfigRecord` |
 | `harvestableLocations` | None: the `.soc` files of the containers below `ObjectContainers/PU/system`, no Records | |
 | `shops` | None: the `ShopBackup` entries of `LayerBackups.xml`, no Records | |
 | `factionReputations` | `libs/foundry/records/factions/factionreputation/` | `FactionReputation` |
 | `reputationScopes` | `libs/foundry/records/reputation/scopes/` | `SReputationScopeParams` |
 | `reputationStandings` | `libs/foundry/records/reputation/standings/` | `SReputationStandingParams` |
+| `reputationPerks` | Any path | `SPerkReputationListParams` |
+| `reputationTriggerRecords` | Any path | `SandboxTriggerRecord` |
+| `reputationRewardAmounts` | Any path | `SReputationRewardAmount` |
+| `infractions` | Any path | `InfractionDefinition` |
+| `infractionSets` | Any path | `InfractionSet` |
+| `jurisdictions` | Any path | `Jurisdiction` |
+| `starmapTypes` | Any path | `StarMapObjectType` |
+| `starmapPresets` | Any path | `StarMapPreset` |
+| `starmapAmenities` | Any path | `StarMapAmenityTypeEntry` |
 | `reputationContexts` | `libs/foundry/records/reputation/contexts/` | `SReputationContextUI` |
 | `missionTypes` | `libs/foundry/records/missiontype/` | `MissionType` |
 | `missionLocalities` | `libs/foundry/records/missiondata/pu_missionlocality/` | `MissionLocality` |
+| `contractScopes` | Any Record path | `ContractScopeGlobalParams` |
+| `missionModuleDeclarations` | Any Record path | `ModuleDeclaration` |
+| `missionScenarios` | `libs/foundry/records/` | `MissionScenario` |
 | `contractScenarios` | `libs/foundry/records/contracts/contractscenarios/` | `ScenarioProgress` |
 | `cargoManifests` | `libs/foundry/records/cargomanifest/` | `CargoManifest` |
 | `missionLocationTemplates` | `libs/foundry/records/missiondata/pu_locations/` | `MissionLocationTemplate` |
+| `locationClasses` | Any Record path | `MissionLocationClass` |
+| `locationFunctions` | Any Record path | `MissionLocationFunction` |
+| `locationSizes` | Any Record path | `MissionLocationSize` |
+| `locationClassRegistries` | Any Record path | `MissionLocationClasses` |
+| `locationFunctionRegistries` | Any Record path | `MissionLocationFunctions` |
+| `locationSizeRegistries` | Any Record path | `MissionLocationSizes` |
 | `contractShipSpawns` | None: derived from the properties of the contracts and their templates, no Records | |
 | `contractLocationQueries` | None: derived from the properties of the contracts and their templates, no Records | |
 | `contractNpcSpawns` | None: derived from the properties of the contracts, templates and broker entries, no Records | |
 | `contractEntitySpawns` | None: derived from the properties of the contracts, templates and broker entries, no Records | |
+| `missionPropertySets` | None: derived from the authored property overrides of selected Generator Records | |
 | `contractTemplates` | `libs/foundry/records/` (every folder; see "Contract templates") | `ContractTemplate` |
 | `missionBrokerEntries` | `libs/foundry/records/` (every folder; see "Mission broker entries") | `MissionBrokerEntry` |
 | `lootTables` | `libs/foundry/records/lootgeneration/loottables/` | `LootTableV3Record` |
 | `lootArchetypes` | `libs/foundry/records/lootgeneration/lootarchetypes/` | `LootArchetypeV3Record` |
 | `lootPoolFilters` | `libs/foundry/records/lootgeneration/filters/` | `PoolFilterRecord` |
+| `lootSecondaryChoiceSingleLayers` | Any physical Record path | `LootV3SecondaryChoicesSingleLayerRecord` |
+| `lootSecondaryChoiceMultiLayers` | Any physical Record path | `LootV3SecondaryChoicesMultiLayerRecord` |
+| `lootThemes` | Any physical Record path | `LootThemeRecord` |
+| `hierarchicalContextualDataPresets` | Any Record path | `HierarchicalContextualDataPresetRecord` |
+| `lootGenerationGlobalParams` | Any Record path | `LootGenerationGlobalParams` |
 | `legacyLootTables` | `libs/foundry/records/lootgeneration/loottables/` | `LootTable` |
 | `legacyLootArchetypes` | `libs/foundry/records/lootgeneration/lootarchetypes/` | `LootArchetype` |
 | `lootContainers` | None: the `entdata` files of the containers below `ObjectContainers/PU/system` and the containers they place, no Records | |
@@ -2525,12 +2863,19 @@ kinds keep their `display` and `temp` Records (radar displays, shop displays and
 changed the selection of `ships` for `schemaVersion` 2 (ADR-0167): 21 ships on LIVE are skipped
 that version 1 listed.
 
-A selected Record that cannot be read, such as one whose struct layout is corrupt, does not stop
-the catalog: it is left out, counted as a failure and reported with its record path, GUID and
-reason (a ship whose loadout cannot be resolved is the exception: it stays in `ships`, see
-"Loadouts"). `p4kx catalog` prints each failure on stderr, lists them under `failed` in `--json` and
-exits with code 1, with the catalog written; the desktop app lists them in the summary. The
-catalog file itself, its schema and its completeness are not affected.
+A selected Record that cannot be read or projected is recorded in the measured `exportHealth`,
+with its physical source index, GUID, readable path, stage and stable diagnostic category. A ship
+whose loadout fails can retain its original ship row; that secondary failure is distinct from an
+omitted ship source. Unreadable owned fields also remain visible when an optional mapper retained
+the row. Source warning codes retain their producer counts and explicit units.
+
+Normal publication refuses incomplete health before creating or replacing the destination.
+Explicit `--diagnostic-partial`, or the separate diagnostic action in the desktop window, permits
+the diagnostic file and records that mode inside it. A successful diagnostic write remains an
+incomplete result. `completeness` retains its Filter-selection meaning. Consumers require both an
+unfiltered selection and complete export health before treating absent rows as removals; preserve
+existing data when a diagnostic artifact cannot establish absence. The complete field and counter
+contract is [catalog export health](catalog-export-health.md) and ADR-0347.
 
 ## Determinism and size
 
@@ -2619,8 +2964,9 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   decision.
 - Every `manufacturerGuid` of an item or ship, every `producedItemGuid`, every ingredient
   `resourceGuid` and `itemGuid` resolves to a catalog entry; no GUID occurs twice.
-- Every commodity `typeGuid` resolves to a `resourceGroups` entry, every `parentGuid` of a group to
-  another one, and every blueprint `categoryGuid` to a `blueprintCategories` entry. On LIVE the
+- Every commodity `typeGuid` resolves to a `definitions.resourceGroups` entry, every chosen group
+  parent in `projections.resourceGroupParents` to another one, and every blueprint `categoryGuid`
+  to a `definitions.blueprintCategories.rows` entry. On LIVE the
   catalog holds 19 groups (8 of them nested) and 21 categories, 14 of which carry blueprints.
 - Texts that carry a key (placeholder keys excluded), checked per kind against the Archive's own
   `global.ini` files (ADR-0270): a key a file holds resolves in the catalog, a key it lacks is
@@ -2650,7 +2996,7 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   | contractTemplates | 6,765 | 12 | 6,651 |
   | missionBrokerEntries | 17,733 | 566 | 17,636 |
 
-  A contract text that holds a `~mission(…)` token is rewritten by the exporter, so the
+  A contract text that holds a `~mission(Ã¢â‚¬Â¦)` token is rewritten by the exporter, so the
   verification only checks that such a text is present. The location templates have 3,297 name
   variants; 86 of them carry a placeholder key or none, which is not counted as a keyed text, so the
   German file lacks 3,246 of the 3,297 variants and 3,160 of the 3,211 keyed texts.

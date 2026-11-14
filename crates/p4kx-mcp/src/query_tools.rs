@@ -29,8 +29,9 @@ impl Server {
         `from EntityClassDefinition at \"*/spaceships/*\" select Components[VehicleComponentParams].crewSize where Components[VehicleComponentParams].crewSize >= 4`. \
         from selects a type and the types deriving from it, at a record path glob, select one column per dot path \
         ([n], [*], [TypeName] for array elements, -> to follow a Reference), where a condition. \
-        Returns the columns and one page of rows in Record order; pass next_cursor back as cursor. \
-        An invalid Query is an error naming its byte span. list_structs gives the type and field names. \
+        Returns the columns and one page of rows in Record order; pass next_cursor back as cursor. Field origins identify the selected inputs and query evidence. \
+        An invalid Query is an error naming its byte span; an unreadable value needed to decide selection is a tool error, not an empty result. \
+        list_structs gives the type and field names. \
         The content may be forwarded by the client to third parties; game texts and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<QueryResult>(),
         annotations(
@@ -54,10 +55,11 @@ impl Server {
             let listing = ("run_query", opened.version(), &params.query);
             let page = Page::new(&listing, params.cursor.as_deref(), params.limit)?;
             let held = opened.clone();
-            opened.with_dataforge(move |forge, archive| {
+            opened.with_dataforge_origin(move |forge, archive, origin| {
                 let target = Target {
                     forge,
                     archive,
+                    origin,
                     opened: &held,
                 };
                 query::run(&target, &params.query, page, &cancel)

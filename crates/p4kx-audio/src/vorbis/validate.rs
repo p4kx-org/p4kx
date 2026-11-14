@@ -10,7 +10,7 @@ use lewton::header::{
 };
 
 use super::VorbisError;
-use super::packets::AudioPackets;
+use super::stream::{AudioRead, StreamError};
 
 const CHECKED_PACKETS: usize = 16;
 const CLIPPED_SHARE: usize = 10;
@@ -33,26 +33,26 @@ pub(crate) struct Decoder {
 
 /// Decodes the rebuilt headers and the first audio packets with a standard Vorbis decoder and
 /// returns the parsed headers for decoding the rest.
-pub(crate) fn validate(
+pub(super) fn validate<E>(
     ident: &[u8],
     comment: &[u8],
     setup: &[u8],
-    audio: AudioPackets<'_>,
-) -> Result<(Fit, Decoder), VorbisError> {
+    audio: impl AudioRead<E>,
+) -> Result<(Fit, Decoder), StreamError<E>> {
     panic::catch_unwind(AssertUnwindSafe(|| decode(ident, comment, setup, audio)))
-        .unwrap_or_else(|_| Err(VorbisError::Rejected("the decoder failed".to_owned())))
+        .unwrap_or_else(|_| Err(VorbisError::Rejected("the decoder failed".to_owned()).into()))
 }
 
 fn rejected(error: &dyn Display) -> VorbisError {
     VorbisError::Rejected(error.to_string())
 }
 
-fn decode(
+fn decode<E>(
     ident: &[u8],
     comment: &[u8],
     setup: &[u8],
-    mut audio: AudioPackets<'_>,
-) -> Result<(Fit, Decoder), VorbisError> {
+    mut audio: impl AudioRead<E>,
+) -> Result<(Fit, Decoder), StreamError<E>> {
     let ident = read_header_ident(ident).map_err(|error| rejected(&error))?;
     read_header_comment(comment).map_err(|error| rejected(&error))?;
     let blocksizes = (ident.blocksize_0, ident.blocksize_1);
@@ -62,18 +62,17 @@ fn decode(
     let mut packet = Vec::new();
     let (mut samples, mut clipped) = (0, 0);
     for _ in 0..CHECKED_PACKETS {
-        match audio.next_into(&mut packet) {
-            Some(rebuilt) => rebuilt?,
-            None => break,
-        };
+        if audio.next_packet(&mut packet)?.is_none() {
+            break;
+        }
         let channels: Vec<Vec<f32>> =
             read_audio_packet_generic(&ident, &setup, &packet, &mut window)
                 .map_err(|error| rejected(&error))?;
         for &sample in channels.iter().flatten() {
             if !sample.is_finite() {
-                return Err(VorbisError::Rejected(
-                    "the decoder returns no number".to_owned(),
-                ));
+                return Err(
+                    VorbisError::Rejected("the decoder returns no number".to_owned()).into(),
+                );
             }
             samples += 1;
             if sample.abs() >= 1.0 {

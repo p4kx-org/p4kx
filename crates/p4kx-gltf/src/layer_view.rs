@@ -92,7 +92,7 @@ pub fn layered_base_textures(
                 if !*fits {
                     return None;
                 }
-                let image = bake_base(job, &decoded, &mut Vec::new())?.ok()?;
+                let image = bake_base(job, &decoded, &mut Vec::new())?.ok()?.image;
                 Some(LoadedTexture::new(image, false))
             })
             .collect();

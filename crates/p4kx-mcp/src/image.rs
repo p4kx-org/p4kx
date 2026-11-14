@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CUBE_FACE_NAMES, DdsHeader, Texture};
+use p4kx_extraction::{CUBE_FACE_NAMES, DdsHeader, SourceInventory, SourceUses, Texture};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::container::Place;
 use crate::error::ToolError;
+use crate::image_origin::ImageFieldOrigins;
 
 /// The side length a preview fits when a call gives none.
 pub(crate) const DEFAULT_SIDE: u32 = 512;
@@ -76,6 +77,11 @@ pub(crate) struct ImageResult {
     pub(crate) mime_type: &'static str,
     /// The size of the PNG in bytes.
     pub(crate) png_bytes: usize,
+    /// Actual source evidence for each returned value and the image content block.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: ImageFieldOrigins,
+    /// The referenced physical inputs and their observed use coordinates.
+    pub(crate) provenance: SourceInventory,
 }
 
 /// Returns the preview of the texture whose header is `path` in `place` and its PNG.
@@ -97,14 +103,19 @@ pub(crate) fn preview(
     let level = level_of(params.mip, side, face.is_some(), header)?;
     check_budget(header, level, face.is_some(), path, MAX_PIXELS, MAX_MIP_LEN)?;
     let shown = texture
-        .preview_png(level, face)
+        .preview_png_observed(level, face)
         .map_err(|error| ToolError::converted(path, "a texture", error))?;
-    if shown.png.len() > MAX_PNG_LEN {
+    if shown.image().png.len() > MAX_PNG_LEN {
         return Err(refused(format!(
             "the PNG of mip {level} of {path} is {} bytes, more than the {MAX_PNG_LEN} a preview returns; ask for a higher mip",
-            shown.png.len()
+            shown.image().png.len()
         )));
     }
+    let uses = SourceUses::new();
+    let field_origins =
+        ImageFieldOrigins::capture(&shown, &uses, params.mip.is_none(), face.is_some())?;
+    let provenance = uses.freeze()?;
+    let shown = shown.into_image();
     let result = ImageResult {
         archive: place.archive().path().display().to_string(),
         path: place.shown(texture.name()),
@@ -122,6 +133,8 @@ pub(crate) fn preview(
         alpha_tail: texture.has_alpha_tail(),
         mime_type: "image/png",
         png_bytes: shown.png.len(),
+        field_origins,
+        provenance,
     };
     Ok((result, shown.png))
 }
@@ -138,7 +151,8 @@ fn check_budget(
 ) -> Result<(), ToolError> {
     let [width, height] = shown_size(header, level, face);
     let side = |full: u32| u64::from(full.checked_shr(level).unwrap_or(0).max(1));
-    let decoded = u64::from(header.images(level))
+    let decoded = header
+        .images(level)
         .saturating_mul(side(header.width()))
         .saturating_mul(side(header.height()));
     if u64::from(width) * u64::from(height) > max_pixels || decoded > max_pixels {

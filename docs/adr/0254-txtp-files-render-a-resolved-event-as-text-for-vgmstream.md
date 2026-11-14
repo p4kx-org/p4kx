@@ -32,7 +32,9 @@ decoding) and ADR-0250 (the object kinds). The format is that of vgmstream's `do
   | Random container, switch container, music switch | `group = -R<n>>1` |
 
   A group of one child is the child. A random or switch container is settled at run time in the
-  game; the file selects its first child, and the `group` line says how to select another.
+  game. A rendered group of several alternatives selects its first child. The header names
+  this behavior with `# approximation: select-first-alternative`. The same code appears in the
+  file's JSON `approximations` array after writing or verifying the retained bytes.
 - **Loops come from the WEM.** The loop of the WEM (`smpl` chunk, issue #95) is written as
   `#I <start> <end>` in frames, the values the sound file carries as `smpl` or `LOOPSTART` too.
   `ExportedSound` gains `loop_points` and `prefetch_only` for this; the header of the WEM is
@@ -50,9 +52,12 @@ decoding) and ADR-0250 (the object kinds). The format is that of vgmstream's `do
 
 ## Consequences
 
-- Music timing (clip positions, trims, transitions, the loop counts of containers and playlist
-  items) is not reproduced; a music event plays its tracks as layers. The map above is a faithful
-  rendition for events of sounds and containers and an approximation for music.
+- TXTP arranges the resolved sound files. Music clip positions, trims, transitions and authored
+  container or playlist loop counts remain source metadata. A music event plays its tracks as
+  layers in the generated TXTP.
+- The `approximations` array describes the generated commands for each file. An empty array
+  means the writer emitted none of the reported approximation codes. A `null` value means the
+  retained bytes were unchecked or differed from the generated text.
 - The segments of an `-S` group are decoded by vgmstream one after another: it takes the highest
   sample rate of them, and segments of different channel counts may need mixing (a mono segment
   next to a stereo one will not sound right without it), so a sequence of sounds with unequal
@@ -68,3 +73,16 @@ decoding) and ADR-0250 (the object kinds). The format is that of vgmstream's `do
   section; not done.
 - Writing a silent `?.` entry for a source without a file: plays a rendition that differs from
   the game without saying so; not done.
+
+The render tree groups sounds by the open visits of the resolved source
+walk. Repeated authored edges contribute distinct visits in source order.
+Separate physical holders of one logical Event contribute independent groups.
+
+MusicTrack leaves carry the observed clip features of their owning track.
+The report and header identify omitted finite nonzero start and trim times
+in milliseconds, omitted posted Events and nonfinite timing words. The
+source duration is a separate authored value.
+
+A rendered path carries observed fade and transition-segment features
+from its actual MusicPlaylist and MusicSwitch ancestors. The writer
+reports each omitted feature in the header and JSON.

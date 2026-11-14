@@ -1,9 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[cfg(test)]
+use std::convert::Infallible;
+
 use p4kx_extraction::Guid;
 
-use crate::starmap_xml::{Document, Node, attribute};
+use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
+use crate::{CatalogError, ExportAccountingError};
+
+#[cfg(test)]
+use crate::starmap_xml::Document;
+use crate::starmap_xml::{Node, XmlError, attribute};
 
 /// The attribute of an entity component that names the container the entity places.
 const CONTAINER_ATTRIBUTE: &str = "objectContainer";
@@ -21,44 +29,114 @@ pub(crate) struct EntityLink {
     pub(crate) config: Option<Guid>,
     /// Whether the file names a second, different container or config that is not used.
     pub(crate) several: bool,
+    /// A populated multi-config attribute is not a GUID.
+    pub(crate) malformed_config: bool,
 }
 
-/// Reads the property file `bytes` of an entity, `CryXml` or text XML; the empty link for a file
-/// that holds neither attribute or is no XML.
-pub(crate) fn read(bytes: &[u8]) -> EntityLink {
-    if !contains(bytes, CONTAINER_ATTRIBUTE) && !contains(bytes, CONFIG_ATTRIBUTE) {
-        return EntityLink::default();
+/// An entity link paired privately to its actual selected authored container token.
+pub(crate) struct CapturedEntityLink {
+    value: EntityLink,
+    selected: Option<AuthoredEntryPath>,
+}
+
+impl CapturedEntityLink {
+    pub(crate) const fn value(&self) -> &EntityLink {
+        &self.value
     }
-    Document::parse(bytes).map_or_else(
-        |_| EntityLink::default(),
-        |document| link_below(document.root()),
-    )
+
+    pub(crate) fn into_parts(self) -> (EntityLink, Option<AuthoredEntryPath>) {
+        (self.value, self.selected)
+    }
 }
 
-fn contains(bytes: &[u8], needle: &str) -> bool {
-    bytes
-        .windows(needle.len())
-        .any(|window| window == needle.as_bytes())
+enum AttributeValue<'source> {
+    Plain(&'source str),
+    Captured(AuthoredEntryPath),
 }
 
-/// Returns the first container and the first config named by an element at or below `root`, in
-/// document order, and whether another one differs.
-fn link_below<'d, N: Node<'d>>(root: N) -> EntityLink {
-    let mut link = EntityLink::default();
+impl AttributeValue<'_> {
+    fn text(&self) -> &str {
+        match self {
+            Self::Plain(value) => value,
+            Self::Captured(value) => value.as_str(),
+        }
+    }
+    fn receipt(self) -> Option<AuthoredEntryPath> {
+        match self {
+            Self::Plain(_) => None,
+            Self::Captured(value) => Some(value),
+        }
+    }
+}
+
+/// Reads configured entity links from an independent plain XML projection.
+#[cfg(test)]
+pub(crate) fn read(bytes: &[u8]) -> Result<EntityLink, XmlError> {
+    let document = Document::parse(bytes)?;
+    let result = link_below(document.root(), |node, name| {
+        Ok::<_, Infallible>(attribute(node, name).map(AttributeValue::Plain))
+    });
+    Ok(match result {
+        Ok(link) => link.value,
+        Err(never) => match never {},
+    })
+}
+
+/// Reads entity links in the same parse as their actual admitted source token.
+pub(crate) fn read_original(
+    read: &EntryRead,
+    capture: &EntryCapture<'_>,
+) -> Result<Result<CapturedEntityLink, XmlError>, CatalogError> {
+    let document = match EntryXml::parse(read, capture)? {
+        Ok(document) => document,
+        Err(error) => return Ok(Err(error)),
+    };
+    let link = link_below(document.root(), |node, name| {
+        if name == CONTAINER_ATTRIBUTE {
+            document
+                .attribute(node, name)
+                .map(|value| value.map(AttributeValue::Captured))
+        } else {
+            Ok(attribute(node, name).map(AttributeValue::Plain))
+        }
+    })?;
+    if link.value.container.is_some() && link.selected.is_none() {
+        return Err(ExportAccountingError::UnboundHealthSubject.into());
+    }
+    Ok(Ok(link))
+}
+
+fn link_below<'document, N: Node<'document>, E>(
+    root: N,
+    mut attribute: impl FnMut(N, &'static str) -> Result<Option<AttributeValue<'document>>, E>,
+) -> Result<CapturedEntityLink, E> {
+    let mut link = CapturedEntityLink {
+        value: EntityLink::default(),
+        selected: None,
+    };
     let mut pending = vec![root];
     while let Some(node) = pending.pop() {
-        if let Some(path) = attribute(node, CONTAINER_ATTRIBUTE).filter(|path| !path.is_empty()) {
-            match link.container.as_deref() {
-                None => link.container = Some(path.to_owned()),
-                Some(first) => link.several |= first != path,
+        if let Some(path) =
+            attribute(node, CONTAINER_ATTRIBUTE)?.filter(|path| !path.text().is_empty())
+        {
+            match link.value.container.as_deref() {
+                None => {
+                    link.value.container = Some(path.text().to_owned());
+                    link.selected = path.receipt();
+                }
+                Some(first) => link.value.several |= first != path.text(),
             }
         }
-        if let Some(guid) =
-            attribute(node, CONFIG_ATTRIBUTE).and_then(|text| text.trim().parse().ok())
+        if let Some(text) =
+            attribute(node, CONFIG_ATTRIBUTE)?.filter(|text| !text.text().trim().is_empty())
         {
-            match link.config {
-                None => link.config = Some(guid),
-                Some(first) => link.several |= first != guid,
+            if let Ok(guid) = text.text().trim().parse() {
+                match link.value.config {
+                    None => link.value.config = Some(guid),
+                    Some(first) => link.value.several |= first != guid,
+                }
+            } else {
+                link.value.malformed_config = true;
             }
         }
         let mark = pending.len();
@@ -67,12 +145,29 @@ fn link_below<'d, N: Node<'d>>(root: N) -> EntityLink {
             added.reverse();
         }
     }
-    link
+    Ok(link)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn read(bytes: &[u8]) -> EntityLink {
+        super::read(bytes).expect("valid source XML")
+    }
+
+    #[test]
+    fn malformed_source_is_distinct_from_a_valid_empty_projection() {
+        assert!(
+            super::read(b"not XML").is_err(),
+            "malformed source is reported"
+        );
+        assert_eq!(
+            super::read(b"<Entity/>"),
+            Ok(EntityLink::default()),
+            "empty source is valid"
+        );
+    }
 
     const CONFIG: &str = "687af3db-4c0d-4e8d-9261-102274f8b6ed";
     const OTHER: &str = "11111111-4c0d-4e8d-9261-102274f8b6ed";
@@ -95,6 +190,7 @@ mod tests {
                 container: Some("ObjectContainers/PU/loot.socpak".to_owned()),
                 config: Some(guid(CONFIG)),
                 several: false,
+                malformed_config: false,
             }
         );
     }
@@ -112,14 +208,24 @@ mod tests {
     fn a_file_with_neither_attribute_is_the_empty_link() {
         let empty = EntityLink::default();
         assert_eq!(read(b"<Entity Name=\"x\"/>"), empty);
-        assert_eq!(read(b"not xml but objectContainer"), empty);
-        assert_eq!(read(b""), empty);
+        assert!(
+            super::read(b"not xml but objectContainer").is_err(),
+            "invalid XML is reported"
+        );
+        assert!(
+            super::read(b"").is_err(),
+            "empty bytes are not an XML document"
+        );
     }
 
     #[test]
-    fn a_config_that_is_no_guid_is_none() {
+    fn a_config_that_is_no_guid_is_reported_without_losing_other_links() {
         let link = read(br#"<Entity><a multiConfigRef="nope"/></Entity>"#);
-        assert_eq!(link, EntityLink::default());
+        assert_eq!(link.config, None, "no invented GUID");
+        assert!(
+            link.malformed_config,
+            "populated invalid source is distinguished from absence"
+        );
     }
 
     #[test]

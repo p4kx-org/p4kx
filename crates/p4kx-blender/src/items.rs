@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::{Assembly, INTERIOR_NODE, Interior, InteriorPart, InteriorPartKind, Part};
+use crate::package_light_placements::PlacedLight;
+use p4kx_assembly::{
+    Assembly, INTERIOR_NODE, Interior, InteriorPart, InteriorPartKind, PaletteSource, Part,
+};
+use p4kx_extraction::{EntryOrigin, ModelArchiveSource};
 use p4kx_gltf::{NodeTransform, SceneLight, light_node_transform, node_transform};
 use p4kx_model::{MaterialStatus, Model, TintPalette, Transform};
 
@@ -11,8 +15,12 @@ use crate::manifest::{EntityRef, NodeKind};
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Drawn<'a> {
     pub(crate) model: &'a Model,
+    pub(crate) model_sources: &'a [ModelArchiveSource],
     pub(crate) materials: &'a MaterialStatus,
+    pub(crate) material_entry: Option<&'a EntryOrigin>,
     pub(crate) palette: Option<&'a TintPalette>,
+    pub(crate) palette_source: Option<&'a PaletteSource>,
+    pub(crate) palette_parent: Option<usize>,
     pub(crate) label: &'a str,
 }
 
@@ -29,6 +37,7 @@ pub(crate) struct Item<'a> {
     pub(crate) geometry: Option<&'a str>,
     pub(crate) drawn: Option<Drawn<'a>>,
     pub(crate) light: Option<SceneLight>,
+    pub(crate) light_placement: Option<PlacedLight<'a>>,
 }
 
 /// Lists the nodes of `assembly`, parts first, then the bone attachments of the parts, then its
@@ -63,6 +72,7 @@ pub(crate) fn items(assembly: &Assembly) -> Vec<Item<'_>> {
             container.interior(),
             Some(node),
             container.placement(),
+            Some((container.part(), container.reference())),
         );
     }
     items
@@ -74,10 +84,12 @@ pub(crate) fn entity_ref(root: Option<&Part>) -> EntityRef {
         || EntityRef {
             class_name: String::new(),
             guid: String::new(),
+            classification: None,
         },
         |part| EntityRef {
             class_name: part.class_name().to_owned(),
             guid: part.guid().to_string(),
+            classification: None,
         },
     )
 }
@@ -86,7 +98,7 @@ pub(crate) fn entity_ref(root: Option<&Part>) -> EntityRef {
 /// files, models, props, lights and nested containers. A node comes after its parent.
 pub(crate) fn interior_items(interior: &Interior) -> Vec<Item<'_>> {
     let mut items = Vec::with_capacity(interior.parts().len());
-    push_parts(&mut items, interior, None, &Transform::IDENTITY);
+    push_parts(&mut items, interior, None, &Transform::IDENTITY, None);
     items
 }
 
@@ -95,6 +107,7 @@ fn push_parts<'a>(
     interior: &'a Interior,
     group: Option<usize>,
     placement: &Transform,
+    owner: Option<(usize, &'a p4kx_assembly::ObjectContainerRef)>,
 ) {
     let base = items.len();
     for part in interior.parts() {
@@ -110,7 +123,18 @@ fn push_parts<'a>(
         } else {
             part.local()
         };
-        items.push(interior_item(part, parent, path, local));
+        let mut item = interior_item(part, parent, path, local);
+        item.light_placement = owner.and_then(|(owner, reference)| {
+            Some(PlacedLight {
+                owner,
+                container: base,
+                reference,
+                part,
+                light: part.light()?,
+                placement: part.light_placement()?,
+            })
+        });
+        items.push(item);
     }
 }
 
@@ -128,11 +152,16 @@ fn push_attachments<'a>(items: &mut Vec<Item<'a>>, assembly: &'a Assembly) {
             geometry: Some(attached.geometry()),
             drawn: Some(Drawn {
                 model: attached.model(),
+                model_sources: attached.model_archive_sources(),
                 materials: attached.materials(),
+                material_entry: attached.material_archive_origins().library(),
                 palette: part.and_then(Part::palette),
+                palette_source: part.and_then(Part::palette_source),
+                palette_parent: Some(index),
                 label: attached.name(),
             }),
             light: None,
+            light_placement: None,
         });
     }
 }
@@ -152,15 +181,23 @@ fn part_item(part: &Part) -> Item<'_> {
         entity: (!gear).then(|| EntityRef {
             class_name: part.class_name().to_owned(),
             guid: part.guid().to_string(),
+            classification: None,
         }),
         geometry: part.geometry(),
         drawn: part.model().map(|model| Drawn {
             model,
+            model_sources: part.model_archive_sources(),
             materials: part.materials(),
+            material_entry: part.material_archive_origins().library(),
             palette: part.palette(),
+            palette_source: part.palette_source(),
+            palette_parent: part
+                .palette_source()
+                .and_then(PaletteSource::inherited_from),
             label: part.class_name(),
         }),
         light: None,
+        light_placement: None,
     }
 }
 
@@ -190,11 +227,16 @@ fn interior_item<'a>(
         geometry: part.model_path(),
         drawn: part.model().map(|model| Drawn {
             model,
+            model_sources: part.model_archive_sources(),
             materials: part.materials(),
+            material_entry: part.material_archive_origins().library(),
             palette: part.palette(),
+            palette_source: part.palette_source(),
+            palette_parent: None,
             label: part.name(),
         }),
         light,
+        light_placement: None,
     }
 }
 
@@ -209,6 +251,7 @@ fn group_item(name: &str, parent: Option<usize>, path: String) -> Item<'_> {
         geometry: None,
         drawn: None,
         light: None,
+        light_placement: None,
     }
 }
 

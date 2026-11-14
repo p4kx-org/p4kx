@@ -4,6 +4,12 @@
 //! Helpers of the Basetool catalog tests: a synthetic Archive with manufacturers and their
 //! texts, opened headless.
 
+mod resource_fixture;
+mod tag_fixture;
+
+pub(crate) use resource_fixture::resources;
+pub(crate) use tag_fixture::tag_taxonomy;
+
 use crate::waiting::wait_polling;
 use std::error::Error;
 use std::fs;
@@ -158,17 +164,27 @@ pub(crate) fn many(count: u32) -> ArchiveBuilder {
     archive(&forge, &texts, &texts)
 }
 
-/// `count` manufacturers sharing a description of `length` characters in both languages.
+/// A two-language catalog with both text forms close to the upload limit.
+pub(crate) fn near_upload_limit() -> ArchiveBuilder {
+    const MANUFACTURERS: u32 = 15;
+    const DESCRIPTION_CHARACTERS: usize = 1_000_000;
+    wordy(MANUFACTURERS, DESCRIPTION_CHARACTERS)
+}
+
+/// `count` manufacturers with distinct description keys and `length` characters per language.
 pub(crate) fn wordy(count: u32, length: usize) -> ArchiveBuilder {
-    let forge = (0..count).fold(structures(), |builder, number| {
-        builder.record(manufacturer(
+    let mut forge = structures();
+    let mut texts = GlobalIniBuilder::new();
+    let long = "x".repeat(length);
+    for number in 0..count {
+        let key = format!("manufacturer_Desc{number:05}");
+        forge = forge.record(manufacturer(
             number,
             &format!("W{number:05}"),
-            "@manufacturer_Desc",
-        ))
-    });
-    let long = "x".repeat(length);
-    let texts = GlobalIniBuilder::new().text("manufacturer_Desc", &long);
+            &format!("@{key}"),
+        ));
+        texts = texts.text(&key, &long);
+    }
     archive(&forge, &texts, &texts)
 }
 

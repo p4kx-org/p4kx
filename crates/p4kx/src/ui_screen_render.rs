@@ -5,19 +5,20 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
 
-use anyhow::Result;
-use p4kx_extraction::gfx::{Background, CanvasSize, Localise, RasterOptions, Skipped};
-use p4kx_extraction::{
-    Archive, ArchiveImages, DataForgeEntry, Language, ScreenTexts, decode_line_breaks,
-    write_bytes_replacing,
-};
+use anyhow::{Context, Result};
+use p4kx_extraction::gfx::{Background, CanvasSize, RasterOptions, Skipped};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Language};
 use p4kx_screens::{
-    ImageSources, MAX_SVG_BYTES, Report, ScreenComposer, Still, StillFormat, StillRequest,
-    TextSources, Variable, check_variable_count,
+    ArchiveScreen, ArchiveScreenError, ArchiveScreenRender, Report, Still, StillFormat,
+    StillRequest, Variable, check_variable_count,
 };
 use serde::Serialize;
 
 use crate::{exit, json};
+
+#[path = "ui_screen_render_origins.rs"]
+mod origins;
+use self::origins::ScreenEvidence;
 
 pub(crate) struct Options<'a> {
     pub(crate) screen: &'a str,
@@ -30,6 +31,25 @@ pub(crate) struct Options<'a> {
     pub(crate) svg: bool,
 }
 
+impl Options<'_> {
+    fn request(&self) -> StillRequest<'_> {
+        StillRequest {
+            screen: self.screen,
+            brand: self.brand,
+            variables: self.variables,
+            raster: RasterOptions {
+                size: self.size.unwrap_or(CanvasSize::Stage),
+                background: self.background,
+            },
+            format: if self.svg {
+                StillFormat::Svg
+            } else {
+                StillFormat::Png
+            },
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct RenderJson<'a> {
     screen: &'a str,
@@ -40,6 +60,10 @@ struct RenderJson<'a> {
     #[serde(flatten)]
     report: &'a Report,
     skipped: &'a [SkippedJson],
+    #[serde(flatten)]
+    evidence: &'a ScreenEvidence<'a>,
+    #[serde(rename = "originReceipt")]
+    origin_receipt: String,
 }
 
 #[derive(Serialize)]
@@ -58,73 +82,37 @@ fn skipped_json(skipped: &[Skipped]) -> Vec<SkippedJson> {
         .collect()
 }
 
-fn draw(archive: &Archive, options: &Options<'_>) -> Result<Still> {
-    let entry = DataForgeEntry::read(archive)?;
-    let forge = entry.open()?;
-    let texts = ScreenTexts::load(
-        archive,
-        &ScreenComposer::new(&forge).font_file(),
-        Some(options.lang.unwrap_or(Language::English)),
-    );
-    let mut warnings = texts.warnings().to_vec();
-    let ini = texts.parsed(&mut warnings);
+fn draw(
+    archive: &Archive,
+    options: &Options<'_>,
+    cancel: &CancelToken,
+) -> Result<ArchiveScreenRender> {
+    let entry = DataForgeEntry::read_until(archive, &|| cancel.is_cancelled())?;
+    let screen = ArchiveScreen::new(archive, &entry).map_err(cli_error)?;
+    let texts = screen.load_texts(Some(options.lang.unwrap_or(Language::English)));
+    let mut warnings = Vec::new();
+    let rendered = screen.render(&texts, &options.request(), cancel, &mut warnings);
     for warning in &warnings {
         warn(warning);
     }
-    let lookup = |key: &str| {
-        ini.as_ref()?
-            .resolve(key)
-            .map(|text| decode_line_breaks(text).into_owned())
-    };
-    let images = ArchiveImages::new(archive);
-    let read_texture = |path: &str, side: u32, pixels: u64| {
-        images
-            .texture(path, side, pixels)
-            .map_err(|error| describe(&error))
-    };
-    let read_vector = |path: &str| {
-        images
-            .vector(path, MAX_SVG_BYTES as u64)
-            .map_err(|error| describe(&error))
-    };
-    let request = StillRequest {
-        screen: options.screen,
-        brand: options.brand,
-        variables: options.variables,
-        raster: RasterOptions {
-            size: options.size.unwrap_or(CanvasSize::Stage),
-            background: options.background,
-        },
-        format: if options.svg {
-            StillFormat::Svg
-        } else {
-            StillFormat::Png
-        },
-    };
-    let text_sources = texts.fonts().map(|fonts| TextSources {
-        fonts,
-        localise: ini.as_ref().map(|_| &lookup as Localise<'_>),
-    });
-    let image_sources = ImageSources {
-        texture: &read_texture,
-        vector: &read_vector,
-    };
-    Ok(Still::render(
-        &forge,
-        text_sources,
-        Some(image_sources),
-        &request,
-    )?)
+    rendered.map_err(cli_error)
 }
 
 /// Runs `p4kx ui render --screen`.
 pub(crate) fn run(archive: &Path, options: &Options<'_>, as_json: bool) -> Result<ExitCode> {
     check_variable_count(options.variables.len())?;
     let archive = crate::key::open(archive)?;
-    let still = draw(&archive, options)?;
-    write_bytes_replacing(options.out, &still.encode()?)?;
+    let cancel = crate::extract::cancel_on_interrupt()?;
+    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let drawn = draw(&archive, options, &cancel)?;
+    let receipt = drawn
+        .publish(options.out, &protection, &cancel)
+        .map_err(cli_error)?;
+    let still = drawn.still();
     let skipped = skipped_json(still.skipped());
     if as_json {
+        let name = receipt.file_name().context("missing Screen receipt name")?;
+        let evidence = ScreenEvidence::of(still, drawn.origin())?;
         json::print(&RenderJson {
             screen: options.screen,
             target: json::path(options.out),
@@ -133,9 +121,11 @@ pub(crate) fn run(archive: &Path, options: &Options<'_>, as_json: bool) -> Resul
             height: still.height(),
             report: still.report(),
             skipped: &skipped,
+            evidence: &evidence,
+            origin_receipt: json::path(Path::new(name)),
         })?;
     } else {
-        print_report(options, &still, &skipped)?;
+        print_report(options, still, &skipped)?;
     }
     Ok(ExitCode::from(if still.is_complete() {
         exit::SUCCESS
@@ -144,15 +134,14 @@ pub(crate) fn run(archive: &Path, options: &Options<'_>, as_json: bool) -> Resul
     }))
 }
 
-fn describe(error: &dyn std::error::Error) -> String {
-    let mut text = error.to_string();
-    let mut source = error.source();
-    while let Some(cause) = source {
-        text.push_str(": ");
-        text.push_str(&cause.to_string());
-        source = cause.source();
+fn cli_error(error: ArchiveScreenError) -> anyhow::Error {
+    match error {
+        ArchiveScreenError::DataForge(error) => error.into(),
+        ArchiveScreenError::Draw(error) => error.into(),
+        ArchiveScreenError::Evidence(error) => error.into(),
+        ArchiveScreenError::Publish(error) => error.into(),
+        other => other.into(),
     }
-    text
 }
 
 fn warn(error: &impl std::fmt::Display) {

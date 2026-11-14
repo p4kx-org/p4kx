@@ -49,7 +49,7 @@ fn lay(texts: &Texts, list: &SoundList) -> Laid {
         .variants
         .iter()
         .map(|variant| {
-            let id = variant.wem_id.map(|id| id.to_string()).unwrap_or_default();
+            let id = variant.wem_id.map_or_default(|id| id.to_string());
             let tint = match variant.playable() {
                 Playable::Yes => Tint::Normal,
                 Playable::PrefetchOnly

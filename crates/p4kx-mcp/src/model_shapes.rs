@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::ChunkJson;
+use p4kx_extraction::{ChunkJson, FieldOrigins, SourceInventory};
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::Value;
@@ -28,6 +28,11 @@ pub(crate) struct ChunksResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    /// The original inputs of each structured output field.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    /// The physical sources and exact uses referenced by the fields.
+    pub(crate) provenance: SourceInventory,
 }
 
 /// One chunk of a chunk file.
@@ -100,7 +105,11 @@ pub(crate) struct LodShape {
 
 /// One page of a section of a model.
 #[derive(Debug, Serialize, JsonSchema)]
-pub(crate) struct ModelItemsResult {
+#[schemars(extend("allOf" = [{
+    "if": { "properties": { "section": { "enum": ["animations", "bones", "nodes"] } }, "required": ["section"] },
+    "then": { "required": ["fieldOrigins", "provenance"] }
+}]))]
+pub(crate) struct ModelItemsResult<Items = Vec<Value>> {
     /// The path of the Archive.
     pub(crate) archive: String,
     /// The Entry path of the model.
@@ -112,8 +121,17 @@ pub(crate) struct ModelItemsResult {
     /// The items on this page, each as `p4kx model info --json` shows it in the section of the
     /// same name.
     #[schemars(with = "Vec<Value>")]
-    pub(crate) items: Vec<Value>,
+    pub(crate) items: Items,
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: Option<ModelItemOrigins>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+pub(crate) struct ModelItemOrigins {
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    pub(crate) provenance: SourceInventory,
 }

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_cryxml::{Element, Xml};
+use p4kx_cryxml::{MAX_TEXT_DEPTH, SourceDocument, SourceElement, SourceReadOptions};
 
-use super::{AudioFileError, MAX_ATL_NODES, MAX_TRIGGER_EVENTS, wwise_id};
+use super::{AudioFileError, MAX_ATL_NODES, wwise_id};
 
 /// A Wwise event an ATL trigger posts: its name and its short ID.
 ///
@@ -59,69 +59,24 @@ impl AtlTrigger {
     }
 }
 
-/// An element of text XML or `CryXml`, read alike and without copying.
-trait AtlNode<'a>: Copy {
-    fn name(self) -> &'a str;
-    fn attribute(self, name: &str) -> Option<&'a str>;
-    fn elements(self) -> impl Iterator<Item = Self>;
-}
-
-impl<'a> AtlNode<'a> for Element<'a> {
-    fn name(self) -> &'a str {
-        Element::name(self)
-    }
-
-    fn attribute(self, name: &str) -> Option<&'a str> {
-        Element::attribute(self, name)
-    }
-
-    fn elements(self) -> impl Iterator<Item = Self> {
-        self.children()
-    }
-}
-
-impl<'a, 'input: 'a> AtlNode<'a> for roxmltree::Node<'a, 'input> {
-    fn name(self) -> &'a str {
-        self.tag_name().name()
-    }
-
-    fn attribute(self, name: &str) -> Option<&'a str> {
-        roxmltree::Node::attribute(&self, name)
-    }
-
-    fn elements(self) -> impl Iterator<Item = Self> {
-        self.children().filter(roxmltree::Node::is_element)
-    }
-}
-
-/// Reads the audio triggers of an ATL definition in text XML or `CryXml`, marking each with the
-/// position `file` of its Entry; a document whose root is no `ATLConfig` holds none.
+/// Reads the audio triggers of an ATL definition in text XML or CryXml.
 pub(crate) fn parse(bytes: &[u8], file: u32) -> Result<Vec<AtlTrigger>, AudioFileError> {
-    let failed = |reason: String| AudioFileError::Atl { reason };
-    match p4kx_cryxml::read(bytes).map_err(|error| failed(error.to_string()))? {
-        Xml::CryXml(document) => Ok(triggers(document.root(), file)),
-        Xml::Text(text) => {
-            let text = std::str::from_utf8(text).map_err(|error| failed(error.to_string()))?;
-            let text = text.trim_start_matches('\u{feff}');
-            p4kx_cryxml::check_text_depth(text).map_err(|error| failed(error.to_string()))?;
-            let options = roxmltree::ParsingOptions {
-                nodes_limit: MAX_ATL_NODES,
-                ..roxmltree::ParsingOptions::default()
-            };
-            let document = roxmltree::Document::parse_with_options(text, options)
-                .map_err(|error| failed(error.to_string()))?;
-            Ok(triggers(document.root_element(), file))
-        }
-    }
+    let options = SourceReadOptions::default()
+        .with_text_node_limit(MAX_ATL_NODES)
+        .with_open_text_depth_limit(MAX_TEXT_DEPTH);
+    let source = SourceDocument::parse(bytes, options).map_err(|error| AudioFileError::Atl {
+        reason: error.to_string(),
+    })?;
+    Ok(triggers(source.root(), file))
 }
 
-fn triggers<'a, N: AtlNode<'a>>(root: N, file: u32) -> Vec<AtlTrigger> {
+fn triggers(root: SourceElement<'_>, file: u32) -> Vec<AtlTrigger> {
     if root.name() != "ATLConfig" {
         return Vec::new();
     }
     root.elements()
         .filter(|list| list.name() == "AudioTriggers")
-        .flat_map(AtlNode::elements)
+        .flat_map(SourceElement::elements)
         .filter(|trigger| trigger.name() == "ATLTrigger")
         .filter_map(|trigger| {
             let name = trigger
@@ -136,7 +91,7 @@ fn triggers<'a, N: AtlNode<'a>>(root: N, file: u32) -> Vec<AtlTrigger> {
         .collect()
 }
 
-fn events<'a, N: AtlNode<'a>>(trigger: N) -> Box<[WwiseEvent]> {
+fn events(trigger: SourceElement<'_>) -> Box<[WwiseEvent]> {
     trigger
         .elements()
         .filter(|event| event.name() == "WwiseEvent")
@@ -152,6 +107,5 @@ fn events<'a, N: AtlNode<'a>>(trigger: N) -> Box<[WwiseEvent]> {
                     .is_some_and(|value| value.eq_ignore_ascii_case("true")),
             })
         })
-        .take(MAX_TRIGGER_EVENTS)
         .collect()
 }

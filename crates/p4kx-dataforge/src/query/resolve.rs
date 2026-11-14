@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::query::reader::{Column, Elements, Reader, Select, Step, Walk};
 use crate::query::schema::{FieldDef, StructFields, ancestors_include, is_scalar};
-use crate::query::suggest::closest;
+use crate::query::suggest::{self, closest};
 use crate::query::syntax::{Name, Path, Segment};
 use crate::query::{QueryError, QueryErrorKind, Span};
 use crate::{DataType, ValueKind};
@@ -174,12 +174,23 @@ impl Resolver<'_, '_> {
         let index = self.struct_for(next)?;
         let structs = self.structs;
         let owner = structs.name(index).map(str::to_owned);
-        let Some(field) = structs.field(index, next.as_str()) else {
+        let Some(field) = structs
+            .field(index, next.as_str())
+            .map_err(|error| QueryError::new(QueryErrorKind::DataForge(error), next.span))?
+        else {
             return Err(QueryError::new(
                 QueryErrorKind::UnknownField {
                     name: next.as_str().to_owned(),
                     owner,
-                    suggestion: closest(next.as_str(), structs.field_names(index)),
+                    suggestion: suggest::closest_fallible(
+                        next.as_str(),
+                        structs.field_names(index).map_err(|error| {
+                            QueryError::new(QueryErrorKind::DataForge(error), next.span)
+                        })?,
+                    )
+                    .map_err(|error| {
+                        QueryError::new(QueryErrorKind::DataForge(error), next.span)
+                    })?,
                 },
                 next.span,
             ));

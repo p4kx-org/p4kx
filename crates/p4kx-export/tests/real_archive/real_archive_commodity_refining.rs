@@ -16,6 +16,8 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 #[expect(
@@ -26,39 +28,20 @@ fn print_line(line: &str) {
     println!("{line}");
 }
 
-fn at<'v>(value: &'v Value, name: &str) -> &'v Value {
-    value.get(name).unwrap_or(&Value::Null)
-}
-
 fn verify(path: &Path) -> TestResult {
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::real_archive_key()?))?;
     let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let commodities = at(&catalog, "commodities")
-        .as_array()
-        .ok_or("the commodities array")?;
-    let subtypes: HashSet<&str> = commodities
-        .iter()
-        .filter_map(|commodity| at(commodity, "subtypeGuid").as_str())
-        .collect();
-    let densities: Vec<f64> = commodities
-        .iter()
-        .filter_map(|commodity| at(commodity, "densityGramsPerCubicCentimetre").as_f64())
-        .collect();
-    let refined: Vec<&str> = commodities
-        .iter()
-        .filter_map(|commodity| at(commodity, "refinedSubtypeGuid").as_str())
-        .collect();
+    let commodities = catalog_v3_consumer::presentations(&catalog)?;
+    let Measurements {
+        subtypes,
+        densities,
+        refined,
+        own,
+    } = measurements(commodities)?;
     let dangling = refined
         .iter()
         .filter(|guid| !subtypes.contains(**guid))
-        .count();
-    let own = commodities
-        .iter()
-        .filter(|commodity| {
-            at(commodity, "refinedSubtypeGuid").is_string()
-                && at(commodity, "refinedSubtypeGuid") == at(commodity, "subtypeGuid")
-        })
         .count();
     let lowest = densities.iter().copied().fold(f64::INFINITY, f64::min);
     let highest = densities.iter().copied().fold(f64::NEG_INFINITY, f64::max);
@@ -79,6 +62,53 @@ fn verify(path: &Path) -> TestResult {
     assert!(!refined.is_empty(), "some commodity has a refined version");
     assert_eq!(own, 0, "no commodity is refined into itself");
     Ok(())
+}
+
+struct Measurements<'catalog> {
+    subtypes: HashSet<&'catalog str>,
+    densities: Vec<f64>,
+    refined: Vec<&'catalog str>,
+    own: usize,
+}
+
+fn measurements(commodities: &[Value]) -> Result<Measurements<'_>, Box<dyn Error>> {
+    let mut subtypes = HashSet::new();
+    let mut densities = Vec::new();
+    let mut refined = Vec::new();
+    let mut own = 0;
+    for commodity in commodities {
+        let subtype = catalog_v3_consumer::nullable_guid(
+            commodity.get("subtypeGuid").ok_or("subtype carrier")?,
+        )?;
+        if let Some(guid) = subtype {
+            subtypes.insert(guid);
+        }
+        let refinement = catalog_v3_consumer::nullable_guid(
+            commodity
+                .get("refinedSubtypeGuid")
+                .ok_or("refinement carrier")?,
+        )?;
+        if let Some(guid) = refinement {
+            refined.push(guid);
+            if subtype == Some(guid) {
+                own += 1;
+            }
+        }
+        let density = catalog_v3_consumer::present(
+            commodity
+                .get("densityGramsPerCubicCentimetre")
+                .ok_or("density carrier")?,
+        )?;
+        if !density.is_null() {
+            densities.push(density.as_f64().ok_or("nullable finite density")?);
+        }
+    }
+    Ok(Measurements {
+        subtypes,
+        densities,
+        refined,
+        own,
+    })
 }
 
 #[test]

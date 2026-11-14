@@ -160,7 +160,7 @@ fn a_play_event_action_follows_an_event_another_soundbank_holds() -> TestResult 
 }
 
 #[test]
-fn a_walk_reads_at_most_one_other_soundbank() -> TestResult {
+fn a_walk_follows_each_referenced_indexed_soundbank() -> TestResult {
     let bank = |name: &str, event: u32, sound: u32| {
         TestBank::new(wwise_short_id(name))
             .object(TestHircObject::event(event, &[2]))
@@ -175,14 +175,18 @@ fn a_walk_reads_at_most_one_other_soundbank() -> TestResult {
         ],
         &LanguageChoice::any(),
         |sounds| {
-            assert_eq!(names(&sounds), [(Some(7000), "First.bnk".to_owned())]);
-            let reasons: Vec<_> = sounds.breaks().iter().map(BrokenLink::reason).collect();
             assert_eq!(
-                reasons,
-                [&BreakReason::OtherSoundbank {
-                    id: 600,
-                    bank_id: wwise_short_id("Second")
-                }]
+                names(&sounds),
+                [
+                    (Some(7000), "First.bnk".to_owned()),
+                    (Some(7001), "Second.bnk".to_owned())
+                ],
+                "both original foreign terminals remain in authored branch order"
+            );
+            assert!(
+                sounds.breaks().is_empty(),
+                "all original indexed references resolve: {:?}",
+                sounds.breaks()
             );
             Ok(())
         },

@@ -5,74 +5,87 @@ use std::collections::{HashMap, HashSet};
 
 use p4kx_extraction::{Filter, Guid};
 
-use crate::blueprint::{Links, blueprint};
-use crate::contract::{
-    Blueprint, BlueprintPool, CraftingGlobal, DismantleProcess, GameplayProperty,
-    QualityDistribution, QualityQuantization,
-};
-use crate::contract_quantization::QuantizationBand;
-use crate::contract_recipe::BlueprintDismantle;
-use crate::contract_rewards::{LocationOverride, PoolEntry, QualityCurve, RewardSource};
-use crate::crafting::Crafting;
+use crate::CatalogError;
+use crate::Kind;
+use crate::blueprint_catalog_rows::{self, BlueprintRow};
+use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_read_failure::CatalogReadFailure;
+use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
+use crate::contract::{BlueprintPool, CraftingGlobal, DismantleProcess};
+use crate::contract_rewards::{PoolEntry, RewardSource};
+use crate::crafting::{Crafting, ReadCrafting};
 use crate::crafting_types as library;
 use crate::crafting_warning::CraftingWarning;
+use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
-use crate::selection::is_leftover;
-use crate::texts::Texts;
-use crate::{CatalogFailure, Kind, QuantizationSummary};
+use crate::quality_catalog::QualityRows;
 
-/// The kinds of the catalog that [`Crafting`] fills, each ordered by the text of the GUID.
+#[path = "crafting_ledger/catalog_rows.rs"]
+mod rows;
+
+/// Selected crafting and canonical source datasets in their documented GUID order.
 pub(crate) struct CraftingKinds<'f> {
-    pub(crate) blueprints: Vec<Blueprint<'f>>,
-    pub(crate) properties: Vec<GameplayProperty<'f>>,
-    pub(crate) distributions: Vec<QualityDistribution<'f>>,
-    pub(crate) quantizations: Vec<QualityQuantization<'f>>,
-    pub(crate) quantization_summary: QuantizationSummary,
+    pub(crate) blueprints: Vec<BlueprintRow<'f>>,
+    pub(crate) properties: Vec<GameplayPropertyDefinition<'f>>,
+    pub(crate) quality: QualityRows<'f>,
     pub(crate) pools: Vec<BlueprintPool<'f>>,
     pub(crate) dismantle: Vec<DismantleProcess<'f>>,
     pub(crate) global: CraftingGlobal,
     pub(crate) skipped: Vec<(Kind, usize)>,
-    pub(crate) failures: Vec<CatalogFailure>,
+    pub(crate) failures: Vec<CatalogReadFailure<'f>>,
     pub(crate) warnings: Vec<CraftingWarning>,
+    pub(crate) ledger: ExportLedger,
 }
 
-/// Maps `crafting` to the catalog kinds, its texts resolved by `texts`.
-///
-/// The blueprints and pools `crafting` read under the Filter are kept as they are; the
-/// properties, quality distributions and dismantle processes, which it reads whatever the Filter,
-/// are kept only when `filter` matches their record path. Development leftovers of these kinds
-/// are left out and counted, like those of every other kind.
+/// Combines canonical gameplay and quality facts with interpreted crafting datasets.
+/// Other crafting rows apply their own catalog Filter and development-leftover rules.
 pub(crate) fn kinds<'f>(
-    crafting: Crafting<'f>,
-    texts: &Texts<'f>,
+    read: ReadCrafting<'f>,
+    origins: &CatalogOrigins,
     filter: Option<&Filter>,
-) -> CraftingKinds<'f> {
-    let (properties, properties_skipped) = properties(&crafting, texts, filter);
-    let (distributions, distributions_skipped) = entities(
-        &crafting.quality_distributions,
-        filter,
-        |item| (item.record_path, item.class_name),
-        distribution,
-        |entity| entity.guid,
-    );
-    let (quantizations, quantizations_skipped, quantization_summary) =
-        quantizations(&crafting, filter);
+) -> Result<CraftingKinds<'f>, CatalogError> {
+    let ReadCrafting {
+        data: crafting,
+        blueprints,
+        blueprint_rules,
+        catalog_failures,
+        mut ledger,
+        gameplay,
+        quality,
+    } = read;
+    let mut selected = rows::Selection::new(filter, &mut ledger);
+    let properties = gameplay.definitions;
+    let properties_skipped = gameplay.skipped;
+    let distributions_skipped = quality.skipped_distributions;
+    let quantizations_skipped = quality.skipped_quantizations;
     let sources = sources_by_pool(&crafting.reward_sources);
-    let (pools, pools_skipped) = entities(
+    let (pools, pools_skipped) = selected.entities(
+        Kind::BlueprintPools,
         &crafting.pools,
-        filter,
-        |item| (item.record_path, item.class_name),
+        |item| (item.record_path, item.class_name, CatalogGuid(item.guid)),
         |source| pool(source, &sources),
         |entity| entity.guid,
     );
-    let (dismantle, dismantle_skipped) = dismantle(&crafting, filter);
+    let (dismantle, dismantle_skipped) = dismantle(&crafting, &mut selected);
     let kept: HashSet<Guid> = dismantle.iter().map(|process| process.guid.0).collect();
-    CraftingKinds {
-        blueprints: blueprints(&crafting, texts, &kept),
+    let process = crafting
+        .dismantle_process()
+        .map(|item| item.guid)
+        .filter(|guid| kept.contains(guid));
+    let mut blueprints = blueprints
+        .into_iter()
+        .map(|row| blueprint_catalog_rows::row(row, &blueprint_rules, process, origins))
+        .collect::<Result<Vec<_>, _>>()?;
+    blueprints.sort_by_cached_key(|row| {
+        (
+            row.definition.physical_guid.text(),
+            row.definition.physical_index,
+        )
+    });
+    Ok(CraftingKinds {
+        blueprints,
         properties,
-        distributions,
-        quantizations,
-        quantization_summary,
+        quality,
         pools,
         dismantle,
         global: global(&crafting.global),
@@ -84,38 +97,20 @@ pub(crate) fn kinds<'f>(
             (Kind::BlueprintPools, pools_skipped),
             (Kind::DismantleProcesses, dismantle_skipped),
         ],
-        failures: crafting.failures,
+        failures: catalog_failures,
         warnings: crafting.warnings,
-    }
-}
-
-fn properties<'f>(
-    crafting: &Crafting<'f>,
-    texts: &Texts<'f>,
-    filter: Option<&Filter>,
-) -> (Vec<GameplayProperty<'f>>, usize) {
-    entities(
-        &crafting.properties,
-        filter,
-        |item| (item.record_path, item.class_name),
-        |source| GameplayProperty {
-            guid: CatalogGuid(source.guid),
-            class_name: source.class_name,
-            record_path: source.record_path,
-            name: texts.localised(source.name_key),
-        },
-        |entity| entity.guid,
-    )
+        ledger,
+    })
 }
 
 fn dismantle<'f>(
     crafting: &Crafting<'f>,
-    filter: Option<&Filter>,
+    selected: &mut rows::Selection<'_>,
 ) -> (Vec<DismantleProcess<'f>>, usize) {
-    entities(
+    selected.entities(
+        Kind::DismantleProcesses,
         &crafting.dismantle,
-        filter,
-        |item| (item.record_path, item.class_name),
+        |item| (item.record_path, item.class_name, CatalogGuid(item.guid)),
         |source| DismantleProcess {
             guid: CatalogGuid(source.guid),
             class_name: source.class_name,
@@ -125,94 +120,6 @@ fn dismantle<'f>(
         },
         |entity| entity.guid,
     )
-}
-
-/// Returns the quality quantizations the Filter keeps, the number of leftovers, and the counts of
-/// the Records no `ResourceType` uses and of the links that reach no kept Record.
-fn quantizations<'f>(
-    crafting: &Crafting<'f>,
-    filter: Option<&Filter>,
-) -> (Vec<QualityQuantization<'f>>, usize, QuantizationSummary) {
-    let (kept, skipped) = entities(
-        &crafting.quality_quantizations,
-        filter,
-        |item| (item.record_path, item.class_name),
-        quantization,
-        |entity| entity.guid,
-    );
-    let leftover_links: usize = crafting
-        .quality_quantizations
-        .iter()
-        .filter(|item| filter.is_none_or(|filter| filter.matches(item.record_path)))
-        .filter(|item| is_leftover(item.record_path, item.class_name))
-        .map(|item| item.resource_types.len())
-        .sum();
-    let summary = QuantizationSummary {
-        unused: kept
-            .iter()
-            .filter(|entity| entity.resource_type_guids.is_empty())
-            .count(),
-        unresolved_links: crafting
-            .unresolved_quantization_links
-            .saturating_add(leftover_links),
-    };
-    (kept, skipped, summary)
-}
-
-/// Returns the entities `make` builds from the `items` whose record path `filter` matches and
-/// that are no development leftover, ordered by the text of the GUID `guid` gives, and the
-/// number of leftovers.
-fn entities<T, E>(
-    items: &[T],
-    filter: Option<&Filter>,
-    names: impl Fn(&T) -> (&str, &str),
-    make: impl Fn(&T) -> E,
-    guid: impl Fn(&E) -> CatalogGuid,
-) -> (Vec<E>, usize) {
-    let mut built = Vec::with_capacity(items.len());
-    let mut skipped = 0_usize;
-    for item in items {
-        let (path, class_name) = names(item);
-        if filter.is_some_and(|filter| !filter.matches(path)) {
-            continue;
-        }
-        if is_leftover(path, class_name) {
-            skipped = skipped.saturating_add(1);
-        } else {
-            built.push(make(item));
-        }
-    }
-    built.sort_by_cached_key(|entity| guid(entity).text());
-    (built, skipped)
-}
-
-/// Returns the blueprints of `crafting`; one links a dismantle process only when that process is
-/// among the `kept` ones, so the link never points at a process the catalog leaves out.
-fn blueprints<'f>(
-    crafting: &Crafting<'f>,
-    texts: &Texts<'f>,
-    kept: &HashSet<Guid>,
-) -> Vec<Blueprint<'f>> {
-    let defaults: HashSet<Guid> = crafting.global.default_blueprints.iter().copied().collect();
-    let mut blueprints: Vec<Blueprint<'f>> = crafting
-        .blueprints
-        .iter()
-        .map(|source| {
-            let links = Links {
-                default_available: defaults.contains(&source.guid),
-                dismantle: crafting
-                    .dismantle_return(source)
-                    .filter(|link| kept.contains(&link.process.guid))
-                    .map(|link| BlueprintDismantle {
-                        process_guid: CatalogGuid(link.process.guid),
-                        tier_index: link.tier.and_then(|tier| u32::try_from(tier).ok()),
-                    }),
-            };
-            blueprint(source, texts, links)
-        })
-        .collect();
-    blueprints.sort_by_cached_key(|entity| entity.guid.text());
-    blueprints
 }
 
 fn global(source: &library::GlobalParams) -> CraftingGlobal {
@@ -269,57 +176,5 @@ fn pool<'f>(
             })
             .collect(),
         reward_sources,
-    }
-}
-
-fn distribution<'f>(source: &library::QualityDistribution<'f>) -> QualityDistribution<'f> {
-    QualityDistribution {
-        guid: CatalogGuid(source.guid),
-        class_name: source.class_name,
-        record_path: source.record_path,
-        distribution: source.distribution.as_ref().map(curve),
-        overrides: source
-            .overrides
-            .iter()
-            .map(|over| LocationOverride {
-                location_guid: over.location.map(CatalogGuid),
-                distribution: over.distribution.as_ref().map(curve),
-            })
-            .collect(),
-    }
-}
-
-fn quantization<'f>(source: &library::QualityQuantization<'f>) -> QualityQuantization<'f> {
-    let mut resource_type_guids: Vec<CatalogGuid> = source
-        .resource_types
-        .iter()
-        .copied()
-        .map(CatalogGuid)
-        .collect();
-    resource_type_guids.sort_by_cached_key(|guid| guid.text());
-    QualityQuantization {
-        guid: CatalogGuid(source.guid),
-        class_name: source.class_name,
-        record_path: source.record_path,
-        bands: source
-            .bands
-            .iter()
-            .map(|band| QuantizationBand {
-                start: band.start,
-                end: band.end,
-                mapped_value: band.mapped_value,
-            })
-            .collect(),
-        resource_type_guids,
-    }
-}
-
-const fn curve<'f>(source: &library::QualityCurve<'f>) -> QualityCurve<'f> {
-    QualityCurve {
-        kind: source.kind,
-        min: source.min,
-        max: source.max,
-        mean: source.mean,
-        stddev: source.stddev,
     }
 }

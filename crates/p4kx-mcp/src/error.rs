@@ -2,13 +2,20 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::error::Error;
+use std::fmt::Error as FormatError;
 use std::path::PathBuf;
 
 use p4kx_assembly::{ChangeError, EntityLookupError, LoadoutError};
+use p4kx_extraction::ChunkEvidenceError;
 use p4kx_extraction::model::MaterialError;
-use p4kx_extraction::{ArchiveError, ConversionError, DataForgeError, EntryReadError, FilterError};
+use p4kx_extraction::query::SelectionError;
+use p4kx_extraction::{
+    ArchiveError, ConversionError, DataForgeError, EntryReadError, FilterError, SourceEvidenceError,
+};
 use p4kx_settings::{KeyChoiceError, SettingsError};
 use thiserror::Error;
+
+use crate::model_item_page::EvidenceError as ModelEvidenceError;
 
 /// A tool call that cannot be answered; its message goes back to the client as a tool error.
 #[derive(Debug, Error)]
@@ -85,6 +92,37 @@ pub(crate) enum ToolError {
     /// ask for less.
     #[error("{0}")]
     Refused(String),
+    /// The image preview's original input evidence could not be retained.
+    #[error("cannot retain the image preview source evidence")]
+    ImageEvidence(#[from] SourceEvidenceError),
+    /// The Entry read's original input evidence could not be retained.
+    #[error("cannot retain the Entry read source evidence")]
+    EntryEvidence(#[source] SourceEvidenceError),
+    /// The cached Archive layout's original source evidence could not be retained.
+    #[error("cannot retain the Archive layout source evidence")]
+    ArchiveLayoutEvidence(#[from] p4kx_extraction::ArchiveLayoutOriginError),
+    /// The Entry listing's original directory evidence could not be retained.
+    #[error("cannot retain the Entry listing source evidence")]
+    EntryListingEvidence(#[from] crate::entry_directory_origins::EvidenceError),
+    /// The emitted material field could not be linked to its original input.
+    #[error("cannot retain the material source evidence")]
+    MaterialEvidence(#[from] crate::material_origin::EvidenceError),
+    /// The original material input failed before a field could be projected.
+    #[error("cannot read the material library at `{path}`")]
+    MaterialRead {
+        path: String,
+        #[source]
+        source: Box<crate::material_origin::MaterialObservationFailure>,
+    },
+    /// The chunk table's original input or field addresses could not be retained.
+    #[error("cannot retain the chunk table source evidence")]
+    ChunkEvidence(#[from] ChunkEvidenceError),
+    /// A model field's source evidence could not be represented.
+    #[error("cannot retain the model field source evidence")]
+    ModelEvidence(#[from] ModelEvidenceError),
+    /// A DataForge field's original input or address could not be retained.
+    #[error("cannot retain the DataForge field evidence")]
+    ForgeEvidence(#[from] crate::forge_origins::EvidenceError),
     /// A material library cannot be read.
     #[error("cannot read the material library {path}")]
     Material {
@@ -196,6 +234,9 @@ pub(crate) enum ToolError {
         "selecting the Records was stopped after at most {0} seconds or by the client; narrow the Query with `from`, `at` or `where`"
     )]
     QueryStopped(u64),
+    /// A demanded Query value cannot be read to decide the selection.
+    #[error("cannot select the Records of the Query")]
+    QuerySelection(#[from] SelectionError),
     /// No ATL definition has the audio trigger.
     #[error("no ATL definition has the audio trigger `{0}`; search_audio_triggers finds triggers")]
     UnknownTrigger(String),
@@ -215,8 +256,10 @@ pub(crate) enum ToolError {
     /// No soundbank embeds the WEM and no loose WEM Entry has its ID.
     #[error("no soundbank embeds the WEM {0} and no loose WEM Entry has that ID")]
     UnknownWem(u32),
-    /// Only the prefetched start of the WEM is in the Archive.
-    #[error("the Archive holds only the prefetched start of the WEM {0}, which cannot be decoded")]
+    /// The indexed locations contain only the prefetched start of this WEM.
+    #[error(
+        "the indexed locations hold only the prefetched start of the WEM {0}, which cannot be decoded"
+    )]
     PrefetchOnly(u32),
     /// The soundbank Entry is larger than the audio tools read.
     #[error("the soundbank {path} is larger than the {limit} bytes the audio tools read")]
@@ -252,6 +295,13 @@ pub(crate) enum ToolError {
     /// A result is not valid UTF-8.
     #[error("the result is not valid UTF-8")]
     Utf8(#[from] std::string::FromUtf8Error),
+    /// A response text formatter failed independently of the response budget.
+    #[error("cannot format response text")]
+    ResponseTextFormat {
+        /// The original formatter failure.
+        #[source]
+        source: FormatError,
+    },
     /// A result cannot be written.
     #[error("cannot write the result")]
     Write(#[from] std::io::Error),

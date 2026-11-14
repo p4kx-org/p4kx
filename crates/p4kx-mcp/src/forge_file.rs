@@ -5,11 +5,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use p4kx_extraction::{DataForge, DataForgeSource, FileStamp};
+use p4kx_extraction::{DataForge, DataForgeOrigin, DataForgeSource, FileStamp};
 
 use crate::archives::Opened;
 use crate::error::ToolError;
 use crate::forge_state::ForgeState;
+use crate::query_selection_sources::SelectionReceipt;
 
 /// A DataForge file on disk, such as a `Game2.dcb`, with its DataForge read on first use and
 /// kept while the file stays unchanged.
@@ -66,15 +67,17 @@ impl ForgeSource {
     }
 
     /// Runs `work` against the DataForge with the input path as text, reading the DataForge on
-    /// first use.
-    pub(crate) fn with_dataforge<T, F>(&self, work: F) -> Result<T, ToolError>
+    /// Runs work against the DataForge with the original input kept by its worker.
+    pub(crate) fn with_dataforge_origin<T, F>(&self, work: F) -> Result<T, ToolError>
     where
         T: Send + 'static,
-        F: FnOnce(&DataForge<'_>, String) -> Result<T, ToolError> + Send + 'static,
+        F: FnOnce(&DataForge<'_>, String, &DataForgeOrigin) -> Result<T, ToolError>
+            + Send
+            + 'static,
     {
         match self {
-            Self::Archive(opened) => opened.with_dataforge(work),
-            Self::File(file) => file.forge.with(
+            Self::Archive(opened) => opened.with_dataforge_origin(work),
+            Self::File(file) => file.forge.with_origin(
                 || file.forge_source().load(),
                 file.path.display().to_string(),
                 work,
@@ -91,7 +94,7 @@ impl ForgeSource {
     }
 
     /// Returns the selection of the last Query run if it was of `query`.
-    pub(crate) fn selection(&self, query: &str) -> Option<Arc<[u32]>> {
+    pub(crate) fn selection(&self, query: &str) -> Option<Arc<SelectionReceipt>> {
         match self {
             Self::Archive(opened) => opened.selection(query),
             Self::File(file) => file.forge.selection(query),
@@ -99,7 +102,7 @@ impl ForgeSource {
     }
 
     /// Keeps `records` as the selection of the last Query run, which was of `query`.
-    pub(crate) fn keep_selection(&self, query: &str, records: Arc<[u32]>) {
+    pub(crate) fn keep_selection(&self, query: &str, records: Arc<SelectionReceipt>) {
         match self {
             Self::Archive(opened) => opened.keep_selection(query, records),
             Self::File(file) => file.forge.keep_selection(query, records),

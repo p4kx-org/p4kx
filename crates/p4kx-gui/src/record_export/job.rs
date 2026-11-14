@@ -13,7 +13,9 @@ use std::time::SystemTime;
 use p4kx_export::{
     CancelToken, ConflictPolicy, RecordExportOptions, RecordForm, write_planned_record_export,
 };
-use p4kx_extraction::{Filter, Record, TagResolver, create_default_target};
+use p4kx_extraction::{
+    ArchiveWriteProtection, Filter, Record, TagResolver, create_default_target_protected,
+};
 use rayon::prelude::*;
 
 use super::RecordExportSummary;
@@ -166,6 +168,7 @@ pub(crate) fn start(
     index: &Arc<EntryIndex>,
     request: Request,
     wake: impl Fn() + Send + 'static,
+    #[cfg(feature = "test-hooks")] pause: crate::hold::Pause,
 ) -> RecordExport {
     static NEXT_ID: AtomicU64 = AtomicU64::new(0);
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
@@ -185,6 +188,8 @@ pub(crate) fn start(
                 request: &request,
                 cancel: &thread_cancel,
                 shared: &thread_shared,
+                #[cfg(feature = "test-hooks")]
+                pause,
             };
             if sender.send(job.run()).is_ok() {
                 wake();
@@ -209,6 +214,8 @@ struct Job<'a> {
     request: &'a Request,
     cancel: &'a CancelToken,
     shared: &'a Shared,
+    #[cfg(feature = "test-hooks")]
+    pause: crate::hold::Pause,
 }
 
 impl Job<'_> {
@@ -235,9 +242,22 @@ impl Job<'_> {
             ));
         }
         let tags = tags.flatten();
-        let target = prepare_target(self.index, self.request).map_err(|error| describe(&error))?;
+        let cancelled =
+            || RecordExportSummary::nothing_written(self.request.form, records.len(), true);
+        let protection = match ArchiveWriteProtection::new(self.index.path(), self.cancel.flag()) {
+            Ok(protection) => protection,
+            Err(error) if error.is_cancelled() => return Ok(cancelled()),
+            Err(error) => return Err(describe(&error)),
+        };
+        let target = match prepare_target(self.index, self.request, &protection, self.cancel) {
+            Ok(target) => target,
+            Err(error) if crate::installation::guard_cancelled(&error) => return Ok(cancelled()),
+            Err(error) => return Err(describe(&error)),
+        };
         self.shared.total.store(records.len(), Ordering::Relaxed);
         self.shared.enter(RecordExportStage::Writing);
+        #[cfg(feature = "test-hooks")]
+        self.pause.wait(|| self.cancel.is_cancelled());
         let progress = || {
             self.shared.done.fetch_add(1, Ordering::Relaxed);
         };
@@ -247,6 +267,7 @@ impl Job<'_> {
             progress: Some(&progress),
             texts: None,
             tags: tags.as_deref().map(|tags| tags as &dyn TagResolver),
+            protection: Some(&protection),
         };
         let summary = write_planned_record_export(
             &forge,
@@ -292,20 +313,32 @@ fn select<'f>(all: &[Record<'f>], selection: &Selection) -> Vec<Record<'f>> {
     }
 }
 
-fn prepare_target(index: &EntryIndex, request: &Request) -> io::Result<PathBuf> {
-    crate::installation::refuse(&request.folder)?;
+fn prepare_target(
+    index: &EntryIndex,
+    request: &Request,
+    protection: &ArchiveWriteProtection,
+    cancel: &CancelToken,
+) -> io::Result<PathBuf> {
+    protection
+        .ensure_writable(&request.folder, cancel.flag())
+        .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
     match request.kind {
         TargetKind::ExistingFolder => {
             fs::create_dir_all(&request.folder)?;
+            protection
+                .ensure_writable(&request.folder, cancel.flag())
+                .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
             Ok(request.folder.clone())
         }
         TargetKind::NewFolder => {
             let (channel, build) = target_naming(index.path(), index.build_of_archive());
-            create_default_target(
+            create_default_target_protected(
                 &request.folder,
                 channel.as_deref(),
                 build,
                 SystemTime::now(),
+                protection,
+                cancel,
             )
         }
     }

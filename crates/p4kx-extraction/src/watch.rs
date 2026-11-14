@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs;
+use std::fs::{self, Metadata};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -50,10 +50,14 @@ impl FileStamp {
     /// Returns the error of looking at the file.
     pub fn of(path: &Path) -> io::Result<Self> {
         let metadata = fs::metadata(path)?;
-        Ok(Self {
+        Ok(Self::from_metadata(&metadata))
+    }
+
+    pub(crate) fn from_metadata(metadata: &Metadata) -> Self {
+        Self {
             len: metadata.len(),
             modified: metadata.modified().ok(),
-        })
+        }
     }
 
     /// Returns the size of the file in bytes.

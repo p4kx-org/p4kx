@@ -7,26 +7,27 @@ use std::collections::{HashMap, HashSet};
 use p4kx_archive::{Archive, Entry};
 use p4kx_audio::MusicStinger;
 use p4kx_extraction::CancelToken;
+use p4kx_extraction::sound::wwise_path;
 
 use super::index_read::{BankRead, DefinitionRead, read_definitions, read_soundbanks};
 use super::language::SOUND_FOLDER;
-use super::media::{Limits, LooseMedia, WemSource};
+use super::media::{BankPath, Limits, LooseMedia, WemSource};
 use super::read::{folded_order, has_extension, starts_with_folder};
 use super::{
-    ATL_FOLDER, AtlTrigger, AudioFileError, AudioIssue, DEFAULT_LANGUAGE, IndexedSoundbank,
-    MAX_AUDIO_TRIGGERS, MAX_STINGERS, WemLocation,
+    AtlTrigger, AudioFileError, AudioIssue, DEFAULT_LANGUAGE, IndexedSoundbank, MAX_AUDIO_TRIGGERS,
+    WemLocation,
 };
 
 /// The audio data of one Archive: every ATL trigger with its Wwise events, and for every Wwise
 /// event ID the soundbanks whose `HIRC` section holds the event.
 ///
-/// [`AudioIndex::build`] reads the ATL definitions below [`ATL_FOLDER`] and every `.bnk` Entry
+/// [`AudioIndex::build`] reads the ATL definitions below [`super::ATL_FOLDER`] and every `.bnk` Entry
 /// once, in parallel; an Entry that cannot be read is left out and kept as an [`AudioIssue`].
 /// Triggers are looked up by name ignoring ASCII case, events by ID; when several definitions
 /// name the same trigger, the first by Entry path wins.
 #[derive(Debug, Default)]
 pub struct AudioIndex {
-    atl_files: Vec<Box<str>>,
+    atl_files: Vec<DefinitionEntry>,
     triggers: Vec<AtlTrigger>,
     by_name: HashMap<Box<str>, usize>,
     soundbanks: Vec<IndexedSoundbank>,
@@ -36,6 +37,12 @@ pub struct AudioIndex {
     media: HashMap<u32, Box<[MediaSpot]>>,
     loose: LooseMedia,
     issues: Vec<AudioIssue>,
+}
+
+#[derive(Debug)]
+struct DefinitionEntry {
+    path: Box<str>,
+    position: usize,
 }
 
 impl AudioIndex {
@@ -50,12 +57,11 @@ impl AudioIndex {
     /// then.
     #[must_use]
     pub fn build_until(archive: &Archive, cancel: &CancelToken) -> Option<Self> {
-        let mut atl_entries: Vec<&Entry> = archive
+        let mut atl_entries: Vec<(usize, &Entry)> = archive
             .entries()
             .iter()
-            .filter(|entry| {
-                starts_with_folder(entry.path(), ATL_FOLDER) && has_extension(entry.path(), "xml")
-            })
+            .enumerate()
+            .filter(|(_, entry)| wwise_path::is_atl_definition(entry.path()))
             .collect();
         let mut bank_entries: Vec<(usize, &Entry)> = archive
             .entries()
@@ -76,7 +82,7 @@ impl AudioIndex {
                 len: entry.uncompressed_size(),
             })
             .collect();
-        atl_entries.sort_by(|a, b| folded_order(a.path(), b.path()));
+        atl_entries.sort_by(|(_, a), (_, b)| folded_order(a.path(), b.path()));
         bank_entries.sort_by(|(_, a), (_, b)| folded_order(a.path(), b.path()));
         wem_entries.sort_by(|a, b| folded_order(a.path, b.path));
         let definitions = read_definitions(archive, &atl_entries, cancel)?;
@@ -86,7 +92,10 @@ impl AudioIndex {
         index.add_soundbanks(&bank_entries, soundbanks);
         let (loose, failures) = LooseMedia::collect(
             wem_entries.iter().copied(),
-            bank_entries.iter().map(|(_, entry)| entry.path()),
+            bank_entries.iter().map(|&(position, entry)| BankPath {
+                path: entry.path(),
+                entry: position,
+            }),
             Limits::DEFAULT,
         );
         index.loose = loose;
@@ -98,9 +107,15 @@ impl AudioIndex {
         Some(index)
     }
 
-    fn add_definitions(&mut self, entries: &[&Entry], definitions: Vec<DefinitionRead>) {
-        self.atl_files = entries.iter().map(|entry| entry.path().into()).collect();
-        for (entry, definition) in entries.iter().zip(definitions) {
+    fn add_definitions(&mut self, entries: &[(usize, &Entry)], definitions: Vec<DefinitionRead>) {
+        self.atl_files = entries
+            .iter()
+            .map(|&(position, entry)| DefinitionEntry {
+                path: entry.path().into(),
+                position,
+            })
+            .collect();
+        for ((_, entry), definition) in entries.iter().zip(definitions) {
             let error = match definition {
                 Ok(triggers) => self.add_triggers(triggers).err(),
                 Err(error) => Some(error),
@@ -188,8 +203,21 @@ impl AudioIndex {
     /// trigger of another index.
     #[must_use]
     pub fn definition_path(&self, trigger: &AtlTrigger) -> Option<&str> {
-        let file = usize::try_from(trigger.file).ok()?;
-        self.atl_files.get(file).map(|path| &**path)
+        self.definition_file(trigger).map(|(path, _)| path)
+    }
+
+    /// Returns the Archive position of the Entry that defines this admitted trigger.
+    #[must_use]
+    pub fn definition_entry_position(&self, trigger: &AtlTrigger) -> Option<usize> {
+        self.definition_file(trigger).map(|(_, position)| position)
+    }
+
+    pub(super) fn definition_file(&self, trigger: &AtlTrigger) -> Option<(&str, usize)> {
+        if !std::ptr::eq(self.trigger(trigger.name())?, trigger) {
+            return None;
+        }
+        let file = self.atl_files.get(usize::try_from(trigger.file).ok()?)?;
+        Some((&file.path, file.position))
     }
 
     /// Returns every soundbank that was parsed, in path order.
@@ -247,6 +275,12 @@ impl AudioIndex {
         self.loose.language_of(name)
     }
 
+    /// Returns the original Entry supplying the displayed spelling of a language folder.
+    #[must_use]
+    pub fn language_entry_position(&self, name: &str) -> Option<usize> {
+        self.loose.language_entry_position(name)
+    }
+
     /// Returns the language folder `English(US)`, the game's default, or the first language folder
     /// when the Archive holds none of that name, or `None` when it holds no language folder.
     #[must_use]
@@ -293,9 +327,6 @@ struct StingerList {
 impl StingerList {
     fn add(&mut self, bank: u32, stingers: &[MusicStinger]) {
         for stinger in stingers {
-            if self.seen.len() >= MAX_STINGERS {
-                return;
-            }
             let found = Stinger {
                 bank,
                 segment_id: stinger.segment_id,
@@ -337,16 +368,25 @@ mod tests {
     }
 
     #[test]
-    fn a_crafted_bank_cannot_grow_the_stinger_list_past_the_cap() {
-        let crafted: Vec<MusicStinger> = (0..2 * u32::try_from(MAX_STINGERS).unwrap_or(0))
-            .map(|number| stinger(number, 1))
-            .collect();
+    fn all_distinct_stinger_tuples_survive_multiple_banks() {
+        let crafted: Vec<MusicStinger> = (0..524_288).map(|number| stinger(number, 1)).collect();
         let mut list = StingerList::default();
         list.add(0, &crafted);
         list.add(1, &crafted);
-        assert_eq!(list.seen.len(), MAX_STINGERS);
-        assert_eq!(list.found.len(), MAX_STINGERS);
-        assert!(list.found.values().all(|found| found.len() == 1));
+        assert_eq!(
+            list.seen.len(),
+            2 * crafted.len(),
+            "every distinct bank tuple is retained"
+        );
+        assert_eq!(
+            list.found.len(),
+            crafted.len(),
+            "all original trigger identities survive"
+        );
+        assert!(
+            list.found.values().all(|found| found.len() == 2),
+            "each trigger keeps both distinct bank declarations"
+        );
     }
 
     #[test]

@@ -1,20 +1,33 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, DataForge, Filter, RecordTree, StructValue, TagTree};
+use std::cell::RefCell;
+
+use p4kx_extraction::{
+    CancelToken, DataForge, Filter, RecordTree, SourcedValue, StructValue, TagTree,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::CatalogError;
 use crate::blueprint::as_struct;
+use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_number_capture::CapturedNumber;
+use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_v3::location_classification::configuration::{
+    self, MissionLocationConfiguration,
+};
+use crate::catalog_v3::location_classification::{self, LocationClassification};
 use crate::contract::{LocalisedText, every_field_required};
 use crate::guid_text::CatalogGuid;
 use crate::mission_layers::{items, key, one};
 use crate::record_fields::{boolean, class_name, reference};
-use crate::record_read::{KindRead, read_kind};
+use crate::record_observation::RecordObservation;
+use crate::record_read::{KindRead, ReadError, RecordProjection, read_kind_with_notes};
 use crate::selection::Kind;
 use crate::spawn_model::{TagPaths, TagTerm};
 use crate::spawn_read::Reader;
+use crate::template_field_capture::TemplateFieldCapture;
 use crate::texts::Texts;
 
 /// A mission location template: a `MissionLocationTemplate` Record under
@@ -31,6 +44,11 @@ pub(crate) struct MissionLocationTemplate<'a> {
     pub(crate) record_path: &'a str,
     /// The `disabled` flag of the location data, `null` when absent.
     pub(crate) disabled: Option<bool>,
+    /// The original classification of the location data.
+    classification: SourcedValue<LocationClassification<'a>>,
+    configuration: SourcedValue<MissionLocationConfiguration<'a>>,
+    #[serde(skip)]
+    pub(crate) configuration_numbers: Vec<CapturedNumber>,
     /// The `isSecurityNetworkHost` flag, `null` when absent.
     pub(crate) is_security_network_host: Option<bool>,
     /// The `generalTags`: what the queries of `contractLocationQueries` match.
@@ -61,7 +79,7 @@ pub(crate) struct LocationName<'a> {
 }
 
 /// The location templates of a DataForge and what was left out.
-pub(crate) type LocationTemplates<'f> = KindRead<MissionLocationTemplate<'f>>;
+pub(crate) type LocationTemplates<'f> = KindRead<'f, MissionLocationTemplate<'f>>;
 
 /// Reads the `MissionLocationTemplate` Records `filter` matches, ordered by GUID; a development
 /// leftover is left out and counted.
@@ -71,32 +89,47 @@ pub(crate) type LocationTemplates<'f> = KindRead<MissionLocationTemplate<'f>>;
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
 pub(crate) fn read<'f>(
     forge: &'f DataForge<'f>,
+    input: &OriginalCatalogInput<'_, 'f>,
     texts: &Texts<'f>,
     tags: &TagTree,
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
 ) -> Result<LocationTemplates<'f>, CatalogError> {
-    read_kind(
+    read_kind_with_notes(
         forge,
+        input,
         Kind::MissionLocationTemplates,
         (filter, cancel),
-        |tree| Ok(template(tree, texts, tags)),
+        |admission, tree| template(input, admission, tree, texts, tags, cancel),
         |template| template.guid,
     )
 }
 
 fn template<'f>(
+    input: &OriginalCatalogInput<'_, 'f>,
+    admission: &RecordObservation<'_, 'f>,
     tree: &RecordTree<'f>,
     texts: &Texts<'f>,
     tags: &TagTree,
-) -> MissionLocationTemplate<'f> {
-    let reader = Reader::new(tags, tree.root());
+    cancel: Option<&CancelToken>,
+) -> Result<RecordProjection<MissionLocationTemplate<'f>>, ReadError> {
+    let scope = input.record_scope(admission.record(), tree)?;
+    let fields = OriginalFlowFields::read(&scope, cancel)?;
+    let capture = TemplateFieldCapture::new(&fields, input, admission)?;
+    let reader = Reader::for_observed(tags, tree, &capture)?;
     let data = one(Some(tree.root()), "locationData");
-    MissionLocationTemplate {
+    let mut notes = Vec::new();
+    let classification = location_classification::read(&fields, input, &capture, &mut notes)?;
+    let numbers = RefCell::default();
+    let configuration = configuration::read(&fields, input, &capture, &numbers, &mut notes)?;
+    let value = MissionLocationTemplate {
         guid: CatalogGuid(tree.guid()),
         class_name: class_name(tree),
         record_path: tree.record_path(),
         disabled: boolean(data, "disabled"),
+        classification,
+        configuration,
+        configuration_numbers: numbers.into_inner(),
         is_security_network_host: boolean(data, "isSecurityNetworkHost"),
         tags: reader.tag_list(data, "generalTags"),
         produces_tags: term(&reader, data, "producesTags"),
@@ -104,10 +137,15 @@ fn template<'f>(
         ai_spawn_tags: reader.tag_list(data, "aiSpawnTags"),
         names: names(&reader, texts, data),
         entity_cluster_member_guid: reference(data, "entityClusterMember"),
-    }
+    };
+    Ok(RecordProjection { value, notes })
 }
 
-fn term(reader: &Reader<'_, '_>, data: Option<&StructValue<'_>>, name: &str) -> TagTerm {
+fn term<'source>(
+    reader: &Reader<'_, 'source>,
+    data: Option<&StructValue<'source>>,
+    name: &str,
+) -> TagTerm {
     let term = one(data, name);
     TagTerm {
         positive_tags: reader.tag_array(term, "positiveTags"),

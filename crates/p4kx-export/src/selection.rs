@@ -1,32 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForgeError, Filter, Record};
-
 pub use crate::selection_rules::KindRule;
 pub(crate) use crate::selection_rules::starts_with_folder;
 
-/// The tokens that mark a development leftover: a Record whose record path or name holds one of
-/// them as a whole word, ignoring ASCII case, is left out and counted as skipped.
-///
-/// Words are the runs of ASCII letters and digits, so `paint_test_01` holds `test` while
-/// `contestant` does not.
-pub const EXCLUDED_TOKENS: [&str; 6] = ["test", "template", "dummy", "debug", "deprecated", "dev"];
+mod blueprint_selection;
+mod names;
+mod record_leftovers;
 
-/// The leftover tokens of a contract template: [`EXCLUDED_TOKENS`] without `template`, which
-/// live templates such as `handyman_template` carry.
-const CONTRACT_TEMPLATE_EXCLUDED_TOKENS: [&str; 5] =
-    ["test", "dummy", "debug", "deprecated", "dev"];
+pub(crate) use blueprint_selection::{BlueprintSelection, selects_blueprint};
 
-/// The extra tokens of a leftover ship.
-///
-/// A Record of the ships kind whose record path or name holds one of them as a whole word, ignoring
-/// ASCII case, is left out and counted as skipped, as for [`EXCLUDED_TOKENS`]. The other kinds keep
-/// their `display` and `temp` Records.
-pub const SHIP_EXCLUDED_TOKENS: [&str; 3] = ["temp", "display", "hijacked"];
+pub(crate) use record_leftovers::is_leftover;
+pub use record_leftovers::{EXCLUDED_TOKENS, SHIP_EXCLUDED_TOKENS, is_kind_leftover};
 
 /// A kind of entity in the Basetool catalog.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 #[non_exhaustive]
 pub enum Kind {
     /// Manufacturers: `SCItemManufacturer` Records.
@@ -84,8 +74,7 @@ pub enum Kind {
     /// Harvestable provider presets: `HarvestableProviderPreset` Records under
     /// `harvestable/providerpresets`.
     HarvestableProviderPresets,
-    /// Sub harvestable multi configs: `SubHarvestableMultiConfigRecord` Records under
-    /// `harvestable/slotpresets`.
+    /// Physical `SubHarvestableMultiConfigRecord` Records.
     SubHarvestableMultiConfigs,
     /// Harvestable locations: the containers whose `.soc` names a provider preset, with the
     /// starmap object they hang below. Derived from the system containers, so no record-path rule
@@ -114,6 +103,18 @@ pub enum Kind {
     LootArchetypes,
     /// Loot pool filters: `PoolFilterRecord` Records under `lootgeneration/filters`.
     LootPoolFilters,
+    /// Physical Loot V3 secondary single-layer choice Records.
+    LootSecondaryChoiceSingleLayers,
+    /// Physical Loot V3 secondary multi-layer choice Records.
+    LootSecondaryChoiceMultiLayers,
+    /// Physical Loot theme Records.
+    LootThemes,
+    /// Physical Hierarchical Contextual Data preset Records.
+    HierarchicalContextualDataPresets,
+    /// Physical Loot Generation global parameter Records.
+    LootGenerationGlobalParams,
+    /// Physical `SubHarvestableConfigRecord` Records.
+    SubHarvestableConfigs,
     /// Loot containers: the containers whose placing entity carries a multi config, read from the
     /// entity files of the containers below the system containers. Derived from Archive files, so
     /// no record-path rule of its own.
@@ -152,11 +153,83 @@ pub enum Kind {
     ContractNpcSpawns,
     /// Contract entity spawns: the distinct entity spawn descriptions. Derived, so no rule either.
     ContractEntitySpawns,
+    /// Authored Generator property arrays, shared by all contract rows that reference them.
+    MissionPropertySets,
+    /// Resource definitions: `ResourceType` Records under `resourcetypedatabase`.
+    ResourceTypes,
+    /// Global Tag definitions, with `TagDatabase` roots as source dependencies.
+    Tags,
+    /// Authored lists: every `BlueprintCategoryDatabaseRecord` under the ordinary Filter.
+    BlueprintCategoryLists,
+    /// Original offline shop inventory JSON files in the Archive.
+    ShopInventories,
+    /// Reusable physical `ExplosionRecord` definitions.
+    ExplosionDefinitions,
+    /// Physical ammunition configurations.
+    AmmoDefinitions,
+    /// All physically typed Faction Records.
+    Factions,
+    /// Physical `FactionIdentity` Records.
+    FactionIdentities,
+    /// All physically typed reputation perk-list Records.
+    ReputationPerks,
+    /// All physical sandbox reputation trigger definition Records.
+    ReputationTriggerRecords,
+    /// All physical reputation reward amount Records.
+    ReputationRewardAmounts,
+    /// Physical authored infraction definitions.
+    Infractions,
+    /// Physical reusable sets of ordered infraction uses.
+    InfractionSets,
+    /// Physical jurisdiction definitions.
+    Jurisdictions,
+    /// Physical security network manifest definitions.
+    SecurityNetworkManifests,
+    /// Physical mission location class definitions.
+    LocationClasses,
+    /// Physical mission location function definitions.
+    LocationFunctions,
+    /// Physical mission location size definitions.
+    LocationSizes,
+    /// Physical mission location class registries.
+    LocationClassRegistries,
+    /// Physical mission location function registries.
+    LocationFunctionRegistries,
+    /// Physical mission location size registries.
+    LocationSizeRegistries,
+    /// Physical NPC archetype Records.
+    NpcArchetypes,
+    /// Physical weighted NPC class pool Records.
+    NpcClassPools,
+    /// Physical automatic spawn Records.
+    AutoSpawns,
+    /// Physical ordered spawn set Records.
+    AutoSpawnSets,
+    /// Physical encounter index Records.
+    EncounterIndices,
+    /// All physical inventory storage Records.
+    InventoryContainers,
+    /// Physical shared medical tier and consumption configuration Records.
+    MedicalItemTierConfigs,
+    /// Physical starmap object type definitions.
+    StarmapTypes,
+    /// Physical starmap preset definitions.
+    StarmapPresets,
+    /// Physical starmap amenity definitions.
+    StarmapAmenities,
+    /// Physical `MissionScenario` Records selected by their exact type.
+    MissionScenarios,
+    /// Physical module declarations linked by objective handlers and other modules.
+    MissionModuleDeclarations,
+    /// Physical authored mission item definitions.
+    MissionItems,
+    /// Physical global definitions of the authored contract scope labels and icons.
+    ContractScopes,
 }
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 47] = [
+    pub const ALL: [Self; 89] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -191,6 +264,12 @@ impl Kind {
         Self::LootTables,
         Self::LootArchetypes,
         Self::LootPoolFilters,
+        Self::LootSecondaryChoiceSingleLayers,
+        Self::LootSecondaryChoiceMultiLayers,
+        Self::LootThemes,
+        Self::HierarchicalContextualDataPresets,
+        Self::LootGenerationGlobalParams,
+        Self::SubHarvestableConfigs,
         Self::LootContainers,
         Self::MineableEntities,
         Self::LegacyLootTables,
@@ -204,122 +283,43 @@ impl Kind {
         Self::MissionBrokerEntries,
         Self::ContractNpcSpawns,
         Self::ContractEntitySpawns,
+        Self::MissionPropertySets,
+        Self::ResourceTypes,
+        Self::Tags,
+        Self::BlueprintCategoryLists,
+        Self::ShopInventories,
+        Self::ExplosionDefinitions,
+        Self::AmmoDefinitions,
+        Self::Factions,
+        Self::FactionIdentities,
+        Self::ReputationPerks,
+        Self::ReputationTriggerRecords,
+        Self::ReputationRewardAmounts,
+        Self::Infractions,
+        Self::InfractionSets,
+        Self::Jurisdictions,
+        Self::SecurityNetworkManifests,
+        Self::LocationClasses,
+        Self::LocationFunctions,
+        Self::LocationSizes,
+        Self::LocationClassRegistries,
+        Self::LocationFunctionRegistries,
+        Self::LocationSizeRegistries,
+        Self::NpcArchetypes,
+        Self::NpcClassPools,
+        Self::AutoSpawns,
+        Self::AutoSpawnSets,
+        Self::EncounterIndices,
+        Self::InventoryContainers,
+        Self::MedicalItemTierConfigs,
+        Self::StarmapTypes,
+        Self::StarmapPresets,
+        Self::StarmapAmenities,
+        Self::MissionScenarios,
+        Self::MissionModuleDeclarations,
+        Self::MissionItems,
+        Self::ContractScopes,
     ];
-
-    /// Returns the name of the kind's array in the catalog, e.g. `manufacturers`.
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Manufacturers => "manufacturers",
-            Self::Items => "items",
-            Self::Ships => "ships",
-            Self::Commodities => "commodities",
-            Self::Blueprints => "blueprints",
-            Self::ResourceGroups => "resourceGroups",
-            Self::BlueprintCategories => "blueprintCategories",
-            Self::GameplayProperties => "gameplayProperties",
-            Self::QualityDistributions => "qualityDistributions",
-            Self::QualityQuantizations => "qualityQuantizations",
-            Self::BlueprintPools => "blueprintPools",
-            Self::DismantleProcesses => "dismantleProcesses",
-            Self::Paints => "paints",
-            Self::Loadouts => "loadouts",
-            Self::StarmapObjects => "starmapObjects",
-            Self::Contracts => "contracts",
-            Self::MineableElements => "mineableElements",
-            Self::RefiningProcesses => "refiningProcesses",
-            Self::MineableCompositions => "mineableCompositions",
-            Self::MiningGlobalParams => "miningGlobalParams",
-            Self::HarvestableProviderPresets => "harvestableProviderPresets",
-            Self::SubHarvestableMultiConfigs => "subHarvestableMultiConfigs",
-            Self::HarvestableLocations => "harvestableLocations",
-            Self::Shops => "shops",
-            Self::FactionReputations => "factionReputations",
-            Self::ReputationScopes => "reputationScopes",
-            Self::ReputationStandings => "reputationStandings",
-            Self::ReputationContexts => "reputationContexts",
-            Self::MissionTypes => "missionTypes",
-            Self::MissionLocalities => "missionLocalities",
-            Self::ContractScenarios => "contractScenarios",
-            Self::LootTables => "lootTables",
-            Self::LootArchetypes => "lootArchetypes",
-            Self::LootPoolFilters => "lootPoolFilters",
-            Self::LootContainers => "lootContainers",
-            Self::MineableEntities => "mineableEntities",
-            Self::LegacyLootTables => "legacyLootTables",
-            Self::LegacyLootArchetypes => "legacyLootArchetypes",
-            Self::Crafters => "crafters",
-            Self::CargoManifests => "cargoManifests",
-            Self::MissionLocationTemplates => "missionLocationTemplates",
-            Self::ContractShipSpawns => "contractShipSpawns",
-            Self::ContractLocationQueries => "contractLocationQueries",
-            Self::ContractTemplates => "contractTemplates",
-            Self::MissionBrokerEntries => "missionBrokerEntries",
-            Self::ContractNpcSpawns => "contractNpcSpawns",
-            Self::ContractEntitySpawns => "contractEntitySpawns",
-        }
-    }
-}
-
-/// What the blueprint selection makes of one Record.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum BlueprintSelection {
-    /// Not a blueprint of the catalog, or one the Filter does not match.
-    Outside,
-    /// A blueprint of the catalog.
-    Kept,
-    /// A blueprint left out as a development leftover.
-    Leftover,
-}
-
-/// Returns what the blueprint selection makes of `record`: the one rule behind the `blueprints`
-/// kind of the catalog and the blueprints of [`read_crafting`](crate::read_crafting).
-///
-/// # Errors
-///
-/// Returns the error of the Record's path, type or name when it cannot be read.
-pub(crate) fn selects_blueprint(
-    record: &Record<'_>,
-    filter: Option<&Filter>,
-) -> Result<BlueprintSelection, DataForgeError> {
-    let rule = Kind::Blueprints.records();
-    let path = record.record_path()?;
-    if !rule.matches_path(path)
-        || record.type_name()? != rule.type_name
-        || filter.is_some_and(|filter| !filter.matches(path))
-    {
-        return Ok(BlueprintSelection::Outside);
-    }
-    Ok(if is_leftover(path, record.name()?) {
-        BlueprintSelection::Leftover
-    } else {
-        BlueprintSelection::Kept
-    })
-}
-
-fn has_word(record_path: &str, name: &str, tokens: &[&str]) -> bool {
-    [record_path, name].into_iter().any(|text| {
-        text.split(|c: char| !c.is_ascii_alphanumeric())
-            .any(|word| tokens.iter().any(|token| word.eq_ignore_ascii_case(token)))
-    })
-}
-
-/// Returns whether a Record with `record_path` and `name` is a development leftover.
-pub(crate) fn is_leftover(record_path: &str, name: &str) -> bool {
-    has_word(record_path, name, &EXCLUDED_TOKENS)
-}
-
-/// Returns whether a Record of `kind` with `record_path` and `name` is a development leftover:
-/// one of [`is_leftover`], or a ship with a [`SHIP_EXCLUDED_TOKENS`] word. A contract template
-/// is a leftover by the words of [`EXCLUDED_TOKENS`] except `template`, which names live ones.
-pub(crate) fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
-    match kind {
-        Kind::ContractTemplates => has_word(record_path, name, &CONTRACT_TEMPLATE_EXCLUDED_TOKENS),
-        Kind::Ships => {
-            is_leftover(record_path, name) || has_word(record_path, name, &SHIP_EXCLUDED_TOKENS)
-        }
-        _ => is_leftover(record_path, name),
-    }
 }
 
 #[cfg(test)]

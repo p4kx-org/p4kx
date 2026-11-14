@@ -2,33 +2,41 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    CancelToken, DataForge, Filter, Record, RecordTree, StructValue, TreeBuilder,
+    CancelToken, DataForge, Filter, Record, RecordTree, SourceUseRole, StructValue, Value,
 };
-use rayon::prelude::*;
 
 use crate::blueprint::as_struct;
-use crate::contract_missions::{ContractEntry, ContractFaction, PickupPlace};
-use crate::contract_offer::OfferedAt;
+use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_v3::mission_sources::contract_scenario_requirements::ContractScenarioRequirements;
+use crate::catalog_v3::mission_sources::local_contract_generator_configuration::LocalContractGeneratorConfiguration;
+use crate::catalog_v3::tag_catalog::{CapturedTags, TagDependencies};
+use crate::contract_missions::ContractWithTitles;
 use crate::contract_starmap::StarmapObject;
+use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
-use crate::mission_cooldown::ContractCooldown;
-use crate::mission_facts::Levels;
-use crate::mission_hauling_levels::HaulingLevels;
-use crate::mission_index::{Broker, MissionIndex, Template};
-use crate::mission_intros::{Grants, record_grants, resolve};
+use crate::mission_entry_source::{MissionEntryContext, MissionEntrySource};
+use crate::mission_generator::{ContractOwner, GeneratorDefinition};
+use crate::mission_index::MissionIndex;
+use crate::mission_intros::{self, Candidates, Grants, INTRO_CONTRACTS, PendingContract};
 use crate::mission_layers::{Layer, items, one};
-use crate::mission_places::{Places, Prerequisites, Where};
-use crate::mission_results::{granted_tags, link};
-use crate::mission_shared::{Found, Rewards, Shared};
+use crate::mission_places::{Places, Where};
+use crate::mission_property_set::MissionPropertySets;
+use crate::mission_property_set_registry::MissionPropertySetRegistry;
 use crate::mission_siblings::{self, Siblings};
-use crate::mission_titles::titles;
-use crate::record_fields::{boolean, identity, reference, text};
+use crate::mission_text_inputs::{LayerKind, LayerTexts};
+use crate::record_fields::{identity, text};
 use crate::selection::{Kind, is_leftover};
-use crate::spawn_error::SpawnError;
-use crate::spawn_layers::{HandlerSpawns, RecordSpawns};
+use crate::spawn_layers::RecordSpawns;
 use crate::spawn_pools::SpawnPools;
-use crate::texts::Texts;
-use crate::{CatalogError, CatalogFailure};
+use crate::{CatalogError, CatalogReadFailure};
+
+#[path = "mission_record_read.rs"]
+mod record_read;
+
+#[path = "mission_property_set_collision.rs"]
+mod property_set_collision;
 
 const CONTAINERS: [&str; 4] = [
     "contracts",
@@ -36,50 +44,132 @@ const CONTAINERS: [&str; 4] = [
     "legacyContracts",
     "PVPBountyContract",
 ];
-const INTRO_CONTRACTS: &str = "introContracts";
 
 /// The contracts of a DataForge and what was left out.
 pub(crate) struct Missions<'f> {
-    pub(crate) contracts: Vec<ContractEntry<'f>>,
+    pub(crate) ledger: ExportLedger,
+    pub(crate) contracts: Vec<ContractWithTitles<'f>>,
+    pub(crate) generators: Vec<GeneratorDefinition<'f>>,
+    pub(crate) scenario_requirements: Vec<ContractScenarioRequirements<'f>>,
+    pub(crate) local_generators: Vec<LocalContractGeneratorConfiguration<'f>>,
     pub(crate) skipped: usize,
-    pub(crate) failures: Vec<CatalogFailure>,
+    pub(crate) failures: Vec<CatalogReadFailure<'f>>,
     pub(crate) pools: SpawnPools<'f>,
     pub(crate) siblings: Siblings<'f>,
+    pub(crate) property_sets: MissionPropertySets<'f>,
 }
 
-/// A Record that cannot be read: the error of the DataForge or a [`SpawnError`].
+/// A source Record that cannot be read or projected into contract rows.
 type PieceError = Box<dyn std::error::Error + Send + Sync>;
 
-enum Piece<'f> {
-    Contracts(Vec<ContractEntry<'f>>, usize, Grants, SpawnPools<'f>),
-    Failed(CatalogFailure),
+struct ContractPiece<'f> {
+    contracts: Vec<PendingContract<'f>>,
+    skipped: usize,
+    grants: Grants,
+    pools: SpawnPools<'f>,
+    property_sets: MissionPropertySets<'f>,
 }
 
-/// What an entry is resolved against: the Records it refers to, the texts and the starmap.
-struct Context<'x, 'f> {
-    index: &'x MissionIndex<'f>,
-    texts: &'x Texts<'f>,
-    places: &'x Places<'x, 'f>,
+struct ContractSource<'t, 'f> {
+    tree: &'t RecordTree<'f>,
+    spawns: &'t RecordSpawns<'t, 'f>,
+    property_sets: &'t MissionPropertySetRegistry<'t, 'f>,
 }
 
-/// Reads each of `records` in parallel; a Record that cannot be read is a failure.
-fn read_pieces<'f>(
-    records: &[Record<'f>],
-    context: &Context<'_, 'f>,
-    cancel: Option<&CancelToken>,
-) -> Result<Vec<Piece<'f>>, CatalogError> {
-    records
-        .par_iter()
-        .map_init(TreeBuilder::new, |trees, record| {
-            if cancel.is_some_and(CancelToken::is_cancelled) {
-                return Err(CatalogError::Cancelled);
+impl<'t, 'f> ContractSource<'t, 'f> {
+    fn handler(
+        &self,
+        handler: &'t StructValue<'f>,
+        context: &MissionEntryContext<'_, 'f>,
+        fields: &OriginalFlowFields<'_, '_, 'f>,
+        contracts: &mut Vec<PendingContract<'f>>,
+        grants: &mut Grants,
+    ) -> Result<usize, PieceError> {
+        let handler_layer = Layer::read(one(Some(handler), "contractParams"));
+        let handler_texts = LayerTexts::read(
+            fields,
+            context.projection.origins(),
+            handler,
+            LayerKind::Handler,
+        )?;
+        let handler_where = Where::read(one(Some(handler), "defaultAvailability"), "prerequisites");
+        let handler_spawns = self.spawns.handler(handler)?;
+        let mut skipped = 0_usize;
+        for container in CONTAINERS {
+            let intro = (container == INTRO_CONTRACTS)
+                .then(|| grants.candidates(fields, handler))
+                .transpose()?;
+            for value in items(Some(handler), container) {
+                let Some(Candidate {
+                    contract,
+                    name,
+                    admitted,
+                }) = self.candidate(fields, grants, intro.as_ref(), value)?
+                else {
+                    continue;
+                };
+                if !admitted {
+                    skipped = skipped.saturating_add(1);
+                    continue;
+                }
+                let parent = MissionEntrySource {
+                    tree: self.tree,
+                    handler,
+                    handler_layer: &handler_layer,
+                    handler_texts: &handler_texts,
+                    handler_where: &handler_where,
+                    spawns: &handler_spawns,
+                    contract,
+                    name,
+                    property_sets: self.property_sets,
+                };
+                let owner = ContractOwner::read(fields, handler, container, contract)?;
+                skipped = skipped.saturating_add(parent.entries(context, &owner, contracts)?);
             }
-            Ok(piece(trees, record, context).unwrap_or_else(|source| {
-                Some(Piece::Failed(CatalogFailure::of(record, source.as_ref())))
-            }))
-        })
-        .filter_map(Result::transpose)
-        .collect()
+        }
+        Ok(skipped)
+    }
+
+    fn candidate<'scope, 'read>(
+        &self,
+        fields: &OriginalFlowFields<'scope, 'read, 'f>,
+        grants: &mut Grants,
+        intro: Option<&Candidates<'_, 'scope, 'read, 'f>>,
+        value: &'t Value<'f>,
+    ) -> Result<Option<Candidate<'t, 'f>>, CatalogError> {
+        let contract = as_struct(value);
+        let name = text(contract, "debugName");
+        let id = contract
+            .and_then(identity)
+            .filter(|_| !is_leftover(self.tree.record_path(), name.unwrap_or_default()));
+        if let Some(intro) = intro {
+            grants.candidate(fields, intro, value, id)?;
+        }
+        Ok(contract.map(|contract| Candidate {
+            contract,
+            name,
+            admitted: id.is_some(),
+        }))
+    }
+}
+
+struct Candidate<'read, 'source> {
+    contract: &'read StructValue<'source>,
+    name: Option<&'source str>,
+    admitted: bool,
+}
+
+enum Piece<'f> {
+    Contracts(Box<ContractPiece<'f>>),
+    Failed(CatalogReadFailure<'f>),
+}
+
+struct ObservedPiece<'f> {
+    piece: Piece<'f>,
+    definition: Option<GeneratorDefinition<'f>>,
+    scenario_requirements: Vec<ContractScenarioRequirements<'f>>,
+    local_generators: Vec<LocalContractGeneratorConfiguration<'f>>,
+    ledger: ExportLedger,
 }
 
 /// Reads the contracts of the `ContractGenerator` Records `filter` matches: for each contract an
@@ -94,305 +184,153 @@ fn read_pieces<'f>(
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
 pub(crate) fn read<'f>(
     forge: &'f DataForge<'f>,
-    texts: &Texts<'f>,
+    projection: &CatalogProjection<'_, 'f>,
+    (tags, dependencies): (&CapturedTags<'_, 'f>, Option<TagDependencies<'f>>),
     starmap: &[StarmapObject<'f>],
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
 ) -> Result<Missions<'f>, CatalogError> {
-    let rule = Kind::Contracts.records();
-    let records: Vec<Record<'f>> = forge
-        .records()
-        .filter(|record| {
-            record
-                .record_path()
-                .is_ok_and(|path| rule.matches_path(path) && filter.is_none_or(|f| f.matches(path)))
-        })
-        .collect();
-    let mut index = MissionIndex::read(forge, cancel)?;
-    let (pools, failures) = index.take_template_results();
+    let input = projection.original();
+    let texts = projection.legacy_texts();
+    let mut grants = Grants::new(projection.origins());
+    let records = selected_generators(forge, input, filter, cancel, &mut grants)?;
+    let mut index = MissionIndex::read_captured(forge, input, filter, cancel, dependencies, tags)?;
+    let (pools, failures, ledger) = index.take_template_results();
     let mut missions = Missions {
+        ledger,
         contracts: Vec::new(),
+        generators: Vec::new(),
+        scenario_requirements: Vec::new(),
+        local_generators: Vec::new(),
         skipped: 0,
         failures,
         pools,
-        siblings: mission_siblings::read(forge, (texts, &index), filter, cancel)?,
+        siblings: mission_siblings::read(forge, projection, (tags, &index), filter, cancel)?,
+        property_sets: MissionPropertySets::default(),
     };
+    crate::mission_ledger::inventory(&mut missions.ledger);
     if records.is_empty() {
         return Ok(missions);
     }
     let places = Places::new(starmap);
-    let context = Context {
+    let context = MissionEntryContext {
         index: &index,
         texts,
+        projection,
         places: &places,
+        cancel,
     };
-    let mut grants = Grants::new();
-    for piece in read_pieces(&records, &context, cancel)? {
-        match piece {
-            Piece::Contracts(contracts, skipped, granted, found) => {
-                missions.pools.merge(found);
-                missions.contracts.extend(contracts);
-                missions.skipped = missions.skipped.saturating_add(skipped);
-                for (tag, intros) in granted {
-                    grants.entry(tag).or_default().extend(intros);
-                }
-            }
-            Piece::Failed(failure) => missions.failures.push(failure),
-        }
-    }
-    missions.order();
-    resolve(&mut missions.contracts, &mut grants);
+    let observed = record_read::read(&records, input, &context, cancel)?;
+    missions.complete_contracts(observed, grants)?;
     Ok(missions)
 }
 
-impl Missions<'_> {
-    /// Orders the entries by the text of their GUIDs and drops an entry whose `guid` and
-    /// `subContractGuid` an earlier one has, counting it as skipped.
-    fn order(&mut self) {
-        self.contracts.sort_by_cached_key(|entry| {
-            (
-                entry.guid.text(),
-                entry.sub_contract_guid.map(CatalogGuid::text),
-                entry.record_guid.text(),
-            )
-        });
-        let listed = self.contracts.len();
-        self.contracts.dedup_by(|later, earlier| {
-            later.guid.0 == earlier.guid.0 && later.sub_contract_guid == earlier.sub_contract_guid
-        });
-        self.skipped = self
-            .skipped
-            .saturating_add(listed.saturating_sub(self.contracts.len()));
-    }
-}
-
-fn piece<'f>(
-    trees: &mut TreeBuilder<'f>,
-    record: &Record<'f>,
-    context: &Context<'_, 'f>,
-) -> Result<Option<Piece<'f>>, PieceError> {
+fn selected_generators<'source>(
+    forge: &'source DataForge<'source>,
+    input: &OriginalCatalogInput<'_, '_>,
+    filter: Option<&Filter>,
+    cancel: Option<&CancelToken>,
+    grants: &mut Grants,
+) -> Result<Vec<Record<'source>>, CatalogError> {
     let rule = Kind::Contracts.records();
-    let path = record.record_path()?;
-    if record.type_name()? != rule.type_name {
-        return Ok(None);
-    }
-    let tree = trees.build(record)?;
-    let mut contracts = Vec::new();
-    let mut skipped = 0_usize;
-    let mut grants = Grants::new();
-    let spawns = RecordSpawns::new(context.index.tags(), tree.root());
-    for handler in items(Some(tree.root()), "generators")
-        .iter()
-        .filter_map(as_struct)
-    {
-        let handler_layer = Layer::read(one(Some(handler), "contractParams"));
-        let handler_where = Where::read(one(Some(handler), "defaultAvailability"), "prerequisites");
-        let handler_spawns = spawns.handler(handler)?;
-        for container in CONTAINERS {
-            for contract in items(Some(handler), container).iter().filter_map(as_struct) {
-                let name = text(Some(contract), "debugName");
-                let Some(id) = identity(contract) else {
-                    skipped = skipped.saturating_add(1);
-                    continue;
-                };
-                if is_leftover(path, name.unwrap_or_default()) {
-                    skipped = skipped.saturating_add(1);
-                    continue;
-                }
-                if container == INTRO_CONTRACTS {
-                    record_grants(&mut grants, CatalogGuid(id), &granted_tags(contract));
-                }
-                let parent = Parent {
-                    tree: &tree,
-                    handler,
-                    handler_layer: &handler_layer,
-                    handler_where: &handler_where,
-                    spawns: &handler_spawns,
-                    contract,
-                    id: CatalogGuid(id),
-                    name,
-                };
-                skipped = skipped.saturating_add(parent.entries(context, &mut contracts)?);
-            }
+    let mut selected = Vec::new();
+    for record in forge.records() {
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
         }
-    }
-    Ok(Some(Piece::Contracts(
-        contracts,
-        skipped,
-        grants,
-        spawns.into_pools(),
-    )))
-}
-
-struct Parent<'t, 'f> {
-    tree: &'t RecordTree<'f>,
-    handler: &'t StructValue<'f>,
-    handler_layer: &'t Layer<'f>,
-    handler_where: &'t Where,
-    spawns: &'t HandlerSpawns<'t, 't, 'f>,
-    contract: &'t StructValue<'f>,
-    id: CatalogGuid,
-    name: Option<&'f str>,
-}
-
-impl<'f> Parent<'_, 'f> {
-    /// Appends the entries of the contract and its sub contracts and returns how many sub
-    /// contracts were left out.
-    fn entries(
-        &self,
-        context: &Context<'_, 'f>,
-        out: &mut Vec<ContractEntry<'f>>,
-    ) -> Result<usize, SpawnError> {
-        let index = context.index;
-        let contract_where = Where::read(Some(self.contract), "additionalPrerequisites");
-        let template = reference(Some(self.contract), "template").map(|guid| guid.0);
-        let template_data = template.and_then(|guid| index.template(guid));
-        let contract_layer = Layer::read(one(Some(self.contract), "paramOverrides"));
-        let broker = reference(Some(self.contract), "missionBrokerEntry")
-            .and_then(|guid| index.broker(guid.0));
-        let shared = Shared::read(self.handler, self.contract);
-        let spawn_levels = self.spawns.contract(
-            self.contract,
-            template_data.and_then(|data| data.spawns.as_ref()),
-        )?;
-        let make = |sub: Option<&StructValue<'f>>| -> Result<ContractEntry<'f>, SpawnError> {
-            let spawns = spawn_levels.resolve(sub)?;
-            let sub_layer =
-                sub.map(|sub| Layer::read(one(Some(sub), "paramOverrides").or(Some(sub))));
-            let levels = Levels {
-                sub: sub_layer.as_ref(),
-                contract: &contract_layer,
-                handler: self.handler_layer,
+        let Ok(path) = record.record_path() else {
+            let source_type = match record.type_name() {
+                Ok(kind) if kind == rule.type_name => SourceUseRole::Selector,
+                Err(_) => SourceUseRole::Attempted,
+                Ok(_) => continue,
             };
-            let facts = shared.facts.facts(sub, &levels, template_data);
-            let (pickup, offered_at) = self.places(sub, &contract_where, broker, context);
-            Ok(self.entry(
-                sub,
-                &levels,
-                template,
-                (template_data, broker),
-                (
-                    &shared,
-                    Found {
-                        pickup,
-                        offered_at,
-                        facts,
-                        spawns,
-                    },
-                ),
-                context,
-            ))
+            let context = input.record_context(&record)?;
+            grants.unreadable_path(&context, source_type)?;
+            continue;
         };
-        out.push(make(None)?);
-        let mut skipped = 0_usize;
-        for sub in items(Some(self.contract), "subContracts")
-            .iter()
-            .filter_map(as_struct)
-        {
-            let name = text(Some(sub), "debugName").unwrap_or_default();
-            if identity(sub).is_none() || is_leftover(self.tree.record_path(), name) {
-                skipped = skipped.saturating_add(1);
-            } else {
-                out.push(make(Some(sub))?);
+        if rule.matches_path(path) && filter.is_none_or(|filter| filter.matches(path)) {
+            selected.push(record);
+        }
+    }
+    Ok(selected)
+}
+
+impl<'f> Missions<'f> {
+    fn complete_contracts(
+        &mut self,
+        observed: Vec<ObservedPiece<'f>>,
+        mut grants: Grants,
+    ) -> Result<(), CatalogError> {
+        let mut contracts = Vec::new();
+        for piece in observed {
+            self.take(piece, &mut contracts, &mut grants)?;
+        }
+        property_set_collision::finalize(
+            &self.property_sets,
+            contracts.iter_mut().map(|contract| &mut contract.base),
+            &mut self.ledger,
+        )?;
+        self.skipped = self.skipped.saturating_add(order(&mut contracts));
+        self.ledger.skipped_rows(Kind::Contracts, self.skipped);
+        self.contracts = mission_intros::resolve(contracts, grants)?;
+        Ok(())
+    }
+
+    fn take(
+        &mut self,
+        observed: ObservedPiece<'f>,
+        pending: &mut Vec<PendingContract<'f>>,
+        grants: &mut Grants,
+    ) -> Result<(), CatalogError> {
+        self.ledger.merge(observed.ledger);
+        self.scenario_requirements
+            .extend(observed.scenario_requirements);
+        self.local_generators.extend(observed.local_generators);
+        if let Some(definition) = observed.definition {
+            self.generators.push(definition);
+        }
+        match observed.piece {
+            Piece::Contracts(piece) => {
+                let ContractPiece {
+                    contracts,
+                    skipped,
+                    grants: granted,
+                    pools: found,
+                    property_sets,
+                } = *piece;
+                self.property_sets.merge(property_sets)?;
+                self.pools.merge(found);
+                pending.extend(contracts);
+                self.skipped = self.skipped.saturating_add(skipped);
+                grants.merge(granted)?;
+            }
+            Piece::Failed(failure) => {
+                self.failures.push(failure);
+                grants.incomplete();
             }
         }
-        Ok(skipped)
+        Ok(())
     }
+}
 
-    /// Returns the pickup places and where the contract or its sub contract `sub` is offered.
-    fn places(
-        &self,
-        sub: Option<&StructValue<'f>>,
-        contract_where: &Where,
-        broker: Option<&Broker<'f>>,
-        context: &Context<'_, 'f>,
-    ) -> (Vec<PickupPlace<'f>>, OfferedAt<'f>) {
-        let own = sub.map(|sub| Where::read(Some(sub), "additionalPrerequisites"));
-        context.places.locate(
-            context.index,
-            &Prerequisites {
-                own: own.as_ref(),
-                inherited: [contract_where, self.handler_where],
-            },
-            broker.and_then(|broker| broker.location),
+/// Orders rows by GUID and counts duplicates removed by the logical ID pair.
+fn order(contracts: &mut Vec<PendingContract<'_>>) -> usize {
+    contracts.sort_by_cached_key(|contract| {
+        let entry = &contract.base;
+        (
+            entry.guid.value().copied().map(CatalogGuid::text),
+            entry
+                .sub_contract_guid
+                .value()
+                .copied()
+                .map(CatalogGuid::text),
+            entry.record_guid.text(),
         )
-    }
-
-    fn entry(
-        &self,
-        sub: Option<&StructValue<'f>>,
-        levels: &Levels<'_, 'f>,
-        template: Option<p4kx_extraction::Guid>,
-        (template_data, broker): (Option<&Template<'f>>, Option<&Broker<'f>>),
-        (shared, found): (&Shared<'f>, Found<'f>),
-        context: &Context<'_, 'f>,
-    ) -> ContractEntry<'f> {
-        let Found {
-            pickup,
-            offered_at,
-            facts,
-            spawns,
-        } = found;
-        let (index, texts) = (context.index, context.texts);
-        let faction = self.faction(context);
-        let rewards = Rewards::read(
-            (self.handler, self.contract, sub),
-            faction.as_ref(),
-            (index, texts),
-        );
-        let (title, description) = titles(levels, (template_data, broker), (index, texts));
-        let mission_type = levels
-            .iter()
-            .find_map(|level| level.mission_type)
-            .or_else(|| template_data.and_then(|data| data.mission_type))
-            .or_else(|| broker.and_then(|broker| broker.mission_type));
-        ContractEntry {
-            guid: self.id,
-            sub_contract_guid: sub.and_then(identity).map(CatalogGuid),
-            record_guid: CatalogGuid(self.tree.guid()),
-            record_path: self.tree.record_path(),
-            debug_name: self.name,
-            handler: text(Some(self.handler), "debugName"),
-            template_guid: template.map(CatalogGuid),
-            broker_entry_guid: reference(Some(self.contract), "missionBrokerEntry"),
-            not_for_release: boolean(Some(self.contract), "notForRelease"),
-            work_in_progress: boolean(Some(self.contract), "workInProgress"),
-            title,
-            description,
-            mission_type_guid: mission_type.map(CatalogGuid),
-            mission_type: texts.localised(
-                mission_type
-                    .and_then(|guid| index.mission_type(guid))
-                    .and_then(|kind| kind.name_key),
-            ),
-            contractor: texts.localised(levels.iter().find_map(|level| level.contractor)),
-            faction,
-            pickup_places: pickup,
-            offered_at,
-            giver_faction: rewards.giver_faction,
-            blueprint_rewards: rewards.blueprints,
-            reputation_gains: rewards.gains,
-            min_standing_guid: shared.standing.min,
-            max_standing_guid: shared.standing.max,
-            standing_requirements: shared.standing.requirements_of(sub),
-            cooldown: ContractCooldown::resolve(&shared.cooldown, levels),
-            facts,
-            ship_spawns: spawns.ship_spawns,
-            npc_spawns: spawns.npc_spawns,
-            entity_spawns: spawns.entity_spawns,
-            location_queries: spawns.location_queries,
-            location_prerequisites: spawns.location_prerequisites,
-            hauling_orders: HaulingLevels::of(levels, template_data, broker).orders(),
-            fixed_rewards: shared.fixed_rewards.clone(),
-        }
-    }
-
-    /// Returns the `factionReputation` of the handler with its display name.
-    fn faction(&self, context: &Context<'_, 'f>) -> Option<ContractFaction<'f>> {
-        link(self.handler, "factionReputation").map(|(guid, name)| ContractFaction {
-            guid,
-            name,
-            display_name: context.texts.localised(context.index.faction_name(guid.0)),
-        })
-    }
+    });
+    let listed = contracts.len();
+    contracts.dedup_by(|later, earlier| {
+        later.base.guid.value() == earlier.base.guid.value()
+            && later.base.sub_contract_guid.value() == earlier.base.sub_contract_guid.value()
+    });
+    listed.saturating_sub(contracts.len())
 }

@@ -4,6 +4,10 @@
 use std::error::Error;
 
 use crate::build::MAX_LOD;
+use crate::{
+    MaterialCompanion, MaterialCompanionUse, MaterialReadObservation, MaterialReadOrigin,
+    MaterialRequest, ModelFile,
+};
 
 /// Returns the names of the files next to the model file `name` that reading it can fetch: the
 /// geometry companion `<name>m`, and for every level of detail from 1 on its model file and its
@@ -38,7 +42,7 @@ pub enum CompanionPath<'a> {
     /// A file in the model's own folder, by file name, e.g. the geometry companion `box.cgfm` of
     /// `box.cgf`.
     Sibling(&'a str),
-    /// The material library the model names, as a path below the `Data` folder with `/` as
+    /// A validated material request below the logical `Data` root, with `/` as
     /// separator and without the `.mtl` extension, e.g. `Objects/Ships/Gladius/gladius`. The
     /// model has checked that it is a plain path: no empty, `.` or `..` component, no drive.
     Material(&'a str),
@@ -53,12 +57,50 @@ pub const MAX_GREY_SATURATION: f32 = 0.05;
 
 /// Supplies the companion files of a model, so that reading a model needs no Archive.
 pub trait CompanionResolver {
+    /// Validates a material name under this resolver's source-path policy.
+    ///
+    /// # Errors
+    /// Returns an error when the name is not admitted by the source-path policy.
+    fn material_request(&self, name: &str) -> Result<MaterialRequest, CompanionError> {
+        MaterialRequest::new(name)
+    }
+
     /// Returns the bytes of the companion at `path`, or `None` when it does not exist.
     ///
     /// # Errors
     ///
     /// Returns the failure to read a companion that exists.
     fn resolve(&mut self, path: CompanionPath<'_>) -> Result<Option<Vec<u8>>, CompanionError>;
+
+    /// Returns the bytes of a sibling requested for a specific model file role.
+    ///
+    /// # Errors
+    /// Returns the failure to read a sibling that exists.
+    fn resolve_model_file(
+        &mut self,
+        _file: ModelFile,
+        name: &str,
+    ) -> Result<Option<Vec<u8>>, CompanionError> {
+        self.resolve(CompanionPath::Sibling(name))
+    }
+
+    /// Reads one material companion with the resolver's original read identity.
+    fn resolve_material_file(&mut self, path: CompanionPath<'_>) -> MaterialCompanion {
+        MaterialCompanion::unobserved(self.resolve(path))
+    }
+
+    /// Observes the companion selected for a library or layer.
+    fn observe_material(
+        &mut self,
+        _usage: MaterialCompanionUse,
+        _origin: Option<&MaterialReadOrigin>,
+    ) {
+    }
+
+    /// Returns the observer for original fields consumed while parsing the main material library.
+    fn observe_material_fields(&mut self) -> Option<&mut dyn FnMut(MaterialReadObservation<'_>)> {
+        None
+    }
 
     /// Returns whether the texture `file`, as a material file names it, holds no colour of its own,
     /// or `None` when the resolver cannot tell, as the default does.

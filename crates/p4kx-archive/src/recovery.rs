@@ -3,6 +3,7 @@
 
 use std::io;
 
+use crate::archive_metadata::ArchiveMetadata;
 use crate::central_directory::parse_header;
 use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog};
@@ -54,6 +55,7 @@ pub(crate) fn recover(
 }
 
 struct Scan {
+    source_len: u64,
     entries: Vec<Entry>,
     log: IssueLog,
     p4k_checksums: bool,
@@ -67,6 +69,7 @@ impl Scan {
             mut entries,
             mut log,
             p4k_checksums,
+            source_len,
             cut,
             ..
         } = self;
@@ -84,7 +87,12 @@ impl Scan {
             log.record_first(EntryIssue::RecoveryLimit);
         }
         log.record_first(EntryIssue::Recovered);
-        Some(Directory { entries, log })
+        Some(Directory {
+            entries,
+            log,
+            installation_flags: None,
+            metadata: ArchiveMetadata::recovered(source_len),
+        })
     }
 }
 
@@ -94,6 +102,7 @@ fn scan(source: &Source, start: u64) -> Result<Scan, FormatError> {
     let mut pos = start;
     let mut budget = (end - start).saturating_mul(WORK_PER_WINDOW_BYTE);
     let mut found = Scan {
+        source_len: source.len(),
         entries: Vec::new(),
         log: IssueLog::default(),
         p4k_checksums: false,
@@ -212,7 +221,7 @@ fn finish(
         return Ok(Outcome::OverBudget);
     }
     let mut log = IssueLog::default();
-    let Ok(header) = parse_header(record, candidate, index, &mut log) else {
+    let Ok(header) = parse_header(record, candidate, index, &mut log, source.len()) else {
         return Ok(Outcome::Rejected);
     };
     let local = match local {

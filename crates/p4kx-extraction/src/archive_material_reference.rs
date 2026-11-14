@@ -1,0 +1,151 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::convert::Infallible;
+
+use p4kx_archive::Entry;
+use p4kx_model::{CompanionError, MaterialRequest};
+use thiserror::Error;
+
+use crate::PathIndex;
+
+#[path = "archive_default_material.rs"]
+pub(crate) mod default_material;
+
+pub use default_material::{ArchiveDefaultMaterial, ArchiveDefaultMaterialState};
+
+#[derive(Debug, Error)]
+enum MaterialReferenceError {
+    #[error("the material reference is not an admitted virtual Archive path")]
+    Unsupported,
+    #[error("the authoring reference has more than one Data root")]
+    AmbiguousRoot,
+    #[error("the mapped Archive target {target} matches more than one Entry")]
+    AmbiguousTarget { target: String },
+}
+
+pub(crate) fn request(name: &str) -> Result<MaterialRequest, CompanionError> {
+    let trimmed = name.trim();
+    if name.chars().any(char::is_control) || trimmed.starts_with('\\') {
+        return Err(MaterialReferenceError::Unsupported.into());
+    }
+    let normalized = trimmed.replace('\\', "/");
+    let relative = if let Some(authoring) = normalized.strip_prefix("//") {
+        authoring_relative(authoring)?
+    } else if let Some(virtual_root) = normalized.strip_prefix('/') {
+        virtual_root
+    } else {
+        normalized.as_str()
+    };
+    let request = MaterialRequest::new(relative)?;
+    Ok(if normalized.starts_with('/') {
+        request.at_data_root()
+    } else {
+        request
+    })
+}
+
+fn authoring_relative(name: &str) -> Result<&str, CompanionError> {
+    MaterialRequest::new(name)?;
+    let mut root = None;
+    for (position, part) in name.split('/').enumerate() {
+        if part.eq_ignore_ascii_case("Data") && root.replace(position).is_some() {
+            return Err(MaterialReferenceError::AmbiguousRoot.into());
+        }
+    }
+    let Some(position) = root.filter(|position| *position >= 2) else {
+        return Err(MaterialReferenceError::Unsupported.into());
+    };
+    name.splitn(position + 2, '/')
+        .nth(position + 1)
+        .filter(|relative| !relative.is_empty())
+        .ok_or_else(|| MaterialReferenceError::Unsupported.into())
+}
+
+pub(crate) fn target(
+    index: &PathIndex<'_>,
+    folder: &str,
+    request: &MaterialRequest,
+) -> Result<String, CompanionError> {
+    if let Some(sibling) = sibling(request, folder)
+        && let Some(entry) = unique_entry(index, &sibling)?
+    {
+        return Ok(entry.path().to_owned());
+    }
+    let target = data_root(request);
+    Ok(unique_entry(index, &target)?.map_or(target, |entry| entry.path().to_owned()))
+}
+
+/// Ordered target paths for an authored archive material name.
+pub struct ArchiveMaterialPaths {
+    /// Candidate beside the model, when the request allows sibling lookup.
+    pub sibling: Option<String>,
+    /// Candidate under the Data root, used only after complete sibling absence.
+    pub data_root: String,
+}
+
+impl ArchiveMaterialPaths {
+    /// Maps the authored name to candidate paths without reading archive entries.
+    ///
+    /// # Errors
+    /// Returns the virtual-path parse error for an inadmissible reference.
+    pub fn new(model_path: &str, name: &str) -> Result<Self, CompanionError> {
+        let request = request(name)?;
+        let (folder, _) = crate::model_source::split_entry_path(model_path);
+        Ok(Self {
+            sibling: sibling(&request, folder),
+            data_root: data_root(&request),
+        })
+    }
+}
+
+fn sibling(request: &MaterialRequest, folder: &str) -> Option<String> {
+    if !request.searches_sibling() || request.path().contains('/') {
+        return None;
+    }
+    Some(if folder.is_empty() {
+        format!("{}.mtl", request.path())
+    } else {
+        format!("{folder}/{}.mtl", request.path())
+    })
+}
+
+fn data_root(request: &MaterialRequest) -> String {
+    format!("Data/{}.mtl", request.path())
+}
+
+pub(crate) fn unique_entry<'a>(
+    index: &PathIndex<'a>,
+    path: &str,
+) -> Result<Option<&'a Entry>, CompanionError> {
+    match unique_entry_choice(index, path)? {
+        EntryChoice::Missing => Ok(None),
+        EntryChoice::Unique(entry) => Ok(Some(entry)),
+        EntryChoice::Ambiguous(_, _) => Err(MaterialReferenceError::AmbiguousTarget {
+            target: path.to_owned(),
+        }
+        .into()),
+    }
+}
+
+pub(crate) enum EntryChoice<'archive> {
+    Missing,
+    Unique(&'archive Entry),
+    Ambiguous(&'archive Entry, &'archive Entry),
+}
+
+pub(crate) fn unique_entry_choice<'a>(
+    index: &PathIndex<'a>,
+    path: &str,
+) -> Result<EntryChoice<'a>, CompanionError> {
+    let mut matches = index.matching_entries_with(path, |_| Ok::<(), Infallible>(()))?;
+    let Some(first) = matches.next().transpose()? else {
+        return Ok(EntryChoice::Missing);
+    };
+    Ok(matches
+        .next()
+        .transpose()?
+        .map_or(EntryChoice::Unique(first), |second| {
+            EntryChoice::Ambiguous(first, second)
+        }))
+}

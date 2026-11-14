@@ -11,24 +11,19 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
+use crate::real_archive_contract_templates::mission_graph::{self as graph, Family, Mission};
 use crate::real_archive_verification::{TestResult, guids, print_line};
 
-/// The fields of an entry that hold one GUID and the kind they link to.
-const LINKS: [(&str, &str); 5] = [
-    ("missionTypeGuid", "missionTypes"),
-    ("locationGuid", "starmapObjects"),
-    ("localityGuid", "missionLocalities"),
-    ("invitationMissionGuid", "missionBrokerEntries"),
-    ("linkedMissionGuid", "missionBrokerEntries"),
-];
-
-/// Asserts that every `brokerEntryGuid` of a contract names an entry, that the links of an entry
-/// resolve to the entry of their kind when they name one the catalog lists, and that every
-/// objective names a parent among those of its entry. Returns the links that name a Record the
-/// catalog does not list, per field, ordered by field name.
+/// Checks the successful contextual Broker owners, their original links and objective parents.
 pub(crate) fn check_broker_links(catalog: &Value) -> Result<BTreeMap<&'static str, usize>, String> {
-    let entries = guids(catalog, "missionBrokerEntries")?;
-    for contract in catalog["contracts"].as_array().ok_or("contracts")? {
+    let contexts = graph::contexts(catalog, Family::Broker)?;
+    let entries: HashSet<_> = contexts
+        .iter()
+        .map(|mission| graph::guid(mission.definition))
+        .collect::<Result<_, _>>()?;
+    let contracts =
+        crate::real_archive_contracts::v3::rows(catalog).map_err(|error| error.to_string())?;
+    for contract in contracts {
         if let Some(guid) = contract["brokerEntryGuid"].as_str()
             && !entries.contains(guid)
         {
@@ -37,74 +32,79 @@ pub(crate) fn check_broker_links(catalog: &Value) -> Result<BTreeMap<&'static st
     }
     let pools = guids(catalog, "contractShipSpawns")?;
     let queries = guids(catalog, "contractLocationQueries")?;
+    let types = guids(catalog, "missionTypes")?;
+    let locations = guids(catalog, "starmapObjects")?;
+    let localities = guids(catalog, "missionLocalities")?;
+    let targets = [
+        ("type", "missionTypeGuid", &types),
+        ("locationMissionAvailable", "locationGuid", &locations),
+        ("localityAvailable", "localityGuid", &localities),
+        ("invitationMission", "invitationMissionGuid", &entries),
+        ("linkedMission", "linkedMissionGuid", &entries),
+    ];
     let mut unlisted = BTreeMap::new();
-    let targets = LINKS
-        .into_iter()
-        .map(|(field, kind)| Ok((field, guids(catalog, kind)?)))
-        .collect::<Result<Vec<_>, String>>()?;
-    for entry in catalog["missionBrokerEntries"]
-        .as_array()
-        .ok_or("entries")?
-    {
-        let name = entry["className"].as_str().unwrap_or_default();
-        for (field, listed) in &targets {
-            if let Some(guid) = entry[*field].as_str()
+    for mission in &contexts {
+        for (field, label, listed) in &targets {
+            if let Some(value) = mission.root(field)?
+                && let Some(guid) = graph::reference(value)?
                 && !listed.contains(guid)
             {
-                *unlisted.entry(*field).or_insert(0) += 1;
+                *unlisted.entry(*label).or_insert(0) += 1;
             }
         }
-        for field in [
-            "associatedMissionGuids",
-            "requiredMissionGuids",
-            "unlessAvailableMissionGuids",
-        ] {
-            for guid in entry[field].as_array().ok_or(field)? {
-                let guid = guid.as_str().ok_or(field)?;
-                if !entries.contains(guid) {
-                    *unlisted.entry("missionGuids").or_insert(0) += 1;
-                }
-            }
-        }
-        check_parts(name, entry, (&pools, &queries, &entries))?;
+        mission_lists(mission, &entries, &mut unlisted)?;
+        check_parts(mission, (&pools, &queries, &entries))?;
     }
     Ok(unlisted)
 }
 
+fn mission_lists(
+    mission: &Mission<'_>,
+    entries: &HashSet<&str>,
+    unlisted: &mut BTreeMap<&'static str, usize>,
+) -> Result<(), String> {
+    for field in [
+        "associatedMissions",
+        "requiredMissions",
+        "onlyAvailableIfAllMissionsNotAvailable",
+    ] {
+        if let Some(array) = mission.root(field)? {
+            for value in mission.elements(array)? {
+                if let Some(guid) = graph::reference(value)?
+                    && !entries.contains(guid)
+                {
+                    *unlisted.entry("missionGuids").or_insert(0) += 1;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 fn check_parts(
-    name: &str,
-    entry: &Value,
+    mission: &Mission<'_>,
     (pools, queries, entries): (&HashSet<&str>, &HashSet<&str>, &HashSet<&str>),
 ) -> Result<(), String> {
-    for link in entry["shipSpawns"].as_array().ok_or("shipSpawns")? {
-        let guid = link["poolGuid"].as_str().ok_or("poolGuid")?;
-        if !pools.contains(guid) {
-            return Err(format!("{name}: ship spawn pool {guid}"));
-        }
-        if link["level"] != "broker" {
-            return Err(format!("{name}: level of a ship spawn"));
-        }
-    }
-    for link in entry["locationQueries"].as_array().ok_or("queries")? {
-        let guid = link["queryGuid"].as_str().ok_or("queryGuid")?;
-        if !queries.contains(guid) {
-            return Err(format!("{name}: location query {guid}"));
-        }
-    }
-    let objectives = entry["objectives"].as_array().ok_or("objectives")?;
-    let ids: HashSet<&str> = objectives
-        .iter()
-        .filter_map(|objective| objective["id"].as_str())
-        .collect();
-    for objective in objectives {
-        if let Some(parent) = objective["parentId"].as_str()
-            && !ids.contains(parent)
-        {
-            return Err(format!("{name}: objective parent {parent}"));
+    let name = graph::text(mission.definition, "/className/value")?;
+    for link in mission.pools()? {
+        match link.family {
+            "ships" if !pools.contains(link.guid) => {
+                return Err(format!("{name}: ship spawn pool {}", link.guid));
+            }
+            "ships" if link.level != "broker" => {
+                return Err(format!("{name}: level of a ship spawn"));
+            }
+            "location" if !queries.contains(link.guid) => {
+                return Err(format!("{name}: location query {}", link.guid));
+            }
+            _ => {}
         }
     }
-    for modifier in entry["modifiers"].as_array().ok_or("modifiers")? {
-        if let Some(guid) = modifier["brokerEntryGuid"].as_str()
+    mission.parents()?;
+    for row in graph::array(mission.projection, "modifiers")? {
+        let modifier = mission.follow(row.get("source").ok_or("actual selected modifier")?)?;
+        if let Some(value) = mission.member(modifier, "missionBrokerEntry")?
+            && let Some(guid) = graph::reference(value)?
             && !entries.contains(guid)
         {
             return Err(format!("{name}: modifier names entry {guid}"));
@@ -125,48 +125,81 @@ fn the_mission_broker_entries_of_a_real_archive_resolve() -> TestResult {
         "links to Records the catalog does not list, per field: {unlisted:?}"
     );
     assert_nothing_unknown(built.summary());
-    let entries = catalog["missionBrokerEntries"]
-        .as_array()
-        .ok_or("entries")?;
-    let named: HashSet<&str> = catalog["contracts"]
-        .as_array()
-        .into_iter()
-        .flatten()
+    let entries = graph::contexts(&catalog, Family::Broker)?;
+    let named: HashSet<&str> = crate::real_archive_contracts::v3::rows(&catalog)?
+        .iter()
         .filter_map(|contract| contract["brokerEntryGuid"].as_str())
         .collect();
-    let count = |field: &str| -> usize {
-        entries
-            .iter()
-            .map(|entry| entry[field].as_array().map_or(0, Vec::len))
-            .sum()
-    };
-    let outside = entries
-        .iter()
-        .filter(|entry| {
-            !entry["recordPath"]
-                .as_str()
-                .is_some_and(|path| path.starts_with("libs/foundry/records/missionbroker/"))
-        })
-        .count();
+    let counts = entry_counts(&entries)?;
+    let triggers = broker_triggers(&catalog)?;
     print_line(&format!(
-        "{} mission broker entries ({outside} outside the missionbroker folder), {} named by a contract, {} objectives, {} properties, {} modifiers, {} flow triggers, {} requirement terms; links to Records the catalog does not list: {unlisted:?}",
+        "{} mission broker entries ({} outside the missionbroker folder), {} named by a contract, {} objectives, {} properties, {} modifiers, {triggers} flow triggers, {} requirement terms; links to Records the catalog does not list: {unlisted:?}",
         entries.len(),
+        counts.outside,
         named.len(),
-        count("objectives"),
-        count("missionProperties"),
-        count("modifiers"),
-        count("missionFlow"),
-        count("standingRequirements"),
+        counts.objectives,
+        counts.properties,
+        counts.modifiers,
+        counts.terms,
     ));
+    let definition_table = catalog
+        .pointer("/definitions/missionBrokerEntries")
+        .ok_or("Broker D table")?;
+    let context_table = catalog
+        .pointer("/configurations/missionBrokerEntries")
+        .ok_or("Broker C table")?;
+    let size = serde_json::to_string(definition_table)?.len()
+        + serde_json::to_string(context_table)?.len();
     print_line(&format!(
-        "the kind is {} bytes of JSON of the {} bytes of the catalog",
-        serde_json::to_string(&catalog["missionBrokerEntries"])?.len(),
-        built.json().len(),
+        "the Broker D/C tables are {size} bytes of JSON of the {} bytes of the catalog",
+        built.json().len()
     ));
     assert!(entries.len() > 2_000, "entries");
     assert!(!named.is_empty(), "a contract names an entry");
-    assert!(count("objectives") > 500, "objectives");
+    assert!(counts.objectives > 500, "objectives");
     Ok(())
+}
+
+#[derive(Default)]
+struct Counts {
+    outside: usize,
+    objectives: usize,
+    properties: usize,
+    modifiers: usize,
+    terms: usize,
+}
+
+fn entry_counts(entries: &[Mission<'_>]) -> Result<Counts, String> {
+    let mut counts = Counts::default();
+    for mission in entries {
+        let row = mission.projection;
+        counts.outside += usize::from(
+            !graph::text(mission.definition, "/recordPath/value")?
+                .starts_with("libs/foundry/records/missionbroker/"),
+        );
+        counts.objectives += graph::array(row, "objectives")?.len();
+        counts.properties += graph::array(row, "properties")?
+            .iter()
+            .filter(|property| property.get("objective") == Some(&Value::Null))
+            .count();
+        counts.modifiers += graph::array(row, "modifiers")?.len();
+        counts.terms += graph::array(row, "standingRequirements")?.len();
+    }
+    Ok(counts)
+}
+
+fn broker_triggers(catalog: &Value) -> Result<usize, String> {
+    let rows = catalog
+        .pointer("/configurations/missionFlows/rows")
+        .and_then(Value::as_array)
+        .ok_or("actual shared Flow table")?;
+    rows.iter()
+        .filter(|row| {
+            row.pointer("/owner/type").and_then(Value::as_str) == Some("missionBrokerEntry")
+        })
+        .try_fold(0, |count, row| {
+            Ok(count + graph::array(row, "triggers")?.len())
+        })
 }
 
 /// Asserts that no Record failed and that no stored name of a template or a broker entry is
@@ -175,7 +208,7 @@ fn assert_nothing_unknown(summary: &CatalogSummary) {
     let failed: Vec<String> = summary
         .failures()
         .iter()
-        .map(|failure| format!("{}: {}", failure.record_path, failure.reason))
+        .map(|failure| format!("{}: {}", failure.record_path(), failure.reason()))
         .collect();
     assert!(
         failed.is_empty(),

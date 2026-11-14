@@ -4,8 +4,8 @@
 use std::io::{self, Write};
 
 use anyhow::Result;
-use p4kx_channels::{PublicPatches, channel_name};
-use p4kx_extraction::{Archive, Build, Entry};
+use p4kx_channels::channel_name;
+use p4kx_extraction::{Archive, ArchiveLayoutInfo, ArchiveLayoutOrigins, Build, Entry};
 use serde::Serialize;
 
 use crate::cli::InfoArgs;
@@ -18,6 +18,9 @@ struct Summary<'a> {
     archive: String,
     channel: Option<String>,
     build: Option<BuildJson<'a>>,
+    metadata: ArchiveLayoutInfo,
+    #[serde(flatten)]
+    origins: Option<ArchiveLayoutOrigins>,
     entry_count: usize,
     encrypted_count: usize,
     issue_count: usize,
@@ -32,13 +35,21 @@ pub(crate) fn run(args: &InfoArgs, as_json: bool) -> Result<()> {
         warn_about_manifest(&archive)?;
     }
     crate::issues::warn(&archive)?;
-    let patches = PublicPatches::standard();
+    let patches = crate::launcher_discovery::patches()?;
     let build = archive.build().map(|build| patches.attach(build));
     let entries = archive.entries();
+    let (metadata, origins) = if as_json {
+        let (metadata, origins) = ArchiveLayoutInfo::project_with_origins(&archive, "/metadata")?;
+        (metadata, Some(origins))
+    } else {
+        (ArchiveLayoutInfo::of(archive.metadata()), None)
+    };
     let info = Summary {
         archive: json::path(archive.path()),
         channel: channel_name(archive.path()),
         build: build.as_ref().map(BuildJson::from),
+        metadata,
+        origins,
         entry_count: entries.len(),
         encrypted_count: entries.iter().filter(|entry| entry.is_encrypted()).count(),
         issue_count: archive.issue_count(),

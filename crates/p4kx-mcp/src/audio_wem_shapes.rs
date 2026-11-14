@@ -106,4 +106,9 @@ pub(crate) struct ExcerptResult {
     pub(crate) max_bytes: usize,
     /// Whether the excerpt is shorter than asked for: cut by the size cap or the sound's end.
     pub(crate) truncated: bool,
+    /// Origin of each structured field and of the WAV content block.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: crate::audio_excerpt_origin::ExcerptFieldOrigins,
+    /// Original source and contribution coordinates used by this response.
+    pub(crate) provenance: p4kx_extraction::SourceInventory,
 }

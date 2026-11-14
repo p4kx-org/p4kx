@@ -19,7 +19,7 @@ fn outcome(forge: &DataForge<'_>, text: &str, share: bool) -> Result<Vec<String>
     if !share {
         compiled = compiled.without_shared_prefixes();
     }
-    let run = compiled.run();
+    let run = compiled.run()?;
     Ok(run
         .rows(0..run.len())
         .iter()

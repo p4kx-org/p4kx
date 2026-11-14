@@ -18,6 +18,33 @@ animation holds 425,242 keys, the largest database 6,751,431. 1,475 `.caf` files
 animations of databases are additive (see below). The five channels of the Archive hold the same
 numbers within a few hundred files.
 
+## Entity rig input discovery
+
+Assembly's `discover_entity_rigs` visits a resolved Loadout's root, attached entities and landing
+gear in declaration order. It retains original geometry selectors, CDF model references, the
+selected physical skeleton and its primary chunk, and ordered animation parameter rows with
+original positions. Repeated placements remain distinct even when they share one Archive Entry.
+Each requested input distinguishes missing, ambiguous, key-required, wrong-key and other read
+failure. Encryption is unknown for a request whose bytes could not be read, and follows the
+observed input and its Archive ancestry after a successful read. Unread or invalid root inputs
+leave child and gear discovery available.
+
+The Rust `discover_entity_clips` API inventories CAF and DBA header declarations under the
+resolved rig positions. Tracks-database links preserve the actual source read or why it could
+not be selected. A folder directive links the physical CAF and DBA candidates in its subtree.
+Candidates shared by different placements refer to the same inventoried Entry. A concrete CAF
+alias resolves by its rooted path or its preceding folder in the same AnimationList. A relative
+alias records the folder as a separate selector. Wildcards remain in the authored parameters.
+Each folder orders candidates by their physical Archive Entry position. All requested folders
+share a single directory scan.
+
+The header inventory preserves the physical clip ordinal, original 48-byte metadata and DBA name,
+independent timing, and each observed controller descriptor and encoding word. A malformed block
+does not discard a separately readable metadata record. The inventory reads one Archive Entry at
+a time without decoding animation key samples or generating a pose. The
+`discover_entity_clips_with` variant polls a caller checkpoint during discovery, file streaming
+and header interpretation. An interrupted inventory returns the checkpoint failure.
+
 ## Where the keys are
 
 | Chunk | ID | Version | In |

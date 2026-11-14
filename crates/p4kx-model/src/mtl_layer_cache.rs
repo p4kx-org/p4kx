@@ -90,7 +90,22 @@ impl LayerBudget {
 struct Fetched {
     bytes: usize,
     held: usize,
+    read: ReadLayer,
+}
+
+#[derive(Debug, Clone)]
+struct ReadLayer {
     status: Arc<MaterialStatus>,
+    origin: Option<crate::MaterialReadOrigin>,
+}
+
+impl ReadLayer {
+    fn unobserved(status: MaterialStatus) -> Self {
+        Self {
+            status: Arc::new(status),
+            origin: None,
+        }
+    }
 }
 
 type Table = HashMap<String, Arc<OnceLock<Fetched>>>;
@@ -190,13 +205,17 @@ impl LayerCache {
         submaterial: &str,
         companions: &mut dyn CompanionResolver,
         budget: &mut LayerBudget,
-    ) -> Option<LayerSurface> {
-        let status = self.library(path, companions, budget);
-        let library = status.library()?;
-        library
-            .materials
-            .get(library.layer_position(submaterial)?)
-            .map(LayerSurface::of)
+    ) -> (
+        Option<(LayerSurface, usize)>,
+        Option<crate::MaterialReadOrigin>,
+    ) {
+        let read = self.read_library(path, companions, budget);
+        let surface = read.status.library().and_then(|library| {
+            let position = library.layer_position(submaterial)?;
+            let material = library.materials.get(position)?;
+            Some((LayerSurface::of(material), position))
+        });
+        (surface, read.origin)
     }
 
     /// Returns the layer file at `path` as a material library, read without its own layers and
@@ -211,17 +230,40 @@ impl LayerCache {
         companions: &mut dyn CompanionResolver,
         budget: &mut LayerBudget,
     ) -> Arc<MaterialStatus> {
+        self.library_with_read_origin(path, companions, budget).0
+    }
+
+    /// Returns the cached library and the opaque identity of the read that supplied it.
+    #[must_use]
+    pub fn library_with_read_origin(
+        &self,
+        path: &str,
+        companions: &mut dyn CompanionResolver,
+        budget: &mut LayerBudget,
+    ) -> (Arc<MaterialStatus>, Option<crate::MaterialReadOrigin>) {
+        let read = self.read_library(path, companions, budget);
+        (read.status, read.origin)
+    }
+
+    fn read_library(
+        &self,
+        path: &str,
+        companions: &mut dyn CompanionResolver,
+        budget: &mut LayerBudget,
+    ) -> ReadLayer {
         let Some(request) = request_path(path) else {
-            return Arc::new(MaterialStatus::Unreadable {
+            return ReadLayer::unobserved(MaterialStatus::Unreadable {
                 path: path.to_owned(),
                 reason: "the path leaves the Data folder or is no plain path".to_owned(),
+                target: None,
             });
         };
         let key = request.to_ascii_lowercase();
         if !budget.admits(&key) {
-            return Arc::new(MaterialStatus::Unreadable {
+            return ReadLayer::unobserved(MaterialStatus::Unreadable {
                 path: request,
                 reason: "the layer-file budget is spent".to_owned(),
+                target: None,
             });
         }
         let cell = self.cell(&key);
@@ -234,7 +276,7 @@ impl LayerCache {
             self.cached_bytes.fetch_add(fetched.held, Ordering::Relaxed);
         }
         budget.charge(&key, fetched.bytes);
-        Arc::clone(&fetched.status)
+        fetched.read.clone()
     }
 
     fn table(&self) -> MutexGuard<'_, Table> {
@@ -258,13 +300,15 @@ impl LayerCache {
 
 fn fetch(request: &str, key: &str, companions: &mut dyn CompanionResolver) -> Fetched {
     let path = request.to_owned();
-    let (bytes, status) = match companions.resolve(CompanionPath::Material(request)) {
-        Ok(None) => (0, MaterialStatus::Missing { path }),
+    let companion = companions.resolve_material_file(CompanionPath::Material(request));
+    let (bytes, status) = match companion.bytes {
+        Ok(None) => (0, MaterialStatus::Missing { path, target: None }),
         Err(error) => (
             0,
             MaterialStatus::Unreadable {
                 path,
                 reason: error.to_string(),
+                target: None,
             },
         ),
         Ok(Some(bytes)) => (
@@ -274,6 +318,7 @@ fn fetch(request: &str, key: &str, companions: &mut dyn CompanionResolver) -> Fe
                 Err(error) => MaterialStatus::Unreadable {
                     path,
                     reason: error.to_string(),
+                    target: None,
                 },
             },
         ),
@@ -281,6 +326,9 @@ fn fetch(request: &str, key: &str, companions: &mut dyn CompanionResolver) -> Fe
     Fetched {
         bytes,
         held: status.library().map_or(0, MaterialLibrary::estimated_bytes),
-        status: Arc::new(status),
+        read: ReadLayer {
+            status: Arc::new(status),
+            origin: companion.origin,
+        },
     }
 }

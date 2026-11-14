@@ -82,8 +82,7 @@ impl PresetStyles {
         let defaults = styles_of(&canvas.defaults);
         let brand = code
             .and_then(|code| canvas.brand_of(code))
-            .map(|brand| styles_of(&brand.entries))
-            .unwrap_or_default();
+            .map_or_default(|brand| styles_of(&brand.entries));
         let by_name = PRESETS
             .into_iter()
             .filter_map(|name| {

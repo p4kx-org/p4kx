@@ -10,9 +10,9 @@ use p4kx_archive::Archive;
 use p4kx_dataforge::{DataForge, DataForgeError};
 use thiserror::Error;
 
-use crate::{ArchiveWatch, DataForgeEntry, DataForgeLoadError};
+use crate::{ArchiveWatch, DataForgeEntry, DataForgeLoadError, DataForgeOrigin};
 
-type Job = Box<dyn FnOnce(&DataForge<'_>) + Send>;
+type Job = Box<dyn FnOnce(&DataForge<'_>, &DataForgeOrigin) + Send>;
 
 /// The DataForge of an Archive, read once and kept open, with the indexes it builds on first
 /// use, for as long as the value lives.
@@ -23,6 +23,7 @@ type Job = Box<dyn FnOnce(&DataForge<'_>) + Send>;
 #[derive(Debug)]
 pub struct LoadedDataForge {
     path: String,
+    origin: DataForgeOrigin,
     jobs: mpsc::Sender<Job>,
 }
 
@@ -60,6 +61,7 @@ impl LoadedDataForge {
 
     fn start(entry: DataForgeEntry) -> Result<Self, DataForgeLoadError> {
         let path = entry.path().to_owned();
+        let origin = entry.origin().clone();
         let (ready, opened) = mpsc::sync_channel(1);
         let (jobs, receiver) = mpsc::channel();
         thread::Builder::new()
@@ -67,7 +69,7 @@ impl LoadedDataForge {
             .spawn(move || serve(&entry, &receiver, &ready))
             .map_err(DataForgeLoadError::Thread)?;
         match opened.recv() {
-            Ok(Ok(())) => Ok(Self { path, jobs }),
+            Ok(Ok(())) => Ok(Self { path, origin, jobs }),
             Ok(Err(error)) => Err(DataForgeLoadError::Corrupt(error)),
             Err(_) => Err(DataForgeLoadError::Thread(io::Error::other(
                 "the DataForge thread ended before it opened the DataForge",
@@ -81,6 +83,12 @@ impl LoadedDataForge {
         &self.path
     }
 
+    /// Returns the physical origin retained by the worker and its cached handle.
+    #[must_use]
+    pub const fn origin(&self) -> &DataForgeOrigin {
+        &self.origin
+    }
+
     /// Runs `work` against the DataForge and returns its result; the caller waits meanwhile.
     ///
     /// # Errors
@@ -91,9 +99,22 @@ impl LoadedDataForge {
         T: Send + 'static,
         F: FnOnce(&DataForge<'_>) -> T + Send + 'static,
     {
+        self.with_origin(move |forge, _origin| work(forge))
+    }
+
+    /// Runs work against the DataForge and the worker's retained physical origin.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`DataForgeStopped`] when work could not run or ended without a result.
+    pub fn with_origin<T, F>(&self, work: F) -> Result<T, DataForgeStopped>
+    where
+        T: Send + 'static,
+        F: FnOnce(&DataForge<'_>, &DataForgeOrigin) -> T + Send + 'static,
+    {
         let (sender, result) = mpsc::sync_channel(1);
-        let job: Job = Box::new(move |forge| {
-            let _ignored = sender.send(work(forge));
+        let job: Job = Box::new(move |forge, origin| {
+            let _ignored = sender.send(work(forge, origin));
         });
         self.jobs.send(job).map_err(|_| DataForgeStopped)?;
         result.recv().map_err(|_| DataForgeStopped)
@@ -116,11 +137,12 @@ fn serve(
         return;
     }
     let forge = &forge;
+    let origin = entry.origin();
     thread::scope(|scope| {
         for job in jobs {
             let _ignored = thread::Builder::new()
                 .name("dataforge-call".to_owned())
-                .spawn_scoped(scope, move || job(forge));
+                .spawn_scoped(scope, move || job(forge, origin));
         }
     });
 }

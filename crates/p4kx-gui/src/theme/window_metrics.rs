@@ -16,18 +16,21 @@ pub const WINDOW_MIN_WIDTH: f32 = 640.0;
 pub const WINDOW_MIN_HEIGHT: f32 = 400.0;
 /// The width of the rail that stays of a collapsed sidebar: a compact button between two
 /// `space-1` margins.
-pub const SIDEBAR_RAIL_WIDTH: f32 = BUTTON_XS_HEIGHT + 2.0 * SPACE_1;
+pub const SIDEBAR_RAIL_WIDTH: f32 = 2.0f32.mul_add(SPACE_1, BUTTON_XS_HEIGHT);
 /// The width the room of a work tab below the tab bar keeps; a narrower window scrolls it.
 ///
 /// The smallest window less the rail, the scrollbar a low window shows and the `space-2` gutter
 /// on each side of the window.
-pub const WORK_MIN_WIDTH: f32 = WINDOW_MIN_WIDTH - SIDEBAR_RAIL_WIDTH - SCROLLBAR - 2.0 * SPACE_2;
+pub const WORK_MIN_WIDTH: f32 =
+    2.0f32.mul_add(-SPACE_2, WINDOW_MIN_WIDTH - SIDEBAR_RAIL_WIDTH - SCROLLBAR);
 /// The height the Entry list of the Browse tab keeps above the preview.
 ///
 /// Its toolbar with the search row, the actions in one row and the quick filters, the table head
 /// and one row, and the two hairlines of its frame.
-pub const BROWSE_LIST_MIN_HEIGHT: f32 =
-    4.0 * TOOLBAR_PADDING + 2.0 * BUTTON_HEIGHT + SEGMENT_HEIGHT + 2.0 * ROW_HEIGHT + 2.0;
+pub const BROWSE_LIST_MIN_HEIGHT: f32 = 2.0f32.mul_add(
+    ROW_HEIGHT,
+    2.0f32.mul_add(BUTTON_HEIGHT, 4.0 * TOOLBAR_PADDING) + SEGMENT_HEIGHT,
+) + 2.0;
 /// The height a second row of actions adds to a toolbar, reserved only while the actions wrap.
 pub const WRAPPED_ACTIONS_HEIGHT: f32 = TOOLBAR_PADDING + BUTTON_HEIGHT;
 /// The height the room of a work tab below the tab bar keeps; a lower window scrolls it.
@@ -40,4 +43,4 @@ pub const SIDEBAR_COLLAPSE_WIDTH: f32 = SIDEBAR_WIDTH + WORK_MIN_WIDTH;
 /// The height the toolbar of the Sounds tab keeps before it scrolls.
 ///
 /// The Entity row, two rows of actions and the search row.
-pub const SOUNDS_TOOLBAR_MIN_HEIGHT: f32 = 4.0 * BUTTON_HEIGHT + 3.0 * TOOLBAR_PADDING;
+pub const SOUNDS_TOOLBAR_MIN_HEIGHT: f32 = 3.0f32.mul_add(TOOLBAR_PADDING, 4.0 * BUTTON_HEIGHT);

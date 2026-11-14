@@ -5,19 +5,57 @@ use std::io;
 use std::path::PathBuf;
 
 use p4kx_gltf::GltfError;
-use p4kx_guard::WriteRefused;
+use p4kx_guard::{OwnedOutputCleanupError, OwnedOutputError, WriteProtectionError, WriteRefused};
 use thiserror::Error;
 
 /// Why a package could not be written.
 ///
-/// Whatever the cause, the output is either the complete new package or what it was before; the
-/// temporary folder is removed.
+/// Errors retain their causes; uncertain temporary targets and unrestored earlier packages remain.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum PackageError {
-    /// The output lies inside a Star Citizen installation.
+    /// Installation protection or source/target identity prevents writing.
     #[error(transparent)]
-    Refused(WriteRefused),
+    Refused(WriteProtectionError),
+    /// Cleanup stopped before modifying an uncertain or inaccessible owned output.
+    #[error(transparent)]
+    Cleanup(OwnedOutputCleanupError),
+    /// Exclusive creation or cleanup retained a typed output failure.
+    #[error(transparent)]
+    OwnedOutput(OwnedOutputError),
+    /// Both the package operation and its explicit cleanup failed.
+    #[error("package operation failed: {primary}; cleanup also failed: {cleanup}")]
+    CleanupFailed {
+        /// The original package failure.
+        #[source]
+        primary: Box<Self>,
+        /// The failure that retained temporary output.
+        cleanup: Box<Self>,
+    },
+    /// A successful rename could not authenticate its destination.
+    #[error("package output {} was retained: {cause}", path.display())]
+    RetainedOutput {
+        /// The renamed output that remains.
+        path: PathBuf,
+        /// The earlier package retained during replacement.
+        previous: Option<PathBuf>,
+        /// The original post-rename failure.
+        #[source]
+        cause: Box<Self>,
+    },
+    /// Protection prevented restoring the earlier package after a failed replacement.
+    #[error("cannot restore the earlier package at {} to {}: {cause}", old.display(), path.display())]
+    RestoreRefused {
+        /// The requested package output.
+        path: PathBuf,
+        /// The retained earlier package.
+        old: PathBuf,
+        /// The protection refusal.
+        #[source]
+        cause: Box<Self>,
+        /// The original replacement failure.
+        replacement: Box<Self>,
+    },
     /// The output exists and is not a package folder of this tool, so it is not replaced.
     #[error(
         "{} exists and is not a package folder written by this tool; choose a new folder",
@@ -25,6 +63,12 @@ pub enum PackageError {
     )]
     NotAPackage {
         /// The output as given.
+        path: PathBuf,
+    },
+    /// An earlier retained backup occupies the requested replacement name.
+    #[error("a retained package backup already exists at {}", path.display())]
+    BackupExists {
+        /// The backup left for explicit recovery.
         path: PathBuf,
     },
     /// The output names no folder, e.g. it ends in `..`.
@@ -79,6 +123,30 @@ pub enum PackageError {
         #[source]
         source: GltfError,
     },
+    /// Original DDS metadata or package field evidence could not be recorded.
+    #[error("cannot record package texture metadata")]
+    TextureEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original authored material source evidence could not be recorded.
+    #[error("cannot record package authored material source evidence")]
+    MaterialSourceEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original physical inputs for an emitted material control could not be recorded.
+    #[error("cannot record package material emission evidence")]
+    MaterialEmissionEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original tint palette or selection evidence could not be recorded.
+    #[error("cannot record package tint palette evidence")]
+    PaletteEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original entity classification evidence could not be recorded.
+    #[error("cannot record package entity classification")]
+    EntityEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original light placement evidence could not be recorded.
+    #[error("cannot record package light placement")]
+    LightEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original collision source or placement evidence could not be recorded.
+    #[error("cannot record package collision helper evidence")]
+    CollisionEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original Entity Glow declarations or their bindings could not be recorded.
+    #[error("cannot record package Glow evidence")]
+    GlowEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
     /// The caller asked to stop.
     #[error("cancelled")]
     Cancelled,
@@ -86,7 +154,54 @@ pub enum PackageError {
 
 impl From<WriteRefused> for PackageError {
     fn from(refused: WriteRefused) -> Self {
-        Self::Refused(refused)
+        Self::Refused(refused.into())
+    }
+}
+
+impl From<WriteProtectionError> for PackageError {
+    fn from(cause: WriteProtectionError) -> Self {
+        if cause.is_cancelled() {
+            Self::Cancelled
+        } else {
+            Self::Refused(cause)
+        }
+    }
+}
+
+impl From<OwnedOutputCleanupError> for PackageError {
+    fn from(cause: OwnedOutputCleanupError) -> Self {
+        Self::Cleanup(cause)
+    }
+}
+
+impl From<OwnedOutputError> for PackageError {
+    fn from(cause: OwnedOutputError) -> Self {
+        match cause {
+            OwnedOutputError::Protection(cause) => cause.into(),
+            OwnedOutputError::Io { path, source } => from_owned_io(path, source),
+            cause => Self::OwnedOutput(cause),
+        }
+    }
+}
+
+fn from_owned_io(path: PathBuf, source: io::Error) -> PackageError {
+    match source.downcast::<PackageError>() {
+        Ok(cause) => cause,
+        Err(source) => PackageError::write(path, source),
+    }
+}
+
+pub(crate) fn finish<T>(
+    result: Result<T, PackageError>,
+    cleanup: Result<(), PackageError>,
+) -> Result<T, PackageError> {
+    match (result, cleanup) {
+        (result, Ok(())) => result,
+        (Ok(_), Err(cleanup)) => Err(cleanup),
+        (Err(primary), Err(cleanup)) => Err(PackageError::CleanupFailed {
+            primary: Box::new(primary),
+            cleanup: Box::new(cleanup),
+        }),
     }
 }
 

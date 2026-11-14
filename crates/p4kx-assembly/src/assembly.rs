@@ -5,13 +5,23 @@ use std::io::Write;
 use std::sync::Arc;
 
 use p4kx_dataforge::Guid;
+use p4kx_extraction::{ArchiveDefaultMaterial, ArchiveMaterialRead, ModelArchiveSource};
 use p4kx_gltf::{
-    GlbOptions, GlbSummary, GltfError, Scene, SceneNode, ScenePart, TextureLoader, write_scene_glb,
-    write_scene_glb_with,
+    GlbOptions, GlbSummary, GltfError, TextureLoader, write_scene_glb, write_scene_glb_with,
 };
 use p4kx_model::{MaterialStatus, Model, TintPalette, Transform, UnresolvedLayers};
 
-use crate::{AttachedModel, Issue, creature_rig};
+pub(crate) use self::part_inputs::ModelDefinition;
+use crate::geometry::GeometrySelectors;
+use crate::model_placement_sources::ModelPlacement;
+use crate::{AttachedModel, GearPlacementSource, Issue, PortPlacementSource};
+
+#[path = "assembly_default_material.rs"]
+mod default_material;
+#[path = "assembly_part_inputs.rs"]
+mod part_inputs;
+#[path = "assembly_scene.rs"]
+mod scene;
 
 /// The most parts an Assembly holds; further parts of the Loadout are left out.
 pub const MAX_ASSEMBLY_PARTS: usize = 1 << 14;
@@ -105,16 +115,23 @@ pub struct Part {
     pub(crate) name: String,
     pub(crate) path: String,
     pub(crate) guid: Guid,
+    pub(crate) entity_record_index: Option<u32>,
     pub(crate) class_name: String,
-    pub(crate) landing_gear: bool,
+    pub(crate) classification: Option<crate::ItemClassification>,
+    pub(crate) landing_gear: Option<GearPlacementSource>,
     pub(crate) parent: Option<usize>,
     pub(crate) local: Transform,
     pub(crate) world: Transform,
     pub(crate) placement: Placement,
+    pub(crate) placement_source: Option<PortPlacementSource>,
+    pub(crate) model_placement: ModelPlacement,
     pub(crate) geometry: Option<String>,
     pub(crate) model: Option<Arc<Model>>,
-    pub(crate) materials: Arc<MaterialStatus>,
-    pub(crate) palette: Option<Arc<TintPalette>>,
+    pub(crate) model_archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) model_definition: ModelDefinition,
+    pub(crate) geometry_selectors: GeometrySelectors,
+    pub(crate) materials: Arc<ArchiveMaterialRead>,
+    pub(crate) palette: Option<crate::palette::ChosenPalette>,
     pub(crate) attachments: Vec<AttachedModel>,
     pub(crate) hidden: bool,
 }
@@ -150,7 +167,7 @@ impl Part {
     /// Returns whether the part is a landing gear of the Entity it hangs below, not an Entity.
     #[must_use]
     pub const fn is_landing_gear(&self) -> bool {
-        self.landing_gear
+        self.landing_gear.is_some()
     }
 
     /// Returns the index of the parent part, or `None` for the root. A parent comes before its
@@ -204,7 +221,7 @@ impl Part {
     /// else the one the model names.
     #[must_use]
     pub fn materials(&self) -> &MaterialStatus {
-        &self.materials
+        &self.materials.status
     }
 
     /// Returns the tint palette the part's materials that take one are drawn with: the one its
@@ -212,7 +229,13 @@ impl Part {
     /// built without palettes or none could be resolved.
     #[must_use]
     pub fn palette(&self) -> Option<&TintPalette> {
-        self.palette.as_deref()
+        self.palette.as_ref().map(|chosen| chosen.palette.as_ref())
+    }
+
+    /// Returns the physical observations used to choose this part's palette.
+    #[must_use]
+    pub fn palette_source(&self) -> Option<&crate::PaletteSource> {
+        self.palette.as_ref().map(|chosen| &chosen.source)
     }
 
     /// Returns the rigid models the part carries at bones of its skeleton, the bone attachments
@@ -231,9 +254,11 @@ impl Part {
 #[derive(Debug, Clone)]
 pub struct Assembly {
     pub(crate) parts: Vec<Part>,
+    pub(crate) forge_origin: Option<Arc<p4kx_extraction::DataForgeOrigin>>,
     pub(crate) issues: Vec<Issue>,
     pub(crate) lod: u32,
     pub(crate) interior: Option<crate::EntityInterior>,
+    pub(crate) default_material: Option<Arc<ArchiveDefaultMaterial>>,
     pub(crate) containers: Vec<Arc<[crate::ObjectContainerRef]>>,
 }
 
@@ -284,16 +309,6 @@ impl Assembly {
     #[must_use]
     pub const fn lod(&self) -> u32 {
         self.lod
-    }
-
-    /// Returns the bone attachments of all parts, each with the index of its part, in the order
-    /// of the parts.
-    pub fn attached_models(&self) -> impl Iterator<Item = (usize, &AttachedModel)> {
-        self.parts.iter().enumerate().flat_map(|(index, part)| {
-            part.attachments
-                .iter()
-                .map(move |attached| (index, attached))
-        })
     }
 
     /// Returns the number of parts that have a model.
@@ -351,36 +366,5 @@ impl Assembly {
         out: &mut impl Write,
     ) -> Result<GlbSummary, GltfError> {
         write_scene_glb_with(&self.scene()?, options, textures, out)
-    }
-
-    pub(crate) fn scene(&self) -> Result<Scene<'_>, GltfError> {
-        let mut scene = creature_rig::skeleton_of(&self.parts, &self.issues, self.lod)
-            .map_or_else(Scene::new, |skeleton| Scene::new().with_skeleton(skeleton));
-        for part in &self.parts {
-            let mut node = SceneNode::new(part.name.clone(), part.parent, part.local);
-            if let Some(model) = &part.model {
-                let drawn = ScenePart::new(model, &part.materials);
-                node = node.with_part(
-                    part.palette
-                        .as_deref()
-                        .map_or(drawn, |palette| drawn.with_palette(palette)),
-                );
-            }
-            scene.push(node)?;
-        }
-        for (index, attached) in self.attached_models() {
-            let drawn = ScenePart::new(&attached.model, &attached.materials);
-            let palette = self
-                .parts
-                .get(index)
-                .and_then(|part| part.palette.as_deref());
-            let node = SceneNode::new(attached.name.clone(), Some(index), attached.local)
-                .with_part(palette.map_or(drawn, |palette| drawn.with_palette(palette)));
-            scene.push(node)?;
-        }
-        if let Some(interior) = &self.interior {
-            interior.add_to_scene(&mut scene, self.parts.len())?;
-        }
-        Ok(scene)
     }
 }

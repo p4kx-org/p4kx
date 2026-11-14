@@ -1,208 +1,216 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeSet, HashMap};
-use std::io::Read;
+use std::collections::HashMap;
 
-use p4kx_extraction::{Archive, Entry};
-use serde::Deserialize;
+use p4kx_extraction::{Archive, CancelToken, Entry};
+use schemars::JsonSchema;
+use serde::Serialize;
 
-use crate::shop_registry::is_guid;
-use crate::starmap_index::key;
+use crate::catalog_read::original::EntryCapture;
+use crate::catalog_table::DatasetAvailability;
+use crate::export_diagnostic::ExportDiagnosticCode;
+use crate::export_entry_ledger::EntryOperation;
+use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::schema_fields::every_field_required;
+use crate::shop_entry_read;
+pub(crate) use crate::shop_inventory_compatibility::ItemList;
+use crate::shop_inventory_file::{
+    InventoryFileEvidence, ReadInventory, RecordedItems, ShopInventoryDefinition,
+};
+use crate::shop_inventory_path::{FOLDER, InventoryStem};
+use crate::shop_inventory_source_read as source;
+use crate::starmap_index;
+use crate::{CatalogError, Kind};
 
-/// The inventory files that are designer placeholders: the same few commodities for bars,
-/// refineries and showrooms alike, or items no Record has. A shop that names one has no list.
-pub(crate) const PLACEHOLDERS: [&str; 2] = ["temp_outpost_shopinventory", "inv_cryastro_dummy"];
+const PLACEHOLDERS: [&str; 2] = ["temp_outpost_shopinventory", "inv_cryastro_dummy"];
 
 pub(crate) fn is_placeholder(stem: &str) -> bool {
     PLACEHOLDERS.contains(&stem)
 }
 
-const FOLDER: &str = "data\\scripts\\shopinventories\\";
-const MAX_INVENTORY_LEN: u64 = 16 << 20;
-
-/// What reading the inventory file of a shop gave.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum ItemList {
-    /// The item GUIDs of the file, lower case, ordered and without repeats (possibly none), and
-    /// how many `ID` values were no GUID and left out.
-    Items { guids: Vec<String>, dropped: usize },
-    /// The Archive holds no such file.
-    Missing,
-    /// The file is too large, empty, cannot be opened or is no inventory JSON; holds the path of
-    /// the file and why it cannot be read.
-    Unreadable(String),
+/// Physical offline inventory definitions selected independently of the shop registry.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub(crate) struct ShopInventoryTable {
+    availability: DatasetAvailability,
+    meaning: InventoryMeaning,
+    pub(crate) rows: Vec<ShopInventoryDefinition>,
 }
 
-/// The inventory files `Data\Scripts\ShopInventories\<stem>.json` of an Archive.
-pub(crate) struct Inventories<'a> {
-    archive: &'a Archive,
-    by_stem: HashMap<String, &'a Entry>,
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
+enum InventoryMeaning {
+    OfflineDesignTime,
 }
 
-#[derive(Deserialize)]
-struct File {
-    #[serde(rename = "Collection")]
-    collection: Option<Collection>,
-    #[serde(rename = "Inventory")]
-    inventory: Option<Vec<Element>>,
+impl Default for ShopInventoryTable {
+    fn default() -> Self {
+        Self {
+            availability: DatasetAvailability::Absent,
+            meaning: InventoryMeaning::OfflineDesignTime,
+            rows: Vec::new(),
+        }
+    }
 }
 
-#[derive(Deserialize)]
-struct Collection {
-    #[serde(rename = "Inventory")]
-    inventory: Vec<Element>,
+pub(crate) struct PreparedInventories {
+    pub(crate) table: ShopInventoryTable,
+    pub(crate) ledger: ExportLedger,
+    pub(crate) inventories: Inventories,
 }
 
-#[derive(Deserialize)]
-struct Element {
-    #[serde(rename = "ID")]
-    id: Id,
+/// The compatibility lookup from the same read that produced each physical definition.
+pub(crate) struct Inventories {
+    count: usize,
+    by_stem: HashMap<String, InventoryFiles>,
+    complete_directory: bool,
 }
 
-#[derive(Deserialize)]
-struct Id {
-    #[serde(rename = "ID")]
-    ids: Vec<String>,
+#[derive(Default)]
+struct InventoryFiles {
+    selected: Option<RecordedItems>,
+    physical: Vec<InventoryFileEvidence>,
 }
 
-impl<'a> Inventories<'a> {
-    /// Indexes the `.json` Entries directly below `Data\Scripts\ShopInventories`.
-    pub(crate) fn new(archive: &'a Archive) -> Self {
-        let by_stem = archive
+impl Inventories {
+    pub(crate) fn prepare(
+        archive: &Archive,
+        capture: &EntryCapture<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<PreparedInventories, CatalogError> {
+        let mut ledger = ExportLedger::default();
+        ledger.inventory(Kind::ShopInventories);
+        let mut table = ShopInventoryTable::default();
+        let mut by_stem: HashMap<String, InventoryFiles> = HashMap::new();
+        for entry in archive.entries() {
+            source::check_cancel(cancel)?;
+            let Some(stem) = inventory_stem(entry) else {
+                continue;
+            };
+            let read = ReadInventory::read(archive, entry, capture, cancel)?;
+            let (definition, items, evidence) = read.retain(&mut ledger);
+            source::push(&mut table.rows, definition)?;
+            by_stem
+                .try_reserve(1)
+                .map_err(CatalogError::JsonSourceAllocation)?;
+            let files = by_stem.entry(stem).or_default();
+            source::push(&mut files.physical, evidence)?;
+            files.selected = Some(items);
+        }
+        table.rows.sort_unstable_by(|left, right| {
+            let left = &left.identity;
+            let right = &right.identity;
+            left.normalized_path
+                .value()
+                .cmp(&right.normalized_path.value())
+                .then_with(|| left.entry_index.cmp(&right.entry_index))
+        });
+        let incomplete = crate::export_archive_health::inventory(archive).is_some();
+        if incomplete {
+            ledger.incomplete_inventory(Kind::ShopInventories);
+        }
+        table.availability = if table.rows.is_empty() {
+            if incomplete {
+                DatasetAvailability::Unavailable
+            } else {
+                DatasetAvailability::Absent
+            }
+        } else {
+            DatasetAvailability::Available
+        };
+        Ok(PreparedInventories {
+            table,
+            ledger,
+            inventories: Self {
+                count: by_stem.len(),
+                by_stem,
+                complete_directory: !incomplete,
+            },
+        })
+    }
+
+    pub(crate) const fn count(&self) -> usize {
+        self.count
+    }
+
+    pub(crate) fn files(&self, stem: &str) -> &[InventoryFileEvidence] {
+        self.by_stem
+            .get(stem)
+            .map_or(&[], |files| files.physical.as_slice())
+    }
+
+    pub(crate) const fn complete_directory(&self) -> bool {
+        self.complete_directory
+    }
+
+    pub(crate) fn items(
+        &mut self,
+        stem: &InventoryStem,
+        ledger: &mut ExportLedger,
+    ) -> Result<ItemList, CatalogError> {
+        if let Some(items) = self
+            .by_stem
+            .get_mut(stem.as_str())
+            .and_then(|files| files.selected.take())
+        {
+            Ok(items.selected(ledger))
+        } else {
+            missing(stem, ledger)
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn selected(
+        archive: &Archive,
+        stem: &InventoryStem,
+        ledger: &mut ExportLedger,
+        capture: &EntryCapture<'_>,
+    ) -> Result<ItemList, CatalogError> {
+        let Some(entry) = archive
             .entries()
             .iter()
-            .filter_map(|entry| {
-                let raw = entry.path();
-                let is_json = raw
-                    .len()
-                    .checked_sub(".json".len())
-                    .and_then(|start| raw.get(start..))
-                    .is_some_and(|tail| tail.eq_ignore_ascii_case(".json"));
-                if !is_json {
-                    return None;
-                }
-                let path = key(raw);
-                let file = path.strip_prefix(FOLDER)?;
-                let stem = file.strip_suffix(".json")?;
-                (!stem.is_empty() && !stem.contains('\\')).then(|| (stem.to_owned(), entry))
-            })
-            .collect();
-        Self { archive, by_stem }
-    }
-
-    /// Returns how many inventory files the Archive holds.
-    pub(crate) fn count(&self) -> usize {
-        self.by_stem.len()
-    }
-
-    /// Reads the item GUIDs of the inventory file with the lower-case stem `stem`. Prices, stock
-    /// and rental offerings are not read.
-    pub(crate) fn items(&self, stem: &str) -> ItemList {
-        let Some(entry) = self.by_stem.get(stem) else {
-            return ItemList::Missing;
+            .rev()
+            .find(|entry| inventory_stem(entry).as_deref() == Some(stem.as_str()))
+        else {
+            return missing(stem, ledger);
         };
-        let unreadable = |reason: &dyn std::fmt::Display| {
-            ItemList::Unreadable(format!("{}: {reason}", entry.path()))
-        };
-        if entry.uncompressed_size() > MAX_INVENTORY_LEN {
-            return unreadable(&"the file is too large");
-        }
-        let mut bytes = Vec::new();
-        let read = self
-            .archive
-            .open_entry(entry)
-            .map_err(|error| format!("the file cannot be opened: {error}"))
-            .and_then(|reader| {
-                reader
-                    .take(MAX_INVENTORY_LEN)
-                    .read_to_end(&mut bytes)
-                    .map_err(|error| format!("the file cannot be read: {error}"))
-            });
-        if let Err(reason) = read {
-            return unreadable(&reason);
-        }
-        match parse(&bytes) {
-            Some((guids, dropped)) => ItemList::Items { guids, dropped },
-            None => unreadable(&why_unparsed(&bytes)),
-        }
+        let read = ReadInventory::read(archive, entry, capture, None)?;
+        Ok(read.items.selected(ledger))
     }
 }
 
-/// Returns why `bytes`, which [`parse`] rejects, are no inventory.
-fn why_unparsed(bytes: &[u8]) -> &'static str {
-    if bytes.iter().all(u8::is_ascii_whitespace) {
-        "the file is empty"
-    } else {
-        "the file is no inventory JSON"
+fn inventory_stem(entry: &Entry) -> Option<String> {
+    let raw = entry.path();
+    let is_json = raw
+        .len()
+        .checked_sub(".json".len())
+        .and_then(|start| raw.get(start..))
+        .is_some_and(|tail| tail.eq_ignore_ascii_case(".json"));
+    if !is_json {
+        return None;
     }
+    let path = starmap_index::key(raw);
+    let file = path.strip_prefix(FOLDER)?;
+    let stem = file.strip_suffix(".json")?;
+    (!stem.is_empty() && !stem.contains('\\')).then(|| stem.to_owned())
 }
 
-fn parse(bytes: &[u8]) -> Option<(Vec<String>, usize)> {
-    let file: File = serde_json::from_slice(bytes).ok()?;
-    let elements = match (file.collection, file.inventory) {
-        (Some(collection), _) => collection.inventory,
-        (None, Some(inventory)) => inventory,
-        (None, None) => return None,
-    };
-    let mut items = BTreeSet::new();
-    let mut dropped = 0;
-    for element in elements {
-        for id in element.id.ids {
-            if is_guid(&id) {
-                items.insert(id.to_ascii_lowercase());
-            } else {
-                dropped += 1;
-            }
-        }
-    }
-    Some((items.into_iter().collect(), dropped))
+fn missing(stem: &InventoryStem, ledger: &mut ExportLedger) -> Result<ItemList, CatalogError> {
+    stem.source()?
+        .operation(EntryOperation::ShopInventory)
+        .dependency()
+        .diagnosed(
+            ledger,
+            Kind::Shops,
+            SourceDisposition::ReadFailed,
+            shop_entry_read::diagnosis(ExportDiagnosticCode::DanglingReference, "offlineInventory"),
+        );
+    Ok(ItemList::Missing)
 }
 
 #[cfg(test)]
-mod tests {
-    use super::{parse, why_unparsed};
-
-    #[test]
-    fn an_empty_file_is_told_from_one_that_is_no_inventory() {
-        assert_eq!(why_unparsed(b""), "the file is empty");
-        assert_eq!(why_unparsed(b" \r\n"), "the file is empty");
-        assert_eq!(why_unparsed(b"not json"), "the file is no inventory JSON");
-        assert_eq!(parse(b""), None);
-    }
-
-    #[test]
-    fn only_the_item_ids_are_read_ordered_and_without_repeats() {
-        let json = br#"{"ShopID":"x","Collection":{"Inventory":[
-            {"ID":{"ID":["D195EB47-24B8-45C0-A4D0-1771D60DC1A8"]},"BuyPrice":1.5,"RentalOfferings":[]},
-            {"ID":{"ID":["70a98c94-9252-4fd3-a673-5a584339e273"]},"BuyPrice":2.0},
-            {"ID":{"ID":["d195eb47-24b8-45c0-a4d0-1771d60dc1a8"]}},
-            {"ID":{"ID":["not a guid"]}}]}}"#;
-        assert_eq!(
-            parse(json),
-            Some((
-                vec![
-                    "70a98c94-9252-4fd3-a673-5a584339e273".to_owned(),
-                    "d195eb47-24b8-45c0-a4d0-1771d60dc1a8".to_owned(),
-                ],
-                1
-            )),
-            "one value that is no GUID is counted as dropped"
-        );
-    }
-
-    #[test]
-    fn an_empty_inventory_is_an_empty_list_and_other_json_is_unreadable() {
-        assert_eq!(
-            parse(br#"{"Collection":{"Inventory":[]}}"#),
-            Some((Vec::new(), 0))
-        );
-        assert_eq!(
-            parse(br#"{"Inventory":[{"ID":{"ID":["70a98c94-9252-4fd3-a673-5a584339e273"]}}]}"#),
-            Some((vec!["70a98c94-9252-4fd3-a673-5a584339e273".to_owned()], 0)),
-            "the shape without a Collection"
-        );
-        assert_eq!(parse(br#"{"Other":1}"#), None);
-        assert_eq!(parse(b"not json"), None);
-    }
-}
+#[path = "shop_inventory_projection_tests.rs"]
+mod tests;

@@ -1,45 +1,61 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! A minimal catalog that holds one entity of every kind and every field the schema lists.
+//! A synthetic catalog for structural schema checks.
 
-use serde_json::json;
+use serde_json::{Value, json};
 
+mod blueprint_categories;
+mod blueprint_category_lists;
 mod blueprints;
-mod brokers;
+mod commodities;
 mod contract_properties;
 mod contracts;
 mod crafters;
+mod gameplay_properties;
 mod harvest;
+mod health;
 mod loadouts;
 mod loot;
+mod mission_sets;
 mod npc_spawns;
+mod public_fixtures;
+mod quality;
 mod recovery;
 mod reputation;
+mod resource_groups;
+mod resources;
 mod slugs;
+mod source_values;
 mod spawns;
+mod tags;
 
-use recovery::item_recovery;
+use self::public_fixtures::{manufacturer, public_names};
 
-pub(crate) fn minimal_catalog() -> serde_json::Value {
-    json!({
-        "schemaVersion": 2,
+pub(crate) fn minimal_catalog() -> Value {
+    let mut catalog = json!({
+        "schemaVersion": p4kx_export::SCHEMA_VERSION,
         "source": {
             "channel": null,
             "build": null,
             "archiveSize": 0,
             "archiveModified": null,
+            "archiveKey": "given",
+            "encryptedEntriesUnread": 0,
             "toolVersion": "0.1.0",
             "exportedAt": "2026-10-18T00:00:00Z"
         },
         "completeness": {
             "manufacturers": {"status": "complete"},
+            "tags": {"status": "complete"},
             "items": {"status": "complete"},
             "ships": {"status": "partial", "filter": "*/spaceships/*"},
             "commodities": {"status": "complete"},
             "blueprints": {"status": "complete"},
             "resourceGroups": {"status": "complete"},
+            "resourceTypes": {"status": "complete"},
             "blueprintCategories": {"status": "partial", "filter": "*/blueprintcategories/*"},
+            "blueprintCategoryLists": {"status": "complete"},
             "gameplayProperties": {"status": "complete"},
             "qualityDistributions": {"status": "complete"},
             "qualityQuantizations": {"status": "complete"},
@@ -57,6 +73,32 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "subHarvestableMultiConfigs": {"status": "complete"},
             "harvestableLocations": {"status": "complete"},
             "shops": {"status": "complete"},
+            "shopInventories": {"status": "complete"},
+            "explosionDefinitions": {"status": "complete"},
+            "inventoryContainers": {"status": "complete"},
+            "medicalItemTierConfigs": {"status": "complete"},
+            "ammoDefinitions": {"status": "complete"},
+            "factions": {"status": "complete"},
+            "reputationPerks": {"status": "complete"},
+            "reputationTriggerRecords": {"status": "complete"},
+            "reputationRewardAmounts": {"status": "complete"},
+            "infractions": {"status": "complete"},
+            "infractionSets": {"status": "complete"},
+            "jurisdictions": {"status": "complete"},
+            "locationClasses": {"status": "complete"},
+            "locationFunctions": {"status": "complete"},
+            "locationSizes": {"status": "complete"},
+            "locationClassRegistries": {"status": "complete"},
+            "locationFunctionRegistries": {"status": "complete"},
+            "locationSizeRegistries": {"status": "complete"},
+            "npcArchetypes": {"status": "complete"},
+            "npcClassPools": {"status": "complete"},
+            "autoSpawns": {"status": "complete"},
+            "autoSpawnSets": {"status": "complete"},
+            "encounterIndices": {"status": "complete"},
+            "starmapTypes": {"status": "complete"},
+            "starmapPresets": {"status": "complete"},
+            "starmapAmenities": {"status": "complete"},
             "factionReputations": {"status": "complete"},
             "reputationScopes": {"status": "complete"},
             "reputationStandings": {"status": "complete"},
@@ -64,11 +106,13 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "missionTypes": {"status": "complete"},
             "missionLocalities": {"status": "complete"},
             "contractScenarios": {"status": "complete"},
+            "missionScenarios": {"status": "complete"},
             "missionLocationTemplates": {"status": "complete"},
             "contractShipSpawns": {"status": "complete"},
             "contractLocationQueries": {"status": "complete"},
             "contractTemplates": {"status": "complete"},
             "missionBrokerEntries": {"status": "complete"},
+            "missionPropertySets": {"status": "complete"},
             "contractNpcSpawns": {"status": "complete"},
             "contractEntitySpawns": {"status": "complete"},
             "lootTables": {"status": "complete"},
@@ -82,14 +126,6 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "cargoManifests": {"status": "complete"},
             "shipStoreSlugs": {"status": "complete"}
         },
-        "manufacturers": [{
-            "guid": "cfc0122d-5275-415a-a656-3dcb3346feb5",
-            "className": "ACAS",
-            "recordPath": "libs/foundry/records/scitemmanufacturer/acas",
-            "code": "ACAS",
-            "name": {"key": "@manufacturer_NameACAS", "en": "Ace Astrogation", "de": null},
-            "description": {"key": null, "en": null, "de": null}
-        }],
         "items": [{
             "guid": "30000000-0000-4000-8000-000000000001",
             "className": "POWR_ACAS_S01",
@@ -137,96 +173,115 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
                 "expediteFee": 3200
             }
         }],
-        "commodities": [{
-            "guid": "a1000000-0000-4000-8000-000000000001",
-            "className": "gold",
-            "recordPath": "libs/foundry/records/entities/commodities/metals/gold",
-            "name": {"key": "@items_commodities_gold", "en": "Gold", "de": null},
-            "description": {"key": null, "en": null, "de": null},
-            "typeGuid": "b1000000-0000-4000-8000-000000000001",
-            "subtypeGuid": null,
-            "displayType": {"key": null, "en": null, "de": null},
-            "densityGramsPerCubicCentimetre": null,
-            "refinedSubtypeGuid": null
-        }],
-        "blueprints": [{
-            "guid": "11000000-0000-4000-8000-000000000001",
-            "className": "BP_CRAFT_core",
-            "recordPath": "libs/foundry/records/crafting/blueprints/crafting/bp_craft_core",
-            "key": "BP_CRAFT_core",
-            "name": {"key": null, "en": null, "de": null},
-            "categoryGuid": "d1000000-0000-4000-8000-000000000001",
-            "producedItemGuid": null,
-            "craftTimeSeconds": 93784,
-            "ingredients": [
-                {
-                    "resourceGuid": "b1000000-0000-4000-8000-000000000001",
-                    "itemGuid": null,
-                    "quantityScu": 0.5,
-                    "quantityUnits": null,
-                    "minQuality": 0,
-                    "slot": "CORE",
-                    "slotKey": null
-                },
-                {
-                    "resourceGuid": null,
-                    "itemGuid": "30000000-0000-4000-8000-000000000001",
-                    "quantityScu": null,
-                    "quantityUnits": 5,
-                    "minQuality": 500,
-                    "slot": null,
-                    "slotKey": "@crafting_ui_slotname_core"
-                }
-            ],
-            "tiers": blueprints::tiers(),
-            "defaultAvailable": false,
-            "dismantle": {
-                "processGuid": "f1000000-0000-4000-8000-000000000001",
-                "tierIndex": 0
-            }
-        }],
-        "resourceGroups": [{
-            "guid": "b1000000-0000-4000-8000-000000000001",
-            "className": "Metal",
-            "recordPath": "libs/foundry/records/resourcetypedatabase/resourcetypedatabase",
-            "name": {"key": "@items_commodities_type_metal", "en": "Metal", "de": null},
-            "parentGuid": null
-        }],
-        "blueprintCategories": [{
-            "guid": "d1000000-0000-4000-8000-000000000001",
-            "className": "Ammo",
-            "recordPath": "libs/foundry/records/crafting/blueprintcategories/blueprintcategorydatabase",
-            "name": {"key": null, "en": null, "de": null}
-        }],
-        "gameplayProperties": [{
-            "guid": "e1000000-0000-4000-8000-000000000001",
-            "className": "GPP_Armor",
-            "recordPath": "libs/foundry/records/crafting/craftedproperties/gpp_armor",
-            "name": {"key": "@StatName_GPP_Armor", "en": "Armour", "de": null}
-        }],
-        "qualityDistributions": [{
-            "guid": "e2000000-0000-4000-8000-000000000001",
-            "className": "Creature_Pyro",
-            "recordPath": "libs/foundry/records/crafting/qualitydistribution/creature_pyro",
-            "distribution": null,
-            "overrides": [{
-                "locationGuid": "e3000000-0000-4000-8000-000000000001",
-                "distribution": {
-                    "kind": "CraftingQualityDistributionNormal",
-                    "min": 1.0, "max": 1000.0, "mean": 269.0, "stddev": null
-                }
-            }]
-        }],
-        "qualityQuantizations": [{
-            "guid": "e4000000-0000-4000-8000-000000000001",
-            "className": "quantization_gold",
-            "recordPath": "libs/foundry/records/crafting/qualityquantization/quantization_gold",
-            "bands": [
-                {"start": 0, "end": 399, "mappedValue": 264},
-                {"start": 400, "end": 1000, "mappedValue": 553}
-            ],
-            "resourceTypeGuids": ["b1000000-0000-4000-8000-000000000001"]
-        }],
+        "definitions": {"contractGenerators": absent_table(), "missionScenarios": absent_table(), "blueprints": blueprints::definitions(), "contractTemplates": absent_table(), "missionBrokerEntries": absent_table(), "lootPoolFilters": loot::filters(), "blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
+            "commodities": commodities::definitions(), "manufacturers": manufacturer(),
+            "tags": tags::definitions(),
+            "explosionDefinitions": absent_table(),
+            "inventoryContainers": absent_table(),
+            "medicalItemTierConfigs": absent_table(),
+            "factions": absent_table(),
+            "factionReputations": reputation::factions(),
+            "reputationPerks": absent_table(),
+            "reputationTriggerRecords": absent_table(),
+            "reputationRewardAmounts": absent_table(),
+            "infractions": absent_table(),
+            "infractionSets": absent_table(),
+            "jurisdictions": absent_table(),
+            "locationClasses": absent_table(),
+            "npcArchetypes": absent_table(),
+            "npcClassPools": absent_table(),
+            "autoSpawns": absent_table(),
+            "autoSpawnSets": absent_table(),
+            "encounterIndices": absent_table(),
+            "locationFunctions": absent_table(),
+            "locationSizes": absent_table(),
+            "locationRegistries": {
+                "classes": absent_table(),
+                "functions": absent_table(),
+                "sizes": absent_table(),
+            },
+            "starmapObjects": absent_table(),
+            "starmapTypes": absent_table(),
+            "starmapPresets": absent_table(),
+            "starmapAmenities": absent_table(),
+            "ammoDefinitions": absent_table(),
+            "weaponActionRecoilDefinitions": absent_table(),
+            "weaponProceduralAnimations": absent_table(),
+            "actorProceduralRecoilConfigs": absent_table(),
+            "weaponProceduralClips": absent_table(),
+            "actorProceduralRecoilModifiers": absent_table(),
+            "reputationContexts": reputation::contexts(),
+            "reputationScopes": reputation::scopes(),
+            "reputationStandings": reputation::standings(),
+            "shopInventories": {"availability": "absent", "meaning": "offlineDesignTime", "rows": []}},
+        "configurations": {
+            "blueprintTiers": blueprints::tiers(),
+            "itemRecoveryEconomy": recovery::economy(),
+            "itemRecoveryOverrides": recovery::overrides(),
+            "itemRecoveryPolicy": recovery::policy(),
+            "durability": absent_table(),
+            "degradation": absent_table(),
+            "distortion": absent_table(),
+            "emp": absent_table(),
+            "explosives": absent_table(),
+            "hackingChips": absent_table(),
+            "ammoContainers": absent_table(),
+            "weaponActions": absent_table(),
+            "missileConfigurations": absent_table(),
+            "jumpDrives": absent_table(),
+            "jumpDriveFlightTuning": absent_table(),
+            "jumpTunnelForces": absent_table(),
+            "quantumDrives": absent_table(),
+            "quantumInterdiction": absent_table(),
+            "shieldGenerators": absent_table(),
+            "itemPorts": absent_table(),
+            "itemAttachmentConstraints": absent_table(),
+            "fuelTanks": absent_table(),
+            "fuelIntakes": absent_table(),
+            "resourceContainers": absent_table(),
+            "facilities": absent_table(),
+            "inventoryConfigurations": absent_table(),
+            "itemBounds": absent_table(),
+            "interactions": absent_table(),
+            "resourceComponents": absent_table(),
+            "resourceConnections": absent_table(),
+            "resourceNetworkParameters": absent_table(),
+            "missionBoards": absent_table(),
+            "entityAnimationControllers": absent_table(),
+            "lootGeneration": absent_table(),
+            "vehicleArmor": absent_table(),
+            "contractTemplates": absent_table(),
+            "missionBrokerEntries": absent_table(),
+            "localContractGenerators": absent_table(),
+            "missionFlows": absent_table(),
+            "reputationTriggers": absent_table(),
+            "missionProperties": absent_table()
+        },
+        "declarations": {
+            "blueprintCategoryLists": blueprint_category_lists::declarations(),
+            "tagRoots": tags::roots(),
+            "shopInventoryResolution": absent_table(),
+            "entityTags": tags::entities(),
+            "ammoBindings": absent_table(),
+            "contractScenarioRequirements": absent_table(),
+            "resourceNetworkLinks": absent_table(),
+            "roomAssociations": absent_table(),
+            "itemRoomAssociations": absent_table(),
+            "resourceGroupMembers": resource_groups::members()
+        },
+        "placements": {
+            "resourceNetworkNodes": absent_table(),
+            "resourceNetworkLinkBindings": absent_table(),
+            "roomAssociationBindings": absent_table(),
+            "starmapPlacements": absent_table(),
+            "facilityInstances": absent_table(),
+            "facilityInteriorCoverage": [],
+            "containerInstances": absent_table()
+        },
+        "texts": {"publicNames": public_names(), "gameTexts": []},
+        "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table(), "weaponProjectileAmmoSelections": absent_table()},
+        "provenance": {"sources": [], "uses": []},
+
         "blueprintPools": blueprints::pools(),
         "dismantleProcesses": [{
             "guid": "f1000000-0000-4000-8000-000000000001",
@@ -244,21 +299,6 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
             "shipGuids": ["90000000-0000-4000-8000-000000000001"]
         }],
         "loadouts": loadouts::loadouts(),
-        "starmapObjects": [{
-            "guid": "a2000000-0000-4000-8000-000000000001",
-            "className": "Stanton1_Hurston",
-            "recordPath": "libs/foundry/records/starmap/pu/system/stanton/stanton1_hurston",
-            "name": {"key": "@Stanton1_Name", "en": "Hurston", "de": null},
-            "type": "Planet",
-            "typeGuid": "a2000000-0000-4000-8000-000000000002",
-            "parentGuid": "a2000000-0000-4000-8000-000000000003",
-            "hideInStarmap": false,
-            "system": "stanton",
-            "entityName": "planet_hurston",
-            "placedUnderGuid": "a2000000-0000-4000-8000-000000000003",
-            "position": [12_850_000_000.0, 1250.5, -3.0]
-        }],
-        "contracts": contracts::contracts(),
         "mineableElements": [{
             "guid": "a3000000-0000-4000-8000-000000000001",
             "className": "agricium_ore",
@@ -290,30 +330,50 @@ pub(crate) fn minimal_catalog() -> serde_json::Value {
         "subHarvestableMultiConfigs": harvest::multi_configs(),
         "harvestableLocations": harvest::locations(),
         "shops": harvest::shops(),
-        "factionReputations": reputation::factions(),
-        "reputationScopes": reputation::scopes(),
-        "reputationStandings": reputation::standings(),
-        "reputationContexts": reputation::contexts(),
         "missionTypes": reputation::mission_types(),
         "missionLocalities": reputation::localities(),
         "contractScenarios": reputation::scenarios(),
         "missionLocationTemplates": spawns::location_templates(),
         "contractShipSpawns": spawns::ship_spawns(),
         "contractLocationQueries": spawns::location_queries(),
-        "contractTemplates": spawns::contract_templates(),
-        "missionBrokerEntries": brokers::broker_entries(),
+        "missionPropertySets": mission_sets::sets(),
         "contractNpcSpawns": npc_spawns::npc_spawns(),
         "contractEntitySpawns": npc_spawns::entity_spawns(),
         "lootTables": loot::tables(),
         "lootArchetypes": loot::archetypes(),
-        "lootPoolFilters": loot::filters(),
         "legacyLootTables": loot::legacy_tables(),
         "legacyLootArchetypes": loot::legacy_archetypes(),
         "lootContainers": loot::containers(),
         "mineableEntities": harvest::mineable_entities(),
         "crafters": crafters::crafters(),
         "cargoManifests": contracts::manifests(),
-        "shipStoreSlugs": slugs::ship_store_slugs(),
-        "itemRecovery": item_recovery()
-    })
+        "shipStoreSlugs": slugs::ship_store_slugs()
+    });
+    for kind in [
+        "factionIdentities",
+        "securityNetworkManifests",
+        "missionModuleDeclarations",
+        "missionItems",
+        "contractScopes",
+    ] {
+        for (section, value) in [
+            ("completeness", json!({"status": "complete"})),
+            ("definitions", absent_table()),
+        ] {
+            if let Some(object) = catalog.get_mut(section).and_then(Value::as_object_mut) {
+                object.insert(kind.to_owned(), value);
+            }
+        }
+    }
+    loot::add_definition_tables(&mut catalog);
+    let export_health = health::fixture(&catalog);
+    let Value::Object(fields) = &mut catalog else {
+        unreachable!("the authored catalog fixture is a JSON object");
+    };
+    fields.insert("exportHealth".to_owned(), export_health);
+    catalog
+}
+
+fn absent_table() -> Value {
+    json!({"availability": "absent", "rows": []})
 }

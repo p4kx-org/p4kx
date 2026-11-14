@@ -1,30 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_foundation::ByteReader;
+use crate::{DdsRawHeader, DxgiFormat, TextureError, TextureFormat};
 
-use crate::{DxgiFormat, TextureError, TextureFormat};
-
-const MAGIC: &[u8; 4] = b"DDS ";
-const MAGIC_LEN: usize = 4;
-const HEADER_SIZE: u32 = 124;
-const DX10_LEN: usize = 20;
-const RESERVED_LEN: usize = 44;
-const DX10_FOUR_CC: [u8; 4] = *b"DX10";
 const FLAG_DEPTH: u32 = 0x80_0000;
 const CAPS2_CUBEMAP: u32 = 0x200;
 const CAPS2_CUBEMAP_FACES: u32 = 0xFC00;
 const CAPS2_VOLUME: u32 = 0x20_0000;
 const CUBE_FACES: u32 = 6;
-const MAX_DEPTH: u32 = 2048;
-const MAX_ARRAY_SIZE: u32 = 2048;
 const DIMENSION_TEXTURE3D: u32 = 4;
 const MISC_TEXTURECUBE: u32 = 0x4;
 pub(crate) const CRYENGINE_TRAILER: &[u8; 8] = b"CExtCEnd";
 const CRYENGINE_TRAILER_LEN: u64 = CRYENGINE_TRAILER.len() as u64;
 
 /// The longest DDS header: magic, the 124-byte header and the DX10 extension.
-pub const MAX_HEADER_LEN: usize = MAGIC_LEN + HEADER_SIZE as usize + DX10_LEN;
+pub const MAX_HEADER_LEN: usize = crate::dds_raw_header::MAX_HEADER_LEN;
 
 /// What the header of a DDS texture says about it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -39,6 +29,18 @@ pub struct DdsHeader {
     header_len: usize,
 }
 
+pub(crate) const fn legacy_is_volume(flags: u32, caps2: u32) -> bool {
+    !legacy_volume_uses_depth_flag(caps2) || flags & FLAG_DEPTH != 0
+}
+
+pub(crate) const fn legacy_volume_uses_depth_flag(caps2: u32) -> bool {
+    caps2 & CAPS2_VOLUME == 0
+}
+
+pub(crate) const fn dx10_is_volume(dimension: u32) -> bool {
+    dimension == DIMENSION_TEXTURE3D
+}
+
 struct Fields {
     flags: u32,
     height: u32,
@@ -46,7 +48,6 @@ struct Fields {
     depth: u32,
     mip_count: u32,
     legacy_format: TextureFormat,
-    is_dx10: bool,
     caps2: u32,
 }
 
@@ -58,41 +59,57 @@ impl DdsHeader {
     ///
     /// Returns [`TextureError::NotDds`] when `bytes` does not start with a DDS header,
     /// [`TextureError::TruncatedHeader`] when it ends inside the header, and
-    /// [`TextureError::InvalidHeader`] when the header contradicts itself, has more than 2048
-    /// slices or array elements, or is a volume that is also a cubemap or an array.
+    /// [`TextureError::InvalidHeader`] when the topology contradicts itself or its byte extent overflows.
     pub fn parse(bytes: &[u8]) -> Result<Self, TextureError> {
-        let magic_len = match bytes.get(..MAGIC_LEN) {
-            Some(start) if start == MAGIC => MAGIC_LEN,
-            Some(start) if start == HEADER_SIZE.to_le_bytes() => 0,
-            _ => return Err(TextureError::NotDds),
+        Self::from_raw(&DdsRawHeader::parse(bytes)?)
+    }
+
+    /// Applies the reader's topology normalization and validation to captured source fields.
+    ///
+    /// # Errors
+    /// Returns the same invalid-topology errors as parsing the corresponding complete header.
+    pub fn from_raw(raw: &DdsRawHeader) -> Result<Self, TextureError> {
+        let legacy = raw.legacy();
+        let pixel = legacy.pixel_format;
+        let fields = Fields {
+            flags: legacy.flags,
+            height: legacy.height,
+            width: legacy.width,
+            depth: legacy.depth,
+            mip_count: legacy.mip_map_count,
+            legacy_format: TextureFormat::from_legacy(
+                pixel.flags,
+                pixel.four_cc,
+                pixel.rgb_bit_count,
+                [
+                    pixel.r_bit_mask,
+                    pixel.g_bit_mask,
+                    pixel.b_bit_mask,
+                    pixel.a_bit_mask,
+                ],
+            ),
+            caps2: legacy.caps2,
         };
-        let body = bytes.get(magic_len..).unwrap_or_default();
-        if body
-            .get(..4)
-            .is_some_and(|size| size != HEADER_SIZE.to_le_bytes())
-        {
-            return Err(TextureError::InvalidHeader("the header size is not 124"));
-        }
-        let truncated = |needed: usize| TextureError::TruncatedHeader {
-            len: bytes.len() as u64,
-            needed: (magic_len + needed) as u64,
-        };
-        let mut reader = ByteReader::new(body);
-        let fields = read_fields(&mut reader).map_err(|_| truncated(HEADER_SIZE as usize))?;
-        let header_len =
-            magic_len + HEADER_SIZE as usize + if fields.is_dx10 { DX10_LEN } else { 0 };
-        let header = if fields.is_dx10 {
-            let dx10 =
-                read_dx10(&mut reader).map_err(|_| truncated(HEADER_SIZE as usize + DX10_LEN))?;
-            Self::from_dx10(&fields, dx10, header_len)
-        } else {
-            Self::from_legacy(&fields, header_len)
-        };
+        let header = raw.dx10().map_or_else(
+            || Self::from_legacy(&fields, raw.header_len()),
+            |dx10| {
+                Self::from_dx10(
+                    &fields,
+                    [
+                        dx10.dxgi_format,
+                        dx10.resource_dimension,
+                        dx10.misc_flag,
+                        dx10.array_size,
+                    ],
+                    raw.header_len(),
+                )
+            },
+        );
         header.validated()
     }
 
     fn from_legacy(fields: &Fields, header_len: usize) -> Self {
-        let is_volume = fields.caps2 & CAPS2_VOLUME != 0 || fields.flags & FLAG_DEPTH != 0;
+        let is_volume = legacy_is_volume(fields.flags, fields.caps2);
         let faces = if fields.caps2 & CAPS2_CUBEMAP == 0 {
             1
         } else {
@@ -116,7 +133,7 @@ impl DdsHeader {
             format: TextureFormat::Dxgi(DxgiFormat(format)),
             width: fields.width,
             height: fields.height,
-            depth: if dimension == DIMENSION_TEXTURE3D {
+            depth: if dx10_is_volume(dimension) {
                 fields.depth.max(1)
             } else {
                 1
@@ -135,12 +152,6 @@ impl DdsHeader {
     fn validated(self) -> Result<Self, TextureError> {
         if self.width == 0 || self.height == 0 {
             return Err(TextureError::InvalidHeader("width or height is zero"));
-        }
-        if self.depth > MAX_DEPTH {
-            return Err(TextureError::InvalidHeader("the depth is above 2048"));
-        }
-        if self.array_size > MAX_ARRAY_SIZE {
-            return Err(TextureError::InvalidHeader("the array size is above 2048"));
         }
         if self.depth > 1 && self.surfaces() > 1 {
             return Err(TextureError::InvalidHeader(
@@ -215,8 +226,8 @@ impl DdsHeader {
 
     /// Returns the number of images per mip: faces times array elements.
     #[must_use]
-    pub const fn surfaces(&self) -> u32 {
-        self.faces.saturating_mul(self.array_size)
+    pub const fn surfaces(&self) -> u64 {
+        self.faces as u64 * self.array_size as u64
     }
 
     /// Returns the number of slices of mip `level`: the depth halved per level, at least 1.
@@ -231,8 +242,8 @@ impl DdsHeader {
     /// Returns the number of images in mip `level`: one per cubemap face, array element and
     /// slice.
     #[must_use]
-    pub const fn images(&self, level: u32) -> u32 {
-        self.surfaces().saturating_mul(self.slices(level))
+    pub const fn images(&self, level: u32) -> u64 {
+        self.surfaces() * self.slices(level) as u64
     }
 
     /// Returns the size in bytes of mip `level` with every face, array element and slice, or
@@ -321,51 +332,4 @@ impl DdsHeader {
         }
         (sum == tail).then_some(0)
     }
-}
-
-fn read_fields(reader: &mut ByteReader<'_>) -> Result<Fields, p4kx_foundation::ParseError> {
-    let _size = reader.read_u32()?;
-    let flags = reader.read_u32()?;
-    let height = reader.read_u32()?;
-    let width = reader.read_u32()?;
-    let _pitch = reader.read_u32()?;
-    let depth = reader.read_u32()?;
-    let mip_count = reader.read_u32()?;
-    reader.skip(RESERVED_LEN)?;
-    let _pixel_format_size = reader.read_u32()?;
-    let pixel_flags = reader.read_u32()?;
-    let mut four_cc = [0; 4];
-    four_cc.copy_from_slice(reader.read_bytes(4)?);
-    let bit_count = reader.read_u32()?;
-    let masks = [
-        reader.read_u32()?,
-        reader.read_u32()?,
-        reader.read_u32()?,
-        reader.read_u32()?,
-    ];
-    let _caps = reader.read_u32()?;
-    let caps2 = reader.read_u32()?;
-    reader.skip(12)?;
-    let is_dx10 = four_cc == DX10_FOUR_CC;
-    Ok(Fields {
-        flags,
-        height,
-        width,
-        depth,
-        mip_count,
-        legacy_format: TextureFormat::from_legacy(pixel_flags, four_cc, bit_count, masks),
-        is_dx10,
-        caps2,
-    })
-}
-
-fn read_dx10(reader: &mut ByteReader<'_>) -> Result<[u32; 4], p4kx_foundation::ParseError> {
-    let values = [
-        reader.read_u32()?,
-        reader.read_u32()?,
-        reader.read_u32()?,
-        reader.read_u32()?,
-    ];
-    reader.skip(4)?;
-    Ok(values)
 }

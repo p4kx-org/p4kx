@@ -31,11 +31,19 @@ pub(crate) fn component<'t, 'f>(
     tree: &'t RecordTree<'f>,
     type_name: &str,
 ) -> Option<&'t StructValue<'f>> {
+    component_occurrence(tree, type_name).map(|(_, fields)| fields)
+}
+
+/// Returns the first matching Components value together with its actual owned fields.
+pub(crate) fn component_occurrence<'read, 'source>(
+    tree: &'read RecordTree<'source>,
+    type_name: &str,
+) -> Option<(&'read Value<'source>, &'read StructValue<'source>)> {
     let Some(Value::Array(components)) = tree.field("Components") else {
         return None;
     };
     components.iter().find_map(|component| match component {
-        Value::Struct(value) if value.type_name() == type_name => Some(value),
+        Value::Struct(fields) if fields.type_name() == type_name => Some((component, fields)),
         _ => None,
     })
 }
@@ -97,7 +105,11 @@ pub(crate) fn locale_key<'f>(parent: Option<&StructValue<'f>>, name: &str) -> Op
 
 /// Returns the string or enum option the field `name` of `parent` holds; an empty one is none.
 pub(crate) fn text<'f>(parent: Option<&StructValue<'f>>, name: &str) -> Option<&'f str> {
-    match parent?.field(name)? {
+    text_value(parent?.field(name)?)
+}
+
+pub(crate) const fn text_value<'source>(value: &Value<'source>) -> Option<&'source str> {
+    match value {
         Value::String(text) | Value::Enum(text) if !text.is_empty() => Some(*text),
         _ => None,
     }
@@ -105,7 +117,12 @@ pub(crate) fn text<'f>(parent: Option<&StructValue<'f>>, name: &str) -> Option<&
 
 /// Returns the integer the field `name` of `parent` holds, `None` for one beyond `i64`.
 pub(crate) fn integer(parent: Option<&StructValue<'_>>, name: &str) -> Option<i64> {
-    match *parent?.field(name)? {
+    integer_value(parent?.field(name)?)
+}
+
+/// Returns the representable integer of an actual value.
+pub(crate) fn integer_value(value: &Value<'_>) -> Option<i64> {
+    match *value {
         Value::Int8(value) => Some(value.into()),
         Value::Int16(value) => Some(value.into()),
         Value::Int32(value) => Some(value.into()),
@@ -120,7 +137,11 @@ pub(crate) fn integer(parent: Option<&StructValue<'_>>, name: &str) -> Option<i6
 
 /// Returns the boolean the field `name` of `parent` holds.
 pub(crate) fn boolean(parent: Option<&StructValue<'_>>, name: &str) -> Option<bool> {
-    match *parent?.field(name)? {
+    boolean_value(parent?.field(name)?)
+}
+
+pub(crate) const fn boolean_value(value: &Value<'_>) -> Option<bool> {
+    match *value {
         Value::Bool(value) => Some(value),
         _ => None,
     }
@@ -128,7 +149,11 @@ pub(crate) fn boolean(parent: Option<&StructValue<'_>>, name: &str) -> Option<bo
 
 /// Returns the finite 32-bit float the field `name` of `parent` holds.
 pub(crate) fn single(parent: Option<&StructValue<'_>>, name: &str) -> Option<f32> {
-    match *parent?.field(name)? {
+    single_value(parent?.field(name)?)
+}
+
+pub(crate) const fn single_value(value: &Value<'_>) -> Option<f32> {
+    match *value {
         Value::Single(value) if value.is_finite() => Some(value),
         _ => None,
     }
@@ -136,16 +161,21 @@ pub(crate) fn single(parent: Option<&StructValue<'_>>, name: &str) -> Option<f32
 
 /// Returns the finite number the field `name` of `parent` holds, whether stored as a float or as
 /// an integer.
+pub(crate) fn number(parent: Option<&StructValue<'_>>, name: &str) -> Option<f32> {
+    number_value(parent?.field(name)?)
+}
+
+/// Returns the established finite 32-bit numeric projection of an actual value.
 #[expect(
     clippy::cast_possible_truncation,
     clippy::cast_precision_loss,
     reason = "a catalog number is a 32-bit float; larger integers lose their low digits"
 )]
-pub(crate) fn number(parent: Option<&StructValue<'_>>, name: &str) -> Option<f32> {
-    match *parent?.field(name)? {
+pub(crate) fn number_value(value: &Value<'_>) -> Option<f32> {
+    match *value {
         Value::Single(value) if value.is_finite() => Some(value),
         Value::Double(value) => Some(value as f32).filter(|narrowed| narrowed.is_finite()),
-        _ => integer(parent, name).map(|value| value as f32),
+        _ => integer_value(value).map(|value| value as f32),
     }
 }
 
@@ -166,13 +196,6 @@ pub(crate) fn reference(parent: Option<&StructValue<'_>>, name: &str) -> Option<
 /// a Record the DataForge does not have.
 pub(crate) fn linked(parent: Option<&StructValue<'_>>, name: &str) -> Option<CatalogGuid> {
     link_of(parent?.field(name)?)
-}
-
-/// Returns the GUIDs of the Records the References among the elements of the array the field
-/// `name` of `parent` holds link to, including References to Records the DataForge does not
-/// have, in stored order.
-pub(crate) fn linked_list(parent: Option<&StructValue<'_>>, name: &str) -> Vec<CatalogGuid> {
-    elements(parent, name).iter().filter_map(link_of).collect()
 }
 
 fn link_of(value: &Value<'_>) -> Option<CatalogGuid> {

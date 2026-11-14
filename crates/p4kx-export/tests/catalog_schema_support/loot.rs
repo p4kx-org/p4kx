@@ -3,9 +3,12 @@
 
 //! One entity of each loot kind, with every field the schema lists.
 
-use serde_json::json;
+use p4kx_extraction::SourceValue;
+use serde_json::{Value, json};
 
-fn selector() -> serde_json::Value {
+use super::source_values as values;
+
+fn selector() -> Value {
     json!({
         "selectorType": "LootArchetypeV3Selector_Tags",
         "positiveTagGuids": ["a9000000-0000-4000-8000-000000000010"],
@@ -14,7 +17,7 @@ fn selector() -> serde_json::Value {
     })
 }
 
-fn archetype_entry() -> serde_json::Value {
+fn archetype_entry() -> Value {
     json!({
         "name": "Ammo",
         "weight": 3.0,
@@ -30,7 +33,7 @@ fn archetype_entry() -> serde_json::Value {
     })
 }
 
-pub(super) fn tables() -> serde_json::Value {
+pub(super) fn tables() -> Value {
     json!([{
         "guid": "a9000000-0000-4000-8000-000000000001",
         "className": "V3LootTable_Actor_CQC",
@@ -57,7 +60,7 @@ pub(super) fn tables() -> serde_json::Value {
     }])
 }
 
-pub(super) fn archetypes() -> serde_json::Value {
+pub(super) fn archetypes() -> Value {
     json!([{
         "guid": "a9000000-0000-4000-8000-000000000002",
         "className": "V3LootArchetype_Medpen_Healing",
@@ -66,36 +69,80 @@ pub(super) fn archetypes() -> serde_json::Value {
     }])
 }
 
-pub(super) fn filters() -> serde_json::Value {
-    json!([{
-        "guid": "a9000000-0000-4000-8000-000000000003",
-        "className": "V3PoolFilter_ASDDelving",
-        "recordPath": "libs/foundry/records/lootgeneration/filters/v3poolfilter_asddelving",
-        "filter": {
-            "nodeType": "PoolFilter_Sequence",
-            "filterGuid": null,
-            "positiveTagGuids": [],
-            "negativeTagGuids": [],
-            "filters": [{
-                "name": "No faction",
-                "mode": "Cumulative",
-                "filter": {
-                    "nodeType": "PoolFilter_RecordRef",
-                    "filterGuid": "a9000000-0000-4000-8000-000000000004",
-                    "positiveTagGuids": [],
-                    "negativeTagGuids": [],
-                    "filters": []
-                }
-            }, {
-                "name": "Event",
-                "mode": "Additive",
-                "filter": null
-            }]
-        }
-    }])
+/// Constructs complete schema data without claiming an actual original read.
+pub(super) fn filters() -> Value {
+    json!({"availability":"available","rows":[{
+        "guid":values::present(json!("a9000000-0000-4000-8000-000000000003")),
+        "recordName":values::present(json!("PoolFilterRecord.SyntheticLootFilter")),
+        "className":values::present(json!("SyntheticLootFilter")),
+        "recordPath":values::present(json!("libs/foundry/records/lootgeneration/filters/synthetic")),
+        "recordIndex":values::present(json!(0)),
+        "sourceType":values::present(json!("PoolFilterRecord")),
+        "fileName":values::present(json!("libs/foundry/records/lootgeneration/filters/synthetic.xml")),
+        "metadataTag":values::source(SourceValue::Absent),
+        "fields":[filter_field("filter","strongPointer",false,0,0)],
+        "values":filter_values()
+    }]})
 }
 
-pub(super) fn legacy_tables() -> serde_json::Value {
+fn filter_values() -> Vec<Value> {
+    vec![
+        filter_value(SourceValue::Present(json!({"type":"struct",
+            "sourceType":values::present(json!("PoolFilter_Sequence")),
+            "fields":[filter_field("filters","class",true,1,1)]}))),
+        filter_value(SourceValue::Present(
+            json!({"type":"array","elements":[{"valueIndex":"2"},{"valueIndex":"7"}]}),
+        )),
+        filter_instance(3, 4, 5),
+        filter_text("No faction"),
+        filter_text("Cumulative"),
+        filter_value(SourceValue::Present(json!({"type":"struct",
+            "sourceType":values::present(json!("PoolFilter_RecordRef")),
+            "fields":[filter_field("filterRecord","reference",false,0,6)]}))),
+        filter_reference(),
+        filter_instance(8, 9, 10),
+        filter_text("Event"),
+        filter_text("Additive"),
+        filter_value(SourceValue::Null),
+    ]
+}
+
+fn filter_instance(name: u64, mode: u64, filter: u64) -> Value {
+    filter_value(SourceValue::Present(json!({"type":"struct",
+        "sourceType":values::present(json!("PoolFilterInstance")),
+        "fields":[filter_field("name","string",false,0,name),
+            filter_field("mode","string",false,0,mode),
+            filter_field("filter","strongPointer",false,0,filter)]})))
+}
+
+fn filter_field(name: &str, data_type: &str, is_array: bool, target: u16, index: u64) -> Value {
+    json!({"name":values::present(json!(name)),"declaration":{
+        "dataType":values::present(json!(data_type)),
+        "isArray":values::present(json!(is_array)),
+        "target":values::present(json!(target))},"value":{"valueIndex":index.to_string()}})
+}
+
+fn filter_text(text: &str) -> Value {
+    filter_value(SourceValue::Present(
+        json!({"type":"string","value":{"type":"public","sourceText":text}}),
+    ))
+}
+
+fn filter_reference() -> Value {
+    filter_value(SourceValue::Present(
+        json!({"type":"recordReference","value":{
+        "targetRecordIndex":values::present(json!(1)),
+        "guid":values::present(json!("a9000000-0000-4000-8000-000000000004")),
+        "recordPath":values::present(json!("libs/foundry/records/lootgeneration/filters/target")),
+        "targetType":values::present(json!("PoolFilterRecord")),"status":"present"}}),
+    ))
+}
+
+fn filter_value(value: SourceValue<Value>) -> Value {
+    json!({"value":values::source(value),"originalError":null})
+}
+
+pub(super) fn legacy_tables() -> Value {
     json!([{
         "guid": "a9000000-0000-4000-8000-000000000005",
         "className": "Ammo",
@@ -114,7 +161,7 @@ pub(super) fn legacy_tables() -> serde_json::Value {
     }])
 }
 
-pub(super) fn legacy_archetypes() -> serde_json::Value {
+pub(super) fn legacy_archetypes() -> Value {
     json!([{
         "guid": "a9000000-0000-4000-8000-000000000006",
         "className": "LootArchetype_AmmoCache_Common",
@@ -143,7 +190,7 @@ pub(super) fn legacy_archetypes() -> serde_json::Value {
     }])
 }
 
-pub(super) fn containers() -> serde_json::Value {
+pub(super) fn containers() -> Value {
     json!([{
         "multiConfigGuid": "a7000000-0000-4000-8000-000000000001",
         "container": "Data\\ObjectContainers\\PU\\loc\\mod\\drlct\\loot_area.socpak",
@@ -159,4 +206,34 @@ pub(super) fn containers() -> serde_json::Value {
         "entityCount": null,
         "tagCounts": []
     }])
+}
+
+const KINDS: [&str; 6] = [
+    "lootSecondaryChoiceSingleLayers",
+    "lootSecondaryChoiceMultiLayers",
+    "lootThemes",
+    "hierarchicalContextualDataPresets",
+    "lootGenerationGlobalParams",
+    "subHarvestableConfigs",
+];
+
+pub(crate) fn add_definition_tables(catalog: &mut Value) {
+    let Some(completeness) = catalog
+        .get_mut("completeness")
+        .and_then(Value::as_object_mut)
+    else {
+        unreachable!("fixture completeness object");
+    };
+    for kind in KINDS {
+        completeness.insert(kind.to_owned(), json!({"status": "complete"}));
+    }
+    let Some(definitions) = catalog
+        .get_mut("definitions")
+        .and_then(Value::as_object_mut)
+    else {
+        unreachable!("fixture definitions object");
+    };
+    for kind in KINDS.into_iter().chain(["subHarvestableMultiConfigs"]) {
+        definitions.insert(kind.to_owned(), super::absent_table());
+    }
 }

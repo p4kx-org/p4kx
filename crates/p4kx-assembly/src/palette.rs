@@ -2,10 +2,19 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_dataforge::{DataForge, Guid, Record, StructValue};
+use p4kx_extraction::{DataForgeEntry, DataForgeOrigin};
 use p4kx_model::{TintEntry, TintPalette, srgb8_to_linear};
 use thiserror::Error;
 
 use crate::read::{as_struct, struct_field, text, unsigned};
+
+#[path = "palette_source.rs"]
+mod source;
+
+pub(crate) use source::{ChosenPalette, material_default_location};
+pub use source::{
+    PaletteRead, PaletteRecordSelection, PaletteRecords, PaletteSelection, PaletteSource,
+};
 
 const TINT_PALETTE_TREE: &str = "TintPaletteTree";
 /// The fields of the palette root that hold the colours of the red, green and blue masks of a
@@ -55,32 +64,80 @@ pub trait PaletteProvider {
     ///
     /// Returns [`PaletteFailure::Missing`] when no tint palette is at the path.
     fn guid_at(&self, path: &str) -> Result<Guid, PaletteFailure>;
+
+    /// Returns the verified DataForge supplying this provider's palette Records.
+    fn forge_origin(&self) -> Option<&DataForgeOrigin> {
+        None
+    }
+
+    /// Reads a palette and its selected DataForge Record coordinate.
+    ///
+    /// # Errors
+    /// As [`Self::by_guid`].
+    fn by_guid_observed(&self, guid: Guid) -> Result<PaletteRead<TintPalette>, PaletteFailure> {
+        self.by_guid(guid).map(PaletteRead::unobserved)
+    }
+
+    /// Selects a palette GUID and the actual Record that supplied it.
+    ///
+    /// # Errors
+    /// As [`Self::guid_at`].
+    fn guid_at_observed(&self, path: &str) -> Result<PaletteRead<Guid>, PaletteFailure> {
+        self.guid_at(path).map(PaletteRead::unobserved)
+    }
 }
 
 /// Reads tint palettes from the `TintPaletteTree` Records of a DataForge.
 #[derive(Debug, Clone, Copy)]
 pub struct ForgePalettes<'f> {
     forge: &'f DataForge<'f>,
+    origin: Option<&'f DataForgeOrigin>,
 }
 
 impl<'f> ForgePalettes<'f> {
     /// Reads palettes from `forge`.
     #[must_use]
     pub const fn new(forge: &'f DataForge<'f>) -> Self {
-        Self { forge }
+        Self {
+            forge,
+            origin: None,
+        }
+    }
+
+    /// Binds the provider to an Entry that supplied this exact opened DataForge.
+    #[must_use]
+    pub fn with_entry(mut self, entry: &'f DataForgeEntry) -> Self {
+        self.origin = entry.origin_of(self.forge);
+        self
     }
 }
 
 impl PaletteProvider for ForgePalettes<'_> {
+    fn forge_origin(&self) -> Option<&DataForgeOrigin> {
+        self.origin
+    }
+
     fn by_guid(&self, guid: Guid) -> Result<TintPalette, PaletteFailure> {
+        self.by_guid_observed(guid).map(|read| read.value)
+    }
+
+    fn guid_at(&self, path: &str) -> Result<Guid, PaletteFailure> {
+        self.guid_at_observed(path).map(|read| read.value)
+    }
+
+    fn by_guid_observed(&self, guid: Guid) -> Result<PaletteRead<TintPalette>, PaletteFailure> {
         let record = self
             .forge
             .record_by_guid(guid)
             .ok_or(PaletteFailure::Missing)?;
-        read_record(&record)
+        let value = read_record(&record)?;
+        Ok(PaletteRead {
+            value,
+            record: Some(PaletteRecordSelection::of(&record)),
+        })
     }
 
-    fn guid_at(&self, path: &str) -> Result<Guid, PaletteFailure> {
+    fn guid_at_observed(&self, path: &str) -> Result<PaletteRead<Guid>, PaletteFailure> {
         self.forge
             .records_at_path(path)
             .find(|record| {
@@ -88,7 +145,10 @@ impl PaletteProvider for ForgePalettes<'_> {
                     .type_name()
                     .is_ok_and(|name| name == TINT_PALETTE_TREE)
             })
-            .map(|record| record.guid())
+            .map(|record| PaletteRead {
+                value: record.guid(),
+                record: Some(PaletteRecordSelection::of(&record)),
+            })
             .ok_or(PaletteFailure::Missing)
     }
 }

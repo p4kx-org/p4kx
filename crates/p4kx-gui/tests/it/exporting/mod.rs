@@ -177,3 +177,14 @@ pub(crate) fn files_below(dir: &Path) -> Result<Vec<String>, Box<dyn Error>> {
     files.sort();
     Ok(files)
 }
+pub(crate) fn wait_for_writing(model: &mut Model) -> TestResult {
+    wait_until(model, |model| {
+        model.record_export().is_some_and(|run| {
+            matches!(
+                run.status(),
+                RecordExportStatus::Running(progress)
+                    if progress.stage == p4kx_gui::RecordExportStage::Writing
+            )
+        })
+    })
+}

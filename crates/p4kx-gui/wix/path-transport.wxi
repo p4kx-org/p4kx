@@ -1,0 +1,94 @@
+<Include xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Binary Id="P4kxPathHelper" SourceFile="$(var.HelperFolder)\p4kx-msi-path.exe" />
+  <Property Id="P4kxPathPackageCode" Value="UNSTAMPED" />
+  <Property Id="P4kxPathCapturedBinding" Value="unbound" Hidden="yes" />
+  <Property Id="P4KX_PATH_BINDING" Value="unbound" Hidden="yes">
+    <RegistrySearch Id="P4kxInvocationBinding" Root="HKCU"
+        Key="Software\P4KX-Installer\PathOwnership\Invocation" Name="Binding"
+        Type="raw" Bitness="always64" />
+  </Property>
+
+  <CustomAction Id="P4kxClearCapturedBinding" Property="P4kxPathCapturedBinding" Value="unbound" />
+  <CustomAction Id="P4kxClearUpgradeDetected" Property="WIX_UPGRADE_DETECTED" Value="" />
+  <CustomAction Id="P4kxClearDowngradeDetected" Property="WIX_DOWNGRADE_DETECTED" Value="" />
+  <CustomAction Id="P4kxPathReserve" BinaryRef="P4kxPathHelper" Execute="immediate"
+      Impersonate="yes" Return="check" HideTarget="yes"
+      ExeCommand="reserve &quot;[ProductCode]&quot; &quot;[P4kxPathPackageCode]&quot;" />
+  <CustomAction Id="P4kxResetBindingSearch" Property="P4KX_PATH_BINDING" Value="unbound" />
+  <CustomAction Id="P4kxCaptureBinding" Property="P4kxPathCapturedBinding" Value="[P4KX_PATH_BINDING]" />
+  <CustomAction Id="P4kxClearBindingSearch" Property="P4KX_PATH_BINDING" Value="unbound" />
+  <CustomAction Id="P4kxRequireRollback" Error="P4KX PATH ownership requires Windows Installer rollback." />
+  <CustomAction Id="P4kxPathRequireBinding" Error="P4KX PATH invocation binding was not captured." />
+  <CustomAction Id="P4kxPathSealEnsure" BinaryRef="P4kxPathHelper" Execute="immediate"
+      Impersonate="yes" Return="check" HideTarget="yes"
+      ExeCommand="seal ensure &quot;[ProductCode]&quot; &quot;[P4kxPathPackageCode]&quot; &quot;[P4kxPathCapturedBinding]&quot; &quot;[WIX_UPGRADE_DETECTED]&quot; &quot;[APPLICATIONFOLDER].&quot;" />
+  <CustomAction Id="P4kxPathSealRemove" BinaryRef="P4kxPathHelper" Execute="immediate"
+      Impersonate="yes" Return="check" HideTarget="yes"
+      ExeCommand="seal remove &quot;[ProductCode]&quot; &quot;[P4kxPathPackageCode]&quot; &quot;[P4kxPathCapturedBinding]&quot;" />
+  <CustomAction Id="P4kxPathCancelNoop" BinaryRef="P4kxPathHelper" Execute="immediate"
+      Impersonate="yes" Return="check" HideTarget="yes"
+      ExeCommand="cancel-reserved &quot;[ProductCode]&quot; &quot;[P4kxPathPackageCode]&quot; &quot;[P4kxPathCapturedBinding]&quot;" />
+  <CustomAction Id="P4kxPathRollback" BinaryRef="P4kxPathHelper" Execute="rollback"
+      Impersonate="yes" Return="check" HideTarget="yes"
+      ExeCommand="rollback &quot;[ProductCode]&quot; &quot;[P4kxPathPackageCode]&quot; &quot;[P4kxPathCapturedBinding]&quot;" />
+  <CustomAction Id="P4kxPathPrepare" BinaryRef="P4kxPathHelper" Execute="deferred"
+      Impersonate="yes" Return="check" HideTarget="yes"
+      ExeCommand="prepare &quot;[ProductCode]&quot; &quot;[P4kxPathPackageCode]&quot; &quot;[P4kxPathCapturedBinding]&quot;" />
+  <CustomAction Id="P4kxPathApply" BinaryRef="P4kxPathHelper" Execute="deferred"
+      Impersonate="yes" Return="check" HideTarget="yes"
+      ExeCommand="apply &quot;[ProductCode]&quot; &quot;[P4kxPathPackageCode]&quot; &quot;[P4kxPathCapturedBinding]&quot;" />
+  <CustomAction Id="P4kxPathCommit" BinaryRef="P4kxPathHelper" Execute="commit"
+      Impersonate="yes" Return="check" HideTarget="yes"
+      ExeCommand="commit &quot;[ProductCode]&quot; &quot;[P4kxPathPackageCode]&quot; &quot;[P4kxPathCapturedBinding]&quot;" />
+  <CustomAction Id="P4kxPathErrorCleanup" BinaryRef="P4kxPathHelper" Execute="immediate"
+      Impersonate="yes" Return="check" HideTarget="yes"
+      ExeCommand="rollback &quot;[ProductCode]&quot; &quot;[P4kxPathPackageCode]&quot; &quot;[P4kxPathCapturedBinding]&quot;" />
+  <CustomAction Id="P4kxPathCancelCleanup" BinaryRef="P4kxPathHelper" Execute="immediate"
+      Impersonate="yes" Return="check" HideTarget="yes"
+      ExeCommand="rollback &quot;[ProductCode]&quot; &quot;[P4kxPathPackageCode]&quot; &quot;[P4kxPathCapturedBinding]&quot;" />
+
+  <InstallUISequence>
+    <AppSearch Suppress="yes" />
+    <FindRelatedProducts Suppress="yes" />
+  </InstallUISequence>
+  <InstallExecuteSequence>
+    <Custom Action="P4kxClearCapturedBinding" Sequence="1"
+        Condition="NOT UPGRADINGPRODUCTCODE" />
+    <Custom Action="P4kxClearUpgradeDetected" Sequence="20"
+        Condition="NOT UPGRADINGPRODUCTCODE" />
+    <Custom Action="P4kxClearDowngradeDetected" Sequence="21"
+        Condition="NOT UPGRADINGPRODUCTCODE" />
+    <FindRelatedProducts Sequence="25" />
+    <Custom Action="P4kxPathReserve" Sequence="200"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED" />
+    <Custom Action="P4kxResetBindingSearch" Sequence="300"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED" />
+    <AppSearch Sequence="400" Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED" />
+    <Custom Action="P4kxCaptureBinding" Sequence="410"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED" />
+    <Custom Action="P4kxClearBindingSearch" Sequence="420"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED" />
+    <Custom Action="P4kxRequireRollback" Sequence="1410"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND ($Application = 2 OR $Application = 3) AND RollbackDisabled" />
+    <Custom Action="P4kxPathRequireBinding" Sequence="1411"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND (NOT P4kxPathCapturedBinding OR P4kxPathCapturedBinding = &quot;unbound&quot;)" />
+    <Custom Action="P4kxPathSealEnsure" Sequence="1420"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding &lt;&gt; &quot;unbound&quot; AND $Application = 3" />
+    <Custom Action="P4kxPathSealRemove" Sequence="1421"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding &lt;&gt; &quot;unbound&quot; AND $Application = 2" />
+    <Custom Action="P4kxPathCancelNoop" Sequence="1430"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding &lt;&gt; &quot;unbound&quot; AND NOT ($Application = 2 OR $Application = 3)" />
+    <Custom Action="P4kxPathRollback" Sequence="1530"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding &lt;&gt; &quot;unbound&quot; AND ($Application = 2 OR $Application = 3)" />
+    <Custom Action="P4kxPathPrepare" Sequence="6410"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding &lt;&gt; &quot;unbound&quot; AND ($Application = 2 OR $Application = 3)" />
+    <Custom Action="P4kxPathApply" Sequence="6420"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding &lt;&gt; &quot;unbound&quot; AND ($Application = 2 OR $Application = 3)" />
+    <Custom Action="P4kxPathCommit" Sequence="6430"
+        Condition="NOT UPGRADINGPRODUCTCODE AND NOT WIX_DOWNGRADE_DETECTED AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding &lt;&gt; &quot;unbound&quot; AND ($Application = 2 OR $Application = 3)" />
+    <Custom Action="P4kxPathErrorCleanup" OnExit="error"
+        Condition="NOT UPGRADINGPRODUCTCODE AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding &lt;&gt; &quot;unbound&quot;" />
+    <Custom Action="P4kxPathCancelCleanup" OnExit="cancel"
+        Condition="NOT UPGRADINGPRODUCTCODE AND P4kxPathCapturedBinding AND P4kxPathCapturedBinding &lt;&gt; &quot;unbound&quot;" />
+  </InstallExecuteSequence>
+</Include>

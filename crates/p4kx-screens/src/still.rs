@@ -4,12 +4,13 @@
 use std::borrow::Cow;
 
 use p4kx_dataforge::DataForge;
-use p4kx_gfx::{RasterOptions, RgbaImage, Skipped};
+use p4kx_gfx::{Raster, RasterOptions, RgbaImage, Skipped, SvgReport};
 
-use crate::compose::{ScreenComposer, TextSources};
+use crate::compose::{Composed, ScreenComposer, TextSources};
 use crate::error::ScreenError;
 use crate::images::ImageSources;
 use crate::report::Report;
+use crate::still_inputs::StillInputs;
 use crate::variables::Variable;
 
 /// The file format a [`Still`] is written in.
@@ -52,6 +53,16 @@ pub struct Still {
     skipped: Vec<Skipped>,
 }
 
+/// A rendered Screen with the source requests used by its composition and backend.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct ObservedStill {
+    /// Pixels or SVG and the regular composition report.
+    pub still: Still,
+    /// Actual contributing inputs retained by the renderer.
+    pub inputs: StillInputs,
+}
+
 impl Still {
     /// Composes the canvas of `request` of `forge` and draws it in the format of the request,
     /// the texts with `texts` and the textures and vector graphics with `images`.
@@ -85,44 +96,75 @@ impl Still {
         request: &StillRequest<'_>,
         stopped: &dyn Fn() -> bool,
     ) -> Result<Self, ScreenError> {
-        if stopped() {
-            return Err(ScreenError::Stopped);
-        }
-        let mut composer = ScreenComposer::new(forge).with_variables(request.variables);
-        if let Some(images) = images {
-            composer = composer.with_images(images);
-        }
-        if let Some(texts) = texts {
-            composer = composer.with_texts(texts);
-        }
-        let scene = composer.compose(request.screen, request.brand)?;
-        if stopped() {
-            return Err(ScreenError::Stopped);
-        }
-        let (picture, width, height, skipped) = match request.format {
-            StillFormat::Png => {
-                let raster = scene.rasterize(&request.raster)?;
-                let (width, height) = (raster.image.width(), raster.image.height());
-                (Picture::Png(raster.image), width, height, raster.skipped)
-            }
+        let scene = compose(ScreenComposer::new(forge), texts, images, request, stopped)?;
+        let report = scene.report().clone();
+        Ok(match request.format {
+            StillFormat::Png => Self::png(scene.rasterize(&request.raster)?, report),
             StillFormat::Svg => {
                 let mut bytes = Vec::new();
                 let written = scene.write_svg(&request.raster, Some(request.screen), &mut bytes)?;
+                Self::svg(bytes, written, report)
+            }
+        })
+    }
+
+    /// Renders a screen with its actual accepted texture, vector and text inputs.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Self::render`].
+    pub fn render_observed<'a>(
+        forge: &'a DataForge<'_>,
+        texts: Option<TextSources<'a>>,
+        images: Option<ImageSources<'a>>,
+        request: &StillRequest<'_>,
+        stopped: &dyn Fn() -> bool,
+    ) -> Result<ObservedStill, ScreenError> {
+        let composer = ScreenComposer::new(forge).observing_inputs();
+        let mut scene = compose(composer, texts, images, request, stopped)?;
+        let report = scene.report().clone();
+        let (still, bitmap_ids, item_ordinals) = match request.format {
+            StillFormat::Png => {
+                let observed = scene.rasterize_observed(&request.raster)?;
                 (
-                    Picture::Svg(bytes),
-                    written.width,
-                    written.height,
-                    written.skipped,
+                    Self::png(observed.raster, report),
+                    observed.bitmap_inputs,
+                    observed.item_inputs,
+                )
+            }
+            StillFormat::Svg => {
+                let mut bytes = Vec::new();
+                let observed =
+                    scene.write_svg_observed(&request.raster, request.screen, &mut bytes)?;
+                (
+                    Self::svg(bytes, observed.svg, report),
+                    observed.bitmap_inputs,
+                    observed.item_inputs,
                 )
             }
         };
-        Ok(Self {
-            picture,
-            width,
-            height,
-            report: scene.report().clone(),
-            skipped,
-        })
+        let inputs = scene.take_used_inputs(&bitmap_ids, item_ordinals);
+        Ok(ObservedStill { still, inputs })
+    }
+
+    fn png(raster: Raster, report: Report) -> Self {
+        Self {
+            width: raster.image.width(),
+            height: raster.image.height(),
+            picture: Picture::Png(raster.image),
+            skipped: raster.skipped,
+            report,
+        }
+    }
+
+    fn svg(bytes: Vec<u8>, output: SvgReport, report: Report) -> Self {
+        Self {
+            width: output.width,
+            height: output.height,
+            picture: Picture::Svg(bytes),
+            skipped: output.skipped,
+            report,
+        }
     }
 
     /// Returns the format the still was drawn in.
@@ -188,4 +230,28 @@ impl Still {
             }
         }
     }
+}
+
+fn compose<'a>(
+    mut composer: ScreenComposer<'a, '_>,
+    texts: Option<TextSources<'a>>,
+    images: Option<ImageSources<'a>>,
+    request: &StillRequest<'_>,
+    stopped: &dyn Fn() -> bool,
+) -> Result<Composed, ScreenError> {
+    if stopped() {
+        return Err(ScreenError::Stopped);
+    }
+    composer = composer.with_variables(request.variables);
+    if let Some(images) = images {
+        composer = composer.with_images(images);
+    }
+    if let Some(texts) = texts {
+        composer = composer.with_texts(texts);
+    }
+    let scene = composer.compose(request.screen, request.brand)?;
+    if stopped() {
+        return Err(ScreenError::Stopped);
+    }
+    Ok(scene)
 }

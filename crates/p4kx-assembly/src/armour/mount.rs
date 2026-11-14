@@ -7,7 +7,7 @@ use p4kx_model::{Bone, BoneMatch, Model};
 use super::ArmourPart;
 use super::jobs::{Job, issue};
 use super::piece::Mount;
-use crate::placement::{bone_transform, is_unskinned, node_transform, offset};
+use crate::placement::{bone_transform, is_unskinned, node_transform, offset_transform};
 use crate::{Issue, IssueKind};
 
 /// The turn about X in degrees from the frame of a bone, which has Z up, to the frame of the
@@ -101,8 +101,8 @@ fn mounted(
     });
     let at_port = anchor
         .then(&held_pose)
-        .then(&offset([0.0; 3], BONE_TO_HELPER))
-        .then(&offset(mount.position(), mount.rotation()));
+        .then(&offset_transform([0.0; 3], BONE_TO_HELPER))
+        .then(&offset_transform(mount.position(), mount.rotation()));
     Ok(RigMount::new(
         bone,
         own.map_or(at_port, |inner| at_port.then(&inner)),

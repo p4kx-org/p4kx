@@ -5,11 +5,16 @@
 
 use std::error::Error;
 
-use p4kx_chunks::ChunkFile;
-use p4kx_model::{CompanionError, CompanionPath, CorruptChunk, LodSelection, Model, ModelError};
-use p4kx_testkit::{TestModel, TestSkeleton};
+use p4kx_chunks::{ChunkFile, ivo};
+use p4kx_model::{
+    ChunkUsage, CompanionError, CompanionPath, CorruptChunk, LodSelection, LodSkeletonOrigin,
+    Model, ModelError, ModelFile,
+};
+use p4kx_testkit::{TestChunkFile, TestModel, TestSkeleton};
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+const UNKNOWN_CHUNK: u32 = 0xDEAD_BEEF;
 
 fn read(model: &TestModel, with_lod_file: bool, lods: LodSelection) -> Result<Model, ModelError> {
     let mut companions = |path: CompanionPath<'_>| -> Result<Option<Vec<u8>>, CompanionError> {
@@ -119,4 +124,218 @@ fn a_level_without_a_file_of_its_own_is_checked_against_the_models_bones() {
         ),
         "{error:?}"
     );
+}
+
+#[test]
+fn inherited_bones_retain_the_actual_level_file_observation() -> TestResult {
+    let skeleton = TestSkeleton::two_bones();
+    let reference = read(
+        &base().with_lod(level_one(&skeleton, 1)),
+        true,
+        LodSelection::All,
+    )?;
+    let reference = reference.lods.get(1).ok_or("reference level")?;
+    let no_skeleton = TestModel::cube().with_bone_map(false, vec![vec![(1, 255)]; 24]);
+    let cases = [
+        (LodSkeletonOrigin::EqualModel, level_one(&skeleton, 1), true),
+        (
+            LodSkeletonOrigin::MissingFile,
+            level_one(&skeleton, 1),
+            false,
+        ),
+        (LodSkeletonOrigin::NoSkeleton, no_skeleton, true),
+        (
+            LodSkeletonOrigin::EmptySkeleton,
+            level_one(&TestSkeleton::new(Vec::new()), 1),
+            true,
+        ),
+    ];
+    for (expected, level, present) in cases {
+        let model = read(&base().with_lod(level), present, LodSelection::All)?;
+        let lod = model.lods.get(1).ok_or("level one")?;
+        assert_eq!(
+            lod.skeleton_origin, expected,
+            "source observation remains distinct"
+        );
+        assert!(
+            lod.bones.is_none(),
+            "effective bones still share the model skeleton"
+        );
+        assert_eq!(
+            model.bones_of(lod),
+            model.bones.as_slice(),
+            "effective skeleton is unchanged"
+        );
+        assert_eq!(
+            lod.meshes, reference.meshes,
+            "source observations do not change geometry"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn level_model_chunks_keep_original_order_and_actual_usage() -> TestResult {
+    let level = level_one(&TestSkeleton::chain(6), 5).with_chunk(UNKNOWN_CHUNK, [7, 8, 9]);
+    let skin = base().with_lod(level);
+    let bytes = skin.lod_cgf(1).ok_or("level model bytes")?;
+    let file = ChunkFile::parse(bytes)?;
+    let model = read(&skin, true, LodSelection::All)?;
+    let lod = model.lods.get(1).ok_or("level one")?;
+    assert_eq!(
+        lod.skeleton_origin,
+        LodSkeletonOrigin::Distinct,
+        "distinct source is retained"
+    );
+    assert_eq!(
+        model.bones_of(lod).len(),
+        6,
+        "level meshes keep their own skeleton"
+    );
+    let chunks: Vec<_> = model
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.file == ModelFile::LodModel(1))
+        .collect();
+    assert_eq!(
+        chunks.len(),
+        file.chunks().len(),
+        "every actually read file chunk is inventoried"
+    );
+    for ((index, expected), actual) in file.chunks().iter().enumerate().zip(&chunks) {
+        assert_eq!(
+            (actual.index, actual.chunk_type),
+            (index, expected.chunk_type()),
+            "physical table ordinal and type remain exact"
+        );
+        let expected_usage = if expected.chunk_type() == ivo::COMPILED_BONES_2 {
+            ChunkUsage::Read
+        } else if expected.chunk_type().is_known() {
+            ChunkUsage::Skipped
+        } else {
+            ChunkUsage::Unknown
+        };
+        assert_eq!(
+            actual.usage, expected_usage,
+            "usage belongs to the level model file"
+        );
+    }
+    assert!(
+        chunks
+            .iter()
+            .any(|chunk| chunk.chunk_type.id() == UNKNOWN_CHUNK
+                && chunk.usage == ChunkUsage::Unknown),
+        "unknown source chunk survives"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_unskinned_level_does_not_claim_a_skeleton_file_read() -> TestResult {
+    let model = read(&base().with_lod(TestModel::cube()), true, LodSelection::All)?;
+    let lod = model.lods.get(1).ok_or("level one")?;
+    assert_eq!(
+        lod.skeleton_origin,
+        LodSkeletonOrigin::NotRead,
+        "unrequested input is not missing"
+    );
+    assert!(
+        model
+            .chunks
+            .iter()
+            .all(|chunk| chunk.file != ModelFile::LodModel(1)),
+        "an unopened file has no invented chunk table"
+    );
+    assert_eq!(
+        model.lods.first().ok_or("base level")?.skeleton_origin,
+        LodSkeletonOrigin::ModelFile,
+        "base skeleton remains model-owned"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_relabelled_base_level_keeps_the_actual_model_skeleton_origin() -> TestResult {
+    let model = read(&base(), true, LodSelection::OnlyOrBase(5))?;
+    let lod = model.lods.first().ok_or("fallback level")?;
+    assert_eq!(
+        lod.level, 5,
+        "existing fallback label remains requested level"
+    );
+    assert_eq!(
+        lod.skeleton_origin,
+        LodSkeletonOrigin::ModelFile,
+        "fallback uses the actual base source"
+    );
+    assert_eq!(
+        model.bones_of(lod),
+        model.bones.as_slice(),
+        "fallback skeleton is unchanged"
+    );
+    assert!(
+        model
+            .chunks
+            .iter()
+            .all(|chunk| chunk.file != ModelFile::LodModel(5)),
+        "no unavailable level file is invented"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_unreadable_level_skeleton_is_not_reported_as_missing() {
+    let level = TestModel::cube()
+        .with_bone_map(false, vec![vec![(1, 255)]; 24])
+        .with_chunk(ivo::COMPILED_BONES_2.id(), 1_u32.to_le_bytes());
+    let result = read(&base().with_lod(level), true, LodSelection::All);
+    assert!(
+        matches!(result, Err(ModelError::Corrupt { ref file, chunk: "CompiledBones2", .. }) if file == "skin_lod1.skin"),
+        "original typed reader failure remains an error"
+    );
+}
+
+#[test]
+fn a_visibility_only_level_retains_every_chunk_without_inventing_geometry() -> TestResult {
+    const IVO_VERSION: u32 = 0x900;
+    let fixture = base();
+    let areas = TestChunkFile::ivo()
+        .chunk(ivo::VIS_AREAS.id(), IVO_VERSION, [0; 64])
+        .chunk(UNKNOWN_CHUNK, IVO_VERSION, [7, 8, 9])
+        .bytes();
+    let file = ChunkFile::parse(fixture.cgf())?;
+    let mut companions = |path: CompanionPath<'_>| -> Result<Option<Vec<u8>>, CompanionError> {
+        Ok(match path {
+            CompanionPath::Sibling("skin.skinm") => Some(fixture.cgfm()),
+            CompanionPath::Sibling("skin_lod1.skinm") => Some(areas.clone()),
+            _ => None,
+        })
+    };
+    let model = Model::read("skin.skin", &file, &mut companions)?;
+    assert_eq!(model.lods.len(), 1, "only actual base geometry is retained");
+    assert_eq!(
+        model.lods[0].level, 0,
+        "the existing base level is unchanged"
+    );
+    let chunks: Vec<_> = model
+        .chunks
+        .iter()
+        .filter(|chunk| chunk.file == ModelFile::LodGeometry(1))
+        .map(|chunk| (chunk.index, chunk.chunk_type.id(), chunk.usage))
+        .collect();
+    assert_eq!(
+        chunks,
+        [
+            (0, ivo::VIS_AREAS.id(), ChunkUsage::Skipped),
+            (1, UNKNOWN_CHUNK, ChunkUsage::Unknown),
+        ],
+        "the actual table keeps its order and source dispositions"
+    );
+    assert!(
+        model
+            .chunks
+            .iter()
+            .all(|chunk| chunk.file != ModelFile::LodModel(1)),
+        "no unread level skeleton is invented"
+    );
+    Ok(())
 }

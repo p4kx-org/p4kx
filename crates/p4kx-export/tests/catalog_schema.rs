@@ -7,13 +7,27 @@
 
 #![recursion_limit = "256"]
 
+#[path = "catalog_schema/additive.rs"]
+mod additive;
 mod catalog_schema_support;
+#[path = "catalog_schema/gameplay_properties.rs"]
+mod gameplay_properties;
+#[path = "catalog_schema/health.rs"]
+mod health;
+#[path = "catalog_schema/mission_values.rs"]
+mod mission_values;
+#[path = "catalog_schema/quality_contract.rs"]
+mod quality_contract;
+#[path = "catalog_schema/resource_groups.rs"]
+mod resource_groups;
+#[path = "catalog_schema/revision.rs"]
+mod revision;
 
 use std::error::Error;
 use std::path::PathBuf;
 
 use catalog_schema_support::minimal_catalog;
-use serde_json::json;
+use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -47,7 +61,7 @@ fn the_checked_in_catalog_schema_is_current() -> TestResult {
 fn the_catalog_schema_is_draft_2020_12() {
     let schema = p4kx_export::catalog_schema();
     assert_eq!(
-        schema.get("$schema").and_then(serde_json::Value::as_str),
+        schema.get("$schema").and_then(Value::as_str),
         Some("https://json-schema.org/draft/2020-12/schema"),
         "draft 2020-12"
     );
@@ -124,56 +138,53 @@ fn a_new_value_of_a_closed_value_set_is_additive() -> TestResult {
 fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> TestResult {
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     let catalog = minimal_catalog();
-    assert!(validator.is_valid(&catalog), "a minimal catalog is valid");
+    let errors: Vec<_> = validator
+        .iter_errors(&catalog)
+        .map(|error| format!("{:?} at {}", error.kind(), error.instance_path()))
+        .collect();
+    assert!(errors.is_empty(), "invalid synthetic catalog: {errors:?}");
 
     let mut version_one = catalog.clone();
     version_one["schemaVersion"] = json!(1);
-    assert!(!validator.is_valid(&version_one), "only version 2");
+    assert!(
+        !validator.is_valid(&version_one),
+        "only the current schema version"
+    );
 
     let mut upper_case = catalog.clone();
-    upper_case["manufacturers"][0]["guid"] = json!("CFC0122D-5275-415A-A656-3DCB3346FEB5");
+    upper_case["definitions"]["manufacturers"]["rows"][0]["guid"]["value"] =
+        json!("CFC0122D-5275-415A-A656-3DCB3346FEB5");
     assert!(!validator.is_valid(&upper_case), "lower-case GUIDs only");
 
     for kind in [
-        "manufacturers",
         "items",
         "ships",
-        "commodities",
-        "blueprints",
-        "resourceGroups",
-        "blueprintCategories",
-        "gameplayProperties",
-        "qualityDistributions",
-        "qualityQuantizations",
         "blueprintPools",
         "dismantleProcesses",
         "paints",
         "loadouts",
-        "contracts",
     ] {
         let mut unknown = catalog.clone();
         unknown[kind][0]["extra"] = json!(true);
         assert!(validator.is_valid(&unknown), "unknown fields in {kind}");
     }
 
-    let mut unknown_kind = catalog.clone();
-    unknown_kind["starmap"] = json!([{"guid": "x"}]);
-    unknown_kind["completeness"]["starmap"] = json!({"status": "complete"});
-    unknown_kind["source"]["extra"] = json!(true);
-    unknown_kind["completeness"]["items"]["extra"] = json!(true);
-    unknown_kind["items"][0]["name"]["extra"] = json!(true);
+    let mut unknown_contract = catalog.clone();
+    unknown_contract["projections"]["contracts"]["rows"][0]["extra"] = json!(true);
     assert!(
-        validator.is_valid(&unknown_kind),
-        "unknown kinds and fields everywhere"
+        validator.is_valid(&unknown_contract),
+        "unknown fields on canonical contracts"
     );
+    quality_contract::assert_unknown_quality_fields(&validator, &catalog)?;
+    let mut unknown_manufacturer = catalog.clone();
+    unknown_manufacturer["definitions"]["manufacturers"]["rows"][0]["extra"] = json!(true);
+    assert!(
+        validator.is_valid(&unknown_manufacturer),
+        "unknown manufacturer fields"
+    );
+    additive::assert_unknown_canonical_fields(&validator, &catalog)?;
 
-    let mut unknown_ingredient = catalog;
-    unknown_ingredient["blueprints"][0]["ingredients"][0]["extra"] = json!(true);
-    assert!(
-        validator.is_valid(&unknown_ingredient),
-        "unknown fields in an ingredient"
-    );
-    Ok(())
+    additive::assert_unknown_nested_fields(&validator, catalog)
 }
 
 #[test]
@@ -193,7 +204,6 @@ fn the_stat_blocks_accept_additions_and_new_closed_values_but_stay_required() ->
             "ammo": null,
             "extra": true
         },
-        "shield": null, "quantumDrive": null, "powerPlant": null, "cooler": null,
         "armor": null, "clothing": null, "radar": null, "tractorBeam": null,
         "weaponModifier": null, "miningLaser": null, "miningModifier": null,
         "missile": {
@@ -201,14 +211,7 @@ fn the_stat_blocks_accept_additions_and_new_closed_values_but_stay_required() ->
             "trackingSignalType": "NewSignal", "lockTime": null, "lockingAngle": null,
             "lockRangeMin": null, "lockRangeMax": null, "linearSpeed": null
         },
-        "health": 1.5, "extra": true,
-        "resourceStates": [{
-            "name": null, "emSignature": null, "irSignature": {"nominal": 1.0, "decayRate": null},
-            "flows": [{
-                "kind": "ItemResourceDeltaNew", "direction": "generation", "resource": "New",
-                "amount": 1.0, "unit": null
-            }]
-        }]
+        "health": 1.5, "extra": true
     });
     assert!(
         validator.is_valid(&stats),
@@ -216,7 +219,7 @@ fn the_stat_blocks_accept_additions_and_new_closed_values_but_stay_required() ->
     );
     let mut no_block = stats.clone();
     if let Some(block) = no_block["items"][0]["stats"].as_object_mut() {
-        block.remove("cooler");
+        block.remove("radar");
     }
     assert!(!validator.is_valid(&no_block), "every block is present");
     let mut no_action_field = stats.clone();
@@ -242,13 +245,6 @@ fn the_stat_blocks_accept_additions_and_new_closed_values_but_stay_required() ->
 fn every_field_the_schema_lists_is_required() -> TestResult {
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     for (kind, field, what) in [
-        ("blueprints", "tiers", "a blueprint lists its tiers"),
-        (
-            "blueprints",
-            "dismantle",
-            "a blueprint states its dismantle",
-        ),
-        ("resourceGroups", "parentGuid", "a resource group"),
         ("ships", "crewSize", "a ship"),
         ("ships", "variantOf", "a ship states its variant base"),
         ("items", "variantOf", "an item states its variant base"),
@@ -261,22 +257,30 @@ fn every_field_the_schema_lists_is_required() -> TestResult {
         }
         assert!(!validator.is_valid(&catalog), "{what} has {field}");
     }
-    let mut no_quantity = minimal_catalog();
-    if let Some(ingredient) = no_quantity["blueprints"][0]["ingredients"][0].as_object_mut() {
-        ingredient.remove("quantityScu");
+    for (pointer, field) in [
+        ("/definitions/blueprints/rows/0", "source"),
+        ("/configurations/blueprintTiers/rows/0", "costs"),
+        (
+            "/configurations/blueprintTiers/rows/0/costs/0/meaning",
+            "quantityScu",
+        ),
+        (
+            "/configurations/blueprintTiers/rows/0/costs/0/context",
+            "modifiers",
+        ),
+        ("/projections/blueprintPresentation/rows/0", "dismantle"),
+    ] {
+        let mut catalog = minimal_catalog();
+        let row = catalog
+            .pointer_mut(pointer)
+            .and_then(Value::as_object_mut)
+            .ok_or("the blueprint schema fixture row")?;
+        assert!(row.remove(field).is_some(), "fixture {pointer}/{field}");
+        assert!(
+            !validator.is_valid(&catalog),
+            "{pointer}/{field} is required"
+        );
     }
-    assert!(
-        !validator.is_valid(&no_quantity),
-        "every field of an ingredient is present"
-    );
-    let mut no_modifiers = minimal_catalog();
-    if let Some(line) = no_modifiers["blueprints"][0]["tiers"][0]["mandatory"].as_object_mut() {
-        line.remove("modifiers");
-    }
-    assert!(
-        !validator.is_valid(&no_modifiers),
-        "every field of a cost line is present"
-    );
     let mut no_global = minimal_catalog();
     if let Some(catalog) = no_global.as_object_mut() {
         catalog.remove("craftingGlobal");
@@ -333,25 +337,25 @@ fn the_loadout_fields_accept_additions_and_new_closed_values_but_stay_required()
 }
 
 #[test]
-fn the_crafting_fields_accept_additions_and_new_closed_values_but_stay_required() -> TestResult {
+fn crafting_fields_allow_additions_but_cost_meanings_are_closed() -> TestResult {
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     let catalog = minimal_catalog();
-    let mut unknown_line = catalog.clone();
-    unknown_line["blueprints"][0]["tiers"][0]["mandatory"]["options"][0]["extra"] = json!(true);
-    unknown_line["blueprints"][0]["dismantle"]["extra"] = json!(true);
-    unknown_line["craftingGlobal"]["extra"] = json!(true);
+    let mut unknown_field = catalog.clone();
+    unknown_field["configurations"]["blueprintTiers"]["rows"][0]["costs"][0]["extra"] = json!(true);
+    unknown_field["projections"]["blueprintPresentation"]["rows"][0]["dismantle"]["value"]["extra"] =
+        json!(true);
+    unknown_field["craftingGlobal"]["extra"] = json!(true);
     assert!(
-        validator.is_valid(&unknown_line),
-        "unknown fields in a cost line, a dismantle link and the global parameters"
+        validator.is_valid(&unknown_field),
+        "unknown fields are additive"
     );
 
-    let mut new_kind_value = catalog;
-    new_kind_value["blueprints"][0]["tiers"][0]["mandatory"]["kind"] = json!("bundle");
-    new_kind_value["blueprints"][0]["tiers"][0]["mandatory"]["options"][0]["modifiers"][0]["ranges"]
-        [0]["kind"] = json!("curve");
+    let mut unknown_cost = catalog;
+    unknown_cost["configurations"]["blueprintTiers"]["rows"][0]["costs"][0]["meaning"]["type"] =
+        json!("bundle");
     assert!(
-        validator.is_valid(&new_kind_value),
-        "a new line or range kind is additive: the closed sets stay strings"
+        !validator.is_valid(&unknown_cost),
+        "cost meanings have a closed shape"
     );
 
     Ok(())

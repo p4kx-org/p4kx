@@ -1,4 +1,8 @@
 # Commodity refining in the DataForge
+Catalog schema 3 keeps source resource definitions in `definitions.resourceTypes` and Commodity
+choices in `projections.commodityPresentation`. Fields below describe the presentation's `value`
+payloads; raw units, exact numbers and authored references retain their own ResourceType owners.
+See the [canonical Commodity contract](catalog-commodity-types.md).
 
 Result of the spike #397 against the LIVE Archive: what the DataForge holds of the raw to refined
 relation, density, instability, counting in SCU or units, and refining methods and yields. Counts

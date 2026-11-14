@@ -26,6 +26,13 @@ pub(crate) struct WemSource<'a> {
     pub(crate) len: u64,
 }
 
+/// A bank path and its position in the Archive directory.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BankPath<'a> {
+    pub(crate) path: &'a str,
+    pub(crate) entry: usize,
+}
+
 /// How many loose WEMs and language folders [`LooseMedia::collect`] keeps.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Limits {
@@ -45,6 +52,7 @@ impl Limits {
 #[derive(Debug, Default)]
 pub(crate) struct LooseMedia {
     languages: Vec<Box<str>>,
+    language_entries: Vec<usize>,
     by_name: HashMap<Box<str>, u16>,
     recent: Option<(Box<str>, u16)>,
     wems: HashMap<u32, Vec<LooseWem>>,
@@ -58,27 +66,27 @@ impl LooseMedia {
     /// `limits.languages` languages further ones are dropped.
     pub(crate) fn collect<'a>(
         wems: impl Iterator<Item = WemSource<'a>>,
-        bank_paths: impl Iterator<Item = &'a str>,
+        bank_paths: impl Iterator<Item = BankPath<'a>>,
         limits: Limits,
     ) -> (Self, Vec<(Box<str>, AudioFileError)>) {
         let mut media = Self::default();
         let mut bank_failure: Option<&str> = None;
         let mut wem_failure: Option<&str> = None;
-        for path in bank_paths {
+        for BankPath { path, entry } in bank_paths {
             let Some(name) = bank_language(path) else {
                 continue;
             };
-            if media.language(name, limits.languages).is_none() {
+            if media.language(name, entry, limits.languages).is_none() {
                 bank_failure.get_or_insert(path);
             }
         }
         let mut count = 0_usize;
         for source in wems {
-            let Some(LooseName { id, language }) = loose_name(source.path) else {
+            let Some(LooseName { id, language, .. }) = loose_name(source.path) else {
                 continue;
             };
             let language = language.map_or(Some(NO_LANGUAGE), |name| {
-                media.language(name, limits.languages)
+                media.language(name, source.entry as usize, limits.languages)
             });
             let Some(language) = language.filter(|_| count < limits.wems) else {
                 wem_failure.get_or_insert(source.path);
@@ -126,6 +134,10 @@ impl LooseMedia {
             .iter()
             .filter_map(|&old| sorted.get_mut(old)?.take())
             .collect();
+        self.language_entries = order
+            .iter()
+            .filter_map(|&old| self.language_entries.get(old).copied())
+            .collect();
         self.by_name = self
             .languages
             .iter()
@@ -137,7 +149,7 @@ impl LooseMedia {
         self.recent = None;
     }
 
-    fn language(&mut self, name: &str, limit: usize) -> Option<u16> {
+    fn language(&mut self, name: &str, entry: usize, limit: usize) -> Option<u16> {
         if let Some((last, at)) = &self.recent
             && last.eq_ignore_ascii_case(name)
         {
@@ -152,6 +164,7 @@ impl LooseMedia {
             }
             let at = u16::try_from(self.languages.len()).ok()?;
             self.languages.push(name.into());
+            self.language_entries.push(entry);
             self.by_name.insert(folded.into(), at);
             at
         };
@@ -164,8 +177,22 @@ impl LooseMedia {
     }
 
     pub(crate) fn language_of(&self, name: &str) -> Option<&str> {
-        let at = *self.by_name.get(name.to_ascii_lowercase().as_str())?;
-        self.languages.get(usize::from(at)).map(|known| &**known)
+        self.language_at(name)
+            .and_then(|at| self.languages.get(at))
+            .map(|known| &**known)
+    }
+
+    pub(crate) fn language_entry_position(&self, name: &str) -> Option<usize> {
+        self.language_at(name)
+            .and_then(|at| self.language_entries.get(at))
+            .copied()
+    }
+
+    fn language_at(&self, name: &str) -> Option<usize> {
+        self.by_name
+            .get(name.to_ascii_lowercase().as_str())
+            .copied()
+            .map(usize::from)
     }
 
     /// Returns the loose WEMs with the ID `id`, in path order, with their language folder.
@@ -205,7 +232,11 @@ mod tests {
         banks: &[&'a str],
         limits: Limits,
     ) -> (LooseMedia, Vec<(Box<str>, AudioFileError)>) {
-        LooseMedia::collect(wems.iter().copied(), banks.iter().copied(), limits)
+        let bank_paths = banks
+            .iter()
+            .enumerate()
+            .map(|(entry, &path)| BankPath { path, entry });
+        LooseMedia::collect(wems.iter().copied(), bank_paths, limits)
     }
 
     fn entries(media: &LooseMedia, id: u32) -> Vec<(u32, Option<String>)> {

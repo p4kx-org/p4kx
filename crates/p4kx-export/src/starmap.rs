@@ -6,8 +6,9 @@ use p4kx_extraction::{DataForge, RecordTree, TreeBuilder};
 use crate::contract::StarmapObject;
 use crate::guid_text::CatalogGuid;
 use crate::memo::Memo;
-use crate::record_fields::{boolean, class_name, locale_key, reference, text};
+use crate::record_fields::{class_name, locale_key, reference, text};
 use crate::starmap_containers::Placements;
+use crate::starmap_containers::proof::PlacementEvidence;
 use crate::texts::Texts;
 
 /// The `description` key all mining claim markers share and no other starmap object has (188 of
@@ -54,13 +55,10 @@ pub(crate) fn starmap_object<'f>(
     let placement = placements.get(tree.guid());
     StarmapObject {
         guid: CatalogGuid(tree.guid()),
+        record_index: tree.record_index(),
         class_name: class_name(tree),
-        record_path: tree.record_path(),
         name: texts.localised(key),
         r#type: type_guid.and_then(|guid| types.get(trees, forge, guid)),
-        type_guid,
-        parent_guid: reference(root, "parent"),
-        hide_in_starmap: boolean(root, "hideInStarmap"),
         system: placement.map(|placement| placement.system.to_string()),
         entity_name: placement
             .map(|placement| placement.entity_name.as_str())
@@ -70,6 +68,9 @@ pub(crate) fn starmap_object<'f>(
             .and_then(|placement| placement.placed_under)
             .map(CatalogGuid),
         position: placement.map(|placement| placement.position.map(millimetres)),
+        placement_proof: placement
+            .map(|placement| PlacementEvidence::Selected(placement.proof.clone()))
+            .or_else(|| placements.ambiguity_proof(tree.guid())),
         mining_claim: locale_key(root, "description").or_else(|| text(root, "description"))
             == Some(MINING_CLAIM_DESCRIPTION),
     }
@@ -86,6 +87,6 @@ fn type_of<'f>(
     Some(plain.unwrap_or_else(|| class_name(&tree)))
 }
 
-fn millimetres(metres: f64) -> f64 {
+pub(crate) fn millimetres(metres: f64) -> f64 {
     (metres * MILLI).round() / MILLI + 0.0
 }

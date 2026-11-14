@@ -152,8 +152,7 @@ pub(crate) fn place(frame: &Frame<'_>, siblings: &[Sibling<'_>]) -> Vec<Placed> 
     let items = flow_items(siblings, &sized, &in_flow);
     let slots = frame
         .flex
-        .map(|flex| arrange(flex, parent, &items))
-        .unwrap_or_default();
+        .map_or_default(|flex| arrange(flex, parent, &items));
     siblings
         .iter()
         .zip(&sized)

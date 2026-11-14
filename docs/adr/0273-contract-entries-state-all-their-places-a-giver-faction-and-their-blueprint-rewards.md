@@ -1,5 +1,8 @@
 # Contract entries state all their places, a giver faction and their blueprint rewards
 
+For catalog schema 3, the pickup-place length cap is superseded by
+[ADR-0359](0359-contract-pickup-places-retain-every-eligible-source-location.md). The original decision and recorded Build observations below remain historical evidence.
+
 Decided for issue #915 (VerseKit, an external consumer). Evidence: LIVE 4.10 (2026-10-31), the 109
 `ContractGenerator` Records, 5,175 contract entries. Builds on ADR-0054 (additive growth), ADR-0065
 (raw facts), ADR-0068 (contracts), ADR-0263 (layers) and ADR-0266 (locations).

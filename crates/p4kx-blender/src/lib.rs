@@ -9,6 +9,7 @@
 //! ```text
 //! <package>/
 //!   scene.json        the manifest: version, source, node hierarchy, meshes, textures, issues
+//!   receipt.json      package-relative SHA-256 checksums and generator identity
 //!   meshes/m0001.glb  one GLB per distinct mesh set (model, material library and palette)
 //!   textures/t0001.png  one PNG per distinct texture of the materials
 //! ```
@@ -22,61 +23,146 @@
 mod build;
 mod character;
 mod collect;
+mod collision_helper_cdf;
+mod collision_helper_document;
+mod collision_helper_model;
+mod collision_helpers;
 mod creature;
 mod describe;
+mod entity_classification;
 mod error;
+pub use entity_classification::EntityClassification;
 mod finite;
 mod interior;
 mod items;
 mod manifest;
 mod manifest_light;
 mod manifest_materials;
+mod manifest_mesh;
 mod manifest_rig;
+mod material_emission_origins;
+mod material_library_sources;
+mod material_source_sidecar;
 mod mesh_options;
+mod mesh_vertex_map;
+mod mesh_vertex_map_wire;
 mod meshes;
+#[cfg(test)]
+mod owned_output_tests;
+mod package_default_material;
+mod package_destination;
+mod package_glow;
+mod package_light_placements;
+mod package_material_emission;
+mod package_palette_provenance;
+mod package_paths;
+mod package_receipt;
+mod package_replacement;
+mod package_soc_scene;
+mod package_write_context;
+mod palette_fields;
+mod palette_selection;
 mod plan;
+mod player_adb_declarations;
+mod player_bundle;
+mod player_bundle_output;
+mod player_bundle_rows;
+mod player_bundle_wire;
+mod player_rig_clip;
+mod player_source;
+mod player_source_body;
+mod player_source_classes;
+mod player_source_loadout;
+mod player_source_motion;
+mod player_source_port_binding;
+mod player_source_port_helper;
+mod player_tag_definitions;
+mod player_weapon_motion_sources;
 mod rename;
 mod rig_package;
 mod roles;
 mod schema;
+mod soc_scene;
+mod soc_scene_class_candidates;
+mod soc_scene_class_components;
+mod soc_scene_class_loadout;
+mod soc_scene_class_mannequin;
+mod soc_scene_class_resources;
+mod soc_scene_class_sensor;
+mod soc_scene_classes;
+mod soc_scene_controller_candidates;
+mod soc_scene_entities;
+mod soc_scene_geometry;
+mod soc_scene_included;
+mod soc_scene_included_row;
+mod soc_scene_light_classes;
+mod soc_scene_light_defaults;
+mod soc_scene_light_override;
+mod soc_scene_light_value;
+mod soc_scene_lights;
+mod soc_scene_loadouts;
+mod soc_scene_occurrence;
+mod soc_scene_origin;
+mod soc_scene_rooms;
+mod soc_scene_stream;
+mod soc_scene_tile_ports;
+mod soc_scene_xml;
 mod stage;
+mod stoppable;
+mod texture_ddna;
+mod texture_dds;
+mod texture_encoding;
+mod texture_field_origins;
+mod texture_format;
+mod texture_source_metadata;
 mod textures;
 mod write;
 
-pub use character::{CharacterScene, write_character_package};
+pub use character::{
+    CharacterScene, write_character_package, write_character_package_with_context,
+};
+pub use collision_helper_document::{CollisionHelperReference, collision_helpers_schema};
 pub use error::PackageError;
-pub use interior::{InteriorScene, write_interior_package};
+pub use interior::{InteriorScene, write_interior_package, write_interior_package_with_context};
 pub use manifest::{
     AlphaMeaning, Basis, BuildInfo, CharacterSource, ColourSpace, Coordinates, EntityRef, FORMAT,
     FORMAT_VERSION, Format, Generator, Issue, IssueOrigin, MANIFEST_FILE, MESHES_FOLDER, Manifest,
     MaterialTextures, Mesh, MeshMaterial, Node, NodeKind, Options, Replacement, Source,
-    TEXTURES_FOLDER, Texture, TextureFormat, Unit,
+    TEXTURES_FOLDER, Texture, Unit,
 };
 pub use manifest_light::{Light, LightKind};
 pub use manifest_materials::{
-    AlphaMode, Element, MaterialDescription, MaterialLayer, MaterialStencil, MaterialTexture,
-    Palette, PaletteColours, PaletteEntry, Parameter, TextureUse,
+    AlphaMode, AuthoredMaterialOrigin, Element, MaterialDescription, MaterialLayer,
+    MaterialLibrarySourceDescription, MaterialStencil, MaterialTexture, Palette, PaletteColours,
+    PaletteEntry, Parameter, TextureUse,
 };
 pub use manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
+pub use material_source_sidecar::{MaterialSourceReference, material_source_sidecar_schema};
+pub use mesh_vertex_map_wire::mesh_vertex_map_schema;
+pub use package_default_material::{FallbackMaterialCause, FallbackMaterialSlot};
+pub use package_material_emission::{
+    AuthoredEmission, EmissionField, EmissionSample, EmissionSlot, EmissionSource,
+    PackageMaterialEmission, StaticEmission,
+};
+pub use package_soc_scene::ManifestSocScene;
+pub use package_write_context::PackageWriteContext;
 pub use schema::manifest_schema;
-pub use stage::check_output;
-pub use write::{PackageInfo, PackageSummary, write_package};
+pub use soc_scene::{SOC_SCENE_VERSION, SocScene, SocSceneError, SocXmlPosition, soc_scene_schema};
+pub use stage::{check_output, check_output_with_context};
+pub use texture_ddna::{DdnaNormalAxis, DdnaSelection, DdnaSmoothnessChannel, DdnaTexturePair};
+pub use texture_dds::{
+    DdsTextureAsset, DdsTextureFallback, DdsTextureSourceChecksum, PackageTextureContainer,
+};
+pub use texture_encoding::{TextureChannelTransform, TextureEncoding, TextureRendition};
+pub use texture_format::TextureFormat;
+pub use texture_source_metadata::TextureSourceMetadata;
+pub use write::{PackageInfo, PackageSummary, write_package, write_package_with_context};
 
 pub(crate) type PackageResult<T> = Result<T, PackageError>;
 
-/// Asks the caller whether to stop.
-pub(crate) struct Cancelled<'a>(&'a (dyn Fn() -> bool + Sync));
-
-impl<'a> Cancelled<'a> {
-    pub(crate) const fn new(check: &'a (dyn Fn() -> bool + Sync)) -> Self {
-        Self(check)
-    }
-
-    pub(crate) fn check(&self) -> PackageResult<()> {
-        if (self.0)() {
-            Err(PackageError::Cancelled)
-        } else {
-            Ok(())
-        }
-    }
-}
+pub use player_bundle::write_player_source_bundle;
+pub use player_bundle_wire::{player_bundle_manifest_schema, player_bundle_record_schema};
+pub use player_source::{
+    PlayerDocument, PlayerDocumentRejection, PlayerDocumentSink, PlayerSource, PlayerSourceCapture,
+    PlayerSourceError, RejectedPlayerDocument, player_source_schema,
+};

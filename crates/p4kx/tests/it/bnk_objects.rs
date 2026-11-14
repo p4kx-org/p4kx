@@ -6,15 +6,49 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use p4kx_extraction::Soundbank;
+
 use p4kx_testkit::{
     ArchiveBuilder, TestBank, TestContainerKind, TestEntry, TestHircObject, TestNodeBase,
     TestPlaylistItem,
 };
 use serde_json::Value;
 
+#[path = "bnk_blend_source_fields.rs"]
+mod blend_source_fields;
+#[path = "bnk_dialogue_source_fields.rs"]
+mod dialogue_source_fields;
+#[path = "bnk_music_track_source_fields.rs"]
+mod music_track_source_fields;
+#[path = "bnk_random_sequence_source_fields.rs"]
+mod random_sequence_source_fields;
+#[path = "bnk_shared_node_fields.rs"]
+mod shared_node_fields;
+#[path = "bnk_switch_source_fields.rs"]
+mod switch_source_fields;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const BANK_ENTRY: &str = "Data\\Sounds\\wwise\\SSAM_Music.bnk";
+
+fn plain_node_prefix() -> Result<Vec<u8>, Box<dyn Error>> {
+    const PLAIN_NODE_LENGTH: usize = 31;
+    let original = TestBank::new(9)
+        .version(154)
+        .object(TestHircObject::actor_mixer(2, &[], TestNodeBase::Plain))
+        .bytes();
+    let original = Soundbank::parse(&original)?;
+    let node = original
+        .objects()
+        .first()
+        .ok_or("original synthetic shared node")?;
+    let start = size_of::<u32>();
+    let bytes = original
+        .object_body(node)
+        .get(start..start + PLAIN_NODE_LENGTH)
+        .ok_or("checked synthetic shared node prefix")?;
+    Ok(bytes.to_vec())
+}
 
 fn music_bank() -> TestBank {
     TestBank::new(0xD155_6D49)
@@ -46,7 +80,7 @@ fn music_bank() -> TestBank {
         ))
         .object(TestHircObject::sound(15, 100, 2, 4096))
         .object(TestHircObject::event(19, &[20]))
-        .object(TestHircObject::raw(7, 16, [0; 8]))
+        .object(TestHircObject::raw(0xFE, 16, [0; 8]))
         .object(TestHircObject::raw(2, 17, [0; 3]))
 }
 
@@ -81,8 +115,7 @@ fn json(args: &[&str], file: &Path) -> Result<Value, Box<dyn Error>> {
 fn ids(report: &Value) -> Vec<u64> {
     report["objects"]
         .as_array()
-        .map(|objects| objects.iter().filter_map(|o| o["id"].as_u64()).collect())
-        .unwrap_or_default()
+        .map_or_default(|objects| objects.iter().filter_map(|o| o["id"].as_u64()).collect())
 }
 
 #[test]
@@ -101,6 +134,14 @@ fn the_json_has_a_stable_shape() -> TestResult {
 
     let mut report = json(&[], &file)?;
     report["soundbank"] = "[FILE]".into();
+    for object in report["objects"].as_array_mut().ok_or("objects")? {
+        let action = object["type"] == "action";
+        let fields = object.as_object_mut().ok_or("object")?;
+        fields.remove("node_fields");
+        if action {
+            fields.remove("source_fields");
+        }
+    }
 
     insta::assert_snapshot!(serde_json::to_string_pretty(&report)?);
     Ok(())
@@ -235,10 +276,30 @@ fn objects_of_a_newer_bank_version_are_unsupported() -> TestResult {
 
     assert_eq!(
         report["layouts"],
-        serde_json::json!({"decoded": 0, "undecoded": 1, "unsupported": 1, "malformed": 0})
+        serde_json::json!({"decoded": 0, "undecoded": 0, "unsupported": 2, "malformed": 0})
     );
     assert_eq!(report["objects"][0]["status"], "unsupported");
-    assert!(text(&[], &file)?.contains("1 unsupported"));
+    assert!(text(&[], &file)?.contains("2 unsupported"));
+    Ok(())
+}
+
+#[test]
+fn a_supported_actor_mixer_exposes_its_original_parent_and_ordered_children() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let children = [37, 19, 37];
+    let bank = TestBank::new(12).object(TestHircObject::actor_mixer(
+        1,
+        &children,
+        TestNodeBase::Full,
+    ));
+    let file = write_bank(dir.path(), &bank)?;
+    let report = json(&["--type", "actor-mixer"], &file)?;
+    let actor = &report["objects"][0];
+    assert_eq!(actor["type"], "actor-mixer");
+    assert_eq!(actor["status"], "decoded");
+    assert_eq!(actor["parent"], 0x2C21_1B2E_u32);
+    assert_eq!(actor["children"], serde_json::json!(children));
+    assert!(actor["detail"]["children_range"]["start"].is_string());
     Ok(())
 }
 

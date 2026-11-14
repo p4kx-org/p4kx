@@ -34,8 +34,7 @@ fn the_localization_tab_is_listed_among_the_work_tabs() {
 
     let tabs: Vec<&str> = json["workTabs"]["tabs"]
         .as_array()
-        .map(|tabs| tabs.iter().filter_map(Value::as_str).collect())
-        .unwrap_or_default();
+        .map_or_default(|tabs| tabs.iter().filter_map(Value::as_str).collect());
 
     assert_eq!(
         tabs,

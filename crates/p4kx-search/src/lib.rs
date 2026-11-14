@@ -22,9 +22,14 @@ mod entries;
 mod entry_scan;
 mod excerpt;
 mod gate;
+mod line_excerpt;
+mod line_match;
 mod line_sink;
+#[cfg(test)]
+mod line_stream_tests;
 mod localization;
 mod needle;
+mod needle_scan;
 mod options;
 mod records;
 mod report;

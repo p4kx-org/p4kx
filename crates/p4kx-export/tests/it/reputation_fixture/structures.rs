@@ -13,58 +13,91 @@ fn pointer(name: &str) -> TestType {
     TestType::StrongPointer(name.to_owned())
 }
 
-fn reputation_structs() -> Vec<TestStruct> {
-    vec![
+fn faction_structs() -> [TestStruct; 6] {
+    [
         TestStruct::new("FactionReputation")
             .field("displayName", TestType::Locale)
             .field("isNPC", TestType::Bool)
-            .field("reputationContextPropertiesUI", TestType::Reference)
-            .array("allies", TestType::Reference)
-            .array("enemies", TestType::Reference)
+            .field(
+                "reputationContextPropertiesUI",
+                TestType::ReferenceTo("SReputationContextUI".to_owned()),
+            )
+            .array(
+                "allies",
+                TestType::ReferenceTo("FactionReputation".to_owned()),
+            )
+            .array(
+                "enemies",
+                TestType::ReferenceTo("FactionReputation".to_owned()),
+            )
             .field("hostilityParams", class("RelationStandingParams"))
             .field("alliedParams", class("RelationStandingParams"))
-            .array(
-                "propertiesBB",
-                pointer("SReputationContextBBPropertyParams"),
-            ),
+            .array("propertiesBB", class("SReputationContextBBPropertyParams")),
         TestStruct::new("RelationStandingParams")
-            .field("scope", TestType::Reference)
-            .field("standing", TestType::Reference),
+            .field(
+                "scope",
+                TestType::ReferenceTo("SReputationScopeParams".to_owned()),
+            )
+            .field(
+                "standing",
+                TestType::ReferenceTo("SReputationStandingParams".to_owned()),
+            ),
         TestStruct::new("SReputationContextBBPropertyParams")
             .field("name", TestType::String)
-            .field("dynamicProperty", pointer("SBBDynamicProperty")),
-        TestStruct::new("SBBDynamicProperty"),
+            .field("dynamicProperty", pointer("SBBDynamicPropertyBase")),
+        TestStruct::new("SBBDynamicPropertyBase"),
         TestStruct::new("SBBDynamicPropertyBool")
-            .parent("SBBDynamicProperty")
+            .parent("SBBDynamicPropertyBase")
             .field("value", TestType::Bool),
         TestStruct::new("SBBDynamicPropertyLocString")
-            .parent("SBBDynamicProperty")
+            .parent("SBBDynamicPropertyBase")
             .field("value", TestType::Locale),
-        TestStruct::new("SReputationScopeParams")
-            .field("scopeName", TestType::String)
-            .field("displayName", TestType::Locale)
-            .field("standingMap", class("SReputationStandingMapParams")),
-        TestStruct::new("SReputationStandingMapParams")
-            .field("reputationCeiling", TestType::Int32)
-            .field("initialReputation", TestType::Int32)
-            .array("standings", TestType::Reference),
-        TestStruct::new("SReputationStandingParams")
-            .field("displayName", TestType::Locale)
-            .field("minReputation", TestType::Int32)
-            .field("driftReputation", TestType::Int32)
-            .field("driftTimeHours", TestType::Int32)
-            .field("gated", TestType::Bool),
-        TestStruct::new("SReputationContextUI")
-            .field("primaryScopeContext", class("SReputationScopeContextUI"))
-            .array("scopeContextList", class("SReputationScopeContextUI")),
-        TestStruct::new("SReputationScopeContextUI").field("scope", TestType::Reference),
     ]
+}
+
+fn reputation_structs() -> Vec<TestStruct> {
+    faction_structs()
+        .into_iter()
+        .chain([
+            TestStruct::new("SReputationScopeParams")
+                .field("scopeName", TestType::String)
+                .field("displayName", TestType::Locale)
+                .field("description", TestType::Locale)
+                .field("icon", TestType::String)
+                .field("standingMap", class("SReputationStandingMapParams")),
+            TestStruct::new("SReputationStandingMapParams")
+                .field("reputationCeiling", TestType::Int64)
+                .field("initialReputation", TestType::Int64)
+                .array(
+                    "standings",
+                    TestType::ReferenceTo("SReputationStandingParams".to_owned()),
+                ),
+            TestStruct::new("SReputationStandingParams")
+                .field("name", TestType::String)
+                .field("description", TestType::String)
+                .field("perkDescription", TestType::Locale)
+                .field("icon", TestType::String)
+                .field("missionBoardIcon", TestType::String)
+                .field("displayName", TestType::Locale)
+                .field("minReputation", TestType::Int64)
+                .field("driftReputation", TestType::Int64)
+                .field("driftTimeHours", TestType::Single)
+                .field("gated", TestType::Bool),
+            TestStruct::new("SReputationContextUI")
+                .field("primaryScopeContext", class("SReputationScopeContextUI"))
+                .array("scopeContextList", class("SReputationScopeContextUI")),
+            TestStruct::new("SReputationScopeContextUI").field("scope", TestType::Reference),
+        ])
+        .collect()
 }
 
 fn mission_structs() -> Vec<TestStruct> {
     vec![
         TestStruct::new("Placeholder"),
-        TestStruct::new("Faction").field("factionReputationRef", TestType::Reference),
+        TestStruct::new("Faction").field(
+            "factionReputationRef",
+            TestType::ReferenceTo("FactionReputation".to_owned()),
+        ),
         TestStruct::new("MissionType").field("LocalisedTypeName", TestType::Locale),
         TestStruct::new("MissionLocality").array("availableLocations", TestType::Reference),
         TestStruct::new("ScenarioProgress")

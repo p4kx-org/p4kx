@@ -64,7 +64,7 @@ impl<'a> GlobalIni<'a> {
                 limit: MAX_GLOBAL_INI_SIZE,
             });
         }
-        let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+        let text = text.trim_prefix('\u{feff}');
         let mut texts = HashMap::new();
         let keys = (text.len() / BYTES_PER_KEY_ESTIMATE).min(MAX_GLOBAL_INI_KEYS);
         texts
@@ -72,7 +72,7 @@ impl<'a> GlobalIni<'a> {
             .map_err(|_| LocalizationError::OutOfMemory { keys })?;
         let mut skipped = 0;
         for line in text.split('\n') {
-            let line = line.strip_suffix('\r').unwrap_or(line);
+            let line = line.trim_suffix('\r');
             let key = line.split_once('=').and_then(|(key, value)| {
                 let (key, suffixed) = key
                     .split_once(',')
@@ -117,7 +117,7 @@ impl<'a> GlobalIni<'a> {
     }
 
     fn texts_of(&self, key: &str) -> Option<Texts<'a>> {
-        let key = key.strip_prefix('@').unwrap_or(key);
+        let key = key.trim_prefix('@');
         let texts: &HashMap<Key<'_>, Texts<'a>> = &self.texts;
         texts.get(&Key(key)).copied()
     }

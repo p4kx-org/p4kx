@@ -4,6 +4,7 @@
 use p4kx_extraction::{Archive, CancelToken};
 
 use crate::CatalogError;
+use crate::catalog_read::original::EntryCapture;
 use crate::collected::Collected;
 use crate::crafting_warning::CraftingWarning;
 use crate::harvest_locations::Objects;
@@ -24,22 +25,31 @@ pub(crate) fn add_loot_containers(
     placements: &Placements,
     collected: &mut Collected<'_>,
     cancel: Option<&CancelToken>,
+    capture: &EntryCapture<'_>,
 ) -> Result<(), CatalogError> {
+    crate::entry_source::dependencies(
+        &placements.ledger,
+        &mut collected.ledger,
+        crate::Kind::LootContainers,
+    );
     let located = locate(
         archive,
         &placements.opened,
         &Objects::new(&collected.starmap_objects),
         cancel,
-    );
+        capture,
+    )?;
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
     let Located {
+        ledger,
         containers,
         unreadable,
         beyond_limit,
         several,
     } = located;
+    collected.ledger.merge(ledger);
     let mut details: Vec<String> = unreadable.iter().map(ToString::to_string).collect();
     if beyond_limit > 0 {
         details.push(format!(

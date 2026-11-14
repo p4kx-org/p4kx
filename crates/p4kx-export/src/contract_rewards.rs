@@ -4,71 +4,8 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract::{LocalisedText, every_field_required};
+use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
-
-/// A gameplay property definition: a `CraftingGameplayPropertyDef` Record under
-/// `crafting/craftedproperties`, the target of the `propertyGuid` of a modifier.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct GameplayProperty<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The name of the property; a placeholder key leaves `en` and `de` `null`.
-    pub(crate) name: LocalisedText<'a>,
-}
-
-/// A normal distribution of quality.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct QualityCurve<'a> {
-    /// The struct of the distribution, e.g. `CraftingQualityDistributionNormal`. A closed set the
-    /// game may extend.
-    pub(crate) kind: &'a str,
-    /// The lowest quality.
-    pub(crate) min: Option<f32>,
-    /// The highest quality.
-    pub(crate) max: Option<f32>,
-    /// The mean.
-    pub(crate) mean: Option<f32>,
-    /// The standard deviation.
-    pub(crate) stddev: Option<f32>,
-}
-
-/// A distribution that replaces the default one at a location.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct LocationOverride<'a> {
-    /// The GUID of the location Record, `null` for a null Reference.
-    pub(crate) location_guid: Option<CatalogGuid>,
-    /// The distribution at the location, `null` when the Record holds none.
-    pub(crate) distribution: Option<QualityCurve<'a>>,
-}
-
-/// A quality distribution Record under `crafting/qualitydistribution`: the default distribution
-/// of a source or the list of its location overrides.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct QualityDistribution<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The distribution of a `CraftingQualityDistributionRecord`, `null` for an override Record.
-    pub(crate) distribution: Option<QualityCurve<'a>>,
-    /// The overrides of a `CraftingQualityLocationOverrideRecord`, empty for a default Record.
-    pub(crate) overrides: Vec<LocationOverride<'a>>,
-}
 
 /// One entry of a blueprint pool.
 #[derive(Debug, Serialize, JsonSchema)]

@@ -3,14 +3,14 @@
 
 mod budget;
 mod build;
-mod lookup;
+pub(crate) mod lookup;
+mod placement;
 
+use p4kx_extraction::ModelArchiveSource;
 use p4kx_gltf::{GltfError, Scene, SceneNode};
-use p4kx_model::{MaterialStatus, Model, Transform};
+use p4kx_model::{MaterialStatus, Transform};
 
-use crate::placement::{node_transform, offset};
 use crate::{Assembly, Interior, Issue, IssueKind, ObjectContainerRef};
-use lookup::near;
 
 /// The name of the scene node that groups the Interior below the Entity.
 pub const INTERIOR_NODE: &str = "Interior";
@@ -112,60 +112,6 @@ impl EntityInterior {
         self.total(Interior::modelled_parts)
     }
 
-    fn place(
-        &mut self,
-        at: &str,
-        reference: &ObjectContainerRef,
-        model: Option<&Model>,
-    ) -> Transform {
-        let finite = reference
-            .position()
-            .iter()
-            .chain(&reference.rotation())
-            .all(|value| value.is_finite());
-        let moved = if finite {
-            offset(reference.position(), reference.rotation())
-        } else {
-            self.note(
-                at,
-                reference,
-                IssueKind::InvalidOffset {
-                    name: reference.file().to_owned(),
-                },
-            );
-            Transform::IDENTITY
-        };
-        let bone = reference.bone();
-        if bone.is_empty() {
-            return moved;
-        }
-        let Some(anchor) = model.and_then(|model| node_transform(model, bone)) else {
-            self.note(
-                at,
-                reference,
-                IssueKind::HelperNotFound {
-                    helper: bone.to_owned(),
-                },
-            );
-            return moved;
-        };
-        let anchored = anchor.translation();
-        if near(anchored, [0.0; 3]) {
-            return anchor.then(&moved);
-        }
-        if finite && !near(reference.position(), [0.0; 3]) && !near(reference.position(), anchored)
-        {
-            self.note(
-                at,
-                reference,
-                IssueKind::OffsetDiffers {
-                    bone: bone.to_owned(),
-                },
-            );
-        }
-        anchor
-    }
-
     fn add(
         &mut self,
         part: usize,
@@ -210,6 +156,7 @@ impl EntityInterior {
         &'s self,
         scene: &mut Scene<'s>,
         parts: usize,
+        observe: &mut impl FnMut(usize, &'s [ModelArchiveSource]),
     ) -> Result<(), GltfError> {
         let mut group: Option<(usize, usize)> = None;
         for container in &self.containers {
@@ -223,9 +170,12 @@ impl EntityInterior {
                     node
                 }
             };
-            container
-                .interior
-                .add_to_scene(scene, Some(node), container.placement)?;
+            container.interior.add_to_scene_observing_models(
+                scene,
+                Some(node),
+                container.placement,
+                observe,
+            )?;
         }
         Ok(())
     }

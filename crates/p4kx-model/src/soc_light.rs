@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::Transform;
+use std::sync::Arc;
+
+use p4kx_cryxml::SourceElementPosition;
+
 use crate::mtl_xml::XmlElement;
 use crate::soc_entities::{child, number};
+use crate::{SocGroupPlacement, Transform};
 
 /// The state of a light whose values a [`SocLight`] carries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -17,6 +21,8 @@ pub enum LightState {
     Emergency,
     /// The cinematic state, `cinematicState`.
     Cinematic,
+    /// The off state, `offState`.
+    Off,
 }
 
 impl LightState {
@@ -27,6 +33,16 @@ impl LightState {
         (Self::Cinematic, "cinematicState"),
     ];
 
+    pub(crate) fn from_element(element: p4kx_cryxml::SourceElement<'_>) -> Option<Self> {
+        if element.namespace().is_some() {
+            return None;
+        }
+        Self::ORDER
+            .into_iter()
+            .chain([(Self::Off, "offState")])
+            .find_map(|(kind, name)| (element.name() == name).then_some(kind))
+    }
+
     /// Returns the stable code of the state, e.g. `default`.
     #[must_use]
     pub const fn code(self) -> &'static str {
@@ -35,6 +51,7 @@ impl LightState {
             Self::Auxiliary => "auxiliary",
             Self::Emergency => "emergency",
             Self::Cinematic => "cinematic",
+            Self::Off => "off",
         }
     }
 }
@@ -51,6 +68,14 @@ pub struct SocLight {
     pub name: String,
     /// The name of the `LightGroup` entity the light belongs to.
     pub group: Option<String>,
+    /// The authored group frame and selectors, when this light belongs to a baked group.
+    pub group_placement: Option<Arc<SocGroupPlacement>>,
+    /// Original baked-light element in the group's SOC chunk.
+    pub baked_position: Option<SourceElementPosition>,
+    /// Original component supplying the selected preview state.
+    pub component_position: Option<SourceElementPosition>,
+    /// Original relative transform element in the group's SOC chunk.
+    pub relative_position: Option<SourceElementPosition>,
     /// The transform from the light's space to the container's, in `CryEngine` coordinates, Z up
     /// and in metres; the light shines along its +X axis.
     pub transform: Transform,
@@ -123,6 +148,10 @@ pub(crate) fn read_light<'a>(
     Some(SocLight {
         name: name.to_owned(),
         group: group.map(str::to_owned),
+        group_placement: None,
+        baked_position: None,
+        component_position: None,
+        relative_position: None,
         transform,
         light_type,
         state: values.state,

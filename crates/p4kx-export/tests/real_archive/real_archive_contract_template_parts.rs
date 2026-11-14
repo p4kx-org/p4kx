@@ -5,14 +5,27 @@
 //! contract templates in the Basetool catalog of a real Archive.
 
 use std::collections::HashSet;
+use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, CraftingWarning, build_catalog};
+use p4kx_export::{CatalogOptions, CraftingWarning, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
+#[path = "real_archive_template_parts_flow.rs"]
+mod flow;
+
+#[path = "real_archive_template_parts_objectives.rs"]
+mod objectives;
+
+use self::flow::Flows;
+use self::objectives::English;
+use crate::catalog_v3_consumer as reader;
+use crate::real_archive_contract_templates::mission_graph::{self as graph, Family, Mission};
 use crate::real_archive_verification::{TestResult, guids, print_line};
+
+type PartsResult<T = ()> = Result<T, Box<dyn Error>>;
 
 /// What the parts of the templates hold.
 #[derive(Default)]
@@ -31,133 +44,147 @@ struct Figures {
     referenced_links: usize,
 }
 
-/// Collects the objective ids a condition names, `None` for a link that points to nothing.
-fn condition_links<'c>(condition: &'c Value, found: &mut Vec<Option<&'c str>>) {
-    match condition["type"].as_str() {
-        Some("tokenState") => found.push(condition["objectiveId"].as_str()),
-        Some("and" | "or") => {
-            for inner in condition["conditions"].as_array().into_iter().flatten() {
-                condition_links(inner, found);
-            }
-        }
-        Some("not") => condition_links(&condition["condition"], found),
-        _ => {}
-    }
-}
-
-fn texts_in(value: &Value) -> usize {
-    match value {
-        Value::Object(map) => {
-            usize::from(map.get("en").is_some_and(Value::is_string))
-                + map.values().map(texts_in).sum::<usize>()
-        }
-        Value::Array(items) => items.iter().map(texts_in).sum(),
-        _ => 0,
-    }
-}
-
-/// Counts the links of the mission flow of `template` and asserts that every one names an
-/// objective among `ids`.
-fn check_flow(name: &str, template: &Value, ids: &HashSet<&str>, figures: &mut Figures) {
-    for trigger in template["missionFlow"].as_array().into_iter().flatten() {
-        figures.flow_triggers += 1;
-        let mut links = Vec::new();
-        condition_links(&trigger["condition"], &mut links);
-        let action = &trigger["action"];
-        if action["type"] == "tokenStateChange" {
-            links.push(action["objectiveId"].as_str());
-        }
-        for phase in action["phases"].as_array().into_iter().flatten() {
-            links.push(phase["objectiveId"].as_str());
-        }
-        for link in links {
-            match link {
-                Some(id) => {
-                    figures.flow_objective_links += 1;
-                    assert!(ids.contains(id), "{name}: flow names objective {id}");
-                }
-                None => figures.unresolved_objective_links += 1,
-            }
-        }
-    }
-}
-
-/// Counts the texts, handlers and comms of the objectives of `template` and asserts that every
-/// marker entity is an entry of `items`.
-fn check_objectives(
-    name: &str,
-    objectives: &[Value],
-    items: &HashSet<&str>,
-    figures: &mut Figures,
-) {
-    for objective in objectives {
-        figures.comms += objective["comms"].as_array().map_or(0, Vec::len);
-        for property in objective["objectiveProperties"]
-            .as_array()
-            .into_iter()
-            .flatten()
-        {
-            figures.properties += 1;
-            figures.property_values += usize::from(!property["value"].is_null());
-            figures.referenced_links += usize::from(property["contractProperty"].is_string());
-        }
-        figures.resolved_texts += texts_in(&objective["display"]) + texts_in(&objective["handler"]);
-        let handler = &objective["handler"];
-        if handler.is_null() {
-            continue;
-        }
-        figures.handlers += 1;
-        for field in [
-            "locationProperty",
-            "organizationProperty",
-            "haulingLimitProperty",
-            "targetProperty",
-        ] {
-            figures.handler_property_links += usize::from(handler[field].is_string());
-        }
-        let marker = handler.pointer("/navPoint/entityClassGuid");
-        if let Some(guid) = marker.and_then(Value::as_str) {
-            assert!(items.contains(guid), "{name}: marker entity {guid}");
-        }
-    }
-}
-
-/// Asserts that every link the parts of a template state names an entry of its kind or an
-/// objective of the same template, and counts what the parts hold.
 fn check_template(
-    template: &Value,
-    kinds: (&HashSet<&str>, &HashSet<&str>),
+    mission: &Mission<'_>,
+    (scopes, items): (&HashSet<&str>, &HashSet<&str>),
+    flows: &Flows<'_>,
+    english: &English<'_>,
     figures: &mut Figures,
-) -> TestResult {
-    let (scopes, items) = kinds;
-    let name = template["className"].as_str().unwrap_or_default();
-    let objectives = template["objectives"].as_array().ok_or("objectives")?;
-    let ids: HashSet<&str> = objectives
-        .iter()
-        .filter_map(|objective| objective["id"].as_str())
-        .collect();
-    check_flow(name, template, &ids, figures);
-    check_objectives(name, objectives, items, figures);
-    let thresholds = template.pointer("/partialPayout/thresholds");
-    for range in thresholds.and_then(Value::as_array).into_iter().flatten() {
-        figures.payout_ranges += 1;
-        for adjustment in range["reputationMultipliers"]
-            .as_array()
-            .ok_or("multipliers")?
-        {
-            let guid = adjustment["scopeGuid"].as_str().ok_or("scopeGuid")?;
-            assert!(scopes.contains(guid), "{name}: payout scope {guid}");
-        }
+) -> PartsResult {
+    let name = graph::text(mission.definition, "/className/value")?;
+    flows.count(mission, name, figures)?;
+    objectives::count(mission, name, items, english, figures)?;
+    check_payouts(mission, name, scopes, figures)?;
+    for modifier in graph::array(mission.projection, "modifiers")? {
+        mission.follow(required(modifier, "source")?)?;
+        figures.modifiers += 1;
     }
-    figures.modifiers += template["modifiers"].as_array().map_or(0, Vec::len);
-    figures.comms += usize::from(!template["startComms"].is_null())
-        + template["endComms"].as_array().map_or(0, Vec::len);
-    let owner_name = template.pointer("/owner/className");
+    figures.comms += usize::from(input_selection(mission, "startComms")?.is_some())
+        + structs(mission, input_declaration(mission, "endComms")?)?.len();
+    let owner = required(mission.projection, "owner")?;
+    let owner_name = owner
+        .get("className")
+        .map(reader::source_value)
+        .transpose()?
+        .flatten();
     assert!(
         owner_name.is_some_and(Value::is_string),
         "{name}: the owner names its Record"
     );
     Ok(())
+}
+
+fn check_payouts(
+    mission: &Mission<'_>,
+    name: &str,
+    scopes: &HashSet<&str>,
+    figures: &mut Figures,
+) -> PartsResult {
+    let Some(payout) = input_selection(mission, "partialRewardPayout")? else {
+        return Ok(());
+    };
+    for range in structs(mission, mission.member(payout, "percentageThresholds")?)? {
+        figures.payout_ranges += 1;
+        for adjustment in structs(mission, mission.member(range, "reputationMultipliers")?)? {
+            let guid =
+                linked(mission.member(adjustment, "reputationScope")?)?.ok_or("scopeGuid")?;
+            assert!(scopes.contains(guid), "{name}: payout scope {guid}");
+        }
+    }
+    Ok(())
+}
+
+fn input_selection<'catalog>(
+    mission: &Mission<'catalog>,
+    name: &str,
+) -> PartsResult<Option<&'catalog Value>> {
+    let input = required(required(mission.projection, "inputs")?, name)?;
+    nullable(input, "selectedStruct")?
+        .map(|reference| mission.follow(reference))
+        .transpose()
+        .map_err(Into::into)
+}
+
+fn input_declaration<'catalog>(
+    mission: &Mission<'catalog>,
+    name: &str,
+) -> PartsResult<Option<&'catalog Value>> {
+    let input = required(required(mission.projection, "inputs")?, name)?;
+    let declaration = required(input, "declaration")?;
+    Ok(match graph::text(declaration, "/state")? {
+        "present" => Some(mission.field(required(declaration, "field")?)?),
+        "absent" => None,
+        _ => return Err("the source input declaration state is invalid".into()),
+    })
+}
+
+fn required<'value>(value: &'value Value, name: &str) -> PartsResult<&'value Value> {
+    value
+        .get(name)
+        .ok_or_else(|| format!("required canonical field {name}").into())
+}
+
+fn nullable<'value>(value: &'value Value, name: &str) -> PartsResult<Option<&'value Value>> {
+    let value = required(value, name)?;
+    Ok((!value.is_null()).then_some(value))
+}
+
+fn selected<'catalog>(
+    mission: &Mission<'catalog>,
+    parent: &'catalog Value,
+    name: &str,
+) -> PartsResult<Option<&'catalog Value>> {
+    let Some(value) = mission.member(parent, name)? else {
+        return Ok(None);
+    };
+    match node_type(value) {
+        Some("struct" | "array") => Ok(mission.first_struct(value)?),
+        _ => Ok(None),
+    }
+}
+
+fn structs<'catalog>(
+    mission: &Mission<'catalog>,
+    source: Option<&'catalog Value>,
+) -> PartsResult<Vec<&'catalog Value>> {
+    let Some(source) = source.filter(|node| node_type(node) == Some("array")) else {
+        return Ok(Vec::new());
+    };
+    Ok(mission
+        .elements(source)?
+        .into_iter()
+        .filter(|node| node_type(node) == Some("struct"))
+        .collect())
+}
+
+fn linked(source: Option<&Value>) -> PartsResult<Option<&str>> {
+    let Some(source) = source else {
+        return Ok(None);
+    };
+    if source
+        .pointer("/originalError/type")
+        .and_then(Value::as_str)
+        == Some("danglingReference")
+        || node_type(source) == Some("recordReference")
+    {
+        return Ok(graph::reference(source)?);
+    }
+    if node_type(source) == Some("weakReference")
+        && source
+            .pointer("/value/value/value/target/type")
+            .and_then(Value::as_str)
+            == Some("record")
+    {
+        return Ok(Some(graph::text(
+            source,
+            "/value/value/value/recordGuid/value",
+        )?));
+    }
+    Ok(None)
+}
+
+fn node_type(value: &Value) -> Option<&str> {
+    value.pointer("/value/value/type").and_then(Value::as_str)
 }
 
 #[test]
@@ -180,10 +207,23 @@ fn the_parts_of_the_contract_templates_of_a_real_archive_resolve() -> TestResult
     );
     let scopes = guids(&catalog, "reputationScopes")?;
     let items = guids(&catalog, "items")?;
+    let flows = Flows::read(&catalog)?;
+    let english = English::read(&catalog)?;
+    let templates = graph::contexts(&catalog, Family::Template)?;
+    assert_eq!(
+        templates.len(),
+        reader::rows(&catalog, Kind::ContractTemplates)?.len(),
+        "every available original Template has its physical configuration"
+    );
     let mut figures = Figures::default();
-    for template in catalog["contractTemplates"].as_array().ok_or("templates")? {
-        check_template(template, (&scopes, &items), &mut figures)?;
+    for template in &templates {
+        check_template(template, (&scopes, &items), &flows, &english, &mut figures)?;
     }
+    assert_template_figures(&figures);
+    Ok(())
+}
+
+fn assert_template_figures(figures: &Figures) {
     print_line(&format!(
         "{} flow triggers ({} objective links, {} unresolved), {} handlers ({} property links), {} resolved texts, {} payout ranges, {} modifiers, {} comms, {} objective properties ({} with a value, {} referenced)",
         figures.flow_triggers,
@@ -220,5 +260,4 @@ fn the_parts_of_the_contract_templates_of_a_real_archive_resolve() -> TestResult
         figures.referenced_links > 4_500,
         "referenced properties that name a property"
     );
-    Ok(())
 }

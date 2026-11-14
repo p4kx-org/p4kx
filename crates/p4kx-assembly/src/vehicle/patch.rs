@@ -243,7 +243,14 @@ fn overlay_children(
         let partner = partners
             .get_mut(&pair_key(source))
             .and_then(VecDeque::pop_front);
-        let mut element = Element::read(source.name.clone(), source.attributes.clone(), Vec::new());
+        let mut element = Element {
+            name: source.name.clone(),
+            port_name: source.port_name.clone(),
+            light_bone: source.light_bone.clone(),
+            attributes: source.attributes.clone(),
+            children: Vec::new(),
+            origins: Vec::new(),
+        };
         for (name, _) in &source.attributes {
             element.mark(name, ValueOrigin::Patch);
         }
@@ -253,6 +260,12 @@ fn overlay_children(
                     if element.attribute(name).is_none() {
                         budget.charge_set(element.attributes.len(), name, value)?;
                         element.set_attribute(name, value);
+                        if name.eq_ignore_ascii_case("name") {
+                            element.port_name.clone_from(&partner.port_name);
+                        }
+                        if name.eq_ignore_ascii_case("bone") {
+                            element.light_bone.clone_from(&partner.light_bone);
+                        }
                         match partner.origin_of(name) {
                             ValueOrigin::Base => {}
                             origin => element.mark(name, origin),
@@ -292,6 +305,12 @@ fn merge_by_id(
             for (name, value) in &patch.attributes {
                 budget.charge_set(child.attributes.len(), name, value)?;
                 child.set_attribute(name, value);
+                if name.eq_ignore_ascii_case("name") {
+                    child.port_name.clone_from(&patch.port_name);
+                }
+                if name.eq_ignore_ascii_case("bone") {
+                    child.light_bone.clone_from(&patch.light_bone);
+                }
                 child.mark(name, ValueOrigin::Patch);
             }
             let old = std::mem::take(&mut child.children);
@@ -345,6 +364,12 @@ fn set_elems<'e>(
         for elem in elems {
             budget.charge_set(element.attributes.len(), &elem.name, &elem.value)?;
             element.set_attribute(&elem.name, &elem.value);
+            if elem.name.eq_ignore_ascii_case("name") {
+                element.port_name.clone_from(&elem.port_name);
+            }
+            if elem.name.eq_ignore_ascii_case("bone") {
+                element.light_bone.clone_from(&elem.light_bone);
+            }
             element.mark(&elem.name, ValueOrigin::Elem);
         }
     }

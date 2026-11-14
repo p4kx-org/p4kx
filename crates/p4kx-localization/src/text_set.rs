@@ -79,6 +79,14 @@ impl<'a> TextSet<'a> {
         self.ini(language)?.resolve(key)
     }
 
+    /// Returns the language supplying the original spelling emitted for a table key.
+    #[must_use]
+    pub fn key_language(&self, key: &str) -> Option<Language> {
+        self.languages
+            .iter()
+            .find_map(|(language, ini)| ini.contains_key(key).then_some(*language))
+    }
+
     /// Returns every key any file holds once, ignoring ASCII case, spelled as the first file in
     /// the order of [`Language::ALL`] that holds it spells it, sorted ignoring ASCII case.
     #[must_use]

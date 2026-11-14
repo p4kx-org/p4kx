@@ -4,6 +4,7 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::archive_key_use::ArchiveKeyState;
 use crate::contract::every_field_required;
 
 /// Where a catalog came from.
@@ -19,6 +20,14 @@ pub(crate) struct Source<'a> {
     pub(crate) archive_size: u64,
     /// The modification time of the Archive file, UTC in RFC 3339 form, `null` when unknown.
     pub(crate) archive_modified: Option<String>,
+    /// Whether the Archive key was there for the encrypted Entries the export read: `given`,
+    /// `missing` (no key was set) or `wrong` (the key did not fit). Without a usable key the file
+    /// is valid but incomplete: vehicle implementations, XML Loadouts, shop inventories and the
+    /// like are absent.
+    pub(crate) archive_key: ArchiveKeyState,
+    /// How many distinct encrypted Entries the export asked for and could not read because the key
+    /// was missing or wrong; `0` when none was needed or all were read.
+    pub(crate) encrypted_entries_unread: u64,
     /// The version of P4KX that wrote the catalog.
     pub(crate) tool_version: &'static str,
     /// When the catalog was written, UTC in RFC 3339 form.

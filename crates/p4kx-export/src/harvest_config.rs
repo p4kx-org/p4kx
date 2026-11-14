@@ -12,6 +12,11 @@ use crate::record_fields::{
     boolean, class_name, number, reference, references, structs, structure, text,
 };
 
+/// Whether a path selects the harvestable slot preset projection.
+pub(crate) fn is_slotpreset_path(path: &str) -> bool {
+    crate::selection::starts_with_folder(path, "libs/foundry/records/harvestable/slotpresets/")
+}
+
 /// Returns the multi config the Record tree `tree` describes; what its sub harvestables spawn is
 /// followed through `links`.
 pub(crate) fn multi_config<'f>(

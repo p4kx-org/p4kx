@@ -10,13 +10,14 @@ use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
 use catalog_fixture::{Maker, english, write_archive, write_archive_with};
-use p4kx_export::{
-    BuiltCatalog, CatalogOptions, Filter, ItemClass, ItemClassSummary, Kind, build_catalog,
-};
+use p4kx_export::{BuiltCatalog, CatalogOptions, ItemClass, ItemClassSummary, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+#[path = "catalog_items_completeness.rs"]
+mod completeness;
 
 const EXPORTED_AT: Duration = Duration::from_secs(1_792_000_000);
 
@@ -46,29 +47,24 @@ fn catalog_of(maker: Maker) -> Result<Value, Box<dyn Error>> {
 }
 
 fn manufacturer_guids<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c Value> {
-    catalog[kind]
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .filter(|entry| entry["className"] != "Counter_Shop")
-                .map(|entry| &entry["manufacturerGuid"])
-                .collect()
-        })
-        .unwrap_or_default()
+    catalog[kind].as_array().map_or_default(|list| {
+        list.iter()
+            .filter(|entry| entry["className"] != "Counter_Shop")
+            .map(|entry| &entry["manufacturerGuid"])
+            .collect()
+    })
 }
 
 #[test]
 fn a_manufacturer_given_by_reference_is_its_guid() -> TestResult {
     let catalog = catalog_of(Maker::Reference)?;
+    assert!(catalog.get("manufacturers").is_none());
+    let maker = &catalog["definitions"]["manufacturers"]["rows"][0]["guid"]["value"];
+    assert_eq!(maker, "10000000-0000-4000-8000-000000000001");
     for kind in ["items", "ships"] {
         let guids = manufacturer_guids(&catalog, kind);
         assert!(!guids.is_empty(), "{kind} present");
-        assert!(
-            guids
-                .iter()
-                .all(|guid| **guid == "10000000-0000-4000-8000-000000000001"),
-            "{kind}: {guids:?}"
-        );
+        assert!(guids.iter().all(|guid| *guid == maker), "{kind}: {guids:?}");
     }
     Ok(())
 }
@@ -87,14 +83,11 @@ fn a_manufacturer_given_by_a_strong_or_weak_pointer_is_null() -> TestResult {
 }
 
 fn class_names<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c str> {
-    catalog[kind]
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .filter_map(|entry| entry["className"].as_str())
-                .collect()
-        })
-        .unwrap_or_default()
+    catalog[kind].as_array().map_or_default(|list| {
+        list.iter()
+            .filter_map(|entry| entry["className"].as_str())
+            .collect()
+    })
 }
 
 fn entity<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, String> {
@@ -156,23 +149,7 @@ fn an_item_carries_its_definition_mass_display_type_and_class() -> TestResult {
             "displayType": {"key": "@item_DisplayType_PowerPlant", "en": "Power Plant", "de": null},
             "itemClass": "Military",
             "playability": null,
-            "stats": {
-                "weapon": null,
-                "shield": null,
-                "quantumDrive": null,
-                "powerPlant": {"powerOutput": null, "unit": null},
-                "cooler": null,
-                "missile": null,
-                "armor": null,
-                "clothing": null,
-                "radar": null,
-                "tractorBeam": null,
-                "weaponModifier": null,
-                "miningLaser": null,
-                "miningModifier": null,
-                "health": null,
-                "resourceStates": []
-            },
+            "stats": null,
         }),
         "the item fields"
     );
@@ -296,82 +273,6 @@ fn a_ship_carries_names_role_career_crew_manufacturer_and_vehicle_definition() -
             "insurance": null,
         }),
         "the ship fields"
-    );
-    Ok(())
-}
-
-#[test]
-fn every_kind_states_its_completeness() -> TestResult {
-    let (_, catalog) = catalog_with(&options())?;
-    assert_eq!(
-        catalog["completeness"],
-        json!({
-            "manufacturers": {"status": "complete"},
-            "items": {"status": "complete"},
-            "ships": {"status": "complete"},
-            "commodities": {"status": "complete"},
-            "blueprints": {"status": "complete"},
-            "resourceGroups": {"status": "complete"},
-            "blueprintCategories": {"status": "complete"},
-            "gameplayProperties": {"status": "complete"},
-            "qualityDistributions": {"status": "complete"},
-            "qualityQuantizations": {"status": "complete"},
-            "blueprintPools": {"status": "complete"},
-            "dismantleProcesses": {"status": "complete"},
-            "paints": {"status": "complete"},
-            "loadouts": {"status": "complete"},
-            "starmapObjects": {"status": "complete"},
-            "contracts": {"status": "complete"},
-            "mineableElements": {"status": "complete"},
-            "refiningProcesses": {"status": "complete"},
-            "mineableCompositions": {"status": "complete"},
-            "miningGlobalParams": {"status": "complete"},
-            "harvestableProviderPresets": {"status": "complete"},
-            "subHarvestableMultiConfigs": {"status": "complete"},
-            "harvestableLocations": {"status": "complete"},
-            "shops": {"status": "complete"},
-            "factionReputations": {"status": "complete"},
-            "reputationScopes": {"status": "complete"},
-            "reputationStandings": {"status": "complete"},
-            "reputationContexts": {"status": "complete"},
-            "missionTypes": {"status": "complete"},
-            "missionLocalities": {"status": "complete"},
-            "contractScenarios": {"status": "complete"},
-            "cargoManifests": {"status": "complete"},
-            "missionLocationTemplates": {"status": "complete"},
-            "contractShipSpawns": {"status": "complete"},
-            "contractLocationQueries": {"status": "complete"},
-            "contractTemplates": {"status": "complete"},
-            "missionBrokerEntries": {"status": "complete"},
-            "contractNpcSpawns": {"status": "complete"},
-            "contractEntitySpawns": {"status": "complete"},
-            "lootTables": {"status": "complete"},
-            "lootArchetypes": {"status": "complete"},
-            "lootPoolFilters": {"status": "complete"},
-            "legacyLootTables": {"status": "complete"},
-            "legacyLootArchetypes": {"status": "complete"},
-            "lootContainers": {"status": "complete"},
-            "mineableEntities": {"status": "complete"},
-            "crafters": {"status": "complete"},
-            "shipStoreSlugs": {"status": "complete"},
-        }),
-        "complete"
-    );
-    let filter = Filter::new("*/spaceships/*");
-    let (built, catalog) = catalog_with(&CatalogOptions {
-        filter: Some(&filter),
-        ..options()
-    })?;
-    assert_eq!(
-        catalog["completeness"]["items"],
-        json!({"status": "partial", "filter": "*/spaceships/*"}),
-        "partial"
-    );
-    assert_eq!(class_names(&catalog, "items"), Vec::<&str>::new(), "none");
-    assert_eq!(class_names(&catalog, "ships"), ["ACAS_Ship"], "the ship");
-    assert!(
-        built.summary().kinds().iter().all(|kind| !kind.complete),
-        "every kind partial"
     );
     Ok(())
 }

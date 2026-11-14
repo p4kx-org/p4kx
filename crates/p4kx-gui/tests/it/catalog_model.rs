@@ -15,30 +15,23 @@ use p4kx_gui::{Browser, CATALOG_FILE, CatalogExportStatus, Model};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 #[test]
-fn an_unreadable_record_is_counted_as_a_failure_and_the_catalog_is_written() -> TestResult {
+fn an_unreadable_record_refuses_a_normal_catalog_without_writing() -> TestResult {
     let (_dir, mut model, out) = opened(&cataloging::unreadable())?;
     let file = out.join("basetool-catalog.json");
 
     assert!(model.start_catalog(file.clone(), || {}), "started");
-    let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
-        return Err("no summary".into());
+    let CatalogExportStatus::Incomplete(health) = ended(&mut model)? else {
+        return Err("no incomplete publication refusal".into());
     };
-    let summary = outcome.summary();
-
-    assert!(!summary.is_complete(), "a Record failed");
-    let failures = summary.failures();
-    assert_eq!(failures.len(), 1, "the broken blueprint");
-    assert_eq!(
-        failures.first().map(|failure| failure.guid.to_string()),
-        Some("90000000-0000-4000-8000-000000000009".to_owned()),
-        "its GUID"
+    assert!(!health.is_complete(), "a selected source failed");
+    assert!(
+        health.failed_records().iter().any(|record| record
+            .guid()
+            .value()
+            .is_some_and(|guid| guid.as_str() == "90000000-0000-4000-8000-000000000009")),
+        "the failed source identity is retained"
     );
-    let json: serde_json::Value = serde_json::from_slice(&fs::read(&file)?)?;
-    assert_eq!(
-        json["manufacturers"].as_array().map(Vec::len),
-        Some(1),
-        "the readable manufacturer is written"
-    );
+    assert!(!file.exists(), "normal publication creates no snapshot");
     Ok(())
 }
 
@@ -82,12 +75,36 @@ fn the_catalog_is_written_and_summarised() -> TestResult {
     assert_eq!(german.unresolved, 1, "DRAK has no German name");
     assert_eq!(summary.size_warning(), None, "small");
     let json: serde_json::Value = serde_json::from_slice(&fs::read(&file)?)?;
-    assert_eq!(json["schemaVersion"], 2, "a Basetool catalog");
     assert_eq!(
-        json["manufacturers"].as_array().map(Vec::len),
+        json["schemaVersion"],
+        p4kx_export::SCHEMA_VERSION,
+        "a Basetool catalog"
+    );
+    assert_eq!(
+        json["definitions"]["manufacturers"]["rows"]
+            .as_array()
+            .map(Vec::len),
         Some(2),
         "two"
     );
+    assert!(json.get("manufacturers").is_none(), "no legacy array");
+    assert_eq!(
+        json["definitions"]["manufacturers"]["availability"],
+        "available"
+    );
+    let row = &json["definitions"]["manufacturers"]["rows"][0];
+    for (field, domain) in [("name", "publicNames"), ("description", "gameTexts")] {
+        let reference = &row["localization"]["value"][field];
+        assert_eq!(reference["state"], "present");
+        let texts = json["texts"][domain]
+            .as_array()
+            .ok_or("canonical text table")?;
+        assert!(
+            texts
+                .iter()
+                .any(|text| text["id"]["value"] == reference["value"])
+        );
+    }
     assert_eq!(
         files_in(&out)?,
         ["basetool-catalog.json"],
@@ -317,7 +334,7 @@ fn a_zst_file_name_writes_the_catalog_as_a_zstd_frame() -> TestResult {
 
 #[test]
 fn a_catalog_near_the_upload_limit_is_flagged() -> TestResult {
-    let (_dir, mut model, out) = opened(&cataloging::wordy(30, 1_000_000))?;
+    let (_dir, mut model, out) = opened(&cataloging::near_upload_limit())?;
 
     model.start_catalog(out.join("catalog.json"), || {});
     let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
@@ -336,4 +353,38 @@ fn a_catalog_near_the_upload_limit_is_flagged() -> TestResult {
 #[test]
 fn the_suggested_catalog_file_is_the_compressed_one() {
     assert_eq!(CATALOG_FILE, "basetool-catalog.json.zst", "the upload form");
+}
+
+#[test]
+fn an_independent_resource_has_its_own_written_kind_and_source_health() -> TestResult {
+    let (_dir, mut model, out) = opened(&cataloging::resources())?;
+    let file = out.join("resources.json");
+    model.start_catalog(file.clone(), || {});
+    let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
+        return Err("the resource catalog did not finish".into());
+    };
+    let summary = outcome.summary();
+    let resources = summary
+        .kind(Kind::ResourceTypes)
+        .ok_or("no resource kind")?;
+    assert_eq!(
+        (resources.count, resources.skipped, resources.complete),
+        (1, 0, true),
+        "the selected resource is independently written"
+    );
+    let health = summary
+        .export_health()
+        .kind(Kind::ResourceTypes)
+        .ok_or("no resource health")?;
+    assert_eq!(
+        health.source_records.selected, 1,
+        "one physical resource source"
+    );
+    assert!(
+        summary.export_health().is_complete(),
+        "the source and projection completed"
+    );
+    let document: serde_json::Value = serde_json::from_slice(&fs::read(file)?)?;
+    crate::catalog_resource_wire::assert_written_resource(&document, resources.count)?;
+    Ok(())
 }

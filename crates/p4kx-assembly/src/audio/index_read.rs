@@ -16,13 +16,13 @@ pub(super) type DefinitionRead = Result<Vec<AtlTrigger>, AudioFileError>;
 /// cancelled.
 pub(super) fn read_definitions(
     archive: &Archive,
-    entries: &[&Entry],
+    entries: &[(usize, &Entry)],
     cancel: &CancelToken,
 ) -> Option<Vec<DefinitionRead>> {
     entries
         .par_iter()
         .enumerate()
-        .map(|(position, entry)| {
+        .map(|(position, &(_, entry))| {
             if cancel.is_cancelled() {
                 return None;
             }

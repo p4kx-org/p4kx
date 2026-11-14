@@ -30,10 +30,11 @@ impl Walker<'_> {
         if let Some(found) = self.palette_paths.get(path) {
             return found.clone();
         }
-        let found = match lookup.palettes().guid_at(path) {
-            Ok(guid) => Some(PaletteRef {
-                guid,
+        let found = match lookup.palettes().guid_at_observed(path) {
+            Ok(read) => Some(PaletteRef {
+                guid: read.value,
                 child_path: String::new(),
+                selector: crate::geometry::PaletteReferenceSource::IncludedPath(read.record),
             }),
             Err(failure) => {
                 let reason = format!("the tint palette {path} cannot be used: {failure}");

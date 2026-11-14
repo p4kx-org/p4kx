@@ -4,13 +4,15 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use p4kx_extraction::Archive;
-use p4kx_model::{ChildContainer, MaterialStatus, Transform};
+use p4kx_extraction::{Archive, ArchiveMaterialRead};
+use p4kx_model::{ChildContainer, MaterialStatus, SocContainerDescriptor, Transform};
 
+use super::child_container_path::ChildContainerPath;
 use super::classes::ClassLookup;
-use super::files::{child_candidates, file_name, find_first, is_plain, path_key, stem};
+use super::files::{find_first, path_key, stem};
 use super::layers::Layers;
-use super::scan::{Scan, StreamScan, scan_container};
+use super::scan::{Scan, scan_container};
+use super::tile_light::{TileLightOwner, TileLightPlacement};
 use super::{
     InteriorOptions, InteriorPart, InteriorPartKind, InteriorWatch, MAX_INTERIOR_CONTAINERS,
     MAX_INTERIOR_DEPTH,
@@ -19,8 +21,7 @@ use crate::{AssemblyError, Geometry, Issue, IssueKind, PaletteRef};
 
 mod classes;
 mod entities;
-
-use entities::Placed;
+mod streams;
 
 /// A model part waiting for its model: where to look for the file, outermost layer first.
 pub(super) struct Placement {
@@ -68,9 +69,11 @@ fn container_part(
         world,
         model_path: None,
         model: None,
-        materials: Arc::new(MaterialStatus::Unnamed),
+        model_archive_sources: Arc::default(),
+        materials: Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed)),
         palette: None,
         light: None,
+        light_placement: None,
     }
 }
 
@@ -82,6 +85,7 @@ pub(super) fn walk<'a>(
     options: &InteriorOptions,
     watch: &InteriorWatch<'_>,
     classes: Option<&'a dyn ClassLookup>,
+    owner: Option<TileLightOwner<'_>>,
 ) -> Result<Walked<'a>, AssemblyError> {
     let mut walker = Walker {
         layers: Layers::new(given),
@@ -119,12 +123,25 @@ pub(super) fn walk<'a>(
         if watch.is_cancelled() {
             return Err(AssemblyError::Cancelled);
         }
-        let scan = walker.scan(&todo);
+        let direct_owner = owner.filter(|_| todo.depth == 0);
+        let scan = walker.scan(&todo, direct_owner.is_some());
         if let Some(error) = scan.fatal {
             return Err(error);
         }
         walker.report(&todo, scan.issues);
-        walker.add_streams(&todo, scan.streams);
+        let descriptor = scan.descriptor.as_ref().and_then(|source| {
+            let descriptor = SocContainerDescriptor::parse(&source.bytes).ok()?;
+            (!descriptor.document().is_lossy()).then_some((source, descriptor))
+        });
+        let tile = direct_owner.map(|owner| {
+            TileLightPlacement::new(
+                owner,
+                descriptor
+                    .as_ref()
+                    .map(|(source, descriptor)| (*source, descriptor)),
+            )
+        });
+        walker.add_streams(&todo, scan.streams, tile.as_ref());
         let mut nested = walker.add_children(&todo, scan.children)?;
         nested.reverse();
         stack.extend(nested);
@@ -183,7 +200,7 @@ impl<'a> Walker<'a> {
         true
     }
 
-    fn scan(&self, todo: &Todo) -> Scan {
+    fn scan(&self, todo: &Todo, capture_tile: bool) -> Scan {
         let (Some(archive), Some(keys)) = (
             self.layers.get(todo.layer),
             self.layers.keys.get(todo.layer),
@@ -193,60 +210,10 @@ impl<'a> Walker<'a> {
                 streams: Vec::new(),
                 issues: Vec::new(),
                 fatal: None,
+                descriptor: None,
             };
         };
-        scan_container(archive, keys, &todo.stem)
-    }
-
-    fn add_streams(&mut self, todo: &Todo, streams: Vec<StreamScan>) {
-        for stream in streams {
-            if !self.room(todo) {
-                return;
-            }
-            let Some(parent) = self.parts.get(todo.part) else {
-                return;
-            };
-            let world = parent.world;
-            let at = self.parts.len();
-            let mut part = container_part(
-                file_name(&stream.name).to_owned(),
-                Some(todo.part),
-                Transform::IDENTITY,
-                world,
-            );
-            part.kind = InteriorPartKind::Stream;
-            self.parts.push(part);
-            let file = file_name(&stream.name);
-            if let Some(objects) = &stream.objects {
-                if objects.invalid > 0 {
-                    let count = objects.invalid;
-                    self.note(&todo.path, file, IssueKind::ObjectsLeftOut { count });
-                }
-                if let Some(kind) = objects.unsupported {
-                    self.note(&todo.path, file, IssueKind::UnsupportedObjects { kind });
-                }
-                for object in &objects.objects {
-                    let Some(path) = objects.models.get(object.model) else {
-                        continue;
-                    };
-                    let name = stem(path).to_owned();
-                    let mut placed =
-                        Placed::new(name, InteriorPartKind::Model, Some(path), object.transform);
-                    placed.palette = object
-                        .palette
-                        .and_then(|index| objects.palettes.get(index))
-                        .and_then(|palette| self.palette_at(todo, file, palette));
-                    if !self.add_placed(todo, at, world, placed) {
-                        return;
-                    }
-                }
-            }
-            if let Some(entities) = &stream.entities
-                && !self.add_entities(todo, at, world, file, entities)
-            {
-                return;
-            }
-        }
+        scan_container(archive, keys, &todo.stem, capture_tile)
     }
 
     fn add_children(
@@ -307,16 +274,19 @@ impl<'a> Walker<'a> {
         child: &ChildContainer,
         name: &str,
     ) -> Result<Option<(Archive, String, String)>, AssemblyError> {
-        let found = if is_plain(&child.name) {
+        let found = ChildContainerPath::new(&child.name).and_then(|path| {
             todo.chain.iter().rev().find_map(|&layer| {
                 let archive = self.layers.get(layer)?;
                 let keys = self.layers.keys.get(layer)?;
-                let candidates = child_candidates(&child.name, layer == 0);
-                find_first(&keys.index(archive), &candidates).map(|entry| (layer, entry))
+                let index = keys.index(archive);
+                let entry = if layer == 0 {
+                    find_first(&index, path.root_candidates())
+                } else {
+                    index.find(path.relative())
+                };
+                entry.map(|entry| (layer, entry))
             })
-        } else {
-            None
-        };
+        });
         let Some((layer, entry)) = found else {
             let kind = IssueKind::ContainerMissing {
                 name: child.name.clone(),

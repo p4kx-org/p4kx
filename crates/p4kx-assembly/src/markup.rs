@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_cryxml::Xml;
+use p4kx_cryxml::SourceAttributePosition;
 
 use crate::ValueOrigin;
 
@@ -17,11 +17,14 @@ pub(crate) struct Element {
     pub(crate) name: String,
     pub(crate) attributes: Vec<(String, String)>,
     pub(crate) origins: Vec<(String, ValueOrigin)>,
+    pub(crate) port_name: Option<crate::LoadoutPath>,
+    pub(crate) light_bone: Option<SourceAttributePosition>,
     pub(crate) children: Vec<Self>,
 }
 
 impl Element {
     /// Creates an element read from the base file: every attribute is [`ValueOrigin::Base`].
+    #[cfg(test)]
     pub(crate) const fn read(
         name: String,
         attributes: Vec<(String, String)>,
@@ -31,6 +34,8 @@ impl Element {
             name,
             attributes,
             origins: Vec::new(),
+            port_name: None,
+            light_bone: None,
             children,
         }
     }
@@ -127,8 +132,16 @@ const ATTRIBUTE_BYTES: usize = size_of::<(String, String)>();
 #[derive(Debug, Clone)]
 pub(crate) struct Budget {
     elements: usize,
+    exhausted: bool,
     attributes: usize,
     bytes: usize,
+}
+
+#[derive(Clone, Copy)]
+enum Unit {
+    Elements,
+    Attributes,
+    Bytes,
 }
 
 impl Budget {
@@ -136,6 +149,7 @@ impl Budget {
     pub(crate) fn new(input: usize) -> Self {
         Self {
             elements: MAX_ELEMENTS,
+            exhausted: false,
             attributes: MAX_ATTRIBUTES,
             bytes: input.saturating_mul(INPUT_FACTOR).max(MIN_BYTES),
         }
@@ -148,30 +162,43 @@ impl Budget {
             .saturating_add(input.saturating_mul(INPUT_FACTOR));
     }
 
-    fn take(left: &mut usize, count: usize, what: &str) -> Result<(), String> {
-        *left = left
-            .checked_sub(count)
-            .ok_or_else(|| format!("it needs more {what} than are allowed"))?;
-        Ok(())
+    #[cfg(test)]
+    pub(crate) fn without_elements() -> Self {
+        Self {
+            elements: 0,
+            ..Self::new(0)
+        }
     }
 
+    pub(crate) const fn exhausted(&self) -> bool {
+        self.exhausted
+    }
+
+    fn take(&mut self, unit: Unit, count: usize) -> Result<(), String> {
+        let (left, what) = match unit {
+            Unit::Elements => (&mut self.elements, "elements"),
+            Unit::Attributes => (&mut self.attributes, "attributes"),
+            Unit::Bytes => (&mut self.bytes, "bytes of names and values"),
+        };
+        let Some(remaining) = left.checked_sub(count) else {
+            self.exhausted = true;
+            return Err(format!("it needs more {what} than are allowed"));
+        };
+        *left = remaining;
+        Ok(())
+    }
     fn element(&mut self, name: &str) -> Result<(), String> {
-        Self::take(&mut self.elements, 1, "elements")?;
-        Self::take(
-            &mut self.bytes,
-            name.len().saturating_add(ELEMENT_BYTES),
-            "bytes of names and values",
-        )
+        self.take(Unit::Elements, 1)?;
+        self.take(Unit::Bytes, name.len().saturating_add(ELEMENT_BYTES))
     }
 
     fn attribute(&mut self, name: &str, value: &str) -> Result<(), String> {
-        Self::take(&mut self.attributes, 1, "attributes")?;
-        Self::take(
-            &mut self.bytes,
+        self.take(Unit::Attributes, 1)?;
+        self.take(
+            Unit::Bytes,
             name.len()
                 .saturating_add(value.len())
                 .saturating_add(ATTRIBUTE_BYTES),
-            "bytes of names and values",
         )
     }
 
@@ -208,13 +235,12 @@ impl Budget {
         name: &str,
         value: &str,
     ) -> Result<(), String> {
-        Self::take(&mut self.attributes, attributes.max(1), "attributes")?;
-        Self::take(
-            &mut self.bytes,
+        self.take(Unit::Attributes, attributes.max(1))?;
+        self.take(
+            Unit::Bytes,
             name.len()
                 .saturating_add(value.len())
                 .saturating_add(ATTRIBUTE_BYTES),
-            "bytes of names and values",
         )
     }
 }
@@ -235,67 +261,82 @@ pub(crate) fn too_deep() -> String {
     format!("its elements are nested deeper than {MAX_ELEMENT_DEPTH}")
 }
 
-/// Reads the root element of a text XML or `CryXml` document, spending `budget`.
+/// Reads the root element within the supplied budget without source-authorship claims.
 pub(crate) fn parse(bytes: &[u8], budget: &mut Budget) -> Result<Element, String> {
-    match p4kx_cryxml::read(bytes).map_err(|error| error.to_string())? {
-        Xml::CryXml(document) => from_cry(document.root(), 0, budget),
-        Xml::Text(text) => {
-            let text = std::str::from_utf8(text).map_err(|error| error.to_string())?;
-            let text = text.trim_start_matches('\u{feff}');
-            p4kx_cryxml::check_text_depth(text).map_err(|error| error.to_string())?;
-            let document = roxmltree::Document::parse(text).map_err(|error| error.to_string())?;
-            from_text(document.root_element(), 0, budget)
-        }
-    }
+    crate::loadout_xml::parse_unbound(bytes, |root, scope| from_node(root, scope, 0, budget))
 }
 
-fn from_cry(
-    element: p4kx_cryxml::Element<'_>,
+pub(crate) fn parse_with_source<T>(
+    bytes: &[u8],
+    budget: &mut Budget,
+    project: impl FnOnce(
+        Element,
+        crate::loadout_xml::Node<'_, '_>,
+        &crate::loadout_xml::Scope<'_, '_>,
+    ) -> Result<T, String>,
+) -> Result<T, String> {
+    crate::loadout_xml::parse_unbound(bytes, |root, scope| {
+        project(from_node(root, scope, 0, budget)?, root, scope)
+    })
+}
+
+pub(crate) fn parse_observed<T>(
+    document: &crate::loadout_file_events::Document,
+    budget: &mut Budget,
+    observation: Option<&crate::resolver_observation::Observation<'_>>,
+    project: impl FnOnce(
+        Element,
+        crate::loadout_xml::Node<'_, '_>,
+        &crate::loadout_xml::Scope<'_, '_>,
+    ) -> Result<T, String>,
+) -> Result<T, String> {
+    crate::loadout_xml::parse(document, observation, |root, scope| {
+        project(from_node(root, scope, 0, budget)?, root, scope)
+    })
+}
+
+fn from_node(
+    node: crate::loadout_xml::Node<'_, '_>,
+    scope: &crate::loadout_xml::Scope<'_, '_>,
     depth: usize,
     budget: &mut Budget,
 ) -> Result<Element, String> {
     if depth >= MAX_ELEMENT_DEPTH {
         return Err(too_deep());
     }
-    budget.element(element.name())?;
+    budget.element(node.name())?;
     let mut attributes = Vec::new();
-    for attribute in element.attributes() {
-        budget.attribute(attribute.name(), attribute.value())?;
-        attributes.push((attribute.name().to_owned(), attribute.value().to_owned()));
-    }
-    let children = element
-        .children()
-        .map(|child| from_cry(child, depth.saturating_add(1), budget))
-        .collect::<Result<_, _>>()?;
-    Ok(Element::read(
-        element.name().to_owned(),
-        attributes,
-        children,
-    ))
-}
 
-fn from_text(
-    element: roxmltree::Node<'_, '_>,
-    depth: usize,
-    budget: &mut Budget,
-) -> Result<Element, String> {
-    if depth >= MAX_ELEMENT_DEPTH {
-        return Err(too_deep());
-    }
-    budget.element(element.tag_name().name())?;
-    let mut attributes = Vec::new();
-    for attribute in element.attributes() {
-        budget.attribute(attribute.name(), attribute.value())?;
-        attributes.push((attribute.name().to_owned(), attribute.value().to_owned()));
-    }
-    let children = element
-        .children()
-        .filter(roxmltree::Node::is_element)
-        .map(|child| from_text(child, depth.saturating_add(1), budget))
-        .collect::<Result<_, _>>()?;
-    Ok(Element::read(
-        element.tag_name().name().to_owned(),
+    node.try_for_each_attribute(|name, value| {
+        budget.attribute(name, value)?;
+
+        attributes.push((name.to_owned(), value.to_owned()));
+        Ok(())
+    })?;
+    let mut children = Vec::new();
+    node.try_for_each_child(|child| {
+        children.push(from_node(child, scope, depth.saturating_add(1), budget)?);
+        Ok(())
+    })?;
+    let port_name = if scope.observes_port_names()
+        && (node.name().eq_ignore_ascii_case("Part") || node.attribute_ascii("id").is_some())
+        && let Some((attribute, _)) = node.attribute_ascii("name")
+    {
+        scope.port_name(node, attribute)?
+    } else {
+        None
+    };
+    let light_bone = if node.name() == "AttachmentPoint" {
+        scope.attribute_ascii_position(node, "bone")
+    } else {
+        None
+    };
+    Ok(Element {
+        port_name,
+        light_bone,
+        name: node.name().to_owned(),
         attributes,
         children,
-    ))
+        origins: Vec::new(),
+    })
 }

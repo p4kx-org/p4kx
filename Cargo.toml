@@ -5,7 +5,7 @@ members = ["crates/*", "xtask"]
 [workspace.package]
 version = "0.4.2"
 edition = "2024"
-rust-version = "1.99"
+rust-version = "1.100.0"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/p4kx-org/p4kx"
 publish = false
@@ -29,10 +29,12 @@ p4kx-export = { path = "crates/p4kx-export" }
 p4kx-gfx = { path = "crates/p4kx-gfx" }
 p4kx-guard = { path = "crates/p4kx-guard" }
 p4kx-localization = { path = "crates/p4kx-localization" }
+p4kx-media = { path = "crates/p4kx-media" }
 p4kx-render = { path = "crates/p4kx-render" }
 p4kx-screens = { path = "crates/p4kx-screens" }
 p4kx-search = { path = "crates/p4kx-search" }
 p4kx-settings = { path = "crates/p4kx-settings" }
+p4kx-shader = { path = "crates/p4kx-shader" }
 p4kx-testkit = { path = "crates/p4kx-testkit" }
 p4kx-texture = { path = "crates/p4kx-texture" }
 p4kx-update = { path = "crates/p4kx-update" }
@@ -58,6 +60,7 @@ fluent-bundle = "0.16.0"
 fluent-syntax = "0.12.0"
 gltf = { version = "1.4.1", default-features = false }
 gltf-json = { version = "1.4.1", default-features = false }
+getrandom = "0.4.3"
 half = "2.7.1"
 insta = "1.49.0"
 jsonschema = { version = "0.59.0", default-features = false }
@@ -70,6 +73,7 @@ pollster = "1.0.1"
 predicates = "3.1.4"
 peak_alloc = "0.3.0"
 proptest = "1.12.0"
+nix = { version = "0.31.3", default-features = false }
 raw-window-handle = "0.6.2"
 rayon = "1.12.0"
 rfd = "0.17.2"
@@ -77,6 +81,7 @@ rmcp = { version = "3.5.1", default-features = false, features = ["macros", "ser
 rodio = { version = "0.23.0", default-features = false, features = ["playback"] }
 roxmltree = "0.21.2"
 rpassword = "7.5.4"
+rustix = { version = "1.1.5", features = ["event", "fs", "net", "process"] }
 ruzstd = "0.9.1"
 schemars = "1.2.3"
 same-file = "1.0.6"
@@ -96,10 +101,13 @@ unicode-width = "0.2.2"
 ureq = { version = "3.4.2", default-features = false, features = ["rustls"] }
 wgpu = { version = "30.0.1", default-features = false, features = ["std", "wgsl", "vulkan", "dx12", "metal"] }
 windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm"] }
+winreg = "0.56.0"
 winresource = "0.1.34"
 zstd = { version = "0.14.3", default-features = false }
 zune-core = "0.5.0"
 zune-jpeg = "0.5.15"
+zbus = { version = "5.19.0", default-features = false, features = ["async-io", "blocking-api"] }
+uds_windows = "1.2.1"
 
 [workspace.lints.rust]
 missing_docs = "deny"

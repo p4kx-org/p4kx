@@ -4,6 +4,8 @@
 //! A synthetic Archive for the `p4kx catalog` tests: manufacturers, an item, a ship, a commodity
 //! and a blueprint with English and German `global.ini` files.
 
+pub(crate) mod origins;
+
 use std::error::Error;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
@@ -330,6 +332,31 @@ pub(crate) fn write_archive_with(
     dir: &Path,
     texts: &[TestEntry],
 ) -> Result<PathBuf, Box<dyn Error>> {
+    let forge = TestEntry::zstd("Data\\Game2.dcb", database().build()).encrypted();
+    write_entries(dir, std::iter::once(forge).chain(texts.iter().cloned()))
+}
+
+/// Writes an Archive whose DataForge is plain and whose vehicle file of the ship is encrypted, so
+/// that the catalog needs the Archive key for the file only.
+pub(crate) fn write_encrypted_vehicle_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+    write_entries(
+        dir,
+        [
+            TestEntry::zstd("Data\\Game2.dcb", database().build()),
+            english(),
+            TestEntry::zstd(
+                "Data\\Scripts\\Entities\\Vehicles\\Implementations\\Xml\\ACAS_Hauler.xml",
+                b"<Vehicle name=\"ACAS_Hauler\"/>".to_vec(),
+            )
+            .encrypted(),
+        ],
+    )
+}
+
+fn write_entries(
+    dir: &Path,
+    entries: impl IntoIterator<Item = TestEntry>,
+) -> Result<PathBuf, Box<dyn Error>> {
     let channel = dir.join("LIVE");
     fs::create_dir(&channel)?;
     write_build_manifest(
@@ -340,14 +367,9 @@ pub(crate) fn write_archive_with(
         "0123456789abcdef",
     )?;
     let path = channel.join("Data.p4k");
-    texts
-        .iter()
-        .cloned()
-        .fold(
-            ArchiveBuilder::new()
-                .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()).encrypted()),
-            ArchiveBuilder::entry,
-        )
+    entries
+        .into_iter()
+        .fold(ArchiveBuilder::new(), ArchiveBuilder::entry)
         .write_to(&path)?;
     File::options()
         .write(true)

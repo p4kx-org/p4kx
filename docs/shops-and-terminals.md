@@ -1,11 +1,11 @@
 # Shops and terminals in the Archive
 
-Result of the spike [#398](https://github.com/p4kx-org/p4kx/issues/398), measured on the LIVE
-Archive, Build 4.10.197. It answers what the Archive says about shops and terminals for the Basetool
-(the Basetool issues on shops and terminals). Prices, stock and demand are
-server-side; UEX stays their source, and UEX IDs are never part of the catalog.
+The archive findings below record the [#398](https://github.com/p4kx-org/p4kx/issues/398) spike on
+LIVE Build 4.10.197. The current export is described in the
+[catalog v3 inventory contract](basetool-catalog.md#physical-offline-shop-inventories).
+Live prices, stock and demand remain server-side. UEX IDs are outside the catalog.
 
-## Short answer
+## Short answer from the spike
 
 - Shop definitions exist, but not as Records. A shop is an `SCShop` Entity inside an object
   container (socpak), and the set of all shops with their place in the world is a registry Entry.
@@ -60,8 +60,8 @@ item list.
 ## Where a shop is
 
 The `SuperName` path is the location. For the 77 distinct location containers that stand in the
-third place of the paths, 63 equal the `entityName` or `className` of a `starmapObjects` entry of
-the catalog (case-insensitively), e.g. `Area18_City_objectContainer`, `Drlct_Stmnt_005_Windmill_RastarLE`,
+third place of the paths, 63 equal the `entityName` of a starmap placement or the `className`
+of its authored definition (case-insensitively), e.g. `Area18_City_objectContainer`, `Drlct_Stmnt_005_Windmill_RastarLE`,
 `LOC_RR_S1_L1` (the Lagrange-point stations). The path also names the body: `OOC_Stanton_1_Hurston`
 (180 entries), `..._4_Microtech` (165), `..._2_Crusader` (98), `..._3_ArcCorp` (89), the jump-point
 stations and the Lagrange points. Rest stops and cities enter as containers whose inner name has
@@ -71,7 +71,7 @@ Pyro: the same file holds a second platform, `pyrosystem` with 371 shops (#462),
 has 813 Stanton and 371 Pyro entries. The catalog measured it on all 1,184 shops (#462): 184 have
 a location container without a starmap match and need a manual mapping.
 
-The catalog `starmapObjects` carry world positions for 1,239 of 2,093 objects. A shop inherits the
+The catalog's starmap placements carry world positions for 1,239 of 2,093 objects in this Build. A shop inherits the
 position of its location object; a position inside the interior needs the `.soc` of the container
 and is out of scope here.
 
@@ -80,8 +80,8 @@ and is out of scope here.
 `Inv_<Brand>_<Place>.json` is `{"ShopID": "<chain>", "Collection": {"Inventory": [...]}}`. Each
 inventory element has an item `ID` (the GUID of an `EntityClassDefinition`; verified for a shotgun
 with `p4kx dcb refs`), `BuyPrice`, `SellPrice`, `CurrentInventory`, `MaxInventory` and
-`RentalOfferings`. The numbers are design-time seed values, not live prices; the catalog does not
-export them. Sizes of the three samples: 132, 230 and 397 items.
+`RentalOfferings`. The spike's three samples contained 132, 230 and 397 items. Catalog v3
+exports these fields from the physical inventory as offline design-time data.
 
 The `ShopID` chain has the same form as the registry `ID`. For two of three samples the first two
 elements (system and body) occur in registry chains; the deeper elements did not match any registry

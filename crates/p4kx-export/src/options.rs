@@ -32,7 +32,9 @@ pub struct CatalogProgress {
 /// The settings of one catalog build.
 #[derive(Clone, Copy)]
 pub struct CatalogOptions<'a> {
-    /// Selects only the Records whose record path matches; every kind is then partial.
+    /// Requires complete reads by default; diagnostic partial publication must be explicit.
+    pub publication_mode: crate::CatalogPublicationMode,
+    /// Selects owning catalog Records by path; the global tag taxonomy remains complete.
     pub filter: Option<&'a Filter>,
     /// The export time the catalog states.
     pub exported_at: SystemTime,
@@ -50,6 +52,7 @@ impl CatalogOptions<'_> {
     #[must_use]
     pub const fn new(exported_at: SystemTime) -> Self {
         Self {
+            publication_mode: crate::CatalogPublicationMode::Normal,
             filter: None,
             exported_at,
             cancel: None,
@@ -62,6 +65,7 @@ impl CatalogOptions<'_> {
 impl fmt::Debug for CatalogOptions<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("CatalogOptions")
+            .field("publication_mode", &self.publication_mode)
             .field("filter", &self.filter)
             .field("exported_at", &self.exported_at)
             .field("cancel", &self.cancel)

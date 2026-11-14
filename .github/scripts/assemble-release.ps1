@@ -3,7 +3,7 @@
 Writes SHA256SUMS.txt and SHA3-512SUMS.txt for the assets of a release and assembles its notes.
 
 .DESCRIPTION
-Hashes every file in -AssetDirectory (the release assets: ZIPs, MSI, SBOM and attestation
+Requires the complete native package, SBOM and runtime evidence matrix. Hashes every file in -AssetDirectory (the release assets: ZIPs, MSI, SBOM and attestation
 bundles) and writes the two hash files next to them in the usual "<hash>  <file>" format. Then
 joins the notes in this order: the CHANGELOG section, the optional VirusTotal section, the
 "Build provenance" section and the "Checksums" section. GitHub appends its generated "What's
@@ -26,6 +26,15 @@ The section written by virustotal-scan.ps1. Optional; omitted from the notes whe
 .PARAMETER Repository
 The repository in the form owner/name, used in the verification commands.
 
+.PARAMETER Version
+The release version, defaulting to the workspace version.
+
+.PARAMETER Revision
+The full source commit digest, defaulting to GITHUB_SHA or the current commit.
+
+.PARAMETER TagAttestations
+Selects attestation instructions after the tagged workflow has verified completion of both attestation jobs.
+
 .EXAMPLE
 ./assemble-release.ps1 -AssetDirectory assets -NotesPath release-notes.md -OutputNotesPath notes.md -Repository p4kx-org/p4kx
 #>
@@ -35,10 +44,47 @@ param(
     [Parameter(Mandatory)][string]$NotesPath,
     [Parameter(Mandatory)][string]$OutputNotesPath,
     [string]$VirusTotalNotePath,
-    [Parameter(Mandatory)][string]$Repository
+    [Parameter(Mandatory)][string]$Repository,
+    [string]$Version,
+    [string]$Revision,
+    [switch]$TagAttestations,
+    [switch]$RequireMacosDeviceEvidence,
+    [string]$MacosCurrentVersion,
+    [string]$MacosDeviceEvidencePath
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not $Version) {
+    $workspace = & cargo metadata --no-deps --format-version 1 --locked | ConvertFrom-Json
+    if ($LASTEXITCODE -ne 0) { throw 'Release version query failed.' }
+    $Version = ($workspace.packages | Where-Object name -CEQ 'p4kx').version
+}
+if (-not $Revision) {
+    $Revision = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (& git rev-parse HEAD).Trim() }
+}
+& (Join-Path $PSScriptRoot 'check-release-matrix.ps1') -AssetDirectory $AssetDirectory -Version $Version -Revision $Revision -RequireMacosDeviceEvidence:$RequireMacosDeviceEvidence -MacosCurrentVersion $MacosCurrentVersion -MacosDeviceEvidencePath $MacosDeviceEvidencePath
+
+$macosRuntimePath = Join-Path $AssetDirectory "P4KX-$Version-aarch64-apple-darwin-runtime.json"
+$macosRuntime = Get-Content -LiteralPath $macosRuntimePath -Raw | ConvertFrom-Json
+$signing = @($macosRuntime.package_smokes)[0].signing
+$macosDistribution = if ($signing.mode -ceq 'developer-id') {
+    "## macOS distribution" + [char]10 + [char]10 +
+        'The Apple Silicon DMG uses Developer ID signing and a validated stapled Apple notarization ticket.'
+} else {
+    $reason = switch -CaseSensitive ($signing.reason) {
+        'package-dry-run' { 'this was a package validation run' }
+        'developer-id-unavailable' { 'Developer ID was unavailable' }
+        'notarization-unavailable' { 'Apple notarization was unavailable' }
+        'developer-id-and-notarization-unavailable' { 'Developer ID and Apple notarization were unavailable' }
+    }
+    @"
+## macOS distribution
+
+The Apple Silicon DMG is ad-hoc signed because $reason. After attempting to open the
+installed P4KX app, use **System Settings → Privacy & Security → Open Anyway** if
+Gatekeeper requires approval. Follow [Apple’s instructions](https://support.apple.com/en-us/102445).
+"@
+}
 
 $sha256Name = 'SHA256SUMS.txt'
 $sha3Name = 'SHA3-512SUMS.txt'
@@ -61,12 +107,13 @@ $sha3Lines = $files | ForEach-Object { Get-HashLine $_ { param($s) [System.Secur
 Set-Content -LiteralPath (Join-Path $AssetDirectory $sha256Name) -Value $sha256Lines -Encoding utf8NoBOM
 Set-Content -LiteralPath (Join-Path $AssetDirectory $sha3Name) -Value $sha3Lines -Encoding utf8NoBOM
 
-$provenance = @"
+$provenance = if ($TagAttestations) {
+@"
 ## Build provenance
 
 Every asset except the hash files and the attestation bundles is attested (SLSA build
 provenance, Sigstore) and ties the file to the commit and workflow that built it. The SBOM
-attestations of the three SBOMs (``*.cdx.json``) cover the portable ZIP and the MSI. Verify a
+attestations of the target-specific SBOMs (``*.cdx.json``) cover the packages of that target. Verify a
 download with the [GitHub CLI](https://cli.github.com/):
 
 ``````
@@ -82,6 +129,13 @@ gh attestation verify <file> --bundle <bundle> --repo $Repository
 gh attestation verify <file> --bundle <sbom>.cdx.json.sigstore.json --repo $Repository --predicate-type https://cyclonedx.org/bom
 ``````
 "@
+} else {
+@'
+## Build provenance
+
+This validation run did not generate Sigstore attestations.
+'@
+}
 
 $checksums = @"
 ## Checksums
@@ -115,6 +169,7 @@ $sections.Add((Get-Content -LiteralPath $NotesPath -Raw -Encoding utf8).TrimEnd(
 if ($VirusTotalNotePath -and (Test-Path -LiteralPath $VirusTotalNotePath -PathType Leaf)) {
     $sections.Add((Get-Content -LiteralPath $VirusTotalNotePath -Raw -Encoding utf8).TrimEnd())
 }
+$sections.Add($macosDistribution.TrimEnd())
 $sections.Add($provenance.TrimEnd())
 $sections.Add($checksums.TrimEnd())
 Set-Content -LiteralPath $OutputNotesPath -Value ($sections -join "`n`n") -Encoding utf8NoBOM

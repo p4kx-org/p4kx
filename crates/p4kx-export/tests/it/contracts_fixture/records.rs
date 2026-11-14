@@ -44,7 +44,7 @@ pub(super) fn string_hash(key: &str) -> TestValue {
         TestValue::Array(vec![TestValue::Struct(
                 TestInstance::new("MissionPropertyValueOption_StringHash")
                     .value("textId", TestValue::text(key))
-                    .value("weighting", TestValue::Int32(1)),
+                    .value("weighting", TestValue::Single(1.0)),
             )]),
     ))
 }

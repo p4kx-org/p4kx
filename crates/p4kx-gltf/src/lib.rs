@@ -36,6 +36,7 @@ mod block_data;
 mod document;
 mod error;
 mod glb;
+mod glb_json;
 mod glb_options;
 mod glb_plan;
 mod instance;
@@ -48,11 +49,15 @@ mod layout;
 mod material_alpha;
 mod material_index;
 mod materials;
+mod mesh_primitive_map;
+mod mesh_vertex_map;
 mod morphs;
 mod nodes;
 mod package_support;
 mod rig;
+mod rig_addresses;
 mod rig_animation;
+mod rig_emission;
 mod rig_mount;
 mod scene;
 mod scene_light;
@@ -65,6 +70,7 @@ mod texture_budget;
 mod texture_cache;
 mod texture_loader;
 mod texture_make;
+mod texture_origins;
 mod texture_pixels;
 mod texture_plan;
 mod texture_report;
@@ -74,26 +80,33 @@ pub use animations::AnimationSummary;
 pub use error::GltfError;
 pub use glb::{
     GlbOptions, GlbSummary, MaterialMode, VertexColours, write_glb, write_glb_animated,
-    write_glb_animated_with, write_glb_with,
+    write_glb_animated_with, write_glb_animated_with_fallback, write_glb_observed, write_glb_with,
 };
 pub use layer_plan::draws_layer_diffuse;
 pub use layer_view::{layered_base_key, layered_base_texture, layered_base_textures};
 pub use materials::base_colour_factor;
+pub use mesh_primitive_map::{MeshPrimitiveMap, PrimitiveMaterialSource};
+pub use mesh_vertex_map::{MeshVertexMap, write_scene_glb_observed};
 pub use morphs::MorphTarget;
 pub use package_support::{
-    DrawnMaterial, NodeTransform, TextureFile, drawn_materials, light_node_transform,
-    node_transform, texture_path,
+    DrawnMaterial, NodeTransform, TextureFile, drawn_materials, drawn_materials_with_fallback,
+    light_node_transform, node_transform, texture_path,
 };
 pub use rig::{
-    RigPiece, write_rigged_glb, write_rigged_glb_animated, write_rigged_glb_animated_with,
-    write_rigged_glb_with,
+    RigPiece, write_rigged_glb, write_rigged_glb_animated, write_rigged_glb_animated_observed,
+    write_rigged_glb_animated_with, write_rigged_glb_with, write_rigged_glb_with_vertex_maps,
 };
+pub use rig_addresses::{RiggedBufferSource, RiggedBufferView, RiggedJsonAddress};
 pub use rig_animation::{RigAnimation, SampledAnimation, SampledBone, SampledWeights};
+pub use rig_emission::{RiggedGlbEmission, RiggedPartEmission};
 pub use rig_mount::RigMount;
 pub use scene::{Scene, SceneNode, ScenePart, write_scene_glb, write_scene_glb_with};
 pub use scene_light::{SceneLight, SceneLightKind};
 pub use shading::{Shading, shading};
 pub use texture_loader::{LoadedTexture, TextureLoadError, TextureLoader};
+pub use texture_origins::{
+    TextureComponents, TextureMaterialSource, TextureReadId, TextureReadUse,
+};
 pub use texture_plan::{MAX_TEXTURE_IMAGES, MAX_TEXTURE_PIXELS};
 pub use texture_report::{TextureFallback, TextureRole};
 pub use texture_roles::diffuse_texture_path;

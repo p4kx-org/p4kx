@@ -3,8 +3,10 @@
 
 use std::sync::LazyLock;
 
-use p4kx_texture::{RgbaImage, TextureError};
+use p4kx_texture::{DdsTransfer, RgbaImage, TextureError};
 use rayon::prelude::*;
+
+use crate::texture_loader::LoadedTexture;
 
 pub(crate) const RGBA: usize = 4;
 pub(crate) const OPAQUE: u8 = u8::MAX;
@@ -63,6 +65,18 @@ pub(crate) fn linear(value: u8) -> f32 {
     LINEAR.get(usize::from(value)).copied().unwrap_or_default()
 }
 
+pub(crate) fn unit(value: u8) -> f32 {
+    f32::from(value) / f32::from(OPAQUE)
+}
+
+pub(crate) const fn colour_decoder(transfer: DdsTransfer) -> fn(u8) -> f32 {
+    if matches!(transfer, DdsTransfer::Linear) {
+        unit
+    } else {
+        linear
+    }
+}
+
 pub(crate) fn encode(value: f32) -> u8 {
     #[expect(
         clippy::cast_possible_truncation,
@@ -85,9 +99,9 @@ pub(crate) fn metal_share(specular: [f32; 3]) -> f32 {
 }
 
 /// Returns the linear specular colour of a texel of the specular map, tinted.
-fn specular_of([red, green, blue]: [u8; 3], tint: [f32; 3]) -> [f32; 3] {
+fn specular_of([red, green, blue]: [u8; 3], tint: [f32; 3], decode: fn(u8) -> f32) -> [f32; 3] {
     let [tr, tg, tb] = tint;
-    [linear(red) * tr, linear(green) * tg, linear(blue) * tb]
+    [decode(red) * tr, decode(green) * tg, decode(blue) * tb]
 }
 
 /// Returns the position in a row or column of `from` texels that covers position `at` of one of
@@ -139,10 +153,8 @@ pub(crate) fn fill(
 /// Returns the colour of a texel with the diffuse texel `diffuse` and the specular texel
 /// `specular`, both as the maps store them: the tinted diffuse colour moved towards the tinted
 /// specular colour by its metalness, encoded.
-fn metal_mix(diffuse: [u8; 3], specular: [u8; 3], tints: Tints) -> [u8; 3] {
-    let reflected = specular_of(specular, tints.specular);
+fn metal_mix([red, green, blue]: [f32; 3], reflected: [f32; 3], tints: Tints) -> [u8; 3] {
     let metal = metal_share(reflected);
-    let [red, green, blue] = diffuse.map(linear);
     let [tr, tg, tb] = tints.diffuse;
     let own = [red * tr, green * tg, blue * tb];
     let mix = |channel: usize| {
@@ -160,19 +172,36 @@ fn metal_mix(diffuse: [u8; 3], specular: [u8; 3], tints: Tints) -> [u8; 3] {
 /// map; without, the material's diffuse colour multiplies the texture as a factor. The alpha
 /// channel is kept only when `keep_alpha` is set, otherwise opaque.
 pub(crate) fn base_colour(
-    diffuse: &RgbaImage,
-    specular: Option<&RgbaImage>,
+    diffuse: &LoadedTexture,
+    specular: Option<&LoadedTexture>,
     tints: Tints,
     keep_alpha: bool,
 ) -> Result<RgbaImage, TextureError> {
-    let size = (diffuse.width() as usize, diffuse.height() as usize);
-    fill(diffuse.width(), diffuse.height(), |y, out| {
+    let diffuse_transfer = diffuse.decoded_transfer();
+    let diffuse_decode = colour_decoder(diffuse_transfer);
+    let keep_alpha = keep_alpha && diffuse.uses_opacity();
+    let image = &diffuse.image;
+    let size = (image.width() as usize, image.height() as usize);
+    fill(image.width(), image.height(), |y, out| {
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
-            let [red, green, blue, alpha] = texel(diffuse, x, y);
-            let [red, green, blue] = specular.map_or([red, green, blue], |specular| {
-                let [sr, sg, sb, _] = sampled(specular, (x, y), size);
-                metal_mix([red, green, blue], [sr, sg, sb], tints)
-            });
+            let [red, green, blue, alpha] =
+                diffuse.straight_texel(texel(image, x, y), y * size.0 + x);
+            let rgb = [red, green, blue];
+            let [red, green, blue] = match specular {
+                Some(specular) => {
+                    let [sr, sg, sb, _] = sampled_colour(specular, (x, y), size);
+                    let reflected = specular_of(
+                        [sr, sg, sb],
+                        tints.specular,
+                        colour_decoder(specular.decoded_transfer()),
+                    );
+                    metal_mix(rgb.map(diffuse_decode), reflected, tints)
+                }
+                None if diffuse_transfer == DdsTransfer::Linear => {
+                    rgb.map(|value| encode(unit(value)))
+                }
+                None => rgb,
+            };
             *target = [red, green, blue, if keep_alpha { alpha } else { OPAQUE }];
         }
     })
@@ -251,10 +280,10 @@ pub(crate) struct MetallicRoughness {
 /// `None` when both are absent.
 pub(crate) fn metallic_roughness(
     gloss: Option<&RgbaImage>,
-    specular: Option<&RgbaImage>,
+    specular: Option<&LoadedTexture>,
     tint: [f32; 3],
 ) -> Result<Option<MetallicRoughness>, TextureError> {
-    let Some(size) = gloss.or(specular) else {
+    let Some(size) = gloss.or_else(|| specular.map(|image| &image.image)) else {
         return Ok(None);
     };
     let dimensions = (size.width() as usize, size.height() as usize);
@@ -264,8 +293,12 @@ pub(crate) fn metallic_roughness(
                 OPAQUE - sampled(gloss, (x, y), dimensions)[3]
             });
             let metallic = specular.map_or(OPAQUE, |specular| {
-                let [red, green, blue, _] = sampled(specular, (x, y), dimensions);
-                encode_share(metal_share(specular_of([red, green, blue], tint)))
+                let [red, green, blue, _] = sampled_colour(specular, (x, y), dimensions);
+                encode_share(metal_share(specular_of(
+                    [red, green, blue],
+                    tint,
+                    colour_decoder(specular.decoded_transfer()),
+                )))
             });
             *target = [OPAQUE, roughness, metallic, OPAQUE];
         }
@@ -275,6 +308,14 @@ pub(crate) fn metallic_roughness(
         roughness: gloss.is_some(),
         metallic: specular.is_some(),
     }))
+}
+
+fn sampled_colour(texture: &LoadedTexture, at: (usize, usize), size: (usize, usize)) -> [u8; RGBA] {
+    let image = &texture.image;
+    let width = image.width() as usize;
+    let x = nearest(at.0, width, size.0);
+    let y = nearest(at.1, image.height() as usize, size.1);
+    texture.straight_texel(texel(image, x, y), y * width + x)
 }
 
 fn encode_share(share: f32) -> u8 {

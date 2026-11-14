@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::DefaultMaterialReceipt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::manifest_light::Light;
-use crate::manifest_materials::{MaterialDescription, Palette};
-use crate::manifest_rig::Rig;
+use crate::manifest_materials::{MaterialDescription, MaterialLibrarySourceDescription, Palette};
+pub use crate::manifest_mesh::{MaterialTextures, Mesh, MeshMaterial};
+use crate::texture_format::TextureFormat;
 
 /// The value of [`Manifest::format`] as text.
 pub const FORMAT: &str = "p4kx-blender-package";
@@ -15,7 +17,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 ///
 /// A new minor version only adds fields and values readers may ignore; a new major version changes
 /// the meaning of existing ones.
-pub const FORMAT_VERSION: &str = "1.8";
+pub const FORMAT_VERSION: &str = "1.20";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";
@@ -23,7 +25,7 @@ pub const MANIFEST_FILE: &str = "scene.json";
 /// The folder of the GLB meshes in the package folder.
 pub const MESHES_FOLDER: &str = "meshes";
 
-/// The folder of the PNG textures in the package folder.
+/// The folder of the texture files in the package folder.
 pub const TEXTURES_FOLDER: &str = "textures";
 
 /// The format name in `scene.json`.
@@ -48,14 +50,6 @@ pub enum Unit {
     /// Metres. A reader refuses a unit it does not know.
     #[serde(rename = "metre")]
     Metre,
-}
-
-/// The image format of a texture file.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub enum TextureFormat {
-    /// An 8-bit RGBA PNG.
-    #[serde(rename = "png")]
-    Png,
 }
 
 /// How the colour channels of a texture are encoded.
@@ -129,6 +123,18 @@ pub struct Manifest {
     pub options: Options,
     /// The scene hierarchy; a node comes after its parent.
     pub nodes: Vec<Node>,
+    /// Physical inputs and references used by sourced Entity classifications.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<p4kx_extraction::SourceInventory>")]
+    pub entity_provenance: Option<serde_json::Value>,
+    /// Placement evidence for baked lights in directly owned vehicle containers.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<crate::package_light_placements::LightPlacements>")]
+    pub light_placements: Option<serde_json::Value>,
+    /// Original Entity Glow declarations and their separate owner model associations.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<crate::package_glow::PackageGlow>")]
+    pub entity_glow: Option<serde_json::Value>,
     /// The GLB meshes, one per distinct mesh set; nodes reference them.
     pub meshes: Vec<Mesh>,
     /// The PNG textures, each written once.
@@ -137,9 +143,25 @@ pub struct Manifest {
     /// version 1.0.
     #[serde(default)]
     pub materials: Vec<MaterialDescription>,
+    /// Authored material-library roots retained once, without inheriting values into children.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub material_libraries: Vec<MaterialLibrarySourceDescription>,
+    /// Physical fallback lookup for drawn mesh assignments that require one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_material: Option<DefaultMaterialReceipt>,
     /// The tint palettes of the meshes, each written once; absent in version 1.0.
     #[serde(default)]
     pub palettes: Vec<Palette>,
+    /// Node-local selections and per-field physical inputs for rendered palette values.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<crate::package_palette_provenance::PaletteProvenance>")]
+    pub palette_provenance: Option<serde_json::Value>,
+    /// The optional authored SOC scene companion.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authored_soc: Option<crate::ManifestSocScene>,
+    /// Optional collision helpers and their original frame evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub collision_helpers: Option<crate::CollisionHelperReference>,
     /// What could not be resolved or written, with the node or texture it concerns.
     pub issues: Vec<Issue>,
 }
@@ -210,6 +232,9 @@ pub struct EntityRef {
     pub class_name: String,
     /// The Entity's GUID.
     pub guid: String,
+    /// Authored classification of an Entity node when selected by the Assembly.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub classification: Option<crate::EntityClassification>,
 }
 
 /// The coordinate system of a package.
@@ -279,69 +304,6 @@ pub struct Node {
     pub scale: [f32; 3],
 }
 
-/// One GLB mesh: the geometry of a model drawn with one material library and one palette.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-pub struct Mesh {
-    /// The mesh's id, e.g. `m0001`; also the stem of its file.
-    pub id: String,
-    /// The GLB file relative to the package folder, e.g. `meshes/m0001.glb`.
-    pub file: String,
-    /// The geometry file in the Archive the model was read from, below `Data`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub geometry: Option<String>,
-    /// The name of the tint palette the mesh's colours were taken from, when it has one.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub palette: Option<String>,
-    /// The id of that palette in `palettes`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub palette_id: Option<String>,
-    /// The number of nodes that draw this mesh; more than one means the mesh is instanced.
-    pub instances: usize,
-    /// The size of the file in bytes.
-    pub bytes: u64,
-    /// The number of vertices of the mesh.
-    pub vertices: usize,
-    /// The number of triangles of the mesh.
-    pub triangles: usize,
-    /// The materials the mesh is drawn with, in the order of the glTF materials in its file; empty
-    /// for a mesh with a `rig`, whose materials are in the file.
-    pub materials: Vec<MeshMaterial>,
-    /// The skeleton, skinned parts, morph targets and animations of the file; present for a
-    /// Character (version 1.3) and a creature with its skeleton (1.8), absent for a static mesh.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rig: Option<Rig>,
-}
-
-/// A material of a mesh and the textures its material file names.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct MeshMaterial {
-    /// The index of the glTF material in the mesh's file.
-    pub index: usize,
-    /// The name of the glTF material in the mesh's file.
-    pub name: String,
-    /// The textures that were written for the material.
-    pub textures: MaterialTextures,
-    /// The id of the material's description in `materials`; absent for the engine's default
-    /// material.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub material: Option<String>,
-}
-
-/// The texture ids of a material by role; a role is absent when the material names no texture for
-/// it or the texture could not be written.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-pub struct MaterialTextures {
-    /// The diffuse map.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub diffuse: Option<String>,
-    /// The normal map.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub normal: Option<String>,
-    /// The specular map.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub specular: Option<String>,
-}
-
 /// One texture file of the package.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct Texture {
@@ -351,14 +313,32 @@ pub struct Texture {
     pub file: String,
     /// The texture's path in the Archive, below `Data`.
     pub source: String,
+    /// The rendition selected by the package writer for that source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_rendition: Option<crate::TextureRendition>,
     /// The image format.
     pub format: TextureFormat,
     /// The bits per channel; 8 in version 1.
     pub bit_depth: u8,
     /// How the colour channels are encoded.
     pub colour_space: ColourSpace,
+    /// The importer input encoding for this specific output role.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub encoding: Option<crate::TextureEncoding>,
+    /// Optional normal and separate DDS smoothness texture association.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ddna_pair: Option<Box<crate::DdnaTexturePair>>,
+    /// A lossless selected-mip DDS byte binding and its original entry checksums.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dds_asset: Option<Box<crate::DdsTextureAsset>>,
+    /// The reason the requested direct DDS texture required PNG.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dds_fallback: Option<crate::DdsTextureFallback>,
     /// What the alpha channel holds.
     pub alpha: AlphaMeaning,
+    /// Original DDS header and actual mip evidence, when the loader exposes its physical input.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_metadata: Option<Box<crate::TextureSourceMetadata>>,
     /// The width in pixels of the mip level that was written.
     pub width: u32,
     /// The height in pixels of the mip level that was written.

@@ -3,6 +3,9 @@
 
 //! The older loot Records and the warnings of the loot container scan, in the Basetool catalog.
 
+#[path = "loot_generation_component_tests.rs"]
+mod loot_generation_component_tests;
+
 use crate::catalog_loot::{build, entry};
 use crate::loot_fixture::{
     GHOST, LEGACY_ARCHETYPE, LEGACY_TABLE, NESTED, TABLE, TAG_COMMON, TAG_RARE,

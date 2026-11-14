@@ -5,11 +5,11 @@ use p4kx_chunks::{ChunkFile, ivo};
 
 use crate::animation::bind_controllers;
 use crate::animation_read::{
-    ANIM_INFO_VERSION, CAF_DATA_VERSION, CAF_SIGNATURE, MAX_ANIMATION_KEYS, RECORD_LEN, Record,
+    ANIM_INFO_VERSION, CAF_DATA_VERSION, CAF_SIGNATURE, MAX_ANIMATION_KEYS, RECORD_LEN,
     check_budget, chunk_bytes, corrupt, declared_keys, listed_tracks, read_block, read_record,
     stem,
 };
-use crate::{Animation, AnimationError, Bone};
+use crate::{Animation, AnimationError, AnimationTiming, Bone};
 
 /// What the headers of an animation file say about one animation, read without decoding a key.
 ///
@@ -35,7 +35,7 @@ pub struct AnimationHeader {
 }
 
 impl AnimationHeader {
-    pub(crate) const fn of(name: String, path: String, record: Record) -> Self {
+    pub(crate) const fn of(name: String, path: String, record: AnimationTiming) -> Self {
         Self {
             name,
             path,

@@ -3,9 +3,10 @@
 
 use std::borrow::Cow;
 
-use p4kx_assembly::{Assembly, EntityInterior, INTERIOR_NODE};
+use p4kx_assembly::{Assembly, EntityInterior, GearPoseInput, INTERIOR_NODE};
 use p4kx_extraction::model::{MaterialStatus, Model, TintPalette};
 
+use super::AssemblyPieceSource;
 use crate::scene::Rows;
 
 #[cfg(test)]
@@ -16,10 +17,12 @@ mod tests;
 /// One thing the scene places: a part of the Loadout, or a part of the Interior with the
 /// transform of its container and the hull applied.
 pub(super) struct Piece<'a> {
+    pub(super) source: AssemblyPieceSource,
     pub(super) name: String,
     pub(super) path: Cow<'a, str>,
     pub(super) parent: Option<usize>,
     pub(super) model: Option<&'a Model>,
+    pub(super) gear_pose: Option<GearPoseInput<'a>>,
     pub(super) world: Rows,
     pub(super) materials: &'a MaterialStatus,
     pub(super) palette: Option<&'a TintPalette>,
@@ -33,18 +36,21 @@ pub(super) fn pieces_of(assembly: &Assembly) -> Vec<Piece<'_>> {
     let mut pieces: Vec<Piece<'_>> = assembly
         .parts()
         .iter()
-        .map(|part| Piece {
+        .enumerate()
+        .map(|(ordinal, part)| Piece {
+            source: AssemblyPieceSource::Part(ordinal),
             name: part.name().to_owned(),
             path: Cow::Borrowed(part.path()),
             parent: part.parent(),
             model: part.model(),
+            gear_pose: part.gear_pose_input(),
             world: part.world().rows,
             materials: part.materials(),
             palette: part.palette(),
             interior: false,
         })
         .collect();
-    for (index, attached) in assembly.attached_models() {
+    for (ordinal, (index, attached)) in assembly.attached_models().enumerate() {
         let Some(part) = assembly.parts().get(index) else {
             continue;
         };
@@ -53,10 +59,12 @@ pub(super) fn pieces_of(assembly: &Assembly) -> Vec<Piece<'_>> {
             folder => format!("{folder}/{}", attached.name()),
         };
         pieces.push(Piece {
+            source: AssemblyPieceSource::BoneAttachment(ordinal),
             name: format!("{}/{}", part.name(), attached.name()),
             path: Cow::Owned(path),
             parent: Some(index),
             model: Some(attached.model()),
+            gear_pose: None,
             world: part.world().then(attached.local()).rows,
             materials: attached.materials(),
             palette: part.palette(),
@@ -74,7 +82,7 @@ fn push_containers<'a>(
     assembly: &'a Assembly,
     interior: &'a EntityInterior,
 ) {
-    for container in interior.containers() {
+    for (container_ordinal, container) in interior.containers().iter().enumerate() {
         let base = pieces.len();
         let owner = assembly.parts().get(container.part());
         let anchor = owner.map_or_else(
@@ -86,14 +94,19 @@ fn push_containers<'a>(
             "" => INTERIOR_NODE.to_owned(),
             port => format!("{port}/{INTERIOR_NODE}"),
         };
-        for part in container.interior().parts() {
+        for (part_ordinal, part) in container.interior().parts().iter().enumerate() {
             pieces.push(Piece {
+                source: AssemblyPieceSource::Interior {
+                    container: container_ordinal,
+                    part: part_ordinal,
+                },
                 name: format!("{prefix}/{}", part.name()),
                 path: Cow::Borrowed(""),
                 parent: part
                     .parent()
                     .map_or(owner_index, |parent| Some(base + parent)),
                 model: part.model(),
+                gear_pose: None,
                 world: anchor.then(part.world()).rows,
                 materials: part.materials(),
                 palette: part.palette(),

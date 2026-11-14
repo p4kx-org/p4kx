@@ -6,8 +6,16 @@
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
-use p4kx_testkit::{ArchiveBuilder, TestEntry, assembly_entries, check_glb, livery_entries};
+use p4kx_testkit::{
+    ArchiveBuilder, TestEntry, assembly_entries, check_entity_package_sources, check_glb,
+    livery_entries,
+};
 use serde_json::Value;
+
+const LIVERY_LIBRARIES: [&str; 2] = [
+    "Data/Objects/Test/livery.mtl",
+    "Data/Objects/Test/livery_default.mtl",
+];
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -84,13 +92,23 @@ fn the_package_has_the_documented_layout_and_validates_against_the_schema() -> T
     )?;
 
     assert_eq!(run.code, Some(0), "{}", run.stderr);
-    assert_eq!(names(&out)?, ["meshes", "scene.json", "textures"]);
+    assert_eq!(
+        names(&out)?,
+        [
+            "material-sources",
+            "meshes",
+            "receipt.json",
+            "scene.json",
+            "textures"
+        ]
+    );
     assert_eq!(
         names(&out.join("meshes"))?,
         ["m0001.glb", "m0002.glb", "m0003.glb", "m0004.glb"]
     );
     assert_eq!(names(&out.join("textures"))?, ["t0001.png"]);
     let manifest = manifest(&out)?;
+    check_entity_package_sources(&out, &manifest, &LIVERY_LIBRARIES)?;
     let schema = p4kx_blender::manifest_schema();
     let validator = jsonschema::draft202012::new(&schema)?;
     let violations: Vec<String> = validator
@@ -131,9 +149,14 @@ fn shared_meshes_are_written_once_and_the_json_report_says_so() -> TestResult {
     assert_eq!(report["meshes"], 4);
     assert_eq!(report["shared_meshes"], 3);
     assert_eq!(report["textures"], 1);
-    assert_eq!(report["files"], 6);
     assert_eq!(report["lod"], 0);
     let manifest = manifest(&out)?;
+    let written = check_entity_package_sources(&out, &manifest, &LIVERY_LIBRARIES)?;
+    assert_eq!(
+        report["files"].as_u64(),
+        Some(written as u64),
+        "report counts all actual package files and the receipt"
+    );
     let instances: Vec<u64> = manifest["meshes"]
         .as_array()
         .ok_or("parts")?

@@ -8,6 +8,8 @@ menu-recent = Recent Archives
 recent-none = No recent Archives
 channels-heading = Channels
 channels-none = No Channels found. Add a folder or an Archive through the Archive menu.
+channels-discovery-incomplete = Automatic discovery or installation protection was incomplete. Add your game folder or Archive manually if it is missing.
+channels-discovery-stopped = The Channel search stopped without returning a result.
 sidebar-show = Show sidebar
 sidebar-hide = Hide sidebar
 menu-language = Language
@@ -77,7 +79,7 @@ archive-issues =
         [one] The directory of the Archive has one defect in an Entry. The Entry stays listed, but its data may not be readable; an Extraction reports it if it fails, and `p4kx info` names it.
        *[other] The directory of the Archive has { $count } defects in its Entries. The Entries stay listed, but their data may not be readable; an Extraction reports those that fail, and `p4kx info` names them.
     }
-game-running = Star Citizen is running. Use this tool with the game closed: reading continues, but the RSI Launcher can change the Archive when it updates, and the tool never writes into the installation.
+game-running = Star Citizen may be running. Use this tool with the game closed: reading continues, but the RSI Launcher can change the Archive when it updates, and the tool never writes into the installation.
 archive-test-build =
     { $kind ->
         [one] This Archive belongs to the { $channel } Channel, which carries Star Citizen test builds. Material of test builds is confidential under the Star Citizen Terms of Service: do not share or publish anything taken from it.
@@ -268,7 +270,8 @@ query-archive-changed = The Archive changed on disk. Reload it to run Queries.
 query-invalid = Line { $line }, column { $column }: { $reason }
 query-empty-title = No Archive open
 query-empty-hint = Open an Archive to run Queries over its DataForge.
-query-prompt = Write a Query and run it with Ctrl+Enter, e.g. from AmmoParams select speed where speed >= 1500
+query-prompt = Write a Query and run it with { $shortcut }, e.g. from AmmoParams select speed where speed >= 1500
+query-run-shortcut = Ctrl+Enter
 query-no-rows = No Record matches the Query.
 query-rows =
     { $count ->
@@ -399,6 +402,10 @@ change-extraction-summary-changed = The Archive changed on disk during the Extra
 preview-tab-image = Image
 image-mip = Mip
 image-format = Format
+image-pixels = Pixels
+image-origin-encrypted = Includes encrypted source data
+image-origin-plain = Unencrypted source data
+image-origin-unknown = Source encryption unknown
 image-size = Size
 image-mips = Mips
 image-faces = Cubemap faces
@@ -461,6 +468,28 @@ record-export-failed = The Record export into { $path } failed: { $reason }
 record-export-stopped = The Record export into { $path } stopped without a result.
 
 catalog-action = Basetool catalog…
+catalog-diagnostic-action = Diagnostic Basetool catalog…
+catalog-diagnostic-running-title = Creating a diagnostic Basetool catalog
+catalog-diagnostic-summary-title = Diagnostic Basetool catalog written
+catalog-diagnostic-notice = Diagnostic catalog. Check its reported export health before treating missing data as removals.
+catalog-incomplete = Some selected data could not be read or included. No file was created or replaced. Use a diagnostic catalog to inspect the partial result.
+catalog-health-complete = Export health: all selected sources were read and projected successfully.
+catalog-health-incomplete = Export health: incomplete. Some selected sources could not be read or projected successfully.
+catalog-health-entry-diagnostic = { $kind ->
+    [catalog] Catalog
+    [shopInventories] Offline shop inventories
+    [shops] Shops
+   *[other] { $kind }
+}: { $reason ->
+    [malformed] invalid source data
+    [unreadable] source could not be read
+    [missing] source is missing
+    [unsupported] unsupported source data
+   *[failed] source operation failed
+} ({ $number } { $singular ->
+    [yes] Archive Entry operation
+   *[no] Archive Entry operations
+})
 catalog-file-filter = Basetool catalog (JSON)
 catalog-file-filter-compressed = Basetool catalog (JSON, zstd-compressed)
 catalog-running-title = Creating the Basetool catalog
@@ -484,15 +513,40 @@ catalog-warning = { $kind ->
 catalog-warning-more = and { $number } more
 catalog-writing = Writing { $path }…
 catalog-summary-title = Basetool catalog created
-catalog-kinds-heading = Kinds
+catalog-kinds-heading = Kinds (selection scope)
 catalog-summary-kind = { $kind ->
+    [tags] Global tags
     [manufacturers] Manufacturers
     [items] Items
     [ships] Ships
     [commodities] Commodities
     [blueprints] Blueprints
     [resourceGroups] Resource groups
+    [resourceTypes] Resource types
+    [missionPropertySets] Mission property sets
     [blueprintCategories] Blueprint categories
+    [blueprintCategoryLists] Blueprint category lists
+    [factions] Factions
+    [factionIdentities] Faction identities
+    [reputationPerks] Reputation perks
+    [reputationTriggerRecords] Reputation trigger records
+    [reputationRewardAmounts] Reputation reward amounts
+    [infractions] Infractions
+    [infractionSets] Infraction sets
+    [jurisdictions] Jurisdictions
+    [securityNetworkManifests] Security network manifests
+    [missionModuleDeclarations] Mission module declarations
+    [locationClasses] Location classes
+    [locationFunctions] Location functions
+    [locationSizes] Location sizes
+    [locationClassRegistries] Location class registries
+    [locationFunctionRegistries] Location function registries
+    [locationSizeRegistries] Location size registries
+    [contractScopes] Contract scopes
+    [inventoryContainers] Inventory containers
+    [starmapTypes] Starmap types
+    [starmapPresets] Starmap presets
+    [starmapAmenities] Starmap amenities
     [paints] Paints
     [loadouts] Loadouts
    *[other] { $kind }
@@ -941,6 +995,7 @@ model-info-usage-unknown = Unknown, skipped
 model-info-file-model = Model file
 model-info-file-geometry = Geometry file
 model-info-file-lod = LOD { $level } geometry
+model-info-file-lod-model = LOD { $level } model file
 model-info-type-unknown = Unknown
 model-export-action = Export as GLB…
 model-export-title = Export as GLB
@@ -982,6 +1037,8 @@ model-export-summary-counts = Nodes { $nodes }, meshes { $meshes }, materials { 
 model-export-summary-bones = Bones { $bones }, skinned meshes { $skinned }
 model-export-summary-library-missing = The material library { $library } does not exist; the default material is used.
 model-export-summary-library-unreadable = The material library { $library } cannot be read ({ $reason }); the default material is used.
+model-export-summary-library-missing-mapped = The material library { $library } (resolved to { $target }) does not exist; the default material is used.
+model-export-summary-library-unreadable-mapped = The material library { $library } (resolved to { $target }) cannot be read ({ $reason }); the default material is used.
 model-export-summary-default-materials = { $count ->
     [one] One material ID has no sub-material in the library; the default material is used for it.
    *[other] { $number } material IDs have no sub-material in the library; the default material is used for them.
@@ -1464,3 +1521,40 @@ folder-conversion-summary-input = Input folder: { $path }
 folder-conversion-failed-title = Conversion failed
 folder-conversion-failed = Cannot convert { $path }: { $reason }
 folder-conversion-stopped = The conversion of { $path } stopped without a result.
+
+protection-target-identity = The destination's host path could not be verified. Writing here is blocked. Choose another folder or check access to its host path.
+protection-source-identity = The archive's host path could not be verified. Writing data from this archive is blocked. Grant access to the archive again.
+protection-source-membership = It could not be determined whether the archive's parent folder { $parent } belongs to a game installation. Choose an export folder outside that folder, or grant access to the source folder.
+protection-identity-unavailable = The output path could not be identified safely. Writing here is blocked.
+protection-prerequisite-title = Flatpak prerequisite unavailable
+protection-prerequisite = This Flatpak needs a Documents portal with API 5 or later and working host path lookup. Update your desktop portal, or use the tar.gz, AppImage or deb package.
+protection-source-overwrite = This output would replace an input archive. Choose a different file or folder.
+gui-command-help =
+    P4KX desktop
+    Usage: p4kx-gui [ARCHIVE]
+    -h, --help: Show this help
+    -V, --version: Show the version
+    Flatpak requires Documents portal API 5 or later with authenticated host path lookup.
+
+output-target-title = Choose export destination
+output-target-parent = Parent folder
+output-target-choose-parent = Choose folder…
+output-target-no-parent = No parent folder chosen
+output-target-file-name = File name
+output-target-package-name = Package folder name
+output-target-destination = Destination
+output-target-no-destination = Choose a parent folder and enter a name.
+output-target-parent-hint = Choose the parent folder. The output will have the name entered below inside that folder.
+output-target-file-hint = The file will be saved in the chosen folder.
+output-target-package-hint = The package is a subfolder of the selected parent. An existing P4KX package is replaced only after its replacement is complete.
+output-target-diagnostic-hint = This diagnostic permission applies only to this export. It is cancelled when this selection is closed.
+output-target-confirm = Use destination
+output-target-start-export = Start export
+output-target-cancel = Cancel
+output-target-empty = Enter a name.
+output-target-component = Enter one name without a parent path, an absolute path, ‘.’ or ‘..’.
+output-target-control = The name cannot contain control characters.
+output-target-picker-failed = The chooser could not be opened: { $reason }
+output-target-picker-failure-title = Chooser failed
+output-target-picker-disconnected = The chooser closed without a reply. Open it again.
+output-target-picker-relative = The folder chooser returned no absolute parent path. The previous choice has been kept.

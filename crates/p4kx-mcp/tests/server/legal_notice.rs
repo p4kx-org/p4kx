@@ -21,6 +21,10 @@ fn output_of(flag: &str) -> TestResult<String> {
 #[test]
 fn help_states_the_legal_notice() -> TestResult {
     let help = output_of("--help")?;
+    assert!(
+        help.contains("--check-update"),
+        "opt-in update check: {help}"
+    );
     for statement in STATEMENTS {
         assert!(help.contains(statement), "{statement}: {help}");
     }

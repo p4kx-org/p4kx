@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::BTreeMap;
-use std::ffi::OsString;
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
@@ -10,6 +9,7 @@ use std::path::{Path, PathBuf};
 use p4kx_archive::Archive;
 use p4kx_texture::SiblingReader;
 
+use crate::disk_parts::DiskParts;
 use crate::entry_path::same_entry_path;
 use crate::path_index::PathIndex;
 use crate::source::{EntrySource, SourceEntry, SourceReader};
@@ -26,12 +26,8 @@ pub(crate) enum Parts<'a> {
         parts: BTreeMap<u32, SourceEntry<'a>>,
         verify: bool,
     },
-    /// Files next to a header file on disk, part `N` named `<base>.<N><suffix>`.
-    Files {
-        header: PathBuf,
-        base: PathBuf,
-        suffix: &'static str,
-    },
+    /// Disk files with shared case resolution and retained physical paths.
+    Files(DiskParts),
 }
 
 /// The parts of a texture and of its alpha tail, if it has one.
@@ -57,12 +53,16 @@ impl Read for PartReader<'_> {
 }
 
 impl<'a> Parts<'a> {
-    /// Finds the Entry at `path`, its parts and its alpha tail in one parallel pass over the
-    /// Archive, or `None` when no Entry has that path.
+    /// Finds the header, its parts and its alpha tail in one pass over the Archive.
+    /// A selected header has already been bound to its original Entry.
     ///
-    /// A path ending in `.a` names an alpha tail itself; its parts are `.1a` … `.Na` and it has
+    /// A path ending in `.a` names an alpha tail itself; its parts are `.1a` . `.Na` and it has
     /// no alpha tail of its own.
-    pub(crate) fn in_archive(archive: &'a Archive, path: &str) -> Option<Found<'a>> {
+    pub(crate) fn in_archive(
+        archive: &'a Archive,
+        path: &str,
+        selected: Option<SourceEntry<'a>>,
+    ) -> Option<Found<'a>> {
         let (base, is_alpha) = split_alpha(path);
         let source: &'a dyn EntrySource = archive;
         let found: Vec<(Role, SourceEntry<'a>)> = source
@@ -86,10 +86,12 @@ impl<'a> Parts<'a> {
             }
             parts
         };
-        let header = find(if is_alpha {
-            Role::AlphaHeader
-        } else {
-            Role::Header
+        let header = selected.or_else(|| {
+            find(if is_alpha {
+                Role::AlphaHeader
+            } else {
+                Role::Header
+            })
         })?;
         let alpha = if is_alpha {
             None
@@ -111,7 +113,7 @@ impl<'a> Parts<'a> {
     }
 
     /// Finds the Entry at `path`, its parts and its alpha tail through `index`, probing the
-    /// parts `.1`, `.2`, … until one is missing instead of scanning the Archive; `path` is
+    /// parts `.1`, `.2`, . until one is missing instead of scanning the Archive; `path` is
     /// treated as [`Parts::in_archive`] treats it.
     pub(crate) fn in_index(index: &PathIndex<'a>, path: &str) -> Option<Found<'a>> {
         let (base, is_alpha) = split_alpha(path);
@@ -154,54 +156,6 @@ impl<'a> Parts<'a> {
             alpha,
         })
     }
-
-    /// Returns the header file at `path` with its parts next to it, and its alpha tail
-    /// `<path>.a` when that file exists; a path ending in `.a` names an alpha tail itself.
-    pub(crate) fn on_disk(path: &Path) -> Found<'static> {
-        let is_alpha = path
-            .extension()
-            .is_some_and(|extension| extension.eq_ignore_ascii_case(ALPHA_SUFFIX));
-        if is_alpha {
-            return Found {
-                colour: Parts::Files {
-                    header: path.to_path_buf(),
-                    base: path.with_extension(""),
-                    suffix: ALPHA_SUFFIX,
-                },
-                alpha: None,
-            };
-        }
-        let alpha_header = with_suffix(path, ".a");
-        let alpha = alpha_header.is_file().then(|| Parts::Files {
-            header: alpha_header,
-            base: path.to_path_buf(),
-            suffix: ALPHA_SUFFIX,
-        });
-        Found {
-            colour: Parts::Files {
-                header: path.to_path_buf(),
-                base: path.to_path_buf(),
-                suffix: "",
-            },
-            alpha,
-        }
-    }
-
-    /// Returns the path of part `index` on disk, or `None` for parts in an Archive.
-    pub(crate) fn file_of(&self, index: u32) -> Option<PathBuf> {
-        match self {
-            Self::Source { .. } => None,
-            Self::Files { base, suffix, .. } => {
-                Some(with_suffix(base, &format!(".{index}{suffix}")))
-            }
-        }
-    }
-}
-
-fn with_suffix(path: &Path, suffix: &str) -> PathBuf {
-    let mut name = OsString::from(path.as_os_str());
-    name.push(suffix);
-    PathBuf::from(name)
 }
 
 impl SiblingReader for Parts<'_> {
@@ -213,12 +167,7 @@ impl SiblingReader for Parts<'_> {
     fn part_len(&self, index: u32) -> io::Result<Option<u64>> {
         match self {
             Self::Source { parts, .. } => Ok(parts.get(&index).map(SourceEntry::uncompressed_size)),
-            Self::Files { .. } => match self.file_of(index).map(fs::metadata) {
-                Some(Ok(metadata)) if metadata.is_file() => Ok(Some(metadata.len())),
-                Some(Ok(_)) | None => Ok(None),
-                Some(Err(error)) if error.kind() == io::ErrorKind::NotFound => Ok(None),
-                Some(Err(error)) => Err(error),
-            },
+            Self::Files(parts) => parts.part_len(index),
         }
     }
 
@@ -233,12 +182,7 @@ impl SiblingReader for Parts<'_> {
                     .map(PartReader::Source)
                     .map_err(io::Error::other)
             }
-            Self::Files { .. } => {
-                let path = self
-                    .file_of(index)
-                    .ok_or_else(|| io::Error::from(io::ErrorKind::NotFound))?;
-                File::open(path).map(PartReader::File)
-            }
+            Self::Files(parts) => parts.open_part(index).map(PartReader::File),
         }
     }
 }
@@ -252,7 +196,7 @@ enum Role {
 }
 
 /// Returns `path` without a trailing `.a`, and whether it had one.
-fn split_alpha(path: &str) -> (&str, bool) {
+pub(crate) fn split_alpha(path: &str) -> (&str, bool) {
     match path
         .len()
         .checked_sub(2)

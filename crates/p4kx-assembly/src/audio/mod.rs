@@ -11,12 +11,12 @@ mod cache;
 mod entity;
 mod error;
 mod export;
-mod hash;
 mod index;
 mod index_read;
 mod language;
 mod locate;
 mod media;
+mod music_clip_features;
 mod read;
 mod references;
 mod resolve;
@@ -26,6 +26,9 @@ mod txtp;
 mod users;
 mod walk;
 mod walk_banks;
+mod wem_selection;
+
+pub use p4kx_extraction::sound::wwise_path::ATL_FOLDER;
 
 pub use atl::{AtlTrigger, WwiseEvent};
 pub use banks::IndexedSoundbank;
@@ -37,14 +40,15 @@ pub use export::{
     ExportFailure, ExportOptions, ExportReport, ExportState, ExportWatch, ExportedSound,
     SoundFormat,
 };
-pub use hash::wwise_id;
 pub use index::AudioIndex;
 pub use language::LanguageChoice;
+pub use p4kx_audio::wwise_id;
 pub use references::{TriggerReference, TriggerScope, trigger_references, trigger_references_in};
 pub use search::{MAX_SEARCH_PAGE, SearchPage, TriggerHit};
 pub use sounds::{NodeKind, PathStep, SoundVariant, SourceKind, TriggerSounds, WemLocation};
-pub use txtp::{TxtpFile, TxtpReport, TxtpSkip, write_txtp};
+pub use txtp::{TxtpApproximation, TxtpFile, TxtpReport, TxtpSkip, write_txtp};
 pub use users::TriggerUsers;
+pub use wem_selection::WemSelection;
 
 /// The largest soundbank Entry that is read, 32 MiB: six times the largest live soundbank.
 pub const MAX_SOUNDBANK_LEN: u64 = 32 << 20;
@@ -59,12 +63,6 @@ pub const MAX_ATL_NODES: u32 = 1 << 20;
 /// the ATL definition that brings the first of them is reported.
 pub const MAX_AUDIO_TRIGGERS: usize = 1 << 18;
 
-/// The most Wwise events one ATL trigger posts; further events are left out.
-pub const MAX_TRIGGER_EVENTS: usize = 256;
-
-/// The folder of the ATL definition Entries, ignoring ASCII case.
-pub const ATL_FOLDER: &str = "Data\\Libs\\GameAudio\\";
-
 /// The language folder the game reads when its settings name none.
 pub const DEFAULT_LANGUAGE: &str = "English(US)";
 
@@ -77,9 +75,6 @@ pub const MAX_LANGUAGES: usize = 1 << 10;
 
 /// The most objects a container path holds, the Event object included.
 pub const MAX_PATH_DEPTH: usize = 32;
-
-/// The most stingers one index holds; further ones are left out.
-pub const MAX_STINGERS: usize = 1 << 18;
 
 /// The most `PlayEvent` and `Trigger` actions that follow one another on one path.
 pub const MAX_ACTION_CHAIN: usize = 8;

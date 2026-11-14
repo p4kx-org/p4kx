@@ -104,3 +104,7 @@ impl<H: Hasher> io::Write for HasherWriter<'_, H> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "item_variant_stats_tests.rs"]
+mod stats_tests;

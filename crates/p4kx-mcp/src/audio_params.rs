@@ -4,7 +4,7 @@
 use schemars::JsonSchema;
 use serde::Deserialize;
 
-/// The longest trigger, Entity or language argument accepted, in bytes.
+/// The most bytes accepted in trigger and language arguments.
 pub(crate) const MAX_NAME_LEN: usize = 256;
 
 /// The most Entities listed per trigger.

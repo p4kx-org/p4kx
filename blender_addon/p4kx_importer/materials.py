@@ -21,11 +21,17 @@ from .material_basic import basic_description
 from .material_model import Palette
 from .material_pairing import INDEX_PROPERTY, index_of, pair_by_index
 from .package import Mesh, Package, PackageError, Texture, resolve_file
+from .package_digests import file_sha256
 
 if TYPE_CHECKING:
     from .package import MeshMaterial
 
-_COLOUR_SPACE_NAMES = {"srgb": "sRGB", "linear": "Non-Color"}
+_COLOUR_SPACE_NAMES = {
+    "srgb": "sRGB",
+    "linear": "Non-Color",
+    "data": "Non-Color",
+    "linear_colour": "Linear Rec.709",
+}
 _ALPHA_MODES = {"opacity": "STRAIGHT", "smoothness": "CHANNEL_PACKED", "none": "NONE"}
 _COLUMN = 280.0
 _ROW = 260.0
@@ -52,11 +58,19 @@ class ImageCache:
     def _load(self, texture: Texture) -> bpy.types.Image | None:
         try:
             path = resolve_file(self._package.root, texture.file)
+            if texture.format == "dds" and (
+                path.stat().st_size != texture.byte_length or file_sha256(path) != texture.sha256
+            ):
+                raise PackageError("DDS file differs from its package byte binding.")
             image = bpy.data.images.load(str(path), check_existing=True)
-        except (PackageError, RuntimeError):
+            if texture.format == "dds":
+                pixels = image.pixels[:4]
+                if len(pixels) != 4 or tuple(image.size) != texture.dimensions or not image.has_data:
+                    raise PackageError("Blender cannot decode the declared DDS mip.")
+        except (OSError, PackageError, RuntimeError):
             self._package.warnings.append(f"Texture {texture.id} could not be loaded.")
             return None
-        image.colorspace_settings.name = _COLOUR_SPACE_NAMES[texture.colour_space]
+        image.colorspace_settings.name = _COLOUR_SPACE_NAMES[texture.encoding or texture.colour_space]
         image.alpha_mode = _ALPHA_MODES[texture.alpha]
         return image
 
@@ -201,4 +215,9 @@ def _context(package: Package, images: ImageCache, palette: Palette | None = Non
         palette,
         {texture.id: texture.alpha for texture in package.textures.values()},
         images.loads,
+        {
+            texture.id: texture.ddna.smoothness
+            for texture in package.textures.values()
+            if texture.ddna is not None
+        },
     )

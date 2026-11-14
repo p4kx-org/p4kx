@@ -5,8 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use p4kx_dataforge::query::{Query, QueryErrorKind};
 use p4kx_dataforge::{
-    DataForge, JsonLayout, MAX_INHERITANCE_DEPTH, RecordJson, RecordTree, RecordXml, TreeBuilder,
-    Value,
+    DataForge, JsonLayout, RecordJson, RecordTree, RecordXml, TreeBuilder, Value,
 };
 use rayon::prelude::*;
 
@@ -227,7 +226,7 @@ fn visit<'f>(forge: &'f DataForge<'f>, context: &Context<'_>, index: u32, pass: 
     let mut current = record.struct_type().ok();
     let mut steps = 0;
     while let Some(found) = current {
-        if steps == MAX_INHERITANCE_DEPTH {
+        if steps == forge.struct_count() {
             cyclic = true;
             break;
         }
@@ -314,7 +313,7 @@ fn count_components(context: &Context<'_>, tree: &RecordTree<'_>, pass: &mut Pas
         let mut name = Some(component.type_name());
         let mut steps = 0;
         while let Some(current) = name
-            && steps < MAX_INHERITANCE_DEPTH
+            && steps <= context.parents.len()
         {
             steps += 1;
             if let Some(slot) = context.components.get(current) {

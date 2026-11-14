@@ -30,7 +30,7 @@ pub(crate) struct OfferedAt<'a> {
 /// Where the faction of a contract was found.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum GiverSource {
     /// The `factionReputation` of the handler.
     Handler,
@@ -55,7 +55,7 @@ pub(crate) struct GiverFaction<'a> {
 /// The struct that states a blueprint reward.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = crate::closed_set::closed_string_set)]
+#[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]
 pub(crate) enum BlueprintSource {
     /// A `BlueprintRewards` result that fires on success.
     Result,

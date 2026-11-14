@@ -14,6 +14,8 @@ use p4kx_extraction::{Archive, DataForgeEntry, Guid};
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 #[expect(
@@ -25,9 +27,7 @@ fn print_line(line: &str) {
 }
 
 fn list<'c>(catalog: &'c Value, kind: &str) -> Result<&'c Vec<Value>, String> {
-    catalog[kind]
-        .as_array()
-        .ok_or_else(|| format!("the {kind} array"))
+    catalog_v3_consumer::named_rows(catalog, kind).map_err(|error| error.to_string())
 }
 
 struct OnDisk {
@@ -84,10 +84,16 @@ fn verify(path: &Path) -> TestResult {
         .iter()
         .filter_map(|element| element["resourceTypeGuid"].as_str())
         .collect();
-    let subtypes: HashSet<&str> = list(&catalog, "commodities")?
-        .iter()
-        .filter_map(|commodity| commodity["subtypeGuid"].as_str())
-        .collect();
+    let mut subtypes = HashSet::new();
+    for choice in catalog_v3_consumer::presentations(&catalog)? {
+        if let Some(guid) = catalog_v3_consumer::nullable_guid(
+            choice
+                .get("subtypeGuid")
+                .ok_or("Commodity subtype carrier")?,
+        )? {
+            subtypes.insert(guid);
+        }
+    }
     let with_commodity = resources
         .iter()
         .filter(|guid| subtypes.contains(**guid))
@@ -307,7 +313,8 @@ fn an_asteroid_composition_and_a_location_of_a_real_archive_are_linked() -> Test
     let catalog: Value = serde_json::from_slice(built.json())?;
     let elements = guids(&catalog, "mineableElements")?;
     let compositions = guids(&catalog, "mineableCompositions")?;
-    let objects = guids(&catalog, "starmapObjects")?;
+    let objects = crate::real_archive_verification::guids(&catalog, "starmapObjects")?;
+    let object_rows = catalog_v3_consumer::named_rows(&catalog, "starmapObjects")?;
 
     let iron = named(&catalog, "mineableCompositions", "Asteroid_CType_Iron")?;
     let parts = iron["parts"].as_array().ok_or("the parts")?;
@@ -334,10 +341,10 @@ fn an_asteroid_composition_and_a_location_of_a_real_archive_are_linked() -> Test
         .find(|location| {
             location["presetGuid"] == preset_guid
                 && location["starmapObjectGuid"].as_str().is_some_and(|guid| {
-                    list(&catalog, "starmapObjects").is_ok_and(|all| {
-                        all.iter().any(|object| {
-                            object["guid"] == guid && object["className"] == "Stanton1_L1_01"
-                        })
+                    object_rows.iter().any(|object| {
+                        object.pointer("/guid/value").and_then(Value::as_str) == Some(guid)
+                            && object.pointer("/className/value").and_then(Value::as_str)
+                                == Some("Stanton1_L1_01")
                     })
                 })
         })

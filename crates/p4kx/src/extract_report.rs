@@ -4,7 +4,7 @@
 use std::io::{self, Write};
 use std::path::Path;
 
-use p4kx_extraction::{EntryFailure, ExtractionReport};
+use p4kx_extraction::{EntryFailure, ExtractionReport, TextureArtifacts};
 use serde::Serialize;
 
 use crate::cli::Conflict;
@@ -31,6 +31,8 @@ pub(crate) struct ReportJson<'a> {
     #[serde(skip_serializing_if = "<[String]>::is_empty")]
     dataforge_left_out: &'a [String],
     archive_changed: bool,
+    #[serde(skip_serializing_if = "<[TextureArtifacts]>::is_empty")]
+    texture_artifacts: &'a [TextureArtifacts],
     #[serde(skip_serializing_if = "Option::is_none")]
     records: Option<RecordsJson<'a>>,
 }
@@ -72,6 +74,7 @@ pub(crate) fn report_json<'a>(
         not_converted: report.not_converted(),
         dataforge_left_out: report.dataforge_left_out(),
         archive_changed: report.archive_changed(),
+        texture_artifacts: report.texture_artifacts(),
         records: report.records().map(|records| RecordsJson {
             exported: records.written(),
             skipped: records.skipped(),

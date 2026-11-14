@@ -3,21 +3,25 @@
 
 use p4kx_audio::{MediaStorage, SoundSource};
 
-use super::{AudioIndex, IndexedSoundbank, LanguageChoice, SourceKind, WemLocation};
+use super::{AudioIndex, IndexedSoundbank, LanguageChoice, WemLocation, WemSelection};
 
-/// Where the WEM of one Sound object is, and in which language.
+/// The selected WEM location and its actual admission rule.
 #[derive(Debug, Default)]
 pub(crate) struct Located<'i> {
     pub(crate) location: Option<WemLocation<'i>>,
+    pub(crate) selection: WemSelection,
     pub(crate) localised: bool,
     pub(crate) language: Option<&'i str>,
     pub(crate) fallback: bool,
     pub(crate) missing_localisation: bool,
 }
 
-/// Locates the WEM of `source`, a Sound object of `soundbank`: embedded in a soundbank, or for a
-/// streamed or prefetched source the loose WEM Entry named by its ID, in the language folder the
-/// choice and the sound's localisation select.
+struct Selected<'i> {
+    location: WemLocation<'i>,
+    reason: WemSelection,
+}
+
+/// Locates the WEM of one Sound object and retains the rule that admitted it.
 pub(crate) fn locate<'i>(
     index: &'i AudioIndex,
     soundbank: &'i IndexedSoundbank,
@@ -27,27 +31,29 @@ pub(crate) fn locate<'i>(
     if !source.has_media_file() {
         return Located::default();
     }
-    let kind = match source.storage {
-        MediaStorage::Embedded => SourceKind::Embedded,
-        MediaStorage::PrefetchStreamed => SourceKind::PrefetchStreamed,
-        MediaStorage::Streamed => SourceKind::Streamed,
-        MediaStorage::Other(storage) => SourceKind::Other(storage),
-    };
-    if matches!(kind, SourceKind::Other(_)) {
-        return Located::default();
+    if matches!(source.storage, MediaStorage::Other(_)) {
+        return Located {
+            selection: WemSelection::UnsupportedStorage,
+            ..Located::default()
+        };
     }
     let localised = source.is_language_specific() || soundbank.language().is_some();
     let id = source.source_id;
-    let streamed = matches!(kind, SourceKind::Streamed | SourceKind::PrefetchStreamed);
     let find_loose = || loose(index, soundbank, choice, id, localised);
-    let location = if streamed {
-        find_loose().or_else(|| match kind {
-            SourceKind::Streamed => None,
-            _ => embedded(index, soundbank, id),
-        })
-    } else {
-        embedded(index, soundbank, id).or_else(find_loose)
+    let find_embedded = || embedded(index, soundbank, id);
+    let selected = match source.storage {
+        MediaStorage::Streamed => find_loose(),
+        MediaStorage::PrefetchStreamed => find_loose().or_else(find_embedded),
+        MediaStorage::Embedded => find_embedded().or_else(find_loose),
+        MediaStorage::Other(_) => None,
     };
+    let (location, selection) = selected.map_or((None, WemSelection::NotFound), |selected| {
+        (Some(selected.location), selected.reason)
+    });
+    let streamed = matches!(
+        source.storage,
+        MediaStorage::Streamed | MediaStorage::PrefetchStreamed
+    );
     let missing_localisation =
         localised && streamed && !matches!(location, Some(WemLocation::Entry { .. }));
     let language = location.as_ref().and_then(WemLocation::language);
@@ -55,6 +61,7 @@ pub(crate) fn locate<'i>(
         fallback: localised && choice.is_fallback(language),
         language: language.filter(|_| localised),
         location,
+        selection,
         localised,
         missing_localisation,
     }
@@ -74,58 +81,82 @@ fn loose<'i>(
     choice: &LanguageChoice,
     id: u32,
     localised: bool,
-) -> Option<WemLocation<'i>> {
-    let pick = |wanted: Option<&str>| {
+) -> Option<Selected<'i>> {
+    let pick = |wanted: Option<&str>, reason| {
         index
             .loose()
             .find(id)
             .find(|(language, _)| same(*language, wanted))
-            .map(|(_, location)| location)
+            .map(|(_, location)| Selected { location, reason })
     };
+    let neutral = || pick(None, WemSelection::LooseNeutral);
     if !localised {
-        return pick(None);
+        return neutral();
     }
+    let named = || {
+        choice
+            .preferred()
+            .and_then(|wanted| pick(Some(wanted), WemSelection::LoosePreferredLanguage))
+            .or_else(|| {
+                choice
+                    .fallback()
+                    .and_then(|wanted| pick(Some(wanted), WemSelection::LooseFallbackLanguage))
+            })
+    };
     if let Some(language) = soundbank.language() {
-        return pick(Some(language))
-            .or_else(|| choice.candidates().find_map(|wanted| pick(Some(wanted))))
-            .or_else(|| pick(None));
+        return pick(Some(language), WemSelection::LooseBankLanguage)
+            .or_else(named)
+            .or_else(neutral);
     }
     if choice.is_any() {
         return index
             .loose()
             .find(id)
             .find(|(language, _)| language.is_some())
-            .map(|(_, location)| location)
-            .or_else(|| pick(None));
+            .map(|(_, location)| Selected {
+                location,
+                reason: WemSelection::LooseFirstLocalised,
+            })
+            .or_else(neutral);
     }
-    choice
-        .candidates()
-        .find_map(|language| pick(Some(language)))
-        .or_else(|| pick(None))
+    named().or_else(neutral)
 }
 
 fn embedded<'i>(
     index: &'i AudioIndex,
     soundbank: &'i IndexedSoundbank,
     wem: u32,
-) -> Option<WemLocation<'i>> {
-    let holder = |location: &WemLocation<'i>| match location {
-        WemLocation::Soundbank { soundbank, .. } => Some(*soundbank),
-        _ => None,
-    };
-    let find = |accepts: &dyn Fn(&'i IndexedSoundbank) -> bool| {
+) -> Option<Selected<'i>> {
+    let find = |accepts: &dyn Fn(&IndexedSoundbank) -> bool, reason| {
         index
             .embedded_wem(wem)
-            .find(|location| holder(location).is_some_and(accepts))
+            .find(|location| matches!(location, WemLocation::Soundbank { soundbank, .. } if accepts(soundbank)))
+            .map(|location| Selected { location, reason })
     };
-    let ours = soundbank.language();
-    find(&|bank| std::ptr::eq(bank, soundbank))
-        .or_else(|| {
-            find(&|bank| match (bank.language(), ours) {
-                (Some(theirs), Some(ours)) => theirs.eq_ignore_ascii_case(ours),
-                _ => false,
-            })
+    find(
+        &|bank| std::ptr::eq(bank, soundbank),
+        WemSelection::EmbeddedSameBank,
+    )
+    .or_else(|| {
+        find(
+            &|bank| {
+                bank.language()
+                    .zip(soundbank.language())
+                    .is_some_and(|(theirs, ours)| theirs.eq_ignore_ascii_case(ours))
+            },
+            WemSelection::EmbeddedBankLanguage,
+        )
+    })
+    .or_else(|| {
+        find(
+            &|bank| bank.language().is_none(),
+            WemSelection::EmbeddedNeutral,
+        )
+    })
+    .or_else(|| {
+        index.embedded_wem(wem).next().map(|location| Selected {
+            location,
+            reason: WemSelection::EmbeddedFirstAvailable,
         })
-        .or_else(|| find(&|bank| bank.language().is_none()))
-        .or_else(|| index.embedded_wem(wem).next())
+    })
 }

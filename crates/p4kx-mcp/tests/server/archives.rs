@@ -65,8 +65,7 @@ fn list_channels_includes_manual_archives_from_the_settings() -> TestResult {
     let channels = server.ok("list_channels", &json!({}))?;
     let names: Vec<&str> = channels["channels"]
         .as_array()
-        .map(|list| list.iter().filter_map(|c| c["name"].as_str()).collect())
-        .unwrap_or_default();
+        .map_or_default(|list| list.iter().filter_map(|c| c["name"].as_str()).collect());
     assert_eq!(names, ["LIVE", "PTU"], "default first, then manual");
     assert_eq!(channels["channels"][1]["source"], "manual", "PTU is manual");
     let first = server.ok("list_channels", &json!({ "limit": 1 }))?;
@@ -87,7 +86,28 @@ fn archive_info_by_channel_name_summarises_the_archive() -> TestResult {
     let install = Install::standard()?;
     write_launcher_log(&install)?;
     let mut server = install.serve(&[])?;
-    let info = server.ok("archive_info", &json!({ "archive": "live" }))?;
+    let mut info = server.ok("archive_info", &json!({ "archive": "live" }))?;
+    let metadata = info
+        .as_object_mut()
+        .ok_or("Archive summary object")?
+        .remove("metadata")
+        .ok_or("cached source metadata")?;
+    assert_cached_layout(&metadata, &install)?;
+    let fields = info.as_object_mut().ok_or("Archive summary object")?;
+    let origins = fields
+        .remove("fieldOrigins")
+        .ok_or("layout field origins")?;
+    assert_eq!(
+        origins.pointer(
+            "/~1structuredContent~1metadata~1zip~1end~1directoryOffset/containsEncryptedSource"
+        ),
+        Some(&json!(false)),
+        "root directory words stay plain with an encrypted payload elsewhere"
+    );
+    assert!(
+        fields.remove("provenance").is_some(),
+        "the summary carries its source inventory"
+    );
     assert_eq!(
         info,
         json!({
@@ -114,6 +134,62 @@ fn archive_info_by_channel_name_summarises_the_archive() -> TestResult {
             .as_u64()
             .is_some_and(|size| size > 0),
         "a stored size"
+    );
+    Ok(())
+}
+
+fn assert_cached_layout(metadata: &Value, install: &Install) -> TestResult {
+    assert_eq!(
+        metadata.get("version"),
+        Some(&json!("1.0")),
+        "layout payload version"
+    );
+    assert_eq!(
+        metadata.get("layout"),
+        Some(&json!("zip64")),
+        "observed ZIP64 reader route"
+    );
+    assert_eq!(
+        metadata.get("declarationState"),
+        Some(&json!("available")),
+        "cached header availability is separate from lazy row checks"
+    );
+    assert_eq!(
+        metadata.get("sourceLength"),
+        Some(&json!(
+            std::fs::metadata(install.archive())?.len().to_string()
+        )),
+        "source length covers the immediately owning Archive"
+    );
+    assert_eq!(
+        metadata.get("v2"),
+        Some(&Value::Null),
+        "ZIP has no v2 declarations"
+    );
+    assert_eq!(
+        metadata.pointer("/zip/count"),
+        Some(&json!("6")),
+        "exact directory count"
+    );
+    assert_eq!(
+        metadata.pointer("/zip/end/disk"),
+        Some(&json!(65535)),
+        "original disk marker"
+    );
+    assert_eq!(
+        metadata.pointer("/zip/end/directoryOffset"),
+        Some(&json!(4_294_967_295_u32)),
+        "original ZIP64 offset marker"
+    );
+    assert_eq!(
+        metadata.pointer("/zip/zip64/entries"),
+        Some(&json!("6")),
+        "exact ZIP64 count"
+    );
+    assert_eq!(
+        metadata.pointer("/zip/installation"),
+        Some(&Value::Null),
+        "absent installation table"
     );
     Ok(())
 }

@@ -3,9 +3,8 @@
 
 //! The smoke run of the real window: `p4kx-gui` starts, draws a few frames and exits.
 //!
-//! The test needs a display (a desktop session, or `xvfb-run` on a server) and a Vulkan or GL
-//! driver (lavapipe on a machine without a GPU), so it runs only when asked for with
-//! `--ignored`. The window gets an empty profile and no network access to the update check.
+//! The test requires a display and a graphics driver. On macOS the application checks that its
+//! actual window adapter uses Metal. Run with `--ignored`. The window uses an isolated profile.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, ExitStatus};
@@ -35,6 +34,7 @@ fn window_binary() -> PathBuf {
 fn run_window(profile: &Path) -> std::io::Result<Option<ExitStatus>> {
     let mut window = Command::new(window_binary())
         .env("P4KX_SMOKE_FRAMES", FRAMES)
+        .env(p4kx_settings::FOLDERS_ROOT_VARIABLE, profile)
         .env("HOME", profile)
         .env("USERPROFILE", profile)
         .env("XDG_CONFIG_HOME", profile.join("config"))

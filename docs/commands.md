@@ -5,11 +5,33 @@ Every command, option and exit code of `p4kx`, and the tools of the MCP server `
 authority on the exact options of the installed version. Terms follow [CONTEXT.md](../CONTEXT.md);
 the JSON shapes are in [cli-json.md](cli-json.md).
 
+## Flatpak prerequisite and write refusals
+
+Flatpak execution requires host Documents-portal API 5 or later with authenticated
+`GetHostPaths`. CLI and MCP check this before profiles, stored keys or normal work. A missing
+capability reports `[p4kx.runtime.documents-api5]` and exits 1; help/version remain available.
+An observed unsupported Documents version also reports
+`[p4kx.documents.unsupported-interface:N]`, with its exact unsigned version. Transport or
+authentication failures retain their own typed cause and do not report that version marker.
+The native package and Flatpak host requirements are described in [Linux packages](linux-packages.md).
+
+Archive-derived writes retain their actual source Archive context. A known installation is
+reported as an installation refusal. Unavailable source identity, target identity or source
+installation membership is reported separately with `[p4kx.write.source-identity]`,
+`[p4kx.write.target-identity]` or `[p4kx.write.source-membership]`; an attempt to replace the
+source itself uses `[p4kx.write.source-overwrite]`. Different Documents paths or grant IDs
+alone do not prove that an existing target is a different host file.
+
 ## Commands
 
 The first argument of nearly every command is the path of a `Data.p4k` Archive, written
 `<archive>` below.
 
+- `p4kx check-update` makes one anonymous request for the latest GitHub Release. It prints the
+  compatible package link for the running application, or the Release page if the distribution
+  identity or package is unavailable. `--json` writes `{ "update": { "version": "…", "url": "…" } }`
+  for a newer release and `{ "update": null }` otherwise. The command downloads and installs no
+  software.
 - `p4kx list <archive>` lists every Entry of an Archive: compression method, encryption flag,
   compressed size, size and path. Archives in the v1 (ZIP64) and the v2 (`Jiji` trailer) layout
   are recognised automatically; any other layout version is rejected with its number. A split
@@ -30,7 +52,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   empty or blank exclusion Filter is refused. Every command that takes a Filter refuses text beyond
   these limits as invalid input (exit 2), and the MCP tools answer with a tool error.
 - `p4kx grep <archive> <text> [--in records,loc,entries] [--filter <filter>] [--exclude <filter>]
-  [--lang <language>,…] [--limit <n>] [--per-item <n>] [--format table|json]` finds a text in the
+  [--lang <language>,Ã¢â‚¬Â¦] [--limit <n>] [--per-item <n>] [--format table|json]` finds a text in the
   contents: in the string, localisation key and enum values of all Records (with the field path),
   in the texts of each language's `global.ini` and in the lines of text and CryXml Entries (CryXml
   converted to XML first). It matches part of a word and ignores case, so `Gladi` finds
@@ -50,10 +72,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   is computed while the data streams past, so a run needs one read and decode of the Archive (timings in [docs/verify.md](verify.md)).
   Exit code 1 when an Entry mismatches or fails. `p4kx extract --verify` does the same for each
   Entry while it is written: a mismatching Entry is not written, and the summary counts it
-  (`mismatched` in `--json`). `p4kx socpak verify <archive> <container…>` and `socpak extract
+  (`mismatched` in `--json`). `p4kx socpak verify <archive> <containerÃ¢â‚¬Â¦>` and `socpak extract
   --verify` check a container with the plain CRC-32 of its directory. Checking is off unless
   asked for.
-- `p4kx extract <archive> <entry paths…> [--out <folder>] [--conflict <policy>] [--convert [--textures <outputs>] [--mip <level>] [--audio <format>]]` writes the
+- `p4kx extract <archive> <entry pathsÃ¢â‚¬Â¦> [--out <folder>] [--conflict <policy>] [--convert [--textures <outputs>] [--mip <level>] [--audio <format>]]` writes the
   given Entries (stored, deflate or zstd, encrypted or not) into a new folder
   `SC-EXPORT-<Channel>-<Build version>-<timestamp>` in the current directory (the Channel is the
   name of the folder holding the Archive, an unknown Build is `UnknownBuild`, the timestamp is
@@ -77,13 +99,13 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   existing file with the converted XML. The summary then also counts the converted Entries.
   `--convert` also writes the DataForge Entry (`Data\Game2.dcb`, falling back to
   `Data\Game.dcb`) as one Record XML file per Record below its folder instead of the `.dcb`,
-  e.g. `Data/libs/foundry/records/…`, each file under `--conflict`; Records with error values are
+  e.g. `Data/libs/foundry/records/Ã¢â‚¬Â¦`, each file under `--conflict`; Records with error values are
   still written, and the summary counts the Records with their error values.
-  `--convert` also converts each texture (`<name>.dds`, its parts `<name>.dds.1` … `.N` and any alpha
-  tail `<name>.dds.a` with `.1a` … `.Na`) once; the PNG carries the tail in its alpha channel, a
+  `--convert` also converts each texture (`<name>.dds`, its parts `<name>.dds.1` Ã¢â‚¬Â¦ `.N` and any alpha
+  tail `<name>.dds.a` with `.1a` Ã¢â‚¬Â¦ `.Na`) once; the PNG carries the tail in its alpha channel, a
   high-range texture (BC6H or floating point) is exported as OpenEXR `<name>.exr` instead, keeping its range, and a
-  cubemap as six faces `<name>_posx` … `<name>_negz`, a texture array as one PNG per element
-  `<name>_layer0` … and a volume as one PNG per slice `<name>_slice0` …:
+  cubemap as six faces `<name>_posx` Ã¢â‚¬Â¦ `<name>_negz`, a texture array as one PNG per element
+  `<name>_layer0` Ã¢â‚¬Â¦ and a volume as one PNG per slice `<name>_slice0` Ã¢â‚¬Â¦:
   `--textures` picks the outputs, by default `merge,png`: `merge` writes one standard DDS under
   the header's path, `png` the mip `--mip <level>` (0, the largest, by default; a texture with
   fewer levels gives its smallest) as `<name>.png`, and `raw` the Entries unchanged as well, with
@@ -111,8 +133,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   exclusion Filter matches is left out with its parts; an excluded part of a texture that stays is
   not written, and with `--convert`, which still reads it to build the texture, a note on stderr
   gives their number. A pair that selects nothing is invalid input (exit 2), and the error says
-  whether the Filter matched none (`no Entry matches …`) or the exclusion left out all it matched
-  (`the exclusion Filters leave out all N Entries that … matches`). A Filter longer than 1024 bytes
+  whether the Filter matched none (`no Entry matches Ã¢â‚¬Â¦`) or the exclusion left out all it matched
+  (`the exclusion Filters leave out all N Entries that Ã¢â‚¬Â¦ matches`). A Filter longer than 1024 bytes
   or with more than 32 `*` and `?`, an empty or blank exclusion Filter and more than 64 of them are invalid
   input too.
   `--threads <n>` limits the worker threads (default one per logical processor); more than about four rarely help on one disk (docs/performance.md).
@@ -141,14 +163,16 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   written; an input that is no folder is too. Progress, Ctrl+C, `--json` and the exit codes are
   those of `extract`; the JSON report of [`p4kx extract`](cli-json.md#p4kx-extract----json) adds
   `not_converted`, the number of files left out, when it is not 0. The window offers **Convert
-  folder…** in the Archive menu with progress and cancel.
+  folderÃ¢â‚¬Â¦** in the Archive menu with progress and cancel.
 - `p4kx info <archive>` prints the Channel, the Build (branch, version, change number, BuildId)
   from the `build_manifest.id` next to the Archive, and the number, encryption and sizes of its
   Entries, and the number of Entry issues (ADR-0025). An Archive without a readable manifest has
   an unknown Build and still opens. A malformed field of one directory record, such as a path
   that is not UTF-8, an encryption value other than 0 or 1 or v2 data outside the file, does not
-  stop an Archive from opening: `info`, `list` and `extract` print up to ten `warning: Entry …`
+  stop an Archive from opening: `info`, `list` and `extract` print up to ten `warning: Entry Ã¢â‚¬Â¦`
   lines to stderr for the Entries concerned.
+  JSON output also includes cached source-layout `metadata`, with exact declarations and
+  explicit absence as defined in [Archive source layout](media-archive-layout.md).
 - **Input of every `p4kx dcb` command:** `<archive>` is a `Data.p4k` Archive or a DataForge file
   on disk, e.g. a `Game2.dcb` kept from an earlier patch (ADR-0249). A file is recognised by its
   content, a DataForge header, not by its name; the file is only read, never written. The limits
@@ -165,7 +189,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   structs and enums. DataForge versions 6 and 8 are read; any other version, version 5 and older included, is
   reported as not supported with exit code 5 (ADR-0136), and a DataForge Entry claiming more than 2 GiB is rejected before it is read.
 - `p4kx dcb export <archive> [--format xml|json|ndjson] [--combined] [--filter <filter>]`
-  `[--lang <language> [--archive <Data.p4k>]] [--tags] [--out <folder>] [--conflict …]` writes
+  `[--lang <language> [--archive <Data.p4k>]] [--tags] [--out <folder>] [--conflict Ã¢â‚¬Â¦]` writes
   Records as Record XML
   ([docs/record-xml.md](record-xml.md)) or Record JSON
   ([docs/record-json.md](record-json.md)), one file per Record: `<record path>.xml`, or
@@ -211,7 +235,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   rules of `search`. An invalid Query exits with code 2 and marks its position. `--format csv`
   writes RFC 4180 CSV with a header row and `--format json` (or `--json`) one line of JSON, an
   array of objects keyed by column with typed values; `--out <file>` writes the result to a file
-  instead of stdout and prints a summary.
+  instead of stdout and prints a summary. A value-reading failure needed to decide `where`
+  exits with code 5 before writing any result; Query-filtered `dcb fields` follows the same rule.
 - `p4kx entity loadout <archive> <entity>` prints the default Loadout tree of an Entity named by
   class name (`AEGS_Avenger_Titan`), GUID or record path: every port with the Entity attached to
   it, its size and helper, and recursively the ports of each attached Entity. Ports that cannot be
@@ -263,7 +288,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 - `p4kx entity package <archive> <entity> --out <folder>` writes an Entity as a Blender package,
   a folder that does not depend on Blender's file format: `scene.json` (format version, source
   Channel and Build, the node hierarchy with names and transforms), one GLB per distinct mesh
-  and the textures of the materials as PNG, each written once. `--lod`, `--texture-mip`,
+  and the textures of the materials as PNG, each written once. `--texture-container dds`
+  opts into verified DDS textures, including supported DDNA normal and smoothness pairs.
+  `--lod`, `--texture-mip`,
   `--exclude` and `--replace` work as for `entity glb`. A creature whose skeleton the Archive
   holds is written as one skinned GLB with the skeleton, the skins and the parts on its bones and
   its textures embedded at `--texture-mip` (default 0, about 110 to 120 MB; `--texture-mip 1`
@@ -272,12 +299,17 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   and moved into place when complete; it must not exist or must hold an earlier package. The
   format is described in [docs/blender-package.md](blender-package.md), the JSON Schema of
   `scene.json` is [schemas/blender-package.schema.json](../schemas/blender-package.schema.json).
+- `p4kx character source <archive> --body <male|female> --out <file>` writes the selected
+  default CHF, player loadout declarations and Player actor animation sources. See
+  [the source format](player-source.md). Use `--bundle` with one or more distinct `--body` selections
+  and a new output directory to share original data across bodies.
 - `p4kx character package <archive> --out <folder>` writes a Character as a Blender package: the
   head of a CHF file (`--chf`), armour and clothing (`--piece`, `--loadout`) on the default body
   (`--body`, optional when the Loadout has a head), as one skinned GLB with the skeleton, the
   head's expressions as morph targets and the animations (`--anim`, `--anim-from`,
   `--anim-folder`), listed in `scene.json`; `--materials` and `--texture-mip` pick plain colours or
-  textures. A `--loadout` of a story character such as Miles Eckhart exports his outfit and his
+  textures. The optional `--vertex-maps` records the GLB's source-stream vertex ordinals.
+  A `--loadout` of a story character such as Miles Eckhart exports his outfit and his
   own head, hair and eyes; with `--chf` the CHF's head is kept instead. The Blender add-on imports
   it as an armature with shape keys and actions.
 - `p4kx interior glb <archive> <container>... --out <file>` exports the Interior of a socpak
@@ -286,11 +318,18 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `--lod <n>`, `--materials colours` and `--no-vertex-colours` apply to every model. Containers nested in themselves,
   and containers, files and models that cannot be resolved, are listed; with `--json` the report
   has the shape described in [docs/cli-json.md](cli-json.md).
+- `p4kx interior source <archive> <container>... --out <file>` writes the versioned authored
+  SOC scene JSON. It includes nested placements, room registries and area shapes, entity links
+  and inline loadout overrides with source coordinates and per-value encryption evidence.
+  [SOC scene format](soc-scene.md).
+
 - `p4kx interior package <archive> <container>... --out <folder>` writes the Interior of a socpak
   container on its own as a Blender package: the same container, object and light nodes, props
   and lights as `entity package --interior`, without an Entity around them. `--lod`,
-  `--texture-mip` and `--no-vertex-colours` work as for `entity package`; the folder is written
+  `--texture-mip`, `--texture-container` and `--no-vertex-colours` work as for `entity package`;
+  the folder is written
   beside the target and moved into place when complete. The Blender add-on imports it.
+  Add `--authored-soc` for the optional [SOC scene companion](soc-scene.md).
 - `p4kx prefab list <archive> [<library>]` lists the prefab libraries below `Data\Prefabs` or the
   prefabs of one; `p4kx prefab dump <archive> <library> <prefab>` prints a prefab with its nested
   prefabs expanded: every object with type, class, geometry file and its transform to the prefab's
@@ -304,7 +343,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   tag, with its bones matched to the skeleton by name. `--loadout <loadout>` takes the pieces from
   a Loadout instead: a file on disk of that name is tried first and read as an XML Loadout,
   otherwise an Entity's default Loadout by class name, GUID or record path, or an XML Loadout
-  (`Scripts/Loadouts/…xml`) by its path in the Archive; its armour and clothing (`Char_Armor_*`,
+  (`Scripts/Loadouts/Ã¢â‚¬Â¦xml`) by its path in the Archive; its armour and clothing (`Char_Armor_*`,
   `Char_Clothing_*`) are worn. A `--piece` then takes the place of the Loadout's pieces of the
   same item type, or is added. An Entity whose default Loadout is an outfit, an NPC such as Miles
   Eckhart, gives its base Loadout and its clothing; its `Char_Head` is worn with its own skins
@@ -327,7 +366,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   variants.
 - `p4kx wwise resolve <archive> <trigger>` lists every sound variant of an audio trigger with
   its soundbank, WEM ID, source and container path, e.g. `Play_QDrive_Spool in SSQD_QDrive.bnk:
-  WEM 98393519 embedded, not located; event 2178236557 > action 98720655 > blend 228967944 > …`;
+  WEM 98393519 embedded, not located; event 2178236557 > action 98720655 > blend 228967944 > Ã¢â‚¬Â¦`;
   broken links are listed with the object where the chain breaks, and `--json` gives the shape in
   [docs/cli-json.md](cli-json.md). A streamed WEM is located as its loose WEM Entry, and
   localised sounds are resolved for `--lang <language>` with `--fallback-lang` (`English(US)` by
@@ -349,9 +388,16 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `--lang`); a sound that cannot be decoded is reported and written as `.wem`. Names follow the
   portable file-name rule of ADR-0248 (forbidden characters, `#` and a leading space become `%`
   and two hex digits, an empty name becomes `%`, a name taken under the case fold of the rule gets
-  `_2`, `_3`, …), and a sound whose path exceeds its limit is reported as failed while the others
+  `_2`, `_3`, Ã¢â‚¬Â¦), and a sound whose path exceeds its limit is reported as failed while the others
   are written. `--txtp` also writes one vgmstream `<event>.txtp` text file per Wwise event of the
-  trigger next to the sounds (ADR-0254); P4KX writes the text only and does not run vgmstream.
+  trigger next to the sounds (ADR-0254). It writes text for vgmstream. A generated choice of
+  several alternatives reports `select-first-alternative` in its header and the JSON report.
+  A rendered MusicTrack reports `omit-music-clip-timing` for finite nonzero clip start or trim
+  times, `omit-music-clip-events` for authored posted Events and
+  `nonfinite-music-clip-timing` for nonfinite timing words.
+  Rendered MusicPlaylist and MusicSwitch paths also report `omit-music-transition-fades`
+  for nonzero transition fade time or offset and `omit-music-transition-segments`
+  for an allocated transition object with an authored segment ID.
   `p4kx entity audio --extract <folder>` does the same for every trigger of an Entity.
 - `p4kx loc languages <archive>` lists the languages the Archive holds a `global.ini` for, with
   their codes (`en`, `de`, `fr`, `it`, `es-ES`, `es-419`, `pt-BR`, `ja`, `ko`, `zh-Hans`,
@@ -359,42 +405,88 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   text of a localisation key, with or without the leading `@`, ignoring case, in `--lang` (English
   by default) and otherwise in `--fallback`, with `\n` decoded; a key with no text in either is
   reported as missing and exits with code 2, a placeholder key such as `@LOC_EMPTY` prints
-  nothing and succeeds. `p4kx loc export <archive> [--lang <language>,…] [--format json|csv]
+  nothing and succeeds. `p4kx loc export <archive> [--lang <language>,Ã¢â‚¬Â¦] [--format json|csv]
   [--out <file>]` writes every key with its text per language, sorted by key. A `--lang` is a
   code, a folder name such as `german_(germany)` or a name such as `german` where one language has
   it. UTF-8 with or without a byte order mark and UTF-16 files are read; invalid bytes become
   U+FFFD and lines without `=` are skipped, and a `note:` line on stderr names each such Entry
   (also for `catalog`). `loc export --format csv` writes a UTF-8 byte order mark and CRLF line
-  ends. `--fallback en` is the usual choice; there is no default. `--json` gives the shapes in [docs/cli-json.md](cli-json.md).
+  ends. File exports write a sibling origin companion. Raw stdout can carry a separate receipt
+  through `--origin-stderr` or `--origin-out <file>`. See [localisation origins](source-origin.md#localisation-tables).
+  `--fallback en` is the usual choice; there is no default. `--json` gives the shapes in [docs/cli-json.md](cli-json.md).
 - `p4kx actionmap export <archive> [--format json|csv] [--csv-raw] [--language <language>]
   [--out <file>]` writes the action maps of `Data\Libs\Config\defaultProfile.xml`: every action with the
   localised label of its key and its default bindings for the keyboard, mouse, gamepad and
   joystick. The CSV has one row per action and a cell per device, bindings joined with ` | `; the
   JSON lists every binding with its device, input and activation mode ([ADR-0180](adr/0180-the-action-map-export-lists-every-default-binding-of-the-default-profile.md)).
   A label whose key has no text in `--language` (English by default) stays empty.
-- `p4kx catalog <archive> --out <file> [--filter <filter>] [--exported-at <seconds>]` writes the
+  File exports write a sibling origin companion. With raw stdout, use `--origin-stderr` or
+  `--origin-out <file>` to receive the same per-field evidence without changing the export.
+  See [Action-map origins](source-origin.md#action-map-exports).
+- `p4kx media export <archive> --out <directory> [--kind <kind>] [--filter <filter>]
+  [--exclude <filter>] [--conflict skip|overwrite|if-changed] [--audio-format raw|wav|ogg]
+  [--animation-skeleton <entry>] [--animation-entity <entity>] [--diagnostic]` writes the
+  versioned `p4kx-media` inventory as JSONL streams, exact decoded raw payloads and an atomic
+  `media-index.json`. Repeat `--kind` and `--exclude` for explicit selections. Omission selects
+  all registered providers. The optional animation skeleton is one exact Entry in each selected
+  CAF or DBA's owning Archive. A nested Archive resolves the same path separately.
+  The shader stream preserves
+  nested `.ext` declarations and inventories `.cfib`/`.cfxb`/`.shcb` caches with explicit coverage.
+  The material stream includes standalone/unused .mtl libraries without geometry conversion;
+  [material source metadata](media-material-metadata.md) describes its exact retained fields.
+  Selecting both `--kind material --kind shader` adds original MTL shader/flag references with
+  explicit physical-target resolution and actual read receipts; filtered targets stay unselected.
+  The Audio stream preserves [standalone and embedded WEM metadata](media-audio-metadata.md),
+  original RIFF chunk ranges, cue and LIST annotations, and [soundbank metadata](media-bank-metadata.md)
+  including typed Action, Event, Sound, container and music fields. Raw bytes and immediate
+  field origins stay available.
+  Use `--audio-format wav` to add 16-bit PCM WAV artifacts from PCM, IMA ADPCM, PTADPCM, Wwise Vorbis and Opus
+  WEMs. Use `--audio-format ogg` to add Ogg artifacts from Wwise Vorbis and Opus WEMs. The default
+  `raw` retains metadata and source bytes. Unsupported codec conversions prevent complete publication.
+  A diagnostic generation can retain the original source and conversion failure.
+  A known kind without a provider
+  fails explicitly. Incomplete diagnostic generations remain separate from the complete root
+  index. Byte, count, nesting and reference limits are exposed as `--max-*` options; their defaults,
+  scopes, publication rules and provider API are in [media-export.md](media-export.md).
+  `p4kx media schema` prints the index schema; mutually exclusive `--record`, `--reference` and
+  `--source` select the JSONL record, common reference and retained-source schemas.
+- `p4kx catalog <archive> --out <file> [--filter <filter>] [--diagnostic-partial]
+  [--exported-at <seconds>]` writes the
   Basetool catalog for the basetool's P4K import ([docs/basetool-catalog.md](basetool-catalog.md)):
-  schema version (2), Channel and Build, completeness per kind and the kinds of the catalog:
+  schema version (3), Channel and Build, Filter selection scope per kind, read/projection health
+  and the kinds of the catalog:
   manufacturers, items (with their item class), ships and ground vehicles, commodities, crafting
   blueprints, loadouts, paints, shops, the starmap, contracts (with their ship, NPC and entity
-  spawns, location queries and hauling orders), contract templates, mission broker entries and
+  spawns, location queries, hauling orders and canonical mission-property sets), contract templates, mission broker entries and
   cargo manifests, factions and reputation, mining,
-  refining and loot, each ordered by GUID, with test, template, dummy,
+  refining and loot, plus the full global Tag taxonomy, original root/child edges and selected
+  Entity GUID tags ([Tag contract](catalog-tags.md)). Definition kinds are ordered by GUID, with test, template, dummy,
   debug, deprecated and dev Records left out and counted as skipped, and names and descriptions
-  resolved in English and German. `--filter` marks the catalog partial. It prints the counts per
+  resolved in English and German. Global Tag definitions retain all source Records, including
+  development-like names; their convenience paths retain tree order. `--filter` leaves that
+  taxonomy complete and marks the owning Entity selection scope partial independently of
+  read/projection health. It prints the counts per
   kind, the item classes read and the unresolved texts per language and warns when the catalog
   nears or exceeds the 64 MB upload limit. An `--out` name ending in `.zst` writes the catalog as
   one zstd frame (level 19, content size declared, plain `zstd -d` decodes it), a fraction of the size, which the Basetool accepts as
-  it does plain JSON. A selected Record that cannot be read is left out,
-  listed on stderr with its GUID and reason and counted as failed; the catalog is still written
-  and the exit code is 1. `p4kx catalog schema` prints the catalog's JSON Schema.
+  it does plain JSON. A read/projection failure or a source warning that makes the export incomplete
+  refuses normal publication with exit code 1, before creating or replacing the destination.
+  `--diagnostic-partial` explicitly permits writing the diagnostic result, marks its publication
+  mode in the file and CLI status, and still exits with 1 when incomplete. Each invocation must
+  request that permission; a healthy Filter-scoped export needs none. A consumer must check
+  `exportHealth` and selection scope before treating missing rows as removals.
+  The `source` block states `archiveKey` (`given`, `missing` or `wrong`) and
+  `encryptedEntriesUnread`, the encrypted Entries the export could not read without a usable key.
+  `p4kx catalog schema` prints the catalog's JSON Schema.
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship
   ([docs/ship-base-data.md](ship-base-data.md)): hull mass and hit points summed from the
   vehicle implementation XML with its Modification applied, the cargo capacity of the cargo grids
   of the default Loadout, `AttachDef.Size` and the Loadout as class names per port path, each
   value with the file and field it was read from. Docked vehicles are marked and not counted. A
-  ship that cannot be read is listed on stderr and the exit code is 1.
+  ship that cannot be read is listed on stderr and the exit code is 1. The `source` block of the
+  file and the `--json` summary state `archiveKey` and `encryptedEntriesUnread`
+  (`archive_key`, `encrypted_entries_unread`) as `catalog` does.
 - `p4kx coverage <archive> [--format table|json]` checks the game data a companion app reads
   ([docs/coverage.md](coverage.md)) against the Archive: whether each listed Record type,
   `EntityClassDefinition` component and vehicle folder exists, how many it has and whether it
@@ -407,33 +499,39 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   manual entries in `settings.toml` in `%APPDATA%\P4KX` (the platform config directory
   elsewhere). `--config-dir`, `--launcher-dir` and `--default-library` (or `P4KX_CONFIG_DIR`,
   `P4KX_LAUNCHER_DIR`, `P4KX_DEFAULT_LIBRARY`) override these locations. Launcher credential
-  files and the launcher's settings store are never opened.
+  files and the launcher's settings store are never opened. On Linux, Proton/Steam external
+  libraries, Bottles and immediate `~/Games/*` prefixes are searched with bounded exact/unique-case
+  resolution. Incomplete automatic discovery is reported on stderr; manual entries remain usable.
+  See [Channel discovery](channel-discovery.md) for roots, priority, limits and cache behavior.
 - `p4kx cryxml <file> [--out <file>]` converts a CryXml file on disk, e.g. an Entry extracted
   earlier, to UTF-8 XML on stdout or in `--out`. All three signatures (`CryXmlB`, `CryXml`,
   `CRY3SDK`) and both byte orders are read; the XML is indented by two spaces with LF line
   endings, and the same input always gives the same bytes. The output is always well-formed:
   characters a name cannot hold, `:` included, become `_`, a repeated attribute name gets the
-  first free suffix `_2`, `_3`, …, and bytes that are not UTF-8 read as `?`. A file that already
+  first free suffix `_2`, `_3`, Ã¢â‚¬Â¦, and bytes that are not UTF-8 read as `?`. A file that already
   is text XML is written unchanged. A truncated or corrupt file is an error and writes nothing.
+  A successful `--out` also writes a sibling `<file>.p4kx-origin.jsonl`. With XML on stdout,
+  `--origin-stderr` writes the companion to stderr and `--origin-out <file>` saves a copy.
+  See [Standalone field origins](source-origin.md) for the binding and per-datum markers.
 - `p4kx texture info <archive> <entry>` prints the format, size, depth, mip count, array size,
   cubemap faces and number of mip parts of a DDS texture; `p4kx texture merge <archive> <entry>
-  --out <file>` merges the header Entry and its mip parts `<entry>.1` … `<entry>.N` into one
+  --out <file>` merges the header Entry and its mip parts `<entry>.1` Ã¢â‚¬Â¦ `<entry>.N` into one
   standard DDS file that common tools open. Both also take a header file on disk instead of an
   Archive and an Entry, with its parts next to it. Legacy and DX10 headers are read; a missing,
   truncated or oversized part is named in the error and nothing is written. A split cubemap or
   texture array, whose parts hold one mip of every face, merges face by face into a valid
   cubemap or array. `info` also names the alpha or smoothness tail `<entry>.a` with its parts
-  `<entry>.1a` … `<entry>.Na`; `merge <archive> <entry>.a` merges the tail on its own.
+  `<entry>.1a` Ã¢â‚¬Â¦ `<entry>.Na`; `merge <archive> <entry>.a` merges the tail on its own.
 - `p4kx texture png <archive> <entry> --out <file>` decodes the largest mip of a texture and
   writes it as an 8-bit RGBA PNG; `--mip <level>` picks a smaller one, 0 being the largest. It
   takes a header file on disk like `info` and `merge`. BC1 to BC7 and the uncompressed formats in
   use decode with pure-Rust decoders; any other format fails with a message naming it and exit
   code 1. An alpha or smoothness tail is decoded and merged into the alpha channel. A cubemap is
-  written as six face files `<stem>_posx.png` … `<stem>_negz.png` next to `<file>`, or with
+  written as six face files `<stem>_posx.png` Ã¢â‚¬Â¦ `<stem>_negz.png` next to `<file>`, or with
   `--cross` as one horizontal cross in `<file>`. A texture array is written as one file per
-  element `<stem>_layer0.png` …, a cubemap array per element and face `<stem>_layer0_posx.png` …
+  element `<stem>_layer0.png` Ã¢â‚¬Â¦, a cubemap array per element and face `<stem>_layer0_posx.png` Ã¢â‚¬Â¦
   (with `--cross` one cross per element) and a volume as one file per slice of the mip
-  `<stem>_slice0.png` …; the numbers are padded to the width of the last. A high-range BC6H or
+  `<stem>_slice0.png` Ã¢â‚¬Â¦; the numbers are padded to the width of the last. A high-range BC6H or
   floating-point texture is written as OpenEXR
   with 32-bit float RGB instead, with the extension `.exr`, so its range is not clipped;
   `--tone-map` writes an 8-bit PNG instead, Reinhard tone-mapped and sRGB-encoded (ADR-0010). The
@@ -486,7 +584,15 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 - `p4kx bnk objects <archive> <entry> [--type <type>] [--id <id>] [--limit <n>] [--offset <n>]`
   prints the objects of the `HIRC` section in bank order: type, ID, parent and children, and for
   music objects a segment's duration, markers and stingers, a track's clips, a switch container's
-  groups and targets and a playlist's items with their nesting and loop counts. `--type` keeps
+  groups and targets and a playlist's items with their nesting and loop counts. Version-154
+  ActorMixers list the original ordered child IDs and parent. Their JSON detail records the
+  bank-relative spans of the shared node base, child count and child list. DialogueEvent JSON
+  includes checked original argument, node and property rows with their per-value source evidence.
+  Random/Sequence JSON exposes original controls and playlist words with the same field receipts.
+  Switch JSON includes original membership groups, ordered members and per-child fade words.
+  Blend JSON includes original child IDs, Layer RTPC curves and crossfade graph words.
+  MusicTrack JSON includes original sources, clips, automation, switch members and fade words.
+  `--type` keeps
   one object type, `--id` one object (decimal or `0x` hexadecimal); `--limit` (default 100) and
   `--offset` page the result, and the summary line gives the next offset. Objects of a type the
   reader does not decode, of a bank version it does not support or with a malformed body are
@@ -496,10 +602,19 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   tag code with its count (unknown tags kept and counted), and the shapes, morph shapes, bitmaps
   (lossless, JPEG, PNG, GFx external and sub-images), fonts and sprites with their IDs and export
   names; a tag that cannot be read is listed instead of failing the movie, with exit code 1.
+  With `--json`, `fieldOrigins` uses JSON Pointers into the report and `provenance` identifies the
+  selected movie and its actual contributors. Origins distinguish individual tag occurrences,
+  multi-item declarations, and the declarations used for each value. Original input coordinates
+  use `gfxMovieInput` ranges `[offset, length]`. A `gfxDecoded*` location addresses decoded movie
+  bytes and links to the original compressed input used. Authored external paths are sourced to
+  the movie declaration. For standalone files, Archive encryption lineage is unknown.
   `p4kx ui extract <archive> <entry> --out <folder>` writes every bitmap as `bitmap_<id>.png`
   and every shape as `shape_<id>.json` (morph shapes as `morph_shape_<id>.json`) in twips as the
   movie stores them; an external image is decoded from the DDS texture it names next to the
   movie (on disk only inside the movie's `Data` folder), a sub-image is cut from its bitmap.
+  Extract writes `.p4kx-origin.jsonl` for the committed assets, with byte bindings and exact
+  source uses. A partial run records the assets it actually wrote. The JSON summary includes
+  `originReceipt`, `fieldOrigins`, and `provenance`.
   Both also take a movie file on disk, compressed (`CWS`, `CFX`, `ZWS`) or not (`FWS`,
   `GFX`).
 - `p4kx ui render <archive> <entry> --out <file.png> [--size <W>x<H>|<W>] [--background
@@ -514,11 +629,14 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   (exit code 1). A movie is
   untrusted: placements, paths, conversions, masks, the canvas and the area the fills cover are
   bounded, and what lies beyond a limit is listed instead of drawn.
-- `p4kx ui render … --lang <language>` resolves the localisation keys (`@key`, with `,P=`
+  Movie PNG and SVG files have a sibling `<file>.p4kx-origin.jsonl` companion
+  that binds the bytes and records the actual inputs.
+
+- `p4kx ui render Ã¢â‚¬Â¦ --lang <language>` resolves the localisation keys (`@key`, with `,P=`
   parameters) of text fields in the `global.ini` of that language of the Archive; it needs an ENTRY.
   A key the language does not hold is drawn as it is and listed. The language is also the
   localisation folder in which imported fonts are looked for after the folders of the UI.
-- `p4kx ui render … --svg` writes the frame as an SVG document instead, which scales without loss:
+- `p4kx ui render Ã¢â‚¬Â¦ --svg` writes the frame as an SVG document instead, which scales without loss:
   shapes are written once and placed with their transforms, gradients, strokes, colour transforms
   and masks become SVG elements, and bitmaps are embedded as PNG data. The same input gives the
   same bytes, `--size` and `--background` set the size and the backdrop of the document, and the
@@ -539,20 +657,24 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   device waits for the queue to go idle for a limited time; a driver that does not finish in it
   leaves a warning that names the stage it stopped in. The background is `transparent` or
   `#RRGGBB[AA]`; the PNG has straight alpha. Textures and interiors are not drawn.
+  A sibling `<file>.p4kx-origin.jsonl` binds the committed PNG by name, byte length and SHA-256.
+  With `--json`, the report includes its name, artifact origin and the individual camera origins.
 - `p4kx ui screens <archive> <entity>` lists the `BuildingBlocks` screens of an Entity and of
   everything in its default Loadout, e.g. the MFDs, the radar and the HUD of a ship: per screen the
   port, the Entity, the canvas Record and its size, the canvases, textures, vector graphics, movies
   and localisation keys it uses, and its widgets by element type with whether they are drawn; the
   UI movies the Entities name are listed after them. `--json` carries the same.
-- `p4kx ui render <archive> --screen <canvas> --out <file.png> [--svg] [--size …] [--background …]
-  [--brand <code>] [--var <name>=<value>]…` renders such a canvas, named by record path or GUID,
+- `p4kx ui render <archive> --screen <canvas> --out <file.png> [--svg] [--size Ã¢â‚¬Â¦] [--background Ã¢â‚¬Â¦]
+  [--brand <code>] [--var <name>=<value>]Ã¢â‚¬Â¦` renders such a canvas, named by record path or GUID,
   as a still through the
   GFx renderer: the layout of its widgets (sizes, margins, padding, flex containers, raw units)
   is computed from the Records and the boxes, circles and polygons are drawn in the colours of
   the style cascade (palette slots of the default and manufacturer style, style entries with type,
-  tag, parent and ancestor selectors at rest). Texts, textures, vector graphics, lists, clones and
-  every other widget type without a renderer are left out and listed, with the features the layout
-  approximates (exit code 1); no ActionScript is run. Every game variable is zero, so the MFD of a
+  tag, parent and ancestor selectors at rest). The renderer draws supported texts, textures and
+  vector graphics. The report lists skipped widgets and approximated layout (exit code 1).
+  PNG and SVG have a sibling `<file>.p4kx-origin.jsonl` companion. `--json` reports the
+  artifact origin and the independent origins of summary values. The renderer evaluates the
+  screen at rest with game variables at zero, so the MFD of a
   cold ship is off; `--var powerstate=1` sets one (repeatable), and the report lists the variables
   in force and those the screen does not read. `--var CANVAS::NAME=VALUE` limits a setting to the
   canvases of that Record name, which are not told apart when several share it; `a::b::c` is
@@ -578,12 +700,17 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   [docs/chf-hashes.md](chf-hashes.md). A hash that a known name matches gets that name in a
   `*_label` key beside it (`from-json` ignores the keys), `--archive` adds the names the Archive
   knows, and the hashes without a name are counted.
+  The file outputs have a sibling `<file>.p4kx-origin.jsonl` companion. For
+  raw JSON on stdout, `to-json --origin-stderr` writes the companion to stderr
+  and `--origin-out <file>` saves it. See [Standalone field origins](source-origin.md).
 - `p4kx chf diff <a.chf> <b.chf> [--format text|json] [--archive <Data.p4k>]` lists the fields in
   which two CHF files differ, by path with the old and the new value: header, DNA by face part and
   blend, item port tree, and materials down to textures, float and colour parameters. Hashes that
   a known name matches are shown as names; the raw path keeps them. It finds which field a control
   of the character customiser changes. Exit code 1 when the files differ, 0 when not; the JSON is
   described in [docs/cli-json.md](cli-json.md#p4kx-chf-diff-achf-bchf---json).
+  For text output, `--origin-stderr` writes a byte-addressed companion to stderr,
+  and `--origin-out <file>` saves it. A completed comparison with changes still exits with 1.
 - `p4kx chf glb <archive> <file> --out <file>` exports the head of a CHF character as one skinned
   GLB: the head skin of the character's head rig, its vertices moved by the character's face DNA
   into the character's neutral face (the neutral morphs of the DNA rig beside the skin, mixed by
@@ -604,13 +731,13 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   listed and left out of the GLB, which is still written, and the exit code is 1; an item or a
   material the Archive does not have is listed, and a character without face DNA exits with 2. The
   report is described in [docs/cli-json.md](cli-json.md).
-- `p4kx socpak list <archive> <container…>` lists the Entries of a socpak container in the
+- `p4kx socpak list <archive> <containerÃ¢â‚¬Â¦>` lists the Entries of a socpak container in the
   columns of `list`, read from the Archive without extracting the container first; each further
-  path names a container inside the one before. `p4kx socpak extract <archive> <container…>
+  path names a container inside the one before. `p4kx socpak extract <archive> <containerÃ¢â‚¬Â¦>
   [--filter <filter>] [--exclude <filter>] [--out <folder>] [--conflict <policy>] [--convert]`
   writes its Entries, or those the Filter matches, without those `--exclude` matches, with the
   rules of `extract`; `--exclude` alone leaves out of all Entries, and a pair that leaves nothing is
-  invalid input. `p4kx socpak verify <archive> <container…> [--filter <filter>] [--exclude
+  invalid input. `p4kx socpak verify <archive> <containerÃ¢â‚¬Â¦> [--filter <filter>] [--exclude
   <filter>]` selects the same way. `if-changed` compares with the CRC-32 containers store.
   Containers nest at most 8 deep; a container whose Entries overlap, whose stored sizes disagree or
   which declares more than 2048 times its stored size for an Entry is refused, as are compressed
@@ -637,8 +764,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   chunks it skipped. `--lod` picks the level of detail, 0 by default; the LODs come from the
   companions `<name>_lod<n>.<extension>m`, and a level the model lacks exits with code 2.
   `--materials colours` (the default) gives every sub-material of the model's `.mtl` file a glTF
-  material with base colour, opacity, roughness, metalness and emissive colour and no textures;
-  submeshes whose material draws nothing (collision and helper geometry) are left out, and a
+  material with base colour, opacity, roughness, metalness and emissive colour without textures.
+  When the static emissive magnitude exceeds the core range, a normalized emissive colour and the
+  optional `KHR_materials_emissive_strength` extension retain its tint and strength.
+  Submeshes whose material draws nothing (collision and helper geometry) are left out, and a
   missing or unreadable `.mtl` file is reported while the model exports with a grey default
   material. `--materials textures` also embeds the textures of the materials as PNG images: the
   diffuse map as base colour, the normal map (green flipped to glTF's up, the blue channel
@@ -661,7 +790,14 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   and the shell history. `p4kx key show` shows the stored key and the one in use with all but
   the last four digits hidden, `p4kx key remove` deletes the stored key. The key never appears in
   logs, error messages or JSON. `--key-file` (or `P4KX_KEY_FILE`) names another file for the stored
-  key, for the command line, the window and the MCP server alike.
+  key, for the command line, the window and the MCP server alike. A command that asked for
+  encrypted Entries it could not read for want of a key, or with a key that does not fit, prints
+  one note on stderr after it ran (the cause, the number of Entries, the first one and how to give
+  the key); its exit code does not change. `catalog` and `ships` also state it in `source`
+  (`archiveKey`, `encryptedEntriesUnread`).
+- `P4KX_FOLDERS_ROOT` selects an absolute root for separate `config`, `cache` and `data`
+  application folders on every platform. An explicitly empty or relative root has no profile
+  fallback. [Profile folders](profile-folders.md) documents paths and key-file precedence.
 - `--recover` on any command rebuilds an Archive whose end of central directory is missing or
   whose central directory is damaged, by scanning its last 4 GiB for directory records. Entries
   whose records are lost are missing, and a warning says the Archive was recovered. Without the
@@ -678,10 +814,17 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 | 2 | Invalid input: bad arguments, an Entry path the Archive does not contain (for `compare --diff`: neither Archive contains), a Filter that matches no Entry or Record, a Channel path that does not exist or was never added, a texture, sound, soundbank, chunk file, UI movie, model or geometry companion file that does not exist, the geometry of the Entity that `entity glb` or `entity package` exports when it does not exist, a mip level, chunk or LOD the file does not have, an output that is one of its inputs or lies inside a Star Citizen installation (the tool never writes there), a package folder that holds something other than an earlier package, an invalid Query, an Entity that no Record or several Records match, a malformed `--exclude` or `--replace`, an audio trigger no ATL definition has, an audio or localisation language the Archive holds nothing for, a `ui render` canvas that is empty, larger than 16384 pixels a side or 2^25 pixels, or not named by exactly one canvas Record, `--json` without `--out` for `cryxml` or `chf to-json`, a catalog `--out` ending in `.gz`, CHF JSON that is invalid, has an unknown version or cannot be stored as CHF, and a CHF file for `chf glb` or `character package` that holds no face DNA or whose DNA belongs to an unknown head rig |
 | 3 | The Archive, a socpak container in it or the input file cannot be read: missing, not an Archive, not CryXml, CHF, a chunk file or a UI movie, corrupt, a corrupt model or companion (for `entity glb` and `entity package` the geometry of the Entity itself, or its `.chrm` companion, that cannot be read), with a CHF CRC-32C mismatch or unknown CHF version, also a `compare --diff` Entry that cannot be read, does not hold its stated size or holds corrupt CryXml, a `global.ini` of `catalog` or `loc` that is over 64 MiB, holds more than 1,048,576 keys or cannot be read (invalid bytes and lines without `=` are no error), and a prefab library that cannot be read; a missing texture, sound, soundbank, chunk file, UI movie or model file is 2 |
 | 4 | The Archive changed on disk while it was open, e.g. updated by the RSI Launcher; the Extraction stopped, and Entries written before may be stale |
-| 5 | The DataForge cannot be read: the Archive holds none, its version is not supported or it is corrupt, or the Record of the Entity whose Loadout or audio is shown cannot be read |
+| 5 | The DataForge cannot be read: the Archive holds none, its version is not supported or it is corrupt, or the Record of the Entity whose Loadout or audio is shown cannot be read, or a demanded Query value cannot be read to decide the selection |
 | 6 | `compare`: the report or the output cannot be written |
 | 7 | The Archive key is missing or wrong: an Entry is encrypted and no key was given with `--key`, `P4KX_ARCHIVE_KEY` or `p4kx key set`, or the key does not decrypt the Archive |
 | 130 | Interrupted: a second Ctrl+C ended an Extraction at once; temporary `.p4kx-*.part` files may remain |
+
+`media export` returns 0 for published, unchanged or validated skipped generations; 1 for diagnosed
+incompleteness, unsupported providers, resource limits, cancellation or generation failures; 2 for
+invalid bounds, unsafe destinations or protected output; 4 for source changes; and 7 for original
+missing or wrong Archive-key errors, including errors wrapped by source retention. A root Archive
+that cannot be opened uses the existing Archive error codes. Failures before publication keep the previous
+complete index.
 
 `p4kx --help` lists every case of each code.
 
@@ -691,6 +834,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 stdio, so an AI client can look into the Archives. It is built with the official Rust MCP SDK
 (`rmcp`) and speaks every protocol version the SDK negotiates, up to `2026-07-28`. Its tools never
 write a file.
+
+Run `p4kx-mcp --check-update` separately to query GitHub and print a newer Release link if one is
+available. The command exits without starting a session. Normal MCP sessions do not check for
+updates.
 
 What the tools return is the content of the Star Citizen Archive. The AI client may forward it to
 third parties, for example the cloud model provider behind the client. Game texts and media must
@@ -705,11 +852,11 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | Tool | Result |
 |------|--------|
 | `list_channels` | The detected Channels with Archive path, source and Build, found like `p4kx channels` |
-| `archive_info` | Channel, Build, number of Entries and encrypted Entries, sizes, `issue_count` and the first 50 `issues` (Entry path and defect) of the directory |
+| `archive_info` | Channel, Build, number of Entries and encrypted Entries, sizes, cached source-layout `metadata`, `issue_count` and the first 50 `issues` (Entry path and defect) of the directory |
 | `list_entries` | One folder of an Archive (`folder`, e.g. `Data/Libs`): its subfolders with their Entry count, then its Entries |
 | `search_entries` | The Entries matching a Filter (`filter`), with the rules of `p4kx search` |
 | `read_entry_text` | A range of an Entry as text (`path`, `offset`, `max_bytes`): CryXml as XML, UTF-16 by its byte order mark, otherwise UTF-8 |
-| `read_entry_bytes` | A range of an Entry's data as base64 (`path`, `offset`, `max_bytes`) |
+| `read_entry_bytes` | A range of an Entry's data as base64 (`path`, `offset`, `max_bytes`) with per-field provenance |
 | `get_record` | A Record by `guid`, or every Record of a record `path`, as Record JSON |
 | `search_records` | The Records whose record `path` and `type` name match Filters, in Record order |
 | `list_structs` | The struct definitions matching a `name` Filter, with parent and declared fields (data type, array, target struct or enum) |
@@ -718,16 +865,133 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 | `list_chunks` | The chunks of a chunk file Entry (`path`) as `p4kx chunks list` shows them: index, type, type ID, known, version, chunk ID, byte order, offset and size; `type` (a name or `0x` ID) narrows it. No chunk data is returned |
 | `get_model_info` | A model Entry (`path`) summarised as `p4kx model info --json`: geometry, material library and IDs, levels of detail, and the number of materials, nodes, meshes, bones, animations and chunks |
 | `list_model_items` | One `section` of a model Entry, paged: `materials`, `nodes`, `meshes`, `bones`, `animations`, `unread_animations` or `chunks`, each item shaped as in `p4kx model info --json` |
-| `search_audio_triggers` | The audio triggers whose name or Wwise event names match `search` (a substring or a glob), as `p4kx wwise events`: events, the soundbanks holding them, why a trigger leads to none, and, with `entities` above 0 (the default is 0, because the lookup reads every Entity), the Entities naming it |
-| `get_entity_sounds` | The audio triggers an Entity (`entity`: GUID, record path or class name) names, each with its ATL definition, events and soundbanks, as `p4kx entity audio` |
-| `resolve_audio_trigger` | The sound variants of a trigger (`trigger`, `lang`, `fallback_lang`) as `p4kx wwise resolve`: soundbank, WEM ID, source kind, where the WEM is and the object path; broken links with the first page |
+| `search_audio_triggers` | The audio triggers whose name or Wwise event names match `search` (a substring or a glob), as `p4kx wwise events`: events, the soundbanks holding them, why a trigger leads to none, and, with `entities` above 0 (the default is 0, because the lookup reads every Entity), the Entities naming it; complete event lists, names and Entity identifiers share the existing 256 KiB response budget, with explicit refusal of an item that cannot fit first |
+| `get_entity_sounds` | The audio triggers an Entity (`entity`: GUID, record path or class name) names, each with its ATL definition, events and soundbanks, as `p4kx entity audio`; complete event lists, identities and reference coordinates share the existing response budget |
+| `resolve_audio_trigger` | The sound variants of a trigger (`trigger`, `lang`, `fallback_lang`) as `p4kx wwise resolve`: soundbank, WEM ID, source kind, where the WEM is and the object path; broken links with the first page; retained names and paths are complete within the existing response budget, and oversized items are explicitly refused |
 | `list_soundbank_wems` | The WEMs a soundbank (`soundbank`) embeds, paged, as `p4kx bnk list`: ID, size, codec, channels, sample rate, frames, duration, prefetch. No audio |
-| `list_soundbank_objects` | The `HIRC` objects of a soundbank (`soundbank`) in bank order, paged with a cursor, as `p4kx bnk objects --json` lists them: type, ID, parent, children, how far the reader decodes the object, and the fields of sounds, actions, containers and music objects. `type` (as `p4kx bnk objects --type`) and `id` narrow it; `matched` counts the objects that pass, `total` and `layouts` the whole bank. Objects the reader does not decode are listed and counted. No audio |
-| `get_wem_info` | One WEM by `wem_id` or loose Entry `path`: every place that holds it and its codec, channels, sample rate, duration and loop. No audio |
-| `get_audio_excerpt` | A short decoded excerpt of one WEM (`wem_id` or `path`, `start_seconds`, `duration_seconds`) as an `audio/wav` content block next to its metadata; at most 10 seconds and 1 MiB, see [ADR-0131](adr/0131-the-mcp-audio-excerpt-is-a-bounded-wav-and-the-only-tool-that-returns-audio.md) |
+| `list_soundbank_objects` | The `HIRC` objects of a soundbank (`soundbank`) in bank order, paged with a cursor, as `p4kx bnk objects --json` lists them: type, ID, parent, children, how far the reader decodes the object, and the fields of sounds, actions, containers, ActorMixers and music objects. Type-specific source fields, including Play Action properties and standalone State, and shared version-154 node fields carry per-value receipts within the whole-object response budget. `type` (as `p4kx bnk objects --type`) and `id` narrow it; `matched` counts the objects that pass, `total` and `layouts` the whole bank. Objects the reader does not decode are listed and counted. No audio |
+| `get_wem_info` | One WEM by `wem_id` or loose Entry `path`: every indexed place that holds it and, from the first complete candidate that parses, its codec, channels, sample rate, duration and loop; the search is independent of location paging. No audio |
+| `get_audio_excerpt` | A short decoded excerpt from the first indexed candidate that can decode one WEM (`wem_id` or `path`, `start_seconds`, `duration_seconds`) as an `audio/wav` content block next to its metadata; at most 10 seconds and 1 MiB, see [ADR-0131](adr/0131-the-mcp-audio-excerpt-is-a-bounded-wav-and-the-only-tool-that-returns-audio.md) |
 | `image_preview` | A DDS texture (`path`) as one PNG image content block of at most 1 MiB, with its format, size and mip count as structured content: the mip chosen by `mip` or the largest that fits `max_side` (512 by default, at most 2048), a cubemap as a cross or one `face`, an array or volume as a sheet |
-| `mtl_summary` | A `.mtl` Entry (`path`), paged by sub-material: name, shader, surface type, flags, colours, opacity, glow, texture slots, shader parameters and layers |
-| `entity_loadout` | The default Loadout of an Entity (`entity`: class name, record path or GUID) as a list of ports, parents first: path, depth, source, what the port takes, the Entity attached and for each unresolved port the reason; each Entity states its `issues` and, only when it has any, its `notes` (what the Archive cannot decide, such as an `assortment_requirement`, as in the CLI JSON); `max_depth` (16 by default, at most 32) and a cursor bound it |
+| `mtl_summary` | A `.mtl` Entry (`path`), paged by sub-material: name, shader, surface type, flags, colours, opacity, glow, complete admitted texture-slot, shader-parameter and layer lists; retained strings are complete, paging observes the 256 KiB response budget, and an item that cannot fit alone is explicitly refused |
+| `entity_loadout` | The default Loadout of an Entity (`entity`: class name, record path or GUID) as a list of ports, parents first: path, depth, source, what the port takes, the Entity attached and for each unresolved port the reason; each Entity states its `issues` and, only when it has any, its `notes` (all admitted undecidable spawn requirements, such as an `assortment_requirement`, as in the CLI JSON); `max_depth` (16 by default, at most 32) and a cursor bound it; retained identities, paths, values and reasons are complete within the 256 KiB response budget, with explicit refusal for an item that cannot fit first |
+
+
+For `search_entries`, `fieldOrigins` covers each returned directory field and its original
+physical Entry, including repeated paths and ZIP or v2 header facts. Leaf encryption
+and the enclosing directory's encryption are separate facts. An encrypted containing
+Entry contributes to its decoded child directory, including a zero-match count.
+`total` and `next_cursor` use the entire consulted directory independently of the returned page.
+A root Archive uses one original directory receipt with half-open admitted path positions,
+including an empty range for an empty Archive.
+
+
+For `list_entries`, a returned folder's path retains the physical Entry that supplies its
+spelling. Its `entry_count` refers to the half-open range of descendants in path order.
+`total` and `next_cursor` retain the relevant directory range and the folder names actually
+compared during lookup. The echoed `folder` value uses the request spelling and, for a
+container, its observed prefix. An empty folder selection has a directory receipt and an
+empty list of returned items.
+
+For `run_query`, `fieldOrigins` addresses the actual JSON columns and list elements. Scalar
+payloads, followed Reference slots and selected instances identify their original decoded DCB
+positions. The total retains the WHERE inputs actually read, including short-circuit evaluation.
+Pages charge provenance to the 256 KiB response budget. A selection survey that cannot fit retains
+an original source witness and marks its contributor set incomplete. The referencing lookup
+retains actual target Record fields and incoming edges. Edge coordinates are
+[sourceRecord, valueOrdinal, targetRecord], with the value position in original canonical
+preorder excluding the root. Unread indexed positions keep the selection evidence incomplete.
+
+For `get_record`, `fieldOrigins` follows the exact canonical Record JSON, including reserved or
+duplicate field wrappers, nested array elements and Reference members. `dataforgeDecodedBytes`
+uses `[start, endExclusive]` within the decoded DCB. Links identify the selecting slot and the
+actual target Record or owned instance. Cursor evidence includes the original Record slots
+examined for the page budget. Provenance counts toward the 256 KiB response budget.
+
+For `search_records`, `fieldOrigins` addresses the existing Record fields in each returned
+row. Record coordinates are the original DCB definition positions. A type name also identifies
+the Struct definition selected by that Record. The total and cursor use the original Record
+count, path survey and applicable type checks. The survey's index runs are pairs of original
+start and end-exclusive definition positions. Provenance is part of the 256 KiB response
+budget. When the complete survey cannot fit, the original Record count retains its encryption
+proof and the navigation contributor set is marked incomplete. A standalone DCB supplies its
+own physical evidence and has unknown P4K encryption.
+
+For `list_structs` and `list_enums`, the same field-origin carrier identifies the original
+definition, property and option table positions. Parent, Struct target and Enum target
+names retain both the selecting declaration and the selected name. Definition totals and
+cursors use the original table count and the names consulted by filtering or sorting.
+The page budget includes provenance and a declaration that cannot fit is explicitly refused.
+
+For `list_model_items` with `section: "bones"`, `fieldOrigins` addresses the returned bone fields,
+including each rotation and translation component. `cryEngineSkeleton` coordinates on a bone
+field are `[chunkOrdinal, boneOrdinal, start, endExclusive]` in the original decoded model Entry.
+The model's primary skeleton supplies the bone list and its stored poses. The chunk-table
+selector records the exact type-word prefix examined for that skeleton. A `CrCh` bone list is
+empty under the selected reader layout. Provenance counts toward the existing response budget,
+and the cursor resumes after the last returned bone.
+
+For `list_model_items` with `section: "nodes"`, `fieldOrigins` addresses the returned node fields
+and matrix, scale and property members. The recorded byte ranges locate the original IVO fields
+or the versioned `CrCh` node words, including the resolved parent ID and the transposed matrix
+cells. The parser's default selectors account for identity matrices and the synthetic root.
+The generated root name also uses the selected model's directory path. The same response budget
+and cursor apply to node pages.
+
+For `list_model_items` with `section: "animations"`, each row has source and encryption
+markers for its values. CAF names use the selected directory path. DBA names use the original
+database name bytes. Timing and counts use the admitted chunk and controller records.
+The duration also identifies the original encoded frame if it extends past the stored end.
+The bound track count includes the selected skeleton's controller IDs. The item collection
+aggregates the returned rows. The total and cursor use the original database count and clip
+admission flags actually evaluated, including flags that exclude an additive clip. A readable
+empty database contributes its authored zero count. Unread files and databases with only failed
+clips appear in the unread list.
+Each `clipFlags` range is `[chunkOrdinal, firstClipOrdinal, start, endExclusive, stride, count]`.
+When the full navigation evidence cannot fit in the existing response budget, the total and
+cursor report incomplete provenance and retain a proved encrypted contribution when one exists.
+The cursor resumes after the last returned animation.
+
+For `mtl_summary`, `fieldOrigins` addresses the fields of the returned page, including each
+admitted texture, parameter and layer. `materialXmlElement` locations are zero-based element
+child ordinals from the original XML root. `materialXmlAttribute` appends the original attribute
+ordinal. The selected Entry supplies the material values and authored references. Its directory
+path uses the names in its actual containing Archive chain. Source-use IDs resolve within that
+response's `provenance` inventory. Provenance is part of the 256 KiB response budget, and the
+cursor resumes after the last returned material.
+
+For `list_chunks`, `fieldOrigins` uses JSON Pointers such as
+`/structuredContent/chunks/0/offset` into the current response. Its `provenance` records the
+original table ordinal and the half-open byte range in the decoded Entry. Filtered totals and
+pagination use the type column with coordinates `[firstStart, firstEndExclusive, stride, count]`.
+The Entry name uses directory metadata, which has a
+separate encryption marker from the chunk table. Provenance counts toward the response budget.
+The cursor resumes after the last returned row.
+
+For `image_preview`, `fieldOrigins` uses JSON Pointers into the complete MCP tool result. For example,
+`/structuredContent/texture_width` addresses the decoded header width and `/content/1/data` addresses
+the unchanged PNG image block. Each origin gives the encryption marker, actual use references and
+contributor completeness. The `provenance` inventory identifies the original Entries and their
+containing Entries. DDS header uses carry `ddsHeader` coordinates `[offset, length]`. DDS mip uses
+carry `ddsMipPayload` coordinates `[level, offset, length, stride, count]` for the exact decoded Entry
+byte spans. A single selected cubemap face contributes only its own color and alpha mip bytes.
+Offsets are relative to the uncompressed Entry. Stored path lookups use Archive directory metadata.
+
+For `get_audio_excerpt`, `fieldOrigins` addresses the structured metadata and the WAV data at
+`/content/1/data`. A PCM excerpt identifies the retained samples by their original half-open byte
+range in the decoded WEM. Other decoders identify the selected encoded data chunk.
+Embedded WEM coordinates begin with the ID, DATA-relative offset and size of the selected media
+in the original soundbank. The WAV bytes and existing playback-window fields keep their format.
+
+For `read_entry_text`, `fieldOrigins` identifies the inputs of each result field. UTF-8 pages keep
+their original decoded Entry byte range after the byte order mark and character alignment.
+UTF-16 and CryXml use the original converter input, while result offsets count UTF-8 bytes.
+CryXml pages also identify the original node or attribute fields intersecting the returned text.
+
+For `read_entry_bytes`, each `fieldOrigins` key addresses the complete MCP tool result.
+The `archiveEntryDecodedBytes` coordinates on `/structuredContent/data` give the half-open
+byte range `[start, endExclusive)` before base64 encoding. The path and Entry size use Archive
+directory metadata, including the origin of enclosing containers. A page at EOF has no payload use.
 
 `list_entries`, `search_entries` (with `container`), `read_entry_text`, `read_entry_bytes`,
 `image_preview` and `mtl_summary` open socpak containers with `::`: `outer.socpak::inner.socpak::path`
@@ -756,7 +1020,19 @@ The server reads encrypted Entries with the Archive key from its `--key <hex>` o
 `P4KX_ARCHIVE_KEY` variable of its configuration or the key stored with `p4kx key set` or in the
 window, in that order; the stored key is read on each call, so one stored while the server runs
 applies to the next call. A tool that reads an encrypted Entry without a key fails with an error
-that says how to give it. `--key-file` (or `P4KX_KEY_FILE`) names another file for the stored key.
+that says how to give it. A tool that works around the gap and returns a result without the
+Entries it could not read adds a text block that says how many and how to give the key, and sets
+`_meta.archive_key` (`missing` or `wrong`) and `_meta.encrypted_entries_unread` on the result. With
+a key set, a result of a tool that read an Archive carries `_meta.archive_key` `given` and no text.
+Physical Entries are identified by their directory position and complete containing Entry chain.
+Identical paths at different positions count separately; one Entry encountered under both a missing
+and a wrong key contributes once to the distinct total.
+The count is of the distinct Entries asked for while that call ran, so it does not repeat an
+earlier call's; a call running at the same time on the same Archive counts into it too. A result
+the server keeps across calls (the audio index, the Loadout trees) remembers how the key served
+its build: a call that reuses it reports that, so it says the same as the call that built it, and
+such a result built with encrypted Entries unread is built again on next use once the Archive has
+another key. `--key-file` (or `P4KX_KEY_FILE`) names another file for the stored key.
 
 The MSI installs `p4kx-mcp.exe` next to `p4kx.exe` in
 `%LOCALAPPDATA%\Programs\P4KX`, and the portable ZIP holds it too. Add it to the AI
@@ -779,6 +1055,9 @@ name:
   }
 }
 ```
+
+On macOS, set the MCP client command to `/Applications/P4KX.app/Contents/MacOS/p4kx-mcp` or the
+corresponding path inside the installed app bundle. The arguments are the same as on Windows.
 
 ## Related documents
 

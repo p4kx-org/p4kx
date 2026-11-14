@@ -21,6 +21,8 @@ mod character;
 mod chf;
 mod container;
 mod diff;
+mod diff_pair;
+mod diff_source;
 mod diff_tree;
 mod dna;
 mod error;
@@ -32,6 +34,7 @@ mod label;
 mod material;
 mod name_table;
 mod named_json;
+mod named_json_field;
 mod names;
 mod rig;
 mod rig_blend;
@@ -50,7 +53,8 @@ mod skin_blendshapes;
 pub use character::{Character, FEMALE_VERSIONS, MALE_VERSIONS, Versions};
 pub use chf::{Chf, ChfContainer};
 pub use container::{CHF_MAGIC, CHF_SIZE, MAX_BODY_LEN};
-pub use diff::{ChfChange, diff_chf};
+pub use diff::{ChfChange, diff_chf, diff_chf_observed};
+pub use diff_source::{ChfDiffLookup, ChfDiffMissing, ChfDiffSite, ChfObservedChange};
 pub use dna::{DNA_MAGIC, Dna, DnaBlend, MAX_FACE_PARTS, face_part_name};
 pub use error::ChfError;
 pub use guid::{Guid, InvalidGuid};
@@ -59,6 +63,7 @@ pub use label::Label;
 pub use material::{ColorParam, FloatParam, Material, SubMaterial, Texture};
 pub use name_table::{MAX_NAME_LEN, MAX_NAMES, NameTable};
 pub use named_json::{LABEL_SUFFIX, NameSummary};
+pub use named_json_field::{ChfJsonField, ChfJsonName, ChfJsonNameUse, ChfNameKind};
 pub use names::{
     BODY_COLOR, EYE_COLOR, HAIR_DYE_COLOR, HAIR_TINT_COLOR, lowered_hash, name_hash,
     skin_attachment,

@@ -15,6 +15,8 @@ from collections.abc import Callable
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from .material_emission import StaticEmission, parse_emission
+
 _MATERIAL_ID = re.compile(r"^x[0-9]{4,}$")
 _PALETTE_ID = re.compile(r"^p[0-9]{4,}$")
 _TEXTURE_ID = re.compile(r"^t[0-9]{4,}$")
@@ -150,6 +152,7 @@ class MaterialDesc:
     stated_vertex_colours: bool | None = None
     layer_shares: tuple[float, ...] | None = None
     stencil: Stencil | None = None
+    emission: StaticEmission | None = None
 
     def slot(self, usage: str) -> TextureSlot | None:
         """Returns the first texture slot of ``usage`` that has a written texture."""
@@ -245,6 +248,7 @@ def _material(item: object) -> MaterialDesc | None:
         stated_vertex_colours=stated if isinstance(stated, bool) else None,
         layer_shares=_layer_shares(item.get("layer_shares"), len(layers)),
         stencil=_stencil(item.get("stencil")),
+        emission=parse_emission(item.get("emission_source")),
     )
 
 

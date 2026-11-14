@@ -8,7 +8,25 @@ use p4kx_audio::{HircKind, HircLayout, HircObject, MusicGroupKind, MusicPlayMode
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
-use crate::hirc_view_build::detail;
+#[path = "hirc_view_build.rs"]
+mod build;
+#[path = "hirc_node_property_projection.rs"]
+mod node_property;
+#[path = "hirc_node_source.rs"]
+mod node_source;
+#[path = "hirc_source_fields.rs"]
+mod source_fields;
+#[path = "hirc_view_state.rs"]
+mod state;
+
+use crate::bank::Bank;
+
+use self::build::detail;
+pub use self::node_source::NodeSourceFields;
+use self::node_source::NodeSourceSchema;
+pub use self::source_fields::ObjectSourceFields;
+use self::source_fields::ObjectSourceSchema;
+pub use self::state::{StateDetail, StatePropertyView, StateRange};
 
 /// One `HIRC` object.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -36,18 +54,30 @@ pub struct ObjectView<'a> {
     pub children: Vec<u32>,
     /// The fields that depend on the type.
     pub detail: Option<Detail<'a>>,
+    /// Original source fields available for the selected physical object.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<ObjectSourceSchema>")]
+    pub source_fields: Option<ObjectSourceFields<'a>>,
+    /// Original fields of the shared Wwise node declaration.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<NodeSourceSchema>")]
+    pub node_fields: Option<NodeSourceFields<'a>>,
 }
 
 /// The fields of an object that depend on its type.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(untagged)]
 pub enum Detail<'a> {
+    /// A standalone State.
+    State(StateDetail),
     /// A Sound.
     Sound(SoundDetail),
     /// An Action.
     Action(ActionDetail),
     /// A random, sequence, switch or blend container.
     Container(ContainerDetail),
+    /// An `ActorMixer`.
+    ActorMixer(ActorMixerDetail),
     /// A music segment.
     Segment(SegmentDetail<'a>),
     /// A music track.
@@ -91,6 +121,18 @@ pub struct ActionDetail {
 pub struct ContainerDetail {
     /// `random`, `sequence`, `switch`, `blend` or `other`.
     pub container_kind: &'static str,
+}
+
+/// Original spans of an `ActorMixer`'s shared node base and ordered children.
+#[derive(Debug, Serialize, JsonSchema)]
+#[non_exhaustive]
+pub struct ActorMixerDetail {
+    /// Traversed shared node base, including checked opaque data.
+    pub node_range: StateRange,
+    /// Original child count word.
+    pub child_count_range: StateRange,
+    /// Original ordered child ID words.
+    pub children_range: StateRange,
 }
 
 /// A music segment.
@@ -227,6 +269,14 @@ pub struct ItemView {
 }
 
 impl<'a> ObjectView<'a> {
+    pub(crate) fn attach_source_fields(&mut self, bank: &'a Bank) {
+        if let Some(object) = bank.soundbank().objects().get(self.index) {
+            self.source_fields = ObjectSourceFields::new(bank, self.index, object.kind);
+            self.node_fields =
+                NodeSourceFields::new(bank, self.index, object.kind, Status::from(self.layout));
+        }
+    }
+
     /// Describes the object at `index` in bank order.
     #[must_use]
     pub fn new(index: usize, object: &'a HircObject) -> Self {
@@ -243,12 +293,14 @@ impl<'a> ObjectView<'a> {
             parent: object.parent_id().filter(|parent| *parent != 0),
             children: object.children().collect(),
             detail: detail(&object.value),
+            source_fields: None,
+            node_fields: None,
         }
     }
 }
 
 /// The `status` of an object in JSON: [`HircLayout`] by name.
-#[derive(Serialize, JsonSchema)]
+#[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 enum Status {
     Decoded,

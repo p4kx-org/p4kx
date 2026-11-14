@@ -5,7 +5,7 @@
 //! `egui_kittest` and drawn by wgpu in both languages.
 //!
 //! The render test needs a graphics adapter, a software one is enough, and returns early without
-//! one unless `P4KX_REQUIRE_SOFTWARE_ADAPTER` is set. `P4KX_RENDER_DIR` names a folder the
+//! one unless `P4KX_REQUIRE_RENDER_ADAPTER` is set. `P4KX_RENDER_DIR` names a folder the
 //! rendered windows are written to as PNG files.
 
 use std::error::Error;
@@ -173,8 +173,8 @@ fn adapter() -> Option<RenderState> {
             .ok();
     if state.is_none() {
         assert!(
-            std::env::var_os("P4KX_REQUIRE_SOFTWARE_ADAPTER").is_none(),
-            "a software adapter is required"
+            !p4kx_testkit::render_adapter_required(),
+            "a graphics adapter is required"
         );
         eprintln!("no graphics adapter: the test checks nothing");
     }

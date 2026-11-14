@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 use crate::selection::Kind;
 
 impl Kind {
@@ -9,6 +10,134 @@ impl Kind {
     #[expect(clippy::too_many_lines, reason = "a table with one entry per kind")]
     pub(crate) const fn records(self) -> KindRule {
         match self {
+            Self::MissionItems => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::mission_sources::item_definition::SOURCE_TYPE,
+            },
+            Self::StarmapTypes => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::starmap_type_definition::SOURCE_TYPE,
+            },
+            Self::StarmapPresets => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::starmap_preset_definition::SOURCE_TYPE,
+            },
+            Self::StarmapAmenities => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::starmap_amenity_definition::SOURCE_TYPE,
+            },
+            Self::Infractions => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::infraction_definition::DEFINITION_TYPE,
+            },
+            Self::InfractionSets => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::infraction_definition::SET_TYPE,
+            },
+            Self::Jurisdictions => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::jurisdiction_definition::SOURCE_TYPE,
+            },
+            Self::SecurityNetworkManifests => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::law_kinds::SECURITY_NETWORK_TYPE,
+            },
+            Self::MissionModuleDeclarations => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::mission_sources::module_declaration::SOURCE_TYPE,
+            },
+            Self::ContractScopes => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::CONTRACT_SCOPE,
+            },
+            Self::LocationClasses => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::CLASS,
+            },
+            Self::LocationFunctions => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::FUNCTION,
+            },
+            Self::LocationSizes => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::SIZE,
+            },
+            Self::LocationClassRegistries => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::CLASS_REGISTRY,
+            },
+            Self::LocationFunctionRegistries => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::FUNCTION_REGISTRY,
+            },
+            Self::LocationSizeRegistries => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::location_vocabulary::SIZE_REGISTRY,
+            },
+            Self::NpcArchetypes => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::npc_spawn_definitions::ARCHETYPE_TYPE,
+            },
+            Self::NpcClassPools => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::npc_spawn_definitions::POOL_TYPE,
+            },
+            Self::AutoSpawns => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::npc_spawn_definitions::SPAWN_TYPE,
+            },
+            Self::AutoSpawnSets => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::npc_spawn_definitions::SET_TYPE,
+            },
+            Self::EncounterIndices => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::npc_spawn_definitions::ENCOUNTER_TYPE,
+            },
+            Self::ReputationPerks => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::reputation_perk_list::SOURCE_TYPE,
+            },
+            Self::ReputationTriggerRecords => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::sandbox_trigger_record_definition::SOURCE_TYPE,
+            },
+            Self::ReputationRewardAmounts => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::reputation_reward_amount_definition::SOURCE_TYPE,
+            },
+            Self::Factions => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::faction_definition::SOURCE_TYPE,
+            },
+            Self::FactionIdentities => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::faction_identity_definition::SOURCE_TYPE,
+            },
+            Self::AmmoDefinitions => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::ammo_definition::SOURCE_TYPE,
+            },
+            Self::InventoryContainers => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::inventory_container_definition::SOURCE_TYPE,
+            },
+            Self::MedicalItemTierConfigs => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::medical::medical_tier_config::SOURCE_TYPE,
+            },
+            Self::ExplosionDefinitions => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::explosion_definition::SOURCE_TYPE,
+            },
+            Self::BlueprintCategoryLists => KindRule {
+                prefixes: &[""],
+                type_name: "BlueprintCategoryDatabaseRecord",
+            },
+            Self::Tags => KindRule {
+                prefixes: &[""],
+                type_name: "Tag",
+            },
             Self::Manufacturers => KindRule {
                 prefixes: &["libs/foundry/records/scitemmanufacturer/"],
                 type_name: "SCItemManufacturer",
@@ -38,6 +167,10 @@ impl Kind {
             Self::ResourceGroups => KindRule {
                 prefixes: &["libs/foundry/records/resourcetypedatabase/"],
                 type_name: "ResourceTypeGroup",
+            },
+            Self::ResourceTypes => KindRule {
+                prefixes: &["libs/foundry/records/resourcetypedatabase/"],
+                type_name: "ResourceType",
             },
             Self::BlueprintCategories => KindRule {
                 prefixes: &["libs/foundry/records/crafting/blueprintcategories/"],
@@ -91,13 +224,12 @@ impl Kind {
                 prefixes: &["libs/foundry/records/harvestable/providerpresets/"],
                 type_name: "HarvestableProviderPreset",
             },
-            Self::SubHarvestableMultiConfigs => KindRule {
-                prefixes: &["libs/foundry/records/harvestable/slotpresets/"],
-                type_name: "SubHarvestableMultiConfigRecord",
-            },
+            Self::SubHarvestableMultiConfigs => {
+                LootDefinitionKind::SubHarvestableMultiConfig.rule()
+            }
             Self::FactionReputations => KindRule {
                 prefixes: &["libs/foundry/records/factions/factionreputation/"],
-                type_name: "FactionReputation",
+                type_name: crate::catalog_v3::reputation_faction_definition::SOURCE_TYPE,
             },
             Self::ReputationScopes => KindRule {
                 prefixes: &["libs/foundry/records/reputation/scopes/"],
@@ -123,6 +255,10 @@ impl Kind {
                 prefixes: &["libs/foundry/records/contracts/contractscenarios/"],
                 type_name: "ScenarioProgress",
             },
+            Self::MissionScenarios => KindRule {
+                prefixes: &["libs/foundry/records/"],
+                type_name: crate::catalog_v3::mission_scenario_definition::SOURCE_TYPE,
+            },
             Self::MissionLocationTemplates => KindRule {
                 prefixes: &["libs/foundry/records/missiondata/pu_locations/"],
                 type_name: "MissionLocationTemplate",
@@ -147,10 +283,19 @@ impl Kind {
                 prefixes: &["libs/foundry/records/lootgeneration/lootarchetypes/"],
                 type_name: "LootArchetypeV3Record",
             },
-            Self::LootPoolFilters => KindRule {
-                prefixes: &["libs/foundry/records/lootgeneration/filters/"],
-                type_name: "PoolFilterRecord",
-            },
+            Self::LootPoolFilters => LootDefinitionKind::PoolFilter.rule(),
+            Self::LootSecondaryChoiceSingleLayers => {
+                LootDefinitionKind::SecondaryChoiceSingleLayer.rule()
+            }
+            Self::LootSecondaryChoiceMultiLayers => {
+                LootDefinitionKind::SecondaryChoiceMultiLayer.rule()
+            }
+            Self::LootThemes => LootDefinitionKind::Theme.rule(),
+            Self::HierarchicalContextualDataPresets => {
+                LootDefinitionKind::HierarchicalContextualDataPreset.rule()
+            }
+            Self::LootGenerationGlobalParams => LootDefinitionKind::GlobalParams.rule(),
+            Self::SubHarvestableConfigs => LootDefinitionKind::SubHarvestableConfig.rule(),
             Self::LegacyLootTables => KindRule {
                 prefixes: &["libs/foundry/records/lootgeneration/loottables/"],
                 type_name: "LootTable",
@@ -171,10 +316,12 @@ impl Kind {
             | Self::Loadouts
             | Self::HarvestableLocations
             | Self::Shops
+            | Self::ShopInventories
             | Self::ContractShipSpawns
             | Self::ContractLocationQueries
             | Self::ContractNpcSpawns
             | Self::ContractEntitySpawns
+            | Self::MissionPropertySets
             | Self::LootContainers => KindRule {
                 prefixes: &[],
                 type_name: "",

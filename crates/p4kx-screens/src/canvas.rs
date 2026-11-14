@@ -11,6 +11,7 @@ use crate::error::ScreenError;
 use crate::geometry::Dim;
 use crate::reader::{as_struct, child, float, items, reference, text};
 use crate::rest::Operations;
+use crate::screen_asset_inputs::{WidgetInput, WidgetSection};
 use crate::statics::static_arrays;
 use crate::style::Entry;
 use crate::style::parse_entries;
@@ -33,9 +34,11 @@ pub(crate) struct BrandStyle {
 /// A canvas read from its Record: the widgets of its scene followed by those of its library.
 #[derive(Debug)]
 pub(crate) struct Canvas {
+    pub(crate) record_index: u32,
     pub(crate) guid: Guid,
     pub(crate) record_path: String,
     pub(crate) size: [f32; 2],
+    pub(crate) size_fields: [bool; 2],
     pub(crate) world_root: Option<[f32; 2]>,
     pub(crate) widgets: Vec<Widget>,
     pub(crate) scene_len: usize,
@@ -91,20 +94,28 @@ impl Canvas {
     pub(crate) fn read(tree: &RecordTree<'_>) -> Self {
         let root = tree.root();
         let guid = tree.guid();
-        let size = child(root, "size").map_or([0.0; 2], |size| {
-            [
-                float(size, "x").unwrap_or(0.0),
-                float(size, "y").unwrap_or(0.0),
-            ]
-        });
+        let size_fields =
+            child(root, "size").map_or([None; 2], |size| [float(size, "x"), float(size, "y")]);
+        let size = size_fields.map(|axis| axis.unwrap_or(0.0));
         let raw = text(root, "coordinateMethod") == Some("useRaw");
-        let parse = |value| as_struct(value).map(|widget| Widget::parse(widget, guid));
-        let scene: Vec<Widget> = items(root, "scene").iter().filter_map(parse).collect();
-        let scene_len = scene.len();
-        let widgets: Vec<Widget> = scene
-            .into_iter()
-            .chain(items(root, "library").iter().filter_map(parse))
-            .collect();
+        let record_index = tree.record_index();
+        let widgets_in = |field, section| {
+            items(root, field)
+                .iter()
+                .enumerate()
+                .filter_map(move |(slot, value)| {
+                    let widget = as_struct(value)?;
+                    let input = WidgetInput {
+                        record_index,
+                        section,
+                        slot,
+                    };
+                    Some(Widget::parse(widget, guid, input))
+                })
+        };
+        let mut widgets: Vec<Widget> = widgets_in("scene", WidgetSection::Scene).collect();
+        let scene_len = widgets.len();
+        widgets.extend(widgets_in("library", WidgetSection::Library));
         let (roots, children) = hierarchy(&widgets, scene_len);
         let unreachable = unreachable_widgets(&widgets, scene_len, &roots, &children);
         Self {
@@ -114,8 +125,10 @@ impl Canvas {
             arrays: static_arrays(root),
             world_root: raw.then(|| world_root(&widgets, &roots)).flatten(),
             guid,
+            record_index,
             record_path: tree.record_path().to_owned(),
             size,
+            size_fields: size_fields.map(|axis| axis.is_some()),
             roots,
             children,
             scene_len,
@@ -123,8 +136,7 @@ impl Canvas {
             brands: brand_styles(root),
             shared: shared_styles(root),
             defaults: child(root, "defaultStyles")
-                .map(|defaults| parse_entries(items(defaults, "entries")).into())
-                .unwrap_or_default(),
+                .map_or_default(|defaults| parse_entries(items(defaults, "entries")).into()),
             embedded: parse_entries(items(root, "embeddedStyles")).into(),
         }
     }

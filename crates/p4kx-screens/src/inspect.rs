@@ -9,9 +9,10 @@ use serde::Serialize;
 use crate::assets::{AssetSet, ScreenAssets};
 use crate::canvas::CanvasStore;
 use crate::elements::is_rendered;
+use crate::screen_asset_inputs::{CanvasRouteInput, ScreenAssetInputs, WidgetInput};
 use crate::style::{CanvasStyles, StyleCache};
-
-const MAX_CANVASES: usize = 4096;
+use crate::widget::Widget;
+use crate::widget_canvas_ref::WidgetCanvasRef;
 
 /// How many widgets of one element type a screen holds and whether P4KX draws them.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -24,50 +25,105 @@ pub struct ElementCount {
     pub rendered: bool,
 }
 
+struct Kind {
+    count: usize,
+    rendered: bool,
+    widgets: Vec<WidgetInput>,
+}
+
+struct Candidate {
+    guid: Guid,
+    selection: Option<DirectSelection>,
+}
+
+struct DirectSelection {
+    target: u32,
+    widget: WidgetInput,
+}
+
+impl Candidate {
+    const fn of_widget(widget: &Widget) -> Option<Self> {
+        match widget.canvas {
+            WidgetCanvasRef::Present { guid, record } => Some(Self {
+                guid,
+                selection: Some(DirectSelection {
+                    target: record,
+                    widget: widget.input,
+                }),
+            }),
+            _ => None,
+        }
+    }
+
+    const fn unobserved(guid: Guid) -> Self {
+        Self {
+            guid,
+            selection: None,
+        }
+    }
+}
+
 pub(crate) fn inspect(
     store: &mut CanvasStore<'_, '_>,
     root: Guid,
+    mut inputs: Option<&mut ScreenAssetInputs>,
 ) -> (ScreenAssets, Vec<ElementCount>) {
     let mut assets = AssetSet::default();
-    let mut kinds: BTreeMap<String, (usize, bool)> = BTreeMap::new();
+    let mut kinds: BTreeMap<String, Kind> = BTreeMap::new();
     let mut seen = HashSet::new();
     let mut cache = StyleCache::new();
-    let mut queue = vec![root];
-    while let Some(guid) = queue.pop() {
-        if !seen.insert(guid) || seen.len() > MAX_CANVASES {
+    let mut queue = vec![Candidate::unobserved(root)];
+    while let Some(Candidate { guid, selection }) = queue.pop() {
+        if !seen.insert(guid) {
             continue;
         }
         let Some(canvas) = store.get(guid) else {
             continue;
         };
-        assets.add_canvas(&canvas.record_path);
+        if let Some(inputs) = inputs.as_deref_mut() {
+            let through_widget = selection
+                .filter(|selection| selection.target == canvas.record_index)
+                .map(|selection| selection.widget);
+            inputs.canvas_routes.push(CanvasRouteInput {
+                record_index: canvas.record_index,
+                through_widget,
+            });
+        }
+        assets.add_canvas(&canvas.record_path, canvas.record_index);
         for widget in &canvas.widgets {
-            assets.add(&widget.assets);
+            assets.add(&widget.assets, widget.input);
             let name = widget
                 .type_name
                 .strip_prefix("BuildingBlocks_")
                 .unwrap_or(&widget.type_name);
-            kinds
-                .entry(name.to_owned())
-                .or_insert_with(|| (0, is_rendered(&widget.type_name)))
-                .0 += 1;
-            queue.extend(widget.canvas);
+            let kind = kinds.entry(name.to_owned()).or_insert_with(|| Kind {
+                count: 0,
+                rendered: is_rendered(&widget.type_name),
+                widgets: Vec::new(),
+            });
+            kind.count += 1;
+            if inputs.is_some() {
+                kind.widgets.push(widget.input);
+            }
+            queue.extend(Candidate::of_widget(widget));
         }
-        queue.extend(CanvasStyles::swapped_canvases(
-            store.forge(),
-            &mut cache,
-            &canvas,
-        ));
+        let swapped = CanvasStyles::swapped_canvases(store.forge(), &mut cache, &canvas);
+        queue.extend(swapped.into_iter().map(Candidate::unobserved));
     }
     let elements = kinds
         .into_iter()
-        .map(|(element, (count, rendered))| ElementCount {
-            element,
-            count,
-            rendered,
+        .map(|(element, kind)| {
+            if let Some(inputs) = inputs.as_deref_mut() {
+                inputs.elements.push(kind.widgets);
+            }
+            ElementCount {
+                element,
+                count: kind.count,
+                rendered: kind.rendered,
+            }
         })
         .collect();
-    (assets.finish(), elements)
+    (assets.finish(inputs), elements)
 }
 
 #[cfg(test)]
@@ -80,6 +136,7 @@ mod tests {
 
     use super::inspect;
     use crate::canvas::{CanvasStore, find_canvas};
+    use crate::screen_asset_inputs::ScreenAssetInputs;
 
     const OUTER: u128 = 0x5a00_0000_0000_4000_8000_0000_0000_0040;
     const SWAPPED: u128 = OUTER + 0x100;
@@ -116,8 +173,87 @@ mod tests {
             .build();
         let forge = DataForge::open(&bytes).expect("database");
         let root = find_canvas(&forge, &guid_text(OUTER)).expect("canvas");
-        let (assets, _) = inspect(&mut CanvasStore::new(&forge), root);
+        let (assets, _) = inspect(&mut CanvasStore::new(&forge), root, None);
         assert_eq!(assets.canvases.len(), 2, "{:?}", assets.canvases);
         assert_eq!(assets.textures, ["UI/Test/swapped.dds"]);
+    }
+
+    #[test]
+    fn the_admitted_style_visit_cannot_borrow_an_equal_direct_reference()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let outer = TestCanvas::new(OUTER, "outer", 10.0, 10.0)
+            .embedded(
+                TestStyleEntry::new("swap")
+                    .when(TestCondition::Type("Canvas"))
+                    .set(TestModifier::Canvas(SWAPPED)),
+            )
+            .widget(
+                TestWidget::new("BuildingBlocks_WidgetCanvas", "holder")
+                    .with("canvas", TestValue::Reference(SWAPPED)),
+            );
+        let nested = TestCanvas::new(SWAPPED, "nested", 10.0, 10.0);
+        let bytes = screens_schema(entity_schema(DataForgeBuilder::new()))
+            .record(outer.record())
+            .record(nested.record())
+            .build();
+        let forge = DataForge::open(&bytes)?;
+        let root = find_canvas(&forge, &guid_text(OUTER))?;
+        let mut inputs = ScreenAssetInputs::default();
+        let (assets, _) = inspect(&mut CanvasStore::new(&forge), root, Some(&mut inputs));
+        assert_eq!(assets.canvases.len(), 2);
+        let nested = inputs
+            .canvas_routes
+            .get(1)
+            .ok_or("nested canvas observation")?;
+        assert!(
+            nested.through_widget.is_none(),
+            "the actual style visit won"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn more_than_4096_distinct_canvases_are_listed_and_cycles_terminate()
+    -> Result<(), Box<dyn std::error::Error>> {
+        const COUNT: usize = 4101;
+        let source = (0..COUNT).fold(
+            screens_schema(entity_schema(DataForgeBuilder::new())),
+            |source, index| {
+                let next = OUTER + ((index + 1) % COUNT) as u128;
+                let mut canvas =
+                    TestCanvas::new(OUTER + index as u128, format!("chain{index}"), 1.0, 1.0)
+                        .widget(
+                            TestWidget::new("BuildingBlocks_WidgetCanvas", "next")
+                                .with("canvas", TestValue::Reference(next)),
+                        );
+                if index + 1 == COUNT {
+                    canvas = canvas.widget(
+                        TestWidget::new("BuildingBlocks_WidgetImage", "last")
+                            .with("imagePath", TestValue::text("UI/Test/final.tif")),
+                    );
+                }
+                source.record(canvas.record())
+            },
+        );
+        let bytes = source.build();
+        let forge = DataForge::open(&bytes)?;
+        let root = find_canvas(&forge, &guid_text(OUTER))?;
+        let mut inputs = ScreenAssetInputs::default();
+        let (assets, kinds) = inspect(&mut CanvasStore::new(&forge), root, Some(&mut inputs));
+        assert_eq!(assets.canvases.len(), COUNT);
+        assert_eq!(inputs.canvas_routes.len(), COUNT);
+        assert!(
+            inputs
+                .canvas_routes
+                .last()
+                .is_some_and(|route| route.through_widget.is_some())
+        );
+        assert_eq!(assets.textures, ["UI/Test/final.dds"]);
+        assert!(
+            kinds
+                .iter()
+                .any(|kind| kind.element == "WidgetCanvas" && kind.count == COUNT)
+        );
+        Ok(())
     }
 }
