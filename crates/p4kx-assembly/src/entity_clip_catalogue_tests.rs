@@ -19,6 +19,9 @@ use crate::{ArchiveModels, LoadoutResolver, RigFileRead};
 #[path = "entity_clip_named_caf_tests.rs"]
 mod named_caf;
 
+#[path = "entity_clip_checkpoint_tests.rs"]
+mod checkpoint;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const ROOT_PARAMS: &str = "Data/Objects/Test/root.chrparams";
@@ -71,12 +74,16 @@ fn original_headers_remain_distinct_and_a_missing_rig_does_not_hide_other_source
 }
 
 fn inventory(archive: &Archive) -> Result<EntityClipCatalogue, Box<dyn Error>> {
+    let tree = resolve_tree(archive)?;
+    Ok(discover_entity_clips(&ArchiveModels::new(archive), &tree))
+}
+
+fn resolve_tree(archive: &Archive) -> Result<crate::EntityNode, Box<dyn Error>> {
     let forge_entry = DataForgeEntry::read(archive)?;
     let forge = forge_entry.open()?;
     let mut resolver = LoadoutResolver::new(&forge).with_forge_entry(&forge_entry);
     let root = resolver.entities().find("RigRoot")?;
-    let tree = resolver.resolve(&root)?;
-    Ok(discover_entity_clips(&ArchiveModels::new(archive), &tree))
+    Ok(resolver.resolve(&root)?)
 }
 
 fn verify_links(catalogue: &EntityClipCatalogue) -> TestResult {

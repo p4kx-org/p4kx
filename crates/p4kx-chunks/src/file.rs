@@ -30,12 +30,23 @@ impl<B: AsRef<[u8]>> ChunkFile<B> {
     /// [`ChunkError::TableOutOfBounds`], [`ChunkError::ChunkOutOfBounds`] or
     /// [`ChunkError::ChunkInHeaderOrTable`] when it is truncated or corrupt.
     pub fn parse(bytes: B) -> Result<Self, ChunkError> {
+        Self::parse_with(bytes, || Ok(()))
+    }
+
+    /// Parses the original chunk table with caller checkpoints between rows.
+    ///
+    /// # Errors
+    /// Returns a structural container error or the caller's checkpoint failure.
+    pub fn parse_with<E: From<ChunkError>>(
+        bytes: B,
+        checkpoint: impl FnMut() -> Result<(), E>,
+    ) -> Result<Self, E> {
         let data = bytes.as_ref();
         let header = ChunkHeader::read(data, data.len() as u64)?;
         let start = usize::try_from(header.table.start).map_err(|_| header.table_error())?;
         let end = usize::try_from(header.table.end).map_err(|_| header.table_error())?;
         let table = data.get(start..end).ok_or_else(|| header.table_error())?;
-        let chunks = read_table(&header, table, || Ok::<_, ChunkError>(()))?;
+        let chunks = read_table(&header, table, checkpoint)?;
         Ok(Self {
             bytes,
             container: header.container,

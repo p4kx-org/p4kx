@@ -2,44 +2,67 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::convert::Infallible;
-use std::io::Read;
+use std::io::{self, Read};
 
 use p4kx_extraction::{
     AnimationChoice, AnimationSet, ArchiveAnimationRead, ArchivePositionedAnimation,
     ConversionError, Entry, EntryOrigin, ObservedEntryBinding,
 };
+use p4kx_extraction::{PathIndex, PathIndexBuildError};
 
-use super::{ArchiveModels, ModelFailure, read_failure};
+use super::{
+    ArchiveMaterialReads, ArchiveModels, LayerCache, MAX_ASSEMBLY_VERTICES, ModelFailure,
+    TextureVerdicts, read_failure,
+};
 
 use crate::entity_rig_catalogue::RigEntry;
 
+const ENTRY_READ_BYTES: usize = 8 << 10;
+
 impl<'archive> ArchiveModels<'archive> {
-    pub(crate) fn rig_entry(&self, path: &str) -> RigEntry<'archive> {
-        for candidate in archive_entry_candidates(path) {
-            let entry = self.exact_rig_entry(&candidate);
-            if !matches!(entry, RigEntry::Missing) {
-                return entry;
-            }
+    /// Builds the provider over an existing index of the same Archive.
+    #[must_use]
+    pub fn from_path_index(index: PathIndex<'archive>) -> Self {
+        Self {
+            archive: index.archive(),
+            index,
+            max_attachment_vertices: MAX_ASSEMBLY_VERTICES,
+            layers: LayerCache::new(),
+            material_reads: ArchiveMaterialReads::default(),
+            observe_nodes: false,
+            verdicts: TextureVerdicts::new(),
         }
-        RigEntry::Missing
     }
 
-    pub(crate) fn exact_rig_entry(&self, path: &str) -> RigEntry<'archive> {
-        let mut matches = match self
-            .index
-            .matching_entries_with(path, |_| Ok::<_, Infallible>(()))
-        {
+    pub(crate) fn rig_entry<E>(
+        &self,
+        path: &str,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<RigEntry<'archive>, E> {
+        for candidate in archive_entry_candidates(path) {
+            let entry = self.exact_rig_entry(&candidate, check)?;
+            if !matches!(entry, RigEntry::Missing) {
+                return Ok(entry);
+            }
+        }
+        Ok(RigEntry::Missing)
+    }
+
+    pub(crate) fn exact_rig_entry<E>(
+        &self,
+        path: &str,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<RigEntry<'archive>, E> {
+        let mut matches = match self.index.matching_entries_with(path, |_| check()) {
             Ok(matches) => matches,
-            Err(error) => return RigEntry::Unreadable(error.to_string()),
+            Err(error) => return lookup_failure(error),
         };
-        match (matches.next(), matches.next()) {
+        Ok(match (matches.next(), matches.next()) {
             (None, _) => RigEntry::Missing,
             (Some(Ok(entry)), None) => RigEntry::Unique(entry),
             (Some(Ok(_)), Some(Ok(_))) => RigEntry::Ambiguous,
-            (Some(Err(error)), _) | (_, Some(Err(error))) => {
-                RigEntry::Unreadable(error.to_string())
-            }
-        }
+            (Some(Err(error)), _) | (_, Some(Err(error))) => return lookup_failure(error),
+        })
     }
 
     /// Returns the selected animations with each admitted Archive Entry.
@@ -124,19 +147,63 @@ impl<'archive> ArchiveModels<'archive> {
         entry: &Entry,
         limit: u64,
     ) -> Result<Vec<u8>, ModelFailure> {
+        match self.read_file_entry_with(entry, limit, &mut || Ok::<_, Infallible>(())) {
+            Ok(result) => result,
+            Err(never) => match never {},
+        }
+    }
+
+    pub(crate) fn read_file_entry_with<E>(
+        &self,
+        entry: &Entry,
+        limit: u64,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<Result<Vec<u8>, ModelFailure>, E> {
+        check()?;
         let size = entry.uncompressed_size();
         if size > limit {
-            return Err(ModelFailure::Unreadable {
+            return Ok(Err(ModelFailure::Unreadable {
                 reason: format!("the file holds {size} bytes, more than the limit of {limit}"),
-            });
+            }));
         }
-        let reader = self.archive.open_entry(entry).map_err(read_failure)?;
-        let mut bytes = Vec::with_capacity(usize::try_from(size).unwrap_or_default());
-        reader
-            .take(limit)
-            .read_to_end(&mut bytes)
-            .map_err(read_failure)?;
-        Ok(bytes)
+        let opened = self.archive.open_entry(entry).map_err(read_failure);
+        check()?;
+        let mut reader = match opened {
+            Ok(reader) => reader,
+            Err(error) => return Ok(Err(error)),
+        };
+        let mut bytes = Vec::new();
+        if let Err(error) = bytes.try_reserve_exact(usize::try_from(size).unwrap_or(usize::MAX)) {
+            return Ok(Err(read_failure(error)));
+        }
+        let mut block = [0; ENTRY_READ_BYTES];
+        loop {
+            check()?;
+            let read = reader.read(&mut block);
+            check()?;
+            match read {
+                Ok(0) => break,
+                Ok(count) => {
+                    let Some(chunk) = block.get(..count) else {
+                        return Ok(Err(read_failure(io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "Archive reader returned a count larger than its buffer",
+                        ))));
+                    };
+                    bytes.extend_from_slice(chunk);
+                }
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
+                Err(error) => return Ok(Err(read_failure(error))),
+            }
+        }
+        Ok(Ok(bytes))
+    }
+}
+
+fn lookup_failure<'archive, E>(error: PathIndexBuildError<E>) -> Result<RigEntry<'archive>, E> {
+    match error.into_cause() {
+        Ok(interrupted) => Err(interrupted),
+        Err(error) => Ok(RigEntry::Unreadable(error.to_string())),
     }
 }
 

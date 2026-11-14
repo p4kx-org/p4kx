@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
+use std::collections::hash_map::Entry as CacheEntry;
 use std::sync::Arc;
 
 use p4kx_chunks::ChunkFile;
@@ -101,40 +102,52 @@ pub(super) struct RigFiles {
     pub(super) parameters: InputCache<Vec<super::RigParameter>>,
 }
 
-pub(super) fn read<T>(
+pub(super) fn read<T, E>(
     models: &ArchiveModels<'_>,
     path: &str,
     cache: &mut InputCache<T>,
     parse: impl FnOnce(&[u8]) -> Result<T, String>,
-) -> RigFile<T> {
-    let read = match models.rig_entry(path) {
+    check: &mut impl FnMut() -> Result<(), E>,
+) -> Result<RigFile<T>, E> {
+    check()?;
+    let read = match models.rig_entry(path, check)? {
         RigEntry::Missing => Arc::new(RigFileRead::Missing),
         RigEntry::Ambiguous => Arc::new(RigFileRead::Ambiguous),
         RigEntry::Unreadable(reason) => Arc::new(RigFileRead::Unreadable { reason }),
-        RigEntry::Unique(entry) => Arc::clone(
-            cache
-                .entry(entry.index())
-                .or_insert_with(|| read_rig_entry(models, entry, parse)),
-        ),
+        RigEntry::Unique(entry) => match cache.entry(entry.index()) {
+            CacheEntry::Occupied(cached) => Arc::clone(cached.get()),
+            CacheEntry::Vacant(slot) => Arc::clone(slot.insert(read_rig_entry(
+                models,
+                entry,
+                |bytes, _| Ok(parse(bytes)),
+                check,
+            )?)),
+        },
     };
-    RigFile {
+    Ok(RigFile {
         path: path.to_owned(),
         read,
-    }
+    })
 }
 
-pub(crate) fn read_rig_entry<T, E>(
+pub(crate) fn read_rig_entry<T, P, E, F>(
     models: &ArchiveModels<'_>,
     entry: &Entry,
-    parse: impl FnOnce(&[u8]) -> Result<T, E>,
-) -> Arc<RigFileRead<T, E>> {
-    Arc::new(match models.read_file_entry(entry, u64::MAX) {
+    parse: impl FnOnce(&[u8], &mut F) -> Result<Result<T, P>, E>,
+    check: &mut F,
+) -> Result<Arc<RigFileRead<T, P>>, E>
+where
+    F: FnMut() -> Result<(), E>,
+{
+    let read = match models.read_file_entry_with(entry, u64::MAX, check)? {
         Ok(bytes) => RigFileRead::Read {
             source: models.archive.entry_origin(entry).map(Box::new),
-            value: parse(&bytes),
+            value: parse(&bytes, check)?,
         },
         Err(error) => read_failure(&error),
-    })
+    };
+    check()?;
+    Ok(Arc::new(read))
 }
 
 fn read_failure<T, E>(error: &ModelFailure) -> RigFileRead<T, E> {

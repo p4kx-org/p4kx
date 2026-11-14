@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use p4kx_dataforge::Guid;
@@ -72,6 +73,18 @@ pub struct EntityRig {
 /// outside this discovery pass.
 #[must_use]
 pub fn discover_entity_rigs(models: &ArchiveModels<'_>, root: &EntityNode) -> Vec<EntityRig> {
+    match discover_entity_rigs_with(models, root, &mut || Ok::<_, Infallible>(())) {
+        Ok(rigs) => rigs,
+        Err(never) => match never {},
+    }
+}
+
+pub(crate) fn discover_entity_rigs_with<E>(
+    models: &ArchiveModels<'_>,
+    root: &EntityNode,
+    check: &mut impl FnMut() -> Result<(), E>,
+) -> Result<Vec<EntityRig>, E> {
+    check()?;
     let mut catalogue = Catalogue {
         models,
         owner_source: root
@@ -81,20 +94,24 @@ pub fn discover_entity_rigs(models: &ArchiveModels<'_>, root: &EntityNode) -> Ve
         rigs: Vec::new(),
         files: files::RigFiles::default(),
     };
-    catalogue.append(root, "", RigPlacement::Root);
-    root.visit_ports(|path, route| {
-        let Some(port) = route.last() else { return };
-        if let Attachment::Entity(child) = port.attachment() {
+    catalogue.append(root, "", RigPlacement::Root, check)?;
+    crate::tree_walk::try_visit(root.ports(), |path, route| {
+        check()?;
+        if let Some(port) = route.last()
+            && let Attachment::Entity(child) = port.attachment()
+        {
             catalogue.append(
                 child,
                 path,
                 RigPlacement::Attachment {
                     port_path: path.to_owned(),
                 },
-            );
+                check,
+            )?;
         }
-    });
-    catalogue.rigs
+        Ok(())
+    })?;
+    Ok(catalogue.rigs)
 }
 
 struct Catalogue<'model, 'archive> {
@@ -105,7 +122,13 @@ struct Catalogue<'model, 'archive> {
 }
 
 impl Catalogue<'_, '_> {
-    fn append(&mut self, node: &EntityNode, path: &str, placement: RigPlacement) {
+    fn append<E>(
+        &mut self,
+        node: &EntityNode,
+        path: &str,
+        placement: RigPlacement,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<(), E> {
         let geometry = if matches!(placement, RigPlacement::Root) {
             node.geometry()
         } else {
@@ -122,16 +145,25 @@ impl Catalogue<'_, '_> {
                 .and_then(crate::Geometry::model_field)
                 .into_iter()
                 .collect(),
-        );
+            check,
+        )?;
         if node.is_docked_vehicle() && !node.is_expanded() {
-            return;
+            return Ok(());
         }
         for gear in node.landing_gear() {
-            self.append_gear(node, path, gear);
+            check()?;
+            self.append_gear(node, path, gear, check)?;
         }
+        Ok(())
     }
 
-    fn append_gear(&mut self, node: &EntityNode, path: &str, gear: &LandingGear) {
+    fn append_gear<E>(
+        &mut self,
+        node: &EntityNode,
+        path: &str,
+        gear: &LandingGear,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<(), E> {
         let geometry = Some(gear.geometry()).filter(|path| !path.is_empty());
         let source = GearPlacementSource::of(node, gear, false);
         self.append_rig(
@@ -146,27 +178,31 @@ impl Catalogue<'_, '_> {
                 .into_iter()
                 .flat_map(|_| source.model_selectors())
                 .collect(),
-        );
+            check,
+        )
     }
 
-    fn append_rig(
+    fn append_rig<E>(
         &mut self,
         node: &EntityNode,
         placement: RigPlacement,
         geometry: Option<&str>,
         geometry_selectors: Vec<SourceLocation>,
-    ) {
-        let rig = self.read(node, placement, geometry, geometry_selectors);
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<(), E> {
+        let rig = self.read(node, placement, geometry, geometry_selectors, check)?;
         self.rigs.push(rig);
+        Ok(())
     }
 
-    fn read(
+    fn read<E>(
         &mut self,
         node: &EntityNode,
         placement: RigPlacement,
         geometry: Option<&str>,
         geometry_selectors: Vec<SourceLocation>,
-    ) -> EntityRig {
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<EntityRig, E> {
         let definition = geometry
             .filter(|path| crate::cdf::is_character_definition(path))
             .map(|path| {
@@ -175,30 +211,38 @@ impl Catalogue<'_, '_> {
                     path,
                     &mut self.files.definitions,
                     files::definition,
+                    check,
                 )
-            });
+            })
+            .transpose()?;
         let skeleton_path = definition.as_ref().map_or(geometry, |definition| {
             definition
                 .value()
                 .and_then(|value| value.skeleton.as_deref())
         });
-        let skeleton = skeleton_path.map(|path| {
-            files::read(
-                self.models,
-                path,
-                &mut self.files.skeletons,
-                files::skeleton,
-            )
-        });
-        let parameters = skeleton_path.map(|path| {
-            files::read(
-                self.models,
-                &crate::gear_clip::params_path(path),
-                &mut self.files.parameters,
-                catalogue_parameters,
-            )
-        });
-        EntityRig {
+        let skeleton = skeleton_path
+            .map(|path| {
+                files::read(
+                    self.models,
+                    path,
+                    &mut self.files.skeletons,
+                    files::skeleton,
+                    check,
+                )
+            })
+            .transpose()?;
+        let parameters = skeleton_path
+            .map(|path| {
+                files::read(
+                    self.models,
+                    &crate::gear_clip::params_path(path),
+                    &mut self.files.parameters,
+                    catalogue_parameters,
+                    check,
+                )
+            })
+            .transpose()?;
+        Ok(EntityRig {
             placement,
             record_index: node.record_index(),
             owner: node.guid(),
@@ -211,6 +255,6 @@ impl Catalogue<'_, '_> {
             definition,
             skeleton,
             parameters,
-        }
+        })
     }
 }

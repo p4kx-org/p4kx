@@ -35,11 +35,15 @@ not be selected. A folder directive links the physical CAF and DBA candidates in
 Candidates shared by different placements refer to the same inventoried Entry. A concrete CAF
 alias resolves by its rooted path or its preceding folder in the same AnimationList. A relative
 alias records the folder as a separate selector. Wildcards remain in the authored parameters.
+Each folder orders candidates by their physical Archive Entry position. All requested folders
+share a single directory scan.
 
 The header inventory preserves the physical clip ordinal, original 48-byte metadata and DBA name,
 independent timing, and each observed controller descriptor and encoding word. A malformed block
 does not discard a separately readable metadata record. The inventory reads one Archive Entry at
-a time without decoding animation key samples or generating a pose.
+a time without decoding animation key samples or generating a pose. The
+`discover_entity_clips_with` variant polls a caller checkpoint during discovery, file streaming
+and header interpretation. An interrupted inventory returns the checkpoint failure.
 
 ## Where the keys are
 

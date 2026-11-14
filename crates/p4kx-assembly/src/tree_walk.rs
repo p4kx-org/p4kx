@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::convert::Infallible;
 use std::slice::Iter;
 
 use crate::{Attachment, PortNode};
@@ -14,6 +15,19 @@ pub(crate) fn visit<'node>(
     ports: &'node [PortNode],
     mut visit: impl FnMut(&str, &[&'node PortNode]),
 ) {
+    match try_visit(ports, |path, route| {
+        visit(path, route);
+        Ok::<_, Infallible>(())
+    }) {
+        Ok(()) => {}
+        Err(never) => match never {},
+    }
+}
+
+pub(crate) fn try_visit<'node, E>(
+    ports: &'node [PortNode],
+    mut visit: impl FnMut(&str, &[&'node PortNode]) -> Result<(), E>,
+) -> Result<(), E> {
     let mut pending = vec![Step::Ports(ports.iter())];
     let mut path = String::new();
     let mut route = Vec::new();
@@ -28,7 +42,7 @@ pub(crate) fn visit<'node>(
                 }
                 path.push_str(port.name());
                 route.push(port);
-                visit(&path, &route);
+                visit(&path, &route)?;
                 if let Attachment::Entity(node) = port.attachment()
                     && !node.ports().is_empty()
                 {
@@ -44,4 +58,5 @@ pub(crate) fn visit<'node>(
             }
         }
     }
+    Ok(())
 }

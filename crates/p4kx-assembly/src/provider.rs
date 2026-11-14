@@ -262,15 +262,7 @@ impl<'a> ArchiveModels<'a> {
     /// Indexes the Entries of `archive`.
     #[must_use]
     pub fn new(archive: &'a Archive) -> Self {
-        Self {
-            archive,
-            index: PathIndex::new(archive),
-            max_attachment_vertices: MAX_ASSEMBLY_VERTICES,
-            layers: LayerCache::new(),
-            material_reads: ArchiveMaterialReads::default(),
-            observe_nodes: false,
-            verdicts: TextureVerdicts::new(),
-        }
+        Self::from_path_index(PathIndex::new(archive))
     }
 
     /// Retains original model node and skeleton coordinates with the Entries read.

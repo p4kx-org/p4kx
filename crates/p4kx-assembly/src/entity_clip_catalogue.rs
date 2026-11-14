@@ -2,14 +2,19 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
+use std::convert::Infallible;
 use std::sync::Arc;
 
 use p4kx_extraction::animation_headers::{AnimationHeaderError, AnimationSourceHeaders};
-use p4kx_extraction::{Entry, EntryTree, FolderId, NamedCafSelector};
+use p4kx_extraction::{Entry, NamedCafSelector};
 
-use crate::character_path;
-use crate::entity_rig_catalogue::{RigEntry, read_rig_entry};
-use crate::{ArchiveModels, EntityNode, EntityRig, RigFile, RigParameter, discover_entity_rigs};
+use crate::entity_rig_catalogue::{RigEntry, discover_entity_rigs_with, read_rig_entry};
+use crate::{ArchiveModels, EntityNode, EntityRig, RigFile, RigParameter};
+
+#[path = "entity_clip_folders.rs"]
+mod folders;
+
+use folders::Folders;
 
 /// Source-only animation inventory for the resolved placements of an Entity.
 #[derive(Debug)]
@@ -127,28 +132,45 @@ pub enum NamedCafTarget {
 /// A failed root or individual source read does not stop work for the other placements.
 #[must_use]
 pub fn discover_entity_clips(models: &ArchiveModels<'_>, root: &EntityNode) -> EntityClipCatalogue {
+    match discover_entity_clips_with(models, root, &mut || Ok::<_, Infallible>(())) {
+        Ok(catalogue) => catalogue,
+        Err(never) => match never {},
+    }
+}
+
+/// Inventories entity clips, polling the caller during source discovery and header reading.
+///
+/// # Errors
+/// Returns the exact checkpoint failure. A failed Archive source remains an inventory row.
+pub fn discover_entity_clips_with<E>(
+    models: &ArchiveModels<'_>,
+    root: &EntityNode,
+    check: &mut impl FnMut() -> Result<(), E>,
+) -> Result<EntityClipCatalogue, E> {
+    let rigs = discover_entity_rigs_with(models, root, check)?;
     let mut inventory = Inventory {
         models,
         physical: PhysicalSources::default(),
-        folders: Folders::default(),
+        folders: Folders::read(models.archive, &rigs, check)?,
     };
-    let rigs = discover_entity_rigs(models, root)
+    let rigs = rigs
         .into_iter()
         .map(|rig| {
-            let links = inventory.links(&rig);
-            EntityClipRig { rig, links }
+            let links = inventory.links(&rig, check)?;
+            Ok(EntityClipRig { rig, links })
         })
-        .collect();
-    EntityClipCatalogue {
+        .collect::<Result<_, E>>()?;
+    check()?;
+    Ok(EntityClipCatalogue {
         rigs,
         sources: inventory.physical.rows,
-    }
+    })
 }
 
 struct Inventory<'model, 'archive> {
     models: &'model ArchiveModels<'archive>,
     physical: PhysicalSources,
-    folders: Folders,
+    folders: Folders<'archive>,
 }
 
 #[derive(Default)]
@@ -157,51 +179,54 @@ struct PhysicalSources {
     positions: HashMap<usize, usize>,
 }
 
-#[derive(Default)]
-struct Folders {
-    tree: Option<EntryTree>,
-    links: HashMap<FolderId, Arc<[usize]>>,
-}
-
 impl Inventory<'_, '_> {
-    fn links(&mut self, rig: &EntityRig) -> Vec<ClipSourceLink> {
+    fn links<E>(
+        &mut self,
+        rig: &EntityRig,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<Vec<ClipSourceLink>, E> {
         let mut folder = None;
-        rig.parameters
-            .as_ref()
-            .and_then(RigFile::value)
-            .into_iter()
-            .flatten()
-            .enumerate()
-            .filter_map(|(parameter, row)| {
-                let selection = if row.name.eq_ignore_ascii_case("#filepath") {
-                    folder = Some((parameter, row));
-                    self.folder(&row.path)
-                } else if row.name.eq_ignore_ascii_case("$TracksDatabase") {
-                    self.database(&row.path)
-                } else {
-                    let caf = NamedCafSelector::new(&row.name, &row.path)?;
-                    self.named_caf(caf, folder.filter(|(_, scope)| scope.list == row.list))
-                };
-                Some(ClipSourceLink {
-                    parameter,
-                    selection,
-                })
-            })
-            .collect()
+        let mut links = Vec::new();
+        let Some(parameters) = rig.parameters.as_ref().and_then(RigFile::value) else {
+            return Ok(links);
+        };
+        for (parameter, row) in parameters.iter().enumerate() {
+            check()?;
+            let selection = if row.name.eq_ignore_ascii_case("#filepath") {
+                folder = Some((parameter, row));
+                self.folder(&row.path, check)?
+            } else if row.name.eq_ignore_ascii_case("$TracksDatabase") {
+                self.database(&row.path, check)?
+            } else if let Some(caf) = NamedCafSelector::new(&row.name, &row.path) {
+                self.named_caf(
+                    caf,
+                    folder.filter(|(_, scope)| scope.list == row.list),
+                    check,
+                )?
+            } else {
+                continue;
+            };
+            links.push(ClipSourceLink {
+                parameter,
+                selection,
+            });
+        }
+        Ok(links)
     }
 
-    fn named_caf(
+    fn named_caf<E>(
         &mut self,
         selector: NamedCafSelector<'_>,
         folder: Option<(usize, &RigParameter)>,
-    ) -> ClipSourceSelection {
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<ClipSourceSelection, E> {
         let scope = folder.filter(|_| selector.uses_scope());
         let target = if selector.uses_scope() && scope.is_none() {
             NamedCafTarget::MissingScope
         } else if let Some(path) = selector.archive_path(scope.map(|(_, row)| row.path.as_str())) {
-            match self.models.exact_rig_entry(&path) {
+            match self.models.exact_rig_entry(&path, check)? {
                 RigEntry::Unique(entry) => {
-                    NamedCafTarget::File(self.physical.resolve(self.models, entry))
+                    NamedCafTarget::File(self.physical.resolve(self.models, entry, check)?)
                 }
                 RigEntry::Missing => NamedCafTarget::Missing,
                 RigEntry::Ambiguous => NamedCafTarget::Ambiguous,
@@ -210,48 +235,45 @@ impl Inventory<'_, '_> {
         } else {
             NamedCafTarget::InvalidPath
         };
-        ClipSourceSelection::NamedCaf {
+        Ok(ClipSourceSelection::NamedCaf {
             filepath_parameter: scope.map(|(parameter, _)| parameter),
             target,
-        }
+        })
     }
 
-    fn folder(&mut self, path: &str) -> ClipSourceSelection {
-        let folder = character_path::below_data(path).trim_end_matches(['/', '\\']);
-        if folder.is_empty() {
-            return ClipSourceSelection::FolderUnavailable;
-        }
-        let archive = self.models.archive;
-        let tree = self
-            .folders
-            .tree
-            .get_or_insert_with(|| EntryTree::build(archive));
-        let Some(id) = tree.find_folder(&format!("Data/{folder}")) else {
-            return ClipSourceSelection::FolderUnavailable;
+    fn folder<E>(
+        &mut self,
+        path: &str,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<ClipSourceSelection, E> {
+        let Some(folder) = self.folders.get(path) else {
+            return Ok(ClipSourceSelection::FolderUnavailable);
         };
-        if let Some(positions) = self.folders.links.get(&id) {
-            return ClipSourceSelection::Folder {
-                sources: Arc::clone(positions),
-            };
-        }
-        let sources: Arc<[_]> = tree
-            .folder(id)
-            .entries()
-            .filter_map(|id| tree.entry(archive, id))
-            .filter(|entry| is_animation_file(entry.path()))
-            .map(|entry| self.physical.resolve(self.models, entry))
-            .collect();
-        self.folders.links.insert(id, Arc::clone(&sources));
-        ClipSourceSelection::Folder { sources }
+        let sources = if let Some(positions) = &folder.positions {
+            Arc::clone(positions)
+        } else {
+            let positions: Arc<[_]> = folder
+                .entries
+                .iter()
+                .map(|entry| self.physical.resolve(self.models, entry, check))
+                .collect::<Result<_, E>>()?;
+            folder.positions = Some(Arc::clone(&positions));
+            positions
+        };
+        Ok(ClipSourceSelection::Folder { sources })
     }
 
-    fn database(&mut self, path: &str) -> ClipSourceSelection {
+    fn database<E>(
+        &mut self,
+        path: &str,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<ClipSourceSelection, E> {
         let reason = if has_extension(path, "dba") {
-            match self.models.rig_entry(path) {
+            match self.models.rig_entry(path, check)? {
                 RigEntry::Unique(entry) => {
-                    return ClipSourceSelection::Database {
-                        source: self.physical.resolve(self.models, entry),
-                    };
+                    return Ok(ClipSourceSelection::Database {
+                        source: self.physical.resolve(self.models, entry, check)?,
+                    });
                 }
                 RigEntry::Missing => ClipDatabaseUnavailable::Missing,
                 RigEntry::Ambiguous => ClipDatabaseUnavailable::Ambiguous,
@@ -260,27 +282,39 @@ impl Inventory<'_, '_> {
         } else {
             ClipDatabaseUnavailable::UnsupportedPath
         };
-        ClipSourceSelection::DatabaseUnavailable { reason }
+        Ok(ClipSourceSelection::DatabaseUnavailable { reason })
     }
 }
 
 impl PhysicalSources {
-    fn resolve(&mut self, models: &ArchiveModels<'_>, entry: &Entry) -> usize {
-        *self.positions.entry(entry.index()).or_insert_with(|| {
-            let position = self.rows.len();
-            let read = read_rig_entry(models, entry, |bytes| {
-                AnimationSourceHeaders::read(entry.path(), bytes)
-            });
-            self.rows.push(ClipArchiveSource {
-                archive_ordinal: entry.index(),
-                directory_ordinal: entry.metadata().original_directory_ordinal(),
-                file: RigFile {
-                    path: entry.path().to_owned(),
-                    read,
-                },
-            });
-            position
-        })
+    fn resolve<E>(
+        &mut self,
+        models: &ArchiveModels<'_>,
+        entry: &Entry,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<usize, E> {
+        check()?;
+        let slot = match self.positions.entry(entry.index()) {
+            std::collections::hash_map::Entry::Occupied(slot) => return Ok(*slot.get()),
+            std::collections::hash_map::Entry::Vacant(slot) => slot,
+        };
+        let read = read_rig_entry(
+            models,
+            entry,
+            |bytes, check| AnimationSourceHeaders::read_with(entry.path(), bytes, check),
+            check,
+        )?;
+        let position = self.rows.len();
+        self.rows.push(ClipArchiveSource {
+            archive_ordinal: entry.index(),
+            directory_ordinal: entry.metadata().original_directory_ordinal(),
+            file: RigFile {
+                path: entry.path().to_owned(),
+                read,
+            },
+        });
+        slot.insert(position);
+        Ok(position)
     }
 }
 

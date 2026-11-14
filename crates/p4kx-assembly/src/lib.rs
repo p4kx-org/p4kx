@@ -215,6 +215,7 @@ pub use entities::{ENTITY_TYPE, Entities};
 pub use entity_clip_catalogue::{
     ClipArchiveSource, ClipDatabaseUnavailable, ClipSourceLink, ClipSourceSelection,
     EntityClipCatalogue, EntityClipRig, NamedCafTarget, discover_entity_clips,
+    discover_entity_clips_with,
 };
 pub use entity_glow::{
     EntityGlow, EntityGlowBindingError, EntityGlowLink, GlowEffectKind, GlowSelection, GlowSubset,

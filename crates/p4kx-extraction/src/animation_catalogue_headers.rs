@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::convert::Infallible;
 use std::ops::Range;
 
 use p4kx_chunks::{ChunkError, ChunkFile};
@@ -117,31 +118,73 @@ pub struct AnimationHeaderController {
     pub translation: AnimationChannel,
 }
 
+enum HeaderRead<E> {
+    Chunk(ChunkError),
+    Interrupted(E),
+}
+
+impl<E> From<ChunkError> for HeaderRead<E> {
+    fn from(error: ChunkError) -> Self {
+        Self::Chunk(error)
+    }
+}
+
 impl AnimationSourceHeaders {
     /// Reads clip metadata and controller declarations without decoding animation keys.
     ///
     /// # Errors
     /// Returns an error for an invalid container, unsupported file kind or unreadable metadata.
     pub fn read(path: &str, bytes: &[u8]) -> Result<Self, AnimationHeaderError> {
-        let kind = kind(path).ok_or(AnimationHeaderError::UnsupportedPath)?;
-        let file = ChunkFile::parse(bytes)?;
-        match kind {
-            Kind::Caf => Ok(Self::caf(path, &file)?),
-            Kind::Dba => Ok(Self::dba(path, &file)?),
+        match Self::read_with(path, bytes, &mut || Ok::<_, Infallible>(())) {
+            Ok(result) => result,
+            Err(never) => match never {},
         }
     }
 
-    fn caf(path: &str, file: &ChunkFile<&[u8]>) -> Result<Self, AnimationError> {
+    /// Reads original headers and polls before each clip and controller occurrence.
+    ///
+    /// # Errors
+    /// The outer error propagates caller interruption; the inner error describes unreadable headers.
+    pub fn read_with<E>(
+        path: &str,
+        bytes: &[u8],
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<Result<Self, AnimationHeaderError>, E> {
+        check()?;
+        let Some(kind) = kind(path) else {
+            return Ok(Err(AnimationHeaderError::UnsupportedPath));
+        };
+        let file = match ChunkFile::parse_with(bytes, || check().map_err(HeaderRead::Interrupted)) {
+            Ok(file) => file,
+            Err(HeaderRead::Chunk(error)) => return Ok(Err(error.into())),
+            Err(HeaderRead::Interrupted(error)) => return Err(error),
+        };
+        check()?;
+        let inventory = match kind {
+            Kind::Caf => Self::caf(path, &file, check)?,
+            Kind::Dba => Self::dba(path, &file, check)?,
+        };
+        Ok(inventory.map_err(AnimationHeaderError::from))
+    }
+
+    fn caf<E>(
+        path: &str,
+        file: &ChunkFile<&[u8]>,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<Result<Self, AnimationError>, E> {
         let mut partial = None;
-        let metadata = AnimationMetadata::read_caf(path, file)?;
+        let metadata = match AnimationMetadata::read_caf(path, file) {
+            Ok(metadata) => metadata,
+            Err(error) => return Ok(Err(error)),
+        };
         let controller_block = match AnimationSource::read_caf(path, file) {
-            Ok(source) => block(source, &mut partial),
+            Ok(source) => block(source, &mut partial, check)?,
             Err(error) => {
                 partial = Some(AnimationHeaderFault::Structure(error));
                 None
             }
         };
-        Ok(Self {
+        Ok(Ok(Self {
             clips: vec![AnimationSourceHeader::new(
                 0,
                 metadata,
@@ -149,10 +192,14 @@ impl AnimationSourceHeaders {
                 controller_block,
             )],
             partial,
-        })
+        }))
     }
 
-    fn dba(path: &str, file: &ChunkFile<&[u8]>) -> Result<Self, AnimationError> {
+    fn dba<E>(
+        path: &str,
+        file: &ChunkFile<&[u8]>,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<Result<Self, AnimationError>, E> {
         let mut inventory = Self::default();
         let sources = match DbaAnimationSources::read(path, file) {
             Ok(sources) => Some(sources),
@@ -162,6 +209,7 @@ impl AnimationSourceHeaders {
             }
         };
         for source in sources.into_iter().flatten() {
+            check()?;
             let source = match source {
                 Ok(source) => source,
                 Err(error) => {
@@ -171,7 +219,7 @@ impl AnimationSourceHeaders {
                     break;
                 }
             };
-            let controller_block = block(source, &mut inventory.partial);
+            let controller_block = block(source, &mut inventory.partial, check)?;
             inventory.clips.push(AnimationSourceHeader::new(
                 source.ordinal(),
                 source.metadata(),
@@ -180,14 +228,27 @@ impl AnimationSourceHeaders {
             ));
         }
         if inventory.partial.is_some() {
-            inventory.metadata_tail(path, file)?;
+            return inventory.metadata_tail(path, file, check);
         }
-        Ok(inventory)
+        Ok(Ok(inventory))
     }
 
-    fn metadata_tail(&mut self, path: &str, file: &ChunkFile<&[u8]>) -> Result<(), AnimationError> {
-        let records = DbaMetadataRecords::read(path, file)?;
-        for record in records.skip(self.clips.len()) {
+    fn metadata_tail<E>(
+        mut self,
+        path: &str,
+        file: &ChunkFile<&[u8]>,
+        check: &mut impl FnMut() -> Result<(), E>,
+    ) -> Result<Result<Self, AnimationError>, E> {
+        let records = match DbaMetadataRecords::read(path, file) {
+            Ok(records) => records,
+            Err(error) => return Ok(Err(error)),
+        };
+        let known = self.clips.len();
+        for (position, record) in records.enumerate() {
+            check()?;
+            if position < known {
+                continue;
+            }
             let record = match record {
                 Ok(record) => record,
                 Err(error) => {
@@ -203,7 +264,7 @@ impl AnimationSourceHeaders {
                 None,
             ));
         }
-        Ok(())
+        Ok(Ok(self))
     }
 }
 
@@ -231,10 +292,12 @@ impl AnimationSourceHeader {
     }
 }
 
-fn block(
+fn block<E>(
     source: AnimationSource<'_>,
     partial: &mut Option<AnimationHeaderFault>,
-) -> Option<AnimationControllerBlock> {
+    check: &mut impl FnMut() -> Result<(), E>,
+) -> Result<Option<AnimationControllerBlock>, E> {
+    check()?;
     let controllers = match source.controllers() {
         Ok(controllers) => controllers,
         Err(error) => {
@@ -242,15 +305,13 @@ fn block(
                 clip: source.ordinal(),
                 reason: error,
             });
-            return None;
+            return Ok(None);
         }
     };
-    Some(AnimationControllerBlock {
-        chunk: source.data_chunk_index(),
-        version: source.data_chunk_version(),
-        range: source.controller_block_range(),
-        controllers: controllers
-            .map(|controller| AnimationHeaderController {
+    let controllers = controllers
+        .map(|controller| {
+            check()?;
+            Ok(AnimationHeaderController {
                 ordinal: controller.ordinal(),
                 id: controller.controller_id(),
                 id_range: controller.id_range(),
@@ -258,6 +319,12 @@ fn block(
                 rotation: controller.rotation(),
                 translation: controller.translation(),
             })
-            .collect(),
-    })
+        })
+        .collect::<Result<_, E>>()?;
+    Ok(Some(AnimationControllerBlock {
+        chunk: source.data_chunk_index(),
+        version: source.data_chunk_version(),
+        range: source.controller_block_range(),
+        controllers,
+    }))
 }
