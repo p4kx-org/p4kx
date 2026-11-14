@@ -330,6 +330,12 @@ impl Kind {
             | Self::Creatures
             | Self::ClimateAssets
             | Self::GeologyAssets
+            | Self::Ecosystems
+            | Self::GeologySets
+            | Self::GeologyTextureSets
+            | Self::Soils
+            | Self::SoilTextureSets
+            | Self::ShadingClasses
             | Self::ContractShipSpawns
             | Self::ContractLocationQueries
             | Self::ContractNpcSpawns

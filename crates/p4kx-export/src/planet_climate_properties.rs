@@ -6,9 +6,12 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::planet_asset_raw_fields::{self, RawPlanetAssetMember};
+use super::terrain_guid_link::{TerrainGuidIndex, TerrainGuidLink};
 use crate::CatalogError;
+use crate::Kind;
 use crate::catalog_read::catalog_json_number::CatalogJsonNumber;
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
+use crate::catalog_read::original::EntryCapture;
 use crate::guid_text::CatalogGuid;
 use crate::schema_fields::every_field_required;
 
@@ -85,18 +88,55 @@ pub(crate) struct ClimateAppearance {
     shading_class_close: GuidField,
     shading_class_mid: GuidField,
     shading_class_far: GuidField,
+    shading_links: Option<ClimateShadingLinks>,
     debris_path: SourcedValue<String>,
     far_lut_path: SourcedValue<String>,
     exclude_from_snow: SourcedValue<bool>,
 }
 
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub(super) struct ClimateShadingLinks {
+    pub(super) default: TerrainGuidLink,
+    pub(super) close: TerrainGuidLink,
+    pub(super) mid: TerrainGuidLink,
+    pub(super) far: TerrainGuidLink,
+}
+
 impl ClimateAppearance {
+    pub(super) fn shading_guids(&self) -> impl Iterator<Item = CatalogGuid> + '_ {
+        [
+            &self.shading_class,
+            &self.shading_class_close,
+            &self.shading_class_mid,
+            &self.shading_class_far,
+        ]
+        .into_iter()
+        .filter_map(SourcedValue::value)
+        .copied()
+        .filter(|guid| guid.0 != p4kx_extraction::Guid::default())
+    }
+
+    pub(super) fn attach_shading_links(
+        &mut self,
+        index: &TerrainGuidIndex,
+        capture: &EntryCapture<'_>,
+    ) -> Result<&ClimateShadingLinks, CatalogError> {
+        Ok(self.shading_links.insert(ClimateShadingLinks {
+            default: index.resolve(Kind::ShadingClasses, &self.shading_class, capture)?,
+            close: index.resolve(Kind::ShadingClasses, &self.shading_class_close, capture)?,
+            mid: index.resolve(Kind::ShadingClasses, &self.shading_class_mid, capture)?,
+            far: index.resolve(Kind::ShadingClasses, &self.shading_class_far, capture)?,
+        }))
+    }
     pub(crate) fn read(o: &EntryJsonObject<'_, '_>) -> Result<Self, CatalogError> {
         Ok(Self {
             shading_class: o.field("shadingClassGUID", entry_json_object::guid)?,
             shading_class_close: o.field("shadingClassCloseGUID", entry_json_object::guid)?,
             shading_class_mid: o.field("shadingClassMidGUID", entry_json_object::guid)?,
             shading_class_far: o.field("shadingClassFarGUID", entry_json_object::guid)?,
+            shading_links: None,
             debris_path: o.field("debrisPath", entry_json_object::text)?,
             far_lut_path: o.field("farLUTPath", entry_json_object::text)?,
             exclude_from_snow: o.field("bExcludeFromSnow", entry_json_object::boolean)?,

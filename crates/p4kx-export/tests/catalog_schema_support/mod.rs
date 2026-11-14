@@ -361,6 +361,12 @@ pub(crate) fn minimal_catalog() -> Value {
         "creatures",
         "climateAssets",
         "geologyAssets",
+        "ecosystems",
+        "geologySets",
+        "geologyTextureSets",
+        "soils",
+        "soilTextureSets",
+        "shadingClasses",
         "proceduralPlanetAudio",
     ] {
         for (section, value) in [

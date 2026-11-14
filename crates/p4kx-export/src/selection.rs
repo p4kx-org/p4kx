@@ -173,6 +173,18 @@ pub enum Kind {
     ClimateAssets,
     /// Original loose `PlanetTech` geology asset definitions.
     GeologyAssets,
+    /// Environment ecosystems authored as loose JSON.
+    Ecosystems,
+    /// Terrain geology definitions and declared selections.
+    GeologySets,
+    /// Original geology texture sets.
+    GeologyTextureSets,
+    /// Original soil definitions and texture-set selectors.
+    Soils,
+    /// Original soil texture sets.
+    SoilTextureSets,
+    /// Original climate shading class definitions.
+    ShadingClasses,
     /// Reusable physical `ExplosionRecord` definitions.
     ExplosionDefinitions,
     /// Physical ammunition configurations.
@@ -243,7 +255,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 96] = [
+    pub const ALL: [Self; 102] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -307,6 +319,12 @@ impl Kind {
         Self::Creatures,
         Self::ClimateAssets,
         Self::GeologyAssets,
+        Self::Ecosystems,
+        Self::GeologySets,
+        Self::GeologyTextureSets,
+        Self::Soils,
+        Self::SoilTextureSets,
+        Self::ShadingClasses,
         Self::ExplosionDefinitions,
         Self::AmmoDefinitions,
         Self::Factions,

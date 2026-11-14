@@ -14,6 +14,12 @@ pub(super) const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::Creatures
             | Kind::ClimateAssets
             | Kind::GeologyAssets
+            | Kind::Ecosystems
+            | Kind::GeologySets
+            | Kind::GeologyTextureSets
+            | Kind::Soils
+            | Kind::SoilTextureSets
+            | Kind::ShadingClasses
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
             | Kind::ParticleLibraries

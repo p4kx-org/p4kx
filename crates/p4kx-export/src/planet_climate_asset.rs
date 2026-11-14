@@ -11,7 +11,7 @@ use super::planet_asset_raw_fields::{self, RawPlanetAssetMember};
 use super::planet_climate_properties::{ClimateAppearance, ClimateEnvelope, ClimateGrowth};
 use super::planet_climate_subasset::ClimateSubAsset;
 use super::planet_resource;
-use super::terrain_guid_link::{TerrainGuidIndex, TerrainTargetFamily};
+use super::terrain_guid_link::{self, TerrainGuidIndex, TerrainTargetFamily};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::catalog_json_number::CatalogJsonNumber;
 use crate::catalog_read::entry_json_object;
@@ -51,6 +51,39 @@ pub(crate) struct PlanetClimateAsset {
     procedural_audio: SourcedValue<String>,
     additional_fields: Vec<RawPlanetAssetMember>,
     issues: Vec<DefinitionIssue>,
+}
+
+impl PlanetClimateAsset {
+    pub(super) fn required_shading_guids(&self) -> impl Iterator<Item = CatalogGuid> + '_ {
+        self.appearance.shading_guids()
+    }
+
+    pub(super) fn link_shading(
+        &mut self,
+        index: &TerrainGuidIndex,
+        capture: &EntryCapture<'_>,
+        ledger: &mut ExportLedger,
+    ) -> Result<(), CatalogError> {
+        let links = self.appearance.attach_shading_links(index, capture)?;
+        for (field, link) in [
+            ("shadingClassGUID", &links.default),
+            ("shadingClassCloseGUID", &links.close),
+            ("shadingClassMidGUID", &links.mid),
+            ("shadingClassFarGUID", &links.far),
+        ] {
+            if let Some(code) = link
+                .state
+                .value()
+                .copied()
+                .and_then(terrain_guid_link::link_issue)
+            {
+                let issue = DefinitionIssue { field, code };
+                issue.record(ledger, Kind::ClimateAssets);
+                parsed_entry_json::push(&mut self.issues, issue)?;
+            }
+        }
+        Ok(())
+    }
 }
 
 impl LooseDefinition for PlanetClimateAsset {

@@ -215,7 +215,7 @@ fn assert_header(catalog: &Value) -> TestResult {
     Ok(())
 }
 
-const EXPECTED_KINDS: [&str; 96] = [
+const EXPECTED_KINDS: [&str; 102] = [
     "manufacturers",
     "items",
     "ships",
@@ -279,6 +279,12 @@ const EXPECTED_KINDS: [&str; 96] = [
     "creatures",
     "climateAssets",
     "geologyAssets",
+    "ecosystems",
+    "geologySets",
+    "geologyTextureSets",
+    "soils",
+    "soilTextureSets",
+    "shadingClasses",
     "explosionDefinitions",
     "ammoDefinitions",
     "factions",

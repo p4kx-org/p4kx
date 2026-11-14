@@ -4907,6 +4907,9 @@
         "creatures": {
           "$ref": "#/$defs/CatalogTableOfPlanetCreature"
         },
+        "ecosystems": {
+          "$ref": "#/$defs/CatalogTableOfEcosystem"
+        },
         "encounterIndices": {
           "$ref": "#/$defs/CatalogTableOfEncounterIndex"
         },
@@ -4927,6 +4930,12 @@
         },
         "geologyAssets": {
           "$ref": "#/$defs/CatalogTableOfPlanetGeologyAsset"
+        },
+        "geologySets": {
+          "$ref": "#/$defs/CatalogTableOfGeologySet"
+        },
+        "geologyTextureSets": {
+          "$ref": "#/$defs/CatalogTableOfGeologyTextureSet"
         },
         "hierarchicalContextualDataPresets": {
           "$ref": "#/$defs/CatalogTableOfLootDefinition"
@@ -5039,8 +5048,17 @@
         "securityNetworkManifests": {
           "$ref": "#/$defs/CatalogTableOfSecurityNetworkManifest"
         },
+        "shadingClasses": {
+          "$ref": "#/$defs/CatalogTableOfShadingClass"
+        },
         "shopInventories": {
           "$ref": "#/$defs/ShopInventoryTable"
+        },
+        "soilTextureSets": {
+          "$ref": "#/$defs/CatalogTableOfSoilTextureSet"
+        },
+        "soils": {
+          "$ref": "#/$defs/CatalogTableOfSoil"
         },
         "starmapAmenities": {
           "$ref": "#/$defs/CatalogTableOfStarmapAmenityDefinition"
@@ -5087,6 +5105,7 @@
         "contractScopes",
         "contractTemplates",
         "creatures",
+        "ecosystems",
         "encounterIndices",
         "explosionDefinitions",
         "factionIdentities",
@@ -5094,6 +5113,8 @@
         "factions",
         "gameplayProperties",
         "geologyAssets",
+        "geologySets",
+        "geologyTextureSets",
         "hierarchicalContextualDataPresets",
         "infractionSets",
         "infractions",
@@ -5131,7 +5152,10 @@
         "resourceGroups",
         "resourceTypes",
         "securityNetworkManifests",
+        "shadingClasses",
         "shopInventories",
+        "soilTextureSets",
+        "soils",
         "starmapAmenities",
         "starmapObjects",
         "starmapPresets",
@@ -5758,6 +5782,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfEcosystem": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/Ecosystem"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfEmp": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -6033,6 +6076,44 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/GeneratorDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfGeologySet": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/GeologySet"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfGeologyTextureSet": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/GeologyTextureSet"
           },
           "type": "array"
         }
@@ -7316,6 +7397,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfShadingClass": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ShadingClass"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfShieldGenerator": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -7344,6 +7444,44 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ShopInventoryResolution"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfSoil": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/Soil"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfSoilTextureSet": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/SoilTextureSet"
           },
           "type": "array"
         }
@@ -8041,6 +8179,16 @@
         },
         "shadingClassMid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "shadingLinks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClimateShadingLinks"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "required": [
@@ -8050,7 +8198,8 @@
         "shadingClass",
         "shadingClassClose",
         "shadingClassFar",
-        "shadingClassMid"
+        "shadingClassMid",
+        "shadingLinks"
       ],
       "type": "object"
     },
@@ -8219,6 +8368,29 @@
       "required": [
         "additionalFields",
         "shadeDensity"
+      ],
+      "type": "object"
+    },
+    "ClimateShadingLinks": {
+      "properties": {
+        "close": {
+          "$ref": "#/$defs/TerrainGuidLink"
+        },
+        "default": {
+          "$ref": "#/$defs/TerrainGuidLink"
+        },
+        "far": {
+          "$ref": "#/$defs/TerrainGuidLink"
+        },
+        "mid": {
+          "$ref": "#/$defs/TerrainGuidLink"
+        }
+      },
+      "required": [
+        "close",
+        "default",
+        "far",
+        "mid"
       ],
       "type": "object"
     },
@@ -9057,6 +9229,9 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `dismantleProcesses`."
         },
+        "ecosystems": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
         "encounterIndices": {
           "$ref": "#/$defs/KindCompleteness"
         },
@@ -9081,6 +9256,12 @@
           "description": "The completeness of `gameplayProperties`."
         },
         "geologyAssets": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
+        "geologySets": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
+        "geologyTextureSets": {
           "$ref": "#/$defs/KindCompleteness"
         },
         "harvestableLocations": {
@@ -9304,6 +9485,9 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The physical security network manifest selection."
         },
+        "shadingClasses": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
         "shipStoreSlugs": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `shipStoreSlugs`."
@@ -9319,6 +9503,12 @@
         "shops": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `shops`."
+        },
+        "soilTextureSets": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
+        "soils": {
+          "$ref": "#/$defs/KindCompleteness"
         },
         "starmapAmenities": {
           "$ref": "#/$defs/KindCompleteness",
@@ -9371,6 +9561,7 @@
         "crafters",
         "creatures",
         "dismantleProcesses",
+        "ecosystems",
         "encounterIndices",
         "explosionDefinitions",
         "factionIdentities",
@@ -9378,6 +9569,8 @@
         "factions",
         "gameplayProperties",
         "geologyAssets",
+        "geologySets",
+        "geologyTextureSets",
         "harvestableLocations",
         "harvestableProviderPresets",
         "hierarchicalContextualDataPresets",
@@ -9436,10 +9629,13 @@
         "resourceGroups",
         "resourceTypes",
         "securityNetworkManifests",
+        "shadingClasses",
         "shipStoreSlugs",
         "ships",
         "shopInventories",
         "shops",
+        "soilTextureSets",
+        "soils",
         "starmapAmenities",
         "starmapObjects",
         "starmapPresets",
@@ -12303,6 +12499,155 @@
           "type": "object"
         }
       ]
+    },
+    "Ecosystem": {
+      "description": "One physical ecosystem definition and its authored audio and texture fields.",
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "guidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/DefinitionIssue"
+          },
+          "type": "array"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "soundEffect": {
+          "$ref": "#/$defs/SourcedValueOfEcosystemSoundEffect"
+        },
+        "textureLinks": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/EcosystemTextureLinks"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "textures": {
+          "$ref": "#/$defs/SourcedValueOfEcosystemTextures"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "guid",
+        "guidRaw",
+        "identity",
+        "issues",
+        "name",
+        "soundEffect",
+        "textureLinks",
+        "textures"
+      ],
+      "type": "object"
+    },
+    "EcosystemSoundEffect": {
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "audioRtpcArrayCount": {
+          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+        },
+        "audioSwitchArrayCount": {
+          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+        },
+        "audioTerrainEccentricity": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "audioTrigger": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "audioRtpcArrayCount",
+        "audioSwitchArrayCount",
+        "audioTerrainEccentricity",
+        "audioTrigger"
+      ],
+      "type": "object"
+    },
+    "EcosystemTextureLinks": {
+      "properties": {
+        "climate": {
+          "$ref": "#/$defs/LooseArchivePath"
+        },
+        "data": {
+          "$ref": "#/$defs/LooseArchivePath"
+        },
+        "elevation": {
+          "$ref": "#/$defs/LooseArchivePath"
+        },
+        "normal": {
+          "$ref": "#/$defs/LooseArchivePath"
+        },
+        "objectPresetSpawnMask": {
+          "$ref": "#/$defs/LooseArchivePath"
+        }
+      },
+      "required": [
+        "climate",
+        "data",
+        "elevation",
+        "normal",
+        "objectPresetSpawnMask"
+      ],
+      "type": "object"
+    },
+    "EcosystemTextures": {
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "climate": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "data": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "elevation": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "normal": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "objectPresetSpawnMask": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "climate",
+        "data",
+        "elevation",
+        "normal",
+        "objectPresetSpawnMask"
+      ],
+      "type": "object"
     },
     "EmbeddedScanInfo": {
       "description": "Ordered original procedures and their owner-local typed value nodes.",
@@ -15797,6 +16142,21 @@
       ],
       "type": "object"
     },
+    "GeologyAssetSlot": {
+      "properties": {
+        "link": {
+          "$ref": "#/$defs/TerrainGuidLink"
+        },
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        }
+      },
+      "required": [
+        "link",
+        "ordinal"
+      ],
+      "type": "object"
+    },
     "GeologyGeometry": {
       "properties": {
         "entityClass": {
@@ -15927,6 +16287,118 @@
       ],
       "type": "object"
     },
+    "GeologySet": {
+      "description": "Original geology asset selections, probabilities and texture-set declaration.",
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "cliffAssets": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGuid"
+        },
+        "cliffAssetsRaw": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring"
+        },
+        "cliffProbability": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "geologyTextureSetGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "geologyTextureSetGuidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "guidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/DefinitionIssue"
+          },
+          "type": "array"
+        },
+        "links": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GeologySetLinks"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "scatteredAssets": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGuid"
+        },
+        "scatteredAssetsRaw": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring"
+        },
+        "sizeNumberOfAssets": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "sizeProbabilities": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "cliffAssets",
+        "cliffAssetsRaw",
+        "cliffProbability",
+        "geologyTextureSetGuid",
+        "geologyTextureSetGuidRaw",
+        "guid",
+        "guidRaw",
+        "identity",
+        "issues",
+        "links",
+        "scatteredAssets",
+        "scatteredAssetsRaw",
+        "sizeNumberOfAssets",
+        "sizeProbabilities"
+      ],
+      "type": "object"
+    },
+    "GeologySetLinks": {
+      "properties": {
+        "cliffAssets": {
+          "items": {
+            "$ref": "#/$defs/GeologyAssetSlot"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "geologyTextureSet": {
+          "$ref": "#/$defs/TerrainGuidLink"
+        },
+        "scatteredAssets": {
+          "items": {
+            "$ref": "#/$defs/GeologyAssetSlot"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "cliffAssets",
+        "geologyTextureSet",
+        "scatteredAssets"
+      ],
+      "type": "object"
+    },
     "GeologySubstrate": {
       "properties": {
         "aggregateSize": {
@@ -15955,6 +16427,109 @@
         "bedrockPointOfMaxInfluence",
         "bedrockScaleRatio",
         "maxSoilDepth"
+      ],
+      "type": "object"
+    },
+    "GeologyTextureSet": {
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "aggregateBleed": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "aggregateSubstrateSpread": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "biplanarLayers": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfTextureLayer"
+        },
+        "biplanarTextures": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LayerTextureLinks"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "gradientMidPoint": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "gradientNoiseRange": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "groundLayers": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGroundLayer"
+        },
+        "groundTextures": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LayerTextureLinks"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "guidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/DefinitionIssue"
+          },
+          "type": "array"
+        },
+        "maxRoughness": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "minRoughness": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "screeContentPerLayer": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "screeMaxRoughness": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "screeMinRoughness": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "screeSpread": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "aggregateBleed",
+        "aggregateSubstrateSpread",
+        "biplanarLayers",
+        "biplanarTextures",
+        "gradientMidPoint",
+        "gradientNoiseRange",
+        "groundLayers",
+        "groundTextures",
+        "guid",
+        "guidRaw",
+        "identity",
+        "issues",
+        "maxRoughness",
+        "minRoughness",
+        "screeContentPerLayer",
+        "screeMaxRoughness",
+        "screeMinRoughness",
+        "screeSpread"
       ],
       "type": "object"
     },
@@ -16496,6 +17071,43 @@
           "value": "reputationPrerequisite"
         }
       ]
+    },
+    "GroundLayer": {
+      "description": "Original terrain material selectors and scalar flags at one layer occurrence.",
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "bedrock": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "gloss": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "surfaceGroupName": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "surfaceTypeName": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "textureName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "bedrock",
+        "gloss",
+        "surfaceGroupName",
+        "surfaceTypeName",
+        "textureName"
+      ],
+      "type": "object"
     },
     "Guid": {
       "description": "A GUID as canonical lower-case UUID text.",
@@ -21120,6 +21732,30 @@
           "value": "geologyAssets"
         },
         {
+          "description": "Environment ecosystems authored as loose JSON.",
+          "value": "ecosystems"
+        },
+        {
+          "description": "Terrain geology definitions and declared selections.",
+          "value": "geologySets"
+        },
+        {
+          "description": "Original geology texture sets.",
+          "value": "geologyTextureSets"
+        },
+        {
+          "description": "Original soil definitions and texture-set selectors.",
+          "value": "soils"
+        },
+        {
+          "description": "Original soil texture sets.",
+          "value": "soilTextureSets"
+        },
+        {
+          "description": "Original climate shading class definitions.",
+          "value": "shadingClasses"
+        },
+        {
           "description": "Reusable physical `ExplosionRecord` definitions.",
           "value": "explosionDefinitions"
         },
@@ -21433,6 +22069,36 @@
         "firstAttack",
         "max",
         "min"
+      ],
+      "type": "object"
+    },
+    "LayerTextureLink": {
+      "properties": {
+        "ordinal": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "target": {
+          "$ref": "#/$defs/LooseArchivePath"
+        }
+      },
+      "required": [
+        "ordinal",
+        "target"
+      ],
+      "type": "object"
+    },
+    "LayerTextureLinks": {
+      "description": "Directory lookups for the paths of the corresponding source layer slots.",
+      "properties": {
+        "slots": {
+          "items": {
+            "$ref": "#/$defs/LayerTextureLink"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "slots"
       ],
       "type": "object"
     },
@@ -37272,6 +37938,82 @@
       ],
       "required": []
     },
+    "ShadingClass": {
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "ambientOcclusionAmount": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "distantVegetationUvScale": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "groundLayer": {
+          "$ref": "#/$defs/SourcedValueOfGroundLayer"
+        },
+        "groundTexture": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LooseArchivePath"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "guidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/DefinitionIssue"
+          },
+          "type": "array"
+        },
+        "lightingModel": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "normalStrength": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "parallaxOcclusionHeight": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "roughness": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "viewAngleMasking": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "ambientOcclusionAmount",
+        "distantVegetationUvScale",
+        "groundLayer",
+        "groundTexture",
+        "guid",
+        "guidRaw",
+        "identity",
+        "issues",
+        "lightingModel",
+        "normalStrength",
+        "parallaxOcclusionHeight",
+        "roughness",
+        "viewAngleMasking"
+      ],
+      "type": "object"
+    },
     "SharedInteraction": {
       "description": "One physical shared interaction and its authored selectors.",
       "properties": {
@@ -38444,6 +39186,166 @@
       "required": [
         "name",
         "value"
+      ],
+      "type": "object"
+    },
+    "Soil": {
+      "description": "Authored soil flags, weight and texture-set declaration.",
+      "properties": {
+        "acid": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "beach": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "guidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/DefinitionIssue"
+          },
+          "type": "array"
+        },
+        "oceanSecondaryColourWeight": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "soilTextureSet": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TerrainGuidLink"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "soilTextureSetGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "soilTextureSetGuidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "stagnantWater": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "trash": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "acid",
+        "additionalFields",
+        "beach",
+        "guid",
+        "guidRaw",
+        "identity",
+        "issues",
+        "oceanSecondaryColourWeight",
+        "soilTextureSet",
+        "soilTextureSetGuid",
+        "soilTextureSetGuidRaw",
+        "stagnantWater",
+        "trash"
+      ],
+      "type": "object"
+    },
+    "SoilTextureSet": {
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "groundLayers": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGroundLayer"
+        },
+        "groundTextures": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LayerTextureLinks"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "guidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/DefinitionIssue"
+          },
+          "type": "array"
+        },
+        "maxRoughness": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "mediumLayerHeightScales": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "mediumLayerWeights": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "mediumLayers": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfTextureLayer"
+        },
+        "mediumTextures": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/LayerTextureLinks"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "minRoughness": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "sand": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "screeContentPerLayer": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "groundLayers",
+        "groundTextures",
+        "guid",
+        "guidRaw",
+        "identity",
+        "issues",
+        "maxRoughness",
+        "mediumLayerHeightScales",
+        "mediumLayerWeights",
+        "mediumLayers",
+        "mediumTextures",
+        "minRoughness",
+        "sand",
+        "screeContentPerLayer"
       ],
       "type": "object"
     },
@@ -46371,6 +47273,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfGasMass"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfGroundLayer": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfGroundLayer"
                 },
                 "type": "array"
               }
@@ -57448,6 +58483,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfTextureLayer": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfTextureLayer"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfUnitSource": {
       "allOf": [
         {
@@ -65939,6 +67107,266 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfEcosystemSoundEffect": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/EcosystemSoundEffect"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfEcosystemTextures": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/EcosystemTextures"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfEmbeddedScanInfo": {
       "allOf": [
         {
@@ -69543,6 +70971,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/GeometryTagList"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfGroundLayer": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/GroundLayer"
               }
             }
           }
@@ -103972,6 +105530,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfTextureLayer": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/TextureLayer"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfUnitSource": {
       "allOf": [
         {
@@ -109514,6 +111202,24 @@
       "required": [
         "displayText",
         "sourceText"
+      ],
+      "type": "object"
+    },
+    "TextureLayer": {
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "textureName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "textureName"
       ],
       "type": "object"
     },

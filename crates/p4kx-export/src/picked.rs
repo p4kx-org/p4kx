@@ -222,7 +222,13 @@ impl<'f> Picked<'f> {
             | Kind::PlanetResources
             | Kind::Creatures
             | Kind::ClimateAssets
-            | Kind::GeologyAssets => return None,
+            | Kind::GeologyAssets
+            | Kind::Ecosystems
+            | Kind::GeologySets
+            | Kind::GeologyTextureSets
+            | Kind::Soils
+            | Kind::SoilTextureSets
+            | Kind::ShadingClasses => return None,
         })
     }
 

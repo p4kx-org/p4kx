@@ -81,6 +81,12 @@ impl Collected<'_> {
             Kind::Creatures => self.planet_tech.creatures.rows.len(),
             Kind::ClimateAssets => self.planet_tech.climate_assets.rows.len(),
             Kind::GeologyAssets => self.planet_tech.geology_assets.rows.len(),
+            Kind::Ecosystems => self.planet_tech.ecosystems.rows.len(),
+            Kind::GeologySets => self.planet_tech.geology_sets.rows.len(),
+            Kind::GeologyTextureSets => self.planet_tech.geology_texture_sets.rows.len(),
+            Kind::Soils => self.planet_tech.soils.rows.len(),
+            Kind::SoilTextureSets => self.planet_tech.soil_texture_sets.rows.len(),
+            Kind::ShadingClasses => self.planet_tech.shading_classes.rows.len(),
             Kind::Crafters => self.crafters.len(),
             Kind::FactionReputations
             | Kind::ReputationScopes

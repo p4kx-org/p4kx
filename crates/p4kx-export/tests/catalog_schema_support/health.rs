@@ -98,7 +98,13 @@ const fn mode(kind: Kind) -> ExportSourceMode {
         | Kind::PlanetResources
         | Kind::Creatures
         | Kind::ClimateAssets
-        | Kind::GeologyAssets => ExportSourceMode::ArchiveEntries,
+        | Kind::GeologyAssets
+        | Kind::Ecosystems
+        | Kind::GeologySets
+        | Kind::GeologyTextureSets
+        | Kind::Soils
+        | Kind::SoilTextureSets
+        | Kind::ShadingClasses => ExportSourceMode::ArchiveEntries,
         Kind::Paints
         | Kind::Loadouts
         | Kind::ContractShipSpawns

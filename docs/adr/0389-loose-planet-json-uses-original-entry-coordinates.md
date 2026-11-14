@@ -32,3 +32,5 @@ headers. These establish authored definition relations. A per-body
 climate/geology/fauna assignment remains unestablished in those sources.
 Emit a per-body relation when an original assignment edge and its route are
 both available. Preserve readable definitions independently of that evidence.
+
+[The terrain definition contract](../catalog-terrain-definitions.md) applies the same original Entry evidence to textured layers and linked geology, soil and climate shading definitions.

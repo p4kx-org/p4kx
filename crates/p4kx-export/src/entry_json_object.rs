@@ -71,6 +71,23 @@ impl<'object, 'read> EntryJsonObject<'object, 'read> {
         self.array_with(name, |element| Ok(project(element)))
     }
 
+    pub(crate) fn object<T>(
+        &self,
+        name: &str,
+        project: impl FnOnce(&Self) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        self.field_with(
+            name,
+            |node| {
+                self.object_node(node)
+                    .map_or(Ok(SourceValue::Invalid), |object| {
+                        project(&object).map(SourceValue::Present)
+                    })
+            },
+            |value| matches!(value, SourceValue::Present(_) | SourceValue::Null),
+        )
+    }
+
     pub(crate) fn object_array<T>(
         &self,
         name: &str,

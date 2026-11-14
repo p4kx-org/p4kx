@@ -67,6 +67,12 @@ planetResources: 0 written, 0 skipped, complete
 creatures: 0 written, 0 skipped, complete
 climateAssets: 0 written, 0 skipped, complete
 geologyAssets: 0 written, 0 skipped, complete
+ecosystems: 0 written, 0 skipped, complete
+geologySets: 0 written, 0 skipped, complete
+geologyTextureSets: 0 written, 0 skipped, complete
+soils: 0 written, 0 skipped, complete
+soilTextureSets: 0 written, 0 skipped, complete
+shadingClasses: 0 written, 0 skipped, complete
 explosionDefinitions: 0 written, 0 skipped, complete
 ammoDefinitions: 0 written, 0 skipped, complete
 factions: 0 written, 0 skipped, complete
@@ -113,4 +119,4 @@ ships variants: 0 in 0 groups
 quality quantizations: 0 used by no ResourceType, 0 links reach no quantization
 en: 16 texts resolved, 1 unresolved, 0 placeholders
 de: 2 texts resolved, 15 unresolved, 0 placeholders
-wrote [DIR]/basetool-catalog.json: 213038 bytes, 1 Records skipped, 0 failed
+wrote [DIR]/basetool-catalog.json: 217913 bytes, 1 Records skipped, 0 failed

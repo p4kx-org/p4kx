@@ -63,6 +63,7 @@ const CONTROL_TYPES: &[&str] = &[
     "TemplateModifierKind",
     "TemplateTagInterpretation",
     "TemplateValueStatus",
+    "TerrainGuidLinkState",
 ];
 const OPEN_TYPES: &[&str] = &[
     "ArchiveKeyState",

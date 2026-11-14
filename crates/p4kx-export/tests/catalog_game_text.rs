@@ -107,7 +107,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 94,
+        marked, 97,
         "every protected field in the canonical schema is accounted for"
     );
 }
@@ -127,7 +127,11 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
             | "onBrickedItemUsed_CannotFire"
             | "onBrickedItemUsed_CannotUse",
         )
-        | ("BlueprintPresentation" | "FactionIdentityDefinition" | "PlanetResource", "name")
+        | (
+            "BlueprintPresentation" | "FactionIdentityDefinition" | "PlanetResource" | "Ecosystem",
+            "name",
+        )
+        | ("GroundLayer", "surfaceTypeName" | "surfaceGroupName")
         | ("MissionStringVariant", "string")
         | ("StandingDefinition", "perkDescription")
         | ("FactionReputationDefinition", "background")
