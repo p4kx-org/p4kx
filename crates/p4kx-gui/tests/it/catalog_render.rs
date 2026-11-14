@@ -278,6 +278,11 @@ fn the_resource_kind_is_localized_and_visible_at_both_window_sizes() -> TestResu
                     "Schließen",
                 )
             };
+            wait_for(
+                &mut harness,
+                "the catalog outcome to become visible",
+                |harness| harness.query_all_by_label(close).count() == 1,
+            )?;
             harness.get_by_label(line).scroll_to_me();
             harness.run_steps(3);
             shoot(&mut harness, ("resources", tag, size), close)?;
