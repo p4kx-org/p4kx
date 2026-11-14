@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_chunks::{ByteOrder, ChunkFile, ChunkType, crch};
+use p4kx_chunks::{ByteOrder, ChunkFile, crch};
 
 use crate::build::{root_node, usage};
 use crate::crch_mesh::{physics_slots, read_physics_mesh};
 use crate::crch_node::{self, CrchNode};
 use crate::error::failure;
-use crate::material::material_library;
+use crate::material::{MaterialName, material_library};
 use crate::mtl_load::load;
 use crate::{
     CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection, LodSkeletonOrigin,
@@ -17,7 +17,6 @@ use crate::{
 
 const MESH_VERSION: u32 = 0x801;
 const PHYSICS_DATA_VERSION: u32 = 0x800;
-const MTL_NAME_VERSION: u32 = 0x802;
 
 /// Builds the model of a `CrCh` file: its nodes, the meshes of the nodes that refer to a `Mesh`
 /// chunk and the material library its `MtlName` chunk names. A `CrCh` model has one level of
@@ -62,7 +61,7 @@ pub(crate) fn build<B: AsRef<[u8]>>(
         });
     }
 
-    let library = first_of_version(file, crch::MTL_NAME, MTL_NAME_VERSION).and_then(|index| {
+    let library = MaterialName::primary(file.chunks()).and_then(|index| {
         read.push((ModelFile::Model, index));
         material_library(file.chunk_data(index).unwrap_or_default())
     });
@@ -105,16 +104,6 @@ fn read_meshes<B: AsRef<[u8]>>(
         }
     }
     Ok(meshes)
-}
-
-fn first_of_version<B: AsRef<[u8]>>(
-    file: &ChunkFile<B>,
-    chunk_type: ChunkType,
-    version: u32,
-) -> Option<usize> {
-    file.chunks_of(chunk_type)
-        .find(|(_, chunk)| chunk.version() == version)
-        .map(|(index, _)| index)
 }
 
 fn read_node_mesh<B: AsRef<[u8]>>(

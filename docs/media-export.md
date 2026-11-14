@@ -120,6 +120,19 @@ can likewise supply the lookup name for its missing counterpart. Each lookup rep
 selected, unselected, missing, ambiguous or unavailable state. A resolved identity establishes
 the directory match. Target payload reads and semantic use are separate.
 
+`model-material-library` rows retain original material-name declarations in measured IVO
+and CrCh chunk layouts. The source chunk ordinal and token range identify the original bytes
+in the hashed Model Entry. The `primary_model_reader_selector` flag identifies the original
+selector chosen by the conversion reader. Other occurrences, empty names, non-UTF-8 names
+and unsupported CrCh versions each retain their own disposition.
+
+A named material declaration provides a physical reference in the immediately owning Archive.
+An admitted bare name tries the model folder, then `Data` after a complete absence there.
+Rooted and multi-component references use the applicable virtual Data path. Duplicate matches
+remain ambiguous. The model provider reports physical targets even when the material provider
+is unselected, and never reads target material contents to resolve these references. The
+material provider owns the separate library payload and its status.
+
 The original decimal LOD suffix survives even when it exceeds the numeric range. The
 `canonical_reader_candidate` flag describes whether the existing model reader would
 construct that name under its supported naming and LOD range. Additional discovered siblings

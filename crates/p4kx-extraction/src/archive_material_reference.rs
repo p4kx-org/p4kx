@@ -67,18 +67,51 @@ pub(crate) fn target(
     folder: &str,
     request: &MaterialRequest,
 ) -> Result<String, CompanionError> {
-    if request.searches_sibling() && !request.path().contains('/') {
-        let sibling = if folder.is_empty() {
-            format!("{}.mtl", request.path())
-        } else {
-            format!("{folder}/{}.mtl", request.path())
-        };
-        if let Some(entry) = unique_entry(index, &sibling)? {
-            return Ok(entry.path().to_owned());
-        }
+    if let Some(sibling) = sibling(request, folder)
+        && let Some(entry) = unique_entry(index, &sibling)?
+    {
+        return Ok(entry.path().to_owned());
     }
-    let target = format!("Data/{}.mtl", request.path());
+    let target = data_root(request);
     Ok(unique_entry(index, &target)?.map_or(target, |entry| entry.path().to_owned()))
+}
+
+/// Ordered target paths for an authored archive material name.
+pub struct ArchiveMaterialPaths {
+    /// Candidate beside the model, when the request allows sibling lookup.
+    pub sibling: Option<String>,
+    /// Candidate under the Data root, used only after complete sibling absence.
+    pub data_root: String,
+}
+
+impl ArchiveMaterialPaths {
+    /// Maps the authored name to candidate paths without reading archive entries.
+    ///
+    /// # Errors
+    /// Returns the virtual-path parse error for an inadmissible reference.
+    pub fn new(model_path: &str, name: &str) -> Result<Self, CompanionError> {
+        let request = request(name)?;
+        let (folder, _) = crate::model_source::split_entry_path(model_path);
+        Ok(Self {
+            sibling: sibling(&request, folder),
+            data_root: data_root(&request),
+        })
+    }
+}
+
+fn sibling(request: &MaterialRequest, folder: &str) -> Option<String> {
+    if !request.searches_sibling() || request.path().contains('/') {
+        return None;
+    }
+    Some(if folder.is_empty() {
+        format!("{}.mtl", request.path())
+    } else {
+        format!("{folder}/{}.mtl", request.path())
+    })
+}
+
+fn data_root(request: &MaterialRequest) -> String {
+    format!("Data/{}.mtl", request.path())
 }
 
 pub(crate) fn unique_entry<'a>(

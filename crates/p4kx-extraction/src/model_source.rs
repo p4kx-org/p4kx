@@ -382,7 +382,7 @@ impl ModelSource {
     }
 }
 
-fn split_entry_path(path: &str) -> (&str, &str) {
+pub(crate) fn split_entry_path(path: &str) -> (&str, &str) {
     path.rfind(['\\', '/'])
         .and_then(|at| Some((path.get(..at)?, path.get(at + 1..)?)))
         .unwrap_or(("", path))

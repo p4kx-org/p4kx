@@ -13976,6 +13976,28 @@
       ],
       "type": "object"
     },
+    "ModelMaterialLibraryRecord": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/Payload"
+            },
+            "record_type": {
+              "const": "material-library",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Record"
+    },
     "ModelMeshRecord": {
       "oneOf": [
         {
@@ -14219,7 +14241,8 @@
         "model-lod-distance-words",
         "model-skeleton-chunk",
         "model-mesh",
-        "model-node-table"
+        "model-node-table",
+        "model-material-library"
       ],
       "type": "string"
     },
@@ -16980,6 +17003,90 @@
           "required": [
             "status",
             "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Payload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "named",
+              "type": "string"
+            },
+            "primary_model_reader_selector": {
+              "type": "boolean"
+            },
+            "reference": {
+              "$ref": "#/$defs/Reference"
+            },
+            "token": {
+              "$ref": "#/$defs/SourceRange"
+            }
+          },
+          "required": [
+            "disposition",
+            "primary_model_reader_selector",
+            "token",
+            "reference"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "empty",
+              "type": "string"
+            },
+            "field": {
+              "$ref": "#/$defs/SourceRange"
+            },
+            "primary_model_reader_selector": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "disposition",
+            "primary_model_reader_selector",
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "non-utf8",
+              "type": "string"
+            },
+            "primary_model_reader_selector": {
+              "type": "boolean"
+            },
+            "token": {
+              "$ref": "#/$defs/SourceRange"
+            }
+          },
+          "required": [
+            "disposition",
+            "primary_model_reader_selector",
+            "token"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "unsupported-version",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
           ],
           "type": "object"
         }
@@ -44446,6 +44553,61 @@
                 "properties": {
                   "record_type": {
                     "const": "character-skeleton"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "model"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "model-material-library"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/ModelMaterialLibraryRecord"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "material-library"
                   }
                 },
                 "required": [

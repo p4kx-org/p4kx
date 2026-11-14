@@ -5,7 +5,7 @@ use p4kx_chunks::{ChunkFile, ChunkType, ivo};
 
 use crate::bone_map::check_joints;
 use crate::build_lod::read_lod_companions;
-use crate::material::material_library;
+use crate::material::{MaterialName, material_library};
 use crate::mesh::split_by_node;
 use crate::model::MESH_TYPES;
 use crate::model_node_sources::ReadCapture;
@@ -19,8 +19,6 @@ use crate::{
     ModelChunkLayout, ModelError, ModelFile, ModelIssue, Node, PositionBox, RigLogicBytes,
     Transform,
 };
-
-const MATERIAL_TYPES: [ChunkType; 2] = [ivo::MTL_NAME_320, ivo::MTL_NAME];
 
 pub(crate) const MAX_LOD: u32 = 15;
 
@@ -63,8 +61,10 @@ pub(crate) fn build<B: AsRef<[u8]>>(
         bones: &bones,
         position_box,
     };
-    let material_library =
-        read_primary_chunk(file, &MATERIAL_TYPES, &mut read).and_then(material_library);
+    let material_library = MaterialName::primary(file.chunks()).and_then(|index| {
+        read.push((ModelFile::Model, index));
+        file.chunk_data(index).and_then(material_library)
+    });
     let rig_logic = read_primary_chunk(file, &[ivo::RIG_LOGIC], &mut read).map(RigLogicBytes::new);
 
     let Geometry {

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::chunks::{ByteOrder as ChunkByteOrder, Chunk, ChunkType, Container, ivo};
+use p4kx_extraction::model::MaterialName;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -89,6 +90,8 @@ pub(super) enum ModelTypedRecord {
     Mesh,
     #[serde(rename = "model-node-table")]
     NodeTable,
+    #[serde(rename = "model-material-library")]
+    MaterialLibrary,
 }
 
 impl ModelTypedRecord {
@@ -99,6 +102,7 @@ impl ModelTypedRecord {
             ivo::COMPILED_BONES | ivo::COMPILED_BONES_2 => Some(Self::Skeleton),
             ivo::SKIN | ivo::SKIN_2 => Some(Self::Mesh),
             ivo::NODE_MESH_COMBO => Some(Self::NodeTable),
+            kind if MaterialName::is_chunk_type(kind) => Some(Self::MaterialLibrary),
             _ => None,
         }
     }

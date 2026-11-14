@@ -11,6 +11,7 @@ use p4kx_extraction::chunks::{ChunkDirectory, ChunkDirectoryError, ChunkError, C
 use super::character;
 use super::companions;
 use super::lod_distances;
+use super::material_library_reference;
 use super::mesh;
 use super::nmc;
 use super::origins::{self, ModelOrigins};
@@ -35,7 +36,7 @@ impl Provider for ModelSourceProvider {
         let mut capability = Capability::new(
             MediaKind::Model,
             "p4kx.model.source",
-            "1.10.0",
+            "1.11.0",
             "Selected original models, geometry and character definitions with positioned source declarations.",
         );
         capability.field_groups = vec![
@@ -50,6 +51,10 @@ impl Provider for ModelSourceProvider {
             FieldGroup::new(
                 "companion-candidates",
                 "Same-Archive geometry and LOD sibling identity and selection without target payload reads.",
+            ),
+            FieldGroup::new(
+                "material-library-references",
+                "Original model material selectors with physical targets and independent selection.",
             ),
             FieldGroup::new(
                 "lod-distance-words",
@@ -81,7 +86,7 @@ impl Provider for ModelSourceProvider {
             ),
             FieldGroup::new_with_unsupported_projection(
                 "model-semantics",
-                "Render model decoding and material dependencies are outside this projection.",
+                "Render model decoding and loaded conversion dependencies are outside this projection.",
             ),
         ];
         capability
@@ -136,7 +141,8 @@ fn chunk_source(
         Ok(file) => {
             entry(family, &file, &origins, writer)?;
             companions::emit(context, &file, &origins, writer)?;
-            chunks(&file, &mut reader, &origins, writer)?;
+            let libraries = material_library_reference::Source::new(family, &file, context);
+            chunks(&file, &libraries, &mut reader, &origins, writer)?;
         }
         Err(ChunkDirectoryError::Format(ChunkError::Allocation)) => {
             return Err(MediaError::Contract(
@@ -336,6 +342,7 @@ fn put(
 
 fn chunks(
     file: &ChunkDirectory,
+    material_libraries: &material_library_reference::Source<'_, '_>,
     reader: &mut RequiredReader<'_>,
     origins: &ModelOrigins<'_>,
     writer: &mut MediaWriter<'_>,
@@ -368,6 +375,9 @@ fn chunks(
                 skeleton::emit(file, index, reader, origins, writer)?;
             }
             Some(ModelTypedRecord::Mesh) => mesh::emit(file, index, reader, origins, writer)?,
+            Some(ModelTypedRecord::MaterialLibrary) => {
+                material_libraries.emit(file, index, reader, origins, writer)?;
+            }
             Some(ModelTypedRecord::NodeTable) => {
                 let admitted = frame_input
                     .as_ref()

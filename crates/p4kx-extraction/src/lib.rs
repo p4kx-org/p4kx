@@ -199,6 +199,7 @@ pub use archive_layout_v2::ArchiveV2Layout;
 pub use archive_layout_zip::{
     ArchiveCigInstallation, ArchiveZip64End, ArchiveZip64Locator, ArchiveZipEnd, ArchiveZipLayout,
 };
+pub use archive_material_reference::ArchiveMaterialPaths;
 pub use archive_metadata_version::ArchiveMetadataVersion;
 pub use archive_region_info::{ArchiveRegion, ArchiveRegionState};
 pub use archive_table_declaration::ArchiveTableDeclaration;

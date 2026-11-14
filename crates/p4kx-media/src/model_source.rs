@@ -25,6 +25,8 @@ mod companions;
 
 #[path = "model_source/lod_distances.rs"]
 mod lod_distances;
+#[path = "model_source/material_library_reference.rs"]
+mod material_library_reference;
 
 #[path = "model_source/character.rs"]
 mod character;

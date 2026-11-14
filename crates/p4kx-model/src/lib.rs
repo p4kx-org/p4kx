@@ -190,6 +190,7 @@ pub use included_object_row::{
 };
 pub use included_objects_chunk::{IncludedObjectTables, IncludedObjectsChunk, IncludedPathSlot};
 pub use lod_skeleton_origin::LodSkeletonOrigin;
+pub use material::MaterialName;
 pub use material_companion::{MaterialCompanion, MaterialCompanionUse, MaterialReadOrigin};
 pub use material_emission::{
     EmissionAttribute, EmissionAttributeKind, EmissionNumber, EmissionNumeric, EmissionTextureSlot,
