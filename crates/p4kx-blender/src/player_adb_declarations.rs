@@ -72,6 +72,7 @@ struct Animation {
     ordinal: usize,
     position: SourcedValue<SocXmlPosition>,
     name: AttributeSelection,
+    alias_key: Option<SourcedValue<String>>,
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -198,10 +199,20 @@ fn layers(
         for animation in layer.animations {
             pending::check(cancel)?;
             let (position, used) = node_position(animation.position, origin)?;
+            let name = AttributeSelection::bind(animation.name, &used, origin)?;
+            let alias_key = match name.occurrences.as_slice() {
+                [attribute] => attribute
+                    .value
+                    .value()
+                    .and_then(|value| crate::player_rig_clip::alias_key(value))
+                    .map(|key| attribute.value.map_ref(|_| key)),
+                _ => None,
+            };
             animations.push(Animation {
                 ordinal: animation.ordinal,
                 position,
-                name: AttributeSelection::bind(animation.name, &used, origin)?,
+                name,
+                alias_key,
             });
         }
         layers.push(Layer {

@@ -68,6 +68,7 @@ mod player_bundle;
 mod player_bundle_output;
 mod player_bundle_rows;
 mod player_bundle_wire;
+mod player_rig_clip;
 mod player_source;
 mod player_source_body;
 mod player_source_classes;

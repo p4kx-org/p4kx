@@ -32,9 +32,7 @@ use crate::{
 };
 use std::cell::OnceCell;
 
-const CAF_IMAGE_TYPE: u32 = 0x3702_75B7;
 const DIRECTIONAL_IMAGE_TYPE: u32 = 0x6B8D_F259;
-const CAF_IMAGE_VERSION: u32 = 0x902;
 const DIRECTIONAL_IMAGE_VERSION: u32 = 0x901;
 const FIELD: &str = "/data/payload/";
 
@@ -46,7 +44,7 @@ pub(super) fn write(
     writer: &mut MediaWriter<'_>,
 ) -> Result<Option<ImageStructureError>, MediaError> {
     let expected_type = match family {
-        Family::CafImage => CAF_IMAGE_TYPE,
+        Family::CafImage => CafImage::CHUNK_TYPE,
         Family::DirectionalBlendImage => DIRECTIONAL_IMAGE_TYPE,
         Family::Caf | Family::Dba | Family::Aim => return Ok(None),
     };
@@ -207,7 +205,7 @@ impl ImageSource<'_, '_> {
         writer: &mut MediaWriter<'_>,
     ) -> Result<Layout<'a>, MediaError> {
         match (kind, version) {
-            (CAF_IMAGE_TYPE, CAF_IMAGE_VERSION) => Ok(match CafImage::read(bytes, start) {
+            (CafImage::CHUNK_TYPE, CafImage::CHUNK_VERSION) => Ok(match CafImage::read(bytes, start) {
                 Ok(image) => Layout::Caf(image),
                 Err(CafImageError::UnsupportedFormat(_)) => Layout::UnsupportedFormat,
                 Err(_) => Layout::InvalidFraming,

@@ -77,6 +77,11 @@ pub enum CafImagePath<'a> {
 }
 
 impl<'a> CafImage<'a> {
+    /// The IVO CAF image chunk type.
+    pub const CHUNK_TYPE: u32 = 0x3702_75B7;
+
+    /// The supported CAF image chunk version.
+    pub const CHUNK_VERSION: u32 = 0x902;
     /// Reads the version 0x902 CAF image chunk at its original Entry offset.
     ///
     /// # Errors

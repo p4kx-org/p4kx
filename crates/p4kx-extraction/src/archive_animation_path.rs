@@ -22,6 +22,29 @@ pub fn archive_animation_path(path: &str) -> Option<String> {
     }
 }
 
+/// Calculates the image checksum for an archive-relative DBA Entry.
+#[must_use]
+pub fn animation_bank_path_crc32(path: &str) -> Option<u32> {
+    let (root, child) = path.split_once(['/', '\\'])?;
+    if !root.eq_ignore_ascii_case("data") {
+        return None;
+    }
+    let (_, extension) = child.rsplit_once('.')?;
+    if !extension.eq_ignore_ascii_case("dba") {
+        return None;
+    }
+    let mut hash = crc32fast::Hasher::new();
+    for byte in child.bytes() {
+        let normalized = if byte == b'\\' {
+            b'/'
+        } else {
+            byte.to_ascii_lowercase()
+        };
+        hash.update(&[normalized]);
+    }
+    Some(hash.finalize())
+}
+
 /// A concrete `AnimationList` CAF alias with its original path spelling.
 #[derive(Debug, Clone, Copy)]
 pub struct NamedCafSelector<'a> {

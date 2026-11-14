@@ -128,6 +128,10 @@ impl<'a> Resources<'a> {
         }
     }
 
+    pub(crate) const fn archive(&self) -> &'a Archive {
+        self.archive
+    }
+
     pub(crate) fn read<T>(
         &self,
         value: SourceValue<String>,

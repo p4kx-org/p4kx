@@ -10,6 +10,7 @@ use serde::Serialize;
 
 use crate::PlayerDocumentRejection;
 use crate::player_adb_declarations::Fragment;
+use crate::player_rig_clip::{Bank, Clip, ImageInventory, Rig, Rule};
 use crate::player_source_body::Body;
 use crate::player_source_classes::ClassTarget;
 use crate::player_source_loadout::Loadout;
@@ -120,6 +121,27 @@ pub(crate) enum Row<'a> {
     ActorRigCandidate {
         index: usize,
         value: &'a RigCandidate,
+    },
+    RigClipImage {
+        value: &'a ImageInventory,
+    },
+    RigClipRig {
+        index: usize,
+        value: &'a Rig,
+    },
+    RigClipRule {
+        rig: usize,
+        index: usize,
+        value: &'a Rule,
+    },
+    RigClipBank {
+        rig: usize,
+        index: usize,
+        value: &'a Bank,
+    },
+    RigClipCandidate {
+        rig: usize,
+        value: &'a Clip,
     },
     WeaponMotionSource {
         index: usize,

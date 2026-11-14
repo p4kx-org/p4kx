@@ -12,6 +12,7 @@ publish.workspace = true
 layer = "service"
 
 [dependencies]
+crc32fast.workspace = true
 p4kx-archive.workspace = true
 p4kx-audio.workspace = true
 p4kx-chunks.workspace = true
@@ -35,7 +36,6 @@ tempfile.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-crc32fast.workspace = true
 exr.workspace = true
 jsonschema.workspace = true
 lewton = { workspace = true, features = ["ogg"] }

@@ -2,6 +2,16 @@
   "$defs": {
     "Animation": {
       "properties": {
+        "aliasKey": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfstring"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "name": {
           "$ref": "#/$defs/AttributeSelection"
         },
@@ -347,6 +357,57 @@
       ],
       "type": "string"
     },
+    "Bank": {
+      "properties": {
+        "declaration": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "metadata": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfnull"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rule": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "target": {
+          "$ref": "#/$defs/SourcedValueOfLookup"
+        }
+      },
+      "required": [
+        "rule",
+        "declaration",
+        "target"
+      ],
+      "type": "object"
+    },
+    "BankMatch": {
+      "properties": {
+        "bank": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "records": {
+          "items": {
+            "$ref": "#/$defs/Record"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "bank",
+        "records"
+      ],
+      "type": "object"
+    },
     "Body": {
       "oneOf": [
         {
@@ -651,6 +712,86 @@
         }
       ]
     },
+    "Clip": {
+      "properties": {
+        "aliasKey": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "bankCrc32": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "chunk": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "record": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rule": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source": {
+          "$ref": "#/$defs/SourcedValueOfClipSources"
+        }
+      },
+      "required": [
+        "rule",
+        "chunk",
+        "record",
+        "path",
+        "aliasKey",
+        "bankCrc32",
+        "source"
+      ],
+      "type": "object"
+    },
+    "ClipSources": {
+      "oneOf": [
+        {
+          "properties": {
+            "target": {
+              "$ref": "#/$defs/SourcedValueOfLookup"
+            },
+            "type": {
+              "const": "loose",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "target"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "candidates": {
+              "items": {
+                "$ref": "#/$defs/BankMatch"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "database",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "candidates"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "ControllerRigOwner": {
       "properties": {
         "controllerDocument": {
@@ -705,7 +846,7 @@
     "CycleEdge": {
       "properties": {
         "kind": {
-          "$ref": "#/$defs/Kind"
+          "$ref": "#/$defs/Kind2"
         },
         "link": {
           "format": "uint",
@@ -915,7 +1056,7 @@
         },
         "kinds": {
           "items": {
-            "$ref": "#/$defs/Kind"
+            "$ref": "#/$defs/Kind2"
           },
           "type": "array",
           "uniqueItems": true
@@ -949,7 +1090,7 @@
         "ownerKind": {
           "anyOf": [
             {
-              "$ref": "#/$defs/Kind"
+              "$ref": "#/$defs/Kind2"
             },
             {
               "type": "null"
@@ -969,7 +1110,7 @@
           "$ref": "#/$defs/SourcedValueOfResource"
         },
         "targetKind": {
-          "$ref": "#/$defs/Kind"
+          "$ref": "#/$defs/Kind2"
         }
       },
       "required": [
@@ -1076,7 +1217,7 @@
         "lookup": {
           "anyOf": [
             {
-              "$ref": "#/$defs/Lookup"
+              "$ref": "#/$defs/Lookup2"
             },
             {
               "type": "null"
@@ -1113,7 +1254,7 @@
     "FragmentOwner": {
       "properties": {
         "lookup": {
-          "$ref": "#/$defs/Lookup"
+          "$ref": "#/$defs/Lookup2"
         },
         "tagScope": {
           "format": "uint",
@@ -1174,6 +1315,27 @@
       ],
       "type": "object"
     },
+    "ImageInventory": {
+      "properties": {
+        "table": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfnull"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "target": {
+          "$ref": "#/$defs/SourcedValueOfLookup"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "type": "object"
+    },
     "InputScope": {
       "description": "The source byte domain interpreted by one use.",
       "oneOf": [
@@ -1196,6 +1358,84 @@
       "x-p4kx-vocabularyClass": "control"
     },
     "Kind": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "folder",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "canonical": {
+              "type": "string"
+            },
+            "type": {
+              "const": "tracksDatabase",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "canonical"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "canonical": {
+              "type": "string"
+            },
+            "folderRule": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "recursiveCaf",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "folderRule",
+            "canonical"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "unsupported",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "invalid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Kind2": {
       "enum": [
         "tags",
         "fragments"
@@ -1368,6 +1608,57 @@
       "type": "object"
     },
     "Lookup": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "missing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "candidates": {
+              "items": {
+                "$ref": "#/$defs/PhysicalSourceRef"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "candidates"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "type": {
+              "const": "found",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "source"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Lookup2": {
       "properties": {
         "containsEncryptedSource": {
           "type": [
@@ -1942,6 +2233,27 @@
         }
       ]
     },
+    "Record": {
+      "properties": {
+        "metadataRange": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_2_of_DecimalU64"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "ordinal",
+        "name",
+        "metadataRange"
+      ],
+      "type": "object"
+    },
     "Resource": {
       "oneOf": [
         {
@@ -2055,6 +2367,41 @@
         }
       ]
     },
+    "Rig": {
+      "properties": {
+        "animationList": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfuint"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "bodyVariant": {
+          "type": "string"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfLookup"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "skeleton": {
+          "$ref": "#/$defs/SourcedValueOfLookup"
+        }
+      },
+      "required": [
+        "bodyVariant",
+        "skeleton"
+      ],
+      "type": "object"
+    },
     "RigCandidate": {
       "properties": {
         "bodyEvidence": {
@@ -2111,6 +2458,43 @@
         "fragmentTags"
       ],
       "type": "string"
+    },
+    "Rule": {
+      "properties": {
+        "child": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/SourcedValueOfKind"
+        },
+        "list": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "items": {
+            "$ref": "#/$defs/SourcedValueOfstring"
+          },
+          "type": "array"
+        },
+        "path": {
+          "items": {
+            "$ref": "#/$defs/SourcedValueOfstring"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "list",
+        "child",
+        "name",
+        "path",
+        "kind"
+      ],
+      "type": "object"
     },
     "ScopeOverride": {
       "properties": {
@@ -3600,6 +3984,141 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_size_2_of_DecimalU64": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/DecimalU64"
+                },
+                "maxItems": 2,
+                "minItems": 2,
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfAttachment": {
       "allOf": [
         {
@@ -3990,6 +4509,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfClipSources": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ClipSources"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfControllerRigOwner": {
       "allOf": [
         {
@@ -4250,6 +4899,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfKind": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/Kind"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfLoadout": {
       "allOf": [
         {
@@ -4344,6 +5123,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/Loadout"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfLookup": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/Lookup"
               }
             }
           }
@@ -5941,6 +6850,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfnull": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfstring": {
       "allOf": [
         {
@@ -6603,7 +7642,7 @@
           "type": "array"
         },
         "kind": {
-          "$ref": "#/$defs/Kind"
+          "$ref": "#/$defs/Kind2"
         },
         "links": {
           "items": {
@@ -7177,6 +8216,127 @@
       "required": [
         "type",
         "index",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "const": "rigClipImage",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/ImageInventory"
+        }
+      },
+      "required": [
+        "type",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "const": "rigClipRig",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Rig"
+        }
+      },
+      "required": [
+        "type",
+        "index",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rig": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "const": "rigClipRule",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Rule"
+        }
+      },
+      "required": [
+        "type",
+        "rig",
+        "index",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "index": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rig": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "const": "rigClipBank",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Bank"
+        }
+      },
+      "required": [
+        "type",
+        "rig",
+        "index",
+        "value"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
+        "rig": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "type": {
+          "const": "rigClipCandidate",
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/Clip"
+        }
+      },
+      "required": [
+        "type",
+        "rig",
         "value"
       ],
       "type": "object"

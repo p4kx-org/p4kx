@@ -177,3 +177,25 @@ incomplete definitions. These shared lists retain each original occurrence
 without materializing the combinations of weapons and options. The relationships
 describe authored source candidates. Runtime selection and physical rig binding
 require separate evidence.
+
+For each requested body, `rigClipRig` records the physical lookup of the
+standard skeleton and its adjacent CHRPARAMS. A parsed CHRPARAMS value links to
+the original `document`. `rigClipRule` retains original AnimationList and child
+ordinals and all name and path attribute occurrences. Supported masks use
+the preceding valid `#filepath` in the same AnimationList with a plain `*` alias
+and a recursive `*/*.caf` mask. Other mappings remain visible as original rules.
+
+`rigClipCandidate` links a rule and a physical CAF image record by chunk and
+record ordinal and retains its full original path. Its ASCII-insensitive
+`aliasKey` can be compared with the matching key of a single original
+`adbFragment` animation name. These comparisons describe possible matches for
+each requested body. Controller scope and runtime playback selection remain
+unresolved. Multiple physical alternatives are retained.
+
+The CAF image's zero DBA checksum is an exact loose archive lookup. Other
+checksums select only authored `$TracksDatabase` declarations in the rule's
+AnimationList. Each matching declaration links to a `rigClipBank` row by index.
+A bank record matches only by its full normalized path and keeps its physical
+metadata ordinal, exact name and Entry-relative byte range. Bank rows carry
+their physical lookup and read outcome so empty candidate rows can be
+distinguished from unavailable or incomplete input.

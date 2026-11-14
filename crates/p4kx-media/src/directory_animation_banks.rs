@@ -5,6 +5,8 @@ use std::collections::HashMap;
 use std::collections::TryReserveError;
 use std::io;
 
+use p4kx_extraction::animation_bank_path_crc32;
+
 use super::DirectoryLookup;
 use crate::origin_lookup::ObservedInputLookup;
 use crate::{
@@ -31,7 +33,7 @@ impl AnimationBanks {
         for batch in entries.chunks(BATCH_LENGTH) {
             budget.metadata(0, batch.len() as u64, writer.limits(), writer.checkpoint)?;
             for entry in batch {
-                let Some(crc) = bank_crc(entry.path()) else {
+                let Some(crc) = animation_bank_path_crc32(entry.path()) else {
                     continue;
                 };
                 if !by_crc.contains_key(&crc) {
@@ -99,27 +101,6 @@ fn resolved_input<'a>(
         chain: directory.chain,
         position: *position,
     })
-}
-
-fn bank_crc(path: &str) -> Option<u32> {
-    let (root, child) = path.split_once(['/', '\\'])?;
-    if !root.eq_ignore_ascii_case("data") {
-        return None;
-    }
-    let (_, extension) = child.rsplit_once('.')?;
-    if !extension.eq_ignore_ascii_case("dba") {
-        return None;
-    }
-    let mut hash = crc32fast::Hasher::new();
-    for byte in child.bytes() {
-        let normalized = if byte == b'\\' {
-            b'/'
-        } else {
-            byte.to_ascii_lowercase()
-        };
-        hash.update(&[normalized]);
-    }
-    Some(hash.finalize())
 }
 
 fn missing_entry() -> MediaError {

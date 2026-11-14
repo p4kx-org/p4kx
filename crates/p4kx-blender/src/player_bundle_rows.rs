@@ -35,6 +35,7 @@ pub(super) fn write(
         push(&Row::ControllerTopology { value })?;
     }
     rig_rows(capture, &mut push)?;
+    clip_rows(capture, &mut push)?;
     for adb in &capture.adb_declarations {
         push(&Row::AdbDocument {
             document: adb.document,
@@ -96,6 +97,36 @@ fn rig_rows(
         for (index, value) in candidates.value().into_iter().flatten().enumerate() {
             push(&Row::ActorRigCandidate { index, value })?;
         }
+    }
+    Ok(())
+}
+
+fn clip_rows(
+    capture: &PlayerSourceCapture,
+    push: &mut impl FnMut(&Row<'_>) -> io::Result<()>,
+) -> io::Result<()> {
+    if let Some(value) = &capture.rig_clips.image {
+        push(&Row::RigClipImage { value })?;
+    }
+    for (index, value) in capture.rig_clips.rigs.iter().enumerate() {
+        push(&Row::RigClipRig { index, value })?;
+    }
+    for (rig, index, value) in &capture.rig_clips.rules {
+        push(&Row::RigClipRule {
+            rig: *rig,
+            index: *index,
+            value,
+        })?;
+    }
+    for (rig, index, value) in &capture.rig_clips.banks {
+        push(&Row::RigClipBank {
+            rig: *rig,
+            index: *index,
+            value,
+        })?;
+    }
+    for (rig, value) in &capture.rig_clips.clips {
+        push(&Row::RigClipCandidate { rig: *rig, value })?;
     }
     Ok(())
 }

@@ -7,12 +7,13 @@ use p4kx_assembly::{BodyVariant, Entities};
 use p4kx_extraction::{
     Archive, ArchiveWatch, CancelToken, DataForgeEntry, DataForgeOrigin, EntryOrigin, FieldOrigin,
     InputScope, PathKeys, PhysicalSourceRef, SourceEvidenceError, SourceInput, SourceInventory,
-    SourceScope, SourceUses, SourcedValue,
+    SourceScope, SourceUse, SourceUses, SourcedValue,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::player_adb_declarations::AdbDeclarations;
+use crate::player_rig_clip::{self, RigClips};
 use crate::player_source_body::{self, Body};
 use crate::player_source_loadout::{self, Loadout};
 use crate::player_source_motion::{ControllerTopology, Motion, RigCandidate, read_rig_candidates};
@@ -103,6 +104,7 @@ pub struct PlayerSourceCapture {
     pub(crate) motion: Motion,
     pub(crate) controller_topology: Vec<ControllerTopology>,
     pub(crate) actor_rig_candidates: Option<SourcedValue<Vec<RigCandidate>>>,
+    pub(crate) rig_clips: RigClips,
     pub(crate) adb_declarations: Vec<AdbDeclarations>,
     pub(crate) tag_definitions: TagDefinitions,
     pub(crate) adb_tag_uses: AdbTagUses,
@@ -124,6 +126,7 @@ pub(super) struct PreparedCapture<'sink> {
     pub(super) motion: Motion,
     controller_topology: Vec<ControllerTopology>,
     actor_rig_candidates: Option<SourcedValue<Vec<RigCandidate>>>,
+    rig_clips: RigClips,
     pub(super) adb_declarations: Vec<AdbDeclarations>,
     pub(super) tag_definitions: TagDefinitions,
     pub(super) documents: XmlDocuments<'sink>,
@@ -157,6 +160,7 @@ impl PreparedCapture<'_> {
             motion: self.motion,
             controller_topology: self.controller_topology,
             actor_rig_candidates: self.actor_rig_candidates,
+            rig_clips: self.rig_clips,
             adb_tag_uses: self.adb_tag_uses,
             weapon_motion_sources: self.weapon_motion_sources,
             weapon_motion_tags: self.weapon_motion_tags,
@@ -204,16 +208,17 @@ fn prepare_observed<'sink>(
     let classes = forge.as_ref().zip(data_scope.as_ref());
     observe(data.as_ref(), classes);
     let bodies = capture_bodies(&paths, variants, &sources, &directory, classes, cancel)?;
-    let loadouts = player_source_loadout::read(
-        archive,
+    let resources = Resources::new(archive, &sources, cancel);
+    let (loadouts, original_motion) =
+        capture_motion(&resources, &directory, classes, &mut documents)?;
+    let rig_clips = streaming_rigs(
+        &mut documents,
+        &paths,
+        variants,
         &sources,
         &directory,
-        classes,
-        &mut documents,
         cancel,
     )?;
-    let resources = Resources::new(archive, &sources, cancel);
-    let original_motion = OriginalMotion::read(&resources, &directory, classes, &mut documents)?;
     let actor_rig_candidates = documents
         .is_streaming()
         .then(|| read_rig_candidates(classes, &directory, &sources, cancel))
@@ -233,6 +238,7 @@ fn prepare_observed<'sink>(
         motion: original_motion.motion,
         controller_topology: documents.bind_controller_topology(&sources, cancel)?,
         actor_rig_candidates,
+        rig_clips,
         adb_declarations: original_motion.adb_declarations,
         tag_definitions: original_motion.tag_definitions,
         documents,
@@ -243,11 +249,44 @@ fn prepare_observed<'sink>(
     })
 }
 
+fn capture_motion(
+    resources: &Resources<'_>,
+    directory: &SourceUse,
+    classes: crate::player_source_classes::Classes<'_, '_>,
+    documents: &mut XmlDocuments<'_>,
+) -> Result<(Vec<SourcedValue<Loadout>>, OriginalMotion), PlayerSourceError> {
+    let loadouts = player_source_loadout::read(
+        resources.archive(),
+        resources.sources,
+        directory,
+        classes,
+        documents,
+        resources.cancel,
+    )?;
+    let motion = OriginalMotion::read(resources, directory, classes, documents)?;
+    Ok((loadouts, motion))
+}
+
+fn streaming_rigs(
+    documents: &mut XmlDocuments<'_>,
+    paths: &p4kx_extraction::PathIndex<'_>,
+    variants: &[BodyVariant],
+    sources: &SourceUses,
+    directory: &SourceUse,
+    cancel: &CancelToken,
+) -> Result<RigClips, PlayerSourceError> {
+    if documents.is_streaming() {
+        player_rig_clip::read(paths, variants, sources, directory, cancel, documents)
+    } else {
+        Ok(RigClips::default())
+    }
+}
+
 fn capture_bodies(
     paths: &p4kx_extraction::PathIndex<'_>,
     variants: &[BodyVariant],
     sources: &SourceUses,
-    directory: &p4kx_extraction::SourceUse,
+    directory: &SourceUse,
     classes: crate::player_source_classes::Classes<'_, '_>,
     cancel: &CancelToken,
 ) -> Result<Vec<CapturedBody>, PlayerSourceError> {
@@ -274,7 +313,7 @@ struct OriginalMotion {
 impl OriginalMotion {
     fn read(
         resources: &Resources<'_>,
-        directory: &p4kx_extraction::SourceUse,
+        directory: &SourceUse,
         classes: crate::player_source_classes::Classes<'_, '_>,
         documents: &mut XmlDocuments<'_>,
     ) -> Result<Self, PlayerSourceError> {

@@ -12,7 +12,6 @@ publish.workspace = true
 layer = "service"
 
 [dependencies]
-crc32fast.workspace = true
 p4kx-assembly.workspace = true
 p4kx-extraction.workspace = true
 p4kx-shader.workspace = true
@@ -24,6 +23,7 @@ sha2.workspace = true
 tempfile.workspace = true
 
 [dev-dependencies]
+crc32fast.workspace = true
 p4kx-testkit.workspace = true
 jsonschema.workspace = true
 
