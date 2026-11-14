@@ -62,6 +62,18 @@ Audio includes 19/10/304 BNK and 1,962/1,469/113 WEM additions/removals/changes.
 path, size and checksum observations guide the selection of concrete source witnesses.
 They do not attribute a change to the current PTU update relative to the prior PTU.
 
+The stored physical-damage channel changed in one ammunition witness alongside
+`impactAIStimulusDistance`. The narrow weapon and related-record filter found four changes
+and zero unreadable Records. Existing typed ammunition inputs cover both changed fields.
+The comparison establishes a content change against LIVE for that sample. A nominal value
+from that source supplies no evidence of actual kill times or a delta against the previous PTU.
+
+The schema also adds two scalar `AudioRtpc` Class members to `ProceduralPlanetAudioData`,
+with two exact Records in each Build. They qualify the original room controls
+`firstRoomIsPlanetRoomNotIncludingShipsRtpc` and `firstRoomIsPlanetRoomOrVehicleRoomRtpc`.
+Their DataForge owner is tracked separately in
+[#1149](https://github.com/p4kx-org/p4kx/issues/1149).
+
 The remaining per-domain source probes and any exporter follow-ups are tracked in
 [#1145](https://github.com/p4kx-org/p4kx/issues/1145).
 The current tuning test and other patch-note items come from the
