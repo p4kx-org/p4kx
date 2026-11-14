@@ -8,6 +8,67 @@ of the current checkout. This report contains technical structures and implement
 only. Game values, text dumps, concrete test-build Record identities, build payloads and
 extracted assets are not included. Public technical issue updates were explicitly authorized.
 
+## PTU 13189690 follow-through
+
+The 2026-11-14 comparison verifies the installed manifests for PTU 13189690
+(`sc-alpha-5.0.0`, internal `5.0.201.16954`) and LIVE 13165946
+(`sc-alpha-4.10.0`, internal `4.10.200.58746`). The earlier 5.0 PTU changelist
+13119881 (`5.0.200.12681`) is identified by its retained client build header.
+The older comparison below covers that earlier set of declaration families. No full prior PTU
+Archive has been found in the installed channels.
+
+The read-only comparison used `p4kx compare LIVE PTU --entries`, `--schema`, and a filtered
+`--records` pass over the FactionReputation path family. Both source Archive identities stayed
+stable through the runs. Only counts and technical declarations are reported here.
+
+| LIVE to current PTU comparison | Added | Removed | Changed |
+| --- | ---: | ---: | ---: |
+| Archive central-directory Entries | 38,744 | 13,478 | 24,145 |
+| DataForge structures | 161 | 7 | 62 |
+| DataForge properties in shared structures | 60 | 33 | 2 |
+| DataForge enums | 6 | 0 | 5 |
+| DataForge options in shared enums | 15 | 1 | 0 |
+| Filtered FactionReputation Records | 11 | 1 | 38 |
+
+All 38 shared changed FactionReputation Records show the four added presentation fields
+`description`, `background`, `missionBoardLogo` and `guildBanner`. The catalog already
+exports these fields under [#1073](https://github.com/p4kx-org/p4kx/issues/1073).
+The archived 5.0 audit below already identified the broader scope, Mission Board and
+FactionIdentity families. Preserve separate checks for Contract-level scope attribution, a
+runtime or authored PTU reputation multiplier, and actual source mapping of lock UI states.
+
+The current DataForge declaration exposes the Bool `ContractResult_CompletionTags.splitPointsForParty`
+and the Int32 `LocationResourceSlot.numberOfResourceSlotsPerEntity`. The LIVE declaration of
+the latter holds a `resourceSlotTag` Reference, and the exact type count in the compared DataForges
+changes from 3 to 66. Source controls, target identities and older authored members need coverage
+under [#1145](https://github.com/p4kx-org/p4kx/issues/1145).
+`AmmoParams.impactAIStimulusDistance` already has its own catalog cell.
+The current PTU declaration trace resolves the added `allowFPSPingWave` Bool through the
+owned scalar `SStandardParams.radarOptionParams` Class. Resource slots, Mode radar options
+and completion-tag outcomes have follow-ups in
+[#1146](https://github.com/p4kx-org/p4kx/issues/1146),
+[#1147](https://github.com/p4kx-org/p4kx/issues/1147) and
+[#1148](https://github.com/p4kx-org/p4kx/issues/1148), respectively.
+
+The changed GFx and SWF Entries each parse successfully in both installations. Both files
+change the container version from 17 to 15 while keeping the same frame count and the same
+unread tag inventory. The exported symbols and frame labels do not identify the missile-lock
+interface. A file-type match by itself cannot attribute this change to the announced UI.
+
+Current PTU has 24 `.resource`, 35 `.climasset`, 68 `.geoasset` and 156 `.dst` Entry additions
+against LIVE. The prior 5.0 audit already observed the loose planet descriptor families.
+The present Entry comparison shows 980 additions, 80 removals and 7,677 changes for SOCPAKs.
+Audio includes 19/10/304 BNK and 1,962/1,469/113 WEM additions/removals/changes. These
+path, size and checksum observations guide the selection of concrete source witnesses.
+They do not attribute a change to the current PTU update relative to the prior PTU.
+
+The remaining per-domain source probes and any exporter follow-ups are tracked in
+[#1145](https://github.com/p4kx-org/p4kx/issues/1145).
+The current tuning test and other patch-note items come from the
+[CIG notes](https://robertsspaceindustries.com/spectrum/community/SC/forum/190048/thread/star-citizen-alpha-5-0-ptu-patch-notes/9230254)
+and separate
+[TTK update](https://robertsspaceindustries.com/spectrum/community/SC/forum/190048/thread/star-citizen-alpha-5-0-ptu-patch-notes/9230300).
+
 ## Schema v3 follow-through
 
 Schema v3 exports the original item-recovery economy, override and policy tables. The
