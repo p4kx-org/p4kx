@@ -18,6 +18,9 @@ const RAPID: &[&str] = &[
 ];
 const BURST: &[&str] = &["shotCount", "cooldownTime"];
 const BEAM: &[&str] = &[
+    "hitType",
+    "fullDamageRange",
+    "zeroDamageRange",
     "heatCostPerSecond",
     "heatPerSecond",
     "wearPerSecond",
@@ -75,7 +78,7 @@ pub(super) fn action<'source>(
             };
             count
         }
-        "beam" => fields(trace, original, data, BEAM)?,
+        "beam" => fields(trace, original, data, BEAM)? + beam_damage(trace, original, data)?,
         "aim" => {
             fields(trace, original, data, &["hasReloadModesOnUI"])?
                 + owned_input(trace, original, data, "aimModifier")?
@@ -87,6 +90,64 @@ pub(super) fn action<'source>(
         _ => 0,
     };
     Ok(count)
+}
+
+fn beam_damage<'source>(
+    trace: &Trace<'_, 'source>,
+    original: &StructValue<'source>,
+    data: &Value,
+) -> TestResult<usize> {
+    let name = "damagePerSecond";
+    let count = owned_input(trace, original, data, name)?;
+    let Some(raw @ Original::Struct(damage)) = original.field(name) else {
+        return Ok(count);
+    };
+    let selected = cell(data, name)?;
+    trace.part(selected, raw, "$target", "selector")?;
+    let projected = selected
+        .pointer("/value")
+        .ok_or("original beam damage body")?;
+    assert!(
+        proof::text(projected, "/sourceType/value")? == damage.type_name(),
+        "the original nominal DamageBase pointer retains its concrete body"
+    );
+    let alternative = proof::text(projected, "/type")?;
+    let fields: &[(&str, &str)] = match alternative {
+        "channels" => &[
+            ("DamagePhysical", "physical"),
+            ("DamageEnergy", "energy"),
+            ("DamageDistortion", "distortion"),
+            ("DamageThermal", "thermal"),
+            ("DamageBiochemical", "biochemical"),
+            ("DamageStun", "stun"),
+        ],
+        "parameters" => &[("damageTotal", "damageTotal")],
+        "base" => return Ok(count),
+        "authored" => {
+            return Ok(count + authored_roots(trace, damage, cell(projected, "authored")?)?);
+        }
+        _ => return Err("unrecognized original beam damage alternative".into()),
+    };
+    let cells = projected
+        .pointer("/value")
+        .ok_or("original beam damage inputs")?;
+    let mut checked = count;
+    for &(name, wire) in fields {
+        let raw = damage.field(name);
+        let output = cell(cells, wire)?;
+        if let Some(raw @ Original::Single(number)) = raw {
+            assert!(
+                u32::from_str_radix(proof::text(output, "/value/rawBits")?, 16)?
+                    == number.to_bits(),
+                "exact authored beam damage Single"
+            );
+            trace.check(output, raw, "payload")?;
+            checked += 1;
+        } else {
+            other_state(trace, raw, output)?;
+        }
+    }
+    Ok(checked)
 }
 
 fn launcher<'source>(

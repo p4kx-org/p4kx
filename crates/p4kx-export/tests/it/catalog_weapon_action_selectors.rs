@@ -86,6 +86,7 @@ fn check_first(catalog: &Value, row: &Value, original: &OriginalSelectors) -> Te
     };
     check_launcher(catalog, rapid, &original.first, RAPID, "rapid", ALPHA)?;
     check_launcher(catalog, burst, &original.second, BURST, "burst", BETA)?;
+    check_beam(catalog, beam)?;
     check_heat(rapid, burst, beam)
 }
 
@@ -159,6 +160,40 @@ fn check_heat(rapid: &Value, burst: &Value, beam: &Value) -> TestResult {
     )?;
     proof::present(rapid, "fireDuringSpinUp", &json!(false), Some(true))?;
     proof::present(burst, "shotCount", &json!(0), Some(true))?;
+    Ok(())
+}
+
+fn check_beam(catalog: &Value, node: &Value) -> TestResult {
+    let action = proof::at(node, "/kind/value")?;
+    check_single(action, "/fullDamageRange/value/rawBits", "41980000")?;
+    check_single(action, "/zeroDamageRange/value/rawBits", "41d80000")?;
+    proof::present(action, "hitType", &json!("FixtureBeamHit"), Some(true))?;
+    let damage = proof::at(action, "/damagePerSecond/value")?;
+    assert_eq!(
+        proof::at(damage, "/type")?,
+        "channels",
+        "original DamageInfo alternative"
+    );
+    proof::present(damage, "sourceType", &json!("DamageInfo"), Some(true))?;
+    let channels = proof::at(damage, "/value")?;
+    for (field, finite, bits) in [("physical", 0.0, "00000000"), ("energy", 12.0, "41400000")] {
+        let value = proof::present(
+            channels,
+            field,
+            &json!({"rawBits": bits, "finite": finite}),
+            Some(true),
+        )?;
+        assert_ne!(
+            proof::uses(catalog, value)?,
+            [] as [&Value; 0],
+            "each original damage channel retains its source use"
+        );
+    }
+    proof::cell(channels, "stun", "absent")?;
+    let [unknown] = proof::rows(damage, "/authored/roots")? else {
+        return Err("original unprojected damage member".into());
+    };
+    proof::present(unknown, "name", &json!("fixtureUnprojected"), Some(true))?;
     Ok(())
 }
 

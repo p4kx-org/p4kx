@@ -2484,7 +2484,7 @@
       "required": []
     },
     "BeamAction": {
-      "description": "Stored beam inputs with independent heat-cost and heat fields.",
+      "description": "Original beam damage, ranges, thermal inputs and activation timing.",
       "properties": {
         "authored": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -2495,14 +2495,23 @@
         "chargeUpTime": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
         },
+        "damagePerSecond": {
+          "$ref": "#/$defs/SourcedValueOfBeamDamage"
+        },
         "fireDuringChargeUp": {
           "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "fullDamageRange": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
         },
         "heatCostPerSecond": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
         },
         "heatPerSecond": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "hitType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "maxEnergyDraw": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -2512,18 +2521,99 @@
         },
         "wearPerSecond": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "zeroDamageRange": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
         }
       },
       "required": [
         "authored",
         "chargeDownTime",
         "chargeUpTime",
+        "damagePerSecond",
         "fireDuringChargeUp",
+        "fullDamageRange",
         "heatCostPerSecond",
         "heatPerSecond",
+        "hitType",
         "maxEnergyDraw",
         "minEnergyDraw",
-        "wearPerSecond"
+        "wearPerSecond",
+        "zeroDamageRange"
+      ],
+      "type": "object"
+    },
+    "BeamDamage": {
+      "description": "The concrete original beam damage declaration and its untouched members.",
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "base",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "channels",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/DamageInfo"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "parameters",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/DamageParameters"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "authored",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "authored": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authored",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -55593,6 +55683,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/BaseSignature"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfBeamDamage": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/BeamDamage"
               }
             }
           }

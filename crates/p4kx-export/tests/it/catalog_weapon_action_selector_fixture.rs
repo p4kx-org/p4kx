@@ -119,7 +119,19 @@ fn launcher_types(types: DataForgeBuilder, case: Case) -> DataForgeBuilder {
         .structure(
             TestStruct::new(BEAM)
                 .parent(ACTION)
-                .field("heatCostPerSecond", TestType::Single),
+                .field("heatCostPerSecond", TestType::Single)
+                .field("hitType", TestType::String)
+                .field("fullDamageRange", TestType::Single)
+                .field("zeroDamageRange", TestType::Single)
+                .field("damagePerSecond", pointer("DamageBase")),
+        )
+        .structure(TestStruct::new("DamageBase"))
+        .structure(
+            TestStruct::new("DamageInfo")
+                .parent("DamageBase")
+                .field("DamagePhysical", TestType::Single)
+                .field("DamageEnergy", TestType::Single)
+                .field("fixtureUnprojected", TestType::Bool),
         )
 }
 
@@ -186,7 +198,7 @@ fn item(case: Case) -> TestRecord {
             .value("heatPerShot", TestValue::Single(1.25))
             .value("shotCount", TestValue::UInt8(0)),
     );
-    let beam = node(TestInstance::new(BEAM).value("heatCostPerSecond", TestValue::Single(6.0)));
+    let beam = beam_action();
     let label = match case {
         Case::UnreadableLabel => TestValue::Raw(BAD_LABEL_OFFSET.to_le_bytes().to_vec()),
         _ => TestValue::text(ALPHA),
@@ -222,6 +234,21 @@ fn item(case: Case) -> TestRecord {
             container,
             weapon(vec![rapid(PROJECTILE, TestValue::text(ALPHA), case)]),
         ]),
+    )
+}
+
+fn beam_action() -> TestValue {
+    let damage = TestInstance::new("DamageInfo")
+        .value("DamagePhysical", TestValue::Single(0.0))
+        .value("DamageEnergy", TestValue::Single(12.0))
+        .value("fixtureUnprojected", TestValue::Bool(false));
+    node(
+        TestInstance::new(BEAM)
+            .value("heatCostPerSecond", TestValue::Single(6.0))
+            .value("hitType", TestValue::text("FixtureBeamHit"))
+            .value("fullDamageRange", TestValue::Single(19.0))
+            .value("zeroDamageRange", TestValue::Single(27.0))
+            .value("damagePerSecond", node(damage)),
     )
 }
 

@@ -141,7 +141,14 @@ owning Record.
 Single, rapid and burst actions expose their stored per-shot inputs and
 owned `launchParams`. Rapid and burst inputs retain their own spin and
 count fields. Beam actions retain `heatCostPerSecond` separately from
-`heatPerSecond`. A projectile launcher's `heatCost` and the action's
+`heatPerSecond`. The typed beam body exposes both original range endpoints and the original
+hit label. The damage-per-second pointer exposes the exact concrete damage
+type. A channel body retains the six stored damage words with their separate
+origins. A parameters body retains the original macro reference and total.
+Other admitted damage bodies and unprojected members remain in the authored
+arena. The catalog retains these inputs for consumers to evaluate.
+
+A projectile launcher's `heatCost` and the action's
 `heatPerShot` remain independent Single values. The other admitted action
 declarations retain their original fields and local value links under the
 `authored` alternative. Other admitted launchers retain their concrete
