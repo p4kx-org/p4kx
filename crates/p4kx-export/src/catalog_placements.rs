@@ -15,7 +15,9 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_table::CatalogTable;
 use crate::collected::Collected;
 use crate::schema_fields::every_field_required;
+use crate::starmap_containers::Placements;
 use crate::starmap_containers::instance::ContainerInstance;
+use crate::starmap_containers::location_instance::LocationInstance;
 
 /// Contextual placements and relationships keyed by their physical definitions.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -28,6 +30,7 @@ pub(crate) struct CatalogPlacements {
     facility_instances: CatalogTable<FacilityInstance>,
     facility_interior_coverage: Vec<InteriorRoomCoverage>,
     container_instances: CatalogTable<ContainerInstance>,
+    location_instances: CatalogTable<LocationInstance>,
 }
 
 impl<'source> Collected<'source> {
@@ -36,7 +39,7 @@ impl<'source> Collected<'source> {
         archive: &Archive,
         forge: &DataForge<'_>,
         input: &OriginalCatalogInput<'_, '_>,
-        container_instances: CatalogTable<ContainerInstance>,
+        placements: &mut Placements,
         cancel: Option<&CancelToken>,
     ) -> Result<(CatalogPlacements, ResourceTopologyTables<'source>), CatalogError> {
         let origins = input.origins();
@@ -56,7 +59,8 @@ impl<'source> Collected<'source> {
             starmap_placements: starmap_placement::table(forge, starmap, origins)?,
             facility_instances,
             facility_interior_coverage,
-            container_instances,
+            container_instances: placements.take_instances(),
+            location_instances: placements.take_locations(),
         };
         Ok((placements, topology.declarations))
     }

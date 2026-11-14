@@ -49,6 +49,10 @@ impl<'read, 'capture, 'input> EntryXml<'read, 'capture, 'input> {
         matches!(&self.document, Document::Cry(document) if document.is_lossy())
     }
 
+    pub(crate) const fn capture(&self) -> &EntryCapture<'input> {
+        self.capture
+    }
+
     pub(crate) fn root(&self) -> Root<'_> {
         self.document.root()
     }

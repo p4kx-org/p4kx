@@ -10,6 +10,7 @@ use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
 use crate::entry_source::EntrySource;
 use crate::starmap_containers::Limits;
 use crate::starmap_containers::instance::{ContainerFile, ContainerInstance, ContainerOccurrence};
+use crate::starmap_containers::location_instance::LocationInstance;
 use crate::starmap_containers::proof::{PlacementProof, PlacementStep};
 use crate::starmap_index::Index;
 use crate::starmap_parse::{Body, Child, Level, Pose};
@@ -24,6 +25,9 @@ const REPORT_LINES: usize = 300;
 /// The longest line the report keeps.
 const LINE_LEN: usize = 300;
 
+#[path = "starmap_walk_location.rs"]
+mod location;
+
 #[derive(Default)]
 pub(crate) struct SystemRead {
     pub(crate) placed: Vec<(Guid, Placement)>,
@@ -36,6 +40,7 @@ pub(crate) struct SystemRead {
     pub(crate) report: StarmapReport,
     pub(crate) containers: Vec<Opened>,
     pub(crate) instances: Vec<ContainerInstance>,
+    pub(crate) locations: Vec<LocationInstance>,
 }
 
 /// A container the walk opened and the starmap record it hangs below.
@@ -53,6 +58,7 @@ struct WalkPath {
     external: usize,
     route: Option<Arc<PlacementStep>>,
     parent_instance: Option<Arc<PlacementStep>>,
+    parent_location: Option<Arc<PlacementStep>>,
     local: Option<AuthoredPose>,
     via: Option<AuthoredEntryPath>,
 }
@@ -64,6 +70,7 @@ impl WalkPath {
         external: 0,
         route: None,
         parent_instance: None,
+        parent_location: None,
         local: None,
         via: None,
     };
@@ -83,6 +90,7 @@ impl WalkPath {
             external: self.external,
             route,
             parent_instance: self.parent_instance.clone(),
+            parent_location: self.parent_location.clone(),
             local: Some(pose),
             via: None,
         }
@@ -232,7 +240,7 @@ impl<'a> System<'a> {
                     ));
                 }
                 self.open.push(entry);
-                self.children(root, &path.within_container(), &label)?;
+                self.children(root, &path.within_container(), &label, file)?;
                 self.open.pop();
             }
         }
@@ -280,6 +288,7 @@ impl<'a> System<'a> {
         level: &Level,
         parent: &WalkPath,
         label: &str,
+        file: &ContainerFile,
     ) -> Result<(), CatalogError> {
         if level.capped {
             let limit = self.limits.depth;
@@ -314,12 +323,13 @@ impl<'a> System<'a> {
                 ));
                 continue;
             }
-            let child_path = parent.child(child, pose, world);
+            let mut child_path = parent.child(child, pose, world);
             self.note(child, &child_path, parent.under)?;
+            self.record_location(child, &mut child_path, pose, file)?;
             if let Some(path) = &child.external {
                 self.follow(path, &child_path, label)?;
             }
-            self.children(&child.below, &child_path, label)?;
+            self.children(&child.below, &child_path, label, file)?;
         }
         if level.truncated {
             let limit = self.limits.children;

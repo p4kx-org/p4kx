@@ -232,6 +232,48 @@ fn unrelated_record_filter_leaves_physical_container_inventory_unavailable() -> 
     Ok(())
 }
 
+#[test]
+fn typed_locations_follow_the_existing_placement_route() -> TestResult {
+    let catalog = catalog(None, true, LABEL_KEY)?;
+    let rows = proof::rows(&catalog, "/placements/locationInstances/rows")?;
+    let [parent, rotated, direct] = rows else {
+        return Err("the root and two reused tile locations each emit a row".into());
+    };
+    proof::present(
+        &parent["declaration"],
+        "locationType",
+        &json!(1),
+        Some(true),
+    )?;
+    for (row, at) in [(rotated, [10.0, 3.0, 0.0]), (direct, [101.0, 0.0, 0.0])] {
+        proof::present(row, "worldPosition", &json!(at), Some(true))?;
+        proof::cell(&row["declaration"], "streamingRoot", "invalid")?;
+        let metadata = proof::rows(row, "/declaration/instanceMetadata/value")?;
+        assert_eq!(
+            metadata.len(),
+            2,
+            "one container and one authored component"
+        );
+        assert_eq!(
+            proof::at(row, "/declaration/instanceMetadata/value/1/name/value")?,
+            "HarvestableComponent",
+            "the original component declaration is retained"
+        );
+    }
+    assert_eq!(
+        proof::at(rotated, "/parentLocationId/value")?,
+        proof::at(parent, "/instanceId/value")?,
+        "the typed parent is inherited across its separately opened tile"
+    );
+    proof::cell(direct, "parentLocationId", "absent")?;
+    assert_ne!(
+        proof::at(rotated, "/instanceId/value")?,
+        proof::at(direct, "/instanceId/value")?,
+        "the physical file is used in distinct location routes"
+    );
+    proof::closure(&catalog)
+}
+
 fn by_path<'catalog>(
     rows: &'catalog [Value],
     path: &'static str,
@@ -278,7 +320,7 @@ fn catalog(
     let root = format!(
         r#"<ObjectContainer version="14">
           <ChildObjectContainers>
-            <Child pos="10,0,0" rot="0.7071067811865475,0,0,0.7071067811865475">
+            <Child locationType="1" streamingRoot="true" pos="10,0,0" rot="0.7071067811865475,0,0,0.7071067811865475">
               <ChildObjectContainers><Child external="1" name="{TILE}" pos="2,0,0" rot="2,0,0,0" label="{first_label}" entityName="SampleEntity"/></ChildObjectContainers>
             </Child>
           </ChildObjectContainers>
@@ -296,7 +338,14 @@ fn catalog(
         .entry(TestEntry::stored(ROOT, socpak("canarysystem.xml", root)).encrypted())
         .entry(TestEntry::stored(
             TILE,
-            socpak("instance.xml", r#"<ObjectContainer version="14"/>"#),
+            socpak(
+                "instance.xml",
+                r#"<ObjectContainer version="14"><ChildObjectContainers>
+                    <Child locationType="3" streamingRoot="broken" pos="1,0,0" label="@synthetic">
+                        <InstanceMetadata><HarvestableComponent/></InstanceMetadata>
+                    </Child>
+                </ChildObjectContainers></ObjectContainer>"#,
+            ),
         ))
         .write_to(&path)?;
     let archive = Archive::open_with_key(&path, Some(test_key()))?;

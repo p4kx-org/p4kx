@@ -1945,6 +1945,24 @@ occurrence. The instance key identifies the system root and original Child route
 keys refer to the enclosing physical container occurrence. Reused tiles keep separate
 local and world transforms, the exact declaring path, label and entity name.
 
+`placements.locationInstances` contains the typed location Children reached by the same walk.
+It uses the system root and physical Child route for each occurrence. `parentLocationId`
+refers to the nearest authored location ancestor. `containerInstanceId` refers to the
+enclosing physical SOCpak occurrence. The original Child's GUID is a declaration and can
+repeat across uses of one container. The local transform and composed system transform use
+the same conventions as container instances.
+
+The `declaration` preserves the stored numeric `locationType`, `streamingRoot`, GUIDs,
+label, entity name, tag text and ordered GUID tokens. Invalid typed attributes retain the
+original text with its source. `instanceMetadata` retains ordered component element
+occurrences, original node/parent positions and attributes. A component element records its
+authored occurrence. A Harvestable preset link requires a separately authored binding.
+
+Placement selection follows the existing container inventory scope. An unrestricted catalog
+or any selected Starmap or HarvestableProviderPreset path requests the walk. Other Record
+filters leave this table unavailable. Walk and archive diagnostics report incomplete source
+discovery separately from whether the table is available.
+
 
 **Where a position comes from.** The main container of a star system is
 `Data/ObjectContainers/PU/system/<folder>/<folder>system.socpak` (else the first `*system.socpak`

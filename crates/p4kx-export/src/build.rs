@@ -140,9 +140,8 @@ fn assemble<R>(
         &forge,
         &origins,
     )?;
-    let instances = placements.take_instances();
     let (catalog_placements, resource_declarations) =
-        collected.catalog_placements(archive, &forge, &input, instances, options.cancel)?;
+        collected.catalog_placements(archive, &forge, &input, &mut placements, options.cancel)?;
     let health = crate::export_health_prepare::compile_captured(
         std::mem::take(&mut collected.ledger),
         &kinds,

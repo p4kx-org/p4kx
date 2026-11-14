@@ -9,6 +9,7 @@ use p4kx_extraction::Guid;
 use super::{Bounds, CHILD, CHILDREN, Child, Level, Pose};
 use crate::CatalogError;
 use crate::catalog_read::original::{AuthoredEntryPath, EntryXml, XmlNodeSource};
+use crate::starmap_containers::location_declaration::ChildLocation;
 use crate::starmap_containers::proof::ChildOrigins;
 use crate::starmap_report::clip;
 use crate::starmap_xml::{Node, Root, attribute, first_below, pose};
@@ -71,7 +72,9 @@ fn read_child(
     let external = external(child, name, xml)?;
     let pose = child_pose(child);
     let below = level(child, depth + 1, bounds, xml)?;
-    let named = record.is_some() || external.is_some() || !below.children.is_empty();
+    let location = ChildLocation::read(xml, child, xml.capture())?;
+    let named =
+        record.is_some() || external.is_some() || !below.children.is_empty() || location.is_some();
     let origins = named
         .then(|| ChildOrigins::capture(xml, list, child).map(Arc::new))
         .transpose()?;
@@ -80,6 +83,7 @@ fn read_child(
         record,
         external,
         origins,
+        location,
         below,
     })
 }

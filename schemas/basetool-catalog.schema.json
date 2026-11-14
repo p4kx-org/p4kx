@@ -5150,6 +5150,9 @@
           },
           "type": "array"
         },
+        "locationInstances": {
+          "$ref": "#/$defs/CatalogTableOfLocationInstance"
+        },
         "resourceNetworkLinkBindings": {
           "$ref": "#/$defs/CatalogTableOfResourceNetworkLinkBinding"
         },
@@ -5167,6 +5170,7 @@
         "containerInstances",
         "facilityInstances",
         "facilityInteriorCoverage",
+        "locationInstances",
         "resourceNetworkLinkBindings",
         "resourceNetworkNodes",
         "roomAssociationBindings",
@@ -6339,6 +6343,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/LocationDictionaryEntry"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfLocationInstance": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/LocationInstance"
           },
           "type": "array"
         }
@@ -7662,6 +7685,62 @@
         "overchargeTime",
         "overchargedTime",
         "weaponAction"
+      ],
+      "type": "object"
+    },
+    "ChildLocation": {
+      "description": "The authored fields and component declarations of a typed location Child.",
+      "properties": {
+        "classGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "entityName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "hasHierarchicalContextData": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "instanceMetadata": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_LocationMetadataElement"
+        },
+        "invalidAttributes": {
+          "items": {
+            "$ref": "#/$defs/LocationAttribute"
+          },
+          "type": "array"
+        },
+        "label": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "locationType": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "streamingRoot": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "tags": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfLocationTag"
+        },
+        "tagsText": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "classGuid",
+        "entityName",
+        "guid",
+        "hasHierarchicalContextData",
+        "instanceMetadata",
+        "invalidAttributes",
+        "label",
+        "locationType",
+        "streamingRoot",
+        "tags",
+        "tagsText"
       ],
       "type": "object"
     },
@@ -21150,6 +21229,22 @@
       "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
+    "LocationAttribute": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "value": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "type": "object"
+    },
     "LocationAutoSpawnSettings": {
       "description": "Authored location NPC spawn settings with source rules and inventory.",
       "properties": {
@@ -21658,6 +21753,77 @@
       ],
       "type": "object"
     },
+    "LocationInstance": {
+      "description": "One typed Child reached through a physical container route.",
+      "properties": {
+        "container": {
+          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"
+        },
+        "containerInstanceId": {
+          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey"
+        },
+        "declaration": {
+          "$ref": "#/$defs/ChildLocation"
+        },
+        "instanceId": {
+          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey"
+        },
+        "localPosition": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+        },
+        "localRotation": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double"
+        },
+        "parentLocationId": {
+          "$ref": "#/$defs/SourcedValueOfContainerInstanceKey"
+        },
+        "worldPosition": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double"
+        },
+        "worldRotation": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_4_of_double"
+        }
+      },
+      "required": [
+        "container",
+        "containerInstanceId",
+        "declaration",
+        "instanceId",
+        "localPosition",
+        "localRotation",
+        "parentLocationId",
+        "worldPosition",
+        "worldRotation"
+      ],
+      "type": "object"
+    },
+    "LocationMetadataElement": {
+      "description": "One original metadata element with its physical node and direct parent.",
+      "properties": {
+        "attributes": {
+          "items": {
+            "$ref": "#/$defs/LocationAttribute"
+          },
+          "type": "array"
+        },
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "nodeIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "parentNodeIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "attributes",
+        "name",
+        "nodeIndex",
+        "parentNodeIndex"
+      ],
+      "type": "object"
+    },
     "LocationMissionLimit": {
       "properties": {
         "authoredFields": {
@@ -21980,6 +22146,21 @@
         "recordPath",
         "resourceSlotTag",
         "sourceType"
+      ],
+      "type": "object"
+    },
+    "LocationTag": {
+      "properties": {
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "raw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "guid",
+        "raw"
       ],
       "type": "object"
     },
@@ -40569,6 +40750,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_LocationMetadataElement": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/LocationMetadataElement"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_ReputationGain": {
       "allOf": [
         {
@@ -47048,6 +47362,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfLocationMissionModule"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfLocationTag": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfLocationTag"
                 },
                 "type": "array"
               }
@@ -74175,6 +74622,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/LocationMissionModule"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfLocationTag": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/LocationTag"
               }
             }
           }

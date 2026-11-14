@@ -13,6 +13,7 @@ use crate::entry_source::EntrySource;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::starmap_containers::instance::ContainerFile;
+use crate::starmap_containers::location_declaration::ChildLocation;
 use crate::starmap_containers::proof::ChildOrigins;
 use crate::starmap_index::Index;
 use crate::starmap_read::main_xml;
@@ -41,6 +42,7 @@ pub(crate) struct Child {
     /// The path of the external container the Child names.
     pub(crate) external: Option<AuthoredEntryPath>,
     pub(crate) origins: Option<Arc<ChildOrigins>>,
+    pub(crate) location: Option<Box<ChildLocation>>,
     pub(crate) below: Level,
 }
 

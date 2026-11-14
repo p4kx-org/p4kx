@@ -23,6 +23,10 @@ pub(crate) struct ContainerFile {
 }
 
 impl ContainerFile {
+    pub(crate) const fn reference(&self) -> &SourcedValue<PhysicalEntryRef> {
+        &self.reference
+    }
+
     pub(crate) fn from_xml(
         xml: &EntryXml<'_, '_, '_>,
         capture: &EntryCapture<'_>,
@@ -56,13 +60,13 @@ pub(crate) struct ContainerOccurrence<'route> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ContainerInstanceKey {
+pub(crate) struct ContainerInstanceKey {
     root_entry_index: u32,
     child_node_indices: Vec<u32>,
 }
 
 impl ContainerInstanceKey {
-    fn from_route(root_entry_index: u32, route: Option<&PlacementStep>) -> Self {
+    pub(crate) fn from_route(root_entry_index: u32, route: Option<&PlacementStep>) -> Self {
         let mut child_node_indices: Vec<u32> = route
             .into_iter()
             .flat_map(PlacementStep::steps)

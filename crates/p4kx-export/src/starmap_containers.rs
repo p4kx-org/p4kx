@@ -14,11 +14,13 @@ use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, unreferenced};
+
 use crate::starmap_parse::{Read, read_all};
 use crate::starmap_report::{ContainerCounts, Placement, StarmapReport, apart, clip};
 use crate::starmap_walk::{Opened, System, SystemRead};
 
 use self::instance::ContainerInstance;
+use self::location_instance::LocationInstance;
 use self::proof::{PlacementEvidence, PlacementProof};
 
 #[path = "starmap_container_instance.rs"]
@@ -26,6 +28,11 @@ pub(crate) mod instance;
 
 #[path = "starmap_placement_proof.rs"]
 pub(crate) mod proof;
+
+#[path = "starmap_location_declaration.rs"]
+pub(crate) mod location_declaration;
+#[path = "starmap_location_instance.rs"]
+pub(crate) mod location_instance;
 
 /// What bounds the walk through a star system.
 #[derive(Debug, Clone, Copy)]
@@ -64,6 +71,7 @@ pub(crate) struct Placements {
     pub(crate) counts: ContainerCounts,
     pub(crate) report: StarmapReport,
     instances: Vec<ContainerInstance>,
+    locations: Vec<LocationInstance>,
     instance_availability: Option<DatasetAvailability>,
     /// Every container below the system folder: those the walk opened, each with the record it
     /// hangs below, then those it did not reach, with none.
@@ -77,6 +85,15 @@ impl Placements {
                 .instance_availability
                 .unwrap_or(DatasetAvailability::Unavailable),
             rows: std::mem::take(&mut self.instances),
+        }
+    }
+
+    pub(crate) fn take_locations(&mut self) -> CatalogTable<LocationInstance> {
+        CatalogTable {
+            availability: self
+                .instance_availability
+                .unwrap_or(DatasetAvailability::Unavailable),
+            rows: std::mem::take(&mut self.locations),
         }
     }
 
@@ -206,6 +223,7 @@ impl Placements {
             self.report.issues.extend(system.report.issues);
             self.opened.extend(system.containers);
             self.instances.extend(system.instances);
+            self.locations.extend(system.locations);
             for (record, placement) in system.placed {
                 self.add(record, placement);
             }
