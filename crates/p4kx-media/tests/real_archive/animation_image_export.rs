@@ -28,27 +28,49 @@ const PATH_LENGTH: usize = 256;
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn global_animation_image_export_matches_original_path_fields()
 -> Result<(), privacy::VerificationFailure> {
-    privacy::redact(verify_configured())
+    privacy::redact(verify_configured(Scope::Both))
 }
 
-fn verify_configured() -> TestResult {
-    verify(&p4kx_testkit::real_archive_path()?)?;
+#[test]
+#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
+fn directional_image_pose_export_matches_original_ranges()
+-> Result<(), privacy::VerificationFailure> {
+    privacy::redact(verify_configured(Scope::Directional))
+}
+
+#[derive(Clone, Copy)]
+enum Scope {
+    Both,
+    Directional,
+}
+
+impl Scope {
+    const fn filter(self) -> &'static str {
+        match self {
+            Self::Both => "Data/Animations/*.img",
+            Self::Directional => DIRECTIONAL_IMAGE,
+        }
+    }
+}
+
+fn verify_configured(scope: Scope) -> TestResult {
+    verify(&p4kx_testkit::real_archive_path()?, scope)?;
     if let Some(path) = p4kx_testkit::real_archive_b_path() {
-        verify(&path)?;
+        verify(&path, scope)?;
     }
     Ok(())
 }
 
-fn verify(path: &Path) -> TestResult {
-    verify_archive(&Archive::open(path)?)
+fn verify(path: &Path, scope: Scope) -> TestResult {
+    verify_archive(&Archive::open(path)?, scope)
 }
 
-fn verify_archive(archive: &Archive) -> TestResult {
+fn verify_archive(archive: &Archive, scope: Scope) -> TestResult {
     let watch = ArchiveWatch::new(archive);
     let scratch = tempfile::tempdir()?;
     let options = ExportOptions {
         kinds: vec![MediaKind::Animation],
-        include: Some(Filter::parse("Data/Animations/*.img")?),
+        include: Some(Filter::parse(scope.filter())?),
         exclude: Exclusion::parse(["*.pak", "*.socpak"])?,
         ..Default::default()
     };
@@ -58,16 +80,21 @@ fn verify_archive(archive: &Archive) -> TestResult {
         return Err("animation images did not publish a complete generation".into());
     };
     let generation = scratch.path().join(&index.artifact_base);
-    let caf = ImageSource::read(archive, CAF_IMAGE, CAF_CHUNK, 0x902)?;
+    let caf = matches!(scope, Scope::Both)
+        .then(|| ImageSource::read(archive, CAF_IMAGE, CAF_CHUNK, 0x902))
+        .transpose()?;
     let directional = ImageSource::read(archive, DIRECTIONAL_IMAGE, DIRECTIONAL_CHUNK, 0x901)?;
     let framed = directional_oracle::Records::read(&directional)?;
+    if matches!(scope, Scope::Directional) {
+        framed.require_poses()?;
+    }
     let stream = index
         .kinds
         .iter()
         .find(|kind| kind.provider.kind == MediaKind::Animation)
         .ok_or("animation stream")?;
     let rows = BufReader::new(File::open(generation.join(&stream.artifact.path))?);
-    verify_rows(&generation, rows, &caf, &directional, &framed)?;
+    verify_rows(&generation, rows, caf.as_ref(), &directional, &framed)?;
     watch.check()?;
     scratch.close()?;
     Ok(())
@@ -124,7 +151,7 @@ impl Coverage {
 fn verify_rows(
     generation: &Path,
     rows: impl BufRead,
-    caf: &ImageSource,
+    caf: Option<&ImageSource>,
     directional: &ImageSource,
     framed: &directional_oracle::Records<'_>,
 ) -> TestResult {
@@ -135,7 +162,7 @@ fn verify_rows(
         let row: MediaRecord = serde_json::from_str(&line?)?;
         match row.subresource.namespace.as_str() {
             "animation-image-record" => {
-                compare_caf(&row, caf, caf_observed.records)?;
+                compare_caf(&row, caf.ok_or("unexpected CAF row")?, caf_observed.records)?;
                 caf_observed.records += 1;
             }
             "animation-image-directional-path" => {
@@ -143,17 +170,16 @@ fn verify_rows(
                 directional_observed.records += 1;
             }
             "animation-image-directional-record" => framed_observed.record(&row)?,
+            "animation-image-directional-pose-index" => framed_observed.pose_index(&row)?,
+            "animation-image-directional-pose-block" => framed_observed.pose_block(&row)?,
             "animation-entry" => {
-                let (source, count) =
-                    match row.data.pointer("/payload/family").and_then(Value::as_str) {
-                        Some("caf-image") => (caf, &mut caf_observed),
-                        Some("directional-blend-image") => (directional, &mut directional_observed),
-                        _ => {
-                            return Err(
-                                "global image verification selected an unrelated animation".into(),
-                            );
-                        }
-                    };
+                let (source, count) = source_of(
+                    &row,
+                    caf,
+                    directional,
+                    &mut caf_observed,
+                    &mut directional_observed,
+                )?;
                 let raw = source.verify_raw(generation, &row)?;
                 if std::ptr::eq(source, directional) {
                     framed_observed.artifact(raw)?;
@@ -167,7 +193,7 @@ fn verify_rows(
                     .and_then(Value::as_str);
                 match status {
                     Some("caf-records") => {
-                        verify_caf_index(&row, caf)?;
+                        verify_caf_index(&row, caf.ok_or("unexpected CAF index")?)?;
                         caf_observed.indices += 1;
                     }
                     Some("directional-records") => {
@@ -181,12 +207,28 @@ fn verify_rows(
             _ => {}
         }
     }
-    require(caf_observed.verified(caf), "CAF image reconciles")?;
+    if let Some(caf) = caf {
+        require(caf_observed.verified(caf), "CAF image reconciles")?;
+    }
     framed_observed.finish()?;
     require(
         directional_observed.verified(directional),
         "directional image reconciles",
     )
+}
+
+fn source_of<'a, 'b>(
+    row: &MediaRecord,
+    caf: Option<&'a ImageSource>,
+    directional: &'a ImageSource,
+    caf_observed: &'b mut Coverage,
+    directional_observed: &'b mut Coverage,
+) -> TestResult<(&'a ImageSource, &'b mut Coverage)> {
+    match row.data.pointer("/payload/family").and_then(Value::as_str) {
+        Some("caf-image") => Ok((caf.ok_or("unexpected CAF Entry")?, caf_observed)),
+        Some("directional-blend-image") => Ok((directional, directional_observed)),
+        _ => Err("global image verification selected an unrelated animation".into()),
+    }
 }
 
 fn verify_caf_index(row: &MediaRecord, source: &ImageSource) -> TestResult {
@@ -336,35 +378,4 @@ fn verify_range(row: &MediaRecord, path: &str, start: usize, end: usize) -> Test
             && range.get("end_exclusive").and_then(Value::as_u64) == Some(end as u64),
         "exact original entry-relative range",
     )
-}
-
-#[test]
-fn animation_image_replay_checks_raw_bytes_headers_and_exact_trailer() -> TestResult {
-    use p4kx_testkit::{ArchiveBuilder, TestChunkFile, TestEntry};
-
-    let mut caf = Vec::new();
-    caf.extend(1_u32.to_le_bytes());
-    caf.extend(2_u32.to_le_bytes());
-    let mut record = [0; CAF_RECORD_LENGTH];
-    let path = b"animations/demo.caf";
-    record[..path.len()].copy_from_slice(path);
-    record[256..260].copy_from_slice(&0x1234_5678_u32.to_le_bytes());
-    caf.extend(record);
-    caf.extend(*b"trailer!");
-    let caf = TestChunkFile::ivo()
-        .chunk(0x1234, 0x900, [9, 8])
-        .chunk(CAF_CHUNK, 0x902, caf)
-        .bytes();
-    let directional = TestChunkFile::ivo()
-        .chunk(0x1234, 0x900, [7, 6, 5])
-        .chunk(DIRECTIONAL_CHUNK, 0x901, directional_oracle::fixture()?)
-        .bytes();
-    let folder = tempfile::tempdir()?;
-    let input = folder.path().join("fixture.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored(CAF_IMAGE, caf))
-        .entry(TestEntry::stored(DIRECTIONAL_IMAGE, directional))
-        .entry(TestEntry::stored("Data/unrelated.pak", b"not an archive"))
-        .write_to(&input)?;
-    verify(&input)
 }

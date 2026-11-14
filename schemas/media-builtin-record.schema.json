@@ -1296,6 +1296,9 @@
         "extensions": {
           "$ref": "#/$defs/SourceRange"
         },
+        "first_orientation": {
+          "$ref": "#/$defs/SourceRange"
+        },
         "header": {
           "$ref": "#/$defs/SourceRange"
         },
@@ -1304,13 +1307,22 @@
           "minimum": 0,
           "type": "integer"
         },
+        "polar_grid": {
+          "$ref": "#/$defs/SourceRange"
+        },
         "pose_count": {
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
+        },
+        "second_orientation": {
+          "$ref": "#/$defs/SourceRange"
         }
       },
       "required": [
+        "first_orientation",
+        "second_orientation",
+        "polar_grid",
         "header",
         "pose_count",
         "extension_count",

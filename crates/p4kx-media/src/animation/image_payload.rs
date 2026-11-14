@@ -116,6 +116,9 @@ pub(super) struct ImageDirectionalRecord {
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "AnimationDirectionalPoseIndex")]
 pub(super) struct ImageDirectionalPoseIndex {
+    pub(super) first_orientation: SourceRange,
+    pub(super) second_orientation: SourceRange,
+    pub(super) polar_grid: SourceRange,
     pub(super) header: SourceRange,
     pub(super) pose_count: u32,
     pub(super) extension_count: u32,

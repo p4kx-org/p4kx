@@ -6,9 +6,12 @@ use std::ops::Range;
 use p4kx_media::{Identity, MediaRecord, Status};
 
 use super::{
-    DIRECTIONAL_IMAGE, ImageSource, PATH_LENGTH, TestResult, compare_path, number, require,
-    verify_range,
+    CAF_CHUNK, CAF_IMAGE, CAF_RECORD_LENGTH, DIRECTIONAL_CHUNK, DIRECTIONAL_IMAGE, ImageSource,
+    PATH_LENGTH, Scope, TestResult, compare_path, number, require, verify, verify_range,
 };
+
+#[path = "animation_directional_pose_oracle.rs"]
+mod poses;
 
 const COUNT_BYTES: usize = 4;
 const HEADER_WORD_OFFSET: usize = 4;
@@ -26,6 +29,7 @@ struct Record {
     length: u32,
     header_word: u32,
     path_hash: u32,
+    poses: Option<poses::Expected>,
 }
 
 impl Record {
@@ -68,6 +72,7 @@ impl Record {
             length,
             header_word: word(record, HEADER_WORD_OFFSET)?,
             path_hash,
+            poses: poses::Expected::read(record, start),
         })
     }
 
@@ -115,12 +120,29 @@ impl<'a> Records<'a> {
         Ok(Self { image, records })
     }
 
+    pub(super) fn require_poses(&self) -> TestResult {
+        require(
+            !self.records.is_empty() && self.records.iter().all(|record| record.poses.is_some()),
+            "installed original records have fully framed pose inventories",
+        )?;
+        require(
+            self.records.iter().any(|record| {
+                record
+                    .poses
+                    .as_ref()
+                    .is_some_and(poses::Expected::has_blocks)
+            }),
+            "installed original contains at least one pose block",
+        )
+    }
+
     pub(super) const fn replay(&self) -> Replay<'_, 'a> {
         Replay {
             expected: self,
             paths: 0,
             records: 0,
             retained: None,
+            poses: poses::Observed::new(),
         }
     }
 }
@@ -130,6 +152,7 @@ pub(super) struct Replay<'a, 'source> {
     paths: usize,
     records: usize,
     retained: Option<Vec<u8>>,
+    poses: poses::Observed,
 }
 
 impl Replay<'_, '_> {
@@ -180,6 +203,28 @@ impl Replay<'_, '_> {
         Ok(())
     }
 
+    pub(super) fn pose_index(&mut self, row: &MediaRecord) -> TestResult {
+        let ordinal = Self::pose_owner(row)?;
+        let index = self.expected.image.chunk.index as u64;
+        self.poses.index(
+            row,
+            index,
+            ordinal,
+            expected_pose(self.expected.records.as_slice(), ordinal)?,
+        )
+    }
+
+    pub(super) fn pose_block(&mut self, row: &MediaRecord) -> TestResult {
+        let ordinal = Self::pose_owner(row)?;
+        let index = self.expected.image.chunk.index as u64;
+        self.poses.block(
+            row,
+            index,
+            ordinal,
+            expected_pose(self.expected.records.as_slice(), ordinal)?,
+        )
+    }
+
     pub(super) fn finish(self) -> TestResult {
         let retained = self.retained.ok_or("directional raw artifact is missing")?;
         let records = &self.expected.records;
@@ -187,7 +232,8 @@ impl Replay<'_, '_> {
             self.paths == records.len() && self.records == records.len(),
             "one projected path and one framed record for every original ordinal",
         )?;
-        for record in records {
+        for (ordinal, record) in records.iter().enumerate() {
+            self.poses.verify(ordinal, record.poses.as_ref())?;
             let range = record.range.clone();
             require(
                 retained.get(range.clone()) == self.expected.image.bytes.get(range),
@@ -195,6 +241,19 @@ impl Replay<'_, '_> {
             )?;
         }
         Ok(())
+    }
+
+    fn pose_owner(row: &MediaRecord) -> TestResult<usize> {
+        require(
+            entry_matches(row),
+            "pose row retains the original directional Entry",
+        )?;
+        let ordinal = row
+            .subresource
+            .indices
+            .get(1)
+            .ok_or("pose member's record ordinal")?;
+        Ok(usize::try_from(*ordinal)?)
     }
 
     fn expected_row(&self, row: &MediaRecord, ordinal: usize) -> TestResult<&Record> {
@@ -210,6 +269,13 @@ impl Replay<'_, '_> {
             .get(ordinal)
             .ok_or_else(|| "unexpected directional record ordinal".into())
     }
+}
+
+fn expected_pose(records: &[Record], ordinal: usize) -> TestResult<&poses::Expected> {
+    records
+        .get(ordinal)
+        .and_then(|record| record.poses.as_ref())
+        .ok_or_else(|| "pose projection requires complete physical framing".into())
 }
 
 fn entry_matches(row: &MediaRecord) -> bool {
@@ -239,7 +305,8 @@ fn ieee_crc32(bytes: &[u8]) -> u32 {
 }
 
 pub(super) fn fixture() -> TestResult<Vec<u8>> {
-    let mut body = Vec::from(2_u32.to_le_bytes());
+    let mut body = Vec::from(3_u32.to_le_bytes());
+    let counted = poses::fixture_tail(FIXED_BYTES);
     for (path, header, tail) in [
         (
             b"Animations/DEMO.AIM".as_slice(),
@@ -251,6 +318,7 @@ pub(super) fn fixture() -> TestResult<Vec<u8>> {
             0x0000_0001_u32,
             b"opaque record bytes!".as_slice(),
         ),
+        (b"Animations/counted.aim".as_slice(), 0, counted.as_slice()),
     ] {
         let length = u32::try_from(FIXED_BYTES + tail.len())?;
         body.extend(length.to_le_bytes());
@@ -270,4 +338,35 @@ fn the_independent_path_crc_matches_the_ieee_known_answer() {
         0xcbf4_3926,
         "standard reflected IEEE CRC-32 check vector",
     );
+}
+
+#[test]
+fn animation_image_replay_checks_raw_bytes_headers_and_exact_trailer() -> TestResult {
+    use p4kx_testkit::{ArchiveBuilder, TestChunkFile, TestEntry};
+
+    let mut caf = Vec::new();
+    caf.extend(1_u32.to_le_bytes());
+    caf.extend(2_u32.to_le_bytes());
+    let mut record = [0; CAF_RECORD_LENGTH];
+    let path = b"animations/demo.caf";
+    record[..path.len()].copy_from_slice(path);
+    record[256..260].copy_from_slice(&0x1234_5678_u32.to_le_bytes());
+    caf.extend(record);
+    caf.extend(*b"trailer!");
+    let caf = TestChunkFile::ivo()
+        .chunk(0x1234, 0x900, [9, 8])
+        .chunk(CAF_CHUNK, 0x902, caf)
+        .bytes();
+    let directional = TestChunkFile::ivo()
+        .chunk(0x1234, 0x900, [7, 6, 5])
+        .chunk(DIRECTIONAL_CHUNK, 0x901, fixture()?)
+        .bytes();
+    let folder = tempfile::tempdir()?;
+    let input = folder.path().join("fixture.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(CAF_IMAGE, caf))
+        .entry(TestEntry::stored(DIRECTIONAL_IMAGE, directional))
+        .entry(TestEntry::stored("Data/unrelated.pak", b"not an archive"))
+        .write_to(&input)?;
+    verify(&input, Scope::Both)
 }

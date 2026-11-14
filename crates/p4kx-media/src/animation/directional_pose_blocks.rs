@@ -5,6 +5,8 @@ use std::ops::Range;
 
 use super::directional_records::DirectionalRecord;
 
+const ORIENTATION_AT: usize = 288;
+const GRID_AT: usize = 320;
 const COUNT_AT: usize = 2_156;
 const WORD: usize = size_of::<u32>();
 const POSE_HEADER_BYTES: usize = 3 * WORD;
@@ -19,6 +21,12 @@ pub(super) struct DirectionalPoseBlocks<'a> {
     pub(super) pose_count: u32,
     pub(super) extension_count: u32,
     pub(super) header_word: u32,
+}
+
+pub(super) struct DirectionalFixedPoseRanges {
+    pub(super) first_orientation: Range<u64>,
+    pub(super) second_orientation: Range<u64>,
+    pub(super) polar_grid: Range<u64>,
 }
 
 pub(super) struct DirectionalPoseBlock {
@@ -64,6 +72,18 @@ impl<'a> DirectionalPoseBlocks<'a> {
 
     pub(super) const fn header(self) -> Range<u64> {
         self.start - POSE_HEADER_BYTES as u64..self.start
+    }
+
+    pub(super) const fn fixed_ranges(self) -> DirectionalFixedPoseRanges {
+        let path = self.header().start - COUNT_AT as u64;
+        let first = path + ORIENTATION_AT as u64;
+        let second = first + QUATERNION_BYTES as u64;
+        let grid = path + GRID_AT as u64;
+        DirectionalFixedPoseRanges {
+            first_orientation: first..second,
+            second_orientation: second..grid,
+            polar_grid: grid..self.header().start,
+        }
     }
 
     pub(super) const fn extensions(self) -> Range<u64> {

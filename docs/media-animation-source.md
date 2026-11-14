@@ -96,6 +96,15 @@ four and three little-endian `f32` lanes. Consumers can read those lanes from
 the retained original Entry, preserving component order and exact bits.
 Zero-count arrays keep an empty value range and their count word.
 
+The pose index also addresses two consecutive raw float4 orientation ranges
+at path offsets 288 and 304, and `polar_grid` at offsets 320..2156. The fixed
+grid has 17 by 9 cells in original order. Each cell stores four u8 indices
+followed by four little-endian i16 coefficients. The historical writer used a
+scale of 8192. All nonsentinel cells in the installed image have in-range pose
+indices and coefficient sums within four of that scale. The original 255 indices
+and their original coefficients are preserved in sentinel cells. The exporter
+provides byte ranges and leaves runtime interpretation to the consumer.
+
 The range named `extensions` holds the trailing 552-byte units as original
 bytes. If the counts, boundaries and extension size do not exhaust the
 physical record, the exporter retains the outer record and its `opaque_tail`.

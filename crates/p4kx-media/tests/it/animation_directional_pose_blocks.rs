@@ -122,6 +122,12 @@ fn verify_index(pose: &MediaRecord, rows: &[MediaRecord]) -> TestResult<u64> {
         ("pose_count", 2),
         ("extension_count", 1),
         ("header_word", 19),
+        ("first_orientation/start", path_at + 288),
+        ("first_orientation/end_exclusive", path_at + 304),
+        ("second_orientation/start", path_at + 304),
+        ("second_orientation/end_exclusive", path_at + 320),
+        ("polar_grid/start", path_at + 320),
+        ("polar_grid/end_exclusive", header_at),
         ("header/start", header_at),
         ("header/end_exclusive", header_at + 12),
     ] {

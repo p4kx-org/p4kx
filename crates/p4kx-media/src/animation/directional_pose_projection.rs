@@ -54,6 +54,7 @@ impl ImageSource<'_, '_> {
         let mut prepared = self.origins.prepared()?;
         let header = blocks.header();
         let extensions = blocks.extensions();
+        let fixed = blocks.fixed_ranges();
         let framing = self.origins.payload(
             header.clone(),
             "directionalPoseHeader",
@@ -63,6 +64,9 @@ impl ImageSource<'_, '_> {
         proof::control(&mut prepared, framing, writer)?;
         for (field, range) in [
             ("header", header.clone()),
+            ("first_orientation", fixed.first_orientation.clone()),
+            ("second_orientation", fixed.second_orientation.clone()),
+            ("polar_grid", fixed.polar_grid.clone()),
             ("pose_count", header.start..header.start + 4),
             ("extension_count", header.start + 4..header.start + 8),
             ("header_word", header.start + 8..header.end),
@@ -70,7 +74,13 @@ impl ImageSource<'_, '_> {
         ] {
             self.pose_origin(&mut prepared, field, range, writer)?;
         }
-        for field in ["header/basis", "extensions/basis"] {
+        for field in [
+            "header/basis",
+            "extensions/basis",
+            "first_orientation/basis",
+            "second_orientation/basis",
+            "polar_grid/basis",
+        ] {
             proof::at(
                 &mut prepared,
                 &format!("/data/payload/{field}"),
@@ -83,6 +93,9 @@ impl ImageSource<'_, '_> {
             &Subresource::new(wire::IMAGE_DIRECTIONAL_POSE_INDEX, indices.to_vec()),
             Status::Complete,
             &AnimationPayload::ImageDirectionalPoseIndex(ImageDirectionalPoseIndex {
+                first_orientation: wire::entry_range(fixed.first_orientation),
+                second_orientation: wire::entry_range(fixed.second_orientation),
+                polar_grid: wire::entry_range(fixed.polar_grid),
                 header: wire::entry_range(header),
                 pose_count: blocks.pose_count,
                 extension_count: blocks.extension_count,
