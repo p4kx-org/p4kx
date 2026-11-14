@@ -83,6 +83,7 @@ mod real_soc_palette;
 mod real_soc_rooms;
 mod real_soc_survey;
 mod real_soc_tile_ports;
+mod real_static_attachment_rotation;
 mod real_streamed_localised;
 mod real_trigger_discovery;
 mod real_txtp;
