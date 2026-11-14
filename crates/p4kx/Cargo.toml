@@ -39,6 +39,7 @@ winresource.workspace = true
 [dev-dependencies]
 p4kx-testkit.workspace = true
 assert_cmd.workspace = true
+base64.workspace = true
 crc32fast.workspace = true
 exr.workspace = true
 insta.workspace = true

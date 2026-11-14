@@ -105,6 +105,7 @@ mod grep;
 mod info;
 mod info_layout;
 mod interior_glb;
+mod interior_included_objects;
 mod interior_package;
 mod json;
 mod json_audio;
