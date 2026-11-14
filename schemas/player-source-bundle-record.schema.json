@@ -12,6 +12,9 @@
             }
           ]
         },
+        "flags": {
+          "$ref": "#/$defs/AttributeSelection"
+        },
         "name": {
           "$ref": "#/$defs/AttributeSelection"
         },
@@ -22,12 +25,17 @@
         },
         "position": {
           "$ref": "#/$defs/SourcedValueOfSocXmlPosition"
+        },
+        "precedingBlend": {
+          "$ref": "#/$defs/SourcedValueOfuint"
         }
       },
       "required": [
         "ordinal",
         "position",
-        "name"
+        "name",
+        "flags",
+        "precedingBlend"
       ],
       "type": "object"
     },
@@ -405,6 +413,35 @@
       "required": [
         "bank",
         "records"
+      ],
+      "type": "object"
+    },
+    "Blend": {
+      "properties": {
+        "duration": {
+          "$ref": "#/$defs/AttributeSelection"
+        },
+        "exitTime": {
+          "$ref": "#/$defs/AttributeSelection"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfSocXmlPosition"
+        },
+        "startTime": {
+          "$ref": "#/$defs/AttributeSelection"
+        }
+      },
+      "required": [
+        "ordinal",
+        "position",
+        "duration",
+        "startTime",
+        "exitTime"
       ],
       "type": "object"
     },
@@ -1450,6 +1487,12 @@
           },
           "type": "array"
         },
+        "blends": {
+          "items": {
+            "$ref": "#/$defs/Blend"
+          },
+          "type": "array"
+        },
         "ordinal": {
           "format": "uint",
           "minimum": 0,
@@ -1462,7 +1505,8 @@
       "required": [
         "ordinal",
         "position",
-        "animations"
+        "animations",
+        "blends"
       ],
       "type": "object"
     },

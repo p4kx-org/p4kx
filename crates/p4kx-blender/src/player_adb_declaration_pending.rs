@@ -58,12 +58,23 @@ pub(super) struct Layer {
     pub(super) ordinal: usize,
     pub(super) position: SocXmlPosition,
     pub(super) animations: Vec<Animation>,
+    pub(super) blends: Vec<Blend>,
 }
 
 pub(super) struct Animation {
     pub(super) ordinal: usize,
     pub(super) position: SocXmlPosition,
     pub(super) name: Selector,
+    pub(super) flags: Selector,
+    pub(super) preceding_blend: Option<usize>,
+}
+
+pub(super) struct Blend {
+    pub(super) ordinal: usize,
+    pub(super) position: SocXmlPosition,
+    pub(super) duration: Selector,
+    pub(super) start_time: Selector,
+    pub(super) exit_time: Selector,
 }
 
 pub(super) struct Selector {
@@ -154,18 +165,41 @@ impl Layer {
     ) -> Result<Self, SocSceneError> {
         check(cancel)?;
         let mut animations = Vec::new();
-        for (ordinal, node) in ordered_children(layer, "Animation") {
+        let mut blends = Vec::new();
+        for (ordinal, node) in layer.elements().enumerate() {
             check(cancel)?;
-            animations.push(Animation {
-                ordinal,
-                position: position(node)?,
-                name: Selector::read(node, "name")?,
-            });
+            if node.namespace().is_some() {
+                continue;
+            }
+            match node.name() {
+                "Blend" => blends.push(Blend::read(ordinal, node)?),
+                "Animation" => animations.push(Animation {
+                    ordinal,
+                    position: position(node)?,
+                    name: Selector::read(node, "name")?,
+                    flags: Selector::read(node, "flags")?,
+                    preceding_blend: blends.len().checked_sub(1),
+                }),
+                _ => {}
+            }
         }
         Ok(Self {
             ordinal,
             position: position(layer)?,
             animations,
+            blends,
+        })
+    }
+}
+
+impl Blend {
+    fn read(ordinal: usize, node: SourceElement<'_>) -> Result<Self, SocSceneError> {
+        Ok(Self {
+            ordinal,
+            position: position(node)?,
+            duration: Selector::read(node, "Duration")?,
+            start_time: Selector::read(node, "StartTime")?,
+            exit_time: Selector::read(node, "ExitTime")?,
         })
     }
 }

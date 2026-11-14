@@ -64,6 +64,7 @@ struct Layer {
     ordinal: usize,
     position: SourcedValue<SocXmlPosition>,
     animations: Vec<Animation>,
+    blends: Vec<Blend>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -73,6 +74,18 @@ struct Animation {
     position: SourcedValue<SocXmlPosition>,
     name: AttributeSelection,
     alias_key: Option<SourcedValue<String>>,
+    flags: AttributeSelection,
+    preceding_blend: SourcedValue<usize>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+struct Blend {
+    ordinal: usize,
+    position: SourcedValue<SocXmlPosition>,
+    duration: AttributeSelection,
+    start_time: AttributeSelection,
+    exit_time: AttributeSelection,
 }
 
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -194,34 +207,86 @@ fn layers(
     let mut layers = Vec::with_capacity(drafts.len());
     for layer in drafts {
         pending::check(cancel)?;
-        let (position, _) = node_position(layer.position, origin)?;
-        let mut animations = Vec::with_capacity(layer.animations.len());
-        for animation in layer.animations {
-            pending::check(cancel)?;
-            let (position, used) = node_position(animation.position, origin)?;
-            let name = AttributeSelection::bind(animation.name, &used, origin)?;
-            let alias_key = match name.occurrences.as_slice() {
-                [attribute] => attribute
-                    .value
-                    .value()
-                    .and_then(|value| crate::player_rig_clip::alias_key(value))
-                    .map(|key| attribute.value.map_ref(|_| key)),
-                _ => None,
-            };
-            animations.push(Animation {
-                ordinal: animation.ordinal,
-                position,
-                name,
-                alias_key,
-            });
-        }
+        let (position, layer_use) = node_position(layer.position, origin)?;
+        let blends = layer
+            .blends
+            .into_iter()
+            .map(|blend| {
+                pending::check(cancel)?;
+                Blend::bind(blend, origin)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        let animations = layer
+            .animations
+            .into_iter()
+            .map(|animation| {
+                pending::check(cancel)?;
+                Animation::bind(animation, &layer_use, &blends, origin)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         layers.push(Layer {
             ordinal: layer.ordinal,
             position,
             animations,
+            blends,
         });
     }
     Ok(layers)
+}
+
+impl Animation {
+    fn bind(
+        animation: pending::Animation,
+        layer: &SourceUse,
+        blends: &[Blend],
+        origin: &XmlOrigin<'_>,
+    ) -> Result<Self, SocSceneError> {
+        let (position, used) = node_position(animation.position, origin)?;
+        let name = AttributeSelection::bind(animation.name, &used, origin)?;
+        let alias_key = match name.occurrences.as_slice() {
+            [attribute] => attribute
+                .value
+                .value()
+                .and_then(|value| crate::player_rig_clip::alias_key(value))
+                .map(|key| attribute.value.map_ref(|_| key)),
+            _ => None,
+        };
+        let flags = AttributeSelection::bind(animation.flags, &used, origin)?;
+        let preceding_blend = match animation.preceding_blend {
+            Some(index) => {
+                let blend = blends.get(index).ok_or(SocSceneError::Position)?;
+                let ordered_children = origin.sources.origin(&[layer.clone(), used], true);
+                origin.sources.value_with_origins(
+                    SourceValue::Present(blend.ordinal),
+                    &[&ordered_children, blend.position.origin()],
+                )?
+            }
+            None => origin
+                .sources
+                .value(SourceValue::Absent, &[layer.clone(), used], true),
+        };
+        Ok(Self {
+            ordinal: animation.ordinal,
+            position,
+            name,
+            alias_key,
+            flags,
+            preceding_blend,
+        })
+    }
+}
+
+impl Blend {
+    fn bind(blend: pending::Blend, origin: &XmlOrigin<'_>) -> Result<Self, SocSceneError> {
+        let (position, used) = node_position(blend.position, origin)?;
+        Ok(Self {
+            ordinal: blend.ordinal,
+            position,
+            duration: AttributeSelection::bind(blend.duration, &used, origin)?,
+            start_time: AttributeSelection::bind(blend.start_time, &used, origin)?,
+            exit_time: AttributeSelection::bind(blend.exit_time, &used, origin)?,
+        })
+    }
 }
 
 fn node_position(

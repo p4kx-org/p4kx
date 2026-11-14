@@ -11,6 +11,9 @@ use serde_json::{Value, json};
 
 use super::TestResult;
 
+#[path = "player_adb_blend_assertions.rs"]
+mod blends;
+
 const BRANCH: &str = "Data/Animations/test/layers.adb";
 
 #[derive(Default)]
@@ -29,11 +32,18 @@ impl PlayerDocumentSink for Documents {
 
 fn branch() -> Vec<u8> {
     let layer = TestElement::new("AnimLayer")
-        .child(TestElement::new("Blend").attribute("Duration", "1"))
+        .child(
+            TestElement::new("Blend")
+                .attribute("Duration", "1")
+                .attribute("StartTime", "")
+                .attribute("ExitTime", ".5"),
+        )
         .child(
             TestElement::new("Animation")
                 .attribute("name", "same")
-                .attribute("name", "second"),
+                .attribute("name", "second")
+                .attribute("flags", "Loop")
+                .attribute("flags", ""),
         )
         .child(TestElement::new("Animation").attribute("name", ""))
         .child(TestElement::new("Animation").attribute("Name", "opaque"))
@@ -41,7 +51,10 @@ fn branch() -> Vec<u8> {
             TestElement::new("Animation")
                 .attribute("name", "same")
                 .attribute("frames", "authored"),
-        );
+        )
+        .child(TestElement::new("Blend").attribute("Duration", "0"))
+        .child(TestElement::new("Other"))
+        .child(TestElement::new("Animation").attribute("flags", "Loop Loop"));
     TestElement::new("AnimDB")
         .child(TestElement::new("Unknown"))
         .child(
@@ -54,7 +67,11 @@ fn branch() -> Vec<u8> {
                             .attribute("GUID", "raw-b")
                             .child(TestElement::new("ProcLayer"))
                             .child(layer)
-                            .child(TestElement::new("AnimLayer")),
+                            .child(TestElement::new("AnimLayer"))
+                            .child(
+                                TestElement::new("AnimLayer")
+                                    .child(TestElement::new("Animation").attribute("flags", "")),
+                            ),
                     ),
             ),
         )
@@ -159,8 +176,8 @@ fn assert_fragment(adb: &Value, capture: &Value, source: &Value) -> TestResult {
         .get("layers")
         .and_then(Value::as_array)
         .ok_or("authored layers")?;
-    let [first, empty] = layers.as_slice() else {
-        return Err("two exact layers".into());
+    let [first, empty, standalone] = layers.as_slice() else {
+        return Err("three exact layers".into());
     };
     assert_eq!(
         first.get("ordinal"),
@@ -178,7 +195,7 @@ fn assert_fragment(adb: &Value, capture: &Value, source: &Value) -> TestResult {
         "authored empty layer"
     );
     assert_animations(first, capture, source)?;
-    Ok(())
+    blends::assert_blends(first, standalone, capture, source)
 }
 
 fn assert_animations(layer: &Value, capture: &Value, source: &Value) -> TestResult {
@@ -186,14 +203,15 @@ fn assert_animations(layer: &Value, capture: &Value, source: &Value) -> TestResu
         .get("animations")
         .and_then(Value::as_array)
         .ok_or("layer declarations")?;
-    let [duplicate, empty, absent, repeated] = animations.as_slice() else {
-        return Err("four Animations".into());
+    let [duplicate, empty, absent, repeated, trailing] = animations.as_slice() else {
+        return Err("five Animations".into());
     };
     for (row, ordinal, state, names) in [
         (duplicate, 1, "invalid", &["same", "second"][..]),
         (empty, 2, "present", &[""][..]),
         (absent, 3, "absent", &[][..]),
         (repeated, 4, "present", &["same"][..]),
+        (trailing, 7, "absent", &[][..]),
     ] {
         assert_eq!(
             row.get("ordinal"),
@@ -205,7 +223,11 @@ fn assert_animations(layer: &Value, capture: &Value, source: &Value) -> TestResu
     }
     let name = duplicate.get("name").ok_or("repeated name declaration")?;
     assert_distinct_attribute_positions(name)?;
-    assert_attribute_evidence(name, capture, source, [9, 3], "name")
+    let first_attr = name
+        .pointer("/occurrences/0/position/attribute")
+        .and_then(Value::as_u64)
+        .ok_or("name table position")?;
+    assert_attribute_evidence(name, capture, source, [9, first_attr], "name")
 }
 
 fn assert_selector(selector: &Value, state: &str, expected: &[&str]) -> TestResult {

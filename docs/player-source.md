@@ -201,3 +201,10 @@ A bank record matches only by its full normalized path and keeps its physical
 metadata ordinal, exact name and Entry-relative byte range. Bank rows carry
 their physical lookup and read outcome so empty candidate rows can be
 distinguished from unavailable or incomplete input.
+
+Each `adbFragment` animation layer retains its authored `Blend` nodes and their
+original `Duration`, `StartTime` and `ExitTime` attribute occurrences. An
+animation's `precedingBlend` points to the closest earlier `Blend` child in the
+same layer by original child ordinal. It records XML order. The original
+animation `flags` retain absent, empty and repeated attributes as distinct
+source states, including repetitions within the authored text.
