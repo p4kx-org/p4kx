@@ -193,25 +193,18 @@ fn verify(package: &Path, manifest: &Manifest) -> TestResult {
     );
     let receipt = package_receipt(package)?;
     let files = receipt.as_array().ok_or("file receipt rows")?;
-    for (texture, block, encrypted, rendition) in [
-        (
-            normal,
-            TEST_NORMAL_BLOCK.as_slice(),
-            false,
-            TextureRendition::NormalSmoothness,
-        ),
-        (
-            smoothness,
-            SMOOTHNESS_BLOCK.as_slice(),
-            true,
-            TextureRendition::SeparateSmoothness,
-        ),
+    assert_eq!(
+        [normal.source_rendition, smoothness.source_rendition],
+        [
+            Some(TextureRendition::NormalSmoothness),
+            Some(TextureRendition::SeparateSmoothness)
+        ],
+        "records the exact DDNA member roles"
+    );
+    for (texture, block, encrypted) in [
+        (normal, TEST_NORMAL_BLOCK.as_slice(), false),
+        (smoothness, SMOOTHNESS_BLOCK.as_slice(), true),
     ] {
-        assert_eq!(
-            texture.source_rendition,
-            Some(rendition),
-            "records the exact DDNA member role"
-        );
         verify_pair_member(package, files, texture, block, encrypted)?;
     }
     Ok(())
