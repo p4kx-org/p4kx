@@ -249,7 +249,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "missionBoards": absent_table(),
             "entityAnimationControllers": absent_table(),
             "lootGeneration": absent_table(),
-            "hackableDevices": absent_table(), "jumpPointConfigurations": absent_table(), "countermeasureEmitters": absent_table(),
+            "hackableDevices": absent_table(), "jumpPointConfigurations": absent_table(), "globalJumpPointConfigurations": absent_table(), "countermeasureEmitters": absent_table(),
             "vehicleArmor": absent_table(),
             "contractTemplates": absent_table(),
             "missionBrokerEntries": absent_table(),

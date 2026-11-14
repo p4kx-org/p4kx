@@ -4714,6 +4714,9 @@
         "fuelTanks": {
           "$ref": "#/$defs/CatalogTableOfFuelTank"
         },
+        "globalJumpPointConfigurations": {
+          "$ref": "#/$defs/CatalogTableOfGlobalJumpConfiguration"
+        },
         "hackableDevices": {
           "$ref": "#/$defs/CatalogTableOfHackableConfiguration"
         },
@@ -4832,6 +4835,7 @@
         "flightControllers",
         "fuelIntakes",
         "fuelTanks",
+        "globalJumpPointConfigurations",
         "hackableDevices",
         "hackingChips",
         "ifcs",
@@ -6212,6 +6216,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/GeologyTextureSet"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfGlobalJumpConfiguration": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/GlobalJumpConfiguration"
           },
           "type": "array"
         }
@@ -17894,6 +17917,50 @@
           "value": "reputationPrerequisite"
         }
       ]
+    },
+    "GlobalJumpConfiguration": {
+      "description": "An original global jump configuration and its authored field graph.",
+      "properties": {
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "className",
+        "fields",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
     },
     "GroundLayer": {
       "description": "Original terrain material selectors and scalar flags at one layer occurrence.",

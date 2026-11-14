@@ -16,6 +16,44 @@ const SIZE: &str = "LandingPadSize";
 const PUSH_AREA: &str = "SJumpPointPushAreaParams";
 const EFFECT: &str = "JumpPointEffectParams";
 const ROWS: &str = "/configurations/jumpPointConfigurations/rows";
+const GLOBAL_ROWS: &str = "/configurations/globalJumpPointConfigurations/rows";
+
+#[test]
+fn global_jump_configurations_preserve_original_records_without_copying_into_endpoints()
+-> TestResult {
+    let (_folder, archive) = common::open(&with_global_records(fixture()), DcbOrigin::Encrypted)?;
+    let mut options = common::options();
+    let only_global = Filter::new("*/jump-global/*");
+    options.filter = Some(&only_global);
+    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let [point, tunnel] = proof::rows(&catalog, GLOBAL_ROWS)? else {
+        return Err("two independently selected global records".into());
+    };
+    for (row, source_type, field, bits) in [
+        (point, "GlobalJumpPointParams", "alignmentRange", "80000000"),
+        (
+            tunnel,
+            "GlobalJumpTunnelHostParams",
+            "entityPullInAcceleration",
+            "3f000000",
+        ),
+    ] {
+        proof::present(row, "sourceType", &json!(source_type), Some(true))?;
+        let root = proof::at(row, "/fields/roots/0")?;
+        proof::present(root, "name", &json!(field), Some(true))?;
+        let datum = proof::cell(proof::at(row, "/fields/values/0")?, "value", "present")?;
+        assert_eq!(proof::at(datum, "/value/value/rawBits")?, bits);
+        assert!(
+            !proof::uses(&catalog, datum)?.is_empty() && datum["containsEncryptedSource"] == true,
+            "the stored global number carries its own source evidence"
+        );
+    }
+    assert!(
+        proof::rows(&catalog, ROWS)?.is_empty(),
+        "local components keep independent scope"
+    );
+    proof::closure(&catalog)
+}
 
 #[test]
 fn jump_point_configurations_preserve_physical_owner_and_native_fields() -> TestResult {
@@ -122,6 +160,35 @@ fn fixture() -> DataForgeBuilder {
             "Fixture",
             "fixtures/landing_size.xml",
         ))
+}
+
+fn with_global_records(builder: DataForgeBuilder) -> DataForgeBuilder {
+    builder
+        .structure(
+            TestStruct::new("GlobalJumpPointParams").field("alignmentRange", TestType::Single),
+        )
+        .structure(
+            TestStruct::new("GlobalJumpTunnelHostParams")
+                .field("entityPullInAcceleration", TestType::Single),
+        )
+        .record(
+            TestRecord::new(
+                4,
+                "GlobalJumpPointParams",
+                "FixtureGlobalPoint",
+                "fixtures/jump-global/point.xml",
+            )
+            .value("alignmentRange", TestValue::Single(-0.0)),
+        )
+        .record(
+            TestRecord::new(
+                5,
+                "GlobalJumpTunnelHostParams",
+                "FixtureGlobalTunnel",
+                "fixtures/jump-global/tunnel.xml",
+            )
+            .value("entityPullInAcceleration", TestValue::Single(0.5)),
+        )
 }
 
 fn component_schema() -> TestStruct {

@@ -9,6 +9,15 @@ including an authored empty string. Push-area and tunnel-effect settings preserv
 numbers, ordered members and source coordinates. Additional declarations use the authored
 field arena.
 
+`configurations.globalJumpPointConfigurations` preserves `GlobalJumpPointParams` and
+`GlobalJumpTunnelHostParams` Records independently. The canonical Record header identifies
+the physical source. `fields` retains each declared setting, nested value and original
+Reference. The point Record owns alignment, closing and pull-in timing, debris, effect and
+UI cone settings. The tunnel-host Record owns acceleration, material, generation, distortion,
+failure, exit, visual and effect settings. Generation probabilities link to their original
+tunnel sections. These links describe section generation. Global values have their own
+source scope and are kept separately from every placement.
+
 `placements.jumpEndpoints` keeps each qualifying `Child/@starMapRecord` occurrence with
 its physical parent, target container and local and world transform. A selected Starmap
 type `JumpPoint` qualifies through the original Record Reference. An `Anomaly` qualifies

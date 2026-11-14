@@ -24,6 +24,7 @@ pub(crate) enum ConfigurationInspection {
     LootGeneration,
     JumpDriveDefinition,
     JumpPoint,
+    JumpPointGlobal,
     WeaponActionRecoilDefinition,
     WeaponProceduralDefinition,
     EntityAnimationController,

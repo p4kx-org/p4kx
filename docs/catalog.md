@@ -227,6 +227,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `configurations.hackingChips` | Original chip charge counts and ordered removable modifier declarations by physical Item and component slot. [Hacking chips](catalog-hacking-chips.md) |
 | `configurations.hackableDevices` | Original target-device timing, error checks and audio declarations by physical Entity and component slot. Hacking state links remain in `configurations.interactions`. [Hacking devices](catalog-hacking-chips.md#hackable-devices) |
 | `configurations.jumpPointConfigurations` | Original physical jump-point component parameters. [Jump points](catalog-jump-points.md) |
+| `configurations.globalJumpPointConfigurations` | Original global jump-point and tunnel-host setup by physical Record. [Jump points](catalog-jump-points.md) |
 | `configurations.blueprintTiers` | Every interpreted tier with cost relationships, normalized values and Research |
 | `projections.blueprintPresentation` | Source-backed name, category, product, default availability, dismantle and first-tier ingredient links |
 | `definitions.resourceGroups`, `declarations.resourceGroupMembers`, `projections.resourceGroupParents` | Physical group definitions, every ordered authored membership and the first-selected parent with direct per-value origins ([contract](catalog-resource-groups.md)) |

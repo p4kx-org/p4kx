@@ -36,12 +36,15 @@ pub(in crate::catalog_v3) mod flight_configuration_tables;
 mod hackable_configuration;
 #[path = "catalog_jump_point.rs"]
 mod jump_point;
+#[path = "jump_point_globals.rs"]
+mod jump_point_globals;
 #[path = "loot_generation_component.rs"]
 mod loot_generation_component;
 
 use flight_configuration_tables::FlightConfigurationTables;
 use hackable_configuration::HackableConfiguration;
 use jump_point::JumpPointConfiguration;
+use jump_point_globals::GlobalJumpConfiguration;
 
 /// Independently scoped configurations with their physical owners.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -62,6 +65,7 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     #[serde(flatten)]
     jump_drive_definitions: JumpDriveDefinitions<'source>,
     jump_point_configurations: CatalogTable<JumpPointConfiguration<'source>>,
+    global_jump_point_configurations: CatalogTable<GlobalJumpConfiguration<'source>>,
 }
 
 pub(crate) struct IndependentConfigurations<'source> {
@@ -100,7 +104,6 @@ pub(crate) fn read<'source>(
         numbers: &mut configuration_numbers,
     };
     let jump_drive_definitions = components.jump_definitions()?;
-    let jump_point_configurations = components.table(JUMP_POINTS, JumpPointConfiguration::read)?;
     let flight = FlightConfigurationTables::read(&mut components)?;
     let weapon_action_recoil_definitions = components.weapon_recoil()?;
     let weapon_procedural = components.weapon_procedural()?;
@@ -109,6 +112,7 @@ pub(crate) fn read<'source>(
         components.table(ANIMATION_CONTROLLERS, EntityAnimationController::read)?;
     let loot_generation = components.table(LOOT_GENERATION, LootGenerationComponent::read)?;
     let hackable_devices = components.table(HACKABLE_DEVICES, HackableConfiguration::read)?;
+    let jump_points = components.jump_points()?;
     Ok(IndependentConfigurations {
         tables: IndependentConfigurationTables {
             item_recovery_economy,
@@ -122,7 +126,8 @@ pub(crate) fn read<'source>(
             hackable_devices,
             flight,
             jump_drive_definitions,
-            jump_point_configurations,
+            jump_point_configurations: jump_points.local,
+            global_jump_point_configurations: jump_points.global,
         },
         weapon_action_recoil_definitions,
         weapon_procedural,
@@ -134,6 +139,11 @@ pub(crate) fn read<'source>(
 struct GameModeTables<'source> {
     resource_network_parameters: CatalogTable<ResourceNetworkConfiguration<'source>>,
     radar_options: CatalogTable<RadarOptionsConfiguration<'source>>,
+}
+
+struct JumpPointTables<'source> {
+    local: CatalogTable<JumpPointConfiguration<'source>>,
+    global: CatalogTable<GlobalJumpConfiguration<'source>>,
 }
 
 fn read_game_mode<'source>(
@@ -195,6 +205,23 @@ struct PhysicalComponents<'options, 'input, 'source> {
 }
 
 impl<'source> PhysicalComponents<'_, '_, 'source> {
+    fn jump_points(&mut self) -> Result<JumpPointTables<'source>, CatalogError> {
+        let local = self.table(JUMP_POINTS, JumpPointConfiguration::read)?;
+        let global = jump_point_globals::read(
+            self.forge,
+            self.projection.original(),
+            self.options.filter,
+            self.options.cancel,
+        )?;
+        self.numbers.extend(global.numbers);
+        self.collected.ledger.merge(global.ledger);
+        self.collected.add_failures(global.failures);
+        Ok(JumpPointTables {
+            local,
+            global: jump_point_globals::table(self.forge, global.rows),
+        })
+    }
+
     fn jump_definitions(&mut self) -> Result<JumpDriveDefinitions<'source>, CatalogError> {
         let jump = jump_drive_definitions::read(
             self.forge,
