@@ -14,6 +14,7 @@ use super::catalog_resource_network_read::{self, ResourceNetworkRead};
 use super::catalog_weapon_actions::RECOIL_DEFINITION;
 use super::jump_drive_definitions::{self, JumpDriveDefinitions};
 use super::weapon_action_recoil_definitions::{self, WeaponActionRecoilDefinition};
+use super::weapon_procedural_definitions::{self, WeaponProceduralTables};
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_table::CatalogTable;
@@ -47,6 +48,7 @@ pub(crate) struct IndependentConfigurations<'source> {
     pub(crate) tables: IndependentConfigurationTables<'source>,
     pub(crate) weapon_action_recoil_definitions:
         CatalogTable<WeaponActionRecoilDefinition<'source>>,
+    pub(crate) weapon_procedural: WeaponProceduralTables<'source>,
     pub(crate) recovery_numbers: Vec<CapturedNumber>,
     pub(crate) configuration_numbers: Vec<CapturedNumber>,
 }
@@ -90,6 +92,7 @@ pub(crate) fn read<'source>(
     };
     let jump_drive_definitions = components.jump_definitions()?;
     let weapon_action_recoil_definitions = components.weapon_recoil()?;
+    let weapon_procedural = components.weapon_procedural()?;
     let mission_boards = components.table(MISSION_BOARDS, MissionBoard::read)?;
     let loot_generation = components.table(LOOT_GENERATION, LootGenerationComponent::read)?;
     Ok(IndependentConfigurations {
@@ -103,6 +106,7 @@ pub(crate) fn read<'source>(
             jump_drive_definitions,
         },
         weapon_action_recoil_definitions,
+        weapon_procedural,
         recovery_numbers,
         configuration_numbers,
     })
@@ -158,6 +162,20 @@ impl<'source> PhysicalComponents<'_, '_, 'source> {
             &[RECOIL_DEFINITION],
             recoil.rows.into_iter().map(|(_, row)| row).collect(),
         ))
+    }
+
+    fn weapon_procedural(&mut self) -> Result<WeaponProceduralTables<'source>, CatalogError> {
+        let (tables, evidence) = weapon_procedural_definitions::read(
+            self.forge,
+            self.projection.original(),
+            self.options.filter,
+            self.options.cancel,
+            &self.collected.item_components.weapon_actions,
+        )?;
+        self.numbers.extend(evidence.numbers);
+        self.collected.ledger.merge(evidence.ledger);
+        self.collected.add_failures(evidence.failures);
+        Ok(tables)
     }
 
     fn table<Row>(

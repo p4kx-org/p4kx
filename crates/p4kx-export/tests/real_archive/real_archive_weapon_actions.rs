@@ -131,6 +131,7 @@ fn compare_owner(
     };
     let trace = Trace::of(tree, &uses, &scope, encrypted);
     let mut rows = component_rows(catalog, "/configurations/weaponActions/rows")?;
+    rows.retain(|(owner, _), _| *owner == tree.record_index());
     let Some(Original::Array(components)) = tree.field("Components") else {
         return Err("representative weapon has an original Components array".into());
     };
@@ -157,7 +158,8 @@ fn compare_owner(
     }
     assert!(
         weapons > 0 && rows.is_empty(),
-        "every exported weapon has its physical source slot"
+        "every exported weapon for this owner has its physical source slot (original={weapons}, unmatched={})",
+        rows.len()
     );
     Ok(())
 }

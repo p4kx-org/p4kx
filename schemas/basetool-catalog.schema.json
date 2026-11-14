@@ -345,6 +345,114 @@
       ],
       "type": "object"
     },
+    "ActorProceduralRecoilConfig": {
+      "description": "Ordered recoil setups belonging to one physical actor recoil configuration.",
+      "properties": {
+        "actorProceduralRecoilSetup": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfActorProceduralRecoilSetup"
+        },
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
+        }
+      },
+      "required": [
+        "actorProceduralRecoilSetup",
+        "additionalFields",
+        "source"
+      ],
+      "type": "object"
+    },
+    "ActorProceduralRecoilSetup": {
+      "description": "Recoil modifier Reference and actor conditions of an original setup occurrence.",
+      "properties": {
+        "actorProceduralRecoilModifiers": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "filter": {
+          "$ref": "#/$defs/ActorStateFilter"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "actorProceduralRecoilModifiers",
+        "additionalFields",
+        "filter",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "ActorStateFilter": {
+      "description": "Original actor-state predicate labels of one authored setup.",
+      "properties": {
+        "filterByAimStanceState": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterByAimingRestriction": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterByCharacterType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterByEquippedArmorClass": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterByHeldItemType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterByLeanState": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterByMotionSpeed": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterByPlayerCamera": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterByPoseState": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterByRestrainedState": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterBySkeleton": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterByStanceState": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterByState": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "filterName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "filterByAimStanceState",
+        "filterByAimingRestriction",
+        "filterByCharacterType",
+        "filterByEquippedArmorClass",
+        "filterByHeldItemType",
+        "filterByLeanState",
+        "filterByMotionSpeed",
+        "filterByPlayerCamera",
+        "filterByPoseState",
+        "filterByRestrainedState",
+        "filterBySkeleton",
+        "filterByStanceState",
+        "filterByState",
+        "filterName"
+      ],
+      "type": "object"
+    },
     "AdditionalProjectiles": {
       "description": "An original additional-projectile definition link and launch inputs.",
       "properties": {
@@ -4654,6 +4762,12 @@
     "CatalogDefinitions": {
       "description": "Canonical typed definitions with distinct physical identities and source scopes.",
       "properties": {
+        "actorProceduralRecoilConfigs": {
+          "$ref": "#/$defs/CatalogTableOfActorProceduralRecoilConfig"
+        },
+        "actorProceduralRecoilModifiers": {
+          "$ref": "#/$defs/CatalogTableOfWeaponProceduralTarget"
+        },
         "ammoDefinitions": {
           "$ref": "#/$defs/CatalogTableOfAmmoDefinition"
         },
@@ -4824,9 +4938,17 @@
         },
         "weaponActionRecoilDefinitions": {
           "$ref": "#/$defs/CatalogTableOfWeaponActionRecoilDefinition"
+        },
+        "weaponProceduralAnimations": {
+          "$ref": "#/$defs/CatalogTableOfWeaponProceduralAnimation"
+        },
+        "weaponProceduralClips": {
+          "$ref": "#/$defs/CatalogTableOfWeaponProceduralTarget"
         }
       },
       "required": [
+        "actorProceduralRecoilConfigs",
+        "actorProceduralRecoilModifiers",
         "ammoDefinitions",
         "autoSpawnSets",
         "autoSpawns",
@@ -4883,7 +5005,9 @@
         "subHarvestableConfigs",
         "subHarvestableMultiConfigs",
         "tags",
-        "weaponActionRecoilDefinitions"
+        "weaponActionRecoilDefinitions",
+        "weaponProceduralAnimations",
+        "weaponProceduralClips"
       ],
       "type": "object"
     },
@@ -5040,6 +5164,25 @@
         "status",
         "targetRecordIndex",
         "targetType"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfActorProceduralRecoilConfig": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ActorProceduralRecoilConfig"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
       ],
       "type": "object"
     },
@@ -7142,6 +7285,44 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/WeaponMagazineResolution"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfWeaponProceduralAnimation": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/WeaponProceduralAnimation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfWeaponProceduralTarget": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/WeaponProceduralTarget"
           },
           "type": "array"
         }
@@ -36923,6 +37104,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfActorProceduralRecoilSetup": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ActorProceduralRecoilSetup"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfAdditionalProjectiles": {
       "allOf": [
         {
@@ -39630,6 +39941,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfActorActionTask"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfActorProceduralRecoilSetup": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfActorProceduralRecoilSetup"
                 },
                 "type": "array"
               }
@@ -53329,6 +53773,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfUnitSource"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfWeaponProceduralClipSetup": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfWeaponProceduralClipSetup"
                 },
                 "type": "array"
               }
@@ -98065,6 +98642,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfWeaponProceduralClipSetup": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/WeaponProceduralClipSetup"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfboolean": {
       "allOf": [
         {
@@ -103532,6 +104239,66 @@
         "connectionParams",
         "proceduralAnimationRecord",
         "weaponDegradationModifier"
+      ],
+      "type": "object"
+    },
+    "WeaponProceduralAnimation": {
+      "description": "Ordered authored clip setups belonging to one physical animation definition.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
+        },
+        "weaponProceduralClipsSetUp": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfWeaponProceduralClipSetup"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "source",
+        "weaponProceduralClipsSetUp"
+      ],
+      "type": "object"
+    },
+    "WeaponProceduralClipSetup": {
+      "description": "Clip References and actor conditions of an original setup occurrence.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "filter": {
+          "$ref": "#/$defs/ActorStateFilter"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "weaponProceduralClips": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "filter",
+        "sourceType",
+        "weaponProceduralClips"
+      ],
+      "type": "object"
+    },
+    "WeaponProceduralTarget": {
+      "description": "Original body of a referenced clip or actor recoil modifier.",
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
+        }
+      },
+      "required": [
+        "fields",
+        "source"
       ],
       "type": "object"
     },

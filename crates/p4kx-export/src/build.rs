@@ -18,7 +18,7 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition;
-use crate::catalog_v3::catalog_independent_configurations::{self, IndependentConfigurations};
+use crate::catalog_v3::catalog_independent_configurations;
 use crate::catalog_v3::inventory_container_definition::table as inventory_table;
 use crate::catalog_v3::medical::medical_tier_config;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
@@ -117,18 +117,14 @@ fn assemble<R>(
         options.cancel,
     )?);
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
-    let IndependentConfigurations {
-        tables: independent,
-        weapon_action_recoil_definitions,
-        recovery_numbers,
-        configuration_numbers,
-    } = catalog_independent_configurations::read(&forge, &projection, options, &mut collected)?;
+    let independent =
+        catalog_independent_configurations::read(&forge, &projection, options, &mut collected)?;
     let kinds = collected.summary(options.filter.is_none());
     let mut catalog_rows = crate::catalog_rows::snapshot(&mut collected, options.filter);
-    catalog_rows.recovery_numbers = recovery_numbers;
+    catalog_rows.recovery_numbers = independent.recovery_numbers;
     catalog_rows
         .configuration_numbers
-        .extend(configuration_numbers);
+        .extend(independent.configuration_numbers);
     if collected
         .ledger
         .catalog_rows
@@ -225,7 +221,8 @@ fn assemble<R>(
                 collected.explosion_definitions,
             ),
             ammo_definitions: ammo_definition::table(&forge, collected.ammo_definitions),
-            weapon_action_recoil_definitions,
+            weapon_action_recoil_definitions: independent.weapon_action_recoil_definitions,
+            weapon_procedural: independent.weapon_procedural,
             reputation_contexts: reputation_tables.contexts,
             faction_reputations: reputation_tables.factions.definitions,
             reputation_scopes: reputation_tables.scopes,
@@ -306,7 +303,7 @@ fn assemble<R>(
         configurations: crate::catalog_configurations::CatalogConfigurations {
             blueprint_tiers: blueprints.tiers,
             reputation_triggers: reputation_tables.factions.triggers,
-            independent,
+            independent: independent.tables,
             durability: components.durability.health,
             degradation: components.durability.degradation,
             distortion: components.durability.distortion,

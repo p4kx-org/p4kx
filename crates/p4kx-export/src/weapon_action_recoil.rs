@@ -9,7 +9,6 @@ use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::interaction_source::RecordLink;
-use crate::definition_reference::DefinitionStatus;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -43,7 +42,7 @@ impl<'source> WeaponActionRecoil<'source> {
     pub(super) fn linked_definitions(&self) -> impl Iterator<Item = u32> + '_ {
         [&self.recoil, &self.recoil_grappling]
             .into_iter()
-            .filter_map(linked_index)
+            .filter_map(|link| link.value()?.resolved_index())
     }
 
     pub(super) const fn projected(&self) -> [(&'static str, SourceValueState); 3] {
@@ -52,14 +51,5 @@ impl<'source> WeaponActionRecoil<'source> {
             ("recoilGrappling", self.recoil_grappling.state()),
             ("recoilInterval", self.recoil_interval.state()),
         ]
-    }
-}
-
-/// Returns the index of a resolved physical definition in this Build.
-pub(in crate::catalog_v3) fn linked_index(link: &RecordLink<'_>) -> Option<u32> {
-    let target = link.value()?;
-    match target.status {
-        DefinitionStatus::Present => target.target_record_index.value().copied(),
-        _ => None,
     }
 }

@@ -15,6 +15,15 @@ enum EnumShape {
 }
 
 impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
+    /// Reads an open label from the original scalar Enum declaration.
+    pub(in crate::catalog_v3) fn borrowed_declared_enum(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<&'source str>, CatalogError> {
+        self.enum_field(name, None, false, notes)
+    }
+
     /// Reads a declared Enum label or a directly stored String label.
     pub(in crate::catalog_v3) fn borrowed_enum_or_string(
         &self,
@@ -22,7 +31,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         target: &str,
         notes: &mut Vec<FieldError>,
     ) -> Result<SourcedValue<&'source str>, CatalogError> {
-        self.enum_field(name, target, true, notes)
+        self.enum_field(name, Some(target), true, notes)
     }
 
     /// Reads one scalar label with its exact original Enum declaration.
@@ -32,13 +41,13 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         target: &str,
         notes: &mut Vec<FieldError>,
     ) -> Result<SourcedValue<&'source str>, CatalogError> {
-        self.enum_field(name, target, false, notes)
+        self.enum_field(name, Some(target), false, notes)
     }
 
     fn enum_field(
         &self,
         name: &str,
-        target: &str,
+        target: Option<&str>,
         allow_string: bool,
         notes: &mut Vec<FieldError>,
     ) -> Result<SourcedValue<&'source str>, CatalogError> {
@@ -64,7 +73,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         let Some((_, fact)) = self.originals.field(self.owner, name)? else {
             return self.absent();
         };
-        self.declared_enum(name, target, EnumShape::Array, fact, notes, |notes| {
+        self.declared_enum(name, Some(target), EnumShape::Array, fact, notes, |notes| {
             self.array_elements(
                 fact,
                 name,
@@ -82,7 +91,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
     fn declared_enum<T>(
         &self,
         name: &str,
-        target: &str,
+        target: Option<&str>,
         shape: EnumShape,
         fact: &Fact<'scope, 'read, 'source>,
         notes: &mut Vec<FieldError>,
@@ -101,9 +110,10 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         }
         fact.check_input(self.input)?;
         let (declared, declaration) = self.input.declared_enum_name(storage.target())?;
+        let expected = target.or_else(|| declared.as_ref().ok().copied());
         self.read_declared_value(
             fact,
-            &[target],
+            expected.as_slice(),
             (declared, fact.declaration_selectors(declaration)?),
             notes,
             |notes| {

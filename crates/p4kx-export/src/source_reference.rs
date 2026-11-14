@@ -21,6 +21,17 @@ pub(crate) struct SourceRecordReference<'source> {
     pub(crate) status: DefinitionStatus,
 }
 
+impl SourceRecordReference<'_> {
+    /// Returns the physical Record index for a resolved compatible target.
+    pub(crate) const fn resolved_index(&self) -> Option<u32> {
+        if matches!(self.status, DefinitionStatus::Present) {
+            self.target_record_index.value().copied()
+        } else {
+            None
+        }
+    }
+}
+
 /// A pointer-derived admitted target with independently sourced original facts.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]

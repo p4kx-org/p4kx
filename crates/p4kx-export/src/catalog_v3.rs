@@ -208,6 +208,9 @@ mod catalog_seat_ejection;
 pub(crate) mod catalog_shield_generator;
 #[path = "catalog_unit_source.rs"]
 mod catalog_unit_source;
+#[path = "weapon_procedural_definitions.rs"]
+pub(crate) mod weapon_procedural_definitions;
+
 #[path = "catalog_weapon_actions.rs"]
 pub(crate) mod catalog_weapon_actions;
 #[path = "catalog_weapon_magazine_slots.rs"]

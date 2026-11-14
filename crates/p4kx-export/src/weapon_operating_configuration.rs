@@ -10,6 +10,9 @@ use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
 use crate::catalog_v3::interaction_source::{RecordLink, original};
+use crate::catalog_v3::weapon_procedural_definitions::{
+    ANIMATION_SOURCE_TYPE, RECOIL_CONFIG_SOURCE_TYPE,
+};
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
@@ -29,6 +32,16 @@ pub(super) struct WeaponOperatingConfiguration<'source> {
 }
 
 impl<'source> WeaponOperatingConfiguration<'source> {
+    pub(super) fn animation_index(&self) -> Option<u32> {
+        self.procedural_animation_record.value()?.resolved_index()
+    }
+
+    pub(super) fn actor_recoil_index(&self) -> Option<u32> {
+        self.actor_procedural_recoil_config
+            .value()?
+            .resolved_index()
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -36,12 +49,12 @@ impl<'source> WeaponOperatingConfiguration<'source> {
         Ok(Self {
             procedural_animation_record: source.record_link_to(
                 "proceduralAnimationRecord",
-                "WeaponProceduralAnimation",
+                ANIMATION_SOURCE_TYPE,
                 notes,
             )?,
             actor_procedural_recoil_config: source.record_link_to(
                 "actorProceduralRecoilConfig",
-                "ActorProceduralRecoilConfig",
+                RECOIL_CONFIG_SOURCE_TYPE,
                 notes,
             )?,
             connection_params: source.declared_class_to(

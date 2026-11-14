@@ -177,6 +177,18 @@ including ordered curves in the original field arenas. Reference states
 and the health report cover unavailable targets independently of their
 physical identity.
 
+Follow `operatingConfiguration.proceduralAnimationRecord` to
+`definitions.weaponProceduralAnimations` and
+`actorProceduralRecoilConfig` to `definitions.actorProceduralRecoilConfigs`.
+Each definition keeps the original setup order, actor-state filter
+labels and nested references. Those references join the physical rows
+in `definitions.weaponProceduralClips` or
+`definitions.actorProceduralRecoilModifiers`. The target bodies retain
+the original typed value storage and payload as an ordered arena. A
+selected weapon's admitted links can include definitions independently
+of the item path filter. The shared tables keep one row per physical
+target, including when multiple setup slots reference the same Record.
+
 A projectile launcher's `projectileType` is the stored label of the
 declared `EProjectileType` Enum. A readable different declaration is
 `unsupported`. A failed declaration or label read is `unreadable`. The ammunition

@@ -58,6 +58,14 @@ impl<'source> WeaponActions<'source> {
         })
     }
 
+    pub(super) fn animation_index(&self) -> Option<u32> {
+        self.operating_configuration.animation_index()
+    }
+
+    pub(super) fn actor_recoil_index(&self) -> Option<u32> {
+        self.operating_configuration.actor_recoil_index()
+    }
+
     pub(super) fn linked_recoil_definitions(&self) -> impl Iterator<Item = u32> + '_ {
         self.action_nodes
             .iter()
