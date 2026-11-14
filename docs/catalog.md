@@ -2963,8 +2963,11 @@ sizes for selected installed builds. [Catalog size investigation](https://github
 The [domain partition assessment](catalog-partitioning.md) describes an optional package with
 reference-safe selective imports.
 
-Measured on LIVE on 2026-10-26 (complete catalog of every kind, English and German texts; Bytes
-is the whole catalog, the other kinds are in `p4kx catalog --json`):
+### Historical measurements
+
+The following measurements describe earlier catalog revisions. Use the size investigation for
+measurements of Catalog v3. The LIVE capture from 2026-10-26 included all kinds and English
+and German texts. Bytes is the whole decoded catalog. The CLI summary was produced with `p4kx catalog --json`.
 
 | Channel | Bytes | Manufacturers | Items | Ships | Commodities | Blueprints | Resource groups | Blueprint categories | Properties | Distributions | Pools | Dismantle | Paints | Loadouts |
 |---------|------:|--------------:|------:|------:|------------:|-----------:|----------------:|---------------------:|-----------:|--------------:|------:|----------:|-------:|---------:|
