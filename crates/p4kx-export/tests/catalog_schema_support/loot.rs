@@ -207,3 +207,33 @@ pub(super) fn containers() -> Value {
         "tagCounts": []
     }])
 }
+
+const KINDS: [&str; 6] = [
+    "lootSecondaryChoiceSingleLayers",
+    "lootSecondaryChoiceMultiLayers",
+    "lootThemes",
+    "hierarchicalContextualDataPresets",
+    "lootGenerationGlobalParams",
+    "subHarvestableConfigs",
+];
+
+pub(crate) fn add_definition_tables(catalog: &mut Value) {
+    let Some(completeness) = catalog
+        .get_mut("completeness")
+        .and_then(Value::as_object_mut)
+    else {
+        unreachable!("fixture completeness object");
+    };
+    for kind in KINDS {
+        completeness.insert(kind.to_owned(), json!({"status": "complete"}));
+    }
+    let Some(definitions) = catalog
+        .get_mut("definitions")
+        .and_then(Value::as_object_mut)
+    else {
+        unreachable!("fixture definitions object");
+    };
+    for kind in KINDS.into_iter().chain(["subHarvestableMultiConfigs"]) {
+        definitions.insert(kind.to_owned(), super::absent_table());
+    }
+}

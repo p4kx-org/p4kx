@@ -224,10 +224,9 @@ impl Kind {
                 prefixes: &["libs/foundry/records/harvestable/providerpresets/"],
                 type_name: "HarvestableProviderPreset",
             },
-            Self::SubHarvestableMultiConfigs => KindRule {
-                prefixes: &["libs/foundry/records/harvestable/slotpresets/"],
-                type_name: "SubHarvestableMultiConfigRecord",
-            },
+            Self::SubHarvestableMultiConfigs => {
+                LootDefinitionKind::SubHarvestableMultiConfig.rule()
+            }
             Self::FactionReputations => KindRule {
                 prefixes: &["libs/foundry/records/factions/factionreputation/"],
                 type_name: crate::catalog_v3::reputation_faction_definition::SOURCE_TYPE,
@@ -292,6 +291,11 @@ impl Kind {
                 LootDefinitionKind::SecondaryChoiceMultiLayer.rule()
             }
             Self::LootThemes => LootDefinitionKind::Theme.rule(),
+            Self::HierarchicalContextualDataPresets => {
+                LootDefinitionKind::HierarchicalContextualDataPreset.rule()
+            }
+            Self::LootGenerationGlobalParams => LootDefinitionKind::GlobalParams.rule(),
+            Self::SubHarvestableConfigs => LootDefinitionKind::SubHarvestableConfig.rule(),
             Self::LegacyLootTables => KindRule {
                 prefixes: &["libs/foundry/records/lootgeneration/loottables/"],
                 type_name: "LootTable",

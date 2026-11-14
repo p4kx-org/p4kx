@@ -109,6 +109,10 @@ const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::LootSecondaryChoiceSingleLayers
             | Kind::LootSecondaryChoiceMultiLayers
             | Kind::LootThemes
+            | Kind::HierarchicalContextualDataPresets
+            | Kind::LootGenerationGlobalParams
+            | Kind::SubHarvestableConfigs
+            | Kind::SubHarvestableMultiConfigs
     )
 }
 

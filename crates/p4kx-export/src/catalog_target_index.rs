@@ -204,6 +204,10 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
             | Kind::LootSecondaryChoiceSingleLayers
             | Kind::LootSecondaryChoiceMultiLayers
             | Kind::LootThemes
+            | Kind::HierarchicalContextualDataPresets
+            | Kind::LootGenerationGlobalParams
+            | Kind::SubHarvestableConfigs
+            | Kind::SubHarvestableMultiConfigs
             | Kind::ExplosionDefinitions
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs

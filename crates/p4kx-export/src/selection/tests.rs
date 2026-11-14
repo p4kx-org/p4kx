@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::{Kind, is_kind_leftover, is_leftover};
+use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 
 const LOOT_TABLES: &str = "libs/foundry/records/lootgeneration/loottables/x";
 
@@ -92,15 +93,9 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::MedicalItemTierConfigs
                 | Kind::StarmapTypes
                 | Kind::StarmapPresets
-                | Kind::StarmapAmenities
-                | Kind::LootSecondaryChoiceSingleLayers
-                | Kind::LootSecondaryChoiceMultiLayers
-                | Kind::LootThemes => {
-                    assert_eq!(
-                        by_path,
-                        Some(Kind::Tags),
-                        "type disambiguates an unrestricted path"
-                    );
+                | Kind::StarmapAmenities => assert_tag_path(by_path),
+                _ if LootDefinitionKind::of(kind).is_some_and(LootDefinitionKind::is_type_wide) => {
+                    assert_tag_path(by_path);
                 }
                 _ => assert_eq!(by_path, by_record, "{kind} by path at {path}"),
             }
@@ -180,4 +175,12 @@ fn a_contract_template_is_no_leftover_for_the_word_template_but_for_the_other_to
     ));
     assert!(template(&format!("{folder}x"), "ContractTemplate.Debug"));
     assert!(is_leftover(&format!("{folder}handyman_template"), "x"));
+}
+
+fn assert_tag_path(kind: Option<Kind>) {
+    assert_eq!(
+        kind,
+        Some(Kind::Tags),
+        "type disambiguates an unrestricted path"
+    );
 }

@@ -341,9 +341,6 @@ pub(crate) fn minimal_catalog() -> Value {
         "missionModuleDeclarations",
         "missionItems",
         "contractScopes",
-        "lootSecondaryChoiceSingleLayers",
-        "lootSecondaryChoiceMultiLayers",
-        "lootThemes",
     ] {
         for (section, value) in [
             ("completeness", json!({"status": "complete"})),
@@ -354,6 +351,7 @@ pub(crate) fn minimal_catalog() -> Value {
             }
         }
     }
+    loot::add_definition_tables(&mut catalog);
     let export_health = health::fixture(&catalog);
     let Value::Object(fields) = &mut catalog else {
         unreachable!("the authored catalog fixture is a JSON object");

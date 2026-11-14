@@ -12,7 +12,17 @@ and `definitions.lootThemes` use the same owner-local value format for the exact
 their dataset names. Single-layer choices retain their original ordered class entries and concrete
 selectors. Multi-layer choices retain ordered Reference slots and original target headers even when
 the target body is outside the filter. Themes retain the concrete type and fields of their original
-owned theme value. The rows describe original source data and do not simulate loot selection.
+owned theme value.
+
+`definitions.hierarchicalContextualDataPresets` retains the original HCD array, concrete context
+types and source selectors. `definitions.lootGenerationGlobalParams` retains authored category
+ordering and special event archetypes. `definitions.subHarvestableConfigs` and
+`definitions.subHarvestableMultiConfigs` retain the complete wrapped configurations, including
+inline alternatives, theme links, and links to an independently defined slot preset. Only the
+existing slot-preset selection also emits a convenience row under the top-level
+`subHarvestableMultiConfigs`. Its GUID joins the canonical row, and the Kind counts the physical
+definition once. The definitions include every Record of their exact source family and do not
+simulate loot selection.
 
 Each row has the common eight independently sourced header fields, ordered root `fields`, and a
 flat `values` vector. A field contains its sourced original `name`, a declaration with sourced

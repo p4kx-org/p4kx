@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::Kind;
+use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 
 /// The tokens that mark a development leftover: a Record whose record path or name holds one of
 /// them as a whole word, ignoring ASCII case, is left out and counted as skipped.
@@ -40,6 +41,9 @@ pub(crate) fn is_leftover(record_path: &str, name: &str) -> bool {
 /// Authored definition kinds retain every matching physical Record.
 #[must_use]
 pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
+    if LootDefinitionKind::of(kind).is_some_and(LootDefinitionKind::is_type_wide) {
+        return false;
+    }
     match kind {
         Kind::Tags
         | Kind::Factions

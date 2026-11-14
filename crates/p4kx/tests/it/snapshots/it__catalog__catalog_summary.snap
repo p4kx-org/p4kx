@@ -41,6 +41,9 @@ lootPoolFilters: 0 written, 0 skipped, complete
 lootSecondaryChoiceSingleLayers: 0 written, 0 skipped, complete
 lootSecondaryChoiceMultiLayers: 0 written, 0 skipped, complete
 lootThemes: 0 written, 0 skipped, complete
+hierarchicalContextualDataPresets: 0 written, 0 skipped, complete
+lootGenerationGlobalParams: 0 written, 0 skipped, complete
+subHarvestableConfigs: 0 written, 0 skipped, complete
 lootContainers: 0 written, 0 skipped, complete
 mineableEntities: 0 written, 0 skipped, complete
 legacyLootTables: 0 written, 0 skipped, complete
@@ -103,4 +106,4 @@ ships variants: 0 in 0 groups
 quality quantizations: 0 used by no ResourceType, 0 links reach no quantization
 en: 16 texts resolved, 1 unresolved, 0 placeholders
 de: 2 texts resolved, 15 unresolved, 0 placeholders
-wrote [DIR]/basetool-catalog.json: 231506 bytes, 1 Records skipped, 0 failed
+wrote [DIR]/basetool-catalog.json: 234118 bytes, 1 Records skipped, 0 failed

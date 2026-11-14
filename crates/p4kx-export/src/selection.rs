@@ -74,8 +74,7 @@ pub enum Kind {
     /// Harvestable provider presets: `HarvestableProviderPreset` Records under
     /// `harvestable/providerpresets`.
     HarvestableProviderPresets,
-    /// Sub harvestable multi configs: `SubHarvestableMultiConfigRecord` Records under
-    /// `harvestable/slotpresets`.
+    /// Physical `SubHarvestableMultiConfigRecord` Records.
     SubHarvestableMultiConfigs,
     /// Harvestable locations: the containers whose `.soc` names a provider preset, with the
     /// starmap object they hang below. Derived from the system containers, so no record-path rule
@@ -110,6 +109,12 @@ pub enum Kind {
     LootSecondaryChoiceMultiLayers,
     /// Physical Loot theme Records.
     LootThemes,
+    /// Physical Hierarchical Contextual Data preset Records.
+    HierarchicalContextualDataPresets,
+    /// Physical Loot Generation global parameter Records.
+    LootGenerationGlobalParams,
+    /// Physical `SubHarvestableConfigRecord` Records.
+    SubHarvestableConfigs,
     /// Loot containers: the containers whose placing entity carries a multi config, read from the
     /// entity files of the containers below the system containers. Derived from Archive files, so
     /// no record-path rule of its own.
@@ -224,7 +229,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 86] = [
+    pub const ALL: [Self; 89] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -262,6 +267,9 @@ impl Kind {
         Self::LootSecondaryChoiceSingleLayers,
         Self::LootSecondaryChoiceMultiLayers,
         Self::LootThemes,
+        Self::HierarchicalContextualDataPresets,
+        Self::LootGenerationGlobalParams,
+        Self::SubHarvestableConfigs,
         Self::LootContainers,
         Self::MineableEntities,
         Self::LegacyLootTables,

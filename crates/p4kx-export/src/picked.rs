@@ -13,6 +13,7 @@ use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyPick;
+use crate::catalog_v3::loot_definition_catalog::LootDefinition;
 use crate::catalog_v3::medical::medical_tier_config::PreparedMedicalTier;
 use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsPick;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
@@ -88,8 +89,11 @@ pub(crate) enum Picked<'f> {
     MineableEntity(MineableEntity<'f>),
     /// A harvestable provider preset.
     Provider(HarvestableProviderPreset<'f>),
-    /// A sub harvestable multi config.
-    MultiConfig(SubHarvestableMultiConfig<'f>),
+    /// A physical multi config with an optional slot-preset projection.
+    MultiConfig {
+        definition: Box<LootDefinition<'f>>,
+        projection: Option<SubHarvestableMultiConfig<'f>>,
+    },
     /// An entity of a mission or reputation kind.
     Mission(MissionPick<'f>),
     /// An entity of a loot kind.
@@ -139,6 +143,9 @@ impl<'f> Picked<'f> {
             | Kind::LootSecondaryChoiceSingleLayers
             | Kind::LootSecondaryChoiceMultiLayers
             | Kind::LootThemes
+            | Kind::HierarchicalContextualDataPresets
+            | Kind::LootGenerationGlobalParams
+            | Kind::SubHarvestableConfigs
             | Kind::Tags
             | Kind::Manufacturers
             | Kind::Ships

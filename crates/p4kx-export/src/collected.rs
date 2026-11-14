@@ -22,6 +22,7 @@ use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
 use crate::catalog_v3::law_kinds::LawKinds;
 use crate::catalog_v3::location_vocabulary::LocationVocabulary;
+use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 use crate::catalog_v3::medical::medical_tier_config::PreparedMedicalTier;
 use crate::catalog_v3::mission_sources::local_contract_generator_configuration::LocalContractGeneratorConfiguration;
 use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitions;
@@ -300,7 +301,15 @@ impl<'f> Collected<'f> {
             Picked::MiningParams(entity) => self.mining_global_params.push(entity),
             Picked::MineableEntity(entity) => self.mineable_entities.push(entity),
             Picked::Provider(entity) => self.harvestable_provider_presets.push(entity),
-            Picked::MultiConfig(entity) => self.sub_harvestable_multi_configs.push(entity),
+            Picked::MultiConfig {
+                definition,
+                projection,
+            } => {
+                self.loot_kinds
+                    .definitions
+                    .push(LootDefinitionKind::SubHarvestableMultiConfig, *definition);
+                self.sub_harvestable_multi_configs.extend(projection);
+            }
             Picked::Mission(entity) => self.mission_kinds.push(entity),
             Picked::Law(entity) => self.law.push(entity),
             Picked::LocationVocabulary(entity) => self.location_vocabulary.push(entity),

@@ -4561,6 +4561,9 @@
         "gameplayProperties": {
           "$ref": "#/$defs/CatalogTableOfGameplayPropertyDefinition"
         },
+        "hierarchicalContextualDataPresets": {
+          "$ref": "#/$defs/CatalogTableOfLootDefinition"
+        },
         "infractionSets": {
           "$ref": "#/$defs/CatalogTableOfInfractionSetDefinition"
         },
@@ -4584,6 +4587,9 @@
         },
         "locationSizes": {
           "$ref": "#/$defs/CatalogTableOfLocationDictionaryEntry"
+        },
+        "lootGenerationGlobalParams": {
+          "$ref": "#/$defs/CatalogTableOfLootDefinition"
         },
         "lootPoolFilters": {
           "$ref": "#/$defs/CatalogTableOfLootDefinition"
@@ -4669,6 +4675,12 @@
         "starmapTypes": {
           "$ref": "#/$defs/CatalogTableOfStarmapTypeDefinition"
         },
+        "subHarvestableConfigs": {
+          "$ref": "#/$defs/CatalogTableOfLootDefinition"
+        },
+        "subHarvestableMultiConfigs": {
+          "$ref": "#/$defs/CatalogTableOfLootDefinition"
+        },
         "tags": {
           "$ref": "#/$defs/CatalogTableOfTagDefinition"
         }
@@ -4689,6 +4701,7 @@
         "factionReputations",
         "factions",
         "gameplayProperties",
+        "hierarchicalContextualDataPresets",
         "infractionSets",
         "infractions",
         "inventoryContainers",
@@ -4697,6 +4710,7 @@
         "locationFunctions",
         "locationRegistries",
         "locationSizes",
+        "lootGenerationGlobalParams",
         "lootPoolFilters",
         "lootSecondaryChoiceMultiLayers",
         "lootSecondaryChoiceSingleLayers",
@@ -4725,6 +4739,8 @@
         "starmapObjects",
         "starmapPresets",
         "starmapTypes",
+        "subHarvestableConfigs",
+        "subHarvestableMultiConfigs",
         "tags"
       ],
       "type": "object"
@@ -7636,6 +7652,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `harvestableProviderPresets`."
         },
+        "hierarchicalContextualDataPresets": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `hierarchicalContextualDataPresets`."
+        },
         "infractionSets": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The physical infraction set selection."
@@ -7693,6 +7713,10 @@
         "lootContainers": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `lootContainers`."
+        },
+        "lootGenerationGlobalParams": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `lootGenerationGlobalParams`."
         },
         "lootPoolFilters": {
           "$ref": "#/$defs/KindCompleteness",
@@ -7860,6 +7884,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The physical `starmapTypes` selection."
         },
+        "subHarvestableConfigs": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `subHarvestableConfigs`."
+        },
         "subHarvestableMultiConfigs": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `subHarvestableMultiConfigs`."
@@ -7897,6 +7925,7 @@
         "gameplayProperties",
         "harvestableLocations",
         "harvestableProviderPresets",
+        "hierarchicalContextualDataPresets",
         "infractionSets",
         "infractions",
         "inventoryContainers",
@@ -7913,6 +7942,7 @@
         "locationSizes",
         "lootArchetypes",
         "lootContainers",
+        "lootGenerationGlobalParams",
         "lootPoolFilters",
         "lootSecondaryChoiceMultiLayers",
         "lootSecondaryChoiceSingleLayers",
@@ -7955,6 +7985,7 @@
         "starmapObjects",
         "starmapPresets",
         "starmapTypes",
+        "subHarvestableConfigs",
         "subHarvestableMultiConfigs",
         "tags"
       ],
@@ -18646,7 +18677,7 @@
           "value": "harvestableProviderPresets"
         },
         {
-          "description": "Sub harvestable multi configs: `SubHarvestableMultiConfigRecord` Records under\n`harvestable/slotpresets`.",
+          "description": "Physical `SubHarvestableMultiConfigRecord` Records.",
           "value": "subHarvestableMultiConfigs"
         },
         {
@@ -18708,6 +18739,18 @@
         {
           "description": "Physical Loot theme Records.",
           "value": "lootThemes"
+        },
+        {
+          "description": "Physical Hierarchical Contextual Data preset Records.",
+          "value": "hierarchicalContextualDataPresets"
+        },
+        {
+          "description": "Physical Loot Generation global parameter Records.",
+          "value": "lootGenerationGlobalParams"
+        },
+        {
+          "description": "Physical `SubHarvestableConfigRecord` Records.",
+          "value": "subHarvestableConfigs"
         },
         {
           "description": "Loot containers: the containers whose placing entity carries a multi config, read from the\nentity files of the containers below the system containers. Derived from Archive files, so\nno record-path rule of its own.",

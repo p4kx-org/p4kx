@@ -240,6 +240,7 @@ mod loadouts_fixture;
 mod loadouts_support;
 mod localization_table;
 mod location_observed_factory_tests;
+mod loot_context_definition_tests;
 mod loot_depth_v3_fixture;
 mod loot_depth_v3_source;
 mod loot_depth_v3_tests;
@@ -379,9 +380,8 @@ mod flow_owner_graph;
 mod mission_template_graph;
 mod template_canonical_graph;
 
-mod scoped_canonical;
-
 mod mission_canonical_text;
+mod scoped_canonical;
 
 mod tag_duplicate_body;
 

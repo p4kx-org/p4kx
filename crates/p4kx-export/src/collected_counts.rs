@@ -70,7 +70,6 @@ impl Collected<'_> {
             Kind::MiningGlobalParams => self.mining_global_params.len(),
             Kind::MineableEntities => self.mineable_entities.len(),
             Kind::HarvestableProviderPresets => self.harvestable_provider_presets.len(),
-            Kind::SubHarvestableMultiConfigs => self.sub_harvestable_multi_configs.len(),
             Kind::HarvestableLocations => self.harvestable_locations.len(),
             Kind::LootContainers => self.loot_containers.len(),
             Kind::Shops => self.shops.len(),
@@ -96,6 +95,10 @@ impl Collected<'_> {
             | Kind::LootSecondaryChoiceSingleLayers
             | Kind::LootSecondaryChoiceMultiLayers
             | Kind::LootThemes
+            | Kind::HierarchicalContextualDataPresets
+            | Kind::LootGenerationGlobalParams
+            | Kind::SubHarvestableConfigs
+            | Kind::SubHarvestableMultiConfigs
             | Kind::LegacyLootTables
             | Kind::LegacyLootArchetypes => self.loot_kinds.count(kind),
         }

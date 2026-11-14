@@ -11,7 +11,7 @@ use crate::commodity_resource::{self, CommodityResource};
 use crate::contract_stats::ItemStats;
 use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
 use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDiagnosis};
-use crate::harvest_config::multi_config;
+use crate::harvest_config::{is_slotpreset_path, multi_config};
 use crate::harvest_preset::provider_preset;
 use crate::loot_kinds::LootPick;
 use crate::mining::mineable_entity;
@@ -35,10 +35,11 @@ impl<'f> Scan<'_, '_, 'f> {
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
-        if let Some(picked) = self.definition_kind(kind, admission, tree, ledger)? {
+        if let Some(picked) = self.definition_kind(kind, trees, admission, tree, ledger)? {
             return Ok(Some(picked));
         }
-        if let Some(picked) = self.harvestable(kind, trees, tree) {
+        if kind == Kind::HarvestableProviderPresets {
+            let picked = Picked::Provider(provider_preset(trees, tree, self.forge, &self.links));
             return Ok(Some(picked));
         }
         if kind == Kind::MineableEntities {
@@ -155,6 +156,7 @@ impl<'f> Scan<'_, '_, 'f> {
     fn definition_kind(
         &self,
         kind: Kind,
+        trees: &mut TreeBuilder<'f>,
         admission: &RecordObservation<'_, 'f>,
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
@@ -166,10 +168,20 @@ impl<'f> Scan<'_, '_, 'f> {
                 self.projection,
                 self.options.cancel,
             )?;
-            return Ok(Some(Picked::Loot(LootPick::Definition(
-                loot,
-                Box::new(value),
-            ))));
+            let definition = Box::new(value);
+            let picked = if kind == Kind::SubHarvestableMultiConfigs {
+                let path = tree.record_path();
+                let projection = (is_slotpreset_path(path)
+                    && !crate::selection::is_leftover(path, tree.name()))
+                .then(|| multi_config(trees, tree, self.forge, &self.links));
+                Picked::MultiConfig {
+                    definition,
+                    projection,
+                }
+            } else {
+                Picked::Loot(LootPick::Definition(loot, definition))
+            };
+            return Ok(Some(picked));
         }
         let Some((picked, notes)) = self.read_definition(kind, admission, tree)? else {
             return Ok(None);
@@ -207,31 +219,6 @@ impl<'f> Scan<'_, '_, 'f> {
             vehicle.source_record_index = Some(record.index());
         }
         Ok(picked)
-    }
-
-    /// Returns the provider preset or multi config `tree` describes when `kind` is one of the
-    /// kinds that follow a harvestable to its entity.
-    fn harvestable(
-        &self,
-        kind: Kind,
-        trees: &mut TreeBuilder<'f>,
-        tree: &RecordTree<'f>,
-    ) -> Option<Picked<'f>> {
-        match kind {
-            Kind::HarvestableProviderPresets => Some(Picked::Provider(provider_preset(
-                trees,
-                tree,
-                self.forge,
-                &self.links,
-            ))),
-            Kind::SubHarvestableMultiConfigs => Some(Picked::MultiConfig(multi_config(
-                trees,
-                tree,
-                self.forge,
-                &self.links,
-            ))),
-            _ => None,
-        }
     }
 
     fn commodity(

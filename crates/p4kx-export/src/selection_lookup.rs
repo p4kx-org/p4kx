@@ -3,6 +3,8 @@
 
 use std::fmt;
 
+use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
+use crate::harvest_config::is_slotpreset_path;
 use crate::selection::{Kind, KindRule};
 
 impl Kind {
@@ -39,17 +41,17 @@ impl Kind {
     /// Returns the first kind in [`Kind::ALL`] one of whose prefixes `record_path` starts with,
     /// and never a derived kind. The prefixes of [`Kind::Crafters`] overlap those of the entity
     /// kinds; only the order of [`Kind::ALL`] resolves it. Kinds that share a folder are told
-    /// apart by [`Self::by_record`]. Loot definitions with unrestricted paths require a type.
+    /// apart by [`Self::by_record`]. Multi configs retain slot-preset path lookup.
+    /// Other type-wide Loot definitions require a Record type.
     pub(crate) fn by_path(record_path: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|kind| {
-            !matches!(
-                kind,
-                Self::LootSecondaryChoiceSingleLayers
-                    | Self::LootSecondaryChoiceMultiLayers
-                    | Self::LootThemes
-            ) && kind
-                .rule()
-                .is_some_and(|rule| rule.matches_path(record_path))
+            if *kind == Self::SubHarvestableMultiConfigs {
+                return is_slotpreset_path(record_path);
+            }
+            !LootDefinitionKind::of(*kind).is_some_and(LootDefinitionKind::is_type_wide)
+                && kind
+                    .rule()
+                    .is_some_and(|rule| rule.matches_path(record_path))
         })
     }
 

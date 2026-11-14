@@ -25,6 +25,10 @@ pub(crate) struct LootDefinitionTables<'source> {
     secondary_choice_multi_layers: CatalogTable<LootDefinition<'source>>,
     #[serde(rename = "lootThemes")]
     themes: CatalogTable<LootDefinition<'source>>,
+    hierarchical_contextual_data_presets: CatalogTable<LootDefinition<'source>>,
+    loot_generation_global_params: CatalogTable<LootDefinition<'source>>,
+    sub_harvestable_configs: CatalogTable<LootDefinition<'source>>,
+    sub_harvestable_multi_configs: CatalogTable<LootDefinition<'source>>,
 }
 
 /// Collected source-owned Loot definitions.
@@ -34,6 +38,10 @@ pub(crate) struct LootDefinitions<'source> {
     secondary_single: Vec<LootDefinition<'source>>,
     secondary_multi: Vec<LootDefinition<'source>>,
     themes: Vec<LootDefinition<'source>>,
+    hierarchical_contextual_data_presets: Vec<LootDefinition<'source>>,
+    global_params: Vec<LootDefinition<'source>>,
+    sub_harvestable_configs: Vec<LootDefinition<'source>>,
+    sub_harvestable_multi_configs: Vec<LootDefinition<'source>>,
 }
 
 impl<'source> LootDefinitions<'source> {
@@ -43,6 +51,14 @@ impl<'source> LootDefinitions<'source> {
             LootDefinitionKind::SecondaryChoiceSingleLayer => &mut self.secondary_single,
             LootDefinitionKind::SecondaryChoiceMultiLayer => &mut self.secondary_multi,
             LootDefinitionKind::Theme => &mut self.themes,
+            LootDefinitionKind::HierarchicalContextualDataPreset => {
+                &mut self.hierarchical_contextual_data_presets
+            }
+            LootDefinitionKind::GlobalParams => &mut self.global_params,
+            LootDefinitionKind::SubHarvestableConfig => &mut self.sub_harvestable_configs,
+            LootDefinitionKind::SubHarvestableMultiConfig => {
+                &mut self.sub_harvestable_multi_configs
+            }
         }
         .push(row);
     }
@@ -53,6 +69,10 @@ impl<'source> LootDefinitions<'source> {
             &mut self.secondary_single,
             &mut self.secondary_multi,
             &mut self.themes,
+            &mut self.hierarchical_contextual_data_presets,
+            &mut self.global_params,
+            &mut self.sub_harvestable_configs,
+            &mut self.sub_harvestable_multi_configs,
         ] {
             sort_by_guid(rows, |row| row.physical_guid);
         }
@@ -79,7 +99,8 @@ impl<'source> LootDefinitions<'source> {
 
     pub(crate) fn tables(self, forge: &DataForge<'_>) -> LootDefinitionTables<'source> {
         use LootDefinitionKind::{
-            PoolFilter, SecondaryChoiceMultiLayer, SecondaryChoiceSingleLayer, Theme,
+            GlobalParams, HierarchicalContextualDataPreset, PoolFilter, SecondaryChoiceMultiLayer,
+            SecondaryChoiceSingleLayer, SubHarvestableConfig, SubHarvestableMultiConfig, Theme,
         };
 
         let table = |kind: LootDefinitionKind, rows| {
@@ -93,6 +114,16 @@ impl<'source> LootDefinitions<'source> {
             ),
             secondary_choice_multi_layers: table(SecondaryChoiceMultiLayer, self.secondary_multi),
             themes: table(Theme, self.themes),
+            hierarchical_contextual_data_presets: table(
+                HierarchicalContextualDataPreset,
+                self.hierarchical_contextual_data_presets,
+            ),
+            loot_generation_global_params: table(GlobalParams, self.global_params),
+            sub_harvestable_configs: table(SubHarvestableConfig, self.sub_harvestable_configs),
+            sub_harvestable_multi_configs: table(
+                SubHarvestableMultiConfig,
+                self.sub_harvestable_multi_configs,
+            ),
         }
     }
 
@@ -102,6 +133,14 @@ impl<'source> LootDefinitions<'source> {
             LootDefinitionKind::SecondaryChoiceSingleLayer => self.secondary_single.as_slice(),
             LootDefinitionKind::SecondaryChoiceMultiLayer => self.secondary_multi.as_slice(),
             LootDefinitionKind::Theme => self.themes.as_slice(),
+            LootDefinitionKind::HierarchicalContextualDataPreset => {
+                self.hierarchical_contextual_data_presets.as_slice()
+            }
+            LootDefinitionKind::GlobalParams => self.global_params.as_slice(),
+            LootDefinitionKind::SubHarvestableConfig => self.sub_harvestable_configs.as_slice(),
+            LootDefinitionKind::SubHarvestableMultiConfig => {
+                self.sub_harvestable_multi_configs.as_slice()
+            }
         }
     }
 }

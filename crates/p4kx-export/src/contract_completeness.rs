@@ -147,6 +147,12 @@ pub(crate) struct Completeness<'a> {
     pub(crate) loot_secondary_choice_multi_layers: KindCompleteness<'a>,
     /// The completeness of `lootThemes`.
     pub(crate) loot_themes: KindCompleteness<'a>,
+    /// The completeness of `hierarchicalContextualDataPresets`.
+    pub(crate) hierarchical_contextual_data_presets: KindCompleteness<'a>,
+    /// The completeness of `lootGenerationGlobalParams`.
+    pub(crate) loot_generation_global_params: KindCompleteness<'a>,
+    /// The completeness of `subHarvestableConfigs`.
+    pub(crate) sub_harvestable_configs: KindCompleteness<'a>,
     /// The completeness of `legacyLootTables`.
     pub(crate) legacy_loot_tables: KindCompleteness<'a>,
     /// The completeness of `legacyLootArchetypes`.
@@ -255,6 +261,9 @@ impl<'a> Completeness<'a> {
             loot_secondary_choice_single_layers: completeness,
             loot_secondary_choice_multi_layers: completeness,
             loot_themes: completeness,
+            hierarchical_contextual_data_presets: completeness,
+            loot_generation_global_params: completeness,
+            sub_harvestable_configs: completeness,
             legacy_loot_tables: completeness,
             legacy_loot_archetypes: completeness,
             mineable_entities: completeness,

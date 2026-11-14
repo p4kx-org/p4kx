@@ -272,6 +272,8 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `lootArchetypes` | The loot archetypes (`LootArchetypeV3Record`) with the weighted selectors of each, ordered by GUID |
 | `definitions.lootPoolFilters` | Complete original pool-filter fields and values, ordered by physical source GUID |
 | `definitions.lootSecondaryChoiceSingleLayers`, `definitions.lootSecondaryChoiceMultiLayers`, `definitions.lootThemes` | Original ordered choices, layers and owned theme values with physical Record identities |
+| `definitions.hierarchicalContextualDataPresets`, `definitions.lootGenerationGlobalParams` | Original context arrays, selectors, category order and global parameter fields |
+| `definitions.subHarvestableConfigs`, `definitions.subHarvestableMultiConfigs` | Full physical harvestable configurations with original references and provenance |
 | `legacyLootTables` | The older loot tables (`LootTable`) with the weighted archetypes of each, ordered by GUID |
 | `legacyLootArchetypes` | The older loot archetypes (`LootArchetype`) with the weighted tags of each, ordered by GUID |
 | `lootContainers` | The containers placed with a multi config, with the starmap object each hangs below, ordered by config, container, system and object |
@@ -2773,7 +2775,8 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `mineableCompositions` | `libs/foundry/records/mining/rockcompositionpresets/` | `MineableComposition` |
 | `miningGlobalParams` | `libs/foundry/records/mining/miningglobalparams` | `MiningGlobalParams` |
 | `harvestableProviderPresets` | `libs/foundry/records/harvestable/providerpresets/` | `HarvestableProviderPreset` |
-| `subHarvestableMultiConfigs` | `libs/foundry/records/harvestable/slotpresets/` | `SubHarvestableMultiConfigRecord` |
+| `subHarvestableConfigs` | Any Record path | `SubHarvestableConfigRecord` |
+| `subHarvestableMultiConfigs` | Any Record path. The top-level convenience projection uses `libs/foundry/records/harvestable/slotpresets/`. | `SubHarvestableMultiConfigRecord` |
 | `harvestableLocations` | None: the `.soc` files of the containers below `ObjectContainers/PU/system`, no Records | |
 | `shops` | None: the `ShopBackup` entries of `LayerBackups.xml`, no Records | |
 | `factionReputations` | `libs/foundry/records/factions/factionreputation/` | `FactionReputation` |
@@ -2816,6 +2819,8 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `lootSecondaryChoiceSingleLayers` | Any physical Record path | `LootV3SecondaryChoicesSingleLayerRecord` |
 | `lootSecondaryChoiceMultiLayers` | Any physical Record path | `LootV3SecondaryChoicesMultiLayerRecord` |
 | `lootThemes` | Any physical Record path | `LootThemeRecord` |
+| `hierarchicalContextualDataPresets` | Any Record path | `HierarchicalContextualDataPresetRecord` |
+| `lootGenerationGlobalParams` | Any Record path | `LootGenerationGlobalParams` |
 | `legacyLootTables` | `libs/foundry/records/lootgeneration/loottables/` | `LootTable` |
 | `legacyLootArchetypes` | `libs/foundry/records/lootgeneration/lootarchetypes/` | `LootArchetype` |
 | `lootContainers` | None: the `entdata` files of the containers below `ObjectContainers/PU/system` and the containers they place, no Records | |

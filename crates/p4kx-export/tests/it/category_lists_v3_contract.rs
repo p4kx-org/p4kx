@@ -215,7 +215,7 @@ fn assert_header(catalog: &Value) -> TestResult {
     Ok(())
 }
 
-const EXPECTED_KINDS: [&str; 86] = [
+const EXPECTED_KINDS: [&str; 89] = [
     "manufacturers",
     "items",
     "ships",
@@ -253,6 +253,9 @@ const EXPECTED_KINDS: [&str; 86] = [
     "lootSecondaryChoiceSingleLayers",
     "lootSecondaryChoiceMultiLayers",
     "lootThemes",
+    "hierarchicalContextualDataPresets",
+    "lootGenerationGlobalParams",
+    "subHarvestableConfigs",
     "lootContainers",
     "mineableEntities",
     "legacyLootTables",

@@ -6,6 +6,7 @@ use p4kx_extraction::Record;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::catalog_entity_configurations::EntityConfigurationRows;
+use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 use crate::catalog_v3::tag_catalog::EntityTags;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -143,6 +144,7 @@ impl SourceTrace {
                         .or_else(|| {
                             crate::catalog_v3::starmap_definition_kinds::kind_for_type(type_name)
                         })
+                        .or_else(|| LootDefinitionKind::kind_for_type(type_name))
                         .or_else(|| {
                             record
                                 .record_path()
