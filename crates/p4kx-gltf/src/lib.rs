@@ -48,6 +48,7 @@ mod layout;
 mod material_alpha;
 mod material_index;
 mod materials;
+mod mesh_primitive_map;
 mod mesh_vertex_map;
 mod morphs;
 mod nodes;
@@ -83,6 +84,7 @@ pub use glb::{
 pub use layer_plan::draws_layer_diffuse;
 pub use layer_view::{layered_base_key, layered_base_texture, layered_base_textures};
 pub use materials::base_colour_factor;
+pub use mesh_primitive_map::{MeshPrimitiveMap, PrimitiveMaterialSource};
 pub use mesh_vertex_map::{MeshVertexMap, write_scene_glb_observed};
 pub use morphs::MorphTarget;
 pub use package_support::{

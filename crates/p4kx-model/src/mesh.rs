@@ -5,7 +5,7 @@ use crate::mesh_origin::MeshSubmeshOrigin;
 use crate::reader::to_usize;
 use crate::skin::{RawSubmesh, SkinMesh};
 use crate::smooth_normals::smooth_normals;
-use crate::{CorruptChunk, Mesh, Submesh};
+use crate::{CorruptChunk, Mesh, MeshSubmeshSource, Submesh};
 
 const UNUSED: u32 = u32::MAX;
 const OPAQUE_WHITE: [u8; 4] = [u8::MAX; 4];
@@ -157,9 +157,8 @@ impl<'s, 'a> MeshBuilder<'s, 'a> {
             first_index: first,
             index_count: self.mesh.indices.len() - first,
             origin: Some(MeshSubmeshOrigin::new(
-                submesh.start,
+                MeshSubmeshSource::from_raw(position, *submesh),
                 self.skin.streams.indices.word_start(submesh.first_index),
-                submesh.page_base,
             )),
         });
         Ok(())

@@ -11,6 +11,7 @@ mod layer_textures;
 mod lods_attributes;
 mod material_emission;
 mod materials;
+mod mesh_primitive_maps;
 mod mesh_vertex_maps;
 mod morphs;
 mod relief_decals;

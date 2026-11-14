@@ -181,7 +181,6 @@ impl<'input> MeshChunkSource<'input> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MeshSubmeshSource {
     ordinal: usize,
-    start: u64,
     inner: RawSubmesh,
 }
 
@@ -193,11 +192,16 @@ impl MeshSubmeshSource {
             reason = "the caller supplies exactly one complete submesh row"
         )]
         let inner = read_submesh(&mut ByteReader::new(row)).expect("fixed-width submesh row");
-        Self {
-            ordinal,
-            start,
-            inner,
-        }
+        Self::from_raw(ordinal, inner).with_base(start)
+    }
+
+    pub(crate) const fn from_raw(ordinal: usize, inner: RawSubmesh) -> Self {
+        Self { ordinal, inner }
+    }
+
+    pub(crate) const fn with_base(mut self, base: u64) -> Self {
+        self.inner.start += base;
+        self
     }
 
     /// Returns the original row ordinal before model grouping and filtering.
@@ -216,6 +220,18 @@ impl MeshSubmeshSource {
     #[must_use]
     pub const fn node(self) -> u16 {
         self.inner.node
+    }
+
+    /// Returns the original material ID word's interval.
+    #[must_use]
+    pub const fn material_range(self) -> Range<u64> {
+        self.inner.start..self.inner.start + size_of::<u16>() as u64
+    }
+
+    /// Returns the original node or skin-zone word's interval.
+    #[must_use]
+    pub const fn node_range(self) -> Range<u64> {
+        self.inner.start + size_of::<u16>() as u64..self.inner.start + WORD_BYTES
     }
 
     /// Returns the first source index named by the row.
@@ -239,19 +255,19 @@ impl MeshSubmeshSource {
     /// Returns the complete original submesh row's byte interval.
     #[must_use]
     pub const fn range(self) -> Range<u64> {
-        self.start..self.start + SUBMESH_BYTES as u64
+        self.inner.start..self.inner.start + SUBMESH_BYTES as u64
     }
 
     /// Returns the index-stream selection and page-base words from the original row.
     #[must_use]
     pub const fn index_selection_range(self) -> Range<u64> {
-        self.start + WORD_BYTES..self.start + 3 * WORD_BYTES
+        self.inner.start + WORD_BYTES..self.inner.start + 3 * WORD_BYTES
     }
 
     /// Returns the original source vertex page-base word's byte interval.
     #[must_use]
     pub const fn page_base_range(self) -> Range<u64> {
-        self.start + 4 * WORD_BYTES..self.start + 5 * WORD_BYTES
+        self.inner.start + 4 * WORD_BYTES..self.inner.start + 5 * WORD_BYTES
     }
 
     /// Streams the physical indices this submesh names, with page-base resolved source vertices.

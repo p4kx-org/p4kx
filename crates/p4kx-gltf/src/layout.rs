@@ -14,6 +14,9 @@ use crate::morphs::{MorphLayout, MorphTarget};
 use crate::skin::SET_LEN;
 use crate::texture_plan::EncodedImage;
 
+#[path = "layout_primitives.rs"]
+mod primitives;
+
 const ALIGNMENT: u64 = 4;
 const BATCH: usize = 1 << 14;
 const WINDOW: u64 = 32 << 20;
@@ -31,6 +34,7 @@ pub(crate) struct Block<'m> {
 pub(crate) struct PrimitiveLayout {
     pub(crate) indices: usize,
     pub(crate) material_id: u16,
+    pub(crate) model_submesh: usize,
     /// Whether the primitive carries the mesh's vertex colours as `COLOR_0`.
     pub(crate) colours: bool,
 }
@@ -181,20 +185,7 @@ impl<'m> Layout<'m> {
         skin: SkinSource<'m>,
     ) {
         let (binds, remapped) = skin;
-        let drawn: Vec<(&'m [u32], u16)> = mesh
-            .submeshes
-            .iter()
-            .filter_map(|submesh| {
-                mesh.submesh_indices(submesh)
-                    .map(|indices| (indices, submesh.material_id))
-            })
-            .collect();
-        let primitives: Vec<(&'m [u32], u16)> = drawn
-            .iter()
-            .copied()
-            .filter(|&(_, id)| !materials.hidden(id))
-            .collect();
-        self.hidden_primitives += drawn.len() - primitives.len();
+        let primitives = self.drawable_submeshes(mesh, materials);
         if primitives.is_empty() {
             return;
         }
@@ -214,7 +205,7 @@ impl<'m> Layout<'m> {
             .map(|tangents| self.push(BlockData::Tangents(tangents)));
         let reading: Vec<bool> = primitives
             .iter()
-            .map(|&(_, id)| materials.writes_vertex_colours(id, colours))
+            .map(|drawn| materials.writes_vertex_colours(drawn.source.material_id, colours))
             .collect();
         let colour_block = mesh
             .colours
@@ -240,28 +231,6 @@ impl<'m> Layout<'m> {
             min,
             max,
         });
-    }
-
-    fn plan_primitives(
-        &mut self,
-        primitives: &[(&'m [u32], u16)],
-        reading: &[bool],
-        vertices: usize,
-    ) -> Vec<PrimitiveLayout> {
-        let short = u16::try_from(vertices).is_ok();
-        primitives
-            .iter()
-            .zip(reading)
-            .map(|(&(indices, material_id), &colours)| PrimitiveLayout {
-                indices: self.push(if short {
-                    BlockData::Short(indices)
-                } else {
-                    BlockData::Wide(indices)
-                }),
-                material_id,
-                colours,
-            })
-            .collect()
     }
 
     pub(crate) fn push(&mut self, data: BlockData<'m>) -> usize {

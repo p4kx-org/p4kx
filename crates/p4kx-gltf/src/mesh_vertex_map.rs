@@ -10,6 +10,8 @@ use p4kx_model::{Mesh, MeshOrigin, MeshVertexOrigin};
 
 use crate::instance::Instance;
 use crate::layout::Layout;
+use crate::mesh_primitive_map;
+use crate::mesh_primitive_map::MeshPrimitiveMap;
 use crate::scene::{Scene, write_scene};
 use crate::texture_loader::{NoTextures, TextureLoader};
 use crate::{GlbOptions, GlbSummary, GltfError};
@@ -39,9 +41,15 @@ pub struct MeshVertexMap<'a> {
     /// One physical stream vertex ordinal per emitted POSITION element when proven.
     pub source_vertices: Option<&'a [u32]>,
     mesh_source: &'a Mesh,
+    primitives: mesh_primitive_map::ObservedMesh<'a>,
 }
 
 impl MeshVertexMap<'_> {
+    /// Streams the output primitives and their actual source submesh associations.
+    pub fn primitives(&self) -> impl ExactSizeIterator<Item = MeshPrimitiveMap> + '_ {
+        self.primitives.rows(self.mesh_source)
+    }
+
     /// Returns original first-use index coordinates when the position order is known.
     pub fn vertex_origins(&self) -> impl Iterator<Item = MeshVertexOrigin> + '_ {
         self.source_vertices
@@ -99,6 +107,8 @@ pub(crate) fn observe(
             .get(position.value())
             .ok_or_else(layout_error)?;
         let origin = source.origin();
+        let primitives =
+            mesh_primitive_map::ObservedMesh::new(document, written, plan, instance, source)?;
         visitor(MeshVertexMap {
             mesh: index,
             position_accessor: position.value(),
@@ -110,6 +120,7 @@ pub(crate) fn observe(
             model_lod: lod.level,
             origin,
             mesh_source: source,
+            primitives,
             source_vertices: (source.has_vertex_origin_order()
                 && source.source.len() as u64 == accessor.count.0)
                 .then_some(source.source.as_slice()),
