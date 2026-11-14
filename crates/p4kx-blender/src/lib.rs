@@ -97,6 +97,7 @@ mod soc_scene_stream;
 mod soc_scene_tile_ports;
 mod soc_scene_xml;
 mod stage;
+mod stoppable;
 mod texture_ddna;
 mod texture_dds;
 mod texture_encoding;

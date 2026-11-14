@@ -100,7 +100,7 @@ impl Collected {
         for index in 0..plan.len() {
             context.check()?;
             let item = plan.first(index).and_then(|position| items.get(position));
-            collected.add_mesh(item, level, models, fallback)?;
+            collected.add_mesh(item, level, models, fallback, context)?;
         }
         collected.cut_issues();
         collected.library_sources.finish(context)?;
@@ -113,6 +113,7 @@ impl Collected {
         level: u32,
         models: &dyn ModelProvider,
         fallback: Option<LibraryInput<'_>>,
+        context: &PackageWriteContext<'_>,
     ) -> PackageResult<()> {
         let drawn = item.and_then(|item| item.drawn).map_or_default(|drawn| {
             drawn_materials_with_fallback(
@@ -147,7 +148,8 @@ impl Collected {
             library.and_then(|library| library.entry),
             &drawn,
             &mut self.issues,
-        );
+            context,
+        )?;
         self.authored_libraries.push(authored);
         let described = drawn
             .iter()
@@ -156,7 +158,7 @@ impl Collected {
                     .library_index
                     .map_or((fallback, 0), |position| (library, position));
                 library.map_or(Ok(None), |library| {
-                    self.describe(library, position, Some(material), models, 0)
+                    self.describe(library, position, Some(material), models, 0, context)
                 })
             })
             .collect::<PackageResult<_>>()?;
@@ -182,14 +184,15 @@ impl Collected {
         drawn: Option<&DrawnMaterial>,
         models: &dyn ModelProvider,
         depth: usize,
+        context: &PackageWriteContext<'_>,
     ) -> PackageResult<Option<usize>> {
         let LibraryInput { library, entry } = input;
         let Some(original) = library.materials.get(position) else {
             return Ok(None);
         };
-        let source_library = self
-            .library_sources
-            .capture(library, entry, &mut self.issues);
+        let source_library =
+            self.library_sources
+                .capture(library, entry, &mut self.issues, context)?;
         let adjusted = original.hair_cap_of_body(&library.path);
         let material = adjusted.as_ref().unwrap_or(original);
         let index = (!library.single).then_some(position);
@@ -206,7 +209,7 @@ impl Collected {
                 .get(known)
                 .is_some_and(|known| known.followed_at.is_none_or(|at| depth < at));
             if shallower && depth < MAX_LAYER_DEPTH {
-                self.follow_layers(known, material, models, depth)?;
+                self.follow_layers(known, material, models, depth, context)?;
             }
             if let Some(drawn) = drawn {
                 self.want_drawn(drawn);
@@ -235,7 +238,7 @@ impl Collected {
         description.source_library = Some(source_library);
         self.add_description(description, input, position, material, drawn)?;
         if depth < MAX_LAYER_DEPTH {
-            self.follow_layers(at, material, models, depth)?;
+            self.follow_layers(at, material, models, depth, context)?;
         } else if !material.layers.is_empty() {
             self.cut.insert(at, (path, material.name.clone()));
         }

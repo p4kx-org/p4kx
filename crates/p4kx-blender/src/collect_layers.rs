@@ -4,9 +4,9 @@
 use p4kx_assembly::ModelProvider;
 use p4kx_model::{Material, MaterialLayer};
 
-use crate::PackageResult;
 use crate::describe::layer_shares;
 use crate::manifest::{Issue, IssueOrigin};
+use crate::{PackageResult, PackageWriteContext};
 
 use super::{Collected, LibraryInput, MAX_LAYER_DEPTH, id_of};
 
@@ -17,6 +17,7 @@ impl Collected {
         material: &Material,
         models: &dyn ModelProvider,
         depth: usize,
+        context: &PackageWriteContext<'_>,
     ) -> PackageResult<()> {
         if let Some(parent) = self.descriptions.get_mut(at) {
             parent.followed_at = Some(depth);
@@ -24,7 +25,7 @@ impl Collected {
         self.cut.remove(&at);
         let mut resolved = vec![false; material.layers.len()];
         for (number, layer) in material.layers.iter().enumerate() {
-            let found = self.layer_material(material, layer, models, depth)?;
+            let found = self.layer_material(material, layer, models, depth, context)?;
             if let Some(found) = found
                 && let Some(slot) = self
                     .descriptions
@@ -64,6 +65,7 @@ impl Collected {
         layer: &MaterialLayer,
         models: &dyn ModelProvider,
         depth: usize,
+        context: &PackageWriteContext<'_>,
     ) -> PackageResult<Option<usize>> {
         let path = layer.attribute("Path").map_or_default(str::trim);
         if path.is_empty() {
@@ -84,7 +86,7 @@ impl Collected {
             library,
             entry: entry.as_ref(),
         };
-        self.describe(input, position, None, models, depth + 1)
+        self.describe(input, position, None, models, depth + 1, context)
     }
 
     fn layer_issue(&mut self, parent: &Material, path: &str, reason: &str) {

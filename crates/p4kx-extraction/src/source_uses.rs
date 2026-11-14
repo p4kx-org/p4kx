@@ -10,11 +10,15 @@ use p4kx_archive::Archive;
 #[path = "source_use_batches.rs"]
 mod batches;
 
+#[path = "source_inventory_freeze.rs"]
+mod freeze;
+pub use self::freeze::SourceInventoryFreezeError;
+
 use crate::DecimalU64;
 use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
 use crate::source_details::{SourceCoordinateOmission, SourceDetails};
 use crate::source_evidence_error::{self, SourceEvidenceError};
-use crate::source_inventory::{SourceEncryptionState, SourceInventory};
+use crate::source_inventory::SourceEncryptionState;
 use crate::source_registry::SourceRegistry;
 use crate::source_scope::{SourceInput, SourceScope};
 use crate::source_use::{InputScope, SourceLocation, SourceUse, SourceUseRole};
@@ -260,22 +264,6 @@ impl SourceUses {
             .iter()
             .filter(move |source| Arc::ptr_eq(&source.identity, &self.identity));
         (own, source_set_complete && !foreign)
-    }
-
-    /// Freezes sorted source/use rows after projection for repeatable serialization passes.
-    ///
-    /// # Errors
-    /// Returns an error when a mutation interrupted the shared evidence registry.
-    pub fn freeze(&self) -> Result<SourceInventory, SourceEvidenceError> {
-        let registry = source_evidence_error::lock(&self.registry)?;
-        Ok(SourceInventory {
-            sources: registry.sources.values().cloned().collect(),
-            uses: registry
-                .uses
-                .values()
-                .map(|description| description.as_ref().clone())
-                .collect(),
-        })
     }
 }
 

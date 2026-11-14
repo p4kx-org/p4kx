@@ -61,7 +61,7 @@ pub use crate::source_scope::{SourceInput, SourceScope};
 pub use crate::source_use::{
     InputScope, SourceLocation, SourceUse, SourceUseDescription, SourceUseRef, SourceUseRole,
 };
-pub use crate::source_uses::SourceUses;
+pub use crate::source_uses::{SourceInventoryFreezeError, SourceUses};
 pub use crate::source_value::{SourceValue, SourceValueState, SourcedValue};
 pub use archive_animation_path::archive_animation_path;
 pub use archive_layout_origins::{ArchiveLayoutOriginError, ArchiveLayoutOrigins};

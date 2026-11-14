@@ -18,6 +18,9 @@ use crate::{
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum MaterialSourceOriginError {
+    /// The caller stopped the traversal.
+    #[error("material source projection was cancelled")]
+    Cancelled,
     /// A registered physical source use was unavailable.
     #[error(transparent)]
     Evidence(#[from] SourceEvidenceError),
@@ -61,12 +64,28 @@ impl<'a> MaterialSourceEvidence<'a> {
         address: &FieldPath,
         fields: &mut FieldOrigins,
     ) -> Result<(), MaterialSourceOriginError> {
+        self.project_with(source, address, fields, &|| false)
+    }
+
+    /// Projects authored field origins while checking for cancellation at source coordinates.
+    ///
+    /// # Errors
+    /// Returns cancellation or an error registering a contributor or output address.
+    pub fn project_with(
+        &self,
+        source: &MaterialSource,
+        address: &FieldPath,
+        fields: &mut FieldOrigins,
+        cancelled: &impl Fn() -> bool,
+    ) -> Result<(), MaterialSourceOriginError> {
         let mut writer = Writer {
             evidence: self,
             fields,
             positions: Vec::new(),
             encoding: source.encoding,
+            cancelled,
         };
+        writer.check()?;
         writer.header(address, source)?;
         if let Some(root) = &source.root {
             writer.element(&member(address, "root")?, root)?;
@@ -117,9 +136,18 @@ struct Writer<'a, 'output> {
     fields: &'output mut FieldOrigins,
     positions: Vec<u64>,
     encoding: MaterialEncoding,
+    cancelled: &'output dyn Fn() -> bool,
 }
 
 impl Writer<'_, '_> {
+    fn check(&self) -> Result<(), MaterialSourceOriginError> {
+        if (self.cancelled)() {
+            Err(MaterialSourceOriginError::Cancelled)
+        } else {
+            Ok(())
+        }
+    }
+
     fn header(
         &mut self,
         path: &FieldPath,
@@ -134,6 +162,7 @@ impl Writer<'_, '_> {
         self.fields.insert(member(path, "encoding")?, header)?;
         let boundaries = member(path, "losses")?;
         for (ordinal, loss) in source.losses.iter().enumerate() {
+            self.check()?;
             let logical: Vec<_> = loss.indices.iter().map(|&index| index as u64).collect();
             let origin = if loss.kind == MaterialSourceLossKind::RepairedEncoding {
                 self.evidence.opaque(SourceUseRole::Conversion)?
@@ -149,6 +178,7 @@ impl Writer<'_, '_> {
             self.members(&item, &["kind", "indices"], &origin)?;
             let positions = member(&item, "indices")?;
             for (position, _) in logical.iter().enumerate() {
+                self.check()?;
                 self.fields
                     .insert(index(&positions, position)?, origin.clone())?;
             }
@@ -163,6 +193,7 @@ impl Writer<'_, '_> {
     ) -> Result<(), MaterialSourceOriginError> {
         let list = source.submaterial_list_ordinal;
         for (position, row) in source.entries.iter().enumerate() {
+            self.check()?;
             let origin = if let Some(list) = list {
                 self.evidence.origin(
                     "materialXmlElement",
@@ -216,6 +247,7 @@ impl Writer<'_, '_> {
         self.content(&syntax, &element.authored.content)?;
         let children = member(path, "children")?;
         for (position, child) in element.children.iter().enumerate() {
+            self.check()?;
             if let Some(ordinal) = child.authored.ordinal {
                 self.positions.push(ordinal as u64);
                 self.element(&index(&children, position)?, child)?;
@@ -233,6 +265,7 @@ impl Writer<'_, '_> {
     ) -> Result<(), MaterialSourceOriginError> {
         let parsed = member(path, "attributes")?;
         for (position, _) in element.attributes.iter().enumerate() {
+            self.check()?;
             self.positions.push(position as u64);
             let origin = self.site("materialXmlAttribute", "attribute", SourceUseRole::Payload)?;
             self.positions.pop();
@@ -240,6 +273,7 @@ impl Writer<'_, '_> {
         }
         let declarations = member(syntax, "attributes")?;
         for (position, attribute) in element.authored.attributes.iter().enumerate() {
+            self.check()?;
             self.positions.push(position as u64);
             let origin = self.site(
                 "materialXmlDeclaration",
@@ -277,6 +311,7 @@ impl Writer<'_, '_> {
     ) -> Result<(), MaterialSourceOriginError> {
         let list = member(path, "content")?;
         for (position, item) in content.iter().enumerate() {
+            self.check()?;
             let location = index(&list, position)?;
             let (ordinal, namespace, fields): (_, _, &[_]) = match item {
                 AuthoredContent::Element { ordinal }

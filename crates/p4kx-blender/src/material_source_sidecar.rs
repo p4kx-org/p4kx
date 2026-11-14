@@ -6,23 +6,30 @@ use std::path::Path;
 
 use flate2::write::GzEncoder;
 use flate2::{Compression, GzBuilder};
-use p4kx_extraction::material_source_info::MaterialSourceEvidence;
+use p4kx_extraction::SourceInventoryFreezeError as FreezeError;
+use p4kx_extraction::material_source_info::{MaterialSourceEvidence, MaterialSourceOriginError};
 use p4kx_extraction::{
     EntryOrigin, FieldOrigin, FieldOrigins, FieldPath, InputScope, MaterialLibrarySourceInfo,
-    OriginDigestWriter, PhysicalSource, SourceInput, SourceUseDescription, SourceUses,
+    OriginDigestWriter, PhysicalSource, SourceInput, SourceInventory, SourceUseDescription,
+    SourceUses,
 };
 use p4kx_model::MaterialSource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::package_receipt::PackageFile;
+use crate::stoppable::{self, Stoppable};
 use crate::{PackageError, PackageResult, PackageWriteContext};
 
 pub(crate) const DIRECTORY: &str = "material-sources";
 const FORMAT: &str = "p4kx-blender-material-source";
 const VERSION: u8 = 1;
 
-type Sink = GzEncoder<OriginDigestWriter<BufWriter<std::fs::File>>>;
+type Sink<'a> = GzEncoder<Stoppable<'a, OriginDigestWriter<BufWriter<std::fs::File>>>>;
+
+#[cfg(test)]
+#[path = "material_source_sidecar_tests.rs"]
+mod tests;
 
 /// Package-local reference to the retained declarations of one material-library row.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -101,45 +108,96 @@ pub(crate) fn write(
     let file_name = file_name(ordinal);
     let path = staging.join(&file_name);
     let (file, ownership) = context.create_file(&path)?.into_parts();
-    let writer = OriginDigestWriter::new(BufWriter::new(file));
+    let writer = Stoppable::new(OriginDigestWriter::new(BufWriter::new(file)), context);
     let mut sink = GzBuilder::new()
         .mtime(0)
         .operating_system(255)
         .write(writer, Compression::default());
-    let write_error = |source| PackageError::write(&path, source);
     row(
         &mut sink,
+        context,
+        &path,
         &Row::Header {
             format: FORMAT,
             version: VERSION,
             library: ordinal,
         },
-    )
-    .map_err(write_error)?;
-    let authored = MaterialLibrarySourceInfo::of_source(owner);
-    row(
-        &mut sink,
-        &Row::Library {
-            authored: &authored,
-        },
-    )
-    .map_err(write_error)?;
+    )?;
+    write_library(&mut sink, owner, context, &path)?;
     write_origins(&mut sink, owner, entry, context, &path)?;
     context.check()?;
     ownership.ensure_writable(&path, context.cancel_flag())?;
+    let write_error = |source| sidecar_write_error(&path, source);
     let writer = sink.finish().map_err(write_error)?;
-    let (digest, file) = writer.finish_with_sink().map_err(write_error)?;
+    let (digest, file) = writer
+        .into_inner()
+        .finish_with_sink()
+        .map_err(write_error)?;
     file.get_ref().sync_all().map_err(write_error)?;
     Ok(PackageFile::new(file_name, &digest))
 }
 
+fn write_library(
+    sink: &mut Sink<'_>,
+    owner: &MaterialSource,
+    context: &PackageWriteContext<'_>,
+    path: &Path,
+) -> PackageResult<()> {
+    let authored = MaterialLibrarySourceInfo::of_source_with(owner, &mut || context.check())?;
+    row(
+        sink,
+        context,
+        path,
+        &Row::Library {
+            authored: &authored,
+        },
+    )
+}
+
 fn write_origins(
-    sink: &mut Sink,
+    sink: &mut Sink<'_>,
     owner: &MaterialSource,
     entry: Option<&EntryOrigin>,
     context: &PackageWriteContext<'_>,
     path: &Path,
 ) -> PackageResult<()> {
+    let (inventory, fields) = capture_origins(owner, entry, context)?;
+    for source in inventory.sources() {
+        row(sink, context, path, &Row::Source { source })?;
+    }
+    for source_use in inventory.uses() {
+        row(sink, context, path, &Row::SourceUse { source_use })?;
+    }
+    let mut count = 0;
+    for (field_path, origin) in fields.iter() {
+        row(
+            sink,
+            context,
+            path,
+            &Row::Field {
+                path: field_path,
+                origin,
+            },
+        )?;
+        count += 1;
+    }
+    row(
+        sink,
+        context,
+        path,
+        &Row::End {
+            sources: inventory.sources().len(),
+            uses: inventory.uses().len(),
+            fields: count,
+        },
+    )
+}
+
+fn capture_origins(
+    owner: &MaterialSource,
+    entry: Option<&EntryOrigin>,
+    context: &PackageWriteContext<'_>,
+) -> PackageResult<(SourceInventory, FieldOrigins)> {
     let uses = SourceUses::with_compact_use_refs();
     let scope = entry
         .map(|entry| uses.observe(SourceInput::Archive(entry), InputScope::Payload))
@@ -150,38 +208,38 @@ fn write_origins(
     let mut fields = FieldOrigins::new();
     let output = FieldPath::parse("/authored").map_err(evidence_error)?;
     MaterialSourceEvidence::new(&uses, scope.as_ref(), &selection)
-        .project(owner, &output, &mut fields)
-        .map_err(evidence_error)?;
-    let inventory = uses.freeze().map_err(evidence_error)?;
-    let write_error = |source| PackageError::write(path, source);
-    for source in inventory.sources() {
-        context.check()?;
-        row(sink, &Row::Source { source }).map_err(write_error)?;
-    }
-    for source_use in inventory.uses() {
-        context.check()?;
-        row(sink, &Row::SourceUse { source_use }).map_err(write_error)?;
-    }
-    let mut count = 0;
-    for (path, origin) in fields.iter() {
-        context.check()?;
-        row(sink, &Row::Field { path, origin }).map_err(write_error)?;
-        count += 1;
-    }
-    row(
-        sink,
-        &Row::End {
-            sources: inventory.sources().len(),
-            uses: inventory.uses().len(),
-            fields: count,
-        },
-    )
-    .map_err(write_error)
+        .project_with(owner, &output, &mut fields, &|| context.check().is_err())
+        .map_err(|error| match error {
+            MaterialSourceOriginError::Cancelled => PackageError::Cancelled,
+            error => evidence_error(error),
+        })?;
+    let inventory = uses
+        .freeze_with(|| context.check())
+        .map_err(|error| match error {
+            FreezeError::Interrupted(error) => error,
+            error => evidence_error(error),
+        })?;
+    Ok((inventory, fields))
 }
 
-fn row(sink: &mut Sink, row: &Row<'_>) -> io::Result<()> {
-    serde_json::to_writer(&mut *sink, row)?;
-    sink.write_all(b"\n")
+fn row(
+    sink: &mut impl Write,
+    context: &PackageWriteContext<'_>,
+    path: &Path,
+    row: &Row<'_>,
+) -> PackageResult<()> {
+    let mut sink = Stoppable::new(sink, context);
+    let write_error = |source| sidecar_write_error(path, source);
+    serde_json::to_writer(&mut sink, row).map_err(|error| write_error(error.into()))?;
+    sink.write_all(b"\n").map_err(write_error)
+}
+
+fn sidecar_write_error(path: &Path, source: io::Error) -> PackageError {
+    if stoppable::is_cancelled(&source) {
+        PackageError::Cancelled
+    } else {
+        PackageError::write(path, source)
+    }
 }
 
 fn evidence_error(error: impl std::error::Error + Send + Sync + 'static) -> PackageError {

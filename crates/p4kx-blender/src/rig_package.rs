@@ -4,7 +4,7 @@
 //! The package of one rigged mesh, the form of a Character and of a creature with a skeleton.
 
 use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use std::io::{self, BufWriter};
 use std::path::Path;
 
 use crate::mesh_options::package_mesh_options;
@@ -23,6 +23,7 @@ use crate::mesh_vertex_map::Writer;
 use crate::package_receipt::{self, PackageFile, PackageTotals};
 use crate::plan::mesh_id;
 use crate::stage::Staging;
+use crate::stoppable::Stoppable;
 use crate::{PackageError, PackageInfo, PackageResult, PackageSummary, PackageWriteContext};
 
 /// What the manifest of a rigged package says besides the file's size: where it comes from, the
@@ -97,25 +98,6 @@ pub(crate) fn rig_manifest(
     }
 }
 
-/// Stops a write when the caller asks to.
-pub(crate) struct Stoppable<'a, W> {
-    inner: W,
-    cancelled: &'a PackageWriteContext<'a>,
-}
-
-impl<W: Write> Write for Stoppable<'_, W> {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        if self.cancelled.check().is_err() {
-            return Err(io::Error::other("cancelled"));
-        }
-        self.inner.write(bytes)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
-    }
-}
-
 /// The file a rigged mesh is written to.
 pub(crate) type RigWriter<'a, 'sink> =
     Stoppable<'a, OriginDigestWriter<&'sink mut BufWriter<File>>>;
@@ -178,14 +160,11 @@ fn write_rig_files(
         .transpose()?;
     let (file, ownership) = cancelled.create_file(&path)?.into_parts();
     let mut sink = BufWriter::new(file);
-    let mut writer = Stoppable {
-        inner: OriginDigestWriter::new(&mut sink),
-        cancelled,
-    };
+    let mut writer = Stoppable::new(OriginDigestWriter::new(&mut sink), cancelled);
     let written = write_glb(&package_mesh_options(options), &mut writer, map.as_mut())
         .map_err(|error| glb_error(error, &path, (&id, name), cancelled))?;
     let digest = writer
-        .inner
+        .into_inner()
         .finish()
         .map_err(|source| flush_error(source, &path, cancelled))?;
     ownership.ensure_writable(&path, cancelled.cancel_flag())?;
