@@ -189,6 +189,23 @@ selected weapon's admitted links can include definitions independently
 of the item path filter. The shared tables keep one row per physical
 target, including when multiple setup slots reference the same Record.
 
+`configurations.entityAnimationControllers` exports the original
+`SAnimationControllerParams.AnimationController` and `AnimationDatabase`
+file locators. These belong to their own component, which can share the
+physical Entity with the weapon. Join by `ownerRecordIndex` and use
+`componentOrdinal` to distinguish multiple controllers. The locators
+identify the authored Mannequin inputs. The reload UI flag and the
+magazine's ammunition-count blend time remain separate values.
+
+In two PTU witnesses the controller's `ControllerDef/Fragments@filename`
+and the database's `AnimDB@FragDef` resolve to the same physical Fragment
+definition. Each paired controller declares four reload-named fragments.
+The paired weapon databases contain zero corresponding options and zero
+sub-databases. These observations establish the declared fragment
+relationship for the two witnesses. A concrete reload animation, event
+or elapsed time requires a bound Fragment option and its applicable
+animation inputs.
+
 A projectile launcher's `projectileType` is the stored label of the
 declared `EProjectileType` Enum. A readable different declaration is
 `unsupported`. A failed declaration or label read is `unreadable`. The ammunition

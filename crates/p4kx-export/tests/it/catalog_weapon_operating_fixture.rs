@@ -7,6 +7,7 @@ const ANIMATION: &str = "WeaponProceduralAnimation";
 const RECOIL: &str = "ActorProceduralRecoilConfig";
 const WEAPON: &str = "SCItemWeaponComponentParams";
 const COMPONENT: &str = "DataForgeComponentParams";
+const MANNEQUIN: &str = "SAnimationControllerParams";
 const CONNECTION: &str = "SWeaponConnectionParams";
 const MODIFIER: &str = "SWeaponModifierParams";
 const STATS: &str = "SWeaponStats";
@@ -70,6 +71,12 @@ fn item_types(types: DataForgeBuilder) -> DataForgeBuilder {
     types
         .enumeration("FixtureItemType", ["WeaponGun"])
         .structure(TestStruct::new(COMPONENT))
+        .structure(
+            TestStruct::new(MANNEQUIN)
+                .parent(COMPONENT)
+                .field("AnimationController", TestType::String)
+                .field("AnimationDatabase", TestType::String),
+        )
         .structure(TestStruct::new("IWeaponComponentParams").parent(COMPONENT))
         .structure(TestStruct::new("EntityClassDefinition").array("Components", pointer(COMPONENT)))
         .structure(
@@ -110,7 +117,24 @@ fn item() -> TestRecord {
         "EntityClassDefinition.FixtureWeaponOperating",
         "libs/foundry/records/entities/scitem/ships/fixture_weapon_operating.xml",
     )
-    .value("Components", TestValue::Array(vec![node(attach), weapon()]))
+    .value(
+        "Components",
+        TestValue::Array(vec![node(attach), weapon(), mannequin()]),
+    )
+}
+
+fn mannequin() -> TestValue {
+    node(
+        TestInstance::new(MANNEQUIN)
+            .value(
+                "AnimationController",
+                TestValue::text("Animations/fixture-controller.xml"),
+            )
+            .value(
+                "AnimationDatabase",
+                TestValue::text("Animations/fixture.adb"),
+            ),
+    )
 }
 
 fn weapon() -> TestValue {

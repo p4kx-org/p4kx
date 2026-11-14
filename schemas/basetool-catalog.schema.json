@@ -4567,6 +4567,9 @@
         "emp": {
           "$ref": "#/$defs/CatalogTableOfEmp"
         },
+        "entityAnimationControllers": {
+          "$ref": "#/$defs/CatalogTableOfEntityAnimationController"
+        },
         "explosives": {
           "$ref": "#/$defs/CatalogTableOfExplosive"
         },
@@ -4675,6 +4678,7 @@
         "distortion",
         "durability",
         "emp",
+        "entityAnimationControllers",
         "explosives",
         "facilities",
         "fuelIntakes",
@@ -5632,6 +5636,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/EncounterIndex"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfEntityAnimationController": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/EntityAnimationController"
           },
           "type": "array"
         }
@@ -11534,6 +11557,42 @@
       "required": [
         "loadoutPortOrdinal",
         "physicalPort"
+      ],
+      "type": "object"
+    },
+    "EntityAnimationController": {
+      "description": "Mannequin file locators owned by one physical Entity component.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "animationController": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "animationDatabase": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "animationController",
+        "animationDatabase",
+        "componentOrdinal",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
       ],
       "type": "object"
     },

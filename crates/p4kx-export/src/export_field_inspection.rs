@@ -24,6 +24,7 @@ pub(crate) enum ConfigurationInspection {
     JumpDriveDefinition,
     WeaponActionRecoilDefinition,
     WeaponProceduralDefinition,
+    EntityAnimationController,
 }
 
 /// Inspection of the canonical values relevant to one source scope.

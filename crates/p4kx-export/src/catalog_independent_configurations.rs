@@ -24,8 +24,11 @@ use crate::export_field_inspection::ConfigurationInspection;
 use crate::recovery::{self, ItemRecoveryPolicy, Recovery};
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, CatalogOptions};
+use entity_animation_controller::EntityAnimationController;
 use loot_generation_component::LootGenerationComponent;
 
+#[path = "catalog_entity_animation_controller.rs"]
+mod entity_animation_controller;
 #[path = "loot_generation_component.rs"]
 mod loot_generation_component;
 
@@ -39,6 +42,7 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     item_recovery_policy: CatalogTable<ItemRecoveryPolicy<'source>>,
     resource_network_parameters: CatalogTable<ResourceNetworkConfiguration<'source>>,
     mission_boards: CatalogTable<MissionBoard<'source>>,
+    entity_animation_controllers: CatalogTable<EntityAnimationController<'source>>,
     loot_generation: CatalogTable<LootGenerationComponent<'source>>,
     #[serde(flatten)]
     jump_drive_definitions: JumpDriveDefinitions<'source>,
@@ -94,6 +98,8 @@ pub(crate) fn read<'source>(
     let weapon_action_recoil_definitions = components.weapon_recoil()?;
     let weapon_procedural = components.weapon_procedural()?;
     let mission_boards = components.table(MISSION_BOARDS, MissionBoard::read)?;
+    let entity_animation_controllers =
+        components.table(ANIMATION_CONTROLLERS, EntityAnimationController::read)?;
     let loot_generation = components.table(LOOT_GENERATION, LootGenerationComponent::read)?;
     Ok(IndependentConfigurations {
         tables: IndependentConfigurationTables {
@@ -102,6 +108,7 @@ pub(crate) fn read<'source>(
             item_recovery_policy,
             resource_network_parameters,
             mission_boards,
+            entity_animation_controllers,
             loot_generation,
             jump_drive_definitions,
         },
@@ -112,6 +119,10 @@ pub(crate) fn read<'source>(
     })
 }
 
+const ANIMATION_CONTROLLERS: ComponentKind = ComponentKind {
+    source_type: entity_animation_controller::COMPONENT,
+    inspection: ConfigurationInspection::EntityAnimationController,
+};
 const MISSION_BOARDS: ComponentKind = ComponentKind {
     source_type: catalog_mission_board::COMPONENT,
     inspection: ConfigurationInspection::MissionBoard,

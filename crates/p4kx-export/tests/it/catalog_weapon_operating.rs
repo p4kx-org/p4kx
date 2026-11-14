@@ -24,6 +24,7 @@ fn weapon_operating_configuration_keeps_authored_states_and_provenance() -> Test
         let row = proof::at(&catalog, "/configurations/weaponActions/rows/0")?;
         let configuration = proof::at(row, "/operatingConfiguration")?;
         check_links(configuration, encrypted)?;
+        check_mannequin(&catalog, row, encrypted)?;
         check_connection(configuration, encrypted)?;
         let degradation = proof::at(
             configuration,
@@ -38,6 +39,31 @@ fn weapon_operating_configuration_keeps_authored_states_and_provenance() -> Test
             .map_err(|error| error.to_string())?;
         proof::closure(&catalog)?;
     }
+    Ok(())
+}
+
+fn check_mannequin(catalog: &Value, weapon: &Value, encrypted: bool) -> TestResult {
+    let [row] = proof::rows(catalog, "/configurations/entityAnimationControllers/rows")? else {
+        return Err("one physical animation controller component".into());
+    };
+    assert_eq!(
+        row.get("ownerRecordIndex"),
+        weapon.get("ownerRecordIndex"),
+        "weapon and controller keep their common Entity identity"
+    );
+    proof::present(row, "componentOrdinal", &json!(2), Some(encrypted))?;
+    proof::present(
+        row,
+        "animationController",
+        &json!("Animations/fixture-controller.xml"),
+        Some(encrypted),
+    )?;
+    proof::present(
+        row,
+        "animationDatabase",
+        &json!("Animations/fixture.adb"),
+        Some(encrypted),
+    )?;
     Ok(())
 }
 
