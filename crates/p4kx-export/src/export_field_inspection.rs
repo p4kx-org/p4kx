@@ -22,6 +22,7 @@ pub(crate) enum ConfigurationInspection {
     ResourceNetwork,
     LootGeneration,
     JumpDriveDefinition,
+    WeaponActionRecoilDefinition,
 }
 
 /// Inspection of the canonical values relevant to one source scope.

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -29,6 +29,7 @@ impl<'source> ConditionalAction<'source> {
         source: Observed<'reader, 'scope, 'read, 'source>,
         pending: &mut AuthoredNodes<'reader, 'scope, 'read, 'source>,
         notes: &mut Vec<FieldError>,
+        recoil: [(&'static str, SourceValueState); 3],
     ) -> Result<Self, CatalogError> {
         let conditional_weapon_actions = source.class_array_to(
             "conditionalWeaponActions",
@@ -37,13 +38,17 @@ impl<'source> ConditionalAction<'source> {
             |entry, notes| ConditionalActionEntry::read(entry, pending, notes),
         )?;
         let default_weapon_action = read_child(source, "defaultWeaponAction", pending, notes)?;
-        let authored = source.authored_members_except([
-            (
-                "conditionalWeaponActions",
-                conditional_weapon_actions.state(),
-            ),
-            ("defaultWeaponAction", default_weapon_action.state()),
-        ])?;
+        let authored = source.authored_members_except(
+            [
+                (
+                    "conditionalWeaponActions",
+                    conditional_weapon_actions.state(),
+                ),
+                ("defaultWeaponAction", default_weapon_action.state()),
+            ]
+            .into_iter()
+            .chain(recoil),
+        )?;
         Ok(Self {
             conditional_weapon_actions,
             default_weapon_action,
@@ -96,9 +101,12 @@ impl<'source> ToggleAction<'source> {
         source: Observed<'reader, 'scope, 'read, 'source>,
         pending: &mut AuthoredNodes<'reader, 'scope, 'read, 'source>,
         notes: &mut Vec<FieldError>,
+        recoil: [(&'static str, SourceValueState); 3],
     ) -> Result<Self, CatalogError> {
         let weapon_action = read_child(source, "weaponAction", pending, notes)?;
-        let authored = source.authored_members_except([("weaponAction", weapon_action.state())])?;
+        let authored = source.authored_members_except(
+            std::iter::once(("weaponAction", weapon_action.state())).chain(recoil),
+        )?;
         Ok(Self {
             weapon_action,
             authored,

@@ -205,6 +205,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "starmapPresets": absent_table(),
             "starmapAmenities": absent_table(),
             "ammoDefinitions": absent_table(),
+            "weaponActionRecoilDefinitions": absent_table(),
             "reputationContexts": reputation::contexts(),
             "reputationScopes": reputation::scopes(),
             "reputationStandings": reputation::standings(),

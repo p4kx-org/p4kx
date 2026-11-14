@@ -14,7 +14,12 @@ mod fixture;
 fn weapon_operating_configuration_keeps_authored_states_and_provenance() -> TestResult {
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&fixture::database(), origin)?;
-        let built = build_catalog(&archive, &common::options())?;
+        let filter = p4kx_extraction::Filter::new("*/entities/scitem/*");
+        let options = p4kx_export::CatalogOptions {
+            filter: Some(&filter),
+            ..common::options()
+        };
+        let built = build_catalog(&archive, &options)?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let row = proof::at(&catalog, "/configurations/weaponActions/rows/0")?;
         let configuration = proof::at(row, "/operatingConfiguration")?;
@@ -26,6 +31,7 @@ fn weapon_operating_configuration_keeps_authored_states_and_provenance() -> Test
         )?;
         check_single(degradation, "damageMultiplier", "3f400000", encrypted)?;
         check_aim(row, encrypted)?;
+        check_action_recoil(&catalog, row, encrypted)?;
         let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
         validator
             .validate(&catalog)
@@ -81,8 +87,8 @@ fn check_connection(configuration: &Value, encrypted: bool) -> TestResult {
 }
 
 fn check_aim(row: &Value, encrypted: bool) -> TestResult {
-    proof::present(row, "aimAction", &json!(0), Some(encrypted))?;
-    let aim = proof::at(row, "/actionNodes/0/kind")?;
+    proof::present(row, "aimAction", &json!(2), Some(encrypted))?;
+    let aim = proof::at(row, "/actionNodes/2/kind")?;
     assert_eq!(
         proof::at(aim, "/type")?,
         "aim",
@@ -101,6 +107,48 @@ fn check_aim(row: &Value, encrypted: bool) -> TestResult {
         Some(encrypted),
     )?;
     Ok(())
+}
+
+fn check_action_recoil(catalog: &Value, row: &Value, encrypted: bool) -> TestResult {
+    let [first, second, aim] = proof::rows(row, "/actionNodes")? else {
+        return Err("two beams and the independent aim slot".into());
+    };
+    let [definition] = proof::rows(catalog, "/definitions/weaponActionRecoilDefinitions/rows")?
+    else {
+        return Err("one physical shared recoil definition across both action nodes".into());
+    };
+    proof::present(
+        proof::at(definition, "/source")?,
+        "recordIndex",
+        &json!(1),
+        Some(encrypted),
+    )?;
+    for (node, bits, finite) in [(first, "3e000000", 0.125), (second, "3e800000", 0.25)] {
+        let link = proof::at(proof::cell(node, "recoil", "present")?, "/value")?;
+        proof::present(link, "targetRecordIndex", &json!(1), Some(encrypted))?;
+        proof::present(
+            node,
+            "recoilInterval",
+            &json!({"rawBits": bits, "finite": finite}),
+            Some(encrypted),
+        )?;
+        let [original] = proof::rows(node, "/kind/value/authored/roots")? else {
+            return Err("inherited UI flag remains outside the projected recoil fields".into());
+        };
+        proof::present(
+            original,
+            "name",
+            &json!("hasReloadModesOnUI"),
+            Some(encrypted),
+        )?;
+    }
+    proof::cell(aim, "recoil", "absent")?;
+    check_single(
+        proof::at(definition, "/aim/value")?,
+        "yawMaxDegrees",
+        "3f800000",
+        encrypted,
+    )
 }
 
 fn check_single(stats: &Value, name: &str, bits: &str, encrypted: bool) -> TestResult {

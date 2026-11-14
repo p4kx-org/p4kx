@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -42,6 +42,7 @@ impl<'source> BeamAction<'source> {
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
+        recoil: [(&'static str, SourceValueState); 3],
     ) -> Result<Self, CatalogError> {
         let damage_per_second = source.strong_pointer_family_to(
             "damagePerSecond",
@@ -60,20 +61,24 @@ impl<'source> BeamAction<'source> {
         let charge_up_time = source.single("chargeUpTime", notes)?;
         let charge_down_time = source.single("chargeDownTime", notes)?;
         let fire_during_charge_up = source.boolean("fireDuringChargeUp", notes)?;
-        let authored = source.authored_members_except([
-            ("damagePerSecond", damage_per_second.state()),
-            ("fullDamageRange", full_damage_range.state()),
-            ("zeroDamageRange", zero_damage_range.state()),
-            ("hitType", hit_type.state()),
-            ("heatCostPerSecond", heat_cost_per_second.state()),
-            ("heatPerSecond", heat_per_second.state()),
-            ("wearPerSecond", wear_per_second.state()),
-            ("minEnergyDraw", min_energy_draw.state()),
-            ("maxEnergyDraw", max_energy_draw.state()),
-            ("chargeUpTime", charge_up_time.state()),
-            ("chargeDownTime", charge_down_time.state()),
-            ("fireDuringChargeUp", fire_during_charge_up.state()),
-        ])?;
+        let authored = source.authored_members_except(
+            [
+                ("damagePerSecond", damage_per_second.state()),
+                ("fullDamageRange", full_damage_range.state()),
+                ("zeroDamageRange", zero_damage_range.state()),
+                ("hitType", hit_type.state()),
+                ("heatCostPerSecond", heat_cost_per_second.state()),
+                ("heatPerSecond", heat_per_second.state()),
+                ("wearPerSecond", wear_per_second.state()),
+                ("minEnergyDraw", min_energy_draw.state()),
+                ("maxEnergyDraw", max_energy_draw.state()),
+                ("chargeUpTime", charge_up_time.state()),
+                ("chargeDownTime", charge_down_time.state()),
+                ("fireDuringChargeUp", fire_during_charge_up.state()),
+            ]
+            .into_iter()
+            .chain(recoil),
+        )?;
         Ok(Self {
             damage_per_second,
             full_damage_range,

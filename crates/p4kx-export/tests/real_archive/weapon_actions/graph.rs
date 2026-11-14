@@ -68,7 +68,7 @@ pub(super) fn compare<'source>(
         let data = node.pointer("/kind/value").ok_or("action kind payload")?;
         let measured = coverage.entry(original.type_name().to_owned()).or_default();
         measured.nodes += 1;
-        measured.inputs += inputs::action(trace, original, data, kind)?;
+        measured.inputs += inputs::action(trace, original, node, data, kind)?;
         measured.inputs += children(trace, original, data, kind, &mut pending)?;
         processed += 1;
     }

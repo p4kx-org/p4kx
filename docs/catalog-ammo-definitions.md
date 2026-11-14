@@ -168,6 +168,15 @@ The typed aim action also retains its geometry settings and
 `hasReloadModesOnUI` flag. These fields describe stored configuration.
 The flag records UI availability for that action.
 
+Each `actionNodes` entry exposes the original `recoil` and `recoilGrappling`
+Record References, and `recoilInterval` where stored. A resolved reference's
+`targetRecordIndex` joins `definitions.weaponActionRecoilDefinitions` by
+`source.recordIndex`. Multiple actions can share one physical definition.
+The definition retains the authored hand, aim, body and head settings,
+including ordered curves in the original field arenas. Reference states
+and the health report cover unavailable targets independently of their
+physical identity.
+
 A projectile launcher's `projectileType` is the stored label of the
 declared `EProjectileType` Enum. A readable different declaration is
 `unsupported`. A failed declaration or label read is `unreadable`. The ammunition

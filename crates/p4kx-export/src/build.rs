@@ -119,6 +119,7 @@ fn assemble<R>(
     let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
     let IndependentConfigurations {
         tables: independent,
+        weapon_action_recoil_definitions,
         recovery_numbers,
         configuration_numbers,
     } = catalog_independent_configurations::read(&forge, &projection, options, &mut collected)?;
@@ -224,6 +225,7 @@ fn assemble<R>(
                 collected.explosion_definitions,
             ),
             ammo_definitions: ammo_definition::table(&forge, collected.ammo_definitions),
+            weapon_action_recoil_definitions,
             reputation_contexts: reputation_tables.contexts,
             faction_reputations: reputation_tables.factions.definitions,
             reputation_scopes: reputation_tables.scopes,

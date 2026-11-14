@@ -292,6 +292,8 @@ mod room_associations;
 mod sensor_mine;
 #[path = "shared_interaction.rs"]
 mod shared_interaction;
+#[path = "weapon_action_recoil_definitions.rs"]
+pub(crate) mod weapon_action_recoil_definitions;
 
 #[path = "catalog_durability.rs"]
 pub(crate) mod catalog_durability;

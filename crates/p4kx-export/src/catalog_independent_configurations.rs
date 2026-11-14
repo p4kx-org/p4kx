@@ -11,7 +11,9 @@ use super::catalog_entity_component_read::{
 use super::catalog_mission_board::{self, MissionBoard};
 use super::catalog_resource_network_configuration::ResourceNetworkConfiguration;
 use super::catalog_resource_network_read::{self, ResourceNetworkRead};
+use super::catalog_weapon_actions::RECOIL_DEFINITION;
 use super::jump_drive_definitions::{self, JumpDriveDefinitions};
+use super::weapon_action_recoil_definitions::{self, WeaponActionRecoilDefinition};
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_table::CatalogTable;
@@ -43,6 +45,8 @@ pub(crate) struct IndependentConfigurationTables<'source> {
 
 pub(crate) struct IndependentConfigurations<'source> {
     pub(crate) tables: IndependentConfigurationTables<'source>,
+    pub(crate) weapon_action_recoil_definitions:
+        CatalogTable<WeaponActionRecoilDefinition<'source>>,
     pub(crate) recovery_numbers: Vec<CapturedNumber>,
     pub(crate) configuration_numbers: Vec<CapturedNumber>,
 }
@@ -77,17 +81,6 @@ pub(crate) fn read<'source>(
     )?;
     collected.ledger.merge(ledger);
     collected.add_failures(failures);
-    let jump = jump_drive_definitions::read(
-        forge,
-        projection.original(),
-        options.filter,
-        options.cancel,
-        &collected.item_components.jump_drives,
-    )?;
-    let jump_drive_definitions = jump.tables;
-    configuration_numbers.extend(jump.numbers);
-    collected.ledger.merge(jump.ledger);
-    collected.add_failures(jump.failures);
     let mut components = PhysicalComponents {
         forge,
         projection,
@@ -95,6 +88,8 @@ pub(crate) fn read<'source>(
         collected,
         numbers: &mut configuration_numbers,
     };
+    let jump_drive_definitions = components.jump_definitions()?;
+    let weapon_action_recoil_definitions = components.weapon_recoil()?;
     let mission_boards = components.table(MISSION_BOARDS, MissionBoard::read)?;
     let loot_generation = components.table(LOOT_GENERATION, LootGenerationComponent::read)?;
     Ok(IndependentConfigurations {
@@ -107,6 +102,7 @@ pub(crate) fn read<'source>(
             loot_generation,
             jump_drive_definitions,
         },
+        weapon_action_recoil_definitions,
         recovery_numbers,
         configuration_numbers,
     })
@@ -130,6 +126,40 @@ struct PhysicalComponents<'options, 'input, 'source> {
 }
 
 impl<'source> PhysicalComponents<'_, '_, 'source> {
+    fn jump_definitions(&mut self) -> Result<JumpDriveDefinitions<'source>, CatalogError> {
+        let jump = jump_drive_definitions::read(
+            self.forge,
+            self.projection.original(),
+            self.options.filter,
+            self.options.cancel,
+            &self.collected.item_components.jump_drives,
+        )?;
+        self.numbers.extend(jump.numbers);
+        self.collected.ledger.merge(jump.ledger);
+        self.collected.add_failures(jump.failures);
+        Ok(jump.tables)
+    }
+
+    fn weapon_recoil(
+        &mut self,
+    ) -> Result<CatalogTable<WeaponActionRecoilDefinition<'source>>, CatalogError> {
+        let recoil = weapon_action_recoil_definitions::read(
+            self.forge,
+            self.projection.original(),
+            self.options.filter,
+            self.options.cancel,
+            &self.collected.item_components.weapon_actions,
+        )?;
+        self.numbers.extend(recoil.numbers);
+        self.collected.ledger.merge(recoil.ledger);
+        self.collected.add_failures(recoil.failures);
+        Ok(CatalogTable::new(
+            self.forge,
+            &[RECOIL_DEFINITION],
+            recoil.rows.into_iter().map(|(_, row)| row).collect(),
+        ))
+    }
+
     fn table<Row>(
         &mut self,
         component: ComponentKind,

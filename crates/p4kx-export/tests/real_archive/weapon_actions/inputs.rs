@@ -5,6 +5,7 @@ use p4kx_extraction::{StructValue, Value as Original};
 use serde_json::Value;
 
 use super::TestResult;
+use crate::real_archive_emp::compare_link;
 use crate::real_archive_item_components::{cell, require_state};
 use crate::real_archive_item_durability::{self as proof, Trace};
 
@@ -65,9 +66,11 @@ const MISSILE: &[&str] = &[
 pub(super) fn action<'source>(
     trace: &Trace<'_, 'source>,
     original: &StructValue<'source>,
+    node: &Value,
     data: &Value,
     kind: &str,
 ) -> TestResult<usize> {
+    let recoil_count = recoil(trace, original, node)?;
     let count = match kind {
         "single" | "rapid" | "burst" => {
             let mut count = fields(trace, original, data, SHOT)? + launcher(trace, original, data)?;
@@ -86,9 +89,24 @@ pub(super) fn action<'source>(
         }
         "charged" => fields(trace, original, data, CHARGED)? + modifier(trace, original, data)?,
         "sequence" => fields(trace, original, data, &["mode"])?,
-        "authored" => authored_roots(trace, original, data)?,
+        "authored" => authored_roots_except_recoil(trace, original, data, node)?,
         _ => 0,
     };
+    Ok(count + recoil_count)
+}
+
+fn recoil<'source>(
+    trace: &Trace<'_, 'source>,
+    original: &StructValue<'source>,
+    node: &Value,
+) -> TestResult<usize> {
+    let mut count = fields(trace, original, node, &["recoilInterval"])?;
+    for name in ["recoil", "recoilGrappling"] {
+        let original = original.field(name);
+        let selected = cell(node, name)?;
+        compare_link(selected, original, trace, false)?;
+        count += usize::from(original.is_some());
+    }
     Ok(count)
 }
 
@@ -265,12 +283,36 @@ fn authored_roots<'source>(
     original: &StructValue<'source>,
     arena: &Value,
 ) -> TestResult<usize> {
+    check_roots(trace, original, arena, |_| true)
+}
+
+fn authored_roots_except_recoil<'source>(
+    trace: &Trace<'_, 'source>,
+    original: &StructValue<'source>,
+    arena: &Value,
+    node: &Value,
+) -> TestResult<usize> {
+    check_roots(trace, original, arena, |name| {
+        !matches!(name, "recoil" | "recoilGrappling" | "recoilInterval")
+            || !matches!(
+                node.get(name)
+                    .and_then(|value| value.get("state"))
+                    .and_then(Value::as_str),
+                Some("present" | "null")
+            )
+    })
+}
+
+fn check_roots<'source>(
+    trace: &Trace<'_, 'source>,
+    original: &StructValue<'source>,
+    arena: &Value,
+    keep: impl Fn(&str) -> bool,
+) -> TestResult<usize> {
     let roots = proof::rows(arena, "/roots")?;
-    assert!(
-        roots.len() == original.fields().len(),
-        "complete original authored field roots"
-    );
-    for (source, projected) in original.fields().iter().zip(roots) {
+    let mut fields = original.fields().iter().filter(|field| keep(field.name()));
+    for projected in roots {
+        let source = fields.next().ok_or("unexpected original field root")?;
         assert!(
             proof::text(projected, "/name/value")? == source.name(),
             "original authored field order"
@@ -282,6 +324,10 @@ fn authored_roots<'source>(
             "payload",
         )?;
     }
+    assert!(
+        fields.next().is_none(),
+        "complete original authored field roots"
+    );
     Ok(roots.len())
 }
 

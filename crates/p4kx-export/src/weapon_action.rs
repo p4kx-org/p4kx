@@ -26,6 +26,8 @@ mod launcher;
 #[path = "weapon_action_sequence.rs"]
 mod sequence;
 
+use super::recoil::WeaponActionRecoil;
+
 use aim::AimAction;
 use beam::BeamAction;
 use charge::ChargedAction;
@@ -40,6 +42,8 @@ use sequence::{ParallelAction, SequenceAction};
 pub(crate) struct WeaponAction<'source> {
     source_type: SourcedValue<&'source str>,
     source_value_ordinal: SourcedValue<DecimalU64>,
+    #[serde(flatten)]
+    recoil: WeaponActionRecoil<'source>,
     kind: WeaponActionKind<'source>,
 }
 
@@ -49,11 +53,17 @@ impl<'source> WeaponAction<'source> {
         pending: &mut AuthoredNodes<'reader, 'scope, 'read, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
+        let recoil = WeaponActionRecoil::read(source, notes)?;
         Ok(Self {
             source_type: source.source_type_value()?,
             source_value_ordinal: source.owner_ordinal()?,
-            kind: WeaponActionKind::read(source, pending, notes)?,
+            kind: WeaponActionKind::read(source, pending, notes, recoil.projected())?,
+            recoil,
         })
+    }
+
+    pub(super) fn linked_recoil_definitions(&self) -> impl Iterator<Item = u32> + '_ {
+        self.recoil.linked_definitions()
     }
 }
 
@@ -81,38 +91,43 @@ impl<'source> WeaponActionKind<'source> {
         source: Observed<'reader, 'scope, 'read, 'source>,
         pending: &mut AuthoredNodes<'reader, 'scope, 'read, 'source>,
         notes: &mut Vec<FieldError>,
+        recoil: [(&'static str, SourceValueState); 3],
     ) -> Result<Self, CatalogError> {
         Ok(match source.source_type()? {
             "SWeaponActionFireSingleParams" => {
-                Self::Single(Box::new(ShotInputs::read(source, notes, [])?))
+                Self::Single(Box::new(ShotInputs::read(source, notes, recoil)?))
             }
             "SWeaponActionFireRapidParams" => {
-                Self::Rapid(Box::new(RapidAction::read(source, notes)?))
+                Self::Rapid(Box::new(RapidAction::read(source, notes, recoil)?))
             }
             "SWeaponActionFireBurstParams" => {
-                Self::Burst(Box::new(BurstAction::read(source, notes)?))
+                Self::Burst(Box::new(BurstAction::read(source, notes, recoil)?))
             }
-            "SWeaponActionFireBeamParams" => Self::Beam(Box::new(BeamAction::read(source, notes)?)),
-            "SWeaponActionAimSimpleParams" => Self::Aim(Box::new(AimAction::read(source, notes)?)),
-            "SWeaponActionSequenceParams" => {
-                Self::Sequence(Box::new(SequenceAction::read(source, pending, notes)?))
+            "SWeaponActionFireBeamParams" => {
+                Self::Beam(Box::new(BeamAction::read(source, notes, recoil)?))
             }
-            "SWeaponActionParallelParams" => {
-                Self::Parallel(Box::new(ParallelAction::read(source, pending, notes)?))
+            "SWeaponActionAimSimpleParams" => {
+                Self::Aim(Box::new(AimAction::read(source, notes, recoil)?))
             }
-            "SWeaponActionConditionParams" => {
-                Self::Conditional(Box::new(ConditionalAction::read(source, pending, notes)?))
-            }
-            "SWeaponActionDynamicConditionParams" => {
-                Self::DynamicConditional(Box::new(ConditionalAction::read(source, pending, notes)?))
-            }
-            "SWeaponActionToggleParams" => {
-                Self::Toggle(Box::new(ToggleAction::read(source, pending, notes)?))
-            }
-            "SWeaponActionFireChargedParams" => {
-                Self::Charged(Box::new(ChargedAction::read(source, pending, notes)?))
-            }
-            _ => Self::Authored(source.authored_members()?),
+            "SWeaponActionSequenceParams" => Self::Sequence(Box::new(SequenceAction::read(
+                source, pending, notes, recoil,
+            )?)),
+            "SWeaponActionParallelParams" => Self::Parallel(Box::new(ParallelAction::read(
+                source, pending, notes, recoil,
+            )?)),
+            "SWeaponActionConditionParams" => Self::Conditional(Box::new(ConditionalAction::read(
+                source, pending, notes, recoil,
+            )?)),
+            "SWeaponActionDynamicConditionParams" => Self::DynamicConditional(Box::new(
+                ConditionalAction::read(source, pending, notes, recoil)?,
+            )),
+            "SWeaponActionToggleParams" => Self::Toggle(Box::new(ToggleAction::read(
+                source, pending, notes, recoil,
+            )?)),
+            "SWeaponActionFireChargedParams" => Self::Charged(Box::new(ChargedAction::read(
+                source, pending, notes, recoil,
+            )?)),
+            _ => Self::Authored(source.authored_members_except(recoil)?),
         })
     }
 }
@@ -177,6 +192,7 @@ impl<'source> RapidAction<'source> {
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
+        recoil: [(&'static str, SourceValueState); 3],
     ) -> Result<Self, CatalogError> {
         let fire_during_spin_up = source.boolean("fireDuringSpinUp", notes)?;
         let spin_up_time = source.single("spinUpTime", notes)?;
@@ -196,7 +212,9 @@ impl<'source> RapidAction<'source> {
                     "audioLoopTimeBetweenFirstShots",
                     audio_loop_time_between_first_shots.state(),
                 ),
-            ],
+            ]
+            .into_iter()
+            .chain(recoil),
         )?;
         Ok(Self {
             shot,
@@ -224,6 +242,7 @@ impl<'source> BurstAction<'source> {
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
+        recoil: [(&'static str, SourceValueState); 3],
     ) -> Result<Self, CatalogError> {
         let shot_count = source.uint8("shotCount", notes)?;
         let cooldown_time = source.single("cooldownTime", notes)?;
@@ -233,7 +252,9 @@ impl<'source> BurstAction<'source> {
             [
                 ("shotCount", shot_count.state()),
                 ("cooldownTime", cooldown_time.state()),
-            ],
+            ]
+            .into_iter()
+            .chain(recoil),
         )?;
         Ok(Self {
             shot,

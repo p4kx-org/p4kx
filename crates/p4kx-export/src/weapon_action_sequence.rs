@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -30,6 +30,7 @@ impl<'source> SequenceAction<'source> {
         source: Observed<'reader, 'scope, 'read, 'source>,
         pending: &mut AuthoredNodes<'reader, 'scope, 'read, 'source>,
         notes: &mut Vec<FieldError>,
+        recoil: [(&'static str, SourceValueState); 3],
     ) -> Result<Self, CatalogError> {
         let mode = source.borrowed_enum_to("mode", "ESequenceMode", notes)?;
         let sequence_entries = source.class_array_to(
@@ -38,10 +39,14 @@ impl<'source> SequenceAction<'source> {
             notes,
             |entry, notes| SequenceActionEntry::read(entry, pending, notes),
         )?;
-        let authored = source.authored_members_except([
-            ("mode", mode.state()),
-            ("sequenceEntries", sequence_entries.state()),
-        ])?;
+        let authored = source.authored_members_except(
+            [
+                ("mode", mode.state()),
+                ("sequenceEntries", sequence_entries.state()),
+            ]
+            .into_iter()
+            .chain(recoil),
+        )?;
         Ok(Self {
             mode,
             sequence_entries,
@@ -102,10 +107,12 @@ impl<'source> ParallelAction<'source> {
         source: Observed<'reader, 'scope, 'read, 'source>,
         pending: &mut AuthoredNodes<'reader, 'scope, 'read, 'source>,
         notes: &mut Vec<FieldError>,
+        recoil: [(&'static str, SourceValueState); 3],
     ) -> Result<Self, CatalogError> {
         let weapon_actions = read_children(source, "weaponActions", pending, notes)?;
-        let authored =
-            source.authored_members_except([("weaponActions", weapon_actions.state())])?;
+        let authored = source.authored_members_except(
+            std::iter::once(("weaponActions", weapon_actions.state())).chain(recoil),
+        )?;
         Ok(Self {
             weapon_actions,
             authored,

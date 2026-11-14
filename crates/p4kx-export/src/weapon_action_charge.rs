@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -39,6 +39,7 @@ impl<'source> ChargedAction<'source> {
         source: Observed<'reader, 'scope, 'read, 'source>,
         pending: &mut AuthoredNodes<'reader, 'scope, 'read, 'source>,
         notes: &mut Vec<FieldError>,
+        recoil: [(&'static str, SourceValueState); 3],
     ) -> Result<Self, CatalogError> {
         let charge_time = source.single("chargeTime", notes)?;
         let overcharge_input = source.single("overchargeTime", notes)?;
@@ -55,22 +56,26 @@ impl<'source> ChargedAction<'source> {
                 stats.authored_members()
             })?;
         let weapon_action = read_child(source, "weaponAction", pending, notes)?;
-        let authored = source.authored_members_except([
-            ("chargeTime", charge_time.state()),
-            ("overchargeTime", overcharge_input.state()),
-            ("overchargedTime", overcharged_time.state()),
-            ("cooldownTime", cooldown_time.state()),
-            ("maxGlow", max_glow.state()),
-            ("interpolateChargeBonus", interpolate_charge_bonus.state()),
-            (
-                "fireAutomaticallyOnFullCharge",
-                fire_automatically_on_full_charge.state(),
-            ),
-            ("fireOnlyOnFullCharge", fire_only_on_full_charge.state()),
-            ("chargeAutomatically", charge_automatically.state()),
-            ("maxChargeModifier", max_charge_modifier.state()),
-            ("weaponAction", weapon_action.state()),
-        ])?;
+        let authored = source.authored_members_except(
+            [
+                ("chargeTime", charge_time.state()),
+                ("overchargeTime", overcharge_input.state()),
+                ("overchargedTime", overcharged_time.state()),
+                ("cooldownTime", cooldown_time.state()),
+                ("maxGlow", max_glow.state()),
+                ("interpolateChargeBonus", interpolate_charge_bonus.state()),
+                (
+                    "fireAutomaticallyOnFullCharge",
+                    fire_automatically_on_full_charge.state(),
+                ),
+                ("fireOnlyOnFullCharge", fire_only_on_full_charge.state()),
+                ("chargeAutomatically", charge_automatically.state()),
+                ("maxChargeModifier", max_charge_modifier.state()),
+                ("weaponAction", weapon_action.state()),
+            ]
+            .into_iter()
+            .chain(recoil),
+        )?;
         Ok(Self {
             charge_time,
             overcharge_time: overcharge_input,

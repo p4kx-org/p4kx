@@ -27,6 +27,7 @@ use crate::catalog_v3::reputation_scope_definition::ScopeDefinition;
 use crate::catalog_v3::reputation_standing_definition::StandingDefinition;
 use crate::catalog_v3::sandbox_trigger_record_definition::SandboxTriggerRecordDefinition;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionTables;
+use crate::catalog_v3::weapon_action_recoil_definitions::WeaponActionRecoilDefinition;
 use crate::commodity_contract::CommodityDefinition;
 use crate::manufacturer::ManufacturerDefinition;
 use crate::mission_generator::GeneratorDefinition;
@@ -65,6 +66,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) inventory_containers: CatalogTable<InventoryContainerDefinition<'source>>,
     pub(crate) medical_item_tier_configs: CatalogTable<MedicalItemTierConfig<'source>>,
     pub(crate) ammo_definitions: CatalogTable<AmmoDefinition<'source>>,
+    pub(crate) weapon_action_recoil_definitions:
+        CatalogTable<WeaponActionRecoilDefinition<'source>>,
     pub(crate) reputation_contexts: CatalogTable<ContextDefinition<'source>>,
     pub(crate) reputation_scopes: CatalogTable<ScopeDefinition<'source>>,
     pub(crate) reputation_standings: CatalogTable<StandingDefinition<'source>>,

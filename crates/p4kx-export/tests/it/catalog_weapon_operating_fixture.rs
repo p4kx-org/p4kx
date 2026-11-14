@@ -11,6 +11,10 @@ const CONNECTION: &str = "SWeaponConnectionParams";
 const MODIFIER: &str = "SWeaponModifierParams";
 const STATS: &str = "SWeaponStats";
 const ACTION: &str = "SWeaponActionParams";
+const BEAM: &str = "SWeaponActionFireBeamParams";
+const ACTION_RECOIL: &str = "WeaponProceduralRecoilConfigDef";
+const RECOIL_AIM: &str = "SWeaponProceduralAimRecoilConfigDef";
+const ACTION_RECOIL_ID: u128 = 0x9af4;
 const AIM: &str = "SWeaponActionAimSimpleParams";
 const GEOMETRY: &str = "SWeaponGeometryTagsParams";
 const ANIMATION_ID: u128 = 0x9af1;
@@ -25,6 +29,7 @@ pub(super) fn database() -> DataForgeBuilder {
             "WeaponProceduralAnimation.Fixture",
             "libs/foundry/records/fixture/weapon_animation.xml",
         ))
+        .record(action_recoil())
         .record(item())
 }
 
@@ -32,6 +37,16 @@ fn operating_types(types: DataForgeBuilder) -> DataForgeBuilder {
     types
         .structure(TestStruct::new(ANIMATION))
         .structure(TestStruct::new(RECOIL))
+        .structure(
+            TestStruct::new(BEAM)
+                .parent(ACTION)
+                .field("recoil", TestType::ReferenceTo(ACTION_RECOIL.to_owned()))
+                .field("recoilInterval", TestType::Single),
+        )
+        .structure(
+            TestStruct::new(ACTION_RECOIL).field("weaponProceduralAimRecoil", class(RECOIL_AIM)),
+        )
+        .structure(TestStruct::new(RECOIL_AIM).field("yawMaxDegrees", TestType::Single))
         .structure(TestStruct::new(ACTION).field("hasReloadModesOnUI", TestType::Bool))
         .structure(
             TestStruct::new(AIM)
@@ -70,6 +85,7 @@ fn item_types(types: DataForgeBuilder) -> DataForgeBuilder {
             TestStruct::new(WEAPON)
                 .parent("IWeaponComponentParams")
                 .field("aimAction", pointer(ACTION))
+                .array("fireActions", pointer(ACTION))
                 .field(
                     "proceduralAnimationRecord",
                     TestType::ReferenceTo(ANIMATION.to_owned()),
@@ -114,6 +130,10 @@ fn weapon() -> TestValue {
         TestInstance::new(WEAPON)
             .value("aimAction", node(aim))
             .value(
+                "fireActions",
+                TestValue::Array(vec![beam(0.125), beam(0.25)]),
+            )
+            .value(
                 "proceduralAnimationRecord",
                 TestValue::Reference(ANIMATION_ID),
             )
@@ -123,6 +143,27 @@ fn weapon() -> TestValue {
             )
             .value("connectionParams", node(connection))
             .value("weaponDegradationModifier", modifier(0.75)),
+    )
+}
+
+fn beam(interval: f32) -> TestValue {
+    node(
+        TestInstance::new(BEAM)
+            .value("recoil", TestValue::Reference(ACTION_RECOIL_ID))
+            .value("recoilInterval", TestValue::Single(interval)),
+    )
+}
+
+fn action_recoil() -> TestRecord {
+    TestRecord::new(
+        ACTION_RECOIL_ID,
+        ACTION_RECOIL,
+        "WeaponProceduralRecoilConfigDef.Fixture",
+        "libs/foundry/records/fixture/action_recoil.xml",
+    )
+    .value(
+        "weaponProceduralAimRecoil",
+        node(TestInstance::new(RECOIL_AIM).value("yawMaxDegrees", TestValue::Single(1.0))),
     )
 }
 

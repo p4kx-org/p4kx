@@ -4821,6 +4821,9 @@
         },
         "tags": {
           "$ref": "#/$defs/CatalogTableOfTagDefinition"
+        },
+        "weaponActionRecoilDefinitions": {
+          "$ref": "#/$defs/CatalogTableOfWeaponActionRecoilDefinition"
         }
       },
       "required": [
@@ -4879,7 +4882,8 @@
         "starmapTypes",
         "subHarvestableConfigs",
         "subHarvestableMultiConfigs",
-        "tags"
+        "tags",
+        "weaponActionRecoilDefinitions"
       ],
       "type": "object"
     },
@@ -7081,6 +7085,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/VehicleArmor"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfWeaponActionRecoilDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/WeaponActionRecoilDefinition"
           },
           "type": "array"
         }
@@ -102860,6 +102883,15 @@
         "kind": {
           "$ref": "#/$defs/WeaponActionKind"
         },
+        "recoil": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "recoilGrappling": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "recoilInterval": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
@@ -102869,6 +102901,9 @@
       },
       "required": [
         "kind",
+        "recoil",
+        "recoilGrappling",
+        "recoilInterval",
         "sourceType",
         "sourceValueOrdinal"
       ],
@@ -103071,6 +103106,38 @@
         }
       ],
       "required": []
+    },
+    "WeaponActionRecoilDefinition": {
+      "description": "Original recoil configuration shared by action nodes in the same Build.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "aim": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        },
+        "body": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        },
+        "hands": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        },
+        "head": {
+          "$ref": "#/$defs/SourcedValueOfUnitSource"
+        },
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "aim",
+        "body",
+        "hands",
+        "head",
+        "source"
+      ],
+      "type": "object"
     },
     "WeaponActions": {
       "description": "Authored fire-action slots and local action nodes of one physical weapon component.",

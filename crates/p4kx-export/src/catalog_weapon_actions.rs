@@ -18,6 +18,8 @@ use crate::source_fields::FieldError;
 mod action;
 #[path = "weapon_operating_configuration.rs"]
 mod operating;
+#[path = "weapon_action_recoil.rs"]
+mod recoil;
 
 use action::WeaponAction;
 use operating::WeaponOperatingConfiguration;
@@ -55,6 +57,12 @@ impl<'source> WeaponActions<'source> {
             operating_configuration: WeaponOperatingConfiguration::read(source, notes)?,
         })
     }
+
+    pub(super) fn linked_recoil_definitions(&self) -> impl Iterator<Item = u32> + '_ {
+        self.action_nodes
+            .iter()
+            .flat_map(WeaponAction::linked_recoil_definitions)
+    }
 }
 
 fn read_child<'reader, 'scope, 'read, 'source>(
@@ -74,6 +82,8 @@ fn read_children<'reader, 'scope, 'read, 'source>(
 ) -> Result<SourcedValue<Vec<SourcedValue<u32>>>, CatalogError> {
     source.strong_pointer_family_array_to(name, ACTION_BASE, notes, |child, _| pending.push(child))
 }
+
+pub(super) const RECOIL_DEFINITION: &str = recoil::CONFIG_TYPE;
 
 pub(super) fn table<'source>(
     forge: &DataForge<'_>,
