@@ -44,3 +44,37 @@ def test_soc_placement_must_refer_to_earlier_occurrence():
 def test_missing_optional_soc_companion_is_reported(tmp_path):
     with pytest.raises(package.PackageError, match="Cannot read the authored SOC scene"):
         soc_scene.load(tmp_path, soc_scene.SOC_SCENE_FILE)
+
+
+def test_included_objects_refs_are_physical_and_scoped_to_the_stream():
+    data = scene()
+    stream = data["occurrences"][0]["streams"][0]
+    stream["member"]["source"] = "synthetic-source"
+    stream["includedObjects"] = [0]
+    data["includedObjects"] = [
+        {
+            "ordinal": 2,
+            "source": "synthetic-source",
+            "byteLength": "4",
+            "raw": {"state": "present", "value": "AQAAAA=="},
+            "tables": {"state": "invalid"},
+        }
+    ]
+    assert soc_scene.nodes(data) == soc_scene.nodes(scene())
+    for invalid in [[0, 0], [1], [True], [-1]]:
+        stream["includedObjects"] = invalid
+        with pytest.raises(package.PackageError, match="distinct chunk"):
+            soc_scene.nodes(data)
+    stream["includedObjects"] = [0]
+    chunk = data["includedObjects"][0]
+    chunk["raw"]["value"] = "!QAAAA=="
+    with pytest.raises(package.PackageError, match="invalid Base64"):
+        soc_scene.nodes(data)
+    chunk["raw"]["value"] = "AQAAAA=="
+    chunk["byteLength"] = "5"
+    with pytest.raises(package.PackageError, match="declared length"):
+        soc_scene.nodes(data)
+    chunk["byteLength"] = "4"
+    chunk["source"] = "different-source"
+    with pytest.raises(package.PackageError, match="belong to its stream"):
+        soc_scene.nodes(data)

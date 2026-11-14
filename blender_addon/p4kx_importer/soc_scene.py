@@ -5,6 +5,8 @@
 
 from __future__ import annotations
 
+import base64
+import binascii
 import json
 import math
 from dataclasses import dataclass
@@ -59,6 +61,7 @@ def nodes(value: object) -> list[SocNode]:
     if document.get("format") != "p4kx-soc-scene" or type(document.get("schemaVersion")) is not int or document["schemaVersion"] != SOC_SCENE_VERSION:
         raise PackageError("The authored SOC scene has an unsupported format or schema version.")
     occurrences = _array(document.get("occurrences"), "SOC occurrences")
+    _validate_included_objects(document, occurrences)
     hierarchy: list[SocNode] = []
     container_indices: list[int] = []
     for index, raw in enumerate(occurrences):
@@ -71,6 +74,59 @@ def nodes(value: object) -> list[SocNode]:
         _add_rooms(occurrence, container, hierarchy)
         _add_entities(occurrence, container, hierarchy)
     return hierarchy
+
+
+def _validate_included_objects(document: dict[str, Any], occurrences: list[Any]) -> None:
+    included = _array(document.get("includedObjects", []), "SOC IncludedObjects")
+    known = set()
+    for item in included:
+        table = read_object(item, "SOC IncludedObjects chunk")
+        source = table.get("source")
+        ordinal = _ordinal(table, "IncludedObjects chunk")
+        if not isinstance(source, str) or not source or (source, ordinal) in known:
+            raise PackageError("A SOC IncludedObjects chunk must have a unique physical identity.")
+        known.add((source, ordinal))
+        _validate_included_payload(table)
+        read_object(table.get("tables"), "SOC IncludedObjects tables")
+    for occurrence in occurrences:
+        streams = _array(read_object(occurrence, "SOC occurrence").get("streams"), "SOC streams")
+        for stream in streams:
+            stream = read_object(stream, "SOC stream")
+            refs = _array(stream.get("includedObjects", []), "SOC IncludedObjects references")
+            if refs:
+                member = read_object(stream.get("member"), "SOC stream member")
+                _validate_included_refs(refs, included, member)
+
+
+def _validate_included_payload(table: dict[str, Any]) -> None:
+    raw = _present(table.get("raw"))
+    length = table.get("byteLength")
+    if not isinstance(raw, str) or not isinstance(length, str) or len(length) > 20 or not length.isascii() or not length.isdecimal():
+        raise PackageError("A SOC IncludedObjects chunk must carry its raw payload and declared length.")
+    if len(raw) != 4 * ((int(length) + 2) // 3):
+        raise PackageError("A SOC IncludedObjects payload does not match its declared length.")
+    block_size = 64 * 1024
+    decoded = 0
+    try:
+        for start in range(0, len(raw), block_size):
+            block = raw[start:start + block_size]
+            if start + block_size < len(raw) and "=" in block:
+                raise PackageError("A SOC IncludedObjects payload contains internal padding.")
+            decoded += len(base64.b64decode(block, validate=True))
+    except (binascii.Error, ValueError) as error:
+        raise PackageError("A SOC IncludedObjects payload has invalid Base64.") from error
+    if decoded != int(length):
+        raise PackageError("A SOC IncludedObjects payload does not match its declared length.")
+
+
+def _validate_included_refs(refs: list[Any], included: list[Any], member: dict[str, Any]) -> None:
+    seen = set()
+    for index in refs:
+        if type(index) is not int or not 0 <= index < len(included) or index in seen:
+            raise PackageError("A SOC IncludedObjects reference must identify a distinct chunk.")
+        if member.get("state") != "present" or included[index].get("source") != member.get("source"):
+            raise PackageError("A SOC IncludedObjects reference must belong to its stream member.")
+        seen.add(index)
 
 
 def _placement(

@@ -91,6 +91,8 @@ mod soc_scene_class_resources;
 mod soc_scene_class_sensor;
 mod soc_scene_classes;
 mod soc_scene_entities;
+mod soc_scene_included;
+mod soc_scene_included_row;
 mod soc_scene_light_classes;
 mod soc_scene_light_defaults;
 mod soc_scene_light_override;

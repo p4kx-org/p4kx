@@ -17,6 +17,7 @@ use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_classes::Classes;
+use crate::soc_scene_included::IncludedSources;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 use crate::soc_scene_rooms::{IndexedRoom, RoomRegistry};
 use crate::soc_scene_stream::{IndexedStream, Stream};
@@ -38,7 +39,7 @@ impl Occurrence {
     pub(super) fn read(
         original: &SocContainerOccurrence,
         sources: &SourceUses,
-        documents: &mut XmlDocuments<'_>,
+        (documents, included): (&mut XmlDocuments<'_>, &mut IncludedSources),
         classes: &Classes,
         cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
@@ -80,7 +81,7 @@ impl Occurrence {
             room_input.as_ref(),
             tile_ports.as_ref(),
             sources,
-            documents,
+            (documents, included),
             classes,
             cancel,
         )?;
@@ -117,7 +118,7 @@ fn streams(
     room: Option<&(SocRoomRegistry<'_>, XmlOrigin<'_>)>,
     tile_ports: Option<&TilePorts<'_>>,
     sources: &SourceUses,
-    documents: &mut XmlDocuments<'_>,
+    (documents, included): (&mut XmlDocuments<'_>, &mut IncludedSources),
     classes: &Classes,
     cancel: &CancelToken,
 ) -> Result<Vec<Stream>, SocSceneError> {
@@ -149,7 +150,13 @@ fn streams(
             if cancel.is_cancelled() {
                 return Err(SocSceneError::Cancelled);
             }
-            Stream::read(declaration, &indexed, sources, documents)
+            Stream::read(
+                declaration,
+                &indexed,
+                sources,
+                (documents, included),
+                cancel,
+            )
         })
         .collect()
 }

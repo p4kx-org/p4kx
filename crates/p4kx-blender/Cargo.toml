@@ -12,6 +12,7 @@ publish.workspace = true
 layer = "service"
 
 [dependencies]
+base64.workspace = true
 crc32c.workspace = true
 flate2.workspace = true
 p4kx-extraction.workspace = true

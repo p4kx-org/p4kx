@@ -4,13 +4,14 @@
 use std::collections::BTreeMap;
 
 use p4kx_assembly::{SocEntityIndex, SocStreamInput};
-use p4kx_extraction::{DecimalU64, EntryOrigin, SourceUses};
+use p4kx_extraction::{CancelToken, DecimalU64, EntryOrigin, SourceUses};
 use p4kx_model::{SocEntityChunk, SocEntityFile};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_entities::Entity;
+use crate::soc_scene_included::IncludedSources;
 use crate::soc_scene_occurrence::{InputState, Member, Selector};
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 use crate::soc_scene_tile_ports::TilePorts;
@@ -31,6 +32,8 @@ pub(crate) struct Stream {
     selector: Selector,
     parent: Option<SocXmlPosition>,
     member: Member<Vec<Chunk>>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    included_objects: Vec<usize>,
 }
 
 impl Stream {
@@ -38,11 +41,16 @@ impl Stream {
         stream: &SocStreamInput,
         index: &IndexedStream<'_>,
         sources: &SourceUses,
-        documents: &mut XmlDocuments<'_>,
+        (documents, included): (&mut XmlDocuments<'_>, &mut IncludedSources),
+        cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
+        let mut included_objects = Vec::new();
         let member = match &stream.member {
             Some(selection) => Member::read(selection, sources, |bytes, origin| {
                 let file = SocEntityFile::parse(bytes).map_err(|_| InputState::Invalid)?;
+                included_objects = included
+                    .bind(&file, origin, cancel)
+                    .map_err(InputState::Capture)?;
                 file.entity_chunks()
                     .map(|chunk| match chunk {
                         Ok(chunk) => Chunk::read(&chunk, index, origin, documents)
@@ -61,6 +69,7 @@ impl Stream {
                 .map(SocXmlPosition::element)
                 .transpose()?,
             member,
+            included_objects,
         })
     }
 }

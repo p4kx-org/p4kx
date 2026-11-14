@@ -91,6 +91,43 @@ with each row's original local coordinate. The document carries their common
 `sourceSetComplete`. The declaration state stays separate from the encryption
 state.
 
+## Binary placements
+
+When a selected stream has binary IncludedObjects chunks, its
+`includedObjects` indices refer to the top-level table with the same name.
+Each physical member and chunk ordinal is stored once. Two containers or
+stream declarations can refer to the same physical chunk while retaining
+their own occurrence coordinates. The chunk's `byteOffset` and
+`byteLength` are relative to the decoded SOC member. Each `raw.value`
+is the original chunk encoded as standard padded Base64.
+
+`tables` separates model, material and tint-palette slots. Each slot keeps
+its ordinal and its complete 256-byte range within the chunk. Paths retain
+empty and repeated spellings. Invalid UTF-8 or missing NUL termination has
+an explicit invalid interpretation and the original slot remains in `raw`.
+A known kind-1 placement records the original model index and byte at
+palette selector offset 172. The nullable local slot links describe
+in-range table indices. Material entries are separate declarations.
+Their presence does not establish a material override.
+
+Placement transforms retain row-major binary64 values in container space,
+with Z up and translation in metres. A nonfinite component is null in the
+numeric matrix. Its original word remains available in `raw` at the
+transform field's byte range. `prefixF64` retains the two numeric triplets
+at row offsets 4 through 51. Their role is unconfirmed. Kind-16 rows and
+unsupported or truncated tails retain their original ranges. An unmeasured layout keeps its
+opaque payload. `tables.sourceSetComplete` and `tables.value.complete`
+describe the available framing. A complete range or value carries its own
+source origin even when the rest of the table is incomplete.
+
+The source locations use `socIncludedObjects` and indices
+`[chunk ordinal, member-relative start, member-relative end]`.
+These intervals address the decoded entry. Offsets stored inside each table
+row address the chunk itself. The Blender extractor and standalone package
+validator check that each stream reference is distinct and belongs to its
+physical member. The optional hierarchy continues to render the usual scene
+meshes and lights.
+
 ## Blender package
 
 `p4kx interior package <archive> <container>... --out <folder> --authored-soc` includes the
