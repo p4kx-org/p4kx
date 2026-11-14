@@ -56,7 +56,8 @@ With `P4KX_DATA_P4K` configured, the opt-in test
 `p4kx-export` `real_archive` test binary checks the original Item slots, authored
 values, declarations and DCB provenance. Set `P4KX_EXPECT_HACKING_COMPONENTS` to
 require both chip families and at least one original modifier for a positive
-acceptance run. The test prints counts only.
+acceptance run. `P4KX_HACKING_COMPONENT_FILTER` can select a known Record path or
+an Item subtree. The test prints counts only.
 
 For a target-device check, set `P4KX_HACKABLE_DEVICE_RECORD` to the exact Record path
 of a hackable Entity with a resolved hacking outcome state. With the same Archive

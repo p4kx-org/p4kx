@@ -41,7 +41,11 @@ fn hacking_chip_components_match_actual_item_slots_and_modifier_sources() -> Tes
     let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
     let watch = ArchiveWatch::new(&archive);
     let entry = DataForgeEntry::read(&archive).map_err(|_| "read configured DataForge")?;
-    let filter = Filter::new(components::FILTER);
+    let filter = std::env::var("P4KX_HACKING_COMPONENT_FILTER")
+        .ok()
+        .map(|filter| Filter::parse(&filter).map_err(|_| "invalid hacking component scope"))
+        .transpose()?
+        .unwrap_or_else(|| Filter::new(components::FILTER));
     let options = CatalogOptions {
         filter: Some(&filter),
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
