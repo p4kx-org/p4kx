@@ -45,8 +45,8 @@ impl<'a> Output<'a> {
         self.root.path().join(file)
     }
 
-    pub(super) fn check_cancel(&self) -> PackageResult<()> {
-        self.context.check()
+    pub(super) const fn write_context(&self) -> PackageWriteContext<'a> {
+        self.context
     }
 
     pub(super) fn check(&self) -> PackageResult<()> {

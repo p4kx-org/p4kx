@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::{self, BufWriter, Write};
 use std::path::Path;
 
-use p4kx_assembly::BodyVariant;
+use p4kx_assembly::{BodyVariant, SocCaptureError};
 use p4kx_extraction::{
     Archive, ArchiveWatch, CancelToken, DecimalU64, OriginDigestWriter, PhysicalSourceRef,
 };
@@ -14,9 +14,11 @@ use p4kx_guard::ArchiveWriteProtection;
 
 use crate::player_bundle_output::Output;
 use crate::player_bundle_wire::{self as wire, Artifact, Manifest, Row, Stream, Totals};
+use crate::soc_scene::SocSceneError;
+use crate::stoppable::{self, Stoppable};
 use crate::{
     PackageError, PackageResult, PackageWriteContext, PlayerDocument, PlayerDocumentSink,
-    PlayerSourceCapture, RejectedPlayerDocument,
+    PlayerSourceCapture, PlayerSourceError, RejectedPlayerDocument,
 };
 
 type Writer = OriginDigestWriter<BufWriter<File>>;
@@ -49,9 +51,14 @@ fn assemble(
     let watch = ArchiveWatch::new(archive);
     let records = output.path(wire::RECORDS);
     let writer = output.file(wire::RECORDS)?;
+    let context = output.write_context();
     let mut sink = Capture {
         output,
-        rows: Rows { writer, count: 0 },
+        rows: Rows {
+            writer,
+            context,
+            count: 0,
+        },
         artifacts: BTreeMap::new(),
         bytes: 0,
     };
@@ -60,12 +67,12 @@ fn assemble(
             format: wire::FORMAT,
             schema_version: wire::VERSION,
         })
-        .map_err(|e| PackageError::write(&records, e))?;
+        .map_err(|e| write_error(&records, e))?;
     let capture = PlayerSourceCapture::read(archive, bodies, cancel, &mut sink)
-        .map_err(|e| PackageError::write(&records, io::Error::other(e)))?;
+        .map_err(|e| capture_error(&records, e))?;
     let (writer, row_count, raw_artifacts) = sink
         .finish(&capture)
-        .map_err(|e| PackageError::write(&records, e))?;
+        .map_err(|e| write_error(&records, e))?;
     let digest = output.complete_file(&records, writer)?;
     watch
         .check()
@@ -83,15 +90,17 @@ fn assemble(
     })
 }
 
-struct Rows {
+struct Rows<'context> {
     writer: Writer,
+    context: PackageWriteContext<'context>,
     count: u64,
 }
 
-impl Rows {
+impl Rows<'_> {
     fn push(&mut self, row: &Row<'_>) -> io::Result<()> {
-        serde_json::to_writer(&mut self.writer, row)?;
-        self.writer.write_all(b"\n")?;
+        let mut writer = Stoppable::new(&mut self.writer, &self.context);
+        serde_json::to_writer(&mut writer, row)?;
+        writer.write_all(b"\n")?;
         self.count = checked_add(self.count, 1)?;
         Ok(())
     }
@@ -99,7 +108,7 @@ impl Rows {
 
 struct Capture<'writer, 'context> {
     output: &'writer mut Output<'context>,
-    rows: Rows,
+    rows: Rows<'context>,
     artifacts: BTreeMap<PhysicalSourceRef, Artifact>,
     bytes: u64,
 }
@@ -115,7 +124,7 @@ impl Capture<'_, '_> {
         let mut file = self.output.file(&path).map_err(io::Error::other)?;
         let mut crc = 0;
         for block in bytes.chunks(256 * 1024) {
-            self.output.check_cancel().map_err(io::Error::other)?;
+            self.rows.context.check().map_err(io::Error::other)?;
             file.write_all(block)?;
             crc = crc32c::crc32c_append(crc, block);
         }
@@ -133,10 +142,7 @@ impl Capture<'_, '_> {
     }
 
     fn finish(mut self, capture: &PlayerSourceCapture) -> io::Result<(Writer, u64, Totals)> {
-        super::player_bundle_rows::write(capture, |row| {
-            self.output.check_cancel().map_err(io::Error::other)?;
-            self.rows.push(row)
-        })?;
+        super::player_bundle_rows::write(capture, |row| self.rows.push(row))?;
         let totals = Totals {
             count: DecimalU64::new(self.artifacts.len() as u64),
             byte_length: DecimalU64::new(self.bytes),
@@ -181,7 +187,35 @@ impl PlayerDocumentSink for Capture<'_, '_> {
     }
 }
 
+fn capture_error(path: &Path, error: PlayerSourceError) -> PackageError {
+    match error {
+        PlayerSourceError::Cancelled
+        | PlayerSourceError::Capture(SocCaptureError::Cancelled)
+        | PlayerSourceError::Xml(
+            SocSceneError::Cancelled | SocSceneError::Capture(SocCaptureError::Cancelled),
+        ) => PackageError::Cancelled,
+        PlayerSourceError::Xml(SocSceneError::DocumentSink(ref cause))
+            if stoppable::is_cancelled(cause) =>
+        {
+            PackageError::Cancelled
+        }
+        _ => PackageError::write(path, io::Error::other(error)),
+    }
+}
+
+fn write_error(path: &Path, error: io::Error) -> PackageError {
+    if stoppable::is_cancelled(&error) {
+        PackageError::Cancelled
+    } else {
+        PackageError::write(path, error)
+    }
+}
+
 fn checked_add(left: u64, right: u64) -> io::Result<u64> {
     left.checked_add(right)
         .ok_or_else(|| io::Error::other("Player bundle counter exceeds u64"))
 }
+
+#[cfg(test)]
+#[path = "player_bundle_cancellation_tests.rs"]
+mod cancellation_tests;
