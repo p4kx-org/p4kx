@@ -8,7 +8,7 @@ use crate::HealthText;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::SourceDisposition;
 
-use super::{BlueprintPool, ExportLedger, Guid, Kind, RewardSource, Scanned};
+use super::{BlueprintPool, Guid, Kind, RewardAccumulator, RewardSearch, RewardSource};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -23,30 +23,35 @@ fn source(path: &str) -> RewardSource<'_> {
     }
 }
 
-fn read<'f>(type_name: &'f str, sources: Vec<RewardSource<'f>>) -> Scanned<'f> {
-    Scanned::Read {
-        type_name,
-        sources,
-        ledger: ExportLedger::default(),
+fn gathered<'f>(
+    readable: &[(&'f str, &[&'f str])],
+    unreadable: &[Option<&'f str>],
+) -> RewardSearch<'f> {
+    let mut found = RewardAccumulator::default();
+    for (name, paths) in readable {
+        found.collect_placements(name, |sources| {
+            sources.extend(paths.iter().map(|path| source(path)));
+        });
     }
-}
-
-fn failed(type_name: &str) -> Scanned<'_> {
-    Scanned::Failed {
-        type_name: Some(type_name),
-        ledger: ExportLedger::default(),
+    let mut failures = RewardAccumulator::default();
+    for &name in unreadable {
+        failures.fail(name);
     }
+    found.append(failures);
+    found.finish()
 }
 
 #[test]
 fn an_unreadable_record_counts_only_when_its_type_holds_a_source_elsewhere() {
-    let search = super::gather(vec![
-        read("ContractGenerator", vec![source("a"), source("b")]),
-        failed("ContractGenerator"),
-        failed("ContractGenerator"),
-        failed("ShipLoadout"),
-        read("Nothing", Vec::new()),
-    ]);
+    let search = gathered(
+        &[("ContractGenerator", &["a", "b"]), ("Nothing", &[])],
+        &[
+            Some("ContractGenerator"),
+            Some("ContractGenerator"),
+            Some("ShipLoadout"),
+            None,
+        ],
+    );
     assert_eq!(
         search.unreadable, 2,
         "the unrelated type is not in the compatibility warning"
@@ -60,13 +65,17 @@ fn an_unreadable_record_counts_only_when_its_type_holds_a_source_elsewhere() {
 
 #[test]
 fn without_any_source_every_unreadable_record_counts() {
-    let search = super::gather(vec![
-        failed("ContractGenerator"),
-        failed("ShipLoadout"),
-        read("Nothing", Vec::new()),
-    ]);
+    let search = gathered(
+        &[("Nothing", &[])],
+        &[
+            Some("ContractGenerator"),
+            Some("ShipLoadout"),
+            None,
+            Some(""),
+        ],
+    );
     assert_eq!(
-        search.unreadable, 2,
+        search.unreadable, 4,
         "any failed Record could hold an undiscovered source"
     );
     assert!(
@@ -77,7 +86,7 @@ fn without_any_source_every_unreadable_record_counts() {
 
 #[test]
 fn records_without_a_type_name_do_not_match_each_other() {
-    let search = super::gather(vec![read("", vec![source("a")]), failed("")]);
+    let search = gathered(&[("", &["a"])], &[Some("")]);
     assert_eq!(
         search.unreadable, 0,
         "an unavailable type is not positive type evidence"
@@ -86,11 +95,14 @@ fn records_without_a_type_name_do_not_match_each_other() {
 
 #[test]
 fn sources_keep_the_order_of_the_records() {
-    let search = super::gather(vec![
-        read("A", vec![source("first")]),
-        read("Nothing", Vec::new()),
-        read("B", vec![source("second"), source("third")]),
-    ]);
+    let search = gathered(
+        &[
+            ("A", &["first"]),
+            ("Nothing", &[]),
+            ("B", &["second", "third"]),
+        ],
+        &[],
+    );
     let paths: Vec<_> = search
         .sources
         .iter()
@@ -107,13 +119,18 @@ const POOL: u128 = 0x6600_0000_0000_4000_8000_0000_0000_0010;
 const CONTRACT: u128 = POOL + 1;
 
 fn rewards() -> Vec<u8> {
-    let reward = || {
-        TestValue::Struct(
-            TestInstance::new("Reward")
-                .value("pool", TestValue::Reference(POOL))
-                .value("chance", TestValue::Single(0.5)),
-        )
-    };
+    rewards_fixture().build()
+}
+
+fn reward(chance: f32) -> TestValue {
+    TestValue::Struct(
+        TestInstance::new("Reward")
+            .value("pool", TestValue::Reference(POOL))
+            .value("chance", TestValue::Single(chance)),
+    )
+}
+
+fn rewards_fixture() -> DataForgeBuilder {
     DataForgeBuilder::new()
         .structure(TestStruct::new("Pool"))
         .structure(
@@ -137,9 +154,8 @@ fn rewards() -> Vec<u8> {
                 "Contract.Synthetic",
                 "synthetic/contract.xml",
             )
-            .value("rewards", TestValue::Array(vec![reward(), reward()])),
+            .value("rewards", TestValue::Array(vec![reward(0.5), reward(0.5)])),
         )
-        .build()
 }
 
 #[test]
@@ -272,3 +288,6 @@ fn unreadable_field_leaves_are_retained_even_without_reward_rows() -> TestResult
     );
     Ok(())
 }
+
+#[path = "reward_parity_tests.rs"]
+mod parity;
