@@ -36,6 +36,7 @@ pub(crate) enum CommoditySelection {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CommodityPresentation {
+    /// The Commodity identity, matching the source GUID in the definitions table.
     pub(crate) commodity_guid: SourcedValue<CatalogGuid>,
     pub(crate) name: SourcedValue<Option<PublicNameRef>>,
     #[schemars(extend("x-gameText" = true))]
@@ -43,6 +44,7 @@ pub(crate) struct CommodityPresentation {
     #[schemars(extend("x-gameText" = true))]
     pub(crate) display_type: SourcedValue<Option<GameTextRef>>,
     pub(crate) type_guid: SourcedValue<Option<CatalogGuid>>,
+    /// The nullable ResourceType link shared by zero, one or several commodities per target.
     pub(crate) subtype_guid: SourcedValue<Option<CatalogGuid>>,
     pub(crate) density_grams_per_cubic_centimetre: SourcedValue<Option<f32>>,
     pub(crate) refined_subtype_guid: SourcedValue<Option<CatalogGuid>>,

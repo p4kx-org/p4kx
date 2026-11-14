@@ -7549,7 +7549,8 @@
       "description": "The established Commodity choices independently of their authored input facts.",
       "properties": {
         "commodityGuid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The Commodity identity, matching the source GUID in the definitions table."
         },
         "densityGramsPerCubicCentimetre": {
           "$ref": "#/$defs/SourcedValueOfNullable_float"
@@ -7569,7 +7570,8 @@
           "$ref": "#/$defs/SourcedValueOfNullable_Guid"
         },
         "subtypeGuid": {
-          "$ref": "#/$defs/SourcedValueOfNullable_Guid"
+          "$ref": "#/$defs/SourcedValueOfNullable_Guid",
+          "description": "The nullable ResourceType link shared by zero, one or several commodities per target."
         },
         "typeGuid": {
           "$ref": "#/$defs/SourcedValueOfNullable_Guid"
