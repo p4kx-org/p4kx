@@ -374,3 +374,47 @@ the export. P4KX exports the segment geometry and source GUID links in
 [#1129](https://github.com/p4kx-org/p4kx/issues/1129). A consumer can compute
 inclusion from those inputs when it needs it.
 [Upstream containment helper](https://github.com/diogotr7/StarBreaker/blob/14ae2d9979af1f39f0299ccda1933e0f988beaa2/crates/starbreaker-3d/src/socpak/room_containment.rs).
+
+### Merged source verification
+
+GitHub merged PR #54 as [`305215bca`](https://github.com/diogotr7/StarBreaker/commit/305215bca75350013c221bdfbcb2f8180fe09dbe).
+Both the merge and the audited head `14ae2d99` resolve to Git tree
+`294754f1b9e0951ee00e3e3a57227fa7995e10fd`. The squash changed the commit
+identity while keeping the source tree identical. The upstream runtime
+evidence in the PR covers its named LIVE build. GitHub still lists
+[v0.3.2](https://github.com/diogotr7/StarBreaker/releases/tag/v0.3.2) as the latest
+published release. Use the merge commit when identifying a matching source build
+for a differential comparison.
+[Pull request](https://github.com/diogotr7/StarBreaker/pull/54)
+
+The integration recheck at `2796853dd` found a concrete join still missing
+from [#1092](https://github.com/p4kx-org/p4kx/issues/1092). A static package
+lists the original geometry material IDs together for each dense GLB material.
+For a single-material library or the archive fallback, multiple source IDs can
+share a single dense index. Each emitted GLB primitive carries only that dense
+index. The layout drops the source submesh ordinal while selecting valid,
+visible primitives. The vertex map binds the mesh and POSITION order to the
+physical source. It contains no primitive binding. Rigged meshes keep their
+materials inside the GLB and need the same primitive-level link.
+[P4KX layout](../crates/p4kx-gltf/src/layout.rs) · [GLB writer](../crates/p4kx-gltf/src/document.rs) · [Package mesh types](../crates/p4kx-blender/src/manifest_mesh.rs)
+
+Preserve the source row identity from layout selection through emission.
+Use the emitted GLB mesh and primitive ordinal and optional dense material index
+as the output coordinates. Resolve the physical model entry, chunk and source
+submesh row independently from the material library and slot used for drawing.
+The existing Model Media export already retains the source row ID, node ID,
+material ID and first-index/count fields with their original evidence. Reuse
+those coordinates and the field-origin contract. Keep absent or unavailable
+identities explicit when a transformation loses the correspondence. Verify
+sparse and repeated slots, a hidden preceding submesh, shared fallback,
+deduplicated instances and rigged parts. Validate geometry/material assignment
+in Blender separately from the source evidence.
+[Model Media submesh rows](../crates/p4kx-media/src/model_source/mesh_submeshes.rs) · [StarBreaker material order](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/gltf/glb_builder.rs)
+
+The remaining comparison work already has owners. The lazy clip inventory and
+independent rig contributions stay with #1093. Scoped animation graph, event
+bindings and player variants stay with #1094, #1095 and #1131. Physical
+collision fidelity and typed emission remain in #1128 and #1133. The merge
+introduced no additional archive, audio or DataForge format change beyond the
+previously reviewed tree. The release and source revision remain separate
+producer identities for [#1104](https://github.com/p4kx-org/p4kx/issues/1104).
