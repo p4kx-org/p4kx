@@ -11,7 +11,7 @@ use p4kx_model::MaterialStatus;
 use crate::build_models::Loaded;
 use crate::flatten::Draft;
 use crate::geometry::PaletteReferenceSource;
-use crate::palette::ChosenPalette;
+use crate::palette::{ChosenPalette, material_default_location};
 use crate::{
     Geometry, IssueKind, PaletteFailure, PaletteProvider, PaletteRecords, PaletteSelection,
     PaletteSource,
@@ -187,19 +187,19 @@ impl<'p> Palettes<'p> {
     fn library_default(
         &mut self,
         provider: &dyn PaletteProvider,
-        (status, library): (&MaterialStatus, Option<&EntryOrigin>),
+        (status, original): (&MaterialStatus, Option<&EntryOrigin>),
         issues: &mut Vec<IssueKind>,
     ) -> Option<ChosenPalette> {
-        let path = status
-            .library()
-            .and_then(|library| library.default_palette.as_deref())?;
+        let library = status.library()?;
+        let path = library.default_palette.as_deref()?;
         let what = format!("the default tint palette {path} of the material library");
         match provider.guid_at_observed(path).and_then(|selector| {
             let mut chosen = self.read(provider, selector.value)?;
             chosen.source.records.selector = selector.record;
             chosen.source.selection = PaletteSelection::MaterialDefault {
-                library: library.cloned().map(Arc::new),
+                library: original.cloned().map(Arc::new),
             };
+            chosen.source.material_default_location = material_default_location(library);
             Ok(chosen)
         }) {
             Ok(palette) => Some(palette),
@@ -223,6 +223,7 @@ impl<'p> Palettes<'p> {
                         },
                         forge_origin: self.forge_origin.clone(),
                         named_origin: None,
+                        material_default_location: None,
                         selection: PaletteSelection::Named { location: None },
                         ancestor: None,
                     },

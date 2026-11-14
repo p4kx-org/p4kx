@@ -17,7 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from . import collision_helpers as collisions
-from . import material_source
+from . import material_source, palette_provenance
 from . import ddna_pair
 from .glb_preflight import check_glb as check_glb
 from .manifest_fields import (
@@ -150,6 +150,7 @@ def parse_manifest(data: object, root: Path) -> Package:
     nodes = parse_nodes(
         manifest.get("nodes"), {mesh_id: mesh.rig is not None for mesh_id, mesh in meshes.items()}, warnings
     )
+    palette_provenance.validate(manifest.get("palette_provenance"), manifest)
     return Package(
         root=root,
         version=version,

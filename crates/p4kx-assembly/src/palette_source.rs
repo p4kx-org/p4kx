@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use p4kx_dataforge::{Guid, Record};
 use p4kx_extraction::{DataForgeOrigin, EntryOrigin, SourceLocation};
-use p4kx_model::TintPalette;
+use p4kx_model::{AuthoredAttributeKind, MaterialLibrary, TintPalette};
 
 /// The physical DataForge Record selected by a palette lookup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -78,6 +78,7 @@ pub struct PaletteSource {
     pub(crate) records: PaletteRecords,
     pub(crate) forge_origin: Option<Arc<DataForgeOrigin>>,
     pub(crate) named_origin: Option<Arc<DataForgeOrigin>>,
+    pub(crate) material_default_location: Option<SourceLocation>,
     pub(crate) selection: PaletteSelection,
     pub(crate) ancestor: Option<usize>,
 }
@@ -101,6 +102,12 @@ impl PaletteSource {
         self.named_origin.as_deref()
     }
 
+    /// Returns the authored root declaration that supplied the material's default palette path.
+    #[must_use]
+    pub const fn material_default_location(&self) -> Option<&SourceLocation> {
+        self.material_default_location.as_ref()
+    }
+
     /// Returns the authored selection which chose this palette.
     #[must_use]
     pub const fn selection(&self) -> &PaletteSelection {
@@ -112,6 +119,23 @@ impl PaletteSource {
     pub const fn inherited_from(&self) -> Option<usize> {
         self.ancestor
     }
+}
+
+pub(crate) fn material_default_location(library: &MaterialLibrary) -> Option<SourceLocation> {
+    let root = library.authored.root.as_ref()?;
+    let position = root.authored.attributes.iter().position(|attribute| {
+        attribute.name == "DefaultPalette"
+            && matches!(
+                attribute.kind,
+                AuthoredAttributeKind::Attribute { namespace: None }
+            )
+            && library.default_palette.as_deref() == Some(attribute.value.as_str())
+    })?;
+    Some(SourceLocation::Subresource {
+        namespace: "materialXmlDeclaration".into(),
+        indices: vec![position as u64],
+        field: "DefaultPalette".into(),
+    })
 }
 
 #[derive(Debug, Clone)]

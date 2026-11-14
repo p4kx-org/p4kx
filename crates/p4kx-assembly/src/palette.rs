@@ -11,7 +11,7 @@ use crate::read::{as_struct, struct_field, text, unsigned};
 #[path = "palette_source.rs"]
 mod source;
 
-pub(crate) use source::ChosenPalette;
+pub(crate) use source::{ChosenPalette, material_default_location};
 pub use source::{
     PaletteRead, PaletteRecordSelection, PaletteRecords, PaletteSelection, PaletteSource,
 };

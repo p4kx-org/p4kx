@@ -132,6 +132,9 @@ pub enum PackageError {
     /// Original physical inputs for an emitted material control could not be recorded.
     #[error("cannot record package material emission evidence")]
     MaterialEmissionEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
+    /// Original tint palette or selection evidence could not be recorded.
+    #[error("cannot record package tint palette evidence")]
+    PaletteEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),
     /// Original entity classification evidence could not be recorded.
     #[error("cannot record package entity classification")]
     EntityEvidence(#[source] Box<dyn std::error::Error + Send + Sync>),

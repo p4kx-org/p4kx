@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::package_light_placements::PlacedLight;
-use p4kx_assembly::{Assembly, INTERIOR_NODE, Interior, InteriorPart, InteriorPartKind, Part};
+use p4kx_assembly::{
+    Assembly, INTERIOR_NODE, Interior, InteriorPart, InteriorPartKind, PaletteSource, Part,
+};
 use p4kx_extraction::{EntryOrigin, ModelArchiveSource};
 use p4kx_gltf::{NodeTransform, SceneLight, light_node_transform, node_transform};
 use p4kx_model::{MaterialStatus, Model, TintPalette, Transform};
@@ -17,6 +19,8 @@ pub(crate) struct Drawn<'a> {
     pub(crate) materials: &'a MaterialStatus,
     pub(crate) material_entry: Option<&'a EntryOrigin>,
     pub(crate) palette: Option<&'a TintPalette>,
+    pub(crate) palette_source: Option<&'a PaletteSource>,
+    pub(crate) palette_parent: Option<usize>,
     pub(crate) label: &'a str,
 }
 
@@ -152,6 +156,8 @@ fn push_attachments<'a>(items: &mut Vec<Item<'a>>, assembly: &'a Assembly) {
                 materials: attached.materials(),
                 material_entry: attached.material_archive_origins().library(),
                 palette: part.and_then(Part::palette),
+                palette_source: part.and_then(Part::palette_source),
+                palette_parent: Some(index),
                 label: attached.name(),
             }),
             light: None,
@@ -184,6 +190,10 @@ fn part_item(part: &Part) -> Item<'_> {
             materials: part.materials(),
             material_entry: part.material_archive_origins().library(),
             palette: part.palette(),
+            palette_source: part.palette_source(),
+            palette_parent: part
+                .palette_source()
+                .and_then(PaletteSource::inherited_from),
             label: part.class_name(),
         }),
         light: None,
@@ -221,6 +231,8 @@ fn interior_item<'a>(
             materials: part.materials(),
             material_entry: part.material_archive_origins().library(),
             palette: part.palette(),
+            palette_source: part.palette_source(),
+            palette_parent: None,
             label: part.name(),
         }),
         light,

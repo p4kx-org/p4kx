@@ -12,13 +12,10 @@ from typing import Any
 import zlib
 
 from .manifest_fields import PackageError, read_array, read_object
+from .source_evidence import SourceEvidence, follows_pointer
 
 _FORMAT = "p4kx-blender-material-source"
 _VERSION = 1
-_ENCRYPTION = ("encrypted", "unencrypted", "unknown")
-_ROLES = ("payload", "selector", "conversion", "attempted", "reference")
-_CONTRIBUTORS = ("payload", "selector", "conversion")
-_SCOPES = ("payload", "archiveDirectoryMetadata", "fileMetadata")
 
 
 def parse_refs(value: object) -> dict[int, str]:
@@ -64,8 +61,7 @@ class _Source:
         self.started = False
         self.ended = False
         self.authored: dict[str, Any] = {}
-        self.sources: dict[str, tuple[str, ...]] = {}
-        self.uses: dict[str, tuple[str, str]] = {}
+        self.evidence = SourceEvidence("authored material")
         self.paths: set[str] = set()
         self.phase = 0
 
@@ -86,10 +82,10 @@ class _Source:
             read_object(row["authored"], "authored material library")
             self.phase = 1
         elif kind == "source" and self.phase == 1:
-            self.source(read_object(row.get("source"), "material physical source"))
+            self.evidence.source(read_object(row.get("source"), "material physical source"))
         elif kind == "sourceUse" and self.phase <= 2:
             self.phase = 2
-            self.source_use(read_object(row.get("sourceUse"), "material source use"))
+            self.evidence.source_use(read_object(row.get("sourceUse"), "material source use"))
         elif kind == "field":
             self.phase = 3
             self.field(row)
@@ -98,85 +94,26 @@ class _Source:
         else:
             raise PackageError("The authored material rows are out of order.")
 
-    def source(self, source: dict[str, Any]) -> None:
-        identity = source.get("id")
-        ancestors = source.get("ancestors")
-        if (
-            not _identity(identity) or identity in self.sources
-            or not isinstance(ancestors, list) or any(not _identity(value) for value in ancestors)
-            or len(set(ancestors)) != len(ancestors) or identity in ancestors
-            or source.get("storedEncryption") not in _ENCRYPTION
-        ):
-            raise PackageError("An authored material physical source is malformed or duplicated.")
-        self.sources[identity] = tuple(ancestors)
-
-    def source_use(self, use: dict[str, Any]) -> None:
-        identity = use.get("id")
-        source = use.get("source")
-        scope = use.get("scope")
-        role = use.get("role")
-        encryption = use.get("effectiveEncryption")
-        if (
-            not _identity(identity) or identity in self.uses or not _identity(source) or source not in self.sources
-            or scope not in _SCOPES or role not in _ROLES or encryption not in _ENCRYPTION
-            or not isinstance(use.get("location"), dict)
-        ):
-            raise PackageError("An authored material source use is malformed or duplicated.")
-        self.uses[identity] = role, encryption
-
     def field(self, row: dict[str, Any]) -> None:
         if row.keys() != {"type", "path", "containsEncryptedSource", "sourceSetComplete", "sourceUsesRefs"}:
             raise PackageError("An authored material field is malformed.")
         path = row["path"]
-        if not isinstance(path, str) or path in self.paths or not _follows(self.authored, path):
-            raise PackageError("An authored material field path is unresolved or duplicated.")
-        references = row["sourceUsesRefs"]
         if (
-            not isinstance(references, list)
-            or any(not _identity(ref) or ref not in self.uses for ref in references)
-            or len(set(references)) != len(references)
-            or any(self.uses[ref][0] not in _CONTRIBUTORS for ref in references)
+            not isinstance(path, str) or path in self.paths or not follows_pointer(self.authored, path)
+            or (path != "/authored" and not path.startswith("/authored/"))
         ):
-            raise PackageError("An authored material field has unresolved contributor references.")
-        complete = row["sourceSetComplete"]
-        if type(complete) is not bool:
-            raise PackageError("An authored material field has an invalid completeness marker.")
-        encryption = {self.uses[ref][1] for ref in references}
-        marker = True if "encrypted" in encryption else False if complete and "unknown" not in encryption else None
-        if row["containsEncryptedSource"] is not marker:
-            raise PackageError("An authored material field encryption marker differs from its sources.")
+            raise PackageError("An authored material field path is unresolved or duplicated.")
+        self.evidence.check_origin({
+            key: value for key, value in row.items() if key not in {"type", "path"}
+        })
         self.paths.add(path)
 
     def end(self, row: dict[str, Any]) -> None:
-        counts = {"sources": len(self.sources), "uses": len(self.uses), "fields": len(self.paths)}
+        counts = {"sources": len(self.evidence.sources), "uses": len(self.evidence.uses), "fields": len(self.paths)}
         if (
             row.keys() != {*counts, "type"}
             or any(type(row.get(name)) is not int or row[name] != count for name, count in counts.items())
-            or any(ancestor not in self.sources for ancestors in self.sources.values() for ancestor in ancestors)
         ):
             raise PackageError("The authored material source counts or identities are incomplete.")
+        self.evidence.check_ancestors()
         self.ended = True
-
-
-def _identity(value: Any) -> bool:
-    return isinstance(value, str) and bool(value)
-
-
-def _follows(value: Any, pointer: str) -> bool:
-    if pointer != "/authored" and not pointer.startswith("/authored/"):
-        return False
-    for part in pointer.split("/")[1:]:
-        if "~" in part.replace("~0", "").replace("~1", ""):
-            return False
-        key = part.replace("~1", "/").replace("~0", "~")
-        if isinstance(value, dict) and key in value:
-            value = value[key]
-        elif (
-            isinstance(value, list) and key.isascii() and key.isdecimal()
-            and (key == "0" or not key.startswith("0"))
-            and len(key) <= len(str(len(value))) and int(key) < len(value)
-        ):
-            value = value[int(key)]
-        else:
-            return False
-    return True

@@ -152,6 +152,10 @@ pub struct Manifest {
     /// The tint palettes of the meshes, each written once; absent in version 1.0.
     #[serde(default)]
     pub palettes: Vec<Palette>,
+    /// Node-local selections and per-field physical inputs for rendered palette values.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<crate::package_palette_provenance::PaletteProvenance>")]
+    pub palette_provenance: Option<serde_json::Value>,
     /// The optional authored SOC scene companion.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authored_soc: Option<crate::ManifestSocScene>,

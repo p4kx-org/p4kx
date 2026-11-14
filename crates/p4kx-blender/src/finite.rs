@@ -193,6 +193,7 @@ pub(super) mod tests {
             materials: Vec::new(),
             material_libraries: Vec::new(),
             palettes: Vec::new(),
+            palette_provenance: None,
             authored_soc: None,
             collision_helpers: None,
             default_material: None,

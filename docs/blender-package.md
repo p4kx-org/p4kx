@@ -194,6 +194,7 @@ written (there are no `null`s).
 | `material_libraries` | Original authored library-root descriptions (1.9), once per distinct retained reader path/root; optional and default-empty for older manifests. |
 | `default_material` | The optional physical Archive fallback lookup for material IDs that need one, see "Meshes". |
 | `palettes` | The tint palettes, see "Palettes". Added in 1.1; absent in 1.0 packages. |
+| `palette_provenance` | Optional source proof for palette fields and each node's selection. |
 | `issues` | What could not be resolved or written. |
 
 `format`, `basis`, `unit`, `Texture.format`, `colour_space`, `alpha`, `Node.kind`,
@@ -597,6 +598,22 @@ opacity is the strongest of the three masks (before `stencil.opacity` and the ma
 `opacity`). Without a `decal` in the palette the decal keeps its `stencil.colour` and the red
 channel as its opacity. Which colour a decal with `StencilTintOverride` 1 takes, and the order of
 overlapping masks, are not settled by the game data, see ADR-0310.
+
+The optional `palette_provenance` object in 1.20 separates the origin of a palette value from
+the action of selecting it. Its `payloads` refer to `palettes` by ordinal. Each carries
+`fieldOrigins` keyed by JSON Pointers into that palette, including separate entries for each
+RGB channel and glossiness. The RGB uses point to the original DataForge fields converted from
+8-bit sRGB to linear values, and glossiness is the original unsigned value represented as a
+float. A missing coordinate stays incomplete. Equal rendered values may refer to different
+physical Records without duplicating their rendered palette.
+
+The `bindings` join an original `nodes` ordinal to `payloads` and `selections` by ordinal.
+An inherited binding identifies its supplying node with `inheritedFrom`. A selection has its
+own immediate origin and can identify a separate DataForge path lookup. The named geometry,
+original material root declaration, and palette payload may come from distinct inputs.
+The source-use references resolve in this object's shared `sourceInventory`. Readers can
+use the payload origins to filter numeric values and the selection origins to filter which
+palette was applied to a node.
 
 ### Issues
 

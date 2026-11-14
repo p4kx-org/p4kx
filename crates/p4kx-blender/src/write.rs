@@ -296,6 +296,8 @@ fn write_scene_files(
     });
     let authored_soc_file =
         complete_manifest(&mut manifest, scene, fallback.as_deref(), staging, context)?;
+    manifest.palette_provenance =
+        crate::package_palette_provenance::capture(items, &plan, &collected, context)?;
     let summary = summarise(&manifest, &outcomes, &written);
     let mut files = package_receipt::scene_files(written, &outcomes, authored_soc_file);
     files.append(&mut authored_files);

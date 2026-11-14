@@ -318,6 +318,40 @@
         }
       ]
     },
+    "Binding": {
+      "additionalProperties": false,
+      "properties": {
+        "inheritedFrom": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "node": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "payload": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "selection": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "node",
+        "payload",
+        "selection"
+      ],
+      "type": "object"
+    },
     "BuildInfo": {
       "description": "The Build of the Archive a package was made from, as its build manifest states it.",
       "properties": {
@@ -2282,6 +2316,16 @@
       ],
       "type": "string"
     },
+    "Kind2": {
+      "enum": [
+        "named",
+        "materialDefault",
+        "includedPath",
+        "socEntity",
+        "unknown"
+      ],
+      "type": "string"
+    },
     "Light": {
       "description": "A punctual light at a node of the kind `light`.\n\nThe node's transform is already turned so that the light shines along its local -Z axis, as\nglTF and Blender lights do.",
       "properties": {
@@ -2461,6 +2505,22 @@
         "effect",
         "ordinal",
         "selection"
+      ],
+      "type": "object"
+    },
+    "Lookup": {
+      "additionalProperties": false,
+      "properties": {
+        "origin": {
+          "$ref": "#/$defs/FieldOrigin"
+        },
+        "record": {
+          "$ref": "#/$defs/Record"
+        }
+      },
+      "required": [
+        "record",
+        "origin"
       ],
       "type": "object"
     },
@@ -4043,6 +4103,39 @@
         }
       ]
     },
+    "PaletteProvenance": {
+      "additionalProperties": false,
+      "properties": {
+        "bindings": {
+          "items": {
+            "$ref": "#/$defs/Binding"
+          },
+          "type": "array"
+        },
+        "payloads": {
+          "items": {
+            "$ref": "#/$defs/Payload"
+          },
+          "type": "array"
+        },
+        "selections": {
+          "items": {
+            "$ref": "#/$defs/Selection2"
+          },
+          "type": "array"
+        },
+        "sourceInventory": {
+          "$ref": "#/$defs/SourceInventory"
+        }
+      },
+      "required": [
+        "payloads",
+        "selections",
+        "bindings",
+        "sourceInventory"
+      ],
+      "type": "object"
+    },
     "Parameter": {
       "description": "A name and a value as the material file gives them.",
       "properties": {
@@ -4058,6 +4151,34 @@
       "required": [
         "name",
         "value"
+      ],
+      "type": "object"
+    },
+    "Payload": {
+      "additionalProperties": false,
+      "properties": {
+        "fieldOrigins": {
+          "$ref": "#/$defs/FieldOrigins"
+        },
+        "palette": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "record": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Record"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "palette",
+        "fieldOrigins"
       ],
       "type": "object"
     },
@@ -4185,6 +4306,28 @@
       "required": [
         "name",
         "interaction_offset"
+      ],
+      "type": "object"
+    },
+    "Record": {
+      "additionalProperties": false,
+      "properties": {
+        "guid": {
+          "type": "string"
+        },
+        "guidOrigin": {
+          "$ref": "#/$defs/FieldOrigin"
+        },
+        "index": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "index",
+        "guid",
+        "guidOrigin"
       ],
       "type": "object"
     },
@@ -4483,6 +4626,32 @@
           "type": "object"
         }
       ]
+    },
+    "Selection2": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/Kind2"
+        },
+        "lookup": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Lookup"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selector": {
+          "$ref": "#/$defs/FieldOrigin"
+        }
+      },
+      "required": [
+        "kind",
+        "selector"
+      ],
+      "type": "object"
     },
     "Source": {
       "description": "Where a package comes from.",
@@ -6690,6 +6859,17 @@
     "options": {
       "$ref": "#/$defs/Options",
       "description": "The choices the package was written with."
+    },
+    "palette_provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PaletteProvenance"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "description": "Node-local selections and per-field physical inputs for rendered palette values."
     },
     "palettes": {
       "default": [],
