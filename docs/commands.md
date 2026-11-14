@@ -425,7 +425,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   See [Action-map origins](source-origin.md#action-map-exports).
 - `p4kx media export <archive> --out <directory> [--kind <kind>] [--filter <filter>]
   [--exclude <filter>] [--conflict skip|overwrite|if-changed] [--audio-format raw|wav|ogg]
-  [--animation-skeleton <entry>] [--diagnostic]` writes the
+  [--animation-skeleton <entry>] [--animation-entity <entity>] [--diagnostic]` writes the
   versioned `p4kx-media` inventory as JSONL streams, exact decoded raw payloads and an atomic
   `media-index.json`. Repeat `--kind` and `--exclude` for explicit selections. Omission selects
   all registered providers. The optional animation skeleton is one exact Entry in each selected

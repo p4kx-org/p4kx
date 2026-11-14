@@ -86,6 +86,9 @@ pub(crate) struct MediaExportArgs {
     /// Exact skeleton Entry path within each selected CAF or DBA's owning Archive.
     #[arg(long = "animation-skeleton", value_name = "ENTRY")]
     pub(crate) animation_skeleton: Option<String>,
+    /// Adds the clip sources of the named root Archive Entity (class, GUID or Record path).
+    #[arg(long = "animation-entity", value_name = "ENTITY")]
+    pub(crate) animation_entity: Option<String>,
     /// Resource limits applied before the next unit of work.
     #[command(flatten)]
     pub(crate) limits: MediaLimitsArgs,

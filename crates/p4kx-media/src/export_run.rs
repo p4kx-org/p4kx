@@ -46,6 +46,9 @@ pub(crate) fn build(
     writer
         .animation_skeleton
         .clone_from(&options.animation_skeleton);
+    writer
+        .animation_entity
+        .clone_from(&options.animation_entity);
     writer.origins.observe_root(archive, size)?;
     writer.bind_build(archive, &mut root)?;
     root_callbacks(&root, providers, &mut writer)?;

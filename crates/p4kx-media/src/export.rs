@@ -46,6 +46,8 @@ pub struct ExportOptions {
     pub texture_mip: Option<u32>,
     /// Exact skeleton Entry path within each selected CAF or DBA's owning Archive.
     pub animation_skeleton: Option<String>,
+    /// Entity selector in the root Archive's preferred DataForge for clip discovery.
+    pub animation_entity: Option<String>,
 }
 
 /// Observable result of a generation attempt.
@@ -98,6 +100,23 @@ pub fn export_with(
     options.limits.validate()?;
     if let Some(path) = options.animation_skeleton.as_deref() {
         crate::animation::validate_skeleton_path(path)?;
+    }
+    if options
+        .animation_entity
+        .as_deref()
+        .is_some_and(|selector| selector.trim().is_empty())
+    {
+        return Err(MediaError::Contract(
+            "animation entity selector is empty".into(),
+        ));
+    }
+    if options.animation_entity.is_some()
+        && !options.kinds.is_empty()
+        && !options.kinds.contains(&MediaKind::Animation)
+    {
+        return Err(MediaError::Contract(
+            "animation entity selection requires the animation provider".into(),
+        ));
     }
     let providers = registry.selected(&options.kinds)?;
     if !options.diagnostic

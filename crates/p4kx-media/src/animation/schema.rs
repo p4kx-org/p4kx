@@ -47,5 +47,6 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             }, "required":["data"]}
         }));
     }
+    super::entity_catalogue::bind_schema(&mut base)?;
     Ok(base)
 }

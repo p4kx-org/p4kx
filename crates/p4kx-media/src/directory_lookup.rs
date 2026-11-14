@@ -324,7 +324,7 @@ impl<'a> DirectoryLookup<'a> {
         Ok(inventory)
     }
 
-    fn allowance(&self, limit: u64) -> u64 {
+    pub(crate) fn allowance(&self, limit: u64) -> u64 {
         self.inputs.map_or(self.source_allowance, |inputs| {
             inputs.source_allowance(limit)
         })

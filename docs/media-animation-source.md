@@ -139,3 +139,27 @@ no additive composition or sample conversion.
 The skeleton contributes to fields that use its actual controller table or selected bone
 ID. Controller occurrence ordinals and decoded sample artifacts keep their animation
 origin. Existing raw controller and sample rows are independent of the binding request.
+
+## Optional entity clip inventory
+
+`p4kx media export Data.p4k --kind animation --animation-entity ENTITY --out export`
+adds the selected entity's rig and clip inventory to `animation.jsonl`. The selector accepts
+a class name, GUID or Record path in the preferred DataForge of the root Archive. The selected
+DataForge and animation inputs follow the ordinary Media filters. Use a fresh output or
+`--conflict overwrite` for a different entity after a complete export.
+
+The entity catalogue, rig, parameter and source-link rows preserve the resolved Loadout order,
+each original parameter occurrence and the outcome of each independent lookup. A concrete CAF
+may use a previous same-list folder selector. A folder links independently observed physical
+CAF and DBA candidates in Archive order. Named DBA selectors do not depend on the ordering of
+loose CAF clips. Unexpanded rules remain visible as authored declarations. Filtered physical
+inputs keep their identities and selection status without byte-derived fields.
+
+Each entity source is inventoried once per physical Entry. Entity clip rows join its physical
+clip ordinal to the ordinary animation record when available. The ordinary records own exact
+metadata, controller rows and decoded key artifacts. Per-field provenance uses the original
+DataForge, parameter and animation inputs consulted for that value.
+
+This catalogue resolves DataForge Loadouts. External XML Loadout dependencies and unresolved
+branches are reported through the incomplete-loadout disposition. To retain usable observed
+records alongside an incomplete scope, run with `--diagnostic`.

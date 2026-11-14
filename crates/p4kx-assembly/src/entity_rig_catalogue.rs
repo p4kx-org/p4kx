@@ -12,8 +12,8 @@ use crate::{ArchiveModels, Attachment, EntityNode, GearPlacementSource, LandingG
 
 #[path = "entity_rig_files.rs"]
 mod files;
-pub use files::{RigDefinition, RigFile, RigFileRead};
-pub(crate) use files::{RigEntry, read_rig_entry};
+pub(crate) use files::{ArchiveRigInputs, RigEntry, read_rig_entry};
+pub use files::{RigDefinition, RigFile, RigFileRead, RigInput, RigInputs};
 
 pub use crate::gear_params::RigParameter;
 
@@ -73,18 +73,22 @@ pub struct EntityRig {
 /// outside this discovery pass.
 #[must_use]
 pub fn discover_entity_rigs(models: &ArchiveModels<'_>, root: &EntityNode) -> Vec<EntityRig> {
-    match discover_entity_rigs_with(models, root, &mut || Ok::<_, Infallible>(())) {
+    let mut inputs = ArchiveRigInputs {
+        models,
+        check: || Ok::<_, Infallible>(()),
+    };
+    match discover_entity_rigs_using(models, root, &mut inputs) {
         Ok(rigs) => rigs,
         Err(never) => match never {},
     }
 }
 
-pub(crate) fn discover_entity_rigs_with<E>(
+pub(crate) fn discover_entity_rigs_using<I: RigInputs>(
     models: &ArchiveModels<'_>,
     root: &EntityNode,
-    check: &mut impl FnMut() -> Result<(), E>,
-) -> Result<Vec<EntityRig>, E> {
-    check()?;
+    inputs: &mut I,
+) -> Result<Vec<EntityRig>, I::Error> {
+    inputs.check()?;
     let mut catalogue = Catalogue {
         models,
         owner_source: root
@@ -94,9 +98,9 @@ pub(crate) fn discover_entity_rigs_with<E>(
         rigs: Vec::new(),
         files: files::RigFiles::default(),
     };
-    catalogue.append(root, "", RigPlacement::Root, check)?;
+    catalogue.append(root, "", RigPlacement::Root, inputs)?;
     crate::tree_walk::try_visit(root.ports(), |path, route| {
-        check()?;
+        inputs.check()?;
         if let Some(port) = route.last()
             && let Attachment::Entity(child) = port.attachment()
         {
@@ -106,7 +110,7 @@ pub(crate) fn discover_entity_rigs_with<E>(
                 RigPlacement::Attachment {
                     port_path: path.to_owned(),
                 },
-                check,
+                inputs,
             )?;
         }
         Ok(())
@@ -122,13 +126,13 @@ struct Catalogue<'model, 'archive> {
 }
 
 impl Catalogue<'_, '_> {
-    fn append<E>(
+    fn append<I: RigInputs>(
         &mut self,
         node: &EntityNode,
         path: &str,
         placement: RigPlacement,
-        check: &mut impl FnMut() -> Result<(), E>,
-    ) -> Result<(), E> {
+        inputs: &mut I,
+    ) -> Result<(), I::Error> {
         let geometry = if matches!(placement, RigPlacement::Root) {
             node.geometry()
         } else {
@@ -145,25 +149,25 @@ impl Catalogue<'_, '_> {
                 .and_then(crate::Geometry::model_field)
                 .into_iter()
                 .collect(),
-            check,
+            inputs,
         )?;
         if node.is_docked_vehicle() && !node.is_expanded() {
             return Ok(());
         }
         for gear in node.landing_gear() {
-            check()?;
-            self.append_gear(node, path, gear, check)?;
+            inputs.check()?;
+            self.append_gear(node, path, gear, inputs)?;
         }
         Ok(())
     }
 
-    fn append_gear<E>(
+    fn append_gear<I: RigInputs>(
         &mut self,
         node: &EntityNode,
         path: &str,
         gear: &LandingGear,
-        check: &mut impl FnMut() -> Result<(), E>,
-    ) -> Result<(), E> {
+        inputs: &mut I,
+    ) -> Result<(), I::Error> {
         let geometry = Some(gear.geometry()).filter(|path| !path.is_empty());
         let source = GearPlacementSource::of(node, gear, false);
         self.append_rig(
@@ -178,31 +182,31 @@ impl Catalogue<'_, '_> {
                 .into_iter()
                 .flat_map(|_| source.model_selectors())
                 .collect(),
-            check,
+            inputs,
         )
     }
 
-    fn append_rig<E>(
+    fn append_rig<I: RigInputs>(
         &mut self,
         node: &EntityNode,
         placement: RigPlacement,
         geometry: Option<&str>,
         geometry_selectors: Vec<SourceLocation>,
-        check: &mut impl FnMut() -> Result<(), E>,
-    ) -> Result<(), E> {
-        let rig = self.read(node, placement, geometry, geometry_selectors, check)?;
+        inputs: &mut I,
+    ) -> Result<(), I::Error> {
+        let rig = self.read(node, placement, geometry, geometry_selectors, inputs)?;
         self.rigs.push(rig);
         Ok(())
     }
 
-    fn read<E>(
+    fn read<I: RigInputs>(
         &mut self,
         node: &EntityNode,
         placement: RigPlacement,
         geometry: Option<&str>,
         geometry_selectors: Vec<SourceLocation>,
-        check: &mut impl FnMut() -> Result<(), E>,
-    ) -> Result<EntityRig, E> {
+        inputs: &mut I,
+    ) -> Result<EntityRig, I::Error> {
         let definition = geometry
             .filter(|path| crate::cdf::is_character_definition(path))
             .map(|path| {
@@ -211,7 +215,7 @@ impl Catalogue<'_, '_> {
                     path,
                     &mut self.files.definitions,
                     files::definition,
-                    check,
+                    inputs,
                 )
             })
             .transpose()?;
@@ -227,7 +231,7 @@ impl Catalogue<'_, '_> {
                     path,
                     &mut self.files.skeletons,
                     files::skeleton,
-                    check,
+                    inputs,
                 )
             })
             .transpose()?;
@@ -238,7 +242,7 @@ impl Catalogue<'_, '_> {
                     &crate::gear_clip::params_path(path),
                     &mut self.files.parameters,
                     catalogue_parameters,
-                    check,
+                    inputs,
                 )
             })
             .transpose()?;

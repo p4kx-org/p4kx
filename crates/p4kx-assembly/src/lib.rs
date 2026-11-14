@@ -215,7 +215,7 @@ pub use entities::{ENTITY_TYPE, Entities};
 pub use entity_clip_catalogue::{
     ClipArchiveSource, ClipDatabaseUnavailable, ClipSourceLink, ClipSourceSelection,
     EntityClipCatalogue, EntityClipRig, NamedCafTarget, discover_entity_clips,
-    discover_entity_clips_with,
+    discover_entity_clips_using, discover_entity_clips_with,
 };
 pub use entity_glow::{
     EntityGlow, EntityGlowBindingError, EntityGlowLink, GlowEffectKind, GlowSelection, GlowSubset,
@@ -223,8 +223,8 @@ pub use entity_glow::{
 };
 pub use entity_interior::{EntityContainer, EntityInterior, INTERIOR_NODE};
 pub use entity_rig_catalogue::{
-    EntityRig, RigDefinition, RigFile, RigFileRead, RigParameter, RigPlacement,
-    discover_entity_rigs,
+    EntityRig, RigDefinition, RigFile, RigFileRead, RigInput, RigInputs, RigParameter,
+    RigPlacement, discover_entity_rigs,
 };
 pub use error::{AssemblyError, EntityLookupError, LoadoutError};
 pub use files::{ArchiveFiles, LoadoutFileError, LoadoutFiles, MAX_XML_LOADOUT_LEN};

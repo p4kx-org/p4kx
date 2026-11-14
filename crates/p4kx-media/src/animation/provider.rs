@@ -23,7 +23,7 @@ impl Provider for AnimationProvider {
         let mut capability = Capability::new(
             MediaKind::Animation,
             "p4kx.animation.source",
-            "1.7.0",
+            "1.8.0",
             "Exact animation and image Entry bytes with positioned source data and separate decoded sample chunks.",
         );
         capability.field_groups = vec![
@@ -52,11 +52,23 @@ impl Provider for AnimationProvider {
                 "The directional image retains original bytes without interpreting record boundaries.",
             ),
             FieldGroup::new(
+                "entity-clip-catalogue",
+                "Optional root Entity scope with positioned rig declarations, explicit lookup outcomes and physical clips.",
+            ),
+            FieldGroup::new(
                 "skeleton-binding",
                 "Optional exact Entry in the owning Archive; original controller and bone selections are supplementary.",
             ),
         ];
         capability
+    }
+
+    fn directory_complete(
+        &self,
+        context: &mut crate::DirectoryContext<'_, '_, '_>,
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<(), MediaError> {
+        super::entity_catalogue::emit(context.lookup, writer)
     }
 
     fn source(

@@ -1247,6 +1247,633 @@
       ],
       "type": "object"
     },
+    "AnimationEntityAttempt": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "primary_chunk": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "status": {
+          "$ref": "#/$defs/AnimationEntityReadStatus"
+        }
+      },
+      "required": [
+        "path",
+        "status",
+        "primary_chunk"
+      ],
+      "type": "object"
+    },
+    "AnimationEntityCatalogue": {
+      "additionalProperties": false,
+      "properties": {
+        "owner": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnimationEntityOwner"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selector": {
+          "type": "string"
+        },
+        "state": {
+          "$ref": "#/$defs/AnimationEntityCatalogueState"
+        }
+      },
+      "required": [
+        "selector",
+        "state",
+        "owner"
+      ],
+      "type": "object"
+    },
+    "AnimationEntityCataloguePayload": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationEntityCatalogue"
+            },
+            "record_type": {
+              "const": "entity-catalogue",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationEntityRig"
+            },
+            "record_type": {
+              "const": "entity-rig",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationEntityParameter"
+            },
+            "record_type": {
+              "const": "entity-parameter",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationEntityLink"
+            },
+            "record_type": {
+              "const": "entity-source-link",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationEntitySource"
+            },
+            "record_type": {
+              "const": "entity-source",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationEntityClip"
+            },
+            "record_type": {
+              "const": "entity-clip",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        }
+      ],
+      "title": "Payload"
+    },
+    "AnimationEntityCatalogueState": {
+      "enum": [
+        "available",
+        "missing-dataforge",
+        "dataforge-not-selected",
+        "dataforge-unavailable",
+        "invalid-dataforge",
+        "incomplete-loadout"
+      ],
+      "type": "string"
+    },
+    "AnimationEntityClip": {
+      "additionalProperties": false,
+      "properties": {
+        "controller_count": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "end_frame": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "flags": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "frames_per_second": {
+          "format": "uint16",
+          "maximum": 65535,
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "metadata_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "metadata_version": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name_bytes": {
+          "items": {
+            "format": "uint8",
+            "maximum": 255,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "physical_record": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ReferenceTarget"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "metadata_range",
+        "metadata_version",
+        "flags",
+        "frames_per_second",
+        "end_frame",
+        "name_bytes",
+        "controller_count",
+        "physical_record"
+      ],
+      "type": "object"
+    },
+    "AnimationEntityLink": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "folder-candidate",
+              "type": "string"
+            },
+            "source": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "disposition",
+            "source"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "folder-empty",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "folder-unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "database",
+              "type": "string"
+            },
+            "source": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "disposition",
+            "source"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "named-caf",
+              "type": "string"
+            },
+            "filepath_parameter": {
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "source": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "disposition",
+            "source",
+            "filepath_parameter"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "unable",
+              "type": "string"
+            },
+            "filepath_parameter": {
+              "format": "uint",
+              "minimum": 0,
+              "type": [
+                "integer",
+                "null"
+              ]
+            },
+            "reason": {
+              "$ref": "#/$defs/AnimationEntitySelectionFailure"
+            }
+          },
+          "required": [
+            "disposition",
+            "reason",
+            "filepath_parameter"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "disposition": {
+              "const": "unexpanded",
+              "type": "string"
+            }
+          },
+          "required": [
+            "disposition"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AnimationEntityOwner": {
+      "additionalProperties": false,
+      "properties": {
+        "guid": {
+          "type": "string"
+        },
+        "record": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "guid",
+        "record"
+      ],
+      "type": "object"
+    },
+    "AnimationEntityParameter": {
+      "additionalProperties": false,
+      "properties": {
+        "list": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "name": {
+          "type": "string"
+        },
+        "ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        },
+        "positions": {
+          "items": {
+            "$ref": "#/$defs/SourceLocation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "list",
+        "ordinal",
+        "name",
+        "path",
+        "positions"
+      ],
+      "type": "object"
+    },
+    "AnimationEntityPlacement": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "root",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "attachment",
+              "type": "string"
+            },
+            "port_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "port_path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "bone": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "kind": {
+              "const": "landing-gear",
+              "type": "string"
+            },
+            "ordinal": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "owner_path": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "owner_path",
+            "ordinal",
+            "bone"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "kind": {
+              "const": "unknown",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "AnimationEntityReadStatus": {
+      "enum": [
+        "missing",
+        "ambiguous",
+        "not-selected",
+        "key-required",
+        "wrong-key",
+        "unreadable",
+        "malformed",
+        "partial",
+        "read"
+      ],
+      "type": "string"
+    },
+    "AnimationEntityRig": {
+      "additionalProperties": false,
+      "properties": {
+        "definition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnimationEntityAttempt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "geometry": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owner": {
+          "$ref": "#/$defs/AnimationEntityOwner"
+        },
+        "parameters": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnimationEntityAttempt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "placement": {
+          "$ref": "#/$defs/AnimationEntityPlacement"
+        },
+        "skeleton": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AnimationEntityAttempt"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "owner",
+        "placement",
+        "geometry",
+        "definition",
+        "skeleton",
+        "parameters"
+      ],
+      "type": "object"
+    },
+    "AnimationEntitySelectionFailure": {
+      "enum": [
+        "invalid-path",
+        "missing",
+        "ambiguous",
+        "missing-scope",
+        "unreadable"
+      ],
+      "type": "string"
+    },
+    "AnimationEntitySource": {
+      "additionalProperties": false,
+      "properties": {
+        "directory_ordinal": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "entry": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "path": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/AnimationEntityReadStatus"
+        }
+      },
+      "required": [
+        "entry",
+        "directory_ordinal",
+        "path",
+        "status"
+      ],
+      "type": "object"
+    },
     "AnimationEntry": {
       "additionalProperties": false,
       "properties": {
@@ -19101,6 +19728,188 @@
       ],
       "type": "object"
     },
+    "SourceCoordinateOmission": {
+      "description": "Why an actual contributing use omits its optional source coordinate.",
+      "oneOf": [
+        {
+          "const": "captureLimit",
+          "description": "Optional coordinate capture was not admitted.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "description": "A proved original contribution has no retained source coordinate.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceLocation": {
+      "description": "A retained source coordinate or an explicit omission inside an observed physical input.",
+      "oneOf": [
+        {
+          "description": "An actual input use with explicitly omitted optional coordinates.",
+          "properties": {
+            "reason": {
+              "$ref": "#/$defs/SourceCoordinateOmission",
+              "description": "Why coordinate details were not retained."
+            },
+            "type": {
+              "const": "opaque",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "reason"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One field of the physical DataForge Record index.",
+          "properties": {
+            "field": {
+              "description": "Exact owned-field path, including stored list positions.",
+              "type": "string"
+            },
+            "recordIndex": {
+              "description": "Physical Record position, independent of nominal GUID aliases.",
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "dataForge",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "recordIndex",
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A localization lookup addressed by its retained authored selector.",
+          "properties": {
+            "language": {
+              "description": "The language Entry used by the lookup.",
+              "type": "string"
+            },
+            "selector": {
+              "$ref": "#/$defs/SourceUseRef",
+              "description": "The source use holding the actual lookup key."
+            },
+            "type": {
+              "const": "localizationLookup",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "language",
+            "selector"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Half-open admitted Entry positions in a parsed root Archive directory.",
+          "properties": {
+            "endEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Position after the last consulted Entry path."
+            },
+            "startEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First admitted Entry path position."
+            },
+            "type": {
+              "const": "archiveDirectoryPaths",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "startEntryIndex",
+            "endEntryIndex"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Half-open Entry positions in an original root Archive's path-ordered folder tree.",
+          "properties": {
+            "endEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "Position after the last contributing path-order Entry."
+            },
+            "startEntryIndex": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First path-order Entry position."
+            },
+            "type": {
+              "const": "archiveDirectoryTreePaths",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "startEntryIndex",
+            "endEntryIndex"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One exact logical field inside an already observed structured source subresource.",
+          "properties": {
+            "field": {
+              "description": "Original source field or token-range label within that object.",
+              "type": "string"
+            },
+            "indices": {
+              "description": "Original source ordinals, including repeated declarations and unknown slots.",
+              "items": {
+                "$ref": "#/$defs/DecimalU64"
+              },
+              "type": "array"
+            },
+            "namespace": {
+              "description": "Format-owned namespace for the original source object.",
+              "type": "string"
+            },
+            "type": {
+              "const": "subresource",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "namespace",
+            "indices",
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A directory or standalone input metadata field.",
+          "properties": {
+            "field": {
+              "description": "Exact metadata field, including stored occurrence positions.",
+              "type": "string"
+            },
+            "type": {
+              "const": "metadata",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "field"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "SourcePrefix": {
       "additionalProperties": false,
       "properties": {
@@ -19267,6 +20076,10 @@
         "has_media_file"
       ],
       "type": "object"
+    },
+    "SourceUseRef": {
+      "description": "A document-local source-use identifier, independent of addresses or pointer values.",
+      "type": "string"
     },
     "SplitParts": {
       "oneOf": [
@@ -39319,6 +40132,336 @@
                 "properties": {
                   "record_type": {
                     "const": "controller-binding"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-entity-catalogue"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationEntityCataloguePayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "entity-catalogue"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 0,
+                "minItems": 0
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-entity-rig"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationEntityCataloguePayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "entity-rig"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-entity-parameter"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationEntityCataloguePayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "entity-parameter"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 2,
+                "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-entity-source-link"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationEntityCataloguePayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "entity-source-link"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-entity-source"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationEntityCataloguePayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "entity-source"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-entity-clip"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationEntityCataloguePayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "entity-clip"
                   }
                 },
                 "required": [

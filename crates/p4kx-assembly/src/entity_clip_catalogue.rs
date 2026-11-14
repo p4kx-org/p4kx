@@ -8,8 +8,10 @@ use std::sync::Arc;
 use p4kx_extraction::animation_headers::{AnimationHeaderError, AnimationSourceHeaders};
 use p4kx_extraction::{Entry, NamedCafSelector};
 
-use crate::entity_rig_catalogue::{RigEntry, discover_entity_rigs_with, read_rig_entry};
-use crate::{ArchiveModels, EntityNode, EntityRig, RigFile, RigParameter};
+use crate::entity_rig_catalogue::{
+    ArchiveRigInputs, RigEntry, discover_entity_rigs_using, read_rig_entry,
+};
+use crate::{ArchiveModels, EntityNode, EntityRig, RigFile, RigInputs, RigParameter};
 
 #[path = "entity_clip_folders.rs"]
 mod folders;
@@ -147,20 +149,32 @@ pub fn discover_entity_clips_with<E>(
     root: &EntityNode,
     check: &mut impl FnMut() -> Result<(), E>,
 ) -> Result<EntityClipCatalogue, E> {
-    let rigs = discover_entity_rigs_with(models, root, check)?;
+    discover_entity_clips_using(models, root, &mut ArchiveRigInputs { models, check })
+}
+
+/// Inventories clips from physically admitted dependencies with caller-owned byte selection.
+///
+/// # Errors
+/// Returns the exact terminal failure from the supplied input reader.
+pub fn discover_entity_clips_using<I: RigInputs>(
+    models: &ArchiveModels<'_>,
+    root: &EntityNode,
+    inputs: &mut I,
+) -> Result<EntityClipCatalogue, I::Error> {
+    let rigs = discover_entity_rigs_using(models, root, inputs)?;
     let mut inventory = Inventory {
         models,
         physical: PhysicalSources::default(),
-        folders: Folders::read(models.archive, &rigs, check)?,
+        folders: Folders::read(models.archive, &rigs, &mut || inputs.check())?,
     };
     let rigs = rigs
         .into_iter()
         .map(|rig| {
-            let links = inventory.links(&rig, check)?;
+            let links = inventory.links(&rig, inputs)?;
             Ok(EntityClipRig { rig, links })
         })
-        .collect::<Result<_, E>>()?;
-    check()?;
+        .collect::<Result<_, I::Error>>()?;
+    inputs.check()?;
     Ok(EntityClipCatalogue {
         rigs,
         sources: inventory.physical.rows,
@@ -180,28 +194,28 @@ struct PhysicalSources {
 }
 
 impl Inventory<'_, '_> {
-    fn links<E>(
+    fn links<I: RigInputs>(
         &mut self,
         rig: &EntityRig,
-        check: &mut impl FnMut() -> Result<(), E>,
-    ) -> Result<Vec<ClipSourceLink>, E> {
+        inputs: &mut I,
+    ) -> Result<Vec<ClipSourceLink>, I::Error> {
         let mut folder = None;
         let mut links = Vec::new();
         let Some(parameters) = rig.parameters.as_ref().and_then(RigFile::value) else {
             return Ok(links);
         };
         for (parameter, row) in parameters.iter().enumerate() {
-            check()?;
+            inputs.check()?;
             let selection = if row.name.eq_ignore_ascii_case("#filepath") {
                 folder = Some((parameter, row));
-                self.folder(&row.path, check)?
+                self.folder(&row.path, inputs)?
             } else if row.name.eq_ignore_ascii_case("$TracksDatabase") {
-                self.database(&row.path, check)?
+                self.database(&row.path, inputs)?
             } else if let Some(caf) = NamedCafSelector::new(&row.name, &row.path) {
                 self.named_caf(
                     caf,
                     folder.filter(|(_, scope)| scope.list == row.list),
-                    check,
+                    inputs,
                 )?
             } else {
                 continue;
@@ -214,19 +228,19 @@ impl Inventory<'_, '_> {
         Ok(links)
     }
 
-    fn named_caf<E>(
+    fn named_caf<I: RigInputs>(
         &mut self,
         selector: NamedCafSelector<'_>,
         folder: Option<(usize, &RigParameter)>,
-        check: &mut impl FnMut() -> Result<(), E>,
-    ) -> Result<ClipSourceSelection, E> {
+        inputs: &mut I,
+    ) -> Result<ClipSourceSelection, I::Error> {
         let scope = folder.filter(|_| selector.uses_scope());
         let target = if selector.uses_scope() && scope.is_none() {
             NamedCafTarget::MissingScope
         } else if let Some(path) = selector.archive_path(scope.map(|(_, row)| row.path.as_str())) {
-            match self.models.exact_rig_entry(&path, check)? {
+            match self.models.exact_rig_entry(&path, &mut || inputs.check())? {
                 RigEntry::Unique(entry) => {
-                    NamedCafTarget::File(self.physical.resolve(self.models, entry, check)?)
+                    NamedCafTarget::File(self.physical.resolve(self.models, entry, inputs)?)
                 }
                 RigEntry::Missing => NamedCafTarget::Missing,
                 RigEntry::Ambiguous => NamedCafTarget::Ambiguous,
@@ -241,11 +255,11 @@ impl Inventory<'_, '_> {
         })
     }
 
-    fn folder<E>(
+    fn folder<I: RigInputs>(
         &mut self,
         path: &str,
-        check: &mut impl FnMut() -> Result<(), E>,
-    ) -> Result<ClipSourceSelection, E> {
+        inputs: &mut I,
+    ) -> Result<ClipSourceSelection, I::Error> {
         let Some(folder) = self.folders.get(path) else {
             return Ok(ClipSourceSelection::FolderUnavailable);
         };
@@ -255,24 +269,24 @@ impl Inventory<'_, '_> {
             let positions: Arc<[_]> = folder
                 .entries
                 .iter()
-                .map(|entry| self.physical.resolve(self.models, entry, check))
-                .collect::<Result<_, E>>()?;
+                .map(|entry| self.physical.resolve(self.models, entry, inputs))
+                .collect::<Result<_, I::Error>>()?;
             folder.positions = Some(Arc::clone(&positions));
             positions
         };
         Ok(ClipSourceSelection::Folder { sources })
     }
 
-    fn database<E>(
+    fn database<I: RigInputs>(
         &mut self,
         path: &str,
-        check: &mut impl FnMut() -> Result<(), E>,
-    ) -> Result<ClipSourceSelection, E> {
+        inputs: &mut I,
+    ) -> Result<ClipSourceSelection, I::Error> {
         let reason = if has_extension(path, "dba") {
-            match self.models.rig_entry(path, check)? {
+            match self.models.rig_entry(path, &mut || inputs.check())? {
                 RigEntry::Unique(entry) => {
                     return Ok(ClipSourceSelection::Database {
-                        source: self.physical.resolve(self.models, entry, check)?,
+                        source: self.physical.resolve(self.models, entry, inputs)?,
                     });
                 }
                 RigEntry::Missing => ClipDatabaseUnavailable::Missing,
@@ -287,13 +301,13 @@ impl Inventory<'_, '_> {
 }
 
 impl PhysicalSources {
-    fn resolve<E>(
+    fn resolve<I: RigInputs>(
         &mut self,
         models: &ArchiveModels<'_>,
         entry: &Entry,
-        check: &mut impl FnMut() -> Result<(), E>,
-    ) -> Result<usize, E> {
-        check()?;
+        inputs: &mut I,
+    ) -> Result<usize, I::Error> {
+        inputs.check()?;
         let slot = match self.positions.entry(entry.index()) {
             std::collections::hash_map::Entry::Occupied(slot) => return Ok(*slot.get()),
             std::collections::hash_map::Entry::Vacant(slot) => slot,
@@ -301,8 +315,10 @@ impl PhysicalSources {
         let read = read_rig_entry(
             models,
             entry,
-            |bytes, check| AnimationSourceHeaders::read_with(entry.path(), bytes, check),
-            check,
+            |bytes, input| {
+                AnimationSourceHeaders::read_with(entry.path(), bytes, &mut || input.check())
+            },
+            inputs,
         )?;
         let position = self.rows.len();
         self.rows.push(ClipArchiveSource {
