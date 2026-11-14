@@ -598,7 +598,8 @@
       "enum": [
         "damagePoints"
       ],
-      "type": "string"
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "AmmoBinding": {
       "description": "The original ammunition links authored on a physical Item component.",
@@ -9274,6 +9275,22 @@
       ],
       "type": "object"
     },
+    "ContractCompletionTagResult": {
+      "description": "The authored sharing flag of one original completion-tag result.",
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/SourceValueRef"
+        },
+        "splitPointsForParty": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        }
+      },
+      "required": [
+        "source",
+        "splitPointsForParty"
+      ],
+      "type": "object"
+    },
     "ContractEntry": {
       "description": "A contract projection with its resolved intro requirements.",
       "properties": {
@@ -11263,7 +11280,8 @@
       "enum": [
         "metres"
       ],
-      "type": "string"
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "Distortion": {
       "description": "One original distortion component on a selected item.",
@@ -11317,7 +11335,8 @@
       "enum": [
         "damagePointsPerSecond"
       ],
-      "type": "string"
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "Durability": {
       "description": "One original Health component on a selected item.",
@@ -14162,7 +14181,8 @@
       "enum": [
         "dischargesPerMinute"
       ],
-      "type": "string"
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "FixedDamage": {
       "properties": {
@@ -14895,6 +14915,12 @@
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
+        "completionTagResults": {
+          "items": {
+            "$ref": "#/$defs/ContractCompletionTagResult"
+          },
+          "type": "array"
+        },
         "fileName": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
@@ -14931,6 +14957,7 @@
       },
       "required": [
         "className",
+        "completionTagResults",
         "fileName",
         "guid",
         "inputRef",

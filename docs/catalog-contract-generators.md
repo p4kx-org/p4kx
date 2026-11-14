@@ -21,6 +21,19 @@ The parent row has an absent `subContractGuid`. The projections follow the estab
 contract ID, sub-contract ID and Generator Record GUID. The first logical ID pair wins. All
 selected physical Generator rows and their original slots remain available in the definition table.
 
+## Authored completion-tag results
+
+Each `completionTagResults` entry belongs to a physical `ContractResult_CompletionTags`
+occurrence in its Generator. The `source.valueIndex` selects the original result in
+`source.values`. Results keep physical source order, including occurrences on contracts
+and sub contracts that the logical projection excludes or deduplicates.
+
+`splitPointsForParty` carries the original scalar Bool and independent source uses. An absent
+declaration has state `absent`. A different source declaration has state `unsupported` and
+remains available in the original arena. Unreadable Bool storage has state `unreadable` and an
+incomplete source set. Unsupported and unreadable values produce scoped diagnostics. The flag
+describes authored configuration.
+
 ## Authored scenario requirements
 
 `declarations.contractScenarioRequirements` contains each original

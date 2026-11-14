@@ -12,6 +12,7 @@ use serde_json::{Map, Value, json};
 
 const VOCABULARY_CLASS: &str = "x-p4kx-vocabularyClass";
 const CONTROL_TYPES: &[&str] = &[
+    "AlphaUnit",
     "AssignmentKind",
     "AttachmentAxisOptionStatus",
     "BlueprintRangeKind",
@@ -19,6 +20,8 @@ const CONTROL_TYPES: &[&str] = &[
     "CommoditySelection",
     "DatasetAvailability",
     "DefinitionStatus",
+    "DistanceUnit",
+    "DpsUnit",
     "ExportDiagnosticSeverity",
     "ExportDiagnosticStage",
     "ExportDiagnosticUnit",
@@ -26,6 +29,7 @@ const CONTROL_TYPES: &[&str] = &[
     "ExportSourceMode",
     "ExportSourceRole",
     "ExportStageStatus",
+    "FireRateUnit",
     "FuseEvidence",
     "InputScope",
     "InteriorFindingKind",

@@ -15,13 +15,13 @@ use crate::catalog_v3::mission_sources::{
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::mission_entry_source::MissionEntryContext;
-use crate::mission_generator::GeneratorDefinition;
+use crate::mission_generator::{GeneratorDefinition, completion_tag_results};
 use crate::mission_layers;
 use crate::mission_property_set_registry::MissionPropertySetRegistry;
 use crate::record_observation::RecordObservation;
 use crate::record_read::ReadError;
 use crate::selection::Kind;
-use crate::source_fields::FieldCapture;
+use crate::source_fields::{FieldCapture, FieldError};
 use crate::source_value_catalog;
 use crate::spawn_layers::RecordSpawns;
 use crate::template_field_capture::TemplateFieldCapture;
@@ -101,12 +101,12 @@ fn project_tree<'source>(
     let indexed = source_value_catalog::read_indexed_arena(&scope, cancel, |_| {})?;
     let fields = &indexed.facts;
     let capture = TemplateFieldCapture::new(fields, input, admission)?;
-    let (definition, item_error) =
+    let (definition, item_error, notes) =
         generator_definition(input, tree, fields, indexed.source, &capture)?;
     let Authored {
         scenario_requirements,
         local_generators,
-    } = authored(input, admission, tree, fields, &capture, &mut ledger)?;
+    } = authored(input, admission, tree, fields, &capture, notes, &mut ledger)?;
     let projected =
         item_error.map_or_else(|| project(admission, tree, context, fields, &capture), Err);
     match projected {
@@ -151,7 +151,16 @@ fn generator_definition<'source>(
     fields: &OriginalFlowFields<'_, '_, 'source>,
     source: source_value_catalog::SourceArenaOutput<'source>,
     capture: &dyn FieldCapture<'source>,
-) -> Result<(GeneratorDefinition<'source>, Option<ReadError>), CatalogError> {
+) -> Result<
+    (
+        GeneratorDefinition<'source>,
+        Option<ReadError>,
+        Vec<FieldError>,
+    ),
+    CatalogError,
+> {
+    let mut notes = Vec::new();
+    let completion_tag_results = completion_tag_results::read(fields, capture, &mut notes)?;
     let (mission_item_properties, error) =
         match crate::mission_generator::item_properties::read(fields, capture) {
             Ok(items) => (items, None),
@@ -161,9 +170,10 @@ fn generator_definition<'source>(
         input_ref: fields.input_ref().clone(),
         header: CanonicalRecordHeader::read(tree, input.origins())?,
         source,
+        completion_tag_results,
         mission_item_properties,
     };
-    Ok((definition, error))
+    Ok((definition, error, notes))
 }
 
 struct Authored<'source> {
@@ -179,9 +189,9 @@ fn authored<'source>(
     tree: &RecordTree<'source>,
     fields: &OriginalFlowFields<'_, '_, 'source>,
     capture: &dyn FieldCapture<'source>,
+    mut notes: Vec<FieldError>,
     ledger: &mut ExportLedger,
 ) -> Result<Authored<'source>, CatalogError> {
-    let mut notes = Vec::new();
     let scenario_requirements =
         contract_scenario_requirements::read(input, tree, fields, capture, &mut notes)?;
     let local_generators =

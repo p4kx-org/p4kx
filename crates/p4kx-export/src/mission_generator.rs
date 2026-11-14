@@ -16,6 +16,9 @@ use crate::schema_fields::every_field_required;
 use crate::source_value_catalog::{SourceArenaOutput, SourceValueRef};
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "contract_completion_tag_result.rs"]
+pub(crate) mod completion_tag_results;
+
 #[path = "generator_mission_item_property.rs"]
 pub(crate) mod item_properties;
 
@@ -28,6 +31,7 @@ pub(crate) struct GeneratorDefinition<'source> {
     #[serde(flatten)]
     pub(crate) header: CanonicalRecordHeader<'source>,
     pub(crate) source: SourceArenaOutput<'source>,
+    pub(crate) completion_tag_results: Vec<completion_tag_results::ContractCompletionTagResult>,
     pub(crate) mission_item_properties: Vec<item_properties::GeneratorMissionItemProperty>,
 }
 

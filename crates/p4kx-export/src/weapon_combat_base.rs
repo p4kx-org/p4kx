@@ -59,24 +59,28 @@ struct CombatUnits {
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 enum FireRateUnit {
     DischargesPerMinute,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 enum AlphaUnit {
     DamagePoints,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 enum DpsUnit {
     DamagePointsPerSecond,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 enum DistanceUnit {
     Metres,
 }

@@ -25,6 +25,7 @@ mod real_archive_catalog_links;
 mod real_archive_catalog_ships;
 mod real_archive_catalog_tags;
 mod real_archive_commodity_refining;
+mod real_archive_completion_tags;
 mod real_archive_compression;
 mod real_archive_contract_cooldown_overrides;
 mod real_archive_contract_cooldowns;

@@ -33,6 +33,7 @@ mod canonical_header_origin;
 mod catalog_broker_entries;
 mod catalog_commodity;
 mod catalog_compression;
+mod catalog_contract_completion_tag_results;
 mod catalog_contract_property_values;
 mod catalog_contract_template_parts;
 mod catalog_contract_template_properties;
@@ -382,7 +383,6 @@ mod template_canonical_graph;
 
 mod mission_canonical_text;
 mod scoped_canonical;
-
 mod tag_duplicate_body;
 
 mod mission_template_original;
