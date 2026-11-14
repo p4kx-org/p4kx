@@ -20,6 +20,7 @@ use crate::{ExportAccountingError, HealthText};
 pub(crate) enum ConfigurationInspection {
     MissionBoard,
     ResourceNetwork,
+    LootGeneration,
 }
 
 /// Inspection of the canonical values relevant to one source scope.

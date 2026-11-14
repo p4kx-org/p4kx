@@ -5,8 +5,10 @@ use p4kx_extraction::DataForge;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::catalog_mission_board::{COMPONENT, MissionBoard};
-use super::catalog_mission_board_read::{self, MissionBoardRead};
+use super::catalog_entity_component_read::{
+    self as entity_component, ComponentKind, ComponentRead,
+};
+use super::catalog_mission_board::{self, MissionBoard};
 use super::catalog_resource_network_configuration::ResourceNetworkConfiguration;
 use super::catalog_resource_network_read::{self, ResourceNetworkRead};
 use crate::catalog_number_capture::CapturedNumber;
@@ -14,9 +16,14 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_table::CatalogTable;
 use crate::collected::Collected;
 use crate::contract_recovery::{ItemRecoveryEconomy, ItemRecoveryOverrides};
+use crate::export_field_inspection::ConfigurationInspection;
 use crate::recovery::{self, ItemRecoveryPolicy, Recovery};
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, CatalogOptions};
+use loot_generation_component::LootGenerationComponent;
+
+#[path = "loot_generation_component.rs"]
+mod loot_generation_component;
 
 /// Independently scoped configurations with their physical owners.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -28,6 +35,7 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     item_recovery_policy: CatalogTable<ItemRecoveryPolicy<'source>>,
     resource_network_parameters: CatalogTable<ResourceNetworkConfiguration<'source>>,
     mission_boards: CatalogTable<MissionBoard<'source>>,
+    loot_generation: CatalogTable<LootGenerationComponent<'source>>,
 }
 
 pub(crate) struct IndependentConfigurations<'source> {
@@ -66,29 +74,72 @@ pub(crate) fn read<'source>(
     )?;
     collected.ledger.merge(ledger);
     collected.add_failures(failures);
-    let MissionBoardRead {
-        rows,
-        numbers,
-        ledger,
-        failures,
-    } = catalog_mission_board_read::read(
+    let mut components = PhysicalComponents {
         forge,
-        projection.original(),
-        options.filter,
-        options.cancel,
-    )?;
-    collected.ledger.merge(ledger);
-    collected.add_failures(failures);
-    configuration_numbers.extend(numbers);
+        projection,
+        options,
+        collected,
+        numbers: &mut configuration_numbers,
+    };
+    let mission_boards = components.table(MISSION_BOARDS, MissionBoard::read)?;
+    let loot_generation = components.table(LOOT_GENERATION, LootGenerationComponent::read)?;
     Ok(IndependentConfigurations {
         tables: IndependentConfigurationTables {
             item_recovery_economy,
             item_recovery_overrides,
             item_recovery_policy,
             resource_network_parameters,
-            mission_boards: CatalogTable::new(forge, &[COMPONENT], rows),
+            mission_boards,
+            loot_generation,
         },
         recovery_numbers,
         configuration_numbers,
     })
+}
+
+const MISSION_BOARDS: ComponentKind = ComponentKind {
+    source_type: catalog_mission_board::COMPONENT,
+    inspection: ConfigurationInspection::MissionBoard,
+};
+const LOOT_GENERATION: ComponentKind = ComponentKind {
+    source_type: loot_generation_component::COMPONENT,
+    inspection: ConfigurationInspection::LootGeneration,
+};
+
+struct PhysicalComponents<'options, 'input, 'source> {
+    forge: &'source DataForge<'source>,
+    projection: &'options CatalogProjection<'input, 'source>,
+    options: &'options CatalogOptions<'input>,
+    collected: &'options mut Collected<'source>,
+    numbers: &'options mut Vec<CapturedNumber>,
+}
+
+impl<'source> PhysicalComponents<'_, '_, 'source> {
+    fn table<Row>(
+        &mut self,
+        component: ComponentKind,
+        project: entity_component::Projection<'source, Row>,
+    ) -> Result<CatalogTable<Row>, CatalogError> {
+        let ComponentRead {
+            rows,
+            numbers,
+            ledger,
+            failures,
+        } = entity_component::read(
+            self.forge,
+            self.projection.original(),
+            self.options.filter,
+            self.options.cancel,
+            &component,
+            project,
+        )?;
+        self.collected.ledger.merge(ledger);
+        self.collected.add_failures(failures);
+        self.numbers.extend(numbers);
+        Ok(CatalogTable::new(
+            self.forge,
+            &[component.source_type],
+            rows,
+        ))
+    }
 }

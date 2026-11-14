@@ -25,5 +25,12 @@ bindings of [ADR-0360](0360-original-read-bindings-stay-separate-from-value-equa
   traversals without another decode or numeric-inspection pass. Canonical-reader resource policies
   remain separate explicit failures, not universal format guarantees or a new normal-output cutoff.
 
+Entity-owned `LootGenerationComponentParams` are independent configurations selected by the
+physical `EntityClassDefinition.Components` slot and ordinary Record filter. Each component's own
+arena retains the authored `LootConfig`, `LootConstraints`, and ordered Reference and pointer
+occurrences. A caller uses the original target header to join a canonical definition, when
+selected. The exporter does not reclassify the owning Entity as an item or infer generated loot,
+active themes or runtime constraint evaluation.
+
 The [Loot source contract](../catalog-loot-source.md) defines the wire and contributor boundaries.
 This decision establishes no runtime, generated-schema, installed-Build or complete-capture acceptance.

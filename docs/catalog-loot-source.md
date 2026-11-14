@@ -24,7 +24,20 @@ existing slot-preset selection also emits a convenience row under the top-level
 definition once. The definitions include every Record of their exact source family and do not
 simulate loot selection.
 
-Each row has the common eight independently sourced header fields, ordered root `fields`, and a
+`configurations.lootGeneration` retains one row for each physical
+`EntityClassDefinition.Components` occurrence of `LootGenerationComponentParams` that matches the
+ordinary Record filter, including owners outside the item and ship kinds. Rows are ordered by
+`ownerRecordIndex` and original `componentOrdinal` and retain sourced `ownerGuid` and `sourceType`.
+`authoredFields.roots` and `authoredFields.values` carry the full ordered component-local source
+arena. Follow `lootConfig` → `lootConstraints` → `themes` to the stored theme References. Each
+present link retains its GUID and physical target Record index and joins `definitions.lootThemes`
+when that target belongs to the export scope. `secondaryChoices` retains the concrete pointer
+wrapper and its original layer selectors. Empty arrays, null slots, repeats, dangling GUIDs and
+unknown members remain distinct. The table reports source-type availability independently of row
+count. It describes authored configuration without resolving runtime loot selection.
+
+
+The definition rows have eight independently sourced header fields, ordered root `fields`, and a
 flat `values` vector. A field contains its sourced original `name`, a declaration with sourced
 `dataType`, `isArray` and `target`, and `value: {"valueIndex":"0"}`. These are actual decoder
 storage declarations, not classifications inferred from the decoded Value. Array elements use the

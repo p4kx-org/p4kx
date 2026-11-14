@@ -106,4 +106,4 @@ ships variants: 0 in 0 groups
 quality quantizations: 0 used by no ResourceType, 0 links reach no quantization
 en: 16 texts resolved, 1 unresolved, 0 placeholders
 de: 0 texts resolved, 17 unresolved, 0 placeholders, the Archive holds no global.ini
-wrote [DIR]/english-only.json: 220588 bytes, 1 Records skipped, 0 failed
+wrote [DIR]/english-only.json: 220641 bytes, 1 Records skipped, 0 failed

@@ -4384,6 +4384,9 @@
         "localContractGenerators": {
           "$ref": "#/$defs/CatalogTableOfLocalContractGeneratorConfiguration"
         },
+        "lootGeneration": {
+          "$ref": "#/$defs/CatalogTableOfLootGenerationComponent"
+        },
         "missileConfigurations": {
           "$ref": "#/$defs/CatalogTableOfMissileConfiguration"
         },
@@ -4448,6 +4451,7 @@
         "itemRecoveryOverrides",
         "itemRecoveryPolicy",
         "localContractGenerators",
+        "lootGeneration",
         "missileConfigurations",
         "missionBoards",
         "missionBrokerEntries",
@@ -5917,6 +5921,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/LootDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfLootGenerationComponent": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/LootGenerationComponent"
           },
           "type": "array"
         }
@@ -20944,6 +20967,34 @@
         "recordPath",
         "sourceType",
         "values"
+      ],
+      "type": "object"
+    },
+    "LootGenerationComponent": {
+      "description": "Original loot generation configuration of one physical Entity component.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "componentOrdinal",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
       ],
       "type": "object"
     },

@@ -44,6 +44,7 @@ fn loot_source_declarations_resolve_to_their_physical_schema() -> TestResult {
     check_secondary_choices(&forge, &declared)?;
     check_themes(&forge, &declared)?;
     check_context(&forge, &declared)?;
+    check_entity(&forge, &declared)?;
     let mut physical = BTreeMap::<_, usize>::new();
     for record in forge.records() {
         watch.poll()?;
@@ -113,6 +114,27 @@ fn check_secondary_choices(forge: &DataForge<'_>, declared: &BTreeSet<&str>) -> 
     Ok(())
 }
 
+fn check_entity(forge: &DataForge<'_>, declared: &BTreeSet<&str>) -> TestResult {
+    if declared.contains("LootGenerationComponentParams") {
+        field(
+            forge,
+            "LootGenerationComponentParams",
+            "lootConfig",
+            DataType::Class,
+            false,
+            "LootConfig",
+        )?;
+        field(
+            forge,
+            "LootConfig",
+            "lootConstraints",
+            DataType::Class,
+            false,
+            "LootConstraints",
+        )?;
+    }
+    Ok(())
+}
 fn check_themes(forge: &DataForge<'_>, declared: &BTreeSet<&str>) -> TestResult {
     for (owner, name, target) in [
         (

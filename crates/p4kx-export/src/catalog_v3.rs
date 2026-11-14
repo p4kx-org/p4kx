@@ -140,6 +140,8 @@ pub(crate) mod catalog_ammo_containers;
 mod catalog_capacity;
 #[path = "catalog_declarations.rs"]
 pub(crate) mod catalog_declarations;
+#[path = "catalog_entity_component_read.rs"]
+mod catalog_entity_component_read;
 #[path = "catalog_entity_configurations.rs"]
 pub(crate) mod catalog_entity_configurations;
 #[path = "catalog_explosives.rs"]
@@ -162,8 +164,6 @@ pub(crate) mod catalog_item_alignment;
 pub(crate) mod catalog_item_components;
 #[path = "catalog_mission_board.rs"]
 mod catalog_mission_board;
-#[path = "catalog_mission_board_read.rs"]
-mod catalog_mission_board_read;
 #[path = "catalog_quantum_drive.rs"]
 pub(crate) mod catalog_quantum_drive;
 #[path = "catalog_resource_component.rs"]

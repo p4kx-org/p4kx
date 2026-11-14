@@ -9,7 +9,7 @@ pub(crate) type Checked<T = ()> = Result<T, Box<dyn Error>>;
 
 /// Strict test navigation over one serialized owner-local Loot value inventory.
 pub(crate) struct Graph<'catalog> {
-    row: &'catalog Value,
+    roots: &'catalog [Value],
     values: &'catalog [Value],
 }
 
@@ -42,13 +42,20 @@ impl<'catalog> Graph<'catalog> {
         }
         let row = found.ok_or("requested original Loot row")?;
         Ok(Self {
-            row,
+            roots: array(row, "fields")?,
             values: array(row, "values")?,
         })
     }
 
+    pub(crate) fn in_arena(arena: &'catalog Value) -> Checked<Self> {
+        Ok(Self {
+            roots: array(arena, "roots")?,
+            values: array(arena, "values")?,
+        })
+    }
+
     pub(crate) fn root(&self, name: &str) -> Checked<&'catalog Value> {
-        self.field(array(self.row, "fields")?, name)
+        self.field(self.roots, name)
     }
 
     pub(crate) fn field(&self, fields: &[Value], name: &str) -> Checked<&'catalog Value> {
