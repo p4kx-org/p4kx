@@ -34,8 +34,13 @@ All 38 shared changed FactionReputation Records show the four added presentation
 `description`, `background`, `missionBoardLogo` and `guildBanner`. The catalog already
 exports these fields under [#1073](https://github.com/p4kx-org/p4kx/issues/1073).
 The archived 5.0 audit below already identified the broader scope, Mission Board and
-FactionIdentity families. Preserve separate checks for Contract-level scope attribution, a
-runtime or authored PTU reputation multiplier, and actual source mapping of lock UI states.
+FactionIdentity families. In the current comparison, all 58 authored mission-reputation reward
+Records in the shared path family are unchanged, with zero unreadable Records. The type-wide
+inventory contains 58 LIVE and 70 PTU Records. The 12 additional PTU Records occur outside that
+path family and are already admitted by `definitions.reputationRewardAmounts`.
+The announced PTU reputation multiplier has no evidence in this comparison of stored awards.
+The existing Handler export exposes authored scope and default board availability.
+A distinct Contract- or SubContract-level override and the runtime multiplier remain unverified.
 
 The current DataForge declaration exposes the Bool `ContractResult_CompletionTags.splitPointsForParty`
 and the Int32 `LocationResourceSlot.numberOfResourceSlotsPerEntity`. The LIVE declaration of
@@ -74,15 +79,22 @@ with two exact Records in each Build. They qualify the original room controls
 Their DataForge owner is tracked separately in
 [#1149](https://github.com/p4kx-org/p4kx/issues/1149).
 
-The scoped Starchitect probe admitted all three system roots matching its original
-`system/<folder>/*system.socpak` rule. They are readable ObjectContainer v14 XML and
-carry 847 Child positions and 847 Child rotations. This root rule found no direct
-Tile edges. An independent directory search found 722 Starchitect Tile SOCPAKs,
-all added relative to current LIVE. The smallest selected Tile opened successfully.
-Its two XML files are a v14 descriptor containing Health and a layer list containing
-15 Layer elements. This proves the Tile can be read directly. An authored path from
-a system or location root to a Tile, and in-Tile HCD or EntXML binding, remain outside
-this sample. The earlier retained Starchitect reports came from a non-5.0 input.
+The system-root probe admitted three ObjectContainer v14 system roots and counted
+847 Child positions and rotations. The independent directory comparison found 722 Starchitect
+Tile SOCPAKs added relative to current LIVE. Directly opening the smallest selected Tile
+verified its descriptor and 15-element layer list.
+
+A second CRC-verified read establishes an authored chain from the Nyx system descriptor to
+the Nyx I descriptor and from there to a physical Starchitect Tile. The Nyx I descriptor has
+16,947 named external children with local position and rotation, including 15,076 Starchitect
+Tile instances and 125 distinct Tile targets. One target selected by its original Child
+reference opened successfully and its ObjectContainer v14 descriptor passed the CRC check.
+The Nyx I container holds 16,948 EntXML members. A direct inventory of a separate large Tile
+found 640 members and no EntXML or HCD members under the tested naming rules. These samples
+establish placement declarations and physical container reads. Full placement-export parity,
+individual EntXML or HCD bindings and source-backed AI, loot and harvestable joins remain with
+[#844](https://github.com/p4kx-org/p4kx/issues/844) and
+[#845](https://github.com/p4kx-org/p4kx/issues/845).
 The remaining per-domain source probes and any exporter follow-ups are tracked in
 [#1145](https://github.com/p4kx-org/p4kx/issues/1145).
 The current tuning test and other patch-note items come from the
