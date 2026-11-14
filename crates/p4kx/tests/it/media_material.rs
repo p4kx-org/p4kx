@@ -2,12 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fs;
+use std::path::Path;
 
-use p4kx_media::{Index, MediaKind, MediaRecord};
+use p4kx_media::{Identity, Index, MediaKind, MediaRecord, reconstruct_material_library};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
-use serde_json::Value;
+use serde_json::{Value, json};
 
-type TestResult = Result<(), Box<dyn std::error::Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 #[test]
 fn standalone_material_cli_export_keeps_original_bytes_and_uses_the_builtin_schema() -> TestResult {
@@ -27,52 +28,109 @@ fn standalone_material_cli_export_keeps_original_bytes_and_uses_the_builtin_sche
         .assert()
         .code(0);
     let index: Index = serde_json::from_slice(&fs::read(output.join("media-index.json"))?)?;
+    let [kind] = index.kinds.as_slice() else {
+        return Err("only the selected standalone material provider should run".into());
+    };
     assert_eq!(
-        index
-            .kinds
-            .iter()
-            .map(|kind| kind.provider.kind)
-            .collect::<Vec<_>>(),
-        [MediaKind::Material],
-        "explicit selection runs only the available material provider"
+        kind.provider.kind,
+        MediaKind::Material,
+        "explicit selection runs the material provider"
     );
-    let lines = fs::read_to_string(output.join(&index.artifact_base).join("material.jsonl"))?;
-    let mut rows = lines.lines();
-    let record: MediaRecord = serde_json::from_str(rows.next().ok_or("material row")?)?;
-    assert!(
-        rows.next().is_none(),
-        "an unused standalone library needs no model or geometry"
-    );
-    let raw = record.source.raw.as_ref().ok_or("exact original source")?;
     assert_eq!(
-        fs::read(output.join(&index.artifact_base).join(&raw.path))?,
+        kind.counts.source_entries.written, 1,
+        "all rows belong to one unused material source"
+    );
+    assert_eq!(
+        kind.counts.converted_outputs.enumerated, 0,
+        "a standalone material requires no geometry conversion"
+    );
+    let artifact_base = output.join(&index.artifact_base);
+    let rows = read_stream(&artifact_base.join(&kind.artifact.path))?;
+    let library = reconstruct_material_library(&rows)?;
+    let raw = library.source.raw.as_ref().ok_or("exact original source")?;
+    assert_eq!(
+        fs::read(artifact_base.join(&raw.path))?,
         source,
         "CLI retains the original decoded XML bytes independently"
     );
-    validate_material_schema(record)
+    validate_library(&library)
 }
 
-fn validate_material_schema(record: MediaRecord) -> TestResult {
-    let value = serde_json::to_value(record)?;
-    assert_eq!(
-        value
-            .pointer("/data/payload/references/0/submaterial")
-            .and_then(Value::as_str),
-        Some("007"),
-        "the original Submtl stays a name"
-    );
+fn read_stream(path: &Path) -> TestResult<Vec<MediaRecord>> {
     let validator = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
-    assert!(
-        validator.is_valid(&value),
-        "CLI row validates against its common builtin schema"
-    );
-    let mut wrong = value;
+    let values: Vec<Value> = fs::read_to_string(path)?
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<Result<_, _>>()?;
+    for value in &values {
+        validator
+            .validate(value)
+            .map_err(|error| error.to_string())?;
+    }
+    let [_, _, reference, _] = values.as_slice() else {
+        return Err("expected header, authored parts, layer reference and end".into());
+    };
+    let mut wrong = reference.clone();
     *wrong
-        .pointer_mut("/data/record_type")
-        .ok_or("record type")? = Value::String("failure".into());
+        .pointer_mut("/subresource/namespace")
+        .ok_or("record namespace")? = Value::String("material-library-header".into());
     assert!(
         !validator.is_valid(&wrong),
-        "the material-library namespace rejects the failure payload"
+        "the library-header namespace rejects an otherwise valid reference payload"
+    );
+    let rows: Vec<MediaRecord> = values
+        .into_iter()
+        .map(serde_json::from_value)
+        .collect::<Result<_, _>>()?;
+    assert_eq!(
+        rows.iter()
+            .map(|row| row.subresource.namespace.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "material-library-header",
+            "material-library-part",
+            "material-reference",
+            "material-library-end",
+        ],
+        "the stream contains only the standalone library and its authored metadata"
+    );
+    Ok(rows)
+}
+
+fn validate_library(record: &MediaRecord) -> TestResult {
+    let Identity::Entry { containers, entry } = &record.source.identity else {
+        return Err("the standalone library comes from a physical entry".into());
+    };
+    assert!(containers.is_empty(), "the source is in the root archive");
+    assert_eq!(
+        entry.path.replace('\\', "/"),
+        "Data/unused.mtl",
+        "the reconstructed library retains its source identity"
+    );
+    assert_eq!(
+        record
+            .data
+            .pointer("/payload/materials")
+            .and_then(Value::as_array)
+            .map(Vec::len),
+        Some(1),
+        "the selected source contributes exactly one material"
+    );
+    assert_eq!(
+        record.data.pointer("/payload/references"),
+        Some(&json!([{
+            "role": "layer-library",
+            "material": 0,
+            "slot": 0,
+            "submaterial": "007",
+            "reference": {
+                "original": {"type": "path", "value": "missing"},
+                "resolution": {"status": "missing"},
+                "observed_candidates": 0,
+                "candidates_complete": true
+            }
+        }])),
+        "the sole layer dependency retains the original path and Submtl name"
     );
     Ok(())
 }
