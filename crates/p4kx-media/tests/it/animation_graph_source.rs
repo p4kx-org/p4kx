@@ -86,27 +86,33 @@ fn assert_sub_database_fragments(rows: &[MediaRecord]) -> TestResult {
         })
         .collect();
     assert_eq!(selectors.len(), 5, "an absent Name still has an owned node");
-    assert!(selectors.iter().all(|selector| {
-        selector
-            .data
-            .pointer("/payload/location/parent")
-            .and_then(Value::as_str)
-            == Some(ordinal.as_str())
-    }));
+    assert!(
+        selectors.iter().all(|selector| {
+            selector
+                .data
+                .pointer("/payload/location/parent")
+                .and_then(Value::as_str)
+                == Some(ordinal.as_str())
+        }),
+        "fragment selector nodes point to the owning SubADB"
+    );
+    let first = selectors.first().ok_or("first fragment selector node")?;
     let named = rows
         .iter()
         .find(|row| row.data.pointer("/payload/field").and_then(Value::as_str) == Some("name"))
         .ok_or("sourced selector Name")?;
     assert_eq!(
         named.subresource.indices.first(),
-        selectors[0].subresource.indices.first()
+        first.subresource.indices.first(),
+        "the Name attribute identifies its own source element"
     );
     assert_eq!(
         named
             .data
             .pointer("/payload/declaration/value")
             .and_then(Value::as_str),
-        Some("FixtureGroup")
+        Some("FixtureGroup"),
+        "the typed attribute carries the original selector"
     );
     Ok(())
 }
