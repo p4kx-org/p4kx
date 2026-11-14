@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::cryxml::SourceElement;
+use p4kx_extraction::cryxml::animation_database::{
+    self, AnimationDatabase, AnimationLayer, FragmentOption, LayerItem,
+};
 use p4kx_extraction::{CancelToken, SourceScope, SourceUse};
 
 use crate::soc_scene::SocSceneError;
@@ -14,16 +17,14 @@ pub(crate) struct Draft {
     pub(super) branches: Vec<Branch>,
 }
 
-pub(crate) struct FragmentSite {
+pub(super) struct FragmentSite {
     pub(crate) list: usize,
     pub(crate) group: usize,
     pub(crate) option: usize,
 }
 
 pub(crate) struct FragmentInput<'document> {
-    pub(crate) site: FragmentSite,
-    pub(crate) group: SourceElement<'document>,
-    pub(crate) option: SourceElement<'document>,
+    pub(crate) source: FragmentOption<'document>,
     pub(crate) group_use: SourceUse,
     pub(crate) node_use: SourceUse,
 }
@@ -98,30 +99,29 @@ impl Draft {
 
     pub(crate) fn branches(
         &mut self,
-        root: SourceElement<'_>,
+        database: AnimationDatabase<'_>,
         cancel: &CancelToken,
     ) -> Result<(), SocSceneError> {
-        for (_, section) in ordered_children(root, "SubADBs") {
-            for (_, branch) in ordered_children(section, "SubADB") {
-                check(cancel)?;
-                let fragments = ordered_children(branch, "FragmentID")
-                    .map(|(ordinal, fragment)| {
-                        check(cancel)?;
-                        Ok(BranchFragment {
-                            ordinal,
-                            position: position(fragment)?,
-                            name: Selector::read(fragment, "Name")?,
-                        })
+        for branch in database.branches() {
+            check(cancel)?;
+            let fragments = branch
+                .fragments()
+                .map(|(ordinal, fragment)| {
+                    check(cancel)?;
+                    Ok(BranchFragment {
+                        ordinal,
+                        position: position(fragment)?,
+                        name: Selector::read(fragment, "Name")?,
                     })
-                    .collect::<Result<_, SocSceneError>>()?;
-                let ordinal = self.branches.len();
-                self.branches.push(Branch {
-                    ordinal,
-                    position: position(branch)?,
-                    tags: Selector::read(branch, "Tags")?,
-                    fragments,
-                });
-            }
+                })
+                .collect::<Result<_, SocSceneError>>()?;
+            let ordinal = self.branches.len();
+            self.branches.push(Branch {
+                ordinal,
+                position: position(branch.element())?,
+                tags: Selector::read(branch.element(), "Tags")?,
+                fragments,
+            });
         }
         Ok(())
     }
@@ -132,17 +132,23 @@ impl Draft {
         cancel: &CancelToken,
     ) -> Result<(), SocSceneError> {
         let FragmentInput {
-            site,
-            group,
-            option,
+            source,
             group_use,
             node_use,
         } = input;
-        let layers = ordered_children(option, "AnimLayer")
-            .map(|(ordinal, layer)| Layer::read(ordinal, layer, cancel))
+        let (list, group_ordinal, option_ordinal) = source.ordinals();
+        let group = source.group();
+        let option = source.element();
+        let layers = source
+            .layers()
+            .map(|layer| Layer::read(layer, cancel))
             .collect::<Result<_, _>>()?;
         self.fragments.push(Fragment {
-            site,
+            site: FragmentSite {
+                list,
+                group: group_ordinal,
+                option: option_ordinal,
+            },
             group_position: position(group)?,
             group_use,
             name: group.name().to_owned(),
@@ -158,34 +164,27 @@ impl Draft {
 }
 
 impl Layer {
-    fn read(
-        ordinal: usize,
-        layer: SourceElement<'_>,
-        cancel: &CancelToken,
-    ) -> Result<Self, SocSceneError> {
+    fn read(layer: AnimationLayer<'_>, cancel: &CancelToken) -> Result<Self, SocSceneError> {
         check(cancel)?;
         let mut animations = Vec::new();
         let mut blends = Vec::new();
-        for (ordinal, node) in layer.elements().enumerate() {
+        for (ordinal, item) in layer.items() {
             check(cancel)?;
-            if node.namespace().is_some() {
-                continue;
-            }
-            match node.name() {
-                "Blend" => blends.push(Blend::read(ordinal, node)?),
-                "Animation" => animations.push(Animation {
+            match item {
+                LayerItem::Blend(blend) => blends.push(Blend::read(ordinal, blend.element())?),
+                LayerItem::Animation(animation) => animations.push(Animation {
                     ordinal,
-                    position: position(node)?,
-                    name: Selector::read(node, "name")?,
-                    flags: Selector::read(node, "flags")?,
+                    position: position(animation.element())?,
+                    name: Selector::read(animation.element(), "name")?,
+                    flags: Selector::read(animation.element(), "flags")?,
                     preceding_blend: blends.len().checked_sub(1),
                 }),
                 _ => {}
             }
         }
         Ok(Self {
-            ordinal,
-            position: position(layer)?,
+            ordinal: layer.ordinal(),
+            position: position(layer.element())?,
             animations,
             blends,
         })
@@ -206,9 +205,7 @@ impl Blend {
 
 impl Selector {
     fn read(node: SourceElement<'_>, name: &'static str) -> Result<Self, SocSceneError> {
-        let occurrences = node
-            .attributes()
-            .filter(|attribute| attribute.namespace().is_none() && attribute.name() == name)
+        let occurrences = animation_database::attributes(node, name)
             .map(|attribute| {
                 Ok(Attribute {
                     position: SocXmlPosition::attribute(attribute.position())?,
@@ -218,16 +215,6 @@ impl Selector {
             .collect::<Result<_, SocSceneError>>()?;
         Ok(Self { name, occurrences })
     }
-}
-
-pub(crate) fn ordered_children<'document>(
-    parent: SourceElement<'document>,
-    name: &'static str,
-) -> impl Iterator<Item = (usize, SourceElement<'document>)> {
-    parent
-        .elements()
-        .enumerate()
-        .filter(move |(_, node)| node.namespace().is_none() && node.name() == name)
 }
 
 pub(super) fn check(cancel: &CancelToken) -> Result<(), SocSceneError> {

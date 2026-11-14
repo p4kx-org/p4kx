@@ -8,6 +8,7 @@
 //! turns a `CryXml` byte slice of either byte order into a [`Document`] that borrows its strings
 //! from the input; [`read`] does both and passes text XML through unchanged.
 
+pub mod animation_database;
 mod comparison;
 mod depth;
 mod document;

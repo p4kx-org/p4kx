@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::cryxml::SourceElement;
+use p4kx_extraction::cryxml::animation_database::AnimationDatabase;
 use p4kx_extraction::{
     CancelToken, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
 };
@@ -9,7 +9,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
-use crate::soc_scene_class_mannequin::{children, string_attribute};
+use crate::soc_scene_class_mannequin::string_attribute;
 use crate::soc_scene_class_resources::Resource;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
 use crate::soc_scene_rooms::position;
@@ -45,24 +45,22 @@ pub(in super::super) struct SubDatabase {
 
 impl SubDatabase {
     pub(in super::super) fn read_all(
-        root: SourceElement<'_>,
+        database: AnimationDatabase<'_>,
         origin: &XmlOrigin<'_>,
         cancel: &CancelToken,
     ) -> Result<Vec<Self>, SocSceneError> {
         let mut links = Vec::new();
-        for section in children(root, "SubADBs") {
-            let section_use = origin.node(section, SourceUseRole::Selector)?;
-            for node in children(section, "SubADB") {
+        for section in database.sections() {
+            let section_use = origin.node(section.element(), SourceUseRole::Selector)?;
+            for branch in section.branches() {
+                let node = branch.element();
                 if cancel.is_cancelled() {
                     return Err(SocSceneError::Cancelled);
                 }
                 let node_use = origin.node(node, SourceUseRole::Selector)?;
                 let mut uses = vec![section_use.clone(), node_use.clone()];
                 let mut files = Vec::new();
-                for attribute in node
-                    .attributes()
-                    .filter(|a| a.namespace().is_none() && a.name() == "File")
-                {
+                for attribute in branch.files() {
                     let (_, selector) = origin.attribute(&attribute, SourceUseRole::Selector)?;
                     files.push(origin.sources.value(
                         SourceValue::Present(attribute.value().to_owned()),

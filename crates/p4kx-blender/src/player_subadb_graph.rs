@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::io;
 
+use p4kx_extraction::cryxml::animation_database::AnimationDatabase;
 use p4kx_extraction::{
     PhysicalSourceRef, SourceUse, SourceUses, SourceValue, SourcedValue, archive_animation_path,
 };
@@ -254,12 +255,17 @@ impl Graph<'_, '_, '_> {
                 ResourceKind::DataRelative,
                 self.documents,
                 |document, origin, documents| {
-                    if document.root().name() != "AnimDB" || document.root().namespace().is_some() {
+                    let Some(original) = AnimationDatabase::from_root(document.root()) else {
                         return Ok(None);
-                    }
+                    };
                     let draft = documents.adb_declaration(origin);
-                    let mut database =
-                        Database::read(document, origin, self.resources.cancel, draft)?;
+                    let mut database = Database::read(
+                        original,
+                        document.is_lossy(),
+                        origin,
+                        self.resources.cancel,
+                        draft,
+                    )?;
                     let index = documents.bind(document, origin)?;
                     if let Some(seeds) = documents.tag_definitions() {
                         seeds.owner(index, document.root(), origin)?;

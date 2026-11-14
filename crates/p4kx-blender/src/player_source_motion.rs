@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::cryxml::SourceDocument;
+use p4kx_extraction::cryxml::animation_database::AnimationDatabase;
 use p4kx_extraction::{
     CancelToken, SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceValue, SourcedValue,
     StructValue, Value,
@@ -216,7 +217,9 @@ impl MotionInput<'_, '_, '_> {
             documents,
             |xml, origin, cancel, documents, index| {
                 let draft = documents.adb_declaration(origin);
-                let mut database = Database::read(xml, origin, cancel, draft)?;
+                let original =
+                    AnimationDatabase::from_root(xml.root()).ok_or(SocSceneError::Position)?;
+                let mut database = Database::read(original, xml.is_lossy(), origin, cancel, draft)?;
                 database.retain_declarations(documents, index);
                 Ok(database)
             },

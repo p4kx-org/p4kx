@@ -3,14 +3,15 @@
 
 use std::collections::HashMap;
 
-use p4kx_extraction::cryxml::{SourceDocument, SourceElement};
+use p4kx_extraction::cryxml::SourceElement;
+use p4kx_extraction::cryxml::animation_database::AnimationDatabase;
 use p4kx_extraction::{
     CancelToken, PhysicalSourceRef, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::player_adb_declarations::{Draft, FragmentInput, FragmentSite, ordered_children};
+use crate::player_adb_declarations::{Draft, FragmentInput};
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_class_mannequin::string_attribute;
 use crate::soc_scene_class_resources::{Resource, ResourceKind, Resources, resource_path};
@@ -123,24 +124,25 @@ impl AuthoredFile {
 
 impl Database {
     pub(super) fn read(
-        document: &SourceDocument<'_>,
+        database: AnimationDatabase<'_>,
+        lossy: bool,
         origin: &XmlOrigin<'_>,
         cancel: &CancelToken,
         mut declarations: Option<Draft>,
     ) -> Result<Self, SocSceneError> {
-        let root = document.root();
+        let root = database.root();
         let file = AuthoredFile::at([root], root, "FragDef", origin)?;
         let tag_file = string_attribute(root, "TagDef", origin)?;
-        let links = SubDatabase::read_all(root, origin, cancel)?;
+        let links = SubDatabase::read_all(database, origin, cancel)?;
         if let Some(draft) = &mut declarations {
-            draft.branches(root, cancel)?;
+            draft.branches(database, cancel)?;
         }
-        let options = database_options(root, origin, cancel, declarations.as_mut())?;
+        let options = database_options(database, origin, cancel, declarations.as_mut())?;
         Ok(Self {
             source: origin.source(),
             root_use: origin.node(root, SourceUseRole::Payload)?,
             links,
-            lossy: document.is_lossy(),
+            lossy,
             file,
             tag_file,
             options,
@@ -163,47 +165,37 @@ impl Database {
 }
 
 fn database_options(
-    root: SourceElement<'_>,
+    database: AnimationDatabase<'_>,
     origin: &XmlOrigin<'_>,
     cancel: &CancelToken,
     mut declarations: Option<&mut Draft>,
 ) -> Result<Vec<OptionInput>, SocSceneError> {
     let mut options = Vec::new();
-    for (list_ordinal, list) in ordered_children(root, "FragmentList") {
-        for (group_ordinal, group) in list.elements().enumerate() {
-            if group.namespace().is_some() {
-                continue;
-            }
+    for group in database.groups() {
+        check(cancel)?;
+        let group_use = origin.node(group.element(), SourceUseRole::Selector)?;
+        for source in group.options() {
             check(cancel)?;
-            let group_use = origin.node(group, SourceUseRole::Selector)?;
-            for (option_ordinal, option) in ordered_children(group, "Fragment") {
-                check(cancel)?;
-                let original = OptionInput {
-                    position: position(option)?,
-                    name: group.name().to_owned(),
-                    group_use: group_use.clone(),
-                    tags: string_attribute(option, "Tags", origin)?,
-                    fragment_tags: string_attribute(option, "FragTags", origin)?,
-                    node_use: origin.node(option, SourceUseRole::Payload)?,
-                };
-                if let Some(draft) = &mut declarations {
-                    draft.fragment(
-                        FragmentInput {
-                            site: FragmentSite {
-                                list: list_ordinal,
-                                group: group_ordinal,
-                                option: option_ordinal,
-                            },
-                            group,
-                            option,
-                            group_use: original.group_use.clone(),
-                            node_use: original.node_use.clone(),
-                        },
-                        cancel,
-                    )?;
-                }
-                options.push(original);
+            let option = source.element();
+            let original = OptionInput {
+                position: position(option)?,
+                name: group.element().name().to_owned(),
+                group_use: group_use.clone(),
+                tags: string_attribute(option, "Tags", origin)?,
+                fragment_tags: string_attribute(option, "FragTags", origin)?,
+                node_use: origin.node(option, SourceUseRole::Payload)?,
+            };
+            if let Some(draft) = &mut declarations {
+                draft.fragment(
+                    FragmentInput {
+                        source,
+                        group_use: original.group_use.clone(),
+                        node_use: original.node_use.clone(),
+                    },
+                    cancel,
+                )?;
             }
+            options.push(original);
         }
     }
     Ok(options)

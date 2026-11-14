@@ -148,6 +148,17 @@ origins. A parameters body retains the original macro reference and total.
 Other admitted damage bodies and unprojected members remain in the authored
 arena. The catalog retains these inputs for consumers to evaluate.
 
+On PTU 13189690 the Player animation component's authored `animDatabase3P` leads to
+`AnimDB/SubADBs/SubADB@File` and ordered `FragmentID@Name` declarations. Two resolved
+sub-databases contain 323 options in the selected reload fragment groups. The source
+carries option blend-out, layer blend start, exit and duration attributes, and optionally
+animation playback speed. The shared CryXML animation database reader keeps each original
+position, tag condition and alternative. The Player exporter reads that structure through
+the shared reader. The Catalog currently exports controller locators. Combining weapon
+motion tag scope with those options and exporting the resulting candidates is tracked
+in [#1053](https://github.com/p4kx-org/p4kx/issues/1053). The authored blend and playback
+values do not specify a total elapsed reload time.
+
 A projectile launcher's `heatCost` and the action's
 `heatPerShot` remain independent Single values. The other admitted action
 declarations retain their original fields and local value links under the
