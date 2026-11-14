@@ -81,6 +81,23 @@ def recipe_source(commit, recipes):
     return reference
 
 
+def preload_distfile(origin, recipe, distfiles):
+    """Preloads the locked official distfile for the installed recipe origin."""
+    if "distfile" not in recipe:
+        return None
+    pinned = recipe["distfile"]
+    name = pinned.get("name", "")
+    expected = pinned.get("sha256", "")
+    if (pinned.get("origin") != origin
+            or not re.fullmatch(r"[a-zA-Z0-9][a-zA-Z0-9._+-]*", name)
+            or not re.fullmatch(r"[0-9a-f]{64}", expected)
+            or pinned.get("url") != f"https://distfiles.alpinelinux.org/distfiles/v3.23/{name}"):
+        raise ValueError(f"invalid Alpine distfile pin: {origin}")
+    distfiles.mkdir()
+    actual = download(pinned["url"], distfiles / name, expected)
+    return {"name": name, "url": pinned["url"], "sha256": actual}
+
+
 def alpine_source(origin, packages, sources, licences, recipes):
     """Collects installed static library sources using their signed package recipe commits."""
     installed = [entry for entry in packages if entry.get("o") == origin]
@@ -110,15 +127,20 @@ def alpine_source(origin, packages, sources, licences, recipes):
         unpacked.mkdir()
         tar.extractall(unpacked, members=selected, filter="data")
     recipe = unpacked / Path(matches[0].name).parent
-    environment = dict(os.environ, SRCDEST=str(directory / "distfiles"))
+    distfiles = directory / "distfiles"
+    preloaded = preload_distfile(origin, reference, distfiles)
+    environment = dict(os.environ, SRCDEST=str(distfiles))
     subprocess.run(["abuild", "-F", "fetch", "verify", "unpack"], cwd=recipe, env=environment, check=True)
     notices = copy_licences(recipe / "src", licences / origin)
-    return {
+    result = {
         "name": origin, "version": version, "recipe_commit": commit,
         "recipe_source": recipe_url, "recipe_archive_sha256": recipe_archive_digest,
         "licence_expressions": sorted({entry["L"] for entry in installed}),
         "licences": notices,
     }
+    if preloaded is not None:
+        result["distfile"] = preloaded
+    return result
 
 
 def linked_archives(upstream, installed, expected, built):

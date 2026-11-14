@@ -52,7 +52,13 @@
       "0436c6d655a04cbfd7987202a970f5aa7870a901": {
         "url": "https://gitlab.alpinelinux.org/api/v4/projects/alpine%2Faports/repository/archive.tar.gz?sha=0436c6d655a04cbfd7987202a970f5aa7870a901",
         "sha256": "920cc2abb5787c04c5072c489771f2128c2957962ff7de2ffdb69c9c2ba26049",
-        "archive_root": "aports-0436c6d655a04cbfd7987202a970f5aa7870a901-0436c6d655a04cbfd7987202a970f5aa7870a901"
+        "archive_root": "aports-0436c6d655a04cbfd7987202a970f5aa7870a901-0436c6d655a04cbfd7987202a970f5aa7870a901",
+        "distfile": {
+          "origin": "zlib",
+          "name": "zlib-1.4.tar.gz",
+          "url": "https://distfiles.alpinelinux.org/distfiles/v3.23/zlib-1.4.tar.gz",
+          "sha256": "02dd159783677a749c04adbdd02b55b8a2bcc7e054f51b76b549199a916ad584"
+        }
       },
       "254024f3b0572339fd24fae8865a4e313239ba71": {
         "url": "https://github.com/alpinelinux/aports/archive/254024f3b0572339fd24fae8865a4e313239ba71.tar.gz",

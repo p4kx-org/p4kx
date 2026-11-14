@@ -8,6 +8,11 @@ corresponding sources and Alpine recipes are alongside them.
 The recipe archives use Alpine's official GitHub mirror or public GitLab repository API, with
 the exact signed-package recipe commit, archive root and SHA-256 pinned in `inputs.json`.
 
+The zlib distfile for the pinned recipe is preloaded from Alpine's v3.23 distfiles mirror.
+The collector verifies the pinned SHA-256 before invoking the original recipe's
+`abuild fetch verify unpack`. The recipe checks its own SHA-512 and the exact distfile remains
+in `zlib/distfiles/`. The corresponding source inventory records the distfile URL and digest.
+
 `type2-runtime/src/runtime/Makefile` contains the complete compiler and static linker command.
 The runtime source is MIT-licensed. Each library's original notices are under `licences/`;
 libfuse's LGPL terms remain applicable to that library.

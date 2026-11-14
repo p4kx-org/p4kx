@@ -162,6 +162,78 @@ class SourceInventoryTests(unittest.TestCase):
                     collect_sources.alpine_source("synthetic", packages, changed_sources, self.directory / "changed-notices", {commit: dict(reference, sha256="0" * 64)})
         abuild.assert_not_called()
 
+    def test_pinned_distfile_is_preloaded_before_abuild_checks_the_original_recipe(self):
+        """The exact mirror bytes reach SRCDEST before the original recipe stages run."""
+        commit = "a" * 40
+        root = f"aports-{commit}"
+        archive_bytes = io.BytesIO()
+        with tarfile.open(fileobj=archive_bytes, mode="w") as archive:
+            recipe = b'pkgname=synthetic\nsource="https://example.invalid/original.tar.gz"\n'
+            entry = tarfile.TarInfo(f"{root}/main/synthetic/APKBUILD")
+            entry.size = len(recipe)
+            archive.addfile(entry, io.BytesIO(recipe))
+        source = archive_bytes.getvalue()
+        distfile = b"exact synthetic source archive"
+        filename = "original.tar.gz"
+        url = f"https://distfiles.alpinelinux.org/distfiles/v3.23/{filename}"
+        pin = {
+            "origin": "synthetic",
+            "name": filename,
+            "url": url,
+            "sha256": hashlib.sha256(distfile).hexdigest(),
+        }
+        reference = {
+            "url": f"https://github.com/alpinelinux/aports/archive/{commit}.tar.gz",
+            "archive_root": root,
+            "sha256": hashlib.sha256(source).hexdigest(),
+            "distfile": pin,
+        }
+        packages = [{"o": "synthetic", "V": "1.0-r0", "c": commit, "L": "MIT"}]
+
+        def unpack(command, *, cwd, env, check):
+            self.assertEqual(command, ["abuild", "-F", "fetch", "verify", "unpack"])
+            self.assertTrue(check)
+            self.assertEqual((cwd / "APKBUILD").read_bytes(), recipe)
+            self.assertEqual((Path(env["SRCDEST"]) / filename).read_bytes(), distfile)
+            (cwd / "src").mkdir()
+            (cwd / "src" / "LICENSE").write_bytes(b"Synthetic licence\n")
+
+        for label, body in [("matched", distfile), ("changed", b"changed mirror response")]:
+            sources = self.directory / label
+            sources.mkdir()
+            responses = [io.BytesIO(source), io.BytesIO(body)]
+            with patch.object(collect_sources.urllib.request, "urlopen", side_effect=responses) as request:
+                with patch.object(collect_sources.subprocess, "run", side_effect=unpack) as abuild:
+                    args = ("synthetic", packages, sources, self.directory / "notices", {commit: reference})
+                    if label == "changed":
+                        with self.assertRaisesRegex(ValueError, "digest mismatch"):
+                            collect_sources.alpine_source(*args)
+                        abuild.assert_not_called()
+                    else:
+                        result = collect_sources.alpine_source(*args)
+                        abuild.assert_called_once()
+                        self.assertEqual(result["distfile"], {"name": filename, "url": url, "sha256": pin["sha256"]})
+            self.assertEqual([call.args[0] for call in request.call_args_list], [reference["url"], url])
+
+    def test_distfile_pin_rejects_a_different_origin_unsafe_name_host_or_digest(self):
+        """Only a safe distfile on the exact official path can be staged for verification."""
+        name = "original.tar.gz"
+        url = f"https://distfiles.alpinelinux.org/distfiles/v3.23/{name}"
+        pin = {"origin": "synthetic", "name": name, "url": url, "sha256": "a" * 64}
+        for changed in (
+            dict(pin, origin="other"),
+            dict(pin, name="../original.tar.gz"),
+            dict(pin, url="https://example.invalid/original.tar.gz"),
+            dict(pin, url=url.replace("v3.23", "edge")),
+            dict(pin, sha256="not a digest"),
+        ):
+            with self.subTest(changed=changed):
+                with patch.object(collect_sources.urllib.request, "urlopen") as request:
+                    with self.assertRaisesRegex(ValueError, "invalid Alpine distfile pin"):
+                        collect_sources.preload_distfile("synthetic", {"distfile": changed}, self.directory)
+                request.assert_not_called()
+
+
     def test_retained_build_input_rejects_parent_traversal(self):
         """A compiled-input receipt cannot read files outside the retained build root."""
         owned = self.directory / "owned"
