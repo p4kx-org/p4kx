@@ -91,6 +91,23 @@ fn check_original_values(row: &Value) {
         row.pointer("/dynamics/afterburnerNew/value/afterburnerRampMapping/value/points/value/1/value/x/value/finite"),
         Some(&json!(0.75)),
     );
+    for block in ["afterburner", "afterburnerNew"] {
+        let base = format!("/dynamics/{block}/value/afterburnerAngCapacitorScalingCurve");
+        assert_eq!(
+            row.pointer(&format!("{base}/state")),
+            Some(&json!("invalid"))
+        );
+        assert_eq!(
+            row.pointer(&format!("{base}/containsEncryptedSource")),
+            Some(&json!(false)),
+        );
+        assert_eq!(
+            row.pointer(&format!(
+                "/dynamics/{block}/value/additionalFields/roots/0/name/value"
+            )),
+            Some(&json!("afterburnerAngCapacitorScalingCurve")),
+        );
+    }
     assert_eq!(
         row.pointer("/additionalFields/roots/0/name/value"),
         Some(&json!("fixtureUnknown"))
@@ -125,6 +142,7 @@ fn fixture() -> DataForgeBuilder {
         .structure(
             TestStruct::new(BURN)
                 .field("capacitorMax", TestType::Single)
+                .field("afterburnerAngCapacitorScalingCurve", TestType::UInt32)
                 .field("afterburnerRampMapping", TestType::Class(CURVE.to_owned())),
         )
         .structure(
@@ -164,6 +182,7 @@ fn burn(capacity: f32) -> TestValue {
     TestValue::Struct(
         TestInstance::new(BURN)
             .value("capacitorMax", TestValue::Single(capacity))
+            .value("afterburnerAngCapacitorScalingCurve", TestValue::UInt32(7))
             .value("afterburnerRampMapping", TestValue::Struct(curve)),
     )
 }
