@@ -8,6 +8,10 @@ use serde::Serialize;
 use super::authored_fields::Observed;
 #[path = "catalog_missile_configuration.rs"]
 pub(crate) mod catalog_missile_configuration;
+#[path = "primeable.rs"]
+mod primeable;
+#[path = "triggerable_device.rs"]
+mod triggerable_device;
 
 use super::item_component_owner::ComponentOwner;
 use super::ordnance_fields::{BombFields, OrdnanceFields};
@@ -17,6 +21,8 @@ use crate::catalog_table::CatalogTable;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use catalog_missile_configuration as missile;
+use primeable::Primeable;
+use triggerable_device::TriggerableDevice;
 
 const SENSOR_MINE: &str = "SSensorMineComponentParams";
 const ORDNANCE: &str = "SExplosiveOrdnanceParams";
@@ -30,6 +36,8 @@ pub(super) enum ExplosiveComponent {
     Bomb,
     SpaceMine,
     Missile,
+    TriggerableDevice,
+    Primeable,
 }
 
 impl ExplosiveComponent {
@@ -40,6 +48,8 @@ impl ExplosiveComponent {
             BOMB => Some(Self::Bomb),
             SPACE_MINE => Some(Self::SpaceMine),
             missile::SOURCE_TYPE => Some(Self::Missile),
+            triggerable_device::SOURCE_TYPE => Some(Self::TriggerableDevice),
+            primeable::SOURCE_TYPE => Some(Self::Primeable),
             _ => None,
         }
     }
@@ -90,11 +100,27 @@ impl<'source> Explosive<'source> {
 )]
 #[schemars(transform = every_field_required)]
 enum ExplosiveConfiguration<'source> {
-    SensorMine { value: Box<SensorMine> },
-    Ordnance { value: Box<OrdnanceFields<'source>> },
-    Bomb { value: Box<BombFields<'source>> },
-    SpaceMine { value: Box<OrdnanceFields<'source>> },
-    Missile { value: Box<OrdnanceFields<'source>> },
+    SensorMine {
+        value: Box<SensorMine>,
+    },
+    Ordnance {
+        value: Box<OrdnanceFields<'source>>,
+    },
+    Bomb {
+        value: Box<BombFields<'source>>,
+    },
+    SpaceMine {
+        value: Box<OrdnanceFields<'source>>,
+    },
+    Missile {
+        value: Box<OrdnanceFields<'source>>,
+    },
+    TriggerableDevice {
+        value: Box<TriggerableDevice<'source>>,
+    },
+    Primeable {
+        value: Box<Primeable<'source>>,
+    },
 }
 
 impl<'source> ExplosiveConfiguration<'source> {
@@ -115,6 +141,12 @@ impl<'source> ExplosiveConfiguration<'source> {
             },
             ExplosiveComponent::SpaceMine => Self::SpaceMine {
                 value: Box::new(OrdnanceFields::read(source, notes)?),
+            },
+            ExplosiveComponent::TriggerableDevice => Self::TriggerableDevice {
+                value: Box::new(TriggerableDevice::read(source, notes)?),
+            },
+            ExplosiveComponent::Primeable => Self::Primeable {
+                value: Box::new(Primeable::read(source, notes)?),
             },
             ExplosiveComponent::Missile => Self::Missile {
                 value: Box::new(OrdnanceFields::read(source, notes)?),
@@ -137,6 +169,8 @@ pub(crate) fn table<'source>(
             BOMB,
             SPACE_MINE,
             missile::SOURCE_TYPE,
+            triggerable_device::SOURCE_TYPE,
+            primeable::SOURCE_TYPE,
         ],
         rows,
     )

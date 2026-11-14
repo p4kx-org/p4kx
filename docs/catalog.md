@@ -222,9 +222,11 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `configurations.quantumDrives` | Original quantum drive components with independent standard, spline, thermal and boost values. [Quantum drives](catalog-quantum-drives.md) |
 | `configurations.lootGeneration` | Original Entity loot components, ordered constraints, theme references and secondary-choice wrappers. [Loot source](catalog-loot-source.md) |
 | `configurations.shieldGenerators` | Original shield generator component occurrences, typed values and provenance. [Shield generators](catalog-shield-generators.md) |
-| `configurations.explosives` | Original sensor mine triggers and explosive ordnance settings by physical Item and component position. [Explosive components](catalog-explosives.md) |
+| `configurations.explosives` | Original sensor mine triggers, explosive ordnance, triggerable devices and priming by physical Item and component position. [Explosive components](catalog-explosives.md) |
+| `configurations.countermeasureEmitters` | Physical launcher routes with references to canonical ammunition profiles and distinct container counts. [Countermeasure emitters](catalog-countermeasure-emitters.md) |
 | `configurations.hackingChips` | Original chip charge counts and ordered removable modifier declarations by physical Item and component slot. [Hacking chips](catalog-hacking-chips.md) |
 | `configurations.hackableDevices` | Original target-device timing, error checks and audio declarations by physical Entity and component slot. Hacking state links remain in `configurations.interactions`. [Hacking devices](catalog-hacking-chips.md#hackable-devices) |
+| `configurations.jumpPointConfigurations` | Original physical jump-point component parameters. [Jump points](catalog-jump-points.md) |
 | `configurations.blueprintTiers` | Every interpreted tier with cost relationships, normalized values and Research |
 | `projections.blueprintPresentation` | Source-backed name, category, product, default availability, dismantle and first-tier ingredient links |
 | `definitions.resourceGroups`, `declarations.resourceGroupMembers`, `projections.resourceGroupParents` | Physical group definitions, every ordered authored membership and the first-selected parent with direct per-value origins ([contract](catalog-resource-groups.md)) |
@@ -239,6 +241,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `loadouts` | The ports of every ship and of every item that has ports, with the Entity the Default Loadout attaches to each, ordered by `entityGuid` |
 | `definitions.starmapObjects` | Authored starmap objects with original links, presentation and navigation settings, ordered by GUID and physical Record index |
 | `placements.starmapPlacements` | The selected world placement of each physical starmap object |
+| `placements.jumpEndpoints` | Each evidenced jump endpoint occurrence, its local and world poses and the physical SOCPAK gate declarations. [Jump points](catalog-jump-points.md) |
 | `definitions.contractGenerators`, `projections.contracts`, `projections.missionTitles` | Physical Generator definitions, logical contract and sub-contract rows, and their sourced titles and descriptions ([contract](catalog-contract-generators.md)) |
 | `definitions.contractScopes` | Physical `ContractScopeGlobalParams` Records with seven individually sourced labels and icons. [Contract scope vocabulary](catalog-location-vocabulary.md#global-contract-scopes) |
 | `definitions.missionModuleDeclarations` | Physical `ModuleDeclaration` Records and authored location acquisition, spawned entities and variable bindings. [Mission module declarations](catalog-location-configuration.md#physical-module-declarations) |

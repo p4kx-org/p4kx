@@ -4,13 +4,34 @@
 use std::sync::Arc;
 
 use super::{System, WalkPath};
-use crate::starmap_containers::instance::ContainerFile;
+use crate::starmap_containers::instance::{ContainerFile, ContainerOccurrence};
 use crate::starmap_containers::location_instance::LocationOccurrence;
 use crate::starmap_parse::Child;
 use crate::starmap_xml::AuthoredPose;
 use crate::{CatalogError, ExportAccountingError};
 
 impl System<'_> {
+    pub(super) fn record_instance(
+        &mut self,
+        path: &WalkPath,
+        file: &ContainerFile,
+    ) -> Result<(), CatalogError> {
+        let instance = ContainerOccurrence {
+            system: &self.name,
+            root_entry: self.root_entry,
+            root_inputs: &self.root,
+            route: path.route.as_deref(),
+            parent_route: path.parent_instance.as_deref(),
+            declared: path.via.as_ref(),
+            local: path.local,
+            world: path.transform,
+        };
+        self.read
+            .instances
+            .push(instance.project(file, self.capture)?);
+        Ok(())
+    }
+
     pub(super) fn record_location(
         &mut self,
         child: &Child,

@@ -19,6 +19,9 @@ use crate::real_archive_item_components::{
 use crate::real_archive_item_durability::{self as proof, Trace};
 use crate::real_archive_verification;
 
+#[path = "real_archive_device_triggers.rs"]
+mod device_triggers;
+
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const KINDS: &[(&str, &str)] = &[
@@ -27,6 +30,11 @@ const KINDS: &[(&str, &str)] = &[
     ("SCItemBombParams", "bomb"),
     ("SCItemSpaceMineParams", "spaceMine"),
     ("SCItemMissileParams", "missile"),
+    (
+        "EntityComponentTriggerableDevicesParams",
+        "triggerableDevice",
+    ),
+    ("SPrimeableComponentParams", "primeable"),
 ];
 const ORDNANCE: &[(&str, &str)] = &[
     ("requiresLauncher", "requiresLauncher"),
@@ -55,6 +63,8 @@ const PROXIMITY: &[(&str, &str)] = &[
 #[derive(Default)]
 struct Counts {
     devices: usize,
+    triggerable_devices: usize,
+    primeable_devices: usize,
     triggers: usize,
     scalars: usize,
 }
@@ -67,7 +77,11 @@ fn explosive_components_match_actual_item_slots_and_sensor_source_fields() -> Te
     let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
     let watch = ArchiveWatch::new(&archive);
     let entry = DataForgeEntry::read(&archive).map_err(|_| "read configured DataForge")?;
-    let filter = Filter::new(FILTER);
+    let filter = std::env::var("P4KX_EXPLOSIVE_COMPONENT_FILTER")
+        .ok()
+        .map(|filter| Filter::parse(&filter).map_err(|_| "invalid explosive component scope"))
+        .transpose()?
+        .unwrap_or_else(|| Filter::new(FILTER));
     let options = CatalogOptions {
         filter: Some(&filter),
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
@@ -84,10 +98,26 @@ fn explosive_components_match_actual_item_slots_and_sensor_source_fields() -> Te
     if std::env::var_os("P4KX_EXPECT_EXPLOSIVE_COMPONENTS").is_some() && counts.devices == 0 {
         return Err("configured Build must exercise an original explosive component".into());
     }
+    verify_grenade_presence(&counts)?;
     real_archive_verification::print_line(&format!(
-        "explosive components: {} device slots, {} trigger slots, {} original scalar fields",
-        counts.devices, counts.triggers, counts.scalars,
+        "explosive components: {} device slots ({} triggerable, {} primeable), {} trigger slots, {} original scalar fields",
+        counts.devices,
+        counts.triggerable_devices,
+        counts.primeable_devices,
+        counts.triggers,
+        counts.scalars,
     ));
+    Ok(())
+}
+
+fn verify_grenade_presence(counts: &Counts) -> TestResult {
+    if std::env::var_os("P4KX_EXPECT_GRENADE_COMPONENTS").is_some()
+        && (counts.triggerable_devices == 0 || counts.primeable_devices == 0)
+    {
+        return Err(
+            "configured Build must exercise both original grenade component families".into(),
+        );
+    }
     Ok(())
 }
 
@@ -182,6 +212,13 @@ fn compare_components<'source>(
             )?;
             counts.scalars += compare_trigger(trace, component, cell(config, "triggerType")?)?;
             counts.triggers += 1;
+        } else if kind == "triggerableDevice" {
+            counts.triggerable_devices += 1;
+            device_triggers::compare_device(trace, component, config, counts)?;
+        } else if kind == "primeable" {
+            counts.primeable_devices += 1;
+            counts.scalars +=
+                compare_fields(trace, component, config, device_triggers::PRIME_FLAGS)?;
         } else {
             counts.scalars += compare_fields(trace, component, config, ORDNANCE)?;
         }

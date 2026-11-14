@@ -20,6 +20,7 @@ use crate::collected::Collected;
 use crate::schema_fields::every_field_required;
 use crate::starmap_containers::Placements;
 use crate::starmap_containers::instance::ContainerInstance;
+use crate::starmap_containers::jump_endpoint::JumpEndpoint;
 use crate::starmap_containers::location_instance::LocationInstance;
 
 /// Contextual placements and relationships keyed by their physical definitions.
@@ -35,6 +36,7 @@ pub(crate) struct CatalogPlacements {
     installed_configurations: CatalogTable<InstalledConfiguration>,
     container_instances: CatalogTable<ContainerInstance>,
     location_instances: CatalogTable<LocationInstance>,
+    jump_endpoints: CatalogTable<JumpEndpoint>,
 }
 
 impl<'source> Collected<'source> {
@@ -74,6 +76,7 @@ impl<'source> Collected<'source> {
             installed_configurations,
             container_instances: placements.take_instances(),
             location_instances: placements.take_locations(),
+            jump_endpoints: placements.take_jump_endpoints(),
         };
         Ok((placements, topology.declarations))
     }

@@ -249,3 +249,17 @@ An unreadable target body, incomplete component survey, competing magazine
 or container, duplicate target GUID, self link, dangling Reference and
 wrong target type each keep an explicit outcome. The linkage is one hop.
 Conditions and competing routes remain available in the authored declarations.
+
+## Installed archive verification
+
+The opt-in ammunition check selects the standard physical ammunition Record directory
+`libs/foundry/records/ammoparams/`. It compares every selected header and source-read outcome,
+then samples original projectile, countermeasure, conversion and physics combinations.
+A build can add additional Record directories. Set `P4KX_AMMO_ORACLE_FILTER` to check an
+alternate measured scope. The test prints how many other physical `AmmoParams` Records are
+outside that filter. Set `P4KX_EXPECT_ALL_AMMO_RECORDS=1` to require that the checked scope
+covers every `AmmoParams` Record in the configured build.
+
+~~~powershell
+cargo test -p p4kx-export --test real_archive ammunition_definitions_match_original_physical_records_and_sampled_variant_values -- --ignored --nocapture
+~~~

@@ -34,7 +34,7 @@ use tachyon::TachyonProjectile;
 const BASE: &str = "ProjectileParams";
 const BULLET: &str = "BulletProjectileParams";
 const TACHYON: &str = "TachyonProjectileParams";
-const COUNTERMEASURE: &str = "CounterMeasureProjectileParams";
+pub(super) const COUNTERMEASURE: &str = "CounterMeasureProjectileParams";
 const TYPES: &[&str] = &[BASE, BULLET, TACHYON, COUNTERMEASURE];
 
 /// One original projectile occurrence with inherited configuration and a concrete branch.
@@ -48,6 +48,10 @@ pub(crate) struct AuthoredProjectile<'source> {
 }
 
 impl<'source> AuthoredProjectile<'source> {
+    pub(super) const fn is_countermeasure(&self) -> bool {
+        matches!(&self.kind, ProjectileKind::Countermeasure { .. })
+    }
+
     pub(super) fn bullet_damage(
         &self,
     ) -> Option<&SourcedValue<super::authored_damage::AuthoredDamage<'source>>> {

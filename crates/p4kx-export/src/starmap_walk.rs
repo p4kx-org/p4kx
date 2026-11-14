@@ -9,7 +9,9 @@ use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse, SourceValue};
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
 use crate::entry_source::EntrySource;
 use crate::starmap_containers::Limits;
-use crate::starmap_containers::instance::{ContainerFile, ContainerInstance, ContainerOccurrence};
+use crate::starmap_containers::instance::{ContainerFile, ContainerInstance};
+use crate::starmap_containers::jump_class::JumpEndpointRecords;
+use crate::starmap_containers::jump_endpoint::JumpEndpoint;
 use crate::starmap_containers::location_instance::LocationInstance;
 use crate::starmap_containers::proof::{PlacementProof, PlacementStep};
 use crate::starmap_index::Index;
@@ -28,6 +30,9 @@ const LINE_LEN: usize = 300;
 #[path = "starmap_walk_location.rs"]
 mod location;
 
+#[path = "starmap_walk_jump.rs"]
+mod jump;
+
 #[derive(Default)]
 pub(crate) struct SystemRead {
     pub(crate) placed: Vec<(Guid, Placement)>,
@@ -41,6 +46,7 @@ pub(crate) struct SystemRead {
     pub(crate) containers: Vec<Opened>,
     pub(crate) instances: Vec<ContainerInstance>,
     pub(crate) locations: Vec<LocationInstance>,
+    pub(crate) jump_endpoints: Vec<JumpEndpoint>,
 }
 
 /// A container the walk opened and the starmap record it hangs below.
@@ -75,7 +81,7 @@ impl WalkPath {
         via: None,
     };
 
-    fn child(&self, child: &Child, pose: AuthoredPose, transform: Transform) -> Self {
+    fn child(&self, child: &Child, pose: Option<AuthoredPose>, transform: Transform) -> Self {
         let route = child.origins.as_ref().map(|origins| {
             Arc::new(PlacementStep {
                 preceding: self.route.clone(),
@@ -91,7 +97,7 @@ impl WalkPath {
             route,
             parent_instance: self.parent_instance.clone(),
             parent_location: self.parent_location.clone(),
-            local: Some(pose),
+            local: pose,
             via: None,
         }
     }
@@ -121,6 +127,7 @@ pub(crate) struct System<'a> {
     root: Arc<[SourceUse]>,
     root_entry: u32,
     capture: &'a EntryCapture<'a>,
+    endpoints: Option<&'a JumpEndpointRecords>,
     read: SystemRead,
     limits: Limits,
     budget: usize,
@@ -136,7 +143,11 @@ impl<'a> System<'a> {
         entry: usize,
         cancel: Option<&'a CancelToken>,
         limits: Limits,
-        (archive, capture): (&Archive, &'a EntryCapture<'a>),
+        (archive, capture, endpoints): (
+            &Archive,
+            &'a EntryCapture<'a>,
+            Option<&'a JumpEndpointRecords>,
+        ),
     ) -> Result<SystemRead, CatalogError> {
         let root = index
             .entries
@@ -155,6 +166,7 @@ impl<'a> System<'a> {
             root: Arc::from(directory.contributions().0),
             root_entry: reference.entry_index,
             capture,
+            endpoints,
             read: SystemRead::default(),
             limits,
             budget: limits.children,
@@ -230,6 +242,7 @@ impl<'a> System<'a> {
                 root,
                 file,
                 fallback,
+                ..
             } => {
                 self.opened(entry, path.under, path.external);
                 self.record_instance(path, file)?;
@@ -262,27 +275,6 @@ impl<'a> System<'a> {
         }
     }
 
-    fn record_instance(
-        &mut self,
-        path: &WalkPath,
-        file: &ContainerFile,
-    ) -> Result<(), CatalogError> {
-        let instance = ContainerOccurrence {
-            system: &self.name,
-            root_entry: self.root_entry,
-            root_inputs: &self.root,
-            route: path.route.as_deref(),
-            parent_route: path.parent_instance.as_deref(),
-            declared: path.via.as_ref(),
-            local: path.local,
-            world: path.transform,
-        };
-        self.read
-            .instances
-            .push(instance.project(file, self.capture)?);
-        Ok(())
-    }
-
     fn children(
         &mut self,
         level: &Level,
@@ -306,6 +298,8 @@ impl<'a> System<'a> {
             let pose = match &child.pose {
                 Pose::Valid(pose) => *pose,
                 Pose::Malformed { pos, rot, entity } => {
+                    let occurrence = parent.child(child, None, parent.transform);
+                    self.record_jump(child, &occurrence, file, None)?;
                     self.skipped(&format!(
                         "{label}: malformed pos {pos} rot {rot} of {entity}"
                     ));
@@ -314,7 +308,10 @@ impl<'a> System<'a> {
             };
             let local = pose.transform();
             let world = parent.transform.place(local.position, local.rotation);
-            if !world.is_sane() {
+            let mut child_path = parent.child(child, Some(pose), world);
+            let sane = world.is_sane();
+            self.record_jump(child, &child_path, file, sane.then_some(world))?;
+            if !sane {
                 self.skipped(&format!(
                     "{label}: out of range: pos {:?} places {:?} of {}",
                     local.position,
@@ -323,7 +320,6 @@ impl<'a> System<'a> {
                 ));
                 continue;
             }
-            let mut child_path = parent.child(child, pose, world);
             self.note(child, &child_path, parent.under)?;
             self.record_location(child, &mut child_path, pose, file)?;
             if let Some(path) = &child.external {

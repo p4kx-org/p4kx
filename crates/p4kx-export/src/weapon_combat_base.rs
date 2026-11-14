@@ -125,9 +125,15 @@ struct NominalBulletDamage {
     nominal_dps: DamageChannels<SourcedValue<f64>>,
 }
 
+#[path = "countermeasure_emitter.rs"]
+pub(crate) mod countermeasure_emitter;
+
+use countermeasure_emitter::CountermeasureEmitter;
+
 pub(crate) struct CatalogWeaponTables<'source> {
     pub(crate) ammunition: CatalogTable<AmmoDefinition<'source>>,
     pub(crate) combat: CatalogTable<WeaponCombatBase<'source>>,
+    pub(crate) emitters: CatalogTable<CountermeasureEmitter>,
 }
 
 impl<'source> CatalogWeaponTables<'source> {
@@ -145,7 +151,15 @@ impl<'source> CatalogWeaponTables<'source> {
             &ammunition,
             cancel,
         )?;
+        let emitters = countermeasure_emitter::table(
+            forge,
+            &input.origins().uses,
+            &components.projectile_ammo_selections.rows,
+            &ammunition,
+            cancel,
+        )?;
         Ok(Self {
+            emitters,
             ammunition: ammo_definition::table(forge, ammunition),
             combat,
         })

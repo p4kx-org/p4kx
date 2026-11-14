@@ -313,6 +313,7 @@ fn assemble<R>(
             explosives: components.explosives,
             hacking_chips: components.hacking_chips,
             ammo_containers: components.ammo_containers,
+            countermeasure_emitters: weapon_tables.emitters,
             weapon_actions: components.weapon_actions,
             missile_configurations: components.missile_configurations,
             jump_drives: components.jump_drives,

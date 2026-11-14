@@ -8,6 +8,8 @@ use serde_json::{Value, json};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
+#[path = "catalog_countermeasure_emitters.rs"]
+mod countermeasure_emitters;
 #[path = "catalog_weapon_projectile_ammo_fixture.rs"]
 mod fixture;
 

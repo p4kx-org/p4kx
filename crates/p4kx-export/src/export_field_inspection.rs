@@ -23,6 +23,7 @@ pub(crate) enum ConfigurationInspection {
     RadarOptions,
     LootGeneration,
     JumpDriveDefinition,
+    JumpPoint,
     WeaponActionRecoilDefinition,
     WeaponProceduralDefinition,
     EntityAnimationController,

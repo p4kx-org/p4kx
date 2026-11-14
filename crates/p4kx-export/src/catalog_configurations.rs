@@ -19,6 +19,7 @@ use crate::catalog_v3::catalog_quantum_interdiction::QuantumInterdictionGenerato
 use crate::catalog_v3::catalog_shield_generator::ShieldGenerator;
 use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
 use crate::catalog_v3::reputation_trigger_configuration::ReputationTriggerConfiguration;
+use crate::catalog_v3::weapon_combat_base::countermeasure_emitter::CountermeasureEmitter;
 use crate::schema_fields::every_field_required;
 use crate::template_configuration::{MissionFlowConfiguration, MissionPropertyConfiguration};
 use crate::template_projection::TemplateProjection;
@@ -38,6 +39,7 @@ pub(crate) struct CatalogConfigurations<'source> {
     pub(crate) explosives: CatalogTable<Explosive<'source>>,
     pub(crate) hacking_chips: CatalogTable<HackingChip<'source>>,
     pub(crate) ammo_containers: CatalogTable<AmmoContainer<'source>>,
+    pub(crate) countermeasure_emitters: CatalogTable<CountermeasureEmitter>,
     pub(crate) weapon_actions: CatalogTable<WeaponActions<'source>>,
     pub(crate) missile_configurations: CatalogTable<MissileConfiguration<'source>>,
     pub(crate) jump_drives: CatalogTable<JumpDrive<'source>>,

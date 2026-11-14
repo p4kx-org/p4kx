@@ -18,7 +18,7 @@ use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_verification;
 
 #[path = "weapon_combat_original.rs"]
-mod original;
+pub(super) mod original;
 
 use original::{OriginalAction, OriginalAmmo, Witness};
 

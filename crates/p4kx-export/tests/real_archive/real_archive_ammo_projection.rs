@@ -8,7 +8,7 @@ use p4kx_export::{
     CatalogOptions, CatalogPublicationMode, Kind, build_catalog_from, is_kind_leftover,
 };
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForge, DataForgeEntry, DataForgeOrigin, InputScope, Record,
+    Archive, ArchiveWatch, DataForge, DataForgeEntry, DataForgeOrigin, Filter, InputScope, Record,
     SourceEncryption, SourceInput, SourceScope, SourceUses, TreeBuilder,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
@@ -24,12 +24,14 @@ mod values;
 const KIND: Kind = Kind::AmmoDefinitions;
 const SOURCE_TYPE: &str = "AmmoParams";
 const SAMPLES_PER_SHAPE: usize = 2;
+const AMMO_SCOPE: &str = "libs/foundry/records/ammoparams/*";
 
 #[derive(Default)]
 struct Counts {
     readable: usize,
     unreadable: usize,
     skipped: usize,
+    outside_scope: usize,
     sampled: usize,
     shapes: usize,
     scalars: usize,
@@ -44,7 +46,10 @@ fn ammunition_definitions_match_original_physical_records_and_sampled_variant_va
     let archive = Archive::open_with_key(path, Some(key)).map_err(|_| "open configured Archive")?;
     let watch = ArchiveWatch::new(&archive);
     let entry = DataForgeEntry::read(&archive).map_err(|_| "read configured DataForge")?;
+    let scope = std::env::var("P4KX_AMMO_ORACLE_FILTER").unwrap_or_else(|_| AMMO_SCOPE.to_owned());
+    let filter = Filter::parse(&scope).map_err(|_| "invalid Ammo Record filter")?;
     let options = CatalogOptions {
+        filter: Some(&filter),
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(SystemTime::now())
     };
@@ -53,7 +58,7 @@ fn ammunition_definitions_match_original_physical_records_and_sampled_variant_va
     let forge = entry.open().map_err(|_| "open original DataForge")?;
     definition_identity::check_original_ammo(&catalog, &forge)
         .map_err(|_| "canonical Ammo headers disagree with original physical Records")?;
-    let counts = compare(&forge, entry.origin(), &catalog, &watch)?;
+    let counts = compare(&forge, entry.origin(), &catalog, &filter, &watch)?;
     watch
         .check()
         .map_err(|_| "Archive changed during comparison")?;
@@ -61,14 +66,18 @@ fn ammunition_definitions_match_original_physical_records_and_sampled_variant_va
         counts.readable > 0 && counts.sampled > 0 && counts.scalars > 0,
         "the configured Build must exercise readable original Ammo definitions"
     );
+    if std::env::var_os("P4KX_EXPECT_ALL_AMMO_RECORDS").is_some() && counts.outside_scope != 0 {
+        return Err("Ammo Record filter excludes part of the original family".into());
+    }
     print_line(&format!(
-        "ammunition: {} readable Records, {} unreadable Records, {} policy skips, {} sampled Records, {} original variant combinations, {} scalar values checked",
+        "ammunition: {} readable Records, {} unreadable Records, {} policy skips, {} sampled Records, {} original variant combinations, {} scalar values checked, {} Ammo Records outside scope",
         counts.readable,
         counts.unreadable,
         counts.skipped,
         counts.sampled,
         counts.shapes,
         counts.scalars,
+        counts.outside_scope,
     ));
     Ok(())
 }
@@ -77,6 +86,7 @@ fn compare(
     forge: &DataForge<'_>,
     origin: &DataForgeOrigin,
     catalog: &Value,
+    filter: &Filter,
     watch: &ArchiveWatch,
 ) -> Result<Counts, Box<dyn std::error::Error>> {
     let mut rows = physical_rows(catalog)?;
@@ -91,6 +101,13 @@ fn compare(
             .poll()
             .map_err(|_| "Archive changed during source census")?;
         if record.type_name().ok() != Some(SOURCE_TYPE) {
+            continue;
+        }
+        let path = record
+            .record_path()
+            .map_err(|_| "read original Ammo path metadata")?;
+        if !filter.matches(path) {
+            counts.outside_scope += 1;
             continue;
         }
         if leftover(&record)? {

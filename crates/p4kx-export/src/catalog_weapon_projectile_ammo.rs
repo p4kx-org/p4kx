@@ -1,23 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{
-    DataForge, DecimalU64, FieldOrigin, SourceValue, SourceValueState, SourcedValue,
-};
-use schemars::JsonSchema;
-use serde::Serialize;
+use p4kx_extraction::{DataForge, FieldOrigin, SourceValue, SourceValueState, SourcedValue};
 
 use super::catalog_ammo_bindings::{AmmoBinding, ContainerAmmoSlots};
 use super::catalog_weapon_actions::{ProjectileAction, ProjectileSelector, WeaponActions};
 use super::catalog_weapon_magazine_slots::WeaponMagazineSlots;
-use super::item_component_owner::ComponentOwner;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition;
 use crate::definition_reference::DefinitionStatus;
 use crate::export_ledger::ExportLedger;
 use crate::item_stats::{MagazineRead, WEAPON_COMPONENT};
-use crate::schema_fields::every_field_required;
 use crate::{CatalogError, ExportAccountingError};
 
 #[path = "weapon_projectile_action_slots.rs"]
@@ -28,6 +22,8 @@ mod linked_reader;
 mod linked_selection;
 #[path = "weapon_projectile_ammo_route.rs"]
 mod route;
+#[path = "weapon_projectile_ammo_selection.rs"]
+mod selection;
 
 use action_slots::ActionSlots;
 pub(crate) use linked_reader::LinkedAmmunitionReader;
@@ -35,104 +31,9 @@ use linked_reader::LinkedMagazineRead;
 use linked_selection::MagazineChoice;
 use route::OwnRoute;
 
-/// An authored launcher selection tied to one original weapon action occurrence.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct WeaponProjectileAmmoSelection {
-    #[serde(flatten)]
-    owner: ComponentOwner,
-    action_source_value_ordinal: SourcedValue<DecimalU64>,
-    selection: SourcedValue<Selection>,
-}
-
-impl WeaponProjectileAmmoSelection {
-    pub(super) const fn owner(&self) -> &ComponentOwner {
-        &self.owner
-    }
-
-    pub(super) const fn action_source_value_ordinal(&self) -> &SourcedValue<DecimalU64> {
-        &self.action_source_value_ordinal
-    }
-
-    pub(super) const fn origin(&self) -> &FieldOrigin {
-        self.selection.origin()
-    }
-
-    pub(super) const fn selected_ammo_index(&self) -> Option<&SourcedValue<u32>> {
-        match self.selection.value() {
-            Some(
-                Selection::Selected {
-                    ammo_record_index, ..
-                }
-                | Selection::SelectedLinkedMagazine {
-                    ammo_record_index, ..
-                },
-            ) => Some(ammo_record_index),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(
-    tag = "type",
-    rename_all = "camelCase",
-    rename_all_fields = "camelCase"
-)]
-#[schemars(transform = every_field_required)]
-enum Selection {
-    Selected {
-        role: SourcedValue<ProjectileAmmoRole>,
-        container_component_ordinal: SourcedValue<u32>,
-        ammo_record_index: SourcedValue<u32>,
-    },
-    SelectedLinkedMagazine {
-        role: SourcedValue<ProjectileAmmoRole>,
-        magazine_record_index: SourcedValue<u32>,
-        container_component_ordinal: SourcedValue<u32>,
-        ammo_record_index: SourcedValue<u32>,
-    },
-    DanglingMagazine,
-    UnsupportedMagazineTarget,
-    SelfLinkedMagazine,
-    AmbiguousMagazineReference,
-    UnreadableMagazine,
-    LinkedMagazineWithoutContainer,
-    AmbiguousLinkedMagazineContainer,
-    IncompleteLinkedMagazineComponents,
-    AmbiguousAction,
-    IncompleteActions,
-    AmbiguousComponents,
-    IncompleteComponents,
-    NoAdmittedOwnContainer,
-    OtherMagazineRoute,
-    IndeterminateMagazineRoute,
-    UnsupportedProjectileType,
-    MissingProjectileType,
-    IndeterminateProjectileType,
-    MissingAmmo,
-    DanglingAmmo,
-    UnsupportedAmmoTarget,
-    IndeterminateAmmo,
-}
-
-#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(super) enum ProjectileAmmoRole {
-    Primary,
-    Secondary,
-}
-
-impl ProjectileAmmoRole {
-    const fn field_name(self) -> &'static str {
-        match self {
-            Self::Primary => "ammoParamsRecord",
-            Self::Secondary => "secondaryAmmoParamsRecord",
-        }
-    }
-}
+pub(in crate::catalog_v3) use selection::ProjectileAmmoRole;
+use selection::Selection;
+pub(crate) use selection::WeaponProjectileAmmoSelection;
 
 pub(crate) fn read<'source>(
     fields: &OriginalFlowFields<'_, '_, 'source>,
@@ -191,13 +92,13 @@ pub(crate) fn read<'source>(
                     )?
                 }
             };
-            rows.push(WeaponProjectileAmmoSelection {
-                owner: weapon.owner().clone(),
-                action_source_value_ordinal: original.source_ordinal.clone(),
-                selection: fields
+            rows.push(WeaponProjectileAmmoSelection::new(
+                weapon.owner().clone(),
+                original.source_ordinal.clone(),
+                fields
                     .sources()
                     .value_with_origins(SourceValue::Present(selection), &origins)?,
-            });
+            ));
         }
     }
     Ok(rows)
@@ -393,8 +294,8 @@ pub(super) fn table(
 ) -> CatalogTable<WeaponProjectileAmmoSelection> {
     rows.sort_by_key(|row| {
         (
-            row.owner.key(),
-            row.action_source_value_ordinal
+            row.owner().key(),
+            row.action_source_value_ordinal()
                 .value()
                 .map(|value| value.get()),
         )

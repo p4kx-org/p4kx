@@ -15,13 +15,23 @@ use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, unreferenced};
 
-use crate::starmap_parse::{Read, read_all};
+use crate::starmap_parse::Read;
 use crate::starmap_report::{ContainerCounts, Placement, StarmapReport, apart, clip};
 use crate::starmap_walk::{Opened, System, SystemRead};
+
+use jump_class::JumpEndpointRecords;
+use jump_endpoint::JumpEndpoint;
 
 use self::instance::ContainerInstance;
 use self::location_instance::LocationInstance;
 use self::proof::{PlacementEvidence, PlacementProof};
+
+#[path = "starmap_jump_class.rs"]
+pub(crate) mod jump_class;
+#[path = "starmap_jump_endpoint.rs"]
+pub(crate) mod jump_endpoint;
+#[path = "starmap_jump_gate.rs"]
+pub(crate) mod jump_gate;
 
 #[path = "starmap_container_instance.rs"]
 pub(crate) mod instance;
@@ -76,6 +86,8 @@ pub(crate) struct Placements {
     pub(crate) report: StarmapReport,
     instances: Vec<ContainerInstance>,
     locations: Vec<LocationInstance>,
+    jump_endpoints: Vec<JumpEndpoint>,
+    endpoint_inventory_complete: bool,
     instance_availability: Option<DatasetAvailability>,
     /// Every container below the system folder: those the walk opened, each with the record it
     /// hangs below, then those it did not reach, with none.
@@ -101,6 +113,18 @@ impl Placements {
         }
     }
 
+    pub(crate) fn take_jump_endpoints(&mut self) -> CatalogTable<JumpEndpoint> {
+        CatalogTable {
+            availability: if self.endpoint_inventory_complete {
+                self.instance_availability
+                    .unwrap_or(DatasetAvailability::Unavailable)
+            } else {
+                DatasetAvailability::Unavailable
+            },
+            rows: std::mem::take(&mut self.jump_endpoints),
+        }
+    }
+
     pub(crate) fn get(&self, record: Guid) -> Option<&Placement> {
         self.by_record.get(&record)
     }
@@ -117,6 +141,7 @@ impl Placements {
     /// placement in document order, the systems taken in the order of their folder names; one
     /// that more than one Child places at places more than `SAME_PLACE` metres apart has no
     /// position.
+    #[cfg(test)]
     pub(crate) fn read(
         archive: &Archive,
         cancel: Option<&CancelToken>,
@@ -126,12 +151,41 @@ impl Placements {
         Self::read_within(archive, cancel, Limits::default(), capture, scope)
     }
 
+    pub(crate) fn read_for_catalog(
+        archive: &Archive,
+        cancel: Option<&CancelToken>,
+        capture: &EntryCapture<'_>,
+        scope: PlacementScope,
+        endpoints: &JumpEndpointRecords,
+    ) -> Result<Self, CatalogError> {
+        Self::read_scoped(
+            archive,
+            cancel,
+            Limits::default(),
+            capture,
+            scope,
+            Some(endpoints),
+        )
+    }
+
+    #[cfg(test)]
     pub(crate) fn read_within(
         archive: &Archive,
         cancel: Option<&CancelToken>,
         limits: Limits,
         capture: &EntryCapture<'_>,
         scope: PlacementScope,
+    ) -> Result<Self, CatalogError> {
+        Self::read_scoped(archive, cancel, limits, capture, scope, None)
+    }
+
+    fn read_scoped(
+        archive: &Archive,
+        cancel: Option<&CancelToken>,
+        limits: Limits,
+        capture: &EntryCapture<'_>,
+        scope: PlacementScope,
+        endpoints: Option<&JumpEndpointRecords>,
     ) -> Result<Self, CatalogError> {
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
@@ -142,17 +196,18 @@ impl Placements {
         if systems.is_empty() && matches!(scope, PlacementScope::ArchiveInventory) {
             return Ok(Self {
                 instance_availability: Some(DatasetAvailability::Absent),
+                endpoint_inventory_complete: endpoints.is_some_and(|records| records.complete),
                 ..Self::default()
             });
         }
         let roots: Vec<usize> = systems.iter().map(|(_, entry)| *entry).collect();
-        let Read { bodies, ledger, .. } = read_all(
+        let Read { bodies, ledger, .. } = crate::starmap_parse::read_all_with_jumps(
             archive,
             &index,
             &roots,
             cancel,
             limits.external,
-            (limits.depth, limits.children),
+            (limits.depth, limits.children, endpoints.is_some()),
             capture,
         )?;
         if cancel.is_some_and(CancelToken::is_cancelled) {
@@ -168,7 +223,7 @@ impl Placements {
                     *entry,
                     cancel,
                     limits,
-                    (archive, capture),
+                    (archive, capture, endpoints),
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
@@ -179,7 +234,15 @@ impl Placements {
             ledger,
             ..Self::default()
         };
+        let endpoint_reads_complete = !placements
+            .ledger
+            .incomplete_inventories
+            .contains(&crate::Kind::StarmapObjects);
         placements.finish(&index, systems.len(), read, scope);
+        placements.endpoint_inventory_complete = endpoint_reads_complete
+            && endpoints.is_some_and(|records| records.complete)
+            && placements.counts.unreadable == 0
+            && placements.counts.missing == 0;
         placements.report.elapsed = started.elapsed();
         Ok(placements)
     }
@@ -228,6 +291,7 @@ impl Placements {
             self.opened.extend(system.containers);
             self.instances.extend(system.instances);
             self.locations.extend(system.locations);
+            self.jump_endpoints.extend(system.jump_endpoints);
             for (record, placement) in system.placed {
                 self.add(record, placement);
             }

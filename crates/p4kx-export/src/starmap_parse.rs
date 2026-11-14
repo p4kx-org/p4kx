@@ -13,6 +13,7 @@ use crate::entry_source::EntrySource;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::starmap_containers::instance::ContainerFile;
+use crate::starmap_containers::jump_gate::{GateFiles, JumpGate};
 use crate::starmap_containers::location_declaration::ChildLocation;
 use crate::starmap_containers::proof::ChildOrigins;
 use crate::starmap_index::Index;
@@ -79,6 +80,8 @@ pub(crate) enum Body {
         root: Level,
         file: Box<ContainerFile>,
         fallback: Option<String>,
+        gate: Option<Box<JumpGate>>,
+        gate_proof: Option<crate::catalog_read::original::XmlNodeSource>,
     },
 }
 
@@ -87,6 +90,7 @@ struct Bounds<'a> {
     cancel: Option<&'a CancelToken>,
     depth: usize,
     children: AtomicUsize,
+    jump_endpoints: bool,
 }
 
 impl Bounds<'_> {
@@ -138,7 +142,14 @@ fn parse_body(
         capture,
         cancel: bounds.cancel,
     };
-    let Ok((mut root, file, entities)) = parsed_root(&main.bytes, bounds, &files, ledger)? else {
+    let Ok(ParsedRoot {
+        mut root,
+        file,
+        entities,
+        gate,
+        gate_proof,
+    }) = parsed_root(&main.bytes, bounds, &files, ledger)?
+    else {
         ledger.incomplete_inventory(Kind::StarmapObjects);
         main.source.record(
             ledger,
@@ -162,7 +173,17 @@ fn parse_body(
         root,
         file: Box::new(file),
         fallback: main.fallback,
+        gate,
+        gate_proof,
     })
+}
+
+struct ParsedRoot {
+    root: Level,
+    file: ContainerFile,
+    entities: entxml::EntXmlIndex,
+    gate: Option<Box<JumpGate>>,
+    gate_proof: Option<crate::catalog_read::original::XmlNodeSource>,
 }
 
 fn parsed_root(
@@ -170,7 +191,7 @@ fn parsed_root(
     bounds: &Bounds<'_>,
     files: &entxml::EntXmlFiles<'_, '_>,
     ledger: &mut ExportLedger,
-) -> Result<Result<(Level, ContainerFile, entxml::EntXmlIndex), XmlError>, CatalogError> {
+) -> Result<Result<ParsedRoot, XmlError>, CatalogError> {
     let xml = match EntryXml::parse(read, files.capture)? {
         Ok(xml) => xml,
         Err(error) => return Ok(Err(error)),
@@ -186,11 +207,28 @@ fn parsed_root(
     let root = reader.level(xml.root(), 0)?;
     let guids = reader.entity_guids;
     let entities = files.scan(&guids, &xml, ledger)?;
-    Ok(Ok((
+    let (gate, gate_proof) = if bounds.jump_endpoints {
+        let readers = GateFiles {
+            archive: files.archive,
+            outer: files.outer,
+            container: files.container,
+            capture: files.capture,
+            cancel: files.cancel,
+        };
+        (
+            Some(Box::new(readers.read(&xml, ledger)?)),
+            Some(xml.node_source(xml.root())?),
+        )
+    } else {
+        (None, None)
+    };
+    Ok(Ok(ParsedRoot {
         root,
-        ContainerFile::from_xml(&xml, files.capture)?,
+        file: ContainerFile::from_xml(&xml, files.capture)?,
         entities,
-    )))
+        gate,
+        gate_proof,
+    }))
 }
 struct SourceLoss {
     projection: bool,
@@ -234,6 +272,7 @@ pub(crate) struct Read {
 /// Reads every container that the containers `roots` name, directly or through other containers
 /// within `chain` steps, once each, the containers of one step in parallel. Together the
 /// containers keep at most `children` Children and nest their lists at most `depth` deep.
+#[cfg(test)]
 pub(crate) fn read_all(
     archive: &Archive,
     index: &Index<'_>,
@@ -243,10 +282,31 @@ pub(crate) fn read_all(
     (depth, children): (usize, usize),
     capture: &EntryCapture<'_>,
 ) -> Result<Read, CatalogError> {
+    read_all_with_jumps(
+        archive,
+        index,
+        roots,
+        cancel,
+        chain,
+        (depth, children, false),
+        capture,
+    )
+}
+
+pub(crate) fn read_all_with_jumps(
+    archive: &Archive,
+    index: &Index<'_>,
+    roots: &[usize],
+    cancel: Option<&CancelToken>,
+    chain: usize,
+    (depth, children, jump_endpoints): (usize, usize, bool),
+    capture: &EntryCapture<'_>,
+) -> Result<Read, CatalogError> {
     let bounds = Bounds {
         cancel,
         depth,
         children: AtomicUsize::new(children),
+        jump_endpoints,
     };
     let mut bodies: HashMap<usize, Body> = HashMap::new();
     let mut ledger = ExportLedger::default();

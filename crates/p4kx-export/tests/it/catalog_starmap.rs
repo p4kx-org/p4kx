@@ -3,6 +3,11 @@
 
 //! Starmap objects and their world positions in the P4KX catalog, through the public API.
 
+#[path = "catalog_jump_endpoints.rs"]
+mod jump_endpoints;
+#[path = "catalog_jump_point.rs"]
+mod jump_point;
+
 use crate::commodity_v3_fixture::{at, guid, text_row};
 use crate::health_origin_assertions as proof;
 use crate::starmap_fixture;

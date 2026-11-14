@@ -34,11 +34,14 @@ mod entity_animation_controller;
 pub(in crate::catalog_v3) mod flight_configuration_tables;
 #[path = "hackable_configuration.rs"]
 mod hackable_configuration;
+#[path = "catalog_jump_point.rs"]
+mod jump_point;
 #[path = "loot_generation_component.rs"]
 mod loot_generation_component;
 
 use flight_configuration_tables::FlightConfigurationTables;
 use hackable_configuration::HackableConfiguration;
+use jump_point::JumpPointConfiguration;
 
 /// Independently scoped configurations with their physical owners.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -58,6 +61,7 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     pub(crate) flight: FlightConfigurationTables<'source>,
     #[serde(flatten)]
     jump_drive_definitions: JumpDriveDefinitions<'source>,
+    jump_point_configurations: CatalogTable<JumpPointConfiguration<'source>>,
 }
 
 pub(crate) struct IndependentConfigurations<'source> {
@@ -86,20 +90,8 @@ pub(crate) fn read<'source>(
     } = recovery::read_recovery(forge, projection, options.filter, options.cancel)?;
     collected.ledger.merge(ledger);
     collected.add_failures(failures);
-    let GameModeRead {
-        resource_network_parameters,
-        radar_options,
-        numbers: mut configuration_numbers,
-        failures,
-        ledger,
-    } = catalog_resource_network_read::read(
-        forge,
-        projection.original(),
-        options.filter,
-        options.cancel,
-    )?;
-    collected.ledger.merge(ledger);
-    collected.add_failures(failures);
+    let (game_mode, mut configuration_numbers) =
+        read_game_mode(forge, projection, options, collected)?;
     let mut components = PhysicalComponents {
         forge,
         projection,
@@ -108,6 +100,7 @@ pub(crate) fn read<'source>(
         numbers: &mut configuration_numbers,
     };
     let jump_drive_definitions = components.jump_definitions()?;
+    let jump_point_configurations = components.table(JUMP_POINTS, JumpPointConfiguration::read)?;
     let flight = FlightConfigurationTables::read(&mut components)?;
     let weapon_action_recoil_definitions = components.weapon_recoil()?;
     let weapon_procedural = components.weapon_procedural()?;
@@ -121,20 +114,55 @@ pub(crate) fn read<'source>(
             item_recovery_economy,
             item_recovery_overrides,
             item_recovery_policy,
-            resource_network_parameters,
-            radar_options,
+            resource_network_parameters: game_mode.resource_network_parameters,
+            radar_options: game_mode.radar_options,
             mission_boards,
             entity_animation_controllers,
             loot_generation,
             hackable_devices,
             flight,
             jump_drive_definitions,
+            jump_point_configurations,
         },
         weapon_action_recoil_definitions,
         weapon_procedural,
         recovery_numbers,
         configuration_numbers,
     })
+}
+
+struct GameModeTables<'source> {
+    resource_network_parameters: CatalogTable<ResourceNetworkConfiguration<'source>>,
+    radar_options: CatalogTable<RadarOptionsConfiguration<'source>>,
+}
+
+fn read_game_mode<'source>(
+    forge: &'source DataForge<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    options: &CatalogOptions<'_>,
+    collected: &mut Collected<'source>,
+) -> Result<(GameModeTables<'source>, Vec<CapturedNumber>), CatalogError> {
+    let GameModeRead {
+        resource_network_parameters,
+        radar_options,
+        numbers,
+        failures,
+        ledger,
+    } = catalog_resource_network_read::read(
+        forge,
+        projection.original(),
+        options.filter,
+        options.cancel,
+    )?;
+    collected.ledger.merge(ledger);
+    collected.add_failures(failures);
+    Ok((
+        GameModeTables {
+            resource_network_parameters,
+            radar_options,
+        },
+        numbers,
+    ))
 }
 
 const ANIMATION_CONTROLLERS: ComponentKind = ComponentKind {
@@ -148,6 +176,10 @@ const MISSION_BOARDS: ComponentKind = ComponentKind {
 const LOOT_GENERATION: ComponentKind = ComponentKind {
     source_type: loot_generation_component::COMPONENT,
     inspection: ConfigurationInspection::LootGeneration,
+};
+const JUMP_POINTS: ComponentKind = ComponentKind {
+    source_type: jump_point::COMPONENT,
+    inspection: ConfigurationInspection::JumpPoint,
 };
 const HACKABLE_DEVICES: ComponentKind = ComponentKind {
     source_type: hackable_configuration::COMPONENT,

@@ -45,12 +45,38 @@ Inline explosion and damage values use the [shared explosion reader](catalog-dur
 Ammo projectile detonation fields remain in the projectile's original scope. The device table
 keeps source numeric widths, raw Single bits and units as authored.
 
+## Triggerable devices and priming
+
+A physical `EntityComponentTriggerableDevicesParams` slot produces a `triggerableDevice` row.
+A physical `SPrimeableComponentParams` slot produces a separate `primeable` row. The same Item
+can own both slots, and each keeps its original `componentOrdinal`.
+
+| Original field | Catalog scope and storage |
+| --- | --- |
+| `triggers`, `aiTriggers`, `deathBehavior` | Two independent ordered StrongPointer arrays and a separate scalar StrongPointer |
+| `STriggerableDevicesTriggerTimerParams` | `timer` with sourced Single `duration` |
+| `STriggerableDevicesTriggerImpactParams` | `impact` with sourced Bool `ignoreWaterCollision` |
+| `STriggerableDevicesTriggerLaserTripParams` | `laserTrip.value` holds authored geometry, timings, helper name and Record References |
+| Trigger `behavior`, `blinkingParams`, `effectTags` | Typed StrongPointer, original inline Class arena and original Reference-array arena |
+| `STriggerableDevicesBehaviorExplosionParams` | `explosion` with its inline `ExplosionParams` using the shared explosion reader |
+| `STriggerableDevicesBehaviorSpawnEntityParams` | `spawnEntity` with the original `entityToSpawn` Record Reference |
+| Primeable `primeOnAttach`, `primeOnPlace`, `primeOnPlaceAttach`, `primeOnTake`, `primeOnThrow`, `unprimeOnTake` | Independent authored Bool settings |
+| Primeable `onPrimeInteraction`, `onUnprimeInteraction`, `pickedUpState`, `primedState`, `settledState`, `unprimedState` | Original weak links |
+| `primeableAnimatedStates` | Original inline Class array with sourced `animatedState`, `fragmentId` and `fragTag` per entry |
+
+Trigger and behavior descriptors carry their original concrete `sourceType`. Future readable
+subtypes project shared fields under `type: "other"` and retain all remaining authored members in
+`additionalFields`. Null slots and empty arrays keep their distinct states. The weak links identify
+original locations, and the Record References retain their own resolution and source status.
+
 ## Installed Archive verification
 
 Run the ignored check against a configured installed Archive to compare the emitted device
 slot set with the original Item Components arrays. It checks the physical owner, concrete type,
-original source-use coordinates, sensor-trigger states and scalar bits. Output contains only
-counts. Set P4KX_EXPECT_EXPLOSIVE_COMPONENTS to require at least one original device slot.
+original source-use coordinates, sensor and device trigger states, priming flags and scalar bits.
+Output contains only counts. Set `P4KX_EXPECT_EXPLOSIVE_COMPONENTS` to require an original device
+slot. A `P4KX_EXPLOSIVE_COMPONENT_FILTER` can limit both sides of the comparison to selected Items.
+Set `P4KX_EXPECT_GRENADE_COMPONENTS` to require a match in both grenade component families.
 
 ~~~powershell
 cargo test -p p4kx-export --test real_archive explosive_components_match_actual_item_slots_and_sensor_source_fields -- --ignored --nocapture

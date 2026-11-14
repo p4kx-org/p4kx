@@ -11,6 +11,7 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::EntryCapture;
 use crate::collected::Collected;
 use crate::scan::Scan;
+use crate::starmap_containers::jump_class::JumpEndpointRecords;
 use crate::starmap_containers::{PlacementScope, Placements};
 use crate::{CatalogError, CatalogOptions};
 
@@ -26,12 +27,16 @@ pub(super) fn scan<'f>(
 ) -> Result<(Collected<'f>, Placements), CatalogError> {
     let scope = placement_scope(forge, options);
     let mut placements = match scope {
-        Some(scope) => Placements::read(
-            archive,
-            options.cancel,
-            &EntryCapture::for_input(projection.original()),
-            scope,
-        )?,
+        Some(scope) => {
+            let endpoints = JumpEndpointRecords::read(forge, projection.original(), options)?;
+            Placements::read_for_catalog(
+                archive,
+                options.cancel,
+                &EntryCapture::for_input(projection.original()),
+                scope,
+                &endpoints,
+            )?
+        }
         None => Placements::default(),
     };
     let scanned = Scan::run(

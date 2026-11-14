@@ -8,7 +8,7 @@ use p4kx_extraction::{DataForge, Filter, Record, RecordTree, StructValue, TreeBu
 
 use crate::real_archive_item_components;
 
-pub(super) const WEAPON: &str = "SCItemWeaponComponentParams";
+pub(crate) const WEAPON: &str = "SCItemWeaponComponentParams";
 const CONTAINER: &str = "SAmmoContainerComponentParams";
 pub(super) const CHANNELS: &[(&str, &str)] = &[
     ("DamagePhysical", "physical"),
@@ -247,7 +247,7 @@ fn selected_ammo<'source>(
     forge.record(reference.record_index())
 }
 
-pub(super) fn unique<'tree, 'source>(
+pub(crate) fn unique<'tree, 'source>(
     tree: &'tree RecordTree<'source>,
     kind: &str,
 ) -> Option<(usize, &'tree Value<'source>)> {
@@ -266,7 +266,7 @@ pub(super) fn unique<'tree, 'source>(
     Some(current)
 }
 
-pub(super) const fn array<'tree, 'source>(
+pub(crate) const fn array<'tree, 'source>(
     value: &'tree Value<'source>,
 ) -> Option<&'tree [Value<'source>]> {
     if let Value::Array(values) = value {
@@ -276,7 +276,7 @@ pub(super) const fn array<'tree, 'source>(
     }
 }
 
-pub(super) const fn structure<'tree, 'source>(
+pub(crate) const fn structure<'tree, 'source>(
     value: &'tree Value<'source>,
 ) -> Option<&'tree StructValue<'source>> {
     if let Value::Struct(body) = value {

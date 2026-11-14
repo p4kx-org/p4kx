@@ -249,7 +249,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "missionBoards": absent_table(),
             "entityAnimationControllers": absent_table(),
             "lootGeneration": absent_table(),
-            "hackableDevices": absent_table(),
+            "hackableDevices": absent_table(), "jumpPointConfigurations": absent_table(), "countermeasureEmitters": absent_table(),
             "vehicleArmor": absent_table(),
             "contractTemplates": absent_table(),
             "missionBrokerEntries": absent_table(),
@@ -271,7 +271,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "resourceGroupMembers": resource_groups::members()
         },
         "placements": {
-            "installedConfigurations": absent_table(),
+            "installedConfigurations": absent_table(), "jumpEndpoints": absent_table(),
             "locationInstances": absent_table(),
             "resourceNetworkNodes": absent_table(),
             "resourceNetworkLinkBindings": absent_table(),

@@ -18,10 +18,14 @@ const CONTAINER_EXTENSION: &str = "FixtureContainerExtension";
 const AMMO_EXTENSION: &str = "FixtureAmmoExtension";
 const AMMO_EXTENSION_GUID: u128 = 0x144;
 const ENTITY: &str = "EntityClassDefinition";
+const COUNTERMEASURE_PROJECTILE: &str = "CounterMeasureProjectileParams";
+const CHAFF: &str = "CounterMeasureChaffParams";
+const FLARE: &str = "CounterMeasureFlareParams";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Case {
     Unique,
+    Countermeasure,
     SecondWeapon,
     CompetingContainerSubtype,
     UnreadableComponent,
@@ -72,17 +76,25 @@ pub(super) fn build(case: Case) -> DataForgeBuilder {
     .fold(builder, |builder, name| {
         builder.structure(TestStruct::new(name).parent(ACTION))
     });
-    let builder = projectile_types(builder)
-        .structure(TestStruct::new(AMMO_EXTENSION).parent("AmmoParams"))
-        .record(ammo(PRIMARY, "Primary", 10.0))
-        .record(ammo(SECONDARY, "Secondary", 20.0))
+    let builder =
+        projectile_types(builder).structure(TestStruct::new(AMMO_EXTENSION).parent("AmmoParams"));
+    let builder = if case == Case::Countermeasure {
+        countermeasure_types(builder)
+            .record(countermeasure(PRIMARY, "Primary", CHAFF))
+            .record(countermeasure(SECONDARY, "Secondary", FLARE))
+    } else {
+        builder
+            .record(ammo(PRIMARY, "Primary", 10.0))
+            .record(ammo(SECONDARY, "Secondary", 20.0))
+    };
+    builder
         .record(TestRecord::new(
             AMMO_EXTENSION_GUID,
             AMMO_EXTENSION,
             "FixtureAmmoExtension.Unsupported",
             "fixture/ammo/unsupported.xml",
-        ));
-    builder.record(weapon(case))
+        ))
+        .record(weapon(case))
 }
 
 fn projectile_types(builder: DataForgeBuilder) -> DataForgeBuilder {
@@ -107,6 +119,46 @@ fn projectile_types(builder: DataForgeBuilder) -> DataForgeBuilder {
                 .field("DamageEnergy", TestType::Single)
                 .field("DamageDistortion", TestType::Single),
         )
+}
+
+fn countermeasure_types(builder: DataForgeBuilder) -> DataForgeBuilder {
+    let builder = builder
+        .structure(
+            TestStruct::new(COUNTERMEASURE_PROJECTILE)
+                .parent("ProjectileParams")
+                .field("typeParams", pointer("CounterMeasureBaseParams")),
+        )
+        .structure(TestStruct::new("CounterMeasureBaseParams"));
+    [CHAFF, FLARE].into_iter().fold(builder, |builder, kind| {
+        builder.structure(
+            TestStruct::new(kind)
+                .parent("CounterMeasureBaseParams")
+                .field("StartInfrared", TestType::Single)
+                .field("EndCrossSection", TestType::Single),
+        )
+    })
+}
+
+fn countermeasure(guid: u128, name: &str, kind: &str) -> TestRecord {
+    TestRecord::new(
+        guid,
+        "AmmoParams",
+        format!("AmmoParams.{name}"),
+        format!("libs/foundry/records/ammoparams/fixture/{name}.xml"),
+    )
+    .value(
+        "projectileParams",
+        TestValue::Struct(
+            TestInstance::new(COUNTERMEASURE_PROJECTILE).value(
+                "typeParams",
+                TestValue::Struct(
+                    TestInstance::new(kind)
+                        .value("StartInfrared", TestValue::Single(5.0))
+                        .value("EndCrossSection", TestValue::Single(0.0)),
+                ),
+            ),
+        ),
+    )
 }
 
 fn common_types(builder: DataForgeBuilder) -> DataForgeBuilder {
@@ -137,6 +189,8 @@ fn common_types(builder: DataForgeBuilder) -> DataForgeBuilder {
         .structure(
             TestStruct::new(CONTAINER)
                 .parent(COMPONENT)
+                .field("maxAmmoCount", TestType::Int32)
+                .field("maxRestockCount", TestType::UInt32)
                 .field("ammoParamsRecord", reference("AmmoParams"))
                 .field("secondaryAmmoParamsRecord", reference("AmmoParams")),
         )
@@ -187,6 +241,9 @@ fn weapon_component(case: Case) -> TestInstance {
         _ => TestValue::Struct(fire("Secondary")),
     };
     let mut actions = vec![TestValue::Struct(primary), second];
+    if case == Case::Countermeasure {
+        actions.push(TestValue::Struct(fire("Primary")));
+    }
     if case == Case::MixedModes {
         actions.push(invalid_pointer());
         for kind in [
@@ -246,6 +303,8 @@ fn container(case: Case, source_type: &str) -> TestInstance {
         _ => TestValue::Reference(SECONDARY),
     };
     TestInstance::new(source_type)
+        .value("maxAmmoCount", TestValue::Int32(3))
+        .value("maxRestockCount", TestValue::UInt32(29))
         .value("ammoParamsRecord", TestValue::Reference(PRIMARY))
         .value("secondaryAmmoParamsRecord", secondary)
 }

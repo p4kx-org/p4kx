@@ -35,6 +35,7 @@ mod real_archive_contract_scopes;
 mod real_archive_contract_template_parts;
 mod real_archive_contract_templates;
 mod real_archive_contracts;
+mod real_archive_countermeasure_emitters;
 mod real_archive_crafters;
 mod real_archive_crafting;
 mod real_archive_crafting_catalog;

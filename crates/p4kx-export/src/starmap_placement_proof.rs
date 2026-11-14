@@ -5,13 +5,15 @@ use std::iter;
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    SharedFieldOrigin, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
+    Guid, SharedFieldOrigin, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
 };
 
 use crate::CatalogError;
 use crate::catalog_read::original::{
     AuthoredEntryPath, EntryXml, XmlAttributeSource, XmlNodeSource,
 };
+use crate::guid_text::CatalogGuid;
+use crate::starmap_containers::jump_endpoint::JumpChild;
 use crate::starmap_xml::{Root, attribute};
 
 #[derive(Debug)]
@@ -23,6 +25,7 @@ pub(crate) struct ChildOrigins {
     record: XmlAttributeSource,
     entity: ChildText,
     label: ChildText,
+    jump_fields: Option<(ChildText, ChildText, XmlAttributeSource)>,
 }
 
 impl ChildOrigins {
@@ -39,6 +42,37 @@ impl ChildOrigins {
             record: xml.attribute_source(child, "starMapRecord")?,
             entity: ChildText::read(xml, child, "entityName")?,
             label: ChildText::read(xml, child, "label")?,
+            jump_fields: if attribute(child, "starMapRecord").is_some() {
+                Some((
+                    ChildText::read(xml, child, "guid")?,
+                    ChildText::read(xml, child, "classGuid")?,
+                    xml.attribute_source(child, "external")?,
+                ))
+            } else {
+                None
+            },
+        })
+    }
+
+    pub(crate) fn external_selector(&self) -> Result<SourceUse, CatalogError> {
+        let Some((_, _, external)) = &self.jump_fields else {
+            return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
+        };
+        external.observe(SourceUseRole::Selector)
+    }
+
+    pub(crate) fn record_selector(&self) -> Result<SourceUse, CatalogError> {
+        self.record.observe(SourceUseRole::Selector)
+    }
+
+    pub(crate) fn jump_declaration(&self, sources: &SourceUses) -> Result<JumpChild, CatalogError> {
+        let Some((guid, class, _)) = &self.jump_fields else {
+            return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
+        };
+        Ok(JumpChild {
+            guid: guid.guid(sources)?,
+            class_guid: class.guid(sources)?,
+            entity_name: self.entity.project(sources)?,
         })
     }
 
@@ -63,6 +97,23 @@ impl ChildText {
             value: attribute(child, field).map(str::to_owned),
             source: xml.attribute_source(child, field)?,
         })
+    }
+
+    fn guid(&self, sources: &SourceUses) -> Result<SourcedValue<CatalogGuid>, CatalogError> {
+        let value = self.value.as_deref().map_or(SourceValue::Absent, |raw| {
+            raw.trim()
+                .parse::<Guid>()
+                .ok()
+                .filter(|guid| *guid != Guid::default())
+                .map_or(SourceValue::Invalid, |guid| {
+                    SourceValue::Present(CatalogGuid(guid))
+                })
+        });
+        Ok(sources.value(
+            value,
+            &[self.source.observe(SourceUseRole::Conversion)?],
+            true,
+        ))
     }
 
     fn project(&self, sources: &SourceUses) -> Result<SourcedValue<String>, CatalogError> {

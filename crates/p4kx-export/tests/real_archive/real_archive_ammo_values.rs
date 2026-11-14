@@ -8,6 +8,8 @@ use crate::catalog_v3_consumer;
 use crate::real_archive_item_components::{cell, require_state};
 use crate::real_archive_item_durability::{self as proof, Trace};
 
+#[path = "real_archive_ammo_ballistics.rs"]
+mod ballistics;
 #[path = "real_archive_ammo_controller.rs"]
 mod controller;
 
@@ -86,6 +88,9 @@ pub(super) struct Shape<'source> {
     conversion: AuthoredShape<'source>,
     physics_wrapper: AuthoredShape<'source>,
     physics_type: AuthoredShape<'source>,
+    falloff: AuthoredShape<'source>,
+    impulse: AuthoredShape<'source>,
+    electron: AuthoredShape<'source>,
 }
 
 impl<'source> Shape<'source> {
@@ -94,6 +99,9 @@ impl<'source> Shape<'source> {
         let physics_wrapper = tree.field("physicsControllerParams");
         Self {
             projectile: AuthoredShape::of(projectile),
+            falloff: AuthoredShape::of(child(projectile, "damageDropParams")),
+            impulse: AuthoredShape::of(child(projectile, "impulseFalloffParams")),
+            electron: AuthoredShape::of(child(projectile, "electronParams")),
             countermeasure: AuthoredShape::of(child(projectile, "typeParams")),
             conversion: AuthoredShape::of(tree.field("conversionRate")),
             physics_wrapper: AuthoredShape::of(physics_wrapper),
@@ -163,11 +171,30 @@ fn projectile<'source>(
     Ok(count
         + match source.kind {
             "base" => 0,
-            "bullet" => fields(trace, source.original, cell(kind, "value")?, BULLET_FIELDS)?,
-            "tachyon" => fields(trace, source.original, cell(kind, "value")?, TACHYON_FIELDS)?,
+            "bullet" => bullet(trace, source.original, cell(kind, "value")?)?,
+            "tachyon" => tachyon(trace, source.original, cell(kind, "value")?)?,
             "countermeasure" => countermeasure(trace, source.original, cell(kind, "value")?)?,
             _ => return Err("unexpected verified projectile shape".into()),
         })
+}
+
+fn bullet<'source>(
+    trace: &Trace<'_, 'source>,
+    original: &StructValue<'source>,
+    row: &Value,
+) -> Result<usize> {
+    Ok(fields(trace, original, row, BULLET_FIELDS)? + ballistics::bullet(trace, original, row)?)
+}
+
+fn tachyon<'source>(
+    trace: &Trace<'_, 'source>,
+    original: &StructValue<'source>,
+    row: &Value,
+) -> Result<usize> {
+    Ok(
+        fields(trace, original, row, TACHYON_FIELDS)?
+            + ballistics::ballistic(trace, original, row)?,
+    )
 }
 
 fn countermeasure<'source>(
