@@ -256,16 +256,12 @@ enum DatabaseState {
 #[serde(deny_unknown_fields)]
 struct ClipCandidate<'a> {
     declaration_ordinal: DecimalU64,
-    #[schemars(schema_with = "identity_definition")]
+    #[schemars(schema_with = "crate::schema::identity_definition")]
     entry: &'a crate::Identity,
     clip_ordinal: DecimalU64,
     authored_name: &'a str,
     name_range: SourceRange,
     metadata_range: SourceRange,
-}
-
-fn identity_definition(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
-    schemars::json_schema!({"$ref": "#/$defs/Identity"})
 }
 
 fn clip_candidate<'a>(matched: &ObservedMatch<'a>, declaration: u64) -> ClipCandidate<'a> {

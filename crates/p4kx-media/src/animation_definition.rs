@@ -17,6 +17,9 @@ mod schema;
 mod sub_database_components;
 mod sub_database_cycles;
 mod sub_database_frontier;
+mod sub_database_scope;
+mod sub_database_selectors;
+mod sub_database_selectors_payload;
 mod timeline;
 mod timeline_payload;
 

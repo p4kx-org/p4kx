@@ -73,3 +73,7 @@ pub(crate) fn optional_reference_definition(_: &mut SchemaGenerator) -> Schema {
 pub(crate) fn reference_definition(_: &mut SchemaGenerator) -> Schema {
     schemars::json_schema!({"$ref": "#/$defs/Reference"})
 }
+
+pub(crate) fn identity_definition(_: &mut SchemaGenerator) -> Schema {
+    schemars::json_schema!({"$ref": "#/$defs/Identity"})
+}

@@ -16,6 +16,10 @@ use super::graph_source::GraphRole;
 use super::links::{self, SubDatabaseSelector};
 use super::named_clip::Filepath;
 use super::payload::{self as wire, DefinitionFamily, DefinitionPayload};
+#[path = "projection_branch.rs"]
+mod branch;
+
+use super::sub_database_selectors::{BranchSelector, Scopes};
 use super::timeline::{TimelineIdentity, TimelineNode};
 use crate::audio_control_payload::{
     AtlBinaryText, AtlContent, AtlDeclaration, AtlElement, AtlLocation, AtlPosition,
@@ -25,6 +29,7 @@ use crate::xml_source_projection::{
     content_position, declaration_position, element_position, source_content,
 };
 use crate::{MediaError, MediaWriter, SourceContext, Status, Subresource, origin_error};
+use branch::{AttachedSelector, BranchSite};
 
 pub(super) struct DefinitionProjection<'a, 'source> {
     pub(super) context: &'a SourceContext<'source>,
@@ -55,8 +60,24 @@ struct Frame<'document> {
     filepath: Option<Filepath<'document>>,
     timeline: TimelineNode,
     graph: Option<(GraphRole, AtlPosition)>,
+    branch: Option<BranchSite>,
     siblings: SourceContents<'document>,
     next_sibling: u64,
+}
+
+impl<'document> Frame<'document> {
+    fn root(source: &'document SourceDocument<'_>) -> Self {
+        Self {
+            parent: None,
+            parent_name: None,
+            filepath: None,
+            timeline: TimelineNode::Other,
+            graph: None,
+            branch: None,
+            siblings: source.content(),
+            next_sibling: 0,
+        }
+    }
 }
 
 struct ElementDeclarations<'element, 'document> {
@@ -66,6 +87,7 @@ struct ElementDeclarations<'element, 'document> {
     timeline: TimelineNode,
     graph: Option<GraphRole>,
     sub_database: Option<&'element SubDatabaseSelector>,
+    branch_selector: Option<AttachedSelector<'element, 'document>>,
 }
 
 impl DefinitionProjection<'_, '_> {
@@ -75,21 +97,14 @@ impl DefinitionProjection<'_, '_> {
         writer: &mut MediaWriter<'_>,
     ) -> Result<u64, Failure> {
         let budget = &self.context.directory.input_state()?.budget;
-        let mut stack = vec![Frame {
-            parent: None,
-            parent_name: None,
-            filepath: None,
-            timeline: TimelineNode::Other,
-            graph: None,
-            siblings: source.content(),
-            next_sibling: 0,
-        }];
+        let mut stack = vec![Frame::root(source)];
         let mut index = 0_u64;
         let mut blend = if matches!(self.family, DefinitionFamily::Bspace) && !source.is_lossy() {
             Some(BlendIndex::default())
         } else {
             None
         };
+        let scopes = Scopes::new(source.root());
         while let Some(frame) = stack.last_mut() {
             let Some(item) = frame.siblings.next() else {
                 stack.pop();
@@ -103,8 +118,13 @@ impl DefinitionProjection<'_, '_> {
             frame.next_sibling = advance(frame.next_sibling)?;
             match item? {
                 SourceContent::Element(element) => {
-                    let child =
-                        self.element(element, frame, index, location, blend.as_mut(), writer)?;
+                    let child = self.element(
+                        element,
+                        frame,
+                        (index, location),
+                        (blend.as_mut(), &scopes),
+                        writer,
+                    )?;
                     stack.try_reserve(1).map_err(|cause| MediaError::Io {
                         path: writer.root.clone(),
                         source: io::Error::new(io::ErrorKind::OutOfMemory, cause),
@@ -138,48 +158,38 @@ impl DefinitionProjection<'_, '_> {
         &self,
         element: SourceElement<'document>,
         parent: &mut Frame<'document>,
-        index: u64,
-        location: AtlLocation,
-        mut blend: Option<&mut BlendIndex<'document>>,
+        (index, location): (u64, AtlLocation),
+        (mut blend, scopes): (Option<&mut BlendIndex<'document>>, &Scopes<'document>),
         writer: &mut MediaWriter<'_>,
     ) -> Result<Frame<'document>, Failure> {
         let syntax = element.syntax()?;
-        let position = element_position(&element.position())?;
-        let (graph, sub_database) = self.graph_element(
-            element,
-            parent,
-            (index, position),
-            blend.as_deref_mut(),
-            writer,
-        )?;
-        let timeline = TimelineNode::at(
-            parent.timeline,
-            self.family,
-            element,
-            parent.parent,
-            TimelineIdentity { index, position },
-        );
-        self.write_element(
-            AtlElement {
-                qualified_name: syntax.qualified_name(),
-                namespace: element.namespace(),
-                location: location.clone(),
-                position,
-            },
+        let site = TimelineIdentity {
             index,
+            position: element_position(&element.position())?,
+        };
+        let (graph, sub_database) =
+            self.graph_element(element, parent, site, blend.as_deref_mut(), writer)?;
+        let timeline = TimelineNode::at(parent.timeline, self.family, element, parent.parent, site);
+        branch::positioned_element(
+            self,
+            element,
+            syntax.qualified_name(),
+            location,
+            site,
+            (timeline, graph),
             writer,
         )?;
-        timeline.write(self, element, index, position, writer)?;
-        if let Some(graph) = graph {
-            graph.write(
-                self,
-                syntax.qualified_name(),
-                index,
-                location,
-                position,
-                writer,
-            )?;
-        }
+        let branch = BranchSite::for_element(graph, index, site.position, parent.branch);
+        let selector = BranchSelector::of(graph, element, self, writer)?;
+        let branch_selector = branch::attach_selector(
+            self,
+            scopes,
+            element,
+            selector.as_ref(),
+            branch,
+            (index, site.position),
+            writer,
+        )?;
         self.declarations(
             &ElementDeclarations {
                 element,
@@ -188,6 +198,7 @@ impl DefinitionProjection<'_, '_> {
                 timeline,
                 graph,
                 sub_database: sub_database.as_ref(),
+                branch_selector,
             },
             parent,
             blend,
@@ -199,7 +210,8 @@ impl DefinitionProjection<'_, '_> {
             parent_name: element.namespace().is_none().then(|| element.name()),
             filepath: Filepath::for_list(self, element, parent.parent_name, writer)?,
             timeline,
-            graph: graph.map(|role| (role, position)),
+            graph: graph.map(|role| (role, site.position)),
+            branch,
             siblings: syntax.content()?,
             next_sibling: 0,
         })
@@ -209,18 +221,23 @@ impl DefinitionProjection<'_, '_> {
         &self,
         element: SourceElement<'_>,
         parent: &Frame<'_>,
-        site: (u64, AtlPosition),
+        TimelineIdentity { index, position }: TimelineIdentity,
         blend: Option<&mut BlendIndex<'_>>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(Option<GraphRole>, Option<SubDatabaseSelector>), Failure> {
         let parent_role = parent.graph.map(|(role, _)| role);
         let graph = GraphRole::of(self.family, parent_role, parent.parent.is_none(), element);
         if let Some(blend) = blend {
-            let (index, position) = site;
             blend.element(graph, parent_role, index, position, writer)?;
         }
-        let sub_database =
-            SubDatabaseSelector::of(graph, parent.graph, element, self, site, writer)?;
+        let sub_database = SubDatabaseSelector::of(
+            graph,
+            parent.graph,
+            element,
+            self,
+            (index, position),
+            writer,
+        )?;
         Ok((graph, sub_database))
     }
 
@@ -259,6 +276,10 @@ impl DefinitionProjection<'_, '_> {
                 element.sub_database,
                 writer,
             )?;
+            if let Some((selector, scopes, mut site)) = element.branch_selector {
+                site.declaration = position;
+                scopes.tokens(site, selector, &declaration, indices[1], self, writer)?;
+            }
             element
                 .timeline
                 .write_attribute(self, &declaration, indices, position, writer)?;

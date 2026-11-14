@@ -10,6 +10,9 @@ use super::graph_source::{GraphAttribute, GraphNode};
 use super::named_dba::Binding;
 use super::sub_database_cycles::{SubDatabaseCycle, SubDatabaseEdge};
 use super::sub_database_frontier::Frontier;
+use super::sub_database_selectors_payload::{
+    Candidate as BranchCandidate, Selector as BranchSelector, Token as BranchToken,
+};
 use super::timeline_payload::{Event, EventAttribute, EventTimeline};
 use crate::Reference;
 use crate::audio_control_payload::{
@@ -36,6 +39,9 @@ pub(super) const SUB_DATABASE_TARGET_FRONTIER: &str =
     "animation-definition-sub-database-target-frontier";
 pub(super) const BLEND_REFERENCE: &str = "animation-definition-blend-space-reference";
 pub(super) const BLEND_CANDIDATE: &str = "animation-definition-blend-space-candidate";
+pub(super) const SUB_DATABASE_SELECTOR: &str = "animation-definition-sub-database-selector";
+pub(super) const SUB_DATABASE_TOKEN: &str = "animation-definition-sub-database-token";
+pub(super) const SUB_DATABASE_CANDIDATE: &str = "animation-definition-sub-database-candidate";
 pub(super) const GRAPH_ATTRIBUTE: &str = "animation-definition-graph-attribute";
 
 #[derive(Clone, Copy, Serialize, JsonSchema)]
@@ -91,6 +97,9 @@ pub(super) enum DefinitionPayload<'source> {
     SubDatabaseEdge(SubDatabaseEdge),
     SubDatabaseCycle(SubDatabaseCycle),
     SubDatabaseFrontier(Frontier),
+    SubDatabaseSelector(BranchSelector),
+    SubDatabaseToken(BranchToken<'source>),
+    SubDatabaseCandidate(BranchCandidate<'source>),
     BlendSpaceReference(BlendReference<'source>),
     BlendSpaceCandidate(BlendCandidate),
 }

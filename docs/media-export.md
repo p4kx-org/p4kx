@@ -676,6 +676,18 @@ role. Follow the source parent ordinal to the owning `SubADB`. Repeated
 declarations and an empty `Name` remain visible. An element with an absent
 `Name` still has a node row.
 
+`sub-database-selector` rows distinguish absent, empty, repeated and single
+attributes. A single nonempty `SubADB@Tags` is split on the original plus
+signs, retaining repeated and empty tokens. A single nonempty `FragmentID@Name`
+is one selector. The token rows independently compare authored ASCII names
+with the physical definitions reached through the owning ADB's `TagDef` or
+`FragDef` and their same-archive imports. They distinguish missing targets,
+unselected or unavailable scopes, observed ambiguity and incomplete imports.
+Candidate rows retain the original definition Entry and its name coordinate;
+their indices extend the original element, declaration and token indices.
+Two branches reaching the same child remain independent. These rows identify
+authored matches and have no runtime selection semantics.
+
 Mannequin SubADB edges join a direct `AnimDB/SubADBs/SubADB` declaration with
 a unique selected, readable database in the same owning archive. The closing
 `sub-database-edge` rows link physical source and target entry ordinals to the

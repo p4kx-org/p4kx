@@ -36,6 +36,9 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
         (wire::BLEND_CANDIDATE, "blend-space-candidate", 3),
         (wire::SUB_DATABASE_EDGE, "sub-database-edge", 3),
         (wire::SUB_DATABASE_CYCLE, "sub-database-cycle", 1),
+        (wire::SUB_DATABASE_SELECTOR, "sub-database-selector", 1),
+        (wire::SUB_DATABASE_TOKEN, "sub-database-token", 3),
+        (wire::SUB_DATABASE_CANDIDATE, "sub-database-candidate", 4),
         (
             wire::SUB_DATABASE_ATTRIBUTE_FRONTIER,
             "sub-database-frontier",

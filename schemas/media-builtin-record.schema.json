@@ -1198,6 +1198,57 @@
           "additionalProperties": false,
           "properties": {
             "payload": {
+              "$ref": "#/$defs/SubDatabaseSelector"
+            },
+            "record_type": {
+              "const": "sub-database-selector",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SubDatabaseToken"
+            },
+            "record_type": {
+              "const": "sub-database-token",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/SubDatabaseCandidate"
+            },
+            "record_type": {
+              "const": "sub-database-candidate",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
               "$ref": "#/$defs/BlendReference"
             },
             "record_type": {
@@ -21815,6 +21866,30 @@
         }
       ]
     },
+    "SubDatabaseCandidate": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "name_position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "target": {
+          "$ref": "#/$defs/Identity"
+        }
+      },
+      "required": [
+        "target",
+        "name",
+        "position",
+        "name_position"
+      ],
+      "type": "object"
+    },
     "SubDatabaseCycle": {
       "additionalProperties": false,
       "properties": {
@@ -21856,6 +21931,108 @@
         "target_entry_index",
         "source_element_index",
         "source_declaration_ordinal"
+      ],
+      "type": "object"
+    },
+    "SubDatabaseResolution": {
+      "enum": [
+        "invalid-token",
+        "unsupported-spelling",
+        "incomplete",
+        "missing",
+        "resolved",
+        "ambiguous"
+      ],
+      "type": "string"
+    },
+    "SubDatabaseScopeState": {
+      "enum": [
+        "complete",
+        "missing-definition-selector",
+        "duplicate-definition-selector",
+        "invalid-definition-path",
+        "missing-definition",
+        "ambiguous-definition",
+        "not-selected",
+        "unavailable",
+        "unreadable",
+        "invalid-definition",
+        "incomplete-imports"
+      ],
+      "type": "string"
+    },
+    "SubDatabaseSelector": {
+      "additionalProperties": false,
+      "properties": {
+        "branch": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "kind": {
+          "$ref": "#/$defs/SubDatabaseSelectorKind"
+        },
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "scope": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SubDatabaseScopeState"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/SubDatabaseSelectorState"
+        }
+      },
+      "required": [
+        "branch",
+        "kind",
+        "position",
+        "state",
+        "scope"
+      ],
+      "type": "object"
+    },
+    "SubDatabaseSelectorKind": {
+      "enum": [
+        "tags",
+        "fragment-name"
+      ],
+      "type": "string"
+    },
+    "SubDatabaseSelectorState": {
+      "enum": [
+        "missing",
+        "empty",
+        "repeated",
+        "present"
+      ],
+      "type": "string"
+    },
+    "SubDatabaseToken": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_count": {
+          "$ref": "#/$defs/DecimalU64"
+        },
+        "position": {
+          "$ref": "#/$defs/AtlPosition"
+        },
+        "resolution": {
+          "$ref": "#/$defs/SubDatabaseResolution"
+        },
+        "spelling": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "spelling",
+        "position",
+        "resolution",
+        "candidate_count"
       ],
       "type": "object"
     },
@@ -43177,6 +43354,171 @@
               "indices": {
                 "maxItems": 1,
                 "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-sub-database-selector"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "sub-database-selector"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 1,
+                "minItems": 1
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-sub-database-token"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "sub-database-token"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation-definition"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-definition-sub-database-candidate"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationDefinitionPayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "sub-database-candidate"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 4,
+                "minItems": 4
               }
             }
           }
