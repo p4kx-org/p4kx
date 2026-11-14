@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::cryxml::{
     SourceAttribute, SourceDeclaration, SourceDeclarationKind, SourceElement,
 };
+use p4kx_extraction::{NamedCafSelector, SourceUseRole};
 
-use super::links::{self, ReferenceSelection};
+use super::links::ReferenceSelection;
 use super::named_dba::{Databases, NamedSelection};
 use super::origins;
 use super::payload::{self as wire, DefinitionFamily, DefinitionPayload, NamedCaf};
@@ -83,13 +83,14 @@ impl<'document> Filepath<'document> {
         };
         let path = declaration.value();
         let name = &attributes.name;
-        if is_concrete_caf(name.value(), path) {
+        if let Some(selector) = NamedCafSelector::new(name.value(), path) {
             let link = Link {
                 name: name.value(),
                 name_position: declaration_position(name.position())?,
                 path,
                 path_position: position,
                 directive: self.directive.as_ref(),
+                selector,
             };
             link.write(projection, &self.databases, indices, writer)?;
         }
@@ -174,22 +175,13 @@ impl<'document> Directive<'document> {
     }
 }
 
-fn is_concrete_caf(name: &str, path: &str) -> bool {
-    !name.is_empty()
-        && !name.starts_with(['#', '$'])
-        && !name.contains(['*', '?'])
-        && !path.contains(['*', '?'])
-        && path
-            .rsplit_once('.')
-            .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("caf"))
-}
-
 struct Link<'directive, 'document> {
     name: &'document str,
     name_position: AtlPosition,
     path: &'document str,
     path_position: AtlPosition,
     directive: Option<&'directive Directive<'document>>,
+    selector: NamedCafSelector<'document>,
 }
 
 impl Link<'_, '_> {
@@ -262,21 +254,9 @@ impl Link<'_, '_> {
     }
 
     fn archive_path(&self) -> Option<String> {
-        if is_rooted(self.path) {
-            return links::archive_animation_path(self.path);
-        }
-        let directory = self.directive?.path()?.trim_end_matches(['/', '\\']);
-        if directory.is_empty() {
-            return None;
-        }
-        links::archive_animation_path(&format!("{directory}/{}", self.path))
+        self.selector
+            .archive_path(self.directive.and_then(Directive::path))
     }
-}
-
-fn is_rooted(path: &str) -> bool {
-    path.split_once(['/', '\\']).is_some_and(|(first, _)| {
-        first.eq_ignore_ascii_case("animations") || first.eq_ignore_ascii_case("data")
-    })
 }
 
 struct Scope {
@@ -298,7 +278,7 @@ impl Scope {
             });
         };
         let mut evidence = directive.evidence(projection, writer)?;
-        if is_rooted(link.path) {
+        if !link.selector.uses_scope() {
             evidence.selection = empty();
         }
         Ok(evidence)

@@ -5,11 +5,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use p4kx_extraction::animation_headers::{AnimationHeaderError, AnimationSourceHeaders};
-use p4kx_extraction::{Entry, EntryTree, FolderId};
+use p4kx_extraction::{Entry, EntryTree, FolderId, NamedCafSelector};
 
 use crate::character_path;
 use crate::entity_rig_catalogue::{RigEntry, read_rig_entry};
-use crate::{ArchiveModels, EntityNode, EntityRig, RigFile, discover_entity_rigs};
+use crate::{ArchiveModels, EntityNode, EntityRig, RigFile, RigParameter, discover_entity_rigs};
 
 /// Source-only animation inventory for the resolved placements of an Entity.
 #[derive(Debug)]
@@ -39,7 +39,7 @@ pub struct ClipArchiveSource {
 pub struct EntityClipRig {
     /// Original rig discovery, including failed reads and unexpanded directives.
     pub rig: EntityRig,
-    /// Candidate folder links and direct database selections in authored parameter order.
+    /// Candidate folders and exact database or named CAF links in authored parameter order.
     pub links: Vec<ClipSourceLink>,
 }
 
@@ -74,6 +74,13 @@ pub enum ClipSourceSelection {
         /// Why no physical source can be selected.
         reason: ClipDatabaseUnavailable,
     },
+    /// A concrete CAF alias and its physical selection, even when the file could not be located.
+    NamedCaf {
+        /// Earlier folder parameter used to resolve a relative path within this `AnimationList`.
+        filepath_parameter: Option<usize>,
+        /// Selected physical source or the reason why none has been selected.
+        target: NamedCafTarget,
+    },
 }
 
 /// Exact lookup disposition for a failed tracks-database selector.
@@ -93,7 +100,28 @@ pub enum ClipDatabaseUnavailable {
     },
 }
 
-/// Inventories physical CAF and DBA headers without resolving clip-name or wildcard selectors.
+/// The available physical file of a named CAF alias.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum NamedCafTarget {
+    /// Index into the shared physical source inventory.
+    File(usize),
+    /// A relative alias has no preceding folder within its `AnimationList`.
+    MissingScope,
+    /// Path spelling cannot be resolved to an eligible Archive path.
+    InvalidPath,
+    /// No Archive Entry matches the selector.
+    Missing,
+    /// More than one physical Archive Entry matches the selector.
+    Ambiguous,
+    /// Archive lookup failed before physical identity could be determined.
+    Unreadable {
+        /// The lookup diagnostic.
+        reason: String,
+    },
+}
+
+/// Inventories physical CAF and DBA headers without expanding wildcard selectors.
 ///
 /// Candidate folders use the same separator and ASCII case rules as normal archive selection.
 /// A failed root or individual source read does not stop work for the other placements.
@@ -137,6 +165,7 @@ struct Folders {
 
 impl Inventory<'_, '_> {
     fn links(&mut self, rig: &EntityRig) -> Vec<ClipSourceLink> {
+        let mut folder = None;
         rig.parameters
             .as_ref()
             .and_then(RigFile::value)
@@ -144,10 +173,14 @@ impl Inventory<'_, '_> {
             .flatten()
             .enumerate()
             .filter_map(|(parameter, row)| {
-                let selection = match row.name.as_str() {
-                    "#filepath" => self.folder(&row.path),
-                    "$TracksDatabase" => self.database(&row.path),
-                    _ => return None,
+                let selection = if row.name.eq_ignore_ascii_case("#filepath") {
+                    folder = Some((parameter, row));
+                    self.folder(&row.path)
+                } else if row.name.eq_ignore_ascii_case("$TracksDatabase") {
+                    self.database(&row.path)
+                } else {
+                    let caf = NamedCafSelector::new(&row.name, &row.path)?;
+                    self.named_caf(caf, folder.filter(|(_, scope)| scope.list == row.list))
                 };
                 Some(ClipSourceLink {
                     parameter,
@@ -155,6 +188,32 @@ impl Inventory<'_, '_> {
                 })
             })
             .collect()
+    }
+
+    fn named_caf(
+        &mut self,
+        selector: NamedCafSelector<'_>,
+        folder: Option<(usize, &RigParameter)>,
+    ) -> ClipSourceSelection {
+        let scope = folder.filter(|_| selector.uses_scope());
+        let target = if selector.uses_scope() && scope.is_none() {
+            NamedCafTarget::MissingScope
+        } else if let Some(path) = selector.archive_path(scope.map(|(_, row)| row.path.as_str())) {
+            match self.models.exact_rig_entry(&path) {
+                RigEntry::Unique(entry) => {
+                    NamedCafTarget::File(self.physical.resolve(self.models, entry))
+                }
+                RigEntry::Missing => NamedCafTarget::Missing,
+                RigEntry::Ambiguous => NamedCafTarget::Ambiguous,
+                RigEntry::Unreadable(reason) => NamedCafTarget::Unreadable { reason },
+            }
+        } else {
+            NamedCafTarget::InvalidPath
+        };
+        ClipSourceSelection::NamedCaf {
+            filepath_parameter: scope.map(|(parameter, _)| parameter),
+            target,
+        }
     }
 
     fn folder(&mut self, path: &str) -> ClipSourceSelection {

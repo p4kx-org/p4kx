@@ -63,7 +63,7 @@ pub use crate::source_use::{
 };
 pub use crate::source_uses::{SourceInventoryFreezeError, SourceUses};
 pub use crate::source_value::{SourceValue, SourceValueState, SourcedValue};
-pub use archive_animation_path::archive_animation_path;
+pub use archive_animation_path::{NamedCafSelector, archive_animation_path};
 pub use archive_layout_origins::{ArchiveLayoutOriginError, ArchiveLayoutOrigins};
 pub use chunk_table_evidence::{ChunkEvidenceError, ChunkTableEvidence, ChunkTableRows};
 pub use default_material_receipt::{

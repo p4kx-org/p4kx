@@ -16,23 +16,30 @@ use crate::entity_rig_catalogue::RigEntry;
 impl<'archive> ArchiveModels<'archive> {
     pub(crate) fn rig_entry(&self, path: &str) -> RigEntry<'archive> {
         for candidate in archive_entry_candidates(path) {
-            let mut matches = match self
-                .index
-                .matching_entries_with(&candidate, |_| Ok::<_, Infallible>(()))
-            {
-                Ok(matches) => matches,
-                Err(error) => return RigEntry::Unreadable(error.to_string()),
-            };
-            match (matches.next(), matches.next()) {
-                (None, _) => {}
-                (Some(Ok(entry)), None) => return RigEntry::Unique(entry),
-                (Some(Ok(_)), Some(Ok(_))) => return RigEntry::Ambiguous,
-                (Some(Err(error)), _) | (_, Some(Err(error))) => {
-                    return RigEntry::Unreadable(error.to_string());
-                }
+            let entry = self.exact_rig_entry(&candidate);
+            if !matches!(entry, RigEntry::Missing) {
+                return entry;
             }
         }
         RigEntry::Missing
+    }
+
+    pub(crate) fn exact_rig_entry(&self, path: &str) -> RigEntry<'archive> {
+        let mut matches = match self
+            .index
+            .matching_entries_with(path, |_| Ok::<_, Infallible>(()))
+        {
+            Ok(matches) => matches,
+            Err(error) => return RigEntry::Unreadable(error.to_string()),
+        };
+        match (matches.next(), matches.next()) {
+            (None, _) => RigEntry::Missing,
+            (Some(Ok(entry)), None) => RigEntry::Unique(entry),
+            (Some(Ok(_)), Some(Ok(_))) => RigEntry::Ambiguous,
+            (Some(Err(error)), _) | (_, Some(Err(error))) => {
+                RigEntry::Unreadable(error.to_string())
+            }
+        }
     }
 
     /// Returns the selected animations with each admitted Archive Entry.

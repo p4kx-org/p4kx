@@ -32,8 +32,9 @@ leave child and gear discovery available.
 The Rust `discover_entity_clips` API inventories CAF and DBA header declarations under the
 resolved rig positions. Tracks-database links preserve the actual source read or why it could
 not be selected. A folder directive links the physical CAF and DBA candidates in its subtree.
-Candidates shared by different placements refer to the same inventoried Entry. Unexpanded
-names and wildcards remain in the authored parameters.
+Candidates shared by different placements refer to the same inventoried Entry. A concrete CAF
+alias resolves by its rooted path or its preceding folder in the same AnimationList. A relative
+alias records the folder as a separate selector. Wildcards remain in the authored parameters.
 
 The header inventory preserves the physical clip ordinal, original 48-byte metadata and DBA name,
 independent timing, and each observed controller descriptor and encoding word. A malformed block

@@ -16,6 +16,9 @@ use super::{
 };
 use crate::{ArchiveModels, LoadoutResolver, RigFileRead};
 
+#[path = "entity_clip_named_caf_tests.rs"]
+mod named_caf;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const ROOT_PARAMS: &str = "Data/Objects/Test/root.chrparams";
@@ -34,6 +37,7 @@ fn original_headers_remain_distinct_and_a_missing_rig_does_not_hide_other_source
     verify_links(&catalogue)?;
     verify_headers(&catalogue)?;
     verify_block_faults(&catalogue)?;
+    named_caf::verify_named_caf(&catalogue)?;
 
     let without_key = Archive::open(&path)?;
     let catalogue = inventory(&without_key)?;
@@ -113,10 +117,8 @@ fn verify_child_links(
     links: &[super::ClipSourceLink],
     root_files: &[usize],
 ) -> TestResult {
-    let [child_folder, child_database] = links else {
-        return Err(
-            "the wildcard remains a declaration and the physical sources have two links".into(),
-        );
+    let [child_folder, child_database, ..] = links else {
+        return Err("the wildcard remains a declaration before the database link".into());
     };
     assert_eq!(
         child_database.parameter, 2,
@@ -279,6 +281,13 @@ fn synthetic_archive() -> ArchiveBuilder {
 <Animation name="#filepath" path="Data/Animations/Loose/"/>
 <Animation name="*" path="*/*.caf"/>
 <Animation name="$TracksDatabase" path="Animations/Db/packed.dba"/>
+<Animation name="relative" path="sub/repeated.caf"/>
+<Animation name="rooted" path="Animations/Loose/sub/repeated.caf"/>
+<Animation name="missing" path="absent.caf"/>
+<Animation name="parentTraversal" path="../repeated.caf"/>
+<Animation name="ambiguous" path="Data/Animations/Duplicate/test.caf"/>
+</AnimationList><AnimationList>
+<Animation name="beforeScope" path="sub/repeated.caf"/>
 </AnimationList></Params>"##,
         ))
         .entry(TestEntry::stored(
@@ -287,6 +296,14 @@ fn synthetic_archive() -> ArchiveBuilder {
         ))
         .entry(TestEntry::stored(PROTECTED, TestAnimation::new("keyed", 50).caf()).encrypted())
         .entry(TestEntry::stored(DBA, broken_dba()))
+        .entry(TestEntry::stored(
+            "Data/Animations/Duplicate/test.caf",
+            TestAnimation::new("duplicate", 25).caf(),
+        ))
+        .entry(TestEntry::stored(
+            "Data/Animations/Duplicate/test.caf",
+            TestAnimation::new("duplicate", 60).caf(),
+        ))
 }
 
 fn database() -> Vec<u8> {

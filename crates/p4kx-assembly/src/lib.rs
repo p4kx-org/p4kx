@@ -214,7 +214,7 @@ pub use creature_animation::{
 pub use entities::{ENTITY_TYPE, Entities};
 pub use entity_clip_catalogue::{
     ClipArchiveSource, ClipDatabaseUnavailable, ClipSourceLink, ClipSourceSelection,
-    EntityClipCatalogue, EntityClipRig, discover_entity_clips,
+    EntityClipCatalogue, EntityClipRig, NamedCafTarget, discover_entity_clips,
 };
 pub use entity_glow::{
     EntityGlow, EntityGlowBindingError, EntityGlowLink, GlowEffectKind, GlowSelection, GlowSubset,
