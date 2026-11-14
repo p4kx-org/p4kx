@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::convert::Infallible;
 use std::io::Read;
 
 use p4kx_extraction::{
@@ -10,7 +11,30 @@ use p4kx_extraction::{
 
 use super::{ArchiveModels, ModelFailure, read_failure};
 
-impl ArchiveModels<'_> {
+use crate::entity_rig_catalogue::RigEntry;
+
+impl<'archive> ArchiveModels<'archive> {
+    pub(crate) fn rig_entry(&self, path: &str) -> RigEntry<'archive> {
+        for candidate in archive_entry_candidates(path) {
+            let mut matches = match self
+                .index
+                .matching_entries_with(&candidate, |_| Ok::<_, Infallible>(()))
+            {
+                Ok(matches) => matches,
+                Err(error) => return RigEntry::Unreadable(error.to_string()),
+            };
+            match (matches.next(), matches.next()) {
+                (None, _) => {}
+                (Some(Ok(entry)), None) => return RigEntry::Unique(entry),
+                (Some(Ok(_)), Some(Ok(_))) => return RigEntry::Ambiguous,
+                (Some(Err(error)), _) | (_, Some(Err(error))) => {
+                    return RigEntry::Unreadable(error.to_string());
+                }
+            }
+        }
+        RigEntry::Missing
+    }
+
     /// Returns the selected animations with each admitted Archive Entry.
     ///
     /// # Errors
@@ -75,8 +99,7 @@ impl ArchiveModels<'_> {
     }
 
     pub(crate) fn entry_of(&self, path: &str) -> Option<String> {
-        let path = path.trim_start_matches(['/', '\\']);
-        [format!("Data\\{path}"), path.to_owned()]
+        archive_entry_candidates(path)
             .into_iter()
             .find_map(|candidate| {
                 self.index
@@ -89,7 +112,7 @@ impl ArchiveModels<'_> {
         self.entry_of(path).and_then(|path| self.index.find(&path))
     }
 
-    pub(super) fn read_file_entry(
+    pub(crate) fn read_file_entry(
         &self,
         entry: &Entry,
         limit: u64,
@@ -108,6 +131,11 @@ impl ArchiveModels<'_> {
             .map_err(read_failure)?;
         Ok(bytes)
     }
+}
+
+fn archive_entry_candidates(path: &str) -> [String; 2] {
+    let path = path.trim_start_matches(['/', '\\']);
+    [format!("Data/{path}"), path.to_owned()]
 }
 
 fn archive_folders(folders: &[&str]) -> Vec<String> {

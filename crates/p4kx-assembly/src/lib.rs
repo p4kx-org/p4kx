@@ -100,6 +100,7 @@ mod creature_rig;
 mod entities;
 mod entity_glow;
 mod entity_interior;
+mod entity_rig_catalogue;
 mod error;
 mod files;
 mod flatten;
@@ -215,6 +216,10 @@ pub use entity_glow::{
     GlowSubsetMaterial,
 };
 pub use entity_interior::{EntityContainer, EntityInterior, INTERIOR_NODE};
+pub use entity_rig_catalogue::{
+    EntityRig, RigDefinition, RigFile, RigFileRead, RigParameter, RigPlacement,
+    discover_entity_rigs,
+};
 pub use error::{AssemblyError, EntityLookupError, LoadoutError};
 pub use files::{ArchiveFiles, LoadoutFileError, LoadoutFiles, MAX_XML_LOADOUT_LEN};
 pub use gear_placement_source::GearPlacementSource;

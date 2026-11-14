@@ -18,6 +18,20 @@ animation holds 425,242 keys, the largest database 6,751,431. 1,475 `.caf` files
 animations of databases are additive (see below). The five channels of the Archive hold the same
 numbers within a few hundred files.
 
+## Entity rig input discovery
+
+Assembly's `discover_entity_rigs` visits a resolved Loadout's root, attached entities and landing
+gear in declaration order. It retains original geometry selectors, CDF model references, the
+selected physical skeleton and its primary chunk, and ordered animation parameter rows with
+original positions. Repeated placements remain distinct even when they share one Archive Entry.
+Each requested input distinguishes missing, ambiguous, key-required, wrong-key and other read
+failure. Encryption is unknown for a request whose bytes could not be read, and follows the
+observed input and its Archive ancestry after a successful read. Unread or invalid root inputs
+leave child and gear discovery available.
+
+This is a Rust discovery API. It reads neither geometry companions nor clip payloads and reports
+authored names and patterns without expanding them into selected clips.
+
 ## Where the keys are
 
 | Chunk | ID | Version | In |

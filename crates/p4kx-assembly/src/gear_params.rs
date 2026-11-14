@@ -32,7 +32,10 @@ impl ParameterSource {
         })
     }
 
-    pub(crate) fn locations(&self, fields: [&str; 2]) -> impl Iterator<Item = SourceLocation> {
+    pub(crate) fn locations(
+        &self,
+        fields: [&str; 2],
+    ) -> impl Iterator<Item = SourceLocation> + use<> {
         [
             NAMESPACES.location(&self.name, fields[0]),
             NAMESPACES.location(&self.path, fields[1]),
@@ -130,58 +133,122 @@ pub(crate) fn read_params(bytes: &[u8]) -> Result<ChrParams, String> {
 pub(crate) fn read_params_with_positions(bytes: &[u8]) -> Result<ChrParams, String> {
     let mut budget = Budget::new(bytes.len());
     markup::parse_with_source(bytes, &mut budget, |root, original, scope| {
-        let lists: Vec<_> = original
-            .children()
-            .into_iter()
-            .map(|list| {
-                if list.name().eq_ignore_ascii_case("AnimationList") {
-                    list.children()
-                } else {
-                    Vec::new()
-                }
-            })
-            .collect();
+        let lists = positioned_lists(original);
         project(&root, |list, entry| {
             ParameterSource::read(*lists.get(list)?.get(entry)?, scope)
         })
     })
 }
 
+/// One complete authored animation parameter without path expansion or deduplication.
+#[derive(Debug)]
+#[non_exhaustive]
+pub struct RigParameter {
+    /// Original `AnimationList` child index in the parameter document.
+    pub list: usize,
+    /// Original child index in that list.
+    pub ordinal: usize,
+    /// Original name, including folder, database and wildcard directives.
+    pub name: String,
+    /// Original path or pattern.
+    pub path: String,
+    /// Positions of the name and path in the parameter source.
+    pub selectors: Vec<SourceLocation>,
+}
+
+pub(crate) fn catalogue_parameters(bytes: &[u8]) -> Result<Vec<RigParameter>, String> {
+    crate::loadout_xml::parse_unbound(bytes, |root, scope| {
+        check_root(root.name())?;
+        let mut result = Vec::new();
+        for (list, node) in root.children().into_iter().enumerate() {
+            if !node.name().eq_ignore_ascii_case("AnimationList") {
+                continue;
+            }
+            for (ordinal, item) in node.children().into_iter().enumerate() {
+                if !item.name().eq_ignore_ascii_case("Animation") {
+                    continue;
+                }
+                let (Some((_, name)), Some((_, path))) =
+                    (item.attribute_ascii("name"), item.attribute_ascii("path"))
+                else {
+                    continue;
+                };
+                result.push(RigParameter {
+                    list,
+                    ordinal,
+                    name: name.to_owned(),
+                    path: path.to_owned(),
+                    selectors: ParameterSource::read(item, scope)
+                        .into_iter()
+                        .flat_map(|source| source.locations(["name", "path"]))
+                        .collect(),
+                });
+            }
+        }
+        Ok(result)
+    })
+}
+
+fn positioned_lists<'node, 'doc>(original: Node<'node, 'doc>) -> Vec<Vec<Node<'node, 'doc>>> {
+    original
+        .children()
+        .into_iter()
+        .map(|list| {
+            if list.name().eq_ignore_ascii_case("AnimationList") {
+                list.children()
+            } else {
+                Vec::new()
+            }
+        })
+        .collect()
+}
+
 fn project(
     root: &Element,
     mut source: impl FnMut(usize, usize) -> Option<ParameterSource>,
 ) -> Result<ChrParams, String> {
-    if !root.name.eq_ignore_ascii_case("Params") {
-        return Err(format!("the root element is {}, not Params", root.name));
-    }
     let mut params = ChrParams::default();
+    visit_parameters(root, |list, entry, name, file| match name {
+        "#filepath" => {
+            params.capped |= keep_last(&mut params.folders, file.replace('\\', "/"));
+            params.folder_source = source(list, entry);
+        }
+        "$TracksDatabase" => {
+            params.capped |= keep_last(&mut params.databases, file.replace('\\', "/"));
+            params.database_source = source(list, entry);
+        }
+        _ => params.choose_deploy(name, file, || source(list, entry)),
+    })?;
+    Ok(params)
+}
+
+fn visit_parameters(
+    root: &Element,
+    mut visit: impl FnMut(usize, usize, &str, &str),
+) -> Result<(), String> {
+    check_root(&root.name)?;
     for (list, items) in root.children.iter().enumerate() {
         if !items.name.eq_ignore_ascii_case("AnimationList") {
             continue;
         }
         for (entry, animation) in items.children.iter().enumerate() {
-            if !animation.name.eq_ignore_ascii_case("Animation") {
-                continue;
-            }
-            let (Some(name), Some(file)) =
-                (animation.attribute("name"), animation.attribute("path"))
-            else {
-                continue;
-            };
-            match name {
-                "#filepath" => {
-                    params.capped |= keep_last(&mut params.folders, file.replace('\\', "/"));
-                    params.folder_source = source(list, entry);
-                }
-                "$TracksDatabase" => {
-                    params.capped |= keep_last(&mut params.databases, file.replace('\\', "/"));
-                    params.database_source = source(list, entry);
-                }
-                _ => params.choose_deploy(name, file, || source(list, entry)),
+            if animation.name.eq_ignore_ascii_case("Animation")
+                && let (Some(name), Some(file)) =
+                    (animation.attribute("name"), animation.attribute("path"))
+            {
+                visit(list, entry, name, file);
             }
         }
     }
-    Ok(params)
+    Ok(())
+}
+
+fn check_root(name: &str) -> Result<(), String> {
+    if name.eq_ignore_ascii_case("Params") {
+        Ok(())
+    } else {
+        Err(format!("the root element is {name}, not Params"))
+    }
 }
 
 fn keep_last(list: &mut Vec<String>, path: String) -> bool {
