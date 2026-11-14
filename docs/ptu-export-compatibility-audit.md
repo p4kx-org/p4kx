@@ -154,6 +154,48 @@ The current tuning test and other patch-note items come from the
 and separate
 [TTK update](https://robertsspaceindustries.com/spectrum/community/SC/forum/190048/thread/star-citizen-alpha-5-0-ptu-patch-notes/9230300).
 
+### Patch-domain results
+
+The physical DataForge probe opened the exact installed LIVE 13165946 and
+PTU 13189690 Archives and checked that each stayed stable. It selected
+Entity owners by the original `Components` types and GameMode rules and
+global definitions by their original Record types. For each directly
+comparable value, it matched the original Record GUID and path and the
+physical component and field positions. Additions and removals in this
+comparison refer to unmatched positions. The probe compared the original
+numeric words and reported only counts and directions of change.
+
+| Area | Observed source and Catalog disposition | Remaining evidence |
+| --- | --- | --- |
+| Reputation and Contracts | Shared nominal awards are unchanged. The faction presentation, Handler scope and board defaults have Catalog paths. Four changed declaration families were verified and delivered in #1146–#1149. | The tested awards and Handler declarations do not establish a separate Contract or SubContract override, board ordering or the effective PTU reputation multiplier. |
+| Missile-lock UI and assets | The GFx/SWF samples open and the missile-lock geometry and material samples pass the focused readers. #1056 preserves the authored missile configurations in Catalog. | The original UI state and range bindings remain unverified. |
+| Starchitect placements, AI, loot and traversal | #844 and #845 verify source-linked transforms and EntXML/HCD occurrences. #847 exports separately owned loot source definitions and original component links. The new Spawn Closet Reference array was declared but absent from the selected Entity census. | Source evidence for this build's AI relocation, traversal and ledge changes, and exact loot or delivery placements remains unverified. |
+| Terrain, vegetation, mining and harvestables | Current directory changes and the sampled climate Class/JSON shapes are recorded. #849 and #1083 cover admitted descriptors and links, and #845 covers the original harvestable setup bindings. | Runtime density, generation, terrain LOD, memory or water changes, and a previous-PTU content delta were outside the available source comparisons. |
+| Weather and VFX | The independent LIVE/PTU particle-library comparison found authored Boolean and lightning-node changes. #1150 publishes the original definitions and references. | Runtime weather frequency and the VFX-to-sound behavior remain unverified. |
+| Audio | The retained comparison has 19 added, 10 removed and 821 changed `Libs/GameAudio` XML Entries. Path-name searches surfaced four changed weather-audio candidates and 26 changed Nyx-audio candidates. The current Archive comparison also accounts for BNK/WEM path populations. #1149 exports the changed procedural planet room RTPC declarations. | The path inventory cannot attribute an ATL trigger to an exact changed bank or prove audible thunder, footstep mixing, music, propagation, or building transitions. The retained earlier PTU bank receipt has a different source identity. |
+| Server meshing | The changed Entry and declaration names provided no territory candidate under the stated name filters. Both position and rotation occur on the separate authored placement descriptors. | No original data binding establishes server territory transforms, claim bias, candidate gating or physics-authority behavior. |
+| TTK armor and turrets | Of 223 matched armor-owner `SHealthComponentParams` slots, `Health` changed in 220, with 105 increases and 115 decreases. Of 460 matched turret-owner slots, `Health` increased in 272 and stayed unchanged in 188. Every matched `DamageCap` was unchanged. Selected Item components retain these two words in `configurations.durability`. | This measures the currently installed LIVE-to-PTU change. The earlier PTU values and any across-the-board balance claim remain unverified. |
+| TTK destruction rules | All 24 matching physical GameMode Records have an original `ResourceNetworkParams` Class. Its `shipDestructionHealthThreshold` increased in 23 and stayed unchanged in one. Its `shipDestructionBufferMultiplier` remained unchanged in all 24. Both fields are already exported in `configurations.resourceNetworkParameters`. | The exact runtime relationship between these two settings and a single-hit destruction event is unverified. |
+| TTK beam and projectile inputs | The scoped ammunition comparison found an authored damage change and existing Catalog coverage for that value. #1052 checks the complete authored weapon-action input paths, including independently stored beam and launcher heat in synthetic fixtures. | The narrow sample does not measure the other weapon-series, beam and projectile-speed claims. |
+| Component power and distribution | All 14 matched wheeled-controller `MinimumPowerAmount` Singles were unchanged. The five matched legacy power connection rows retained identical base, draw and overclock threshold Singles. The separate authored `ItemResourceNetworkGlobal` Record changed five Singles in `defaultPowerDistributionParams`, including `powerDistCoolerMin`. | These source fields do not establish a general minimum assignment rule. The independent global Record and its power settings require their own Catalog path. |
+| Other fixes and platform behavior | The source audit records archive readers, source declarations and scoped Catalog checks. | Gameplay fixes, VR, runtime rendering and crashes require runtime evidence. The installed release export and native package acceptance are tracked in #1116. |
+
+Two independent original source shapes merit preserving. The standalone
+`ItemResourceNetworkGlobal` definition owns the power distribution block
+and `powerParams`. Its physical Record differs from the per-GameMode
+resource-network rules. The standalone `STurretHealthModifierDef` contains
+a `damageMovementModifier` curve. Its nine stored point pairs and LUT flag
+are unchanged in this comparison. All 474 LIVE and 475 PTU
+`SCItemTurretParams.healthModifierRecord` slots are authored null. The curve
+and optional link lack dedicated Catalog paths. A Catalog projection can
+preserve the independent Record and link state without applying the curve
+to an unrelated turret.
+
+The retained older PTU declaration evidence can establish what already
+existed by that earlier 5.0 snapshot. The two current Archive receipts
+cannot reconstruct the overwritten earlier payload. The full installed
+release verification is tracked by [#1116](https://github.com/p4kx-org/p4kx/issues/1116).
+
 ## Schema v3 follow-through
 
 Schema v3 exports the original item-recovery economy, override and policy tables. The
