@@ -23,7 +23,7 @@ dataforgeRecordHeader; genuine body paths, identity, selection and counts retain
 | Issue | Owning contract location | Facts/cardinality/scope kept |
 |---|---|---|
 | #844 | P.containerInstances, P.starmapPlacements | XML/Child/entxml/HCD declared traversal; reusable tile instances; local/world transforms, source chain and limits; existing LIVE placement convention |
-| #845 | P.locationInstances; A.harvestableBindings | sector/cluster/location tree, type, parent/children, source labels/keys/tags, local/world placement, InstanceMetadata host links; binding only if proved, otherwise explicit bounded finding |
+| #845 | P.locationInstances | Sector, cluster and location hierarchy, authored metadata, transforms, HCD presets and same-container EntXML Harvestable Multi Configuration bindings |
 | #847 | D.lootThemes, D.lootSecondaryChoiceSingleLayers, D.lootSecondaryChoiceMultiLayers, D.hierarchicalContextualDataPresets, D.lootGenerationGlobalParams, D.subHarvestableConfigs, D.subHarvestableMultiConfigs, C.lootGeneration | Theme links in subconfigs and physical Entity constraints, ordered secondary choices, HCD hierarchy and overrides, and category order. |
 | #848 | D.planetResources | Entry GUID/name/bMinable/tintPalette and source Entry, additional declared fields, exact missing/null/zero/invalid states; owns shared bounded JSON/GUID/path reader |
 | #849 | D.climateAssets, D.geologyAssets, D.creatures; A.planetAssetBindings | promotion/entity/resource/shading links; climate envelope and subasset order; Mineable_cfg_path; actual fauna definitions; proved per-body assignment or explicit notEstablished finding |

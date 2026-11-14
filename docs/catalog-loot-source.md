@@ -24,6 +24,12 @@ existing slot-preset selection also emits a convenience row under the top-level
 definition once. The definitions include every Record of their exact source family and do not
 simulate loot selection.
 
+An EntXML HarvestableComponent on a typed Starchitect location supplies an
+authored SubHarvestable Multi Configuration GUID. For this source follow
+`placements.locationInstances.rows[].declaration.entXml.candidates.value[].document.value.harvestableComponents.value[].subConfigGuid.value`
+and join the same Build's `definitions.subHarvestableMultiConfigs`. Use
+`entXml.selected` to check whether the physical candidate was uniquely selected.
+
 `configurations.lootGeneration` retains one row for each physical
 `EntityClassDefinition.Components` occurrence of `LootGenerationComponentParams` that matches the
 ordinary Record filter, including owners outside the item and ship kinds. Rows are ordered by

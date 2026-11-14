@@ -5,7 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use p4kx_extraction::{Archive, CancelToken, Guid};
+use p4kx_extraction::{Archive, CancelToken, Guid, SourceUses};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
@@ -24,6 +24,9 @@ mod children;
 
 #[path = "starmap_hcd.rs"]
 pub(crate) mod hcd;
+
+#[path = "starmap_entxml.rs"]
+pub(crate) mod entxml;
 
 const CHILDREN: &str = "ChildObjectContainers";
 const CHILD: &str = "Child";
@@ -128,8 +131,14 @@ fn parse_body(
             return Ok(Body::Unreadable(reason));
         }
     };
-    let mut hcd = hcd::HcdReader::new(archive, socpak, &main.container, capture, bounds.cancel);
-    let Ok((root, file)) = parsed_root(&main.bytes, bounds, capture, &mut hcd, ledger)? else {
+    let files = entxml::EntXmlFiles {
+        archive,
+        outer: socpak,
+        container: &main.container,
+        capture,
+        cancel: bounds.cancel,
+    };
+    let Ok((mut root, file, entities)) = parsed_root(&main.bytes, bounds, &files, ledger)? else {
         ledger.incomplete_inventory(Kind::StarmapObjects);
         main.source.record(
             ledger,
@@ -138,7 +147,7 @@ fn parse_body(
         );
         return Ok(Body::Unparsed);
     };
-    let loss = source_loss(&root);
+    let loss = source_loss(&mut root, &entities, capture.source_uses());
     if loss.inventory {
         ledger.incomplete_inventory(Kind::StarmapObjects);
     }
@@ -156,37 +165,49 @@ fn parse_body(
     })
 }
 
-fn parsed_root<'capture, 'input>(
+fn parsed_root(
     read: &EntryRead,
     bounds: &Bounds<'_>,
-    capture: &'capture EntryCapture<'input>,
-    hcd: &mut hcd::HcdReader<'_, 'capture, 'input>,
+    files: &entxml::EntXmlFiles<'_, '_>,
     ledger: &mut ExportLedger,
-) -> Result<Result<(Level, ContainerFile), XmlError>, CatalogError> {
-    match EntryXml::parse(read, capture)? {
-        Ok(xml) => {
-            let root = xml.root();
-            Ok(Ok((
-                children::ChildReader::new(bounds, &xml, hcd, ledger).level(root, 0)?,
-                ContainerFile::from_xml(&xml, capture)?,
-            )))
-        }
-        Err(error) => Ok(Err(error)),
-    }
+) -> Result<Result<(Level, ContainerFile, entxml::EntXmlIndex), XmlError>, CatalogError> {
+    let xml = match EntryXml::parse(read, files.capture)? {
+        Ok(xml) => xml,
+        Err(error) => return Ok(Err(error)),
+    };
+    let mut hcd = hcd::HcdReader::new(
+        files.archive,
+        files.outer,
+        files.container,
+        files.capture,
+        files.cancel,
+    );
+    let mut reader = children::ChildReader::new(bounds, &xml, &mut hcd, ledger);
+    let root = reader.level(xml.root(), 0)?;
+    let guids = reader.entity_guids;
+    let entities = files.scan(&guids, &xml, ledger)?;
+    Ok(Ok((
+        root,
+        ContainerFile::from_xml(&xml, files.capture)?,
+        entities,
+    )))
 }
 struct SourceLoss {
     projection: bool,
     inventory: bool,
 }
 
-fn source_loss(level: &Level) -> SourceLoss {
+fn source_loss(level: &mut Level, entities: &entxml::EntXmlIndex, uses: &SourceUses) -> SourceLoss {
     let inventory = level.capped || level.truncated;
     let mut loss = SourceLoss {
         projection: inventory,
         inventory,
     };
-    for child in &level.children {
-        let below = source_loss(&child.below);
+    for child in &mut level.children {
+        if let Some(location) = &mut child.location {
+            location.attach_entity(entities, uses);
+        }
+        let below = source_loss(&mut child.below, entities, uses);
         loss.projection |= matches!(&child.pose, Pose::Malformed { .. }) || below.projection;
         loss.inventory |= below.inventory;
     }

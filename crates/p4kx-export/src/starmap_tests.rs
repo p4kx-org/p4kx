@@ -370,3 +370,6 @@ mod child_paths;
 
 #[path = "starmap_hcd_tests.rs"]
 mod hcd;
+
+#[path = "starmap_entxml_tests.rs"]
+mod entxml;

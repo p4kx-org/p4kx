@@ -11,6 +11,7 @@ use crate::catalog_read::original::{EntryCapture, EntryXml, XmlNodeSource};
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::schema_fields::every_field_required;
+use crate::starmap_parse::entxml::{EntXmlIndex, EntXmlLink, EntXmlRequest};
 use crate::starmap_parse::hcd::{HcdLink, HcdLookup, HcdReader};
 use crate::starmap_xml::{Node, Root, attribute};
 use crate::{CatalogError, ExportAccountingError};
@@ -34,6 +35,10 @@ pub(crate) struct ChildLocation {
     tags: SourcedValue<Vec<SourcedValue<LocationTag>>>,
     has_hierarchical_context_data: SourcedValue<bool>,
     hierarchical_context: Option<HcdLink>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    entity_request: Option<EntXmlRequest>,
+    ent_xml: Option<EntXmlLink>,
     invalid_attributes: Vec<LocationAttribute>,
     instance_metadata: SourcedValue<Vec<LocationMetadataElement>>,
 }
@@ -72,11 +77,29 @@ impl ChildLocation {
             tags: tags.tokens,
             has_hierarchical_context_data,
             hierarchical_context: None,
+            entity_request: None,
+            ent_xml: None,
             instance_metadata: read_metadata(xml, child, capture)?,
             invalid_attributes: fields.invalid_attributes,
         })))
     }
 
+    pub(crate) fn request_entity(
+        &mut self,
+        xml: &EntryXml<'_, '_, '_>,
+        child: Root<'_>,
+    ) -> Result<Option<Guid>, CatalogError> {
+        let request = EntXmlRequest::capture(xml, child, self.guid.value().map(|guid| guid.0))?;
+        let guid = request.guid();
+        self.entity_request = Some(request);
+        Ok(guid)
+    }
+
+    pub(crate) fn attach_entity(&mut self, index: &EntXmlIndex, sources: &SourceUses) {
+        if let Some(request) = self.entity_request.take() {
+            self.ent_xml = Some(index.project(&request, sources));
+        }
+    }
     pub(crate) fn read_context(
         &mut self,
         hcd: &mut HcdReader<'_, '_, '_>,

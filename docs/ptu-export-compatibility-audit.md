@@ -90,11 +90,13 @@ the Nyx I descriptor and from there to a physical Starchitect Tile. The Nyx I de
 Tile instances and 125 distinct Tile targets. One target selected by its original Child
 reference opened successfully and its ObjectContainer v14 descriptor passed the CRC check.
 The Nyx I container holds 16,948 EntXML members. A direct inventory of a separate large Tile
-found 640 members and no EntXML or HCD members under the tested naming rules. These samples
-establish placement declarations and physical container reads. Full placement-export parity,
-individual EntXML or HCD bindings and source-backed AI, loot and harvestable joins remain with
-[#844](https://github.com/p4kx-org/p4kx/issues/844) and
-[#845](https://github.com/p4kx-org/p4kx/issues/845).
+found 640 members and no EntXML or HCD members under the tested naming rules. The placement
+walk and native transform test are complete in [#844](https://github.com/p4kx-org/p4kx/issues/844).
+The EntXML survey in [#845](https://github.com/p4kx-org/p4kx/issues/845) matched 16,947 root
+`EntityCryGUID` values with exact `Child@guid` declarations, including all 1,791 typed
+locations. Their original HarvestableComponent occurrences provide a
+`SubHarvestableMultiConfigRecord` link. The HCD companion independently provides a Context
+Preset GUID. AI and generated resource placement require separate source evidence.
 
 The filtered diagnostic Catalog preserves all 2,248 occurrences of one independently
 selected Tile, including distinct occurrence identities, system and planet parent links,

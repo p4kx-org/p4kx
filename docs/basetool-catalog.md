@@ -1976,6 +1976,28 @@ consumer can join `presetGuid` to `definitions.hierarchicalContextualDataPresets
 That table has its own selection scope. Context field provenance comes from the
 companion Entry. Lookup provenance retains the owning Child and directory sources.
 
+The optional `declaration.entXml` inventories matches for the original typed Child
+within its physical SOCpak. It checks `.entxml` members under an `entdata` path
+segment and joins the Child's nonzero `guid` to the decoded root `EntityCryGUID`.
+Each candidate contains its physical `entry` and a `document` sourced from that Entry.
+The original file name, class GUID and display text are independent declarations.
+
+`inventoryComplete` describes the running lookup's source-read coverage. `selected`
+contains the single physical Entry after a complete lookup. No match is absent,
+multiple matches or an invalid Child identity are invalid, and a failed or unsupported
+candidate can leave selection unreadable. The readable candidates remain available
+in directory order. Candidate-set and selection carriers retain their observed
+source references with incomplete source-set proof when the survey cannot be
+reconstructed from the retained references alone.
+
+The document retains the root and class GUIDs, original root-owned
+`harvestableComponents`, and independently ordered `areaEntities` with their
+containing sphere node indices. The typed `subConfigGuid` and original
+`subConfigText` belong to the individual component occurrence. The GUID joins the
+canonical row in `definitions.subHarvestableMultiConfigs` from the same Build when
+selected. The area entries are authored declarations with their own positions in
+the XML. No per-component mapping to one area entity is defined.
+
 Placement selection follows the existing container inventory scope. An unrestricted catalog
 or any selected Starmap or HarvestableProviderPreset path requests the walk. Other Record
 filters leave this table unavailable. Walk and archive diagnostics report incomplete source

@@ -99,3 +99,30 @@ separate so reused Children still have the correct source references. The
 companion's `preset` is an authored Context Preset GUID. Its recorded name and
 the location's component names do not establish a Harvestable Provider Preset
 binding.
+
+## Authored entity XML and harvestable setup
+
+A typed location can own an EntXML entity in the same physical container. Match
+the original Child GUID to the verified root Entity GUID in the eligible member
+family. The central directory supplies member positions, while the decoded XML
+supplies entity identity. Preserve each physical candidate and original element
+occurrence. Require a complete scan to select a unique candidate.
+
+The direct HarvestableComponent children of the EntXML root carry an authored
+SubHarvestable Multi Configuration GUID. Join that GUID to its independently
+owned DataForge definition. AreaSphere Entity references remain independent.
+The in-game placement or selection of a particular resource requires actual
+source evidence beyond this stored configuration.
+
+The installed PTU survey verified all 16,948 members in one selected planet
+container. It established 16,947 exact Child/Entity joins, including all 1,791
+typed locations. The 1,211 locations with an authored Harvestable metadata marker
+each retained two root-owned HarvestableComponent occurrences. The independent
+DataForge query admitted the referenced SubHarvestableMultiConfigRecord. A separate
+named entity document supplied the planet's authored entity and procedural controls.
+
+The selected HCD preset, the mission location template family and the changed
+ecosystem descriptors were also inspected for an explicit Harvestable Provider
+Preset association. No direct provider placement or component-to-AreaSphere
+mapping was found in those scoped sources. See the catalog's existing SOC-based
+provider placement rules for separately authored relationships.

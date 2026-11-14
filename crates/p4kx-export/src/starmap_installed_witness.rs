@@ -21,6 +21,9 @@ mod oracle;
 #[path = "starmap_installed_hcd.rs"]
 mod hcd;
 
+#[path = "starmap_installed_entxml.rs"]
+mod entxml;
+
 #[path = "starmap_installed_source.rs"]
 mod source;
 

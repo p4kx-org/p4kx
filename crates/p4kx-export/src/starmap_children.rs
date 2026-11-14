@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use p4kx_assembly::is_external_child_value;
@@ -20,12 +21,13 @@ pub(super) struct ChildReader<'a, 'read, 'capture, 'input, 'archive, 'cancel> {
     xml: &'a EntryXml<'read, 'capture, 'input>,
     hcd: &'a mut HcdReader<'archive, 'capture, 'input>,
     ledger: &'a mut ExportLedger,
+    pub(super) entity_guids: HashSet<Guid>,
 }
 
 impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
     ChildReader<'a, 'read, 'capture, 'input, 'archive, 'cancel>
 {
-    pub(super) const fn new(
+    pub(super) fn new(
         bounds: &'a Bounds<'cancel>,
         xml: &'a EntryXml<'read, 'capture, 'input>,
         hcd: &'a mut HcdReader<'archive, 'capture, 'input>,
@@ -36,6 +38,7 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
             xml,
             hcd,
             ledger,
+            entity_guids: HashSet::new(),
         }
     }
 
@@ -96,6 +99,8 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
         let mut location = ChildLocation::read(xml, child, xml.capture())?;
         if let Some(location) = &mut location {
             location.read_context(self.hcd, xml, child, self.ledger)?;
+            self.entity_guids
+                .extend(location.request_entity(xml, child)?);
         }
         let named = record.is_some()
             || external.is_some()
