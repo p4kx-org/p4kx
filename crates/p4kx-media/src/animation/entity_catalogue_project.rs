@@ -13,6 +13,9 @@ use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
 use crate::{DirectoryLookup, MediaError, MediaWriter};
 
+#[path = "entity_catalogue_banks.rs"]
+mod banks;
+
 #[path = "entity_catalogue_links.rs"]
 mod links;
 
@@ -30,9 +33,10 @@ impl Rows<'_, '_> {
         catalogue: &EntityClipCatalogue,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
+        let mut banks = banks::Banks::default();
         for (position, rig) in catalogue.rigs.iter().enumerate() {
             self.rig(position, &rig.rig, writer)?;
-            self.links(position, rig, &catalogue.sources, writer)?;
+            self.links(position, rig, &catalogue.sources, &mut banks, writer)?;
         }
         Ok(())
     }

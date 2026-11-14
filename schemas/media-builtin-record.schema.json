@@ -1402,6 +1402,40 @@
             "payload"
           ],
           "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationEntityNamedDbaBank"
+            },
+            "record_type": {
+              "const": "entity-named-dba-bank",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "payload": {
+              "$ref": "#/$defs/AnimationEntityNamedDbaMatch"
+            },
+            "record_type": {
+              "const": "entity-named-dba-match",
+              "type": "string"
+            }
+          },
+          "required": [
+            "record_type",
+            "payload"
+          ],
+          "type": "object"
         }
       ],
       "title": "Payload"
@@ -1627,6 +1661,96 @@
           "type": "object"
         }
       ]
+    },
+    "AnimationEntityNamedDbaBank": {
+      "additionalProperties": false,
+      "properties": {
+        "archive_path": {
+          "type": "string"
+        },
+        "database_parameter": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "observed_matches": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "state": {
+          "$ref": "#/$defs/AnimationEntityNamedDbaState"
+        }
+      },
+      "required": [
+        "archive_path",
+        "database_parameter",
+        "source",
+        "state",
+        "observed_matches"
+      ],
+      "type": "object"
+    },
+    "AnimationEntityNamedDbaMatch": {
+      "additionalProperties": false,
+      "properties": {
+        "authored_name": {
+          "type": "string"
+        },
+        "clip_ordinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "database_parameter": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "metadata_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "name_range": {
+          "$ref": "#/$defs/SourceRange"
+        },
+        "source": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "database_parameter",
+        "source",
+        "clip_ordinal",
+        "authored_name",
+        "name_range",
+        "metadata_range"
+      ],
+      "type": "object"
+    },
+    "AnimationEntityNamedDbaState": {
+      "enum": [
+        "enumerated",
+        "incomplete",
+        "invalid-path",
+        "missing",
+        "ambiguous",
+        "not-selected",
+        "key-required",
+        "wrong-key",
+        "unavailable",
+        "malformed"
+      ],
+      "type": "string"
     },
     "AnimationEntityOwner": {
       "additionalProperties": false,
@@ -41627,6 +41751,116 @@
               "indices": {
                 "maxItems": 2,
                 "minItems": 2
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-entity-named-dba-bank"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationEntityCataloguePayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "entity-named-dba-bank"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 3,
+                "minItems": 3
+              }
+            }
+          }
+        },
+        "required": [
+          "data"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "animation"
+          },
+          "subresource": {
+            "properties": {
+              "namespace": {
+                "const": "animation-entity-named-dba-match"
+              }
+            },
+            "required": [
+              "namespace"
+            ]
+          }
+        },
+        "required": [
+          "kind",
+          "subresource"
+        ]
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/AnimationEntityCataloguePayload"
+              },
+              {
+                "properties": {
+                  "record_type": {
+                    "const": "entity-named-dba-match"
+                  }
+                },
+                "required": [
+                  "record_type"
+                ]
+              }
+            ]
+          },
+          "subresource": {
+            "properties": {
+              "indices": {
+                "maxItems": 4,
+                "minItems": 4
               }
             }
           }

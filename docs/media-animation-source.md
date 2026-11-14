@@ -160,6 +160,17 @@ clip ordinal to the ordinary animation record when available. The ordinary recor
 metadata, controller rows and decoded key artifacts. Per-field provenance uses the original
 DataForge, parameter and animation inputs consulted for that value.
 
+A concrete CAF alias also has a bank row for each `$TracksDatabase` declaration in its
+`AnimationList`, including declarations after the alias. `animation-entity-named-dba-bank`
+uses `[rig, alias parameter, database parameter]` and reports the physical source row,
+metadata coverage state and number of observed exact full-path matches. Each
+`animation-entity-named-dba-match` adds the original DBA clip ordinal to that address and
+links `[source, clip_ordinal]` to the entity clip. It retains the authored path and separate
+name and metadata byte ranges. Repeated declarations and multiple matching ordinals remain
+independent. A bank can have a complete name inventory even when controller reads fail.
+Filtered, missing and damaged banks have explicit states. The loose CAF lookup has its own
+row. The catalogue records candidates without choosing runtime playback precedence.
+
 This catalogue resolves DataForge Loadouts. External XML Loadout dependencies and unresolved
 branches are reported through the incomplete-loadout disposition. To retain usable observed
 records alongside an incomplete scope, run with `--diagnostic`.

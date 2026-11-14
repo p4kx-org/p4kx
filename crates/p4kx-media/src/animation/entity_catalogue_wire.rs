@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_assembly::ClipDatabaseUnavailable;
 use p4kx_extraction::{FieldPath, InputScope, SourceLocation, SourceUseRole};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -20,6 +21,8 @@ pub(super) const PARAMETER: &str = "animation-entity-parameter";
 pub(super) const LINK: &str = "animation-entity-source-link";
 pub(super) const SOURCE: &str = "animation-entity-source";
 pub(super) const CLIP: &str = "animation-entity-clip";
+pub(super) const BANK: &str = "animation-entity-named-dba-bank";
+pub(super) const BANK_MATCH: &str = "animation-entity-named-dba-match";
 
 #[path = "entity_catalogue_project.rs"]
 mod project;
@@ -45,6 +48,10 @@ pub(super) enum Payload<'a> {
     Source(Source<'a>),
     #[serde(rename = "entity-clip")]
     Clip(Clip<'a>),
+    #[serde(rename = "entity-named-dba-bank")]
+    NamedDbaBank(Bank<'a>),
+    #[serde(rename = "entity-named-dba-match")]
+    NamedDbaMatch(BankMatch<'a>),
 }
 
 #[derive(Clone, Copy, Serialize, JsonSchema)]
@@ -201,6 +208,10 @@ pub(super) enum SelectionFailure {
     Unreadable,
 }
 
+#[path = "entity_catalogue_bank_wire.rs"]
+mod bank_wire;
+use bank_wire::{Bank, BankMatch, BankState};
+
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 #[schemars(rename = "AnimationEntitySource")]
@@ -347,6 +358,8 @@ pub(crate) fn bind_schema(base: &mut Value) -> Result<(), MediaError> {
         (LINK, "entity-source-link", 3),
         (SOURCE, "entity-source", 1),
         (CLIP, "entity-clip", 2),
+        (BANK, "entity-named-dba-bank", 3),
+        (BANK_MATCH, "entity-named-dba-match", 4),
     ] {
         branches.push(json!({
             "if":{"properties":{"kind":{"const":"animation"},"subresource":{"properties":{"namespace":{"const":namespace}},"required":["namespace"]}},"required":["kind","subresource"]},

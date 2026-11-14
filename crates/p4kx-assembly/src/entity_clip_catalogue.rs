@@ -6,7 +6,7 @@ use std::convert::Infallible;
 use std::sync::Arc;
 
 use p4kx_extraction::animation_headers::{AnimationHeaderError, AnimationSourceHeaders};
-use p4kx_extraction::{Entry, NamedCafSelector};
+use p4kx_extraction::{Entry, NamedCafSelector, archive_animation_path};
 
 use crate::entity_rig_catalogue::{
     ArchiveRigInputs, RigEntry, discover_entity_rigs_using, read_rig_entry,
@@ -85,6 +85,8 @@ pub enum ClipSourceSelection {
     NamedCaf {
         /// Earlier folder parameter used to resolve a relative path within this `AnimationList`.
         filepath_parameter: Option<usize>,
+        /// Normalized full archive path when the selector is usable.
+        archive_path: Option<String>,
         /// Selected physical source or the reason why none has been selected.
         target: NamedCafTarget,
     },
@@ -235,10 +237,11 @@ impl Inventory<'_, '_> {
         inputs: &mut I,
     ) -> Result<ClipSourceSelection, I::Error> {
         let scope = folder.filter(|_| selector.uses_scope());
+        let archive_path = selector.archive_path(scope.map(|(_, row)| row.path.as_str()));
         let target = if selector.uses_scope() && scope.is_none() {
             NamedCafTarget::MissingScope
-        } else if let Some(path) = selector.archive_path(scope.map(|(_, row)| row.path.as_str())) {
-            match self.models.exact_rig_entry(&path, &mut || inputs.check())? {
+        } else if let Some(path) = &archive_path {
+            match self.models.exact_rig_entry(path, &mut || inputs.check())? {
                 RigEntry::Unique(entry) => {
                     NamedCafTarget::File(self.physical.resolve(self.models, entry, inputs)?)
                 }
@@ -251,6 +254,7 @@ impl Inventory<'_, '_> {
         };
         Ok(ClipSourceSelection::NamedCaf {
             filepath_parameter: scope.map(|(parameter, _)| parameter),
+            archive_path,
             target,
         })
     }
@@ -282,8 +286,9 @@ impl Inventory<'_, '_> {
         path: &str,
         inputs: &mut I,
     ) -> Result<ClipSourceSelection, I::Error> {
-        let reason = if has_extension(path, "dba") {
-            match self.models.rig_entry(path, &mut || inputs.check())? {
+        let path = archive_animation_path(path).filter(|path| has_extension(path, "dba"));
+        let reason = if let Some(path) = path {
+            match self.models.exact_rig_entry(&path, &mut || inputs.check())? {
                 RigEntry::Unique(entry) => {
                     return Ok(ClipSourceSelection::Database {
                         source: self.physical.resolve(self.models, entry, inputs)?,

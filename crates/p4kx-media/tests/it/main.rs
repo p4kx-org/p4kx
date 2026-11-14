@@ -6,6 +6,7 @@
 mod animation_dba_metadata;
 mod animation_definition_provider;
 mod animation_entity_catalogue;
+mod animation_entity_named_dba;
 mod animation_event_timeline;
 mod animation_graph_source;
 mod animation_images;

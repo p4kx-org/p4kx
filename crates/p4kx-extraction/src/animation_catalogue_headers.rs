@@ -4,7 +4,7 @@
 use std::convert::Infallible;
 use std::ops::Range;
 
-use p4kx_chunks::{ChunkError, ChunkFile};
+use p4kx_chunks::{ChunkError, ChunkFile, ivo};
 use p4kx_model::{
     AnimationChannel, AnimationError, AnimationMetadata, AnimationSource, AnimationTiming,
     CorruptAnimation, DbaAnimationName, DbaAnimationSources, DbaMetadataRecords,
@@ -20,6 +20,10 @@ pub struct AnimationSourceHeaders {
     pub clips: Vec<AnimationSourceHeader>,
     /// Structural diagnostic for an incomplete metadata or controller stream.
     pub partial: Option<AnimationHeaderFault>,
+    /// Original DBA metadata chunk range when the container identifies it.
+    pub database_metadata_range: Option<Range<u64>>,
+    /// Whether all declared DBA metadata records and names could be read structurally.
+    pub database_metadata_complete: bool,
 }
 
 /// Failure to open original animation metadata.
@@ -192,6 +196,7 @@ impl AnimationSourceHeaders {
                 controller_block,
             )],
             partial,
+            ..Self::default()
         }))
     }
 
@@ -200,7 +205,13 @@ impl AnimationSourceHeaders {
         file: &ChunkFile<&[u8]>,
         check: &mut impl FnMut() -> Result<(), E>,
     ) -> Result<Result<Self, AnimationError>, E> {
-        let mut inventory = Self::default();
+        let mut inventory = Self {
+            database_metadata_range: file
+                .chunks_of(ivo::DBA_METADATA)
+                .next()
+                .map(|(_, chunk)| chunk.offset()..chunk.offset() + chunk.size()),
+            ..Self::default()
+        };
         let sources = match DbaAnimationSources::read(path, file) {
             Ok(sources) => Some(sources),
             Err(error) => {
@@ -230,6 +241,7 @@ impl AnimationSourceHeaders {
         if inventory.partial.is_some() {
             return inventory.metadata_tail(path, file, check);
         }
+        inventory.database_metadata_complete = true;
         Ok(Ok(inventory))
     }
 
@@ -244,6 +256,7 @@ impl AnimationSourceHeaders {
             Err(error) => return Ok(Err(error)),
         };
         let known = self.clips.len();
+        self.database_metadata_complete = true;
         for (position, record) in records.enumerate() {
             check()?;
             if position < known {
@@ -254,6 +267,7 @@ impl AnimationSourceHeaders {
                 Err(error) => {
                     self.partial
                         .get_or_insert(AnimationHeaderFault::Structure(error));
+                    self.database_metadata_complete = false;
                     break;
                 }
             };

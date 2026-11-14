@@ -127,6 +127,13 @@ pub(crate) fn read(
     })
 }
 
+/// Matches exact normalized archive paths while retaining the authored spelling.
+pub(crate) fn name_key(bytes: &[u8]) -> Option<(&str, String)> {
+    let authored = std::str::from_utf8(bytes).ok()?;
+    let key = archive_animation_path(authored)?.to_ascii_lowercase();
+    Some((authored, key))
+}
+
 type Records = HashMap<String, Vec<Record>>;
 
 fn metadata(
@@ -144,12 +151,7 @@ fn metadata(
             complete = false;
             break;
         };
-        let Some((authored, key)) = std::str::from_utf8(name.name.bytes())
-            .ok()
-            .and_then(|name| {
-                archive_animation_path(name).map(|path| (name, path.to_ascii_lowercase()))
-            })
-        else {
+        let Some((authored, key)) = name_key(name.name.bytes()) else {
             complete = false;
             continue;
         };

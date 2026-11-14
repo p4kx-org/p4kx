@@ -24,6 +24,7 @@ pub(super) fn verify_named_caf(catalogue: &EntityClipCatalogue) -> TestResult {
     let ClipSourceSelection::NamedCaf {
         filepath_parameter: Some(scope),
         target: NamedCafTarget::File(relative_source),
+        ..
     } = relative.selection
     else {
         return Err("relative CAF uses the preceding same-list folder".into());
@@ -31,6 +32,7 @@ pub(super) fn verify_named_caf(catalogue: &EntityClipCatalogue) -> TestResult {
     let ClipSourceSelection::NamedCaf {
         filepath_parameter: None,
         target: NamedCafTarget::File(rooted_source),
+        ..
     } = rooted.selection
     else {
         return Err("rooted CAF stands independently of the folder".into());
@@ -52,6 +54,7 @@ fn verify_named_failures(
         ClipSourceSelection::NamedCaf {
             filepath_parameter: Some(_),
             target: NamedCafTarget::Missing,
+            archive_path: Some(_),
         }
     ));
     assert!(matches!(
@@ -73,6 +76,7 @@ fn verify_named_failures(
         ClipSourceSelection::NamedCaf {
             filepath_parameter: None,
             target: NamedCafTarget::MissingScope,
+            archive_path: None,
         }
     ));
 }

@@ -23,7 +23,7 @@ impl Provider for AnimationProvider {
         let mut capability = Capability::new(
             MediaKind::Animation,
             "p4kx.animation.source",
-            "1.8.0",
+            "1.9.0",
             "Exact animation and image Entry bytes with positioned source data and separate decoded sample chunks.",
         );
         capability.field_groups = vec![
@@ -53,7 +53,7 @@ impl Provider for AnimationProvider {
             ),
             FieldGroup::new(
                 "entity-clip-catalogue",
-                "Optional root Entity scope with positioned rig declarations, explicit lookup outcomes and physical clips.",
+                "Optional root Entity scope with positioned rig declarations, exact DBA alias candidates, explicit lookup outcomes and physical clips.",
             ),
             FieldGroup::new(
                 "skeleton-binding",

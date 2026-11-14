@@ -7,18 +7,19 @@ use p4kx_assembly::{
 };
 
 use super::super::{LINK, Link, Payload, Scope, SelectionFailure};
-use super::{Rows, positions};
+use super::{Rows, banks, positions};
 use crate::origin_capture::OriginSite;
 use crate::origin_contributions::OriginContributions;
 use crate::{MediaError, MediaWriter};
 use p4kx_extraction::{InputScope, SourceUseRole};
 
 impl Rows<'_, '_> {
-    pub(super) fn links(
+    pub(super) fn links<'source>(
         &self,
         rig: usize,
         node: &EntityClipRig,
-        catalogue_sources: &[ClipArchiveSource],
+        catalogue_sources: &'source [ClipArchiveSource],
+        banks: &mut banks::Banks<'source>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), MediaError> {
         let Some(parameters) = node.rig.parameters.as_ref().and_then(RigFile::value) else {
@@ -31,35 +32,25 @@ impl Rows<'_, '_> {
             .and_then(RigFile::source)
             .map(|input| self.observe(input, writer))
             .transpose()?;
+        let bank_lists = banks::declarations(node, writer)?;
         let mut links = node.links.iter().peekable();
         for (slot, parameter) in parameters.iter().enumerate() {
             Self::parameter(rig, slot, parameter, input.as_ref(), writer)?;
             let selection = links
                 .next_if(|link| link.parameter == slot)
                 .map(|link| &link.selection);
-            if let Some(ClipSourceSelection::Folder { sources }) = selection
-                && !sources.is_empty()
-            {
-                for (candidate, &source) in sources.iter().enumerate() {
-                    self.link(
-                        [rig, slot, candidate],
-                        Link::FolderCandidate { source },
-                        &parameter.selectors,
-                        input.as_ref(),
-                        catalogue_sources,
-                        writer,
-                    )?;
-                }
+            if self.folder_links(
+                [rig, slot],
+                selection,
+                parameter,
+                input.as_ref(),
+                catalogue_sources,
+                writer,
+            )? {
                 continue;
             }
             let link = link_of(selection);
-            let mut selectors = parameter.selectors.clone();
-            if let Some(folder) = link.folder_parameter() {
-                let owner = parameters.get(folder).ok_or_else(|| {
-                    MediaError::Contract("CAF link points to an unavailable selector".into())
-                })?;
-                selectors.extend_from_slice(&owner.selectors);
-            }
+            let selectors = link_selectors(parameter, link.folder_parameter(), parameters)?;
             self.link(
                 [rig, slot, 0],
                 link,
@@ -68,8 +59,54 @@ impl Rows<'_, '_> {
                 catalogue_sources,
                 writer,
             )?;
+            if let Some(ClipSourceSelection::NamedCaf {
+                archive_path: Some(path),
+                ..
+            }) = selection
+                && let Some((input, declarations)) =
+                    input.as_ref().zip(bank_lists.get(&parameter.list))
+            {
+                self.banks(
+                    &banks::Alias::new(
+                        [rig, slot],
+                        path,
+                        positions(input, &selectors, writer)?,
+                        input,
+                        parameters,
+                    ),
+                    declarations,
+                    catalogue_sources,
+                    banks,
+                    writer,
+                )?;
+            }
         }
         Ok(())
+    }
+
+    fn folder_links(
+        &self,
+        [rig, slot]: [usize; 2],
+        selection: Option<&ClipSourceSelection>,
+        parameter: &p4kx_assembly::RigParameter,
+        input: Option<&crate::origin_input::MediaOriginInput>,
+        catalogue_sources: &[ClipArchiveSource],
+        writer: &mut MediaWriter<'_>,
+    ) -> Result<bool, MediaError> {
+        let Some(ClipSourceSelection::Folder { sources }) = selection else {
+            return Ok(false);
+        };
+        for (candidate, &source) in sources.iter().enumerate() {
+            self.link(
+                [rig, slot, candidate],
+                Link::FolderCandidate { source },
+                &parameter.selectors,
+                input,
+                catalogue_sources,
+                writer,
+            )?;
+        }
+        Ok(!sources.is_empty())
     }
 
     fn link(
@@ -138,6 +175,21 @@ impl Rows<'_, '_> {
     }
 }
 
+fn link_selectors(
+    parameter: &p4kx_assembly::RigParameter,
+    folder: Option<usize>,
+    parameters: &[p4kx_assembly::RigParameter],
+) -> Result<Vec<p4kx_extraction::SourceLocation>, MediaError> {
+    let mut selectors = parameter.selectors.clone();
+    if let Some(folder) = folder {
+        let owner = parameters.get(folder).ok_or_else(|| {
+            MediaError::Contract("CAF link points to an unavailable selector".into())
+        })?;
+        selectors.extend_from_slice(&owner.selectors);
+    }
+    Ok(selectors)
+}
+
 impl Link {
     const fn source_position(&self) -> Option<usize> {
         match self {
@@ -172,6 +224,7 @@ const fn link_of(selection: Option<&ClipSourceSelection>) -> Link {
         Some(ClipSourceSelection::NamedCaf {
             filepath_parameter,
             target,
+            ..
         }) => match target {
             NamedCafTarget::File(source) => Link::NamedCaf {
                 source: *source,
