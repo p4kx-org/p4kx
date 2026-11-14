@@ -14,6 +14,7 @@ use p4kx_testkit::gltf::Semantic;
 use p4kx_testkit::{TestEntry, TestModel, check_glb, livery_entries, mesh_streams, test_key};
 use serde_json::{Value, json};
 
+use super::package_primitive_map::{ExpectedSubmesh, assert_draws, assert_submesh, primitive_row};
 use crate::support::{TestResult, assemble, fixture, glb_options};
 
 const GEOMETRY: &str = r"Data\Objects\Test\livery_ship.cgfm";
@@ -34,7 +35,7 @@ fn archive_geometry_vertex_sidecar_binds_actual_glb_and_original_encrypted_range
     let observed = out.path().join("observed");
     write_pair(&archive, &plain, &observed)?;
     let manifest: Manifest = serde_json::from_slice(&fs::read(observed.join("scene.json"))?)?;
-    assert_eq!(manifest.version, "1.19", "opt-in enables the additive wire");
+    assert_eq!(manifest.version, "1.20", "opt-in enables the additive wire");
     let root = manifest.meshes.first().ok_or("root GLB")?;
     let map = root
         .vertex_map
@@ -59,6 +60,7 @@ fn archive_geometry_vertex_sidecar_binds_actual_glb_and_original_encrypted_range
         .ok_or("original index stream")?;
     let base = chunk.offset();
     assert_first(&rows, base + indices.data.start as u64, base + 184)?;
+    assert_static_primitives(&rows, &glb, base)?;
     assert_receipt(&observed, map)?;
     let before = fs::read(observed.join(map))?;
     write_pair(&archive, &plain, &observed)?;
@@ -78,6 +80,9 @@ fn geometry() -> Result<(Vec<u8>, Vec<u8>), Box<dyn std::error::Error>> {
     mesh.get_mut(184..188)
         .ok_or("submesh page base")?
         .copy_from_slice(&4_u32.to_le_bytes());
+    mesh.get_mut(216..218)
+        .ok_or("second submesh material")?
+        .copy_from_slice(&77_u16.to_le_bytes());
     let file = p4kx_testkit::TestChunkFile::ivo()
         .chunk(p4kx_chunks::ivo::SKIN_2.id(), 0x900, mesh.as_slice())
         .bytes();
@@ -156,6 +161,44 @@ fn assert_map(rows: &[Value], glb_path: &str, bytes: &[u8]) -> TestResult {
         Some(&json!("end")),
         "complete durable stream"
     );
+    Ok(())
+}
+
+fn assert_static_primitives(proof: &[Value], glb: &[u8], chunk: u64) -> TestResult {
+    assert_draws(proof, glb)?;
+    for (ordinal, material, renderer) in [
+        (0, 1, json!({"type": "library", "slot": 1})),
+        (1, 77, json!({"type": "builtInFallback"})),
+    ] {
+        let row = primitive_row(proof, 0, ordinal)?;
+        assert_eq!(
+            row.get("modelSubmesh"),
+            Some(&json!(ordinal)),
+            "decoded row"
+        );
+        assert_eq!(
+            row.get("materialSource"),
+            Some(&renderer),
+            "renderer decision"
+        );
+        assert_ne!(
+            row.get("materialIndex"),
+            Some(&json!(material)),
+            "dense GLB index"
+        );
+        assert_submesh(
+            proof,
+            row,
+            &ExpectedSubmesh {
+                source: GEOMETRY,
+                encrypted: true,
+                start: chunk + 168 + ordinal as u64 * 48,
+                ordinal,
+                node: 1,
+                material,
+            },
+        )?;
+    }
     Ok(())
 }
 

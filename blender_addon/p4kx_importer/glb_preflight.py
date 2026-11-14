@@ -33,6 +33,7 @@ class GlbInfo:
     geometry: GeometryCounts | None
     positions: tuple[tuple[int, int] | None, ...]
     material_slot_issue: str | None
+    primitive_bindings: tuple[tuple[tuple[int | None, int | None], ...], ...]
 
 
 def check_glb(path: Path) -> GlbInfo:
@@ -77,6 +78,10 @@ def _check_stream(stream: BinaryIO) -> GlbInfo:
         geometry_counts(document),
         _position_accessors(document),
         material_slot_issue(document.get("materials", [])),
+        tuple(
+            tuple((row.get("indices"), row.get("material")) for row in mesh["primitives"])
+            for mesh in document.get("meshes", [])
+        ),
     )
 
 

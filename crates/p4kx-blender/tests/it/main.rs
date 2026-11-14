@@ -27,6 +27,7 @@ mod package_layout;
 mod package_light_placements;
 mod package_materials;
 mod package_mesh_extras;
+mod package_primitive_map;
 mod package_safety;
 mod package_vertex_colours;
 mod package_vertex_map;

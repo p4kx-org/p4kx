@@ -822,16 +822,23 @@ Use `--vertex-maps` with `entity package`, `interior package` or `character pack
 `meshes/mNNNN.vertex-map.jsonl` alongside each emitted GLB. In Rust, enable this
 option with `PackageWriteContext::with_vertex_maps`. The package declares each file
 as `mesh.vertex_map`, and `receipt.json` records its SHA-256. The package uses minor
-version 1.19 when it contains a map. A rigged GLB has one map with a row for each emitted mesh,
+version 1.20 when it contains a map. A rigged GLB has one map with a row for each emitted mesh,
 linked to the Character part, creature part, or attachment that supplied it.
 When two instances share one GLB mesh, the source is the writer's first producer
 instance.
 
 Each JSONL file begins with the format and version. A `mesh` row identifies the actual GLB
 mesh and POSITION accessor, its element count, the requested level, the selected model
-level, and the original geometry level and chunk when observed. A `vertex` row links an
-output POSITION ordinal to its source-stream vertex ordinal. It includes original source
-uses for the first little-endian index word, its page base and the original submesh
+level, and the original geometry level and chunk when observed. Map version 2 emits
+one `primitive` row for each GLB draw in mesh and primitive order before its mesh's
+vertex rows. The row gives the emitted index accessor and dense material index
+when present, the renderer's material choice, and the decoded model submesh ordinal.
+The renderer choice is a library slot, a supplied fallback, the built-in fallback,
+or unassigned. `sourceSubmesh` holds the authored row ordinal, node or skin-zone ID,
+and original material ID when the decoder can recover them. Each value identifies
+its own decoded geometry byte range and encryption state. Material selection is a
+renderer result. A `vertex` row links an output POSITION ordinal to its source-stream
+vertex ordinal. It includes original source uses for the first little-endian index word, its page base and the original submesh
 selectors. The GLB writer retains the POSITION order of the decoded mesh even when it
 omits individual material primitives. DNA shaping can move Character vertices while keeping this
 ordinal mapping. The map positions identify original index words and establish the mapping.
@@ -842,10 +849,12 @@ A `mapping` of `unknown` records a GLB mesh without a proved IVO mapping. A mapp
 present when the source file's physical Archive identity is unavailable. In that case
 the values carry an unknown encryption marker and incomplete source set. Batches of
 `sourceUse` rows resolve their immediately preceding field references. The original
-`source` rows follow, then the measured artifact binding and an `end` count row. The
-[mesh vertex map schema](../schemas/blender-mesh-vertex-map.schema.json) describes each row.
+`source` rows follow, then the measured artifact binding and an `end` count row with
+a decimal `primitives` count in version 2. Version 1 maps contain vertex correspondence
+and have their own shorter count row. The [mesh vertex map schema](../schemas/blender-mesh-vertex-map.schema.json) describes each row.
 
-The package validator checks the mesh, accessor and position counts, source-use closure,
+The package validator checks the mesh, POSITION accessor and vertex counts, primitive
+ordinals and their actual GLB index accessor and material index, source-use closure,
 GLB SHA-256 and receipt. Blender imports the same render geometry independently of the
 companion. The source-byte ranges for the selected geometry can be joined to the
 [Media model export](media-export.md) by physical Archive identity and chunk.

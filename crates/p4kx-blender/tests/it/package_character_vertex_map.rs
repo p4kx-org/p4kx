@@ -238,7 +238,7 @@ fn assert_accessors(proof: &[Value], glb: &[u8]) -> Result<Vec<usize>, Box<dyn s
 
 fn map(out: &Path) -> Result<(String, Vec<Value>), Box<dyn std::error::Error>> {
     let manifest: Manifest = serde_json::from_slice(&fs::read(out.join("scene.json"))?)?;
-    assert_eq!(manifest.version, "1.19", "additive sidecar version");
+    assert_eq!(manifest.version, "1.20", "additive sidecar version");
     let map = manifest
         .meshes
         .first()

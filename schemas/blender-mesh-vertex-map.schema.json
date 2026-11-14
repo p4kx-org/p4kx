@@ -273,6 +273,68 @@
       "description": "A document-local physical-source reference, without a machine address.",
       "type": "string"
     },
+    "RendererMaterial": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "slot": {
+              "format": "uint",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": {
+              "const": "library",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "slot"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "suppliedFallback",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "builtInFallback",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "const": "unassigned",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "SourceCoordinateOmission": {
       "description": "Why an actual contributing use omits its optional source coordinate.",
       "oneOf": [
@@ -561,6 +623,41 @@
         }
       ],
       "x-p4kx-vocabularyClass": "control"
+    },
+    "SourceSubmesh": {
+      "additionalProperties": false,
+      "properties": {
+        "material": {
+          "$ref": "#/$defs/SourcedValueOfuint16",
+          "properties": {
+            "state": {
+              "const": "present"
+            }
+          }
+        },
+        "node": {
+          "$ref": "#/$defs/SourcedValueOfuint16",
+          "properties": {
+            "state": {
+              "const": "present"
+            }
+          }
+        },
+        "row": {
+          "$ref": "#/$defs/SourcedValueOfuint",
+          "properties": {
+            "state": {
+              "const": "present"
+            }
+          }
+        }
+      },
+      "required": [
+        "row",
+        "node",
+        "material"
+      ],
+      "type": "object"
     },
     "SourceUseDescription": {
       "description": "One source-use inventory row, kept separately from the field's actual contribution set.",
@@ -1324,6 +1421,138 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfuint": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "format": "uint",
+                "minimum": 0,
+                "type": "integer"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfuint16": {
       "allOf": [
         {
@@ -1473,7 +1702,7 @@
         },
         "version": {
           "format": "uint8",
-          "maximum": 1,
+          "maximum": 2,
           "minimum": 1,
           "type": "integer"
         }
@@ -1666,6 +1895,70 @@
     {
       "additionalProperties": false,
       "properties": {
+        "indexAccessor": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "materialIndex": {
+          "format": "uint",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "materialSource": {
+          "$ref": "#/$defs/RendererMaterial"
+        },
+        "mesh": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "modelSubmesh": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "primitive": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sourceSubmesh": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourceSubmesh"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "type": {
+          "const": "primitive",
+          "type": "string"
+        }
+      },
+      "required": [
+        "type",
+        "mesh",
+        "primitive",
+        "indexAccessor",
+        "materialIndex",
+        "materialSource",
+        "modelSubmesh",
+        "sourceSubmesh"
+      ],
+      "type": "object"
+    },
+    {
+      "additionalProperties": false,
+      "properties": {
         "source": {
           "$ref": "#/$defs/PhysicalSource"
         },
@@ -1823,6 +2116,19 @@
       "properties": {
         "meshes": {
           "$ref": "#/$defs/DecimalU64"
+        },
+        "primitives": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/DecimalU64"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "not": {
+            "type": "null"
+          }
         },
         "sourceUses": {
           "$ref": "#/$defs/DecimalU64"

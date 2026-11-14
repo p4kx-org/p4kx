@@ -15,6 +15,7 @@ use p4kx_testkit::{
 };
 use serde_json::{Value, json};
 
+use super::package_primitive_map::{ExpectedSubmesh, assert_draws, assert_submesh, primitive_row};
 use super::package_vertex_map::{assert_receipt, rows};
 use super::support::{TestResult, assemble, fixture, glb_options};
 
@@ -40,7 +41,7 @@ fn rigged_creature_vertex_map_preserves_both_physical_producers_and_replacement(
     let original = fs::read(package.join("meshes/m0001.glb"))?;
     write(&archive, &assembly, &package, true)?;
     let manifest: Manifest = serde_json::from_slice(&fs::read(package.join("scene.json"))?)?;
-    assert_eq!(manifest.version, "1.19", "same additive package contract");
+    assert_eq!(manifest.version, "1.20", "same additive package contract");
     let combined = manifest.meshes.first().ok_or("creature GLB")?;
     let map = combined
         .vertex_map
@@ -57,6 +58,7 @@ fn rigged_creature_vertex_map_preserves_both_physical_producers_and_replacement(
         (HORN, false, first_index(&horn)?),
     ];
     assert_meshes(&proof, &glb, expected)?;
+    assert_creature_primitives(&proof, &glb, [&skin, &horn])?;
     assert_receipt(&package, map)?;
     write(&archive, &assembly, &package, true)?;
     assert_eq!(
@@ -216,6 +218,39 @@ fn at<'a>(
         .iter()
         .find(|row| row.get("type") == Some(&json!(kind)) && row.get("mesh") == Some(&json!(mesh)))
         .ok_or_else(|| format!("missing {kind} row for mesh {mesh}").into())
+}
+
+fn assert_creature_primitives(proof: &[Value], glb: &[u8], models: [&TestModel; 2]) -> TestResult {
+    assert_draws(proof, glb)?;
+    for (mesh, (model, source)) in models.into_iter().zip([SKIN, HORN]).enumerate() {
+        let original = model.cgfm();
+        let geometry = ChunkFile::parse(original)?;
+        let (_, chunk) = geometry
+            .chunks_of(ivo::SKIN_2)
+            .next()
+            .ok_or("physical mesh chunk")?;
+        let decoded = model.skin_chunk();
+        let material = decoded
+            .get(168..170)
+            .ok_or("authored material")?
+            .try_into()?;
+        let node = decoded.get(170..172).ok_or("authored node")?.try_into()?;
+        let row = primitive_row(proof, mesh, 0)?;
+        assert_eq!(row.get("modelSubmesh"), Some(&json!(0)), "decoded row");
+        assert_submesh(
+            proof,
+            row,
+            &ExpectedSubmesh {
+                source,
+                encrypted: mesh == 0,
+                start: chunk.offset() + 168,
+                ordinal: 0,
+                node: u16::from_le_bytes(node),
+                material: u16::from_le_bytes(material),
+            },
+        )?;
+    }
+    Ok(())
 }
 
 fn first_index(model: &TestModel) -> Result<u64, Box<dyn std::error::Error>> {

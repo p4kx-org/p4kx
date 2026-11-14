@@ -8,16 +8,16 @@ use std::path::Path;
 use p4kx_extraction::{
     DecimalU64, EntryOrigin, InputScope, ModelArchiveSource, OriginArtifactDigest,
     OriginDigestWriter, SourceInput, SourceLocation, SourceScope, SourceUse, SourceUseRole,
-    SourceUses,
+    SourceUses, SourceValue, SourcedValue,
 };
-use p4kx_gltf::MeshVertexMap;
-use p4kx_model::{MeshOrigin, Model, ModelChunk};
+use p4kx_gltf::{MeshVertexMap, PrimitiveMaterialSource};
+use p4kx_model::{MeshOrigin, MeshSubmeshSource, Model, ModelChunk};
 
-use crate::mesh_vertex_map_wire::{self as wire, Mapping, Row};
+use crate::mesh_vertex_map_wire::{self as wire, Mapping, RendererMaterial, Row, SourceSubmesh};
 use crate::package_receipt::PackageFile;
 use crate::{MESHES_FOLDER, PackageError, PackageResult, PackageWriteContext};
 
-const VERTICES_PER_USE_BATCH: u64 = 4096;
+const ROWS_PER_USE_BATCH: u64 = 4096;
 
 pub(super) struct Writer {
     sink: OriginDigestWriter<BufWriter<std::fs::File>>,
@@ -25,6 +25,7 @@ pub(super) struct Writer {
     inventory: SourceUses,
     meshes: u64,
     vertices: u64,
+    primitives: u64,
     uses: u64,
 }
 
@@ -37,6 +38,7 @@ impl Writer {
             inventory: SourceUses::with_batched_use_refs(),
             meshes: 0,
             vertices: 0,
+            primitives: 0,
             uses: 0,
         };
         writer
@@ -100,6 +102,7 @@ impl Writer {
             origin: &origin,
         })?;
         self.meshes += 1;
+        self.observe_primitives(map, scope.as_ref(), context)?;
         let mut vertices = 0_u64;
         for vertex in map.vertex_origins() {
             context.check().map_err(io::Error::other)?;
@@ -110,6 +113,35 @@ impl Writer {
             return Err(io::Error::other("incomplete first-use vertex map"));
         }
         self.vertices += vertices;
+        self.finish_uses()
+    }
+
+    fn observe_primitives(
+        &mut self,
+        map: &MeshVertexMap<'_>,
+        bound: Option<&Bound<'_>>,
+        context: &PackageWriteContext<'_>,
+    ) -> io::Result<()> {
+        for primitive in map.primitives() {
+            context.check().map_err(io::Error::other)?;
+            let source_submesh = primitive
+                .original
+                .map(|source| source_submesh(&self.inventory, bound, source))
+                .transpose()?;
+            self.row(&Row::Primitive {
+                mesh: map.mesh,
+                primitive: primitive.primitive,
+                index_accessor: primitive.index_accessor,
+                material_index: primitive.material_index,
+                material_source: renderer_material(primitive.material_source)?,
+                model_submesh: primitive.model_submesh,
+                source_submesh: source_submesh.as_ref(),
+            })?;
+            self.primitives += 1;
+            if self.primitives.is_multiple_of(ROWS_PER_USE_BATCH) {
+                self.finish_uses()?;
+            }
+        }
         self.finish_uses()
     }
 
@@ -130,7 +162,7 @@ impl Writer {
             source_vertex: vertex.source_vertex,
             origin: &origin,
         })?;
-        if (u64::from(vertex.output_vertex) + 1).is_multiple_of(VERTICES_PER_USE_BATCH) {
+        if (u64::from(vertex.output_vertex) + 1).is_multiple_of(ROWS_PER_USE_BATCH) {
             self.finish_uses()?;
         }
         Ok(())
@@ -171,6 +203,7 @@ impl Writer {
         self.row(&Row::End {
             meshes: DecimalU64::new(self.meshes),
             vertices: DecimalU64::new(self.vertices),
+            primitives: Some(DecimalU64::new(self.primitives)),
             sources: DecimalU64::new(inventory.sources().len() as u64),
             source_uses: DecimalU64::new(self.uses),
         })
@@ -187,6 +220,67 @@ impl Writer {
             .map_err(|error| PackageError::write(path, error))?;
         Ok(PackageFile::new(format!("{MESHES_FOLDER}/{name}"), &digest))
     }
+}
+
+fn renderer_material(source: PrimitiveMaterialSource) -> io::Result<RendererMaterial> {
+    Ok(match source {
+        PrimitiveMaterialSource::Library(slot) => RendererMaterial::Library { slot },
+        PrimitiveMaterialSource::SuppliedFallback => RendererMaterial::SuppliedFallback,
+        PrimitiveMaterialSource::BuiltInFallback => RendererMaterial::BuiltInFallback,
+        PrimitiveMaterialSource::Unassigned => RendererMaterial::Unassigned,
+        _ => return Err(io::Error::other("unknown primitive material disposition")),
+    })
+}
+
+fn source_submesh(
+    inventory: &SourceUses,
+    bound: Option<&Bound<'_>>,
+    source: MeshSubmeshSource,
+) -> io::Result<SourceSubmesh> {
+    Ok(SourceSubmesh {
+        row: geometry_value(
+            inventory,
+            bound,
+            source.ordinal(),
+            source.range(),
+            "submeshRow",
+            SourceUseRole::Selector,
+        )?,
+        node: geometry_value(
+            inventory,
+            bound,
+            source.node(),
+            source.node_range(),
+            "submeshNode",
+            SourceUseRole::Payload,
+        )?,
+        material: geometry_value(
+            inventory,
+            bound,
+            source.material(),
+            source.material_range(),
+            "submeshMaterial",
+            SourceUseRole::Payload,
+        )?,
+    })
+}
+
+fn geometry_value<T>(
+    inventory: &SourceUses,
+    bound: Option<&Bound<'_>>,
+    value: T,
+    span: Range<u64>,
+    field: &str,
+    role: SourceUseRole,
+) -> io::Result<SourcedValue<T>> {
+    let source_use = bound
+        .map(|bound| bound.use_range(span, field, role))
+        .transpose()?;
+    Ok(inventory.value(
+        SourceValue::Present(value),
+        source_use.as_slice(),
+        bound.is_some_and(|bound| bound.complete),
+    ))
 }
 
 fn write_row(writer: &mut impl Write, row: &Row<'_>) -> io::Result<()> {

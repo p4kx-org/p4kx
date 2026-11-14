@@ -101,3 +101,55 @@ fn the_mesh_vertex_map_schema_is_current() -> TestResult {
     );
     Ok(())
 }
+
+#[test]
+fn the_mesh_vertex_map_row_schema_retains_v1_and_validates_v2_fields() -> TestResult {
+    use serde_json::json;
+
+    let validator = jsonschema::validator_for(&p4kx_blender::mesh_vertex_map_schema())?;
+    for version in [1, 2] {
+        let header =
+            json!({"type": "header", "format": "p4kx-mesh-vertex-map", "version": version});
+        assert!(validator.is_valid(&header), "version {version} header");
+    }
+    let mut end =
+        json!({"type": "end", "meshes": "1", "vertices": "3", "sources": "1", "sourceUses": "10"});
+    assert!(
+        validator.is_valid(&end),
+        "historical closure without a primitive count"
+    );
+    end["primitives"] = json!("1");
+    assert!(validator.is_valid(&end), "new closure with a decimal count");
+    end["primitives"] = serde_json::Value::Null;
+    assert!(
+        !validator.is_valid(&end),
+        "only a missing or complete count"
+    );
+    end["primitives"] = json!(1);
+    assert!(
+        !validator.is_valid(&end),
+        "counts remain portable decimal strings"
+    );
+    let mut draw = json!({
+        "type": "primitive",
+        "mesh": 0,
+        "primitive": 0,
+        "indexAccessor": null,
+        "materialIndex": null,
+        "materialSource": {"type": "unassigned"},
+        "modelSubmesh": 0,
+        "sourceSubmesh": null
+    });
+    assert!(validator.is_valid(&draw), "unproved optional source fields");
+    for name in ["indexAccessor", "materialIndex", "sourceSubmesh"] {
+        let mut missing = draw.clone();
+        missing.as_object_mut().ok_or("draw object")?.remove(name);
+        assert!(
+            !validator.is_valid(&missing),
+            "explicit nullable member {name}"
+        );
+    }
+    draw["invented"] = json!(0);
+    assert!(!validator.is_valid(&draw), "closed per-primitive row");
+    Ok(())
+}

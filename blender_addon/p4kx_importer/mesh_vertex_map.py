@@ -8,7 +8,7 @@ from pathlib import Path
 import json
 from typing import Any, BinaryIO
 
-from .glb_preflight import check_glb
+from .glb_preflight import GlbInfo, check_glb
 from .manifest_fields import PackageError
 from .package_digests import file_sha256, is_sha256
 
@@ -22,7 +22,7 @@ def validate(path: Path, artifact: str, glb: Path) -> None:
     info = check_glb(glb)
     try:
         with path.open("rb") as stream:
-            state = _State(info.positions)
+            state = _State(info)
             for line in _lines(stream):
                 row = json.loads(line)
                 if not isinstance(row, dict):
@@ -54,15 +54,18 @@ def _lines(stream: BinaryIO) -> Iterator[bytes]:
 class _State:
     """Tracks physical output coordinates and closure while accepting rows in order."""
 
-    def __init__(self, positions: tuple[tuple[int, int] | None, ...]):
-        self.positions = positions
-        self.started = False
+    def __init__(self, info: GlbInfo):
+        self.positions = info.positions
+        self.primitive_bindings = info.primitive_bindings
+        self.version = 0
         self.ended = False
         self.binding: dict[str, Any] | None = None
         self.meshes = 0
         self.vertices = 0
+        self.primitives = 0
         self.left = 0
         self.next_vertex = 0
+        self.next_primitive = 0
         self.sources: set[str] = set()
         self.source_uses = 0
         self.pending_refs: set[str] = set()
@@ -71,14 +74,17 @@ class _State:
 
     def accept(self, row: dict[str, Any]) -> None:
         kind = row.get("type")
-        if self.ended or (not self.started and kind != "header") or (self.binding is not None and kind != "end"):
+        if self.ended or (not self.version and kind != "header") or (self.binding is not None and kind != "end"):
             raise PackageError("Vertex map rows are out of order.")
         if kind == "header":
-            if self.started or type(row.get("version")) is not int or row.get("version") != 1 or row.get("format") != _FORMAT:
+            version = row.get("version")
+            if self.version or type(version) is not int or version not in (1, 2) or row.get("format") != _FORMAT:
                 raise PackageError("Unknown mesh vertex map format or version.")
-            self.started = True
+            self.version = version
         elif kind == "mesh":
             self.mesh(row)
+        elif kind == "primitive" and self.version == 2:
+            self.primitive(row)
         elif kind == "vertex":
             self.vertex(row)
         elif kind == "sourceUse":
@@ -115,7 +121,7 @@ class _State:
 
     def mesh(self, row: dict[str, Any]) -> None:
         mesh = _integer(row.get("mesh"))
-        if self.left or mesh != self.meshes or mesh >= len(self.positions):
+        if self.left or not self.primitives_complete() or mesh != self.meshes or mesh >= len(self.positions):
             raise PackageError("Vertex map mesh order or count differs from the output.")
         accessor = _integer(row.get("positionAccessor"))
         count = _number(row.get("vertices"))
@@ -126,11 +132,49 @@ class _State:
             raise PackageError("Vertex map mapping state is invalid.")
         self.left = count if state == "present" else 0
         self.next_vertex = 0
+        self.next_primitive = 0
         self.meshes += 1
         self.references(row)
 
+    def primitives_complete(self) -> bool:
+        return self.version == 1 or not self.meshes or self.next_primitive == len(
+            self.primitive_bindings[self.meshes - 1]
+        )
+
+    def primitive(self, row: dict[str, Any]) -> None:
+        if not self.meshes or self.next_vertex or _integer(row.get("mesh")) != self.meshes - 1:
+            raise PackageError("An extra or misplaced mapped primitive was written.")
+        index = _integer(row.get("primitive"))
+        bindings = self.primitive_bindings[self.meshes - 1]
+        if index != self.next_primitive or index >= len(bindings):
+            raise PackageError("Mapped primitives are out of GLB order.")
+        accessor = _nullable_index(row, "indexAccessor")
+        material = _nullable_index(row, "materialIndex")
+        if (accessor, material) != bindings[index]:
+            raise PackageError("Primitive accessor or material index differs from the GLB.")
+        _integer(row.get("modelSubmesh"))
+        _material_source(row.get("materialSource"), material)
+        if "sourceSubmesh" not in row:
+            raise PackageError("Primitive source submesh member is missing.")
+        source = row["sourceSubmesh"]
+        if source is not None:
+            self.primitive_source(source)
+        self.next_primitive += 1
+        self.primitives += 1
+
+    def primitive_source(self, source: object) -> None:
+        if not isinstance(source, dict) or source.keys() != {"row", "node", "material"}:
+            raise PackageError("Primitive source submesh fields are invalid.")
+        for name in ("row", "node", "material"):
+            field = source[name]
+            if not isinstance(field, dict) or field.get("state") != "present":
+                raise PackageError("Primitive source submesh field is not present.")
+            if _integer(field.get("value")) > (0xFFFFFFFFFFFFFFFF if name == "row" else 0xFFFF):
+                raise PackageError("Primitive source submesh field crosses the unsigned width.")
+            self.references(field)
+
     def vertex(self, row: dict[str, Any]) -> None:
-        if not self.left or _integer(row.get("mesh")) != self.meshes - 1:
+        if not self.left or not self.primitives_complete() or _integer(row.get("mesh")) != self.meshes - 1:
             raise PackageError("An extra or misplaced mapped vertex was written.")
         if _integer(row.get("vertex")) != self.next_vertex:
             raise PackageError("Mapped vertices are not in POSITION order.")
@@ -163,12 +207,37 @@ class _State:
     def end(self, row: dict[str, Any]) -> None:
         actual = (self.meshes, self.vertices, len(self.sources), self.source_uses)
         expected = tuple(_number(row.get(key)) for key in ("meshes", "vertices", "sources", "sourceUses"))
+        if self.version == 2 and _number(row.get("primitives")) != self.primitives:
+            raise PackageError("Vertex map primitive count differs from the end row.")
         if (
-            self.binding is None or self.left or self.meshes != len(self.positions) or self.pending_refs
+            self.binding is None or self.left or not self.primitives_complete()
+            or self.meshes != len(self.positions) or self.pending_refs
             or not self.used_sources.issubset(self.sources) or actual != expected
         ):
             raise PackageError("Vertex map source evidence or row counts are incomplete.")
         self.ended = True
+
+
+def _nullable_index(row: dict[str, Any], key: str) -> int | None:
+    if key not in row:
+        raise PackageError("A nullable primitive index is missing.")
+    value = row[key]
+    return None if value is None else _integer(value)
+
+
+def _material_source(value: object, material: int | None) -> None:
+    if not isinstance(value, dict):
+        raise PackageError("Primitive material disposition is invalid.")
+    kind = value.get("type")
+    if kind == "library" and value.keys() == {"type", "slot"} and material is not None:
+        _integer(value["slot"])
+        return
+    if value.keys() == {"type"}:
+        if kind in ("suppliedFallback", "builtInFallback") and material is not None:
+            return
+        if kind == "unassigned" and material is None:
+            return
+    raise PackageError("Primitive material disposition is invalid.")
 
 
 def _number(value: Any) -> int:
