@@ -50,9 +50,9 @@ struct Frame {
     uses: Vec<SourceUse>,
 }
 
-struct Graph<'a, 'archive> {
+struct Graph<'a, 'archive, 'sink> {
     resources: &'a Resources<'archive>,
-    documents: &'a mut XmlDocuments,
+    documents: &'a mut XmlDocuments<'sink>,
     captures: HashMap<String, ResourceCapture<usize>>,
     visits: HashMap<usize, usize>,
     branches: Vec<Branch>,
@@ -77,7 +77,7 @@ impl DatabaseGraph {
     pub(super) fn read(
         resources: &Resources<'_>,
         root: DatabaseRoot<'_>,
-        documents: &mut XmlDocuments,
+        documents: &mut XmlDocuments<'_>,
     ) -> Result<Self, PlayerSourceError> {
         let DatabaseRoot {
             database,
@@ -121,7 +121,7 @@ impl DatabaseGraph {
     }
 }
 
-impl Graph<'_, '_> {
+impl Graph<'_, '_, '_> {
     fn step(&mut self) -> Result<(), SocSceneError> {
         let Some(frame) = self.active.last_mut() else {
             return Ok(());

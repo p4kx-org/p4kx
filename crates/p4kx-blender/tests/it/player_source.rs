@@ -19,6 +19,9 @@ mod motion_option_assertions;
 #[path = "player_subadb_graph_assertions.rs"]
 mod subadb_graph_assertions;
 
+#[path = "player_shared_capture.rs"]
+mod shared_capture;
+
 const BODY: u128 = 0x0101_0101_0101_0101_0101_0101_0101_0101;
 const WEAPON_ONE: u128 = 0x0202_0202_0202_0202_0202_0202_0202_0202;
 const WEAPON_TWO: u128 = 0x0303_0303_0303_0303_0303_0303_0303_0303;

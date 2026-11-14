@@ -3,20 +3,24 @@
 
 use p4kx_assembly::{BodyVariant, SocCaptureError};
 use p4kx_extraction::{
-    Archive, ArchiveChanged, ArchiveWatch, CancelToken, DataForgeEntry, DataForgeOrigin,
-    InputScope, PathIndexBuildError, PathIndexError, PathKeys, SourceEvidenceError, SourceInput,
-    SourceInventory, SourceScope, SourceUses, SourcedValue,
+    Archive, ArchiveChanged, CancelToken, PathIndexBuildError, PathIndexError, SourceEvidenceError,
+    SourceInventory, SourcedValue,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::player_source_body::{self, Body};
-use crate::player_source_loadout::{self, Loadout};
+use crate::player_source_body::Body;
+use crate::player_source_loadout::Loadout;
 use crate::player_source_motion::Motion;
 use crate::soc_scene::SocSceneError;
-use crate::soc_scene_class_resources::Resources;
 use crate::soc_scene_xml::{XmlDocument, XmlDocuments};
+
+#[path = "player_source_capture.rs"]
+mod capture;
+
+use capture::prepare;
+pub use capture::{PlayerDocument, PlayerDocumentSink, PlayerSourceCapture};
 
 /// Original character defaults and player loadout declarations.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -44,51 +48,17 @@ impl PlayerSource {
         variant: BodyVariant,
         cancel: &CancelToken,
     ) -> Result<Self, PlayerSourceError> {
-        let watch = ArchiveWatch::new(archive);
-        watch.check()?;
-        let sources = SourceUses::with_compact_use_refs();
-        let keys = PathKeys::try_new_with(archive, |_| check(cancel)).map_err(index_error)?;
-        let paths = keys.index(archive);
-        let directory = sources
-            .observe_root_directory_paths(archive)?
-            .ok_or(PlayerSourceError::RootArchive)?;
-        let data = DataForgeEntry::read_until(archive, &|| cancel.is_cancelled()).ok();
-        check(cancel)?;
-        let opened = data.as_ref().and_then(|data| data.open().ok());
-        let forge = opened.as_ref().map(p4kx_assembly::Entities::new);
-        let data_scope = data
-            .as_ref()
-            .map(|data| scope(&sources, data.origin()))
-            .transpose()?
-            .flatten();
-        let classes = forge.as_ref().zip(data_scope.as_ref());
-        let body =
-            player_source_body::read(&paths, variant, &sources, &directory, classes, cancel)?;
-        let mut documents = XmlDocuments::default();
-        let loadouts = player_source_loadout::read(
-            archive,
-            &sources,
-            &directory,
-            classes,
-            &mut documents,
-            cancel,
-        )?;
-        let motion = Motion::read(
-            &Resources::new(archive, &sources, cancel),
-            &directory,
-            classes,
-            &mut documents,
-        )?;
-        watch.check()?;
+        let mut capture = prepare(archive, &[variant], cancel, XmlDocuments::default())?;
+        let body = capture.bodies.pop().ok_or(PlayerSourceError::BodyVariant)?;
         Ok(Self {
             format: "p4kx-player-source",
             schema_version: 1,
             body_variant: variant.code(),
-            body,
-            loadouts,
-            motion,
-            documents: documents.finish(),
-            source_inventory: sources.freeze()?,
+            body: body.body,
+            loadouts: capture.loadouts,
+            motion: capture.motion,
+            documents: capture.documents.finish(),
+            source_inventory: capture.source_inventory,
         })
     }
 }
@@ -103,6 +73,9 @@ pub enum PlayerSourceError {
     /// The selected body variant has no verified archive selector.
     #[error("unknown player body variant")]
     BodyVariant,
+    /// The caller selected no body or repeated a body in the same capture.
+    #[error("select at least one distinct player body")]
+    BodySelection,
     /// Source capture was cancelled.
     #[error("player source export cancelled")]
     Cancelled,
@@ -144,17 +117,5 @@ pub(crate) fn index_error(error: PathIndexBuildError<PlayerSourceError>) -> Play
     match error.into_cause() {
         Ok(error) => error,
         Err(error) => error.into(),
-    }
-}
-
-fn scope(
-    sources: &SourceUses,
-    origin: &DataForgeOrigin,
-) -> Result<Option<SourceScope>, SourceEvidenceError> {
-    match origin {
-        DataForgeOrigin::Archive(original) => sources
-            .observe(SourceInput::Archive(original), InputScope::Payload)
-            .map(Some),
-        _ => Ok(None),
     }
 }

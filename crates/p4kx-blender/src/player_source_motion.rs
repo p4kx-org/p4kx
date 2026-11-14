@@ -56,7 +56,7 @@ impl Motion {
         resources: &Resources<'_>,
         directory: &SourceUse,
         classes: Classes<'_, '_>,
-        documents: &mut XmlDocuments,
+        documents: &mut XmlDocuments<'_>,
     ) -> Result<Self, PlayerSourceError> {
         let actor =
             player_source_classes::by_name(resources.sources, classes, directory, PLAYER_CLASS)?;
@@ -124,7 +124,7 @@ fn components(
     record: u32,
     scope: &SourceScope,
     resources: &Resources<'_>,
-    documents: &mut XmlDocuments,
+    documents: &mut XmlDocuments<'_>,
 ) -> Result<Vec<MotionComponent>, PlayerSourceError> {
     let mut rows = Vec::new();
     for (ordinal, value) in values.iter().enumerate() {
@@ -168,7 +168,10 @@ struct SelectedResource<T> {
 }
 
 impl MotionInput<'_, '_, '_> {
-    fn project(&self, documents: &mut XmlDocuments) -> Result<MotionComponent, PlayerSourceError> {
+    fn project(
+        &self,
+        documents: &mut XmlDocuments<'_>,
+    ) -> Result<MotionComponent, PlayerSourceError> {
         let controller = self.resource(
             "actionController",
             "ControllerDef",
@@ -224,7 +227,7 @@ impl MotionInput<'_, '_, '_> {
         &self,
         name: &str,
         expected_root: &'static str,
-        documents: &mut XmlDocuments,
+        documents: &mut XmlDocuments<'_>,
         read: impl FnOnce(&SourceDocument<'_>, &XmlOrigin<'_>, &CancelToken) -> Result<T, SocSceneError>,
     ) -> Result<SelectedResource<T>, PlayerSourceError> {
         let value = crate::soc_scene_classes::string(self.component.field(name));

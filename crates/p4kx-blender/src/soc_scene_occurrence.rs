@@ -38,7 +38,7 @@ impl Occurrence {
     pub(super) fn read(
         original: &SocContainerOccurrence,
         sources: &SourceUses,
-        documents: &mut XmlDocuments,
+        documents: &mut XmlDocuments<'_>,
         classes: &Classes,
         cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
@@ -117,7 +117,7 @@ fn streams(
     room: Option<&(SocRoomRegistry<'_>, XmlOrigin<'_>)>,
     tile_ports: Option<&TilePorts<'_>>,
     sources: &SourceUses,
-    documents: &mut XmlDocuments,
+    documents: &mut XmlDocuments<'_>,
     classes: &Classes,
     cancel: &CancelToken,
 ) -> Result<Vec<Stream>, SocSceneError> {

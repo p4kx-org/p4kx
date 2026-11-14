@@ -34,7 +34,7 @@ impl RoomRegistry {
     pub(super) fn read(
         registry: &SocRoomRegistry<'_>,
         origin: &XmlOrigin<'_>,
-        documents: &mut XmlDocuments,
+        documents: &mut XmlDocuments<'_>,
     ) -> Result<Self, SocSceneError> {
         Ok(Self {
             xml: documents.bind(registry.document(), origin)?,

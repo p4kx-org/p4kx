@@ -208,7 +208,7 @@ impl<'a> Resources<'a> {
                 Ok(())
             }
         })?;
-        let origin = XmlOrigin::new(self.sources, member.origin(), None)?;
+        let origin = XmlOrigin::with_archive_member(self.sources, &member)?;
         let source = origin.source();
         let payload = || {
             origin.scope.at(

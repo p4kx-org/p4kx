@@ -10,6 +10,7 @@ use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
+use crate::{PlayerDocument, PlayerDocumentSink};
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -46,12 +47,20 @@ struct XmlAttribute {
 }
 
 #[derive(Default)]
-pub(crate) struct XmlDocuments {
+pub(crate) struct XmlDocuments<'sink> {
     indices: BTreeMap<(PhysicalSourceRef, Option<usize>), usize>,
     rows: Vec<XmlDocument>,
+    sink: Option<&'sink mut dyn PlayerDocumentSink>,
 }
 
-impl XmlDocuments {
+impl<'sink> XmlDocuments<'sink> {
+    pub(crate) fn stream_to(sink: &'sink mut dyn PlayerDocumentSink) -> Self {
+        Self {
+            sink: Some(sink),
+            ..Self::default()
+        }
+    }
+
     pub(crate) fn bind(
         &mut self,
         document: &SourceDocument<'_>,
@@ -61,8 +70,23 @@ impl XmlDocuments {
         if let Some(&index) = self.indices.get(&key) {
             return Ok(index);
         }
-        let index = self.rows.len();
-        self.rows.push(XmlDocument::read(document, origin)?);
+        let index = self.indices.len();
+        if let Some(sink) = self.sink.as_mut() {
+            let member = origin.archive_member.ok_or(SocSceneError::Position)?;
+            let bytes = member.payload().map_err(|_| SocSceneError::Position)?;
+            sink.document(PlayerDocument {
+                index,
+                source: origin.source(),
+                original: member.origin(),
+                origin: origin.node_origin(document.root())?,
+                format: source_format(document),
+                lossy: document.is_lossy(),
+                bytes,
+            })
+            .map_err(SocSceneError::DocumentSink)?;
+        } else {
+            self.rows.push(XmlDocument::read(document, origin)?);
+        }
         self.indices.insert(key, index);
         Ok(index)
     }
@@ -72,15 +96,18 @@ impl XmlDocuments {
     }
 }
 
+const fn source_format(document: &SourceDocument<'_>) -> &'static str {
+    match document.format() {
+        Format::CryXml(signature) => signature.as_str(),
+        Format::Text => "textXml",
+    }
+}
+
 impl XmlDocument {
     pub(crate) fn read(
         document: &SourceDocument<'_>,
         origin: &XmlOrigin<'_>,
     ) -> Result<Self, SocSceneError> {
-        let format = match document.format() {
-            Format::CryXml(signature) => signature.as_str(),
-            Format::Text => "textXml",
-        };
         let document_origin = origin.node_origin(document.root())?;
         let contains_encrypted_source = document_origin.contains_encrypted_source();
         let mut pending = vec![(None, 0, document.root())];
@@ -107,7 +134,7 @@ impl XmlDocument {
         Ok(Self {
             source: origin.source(),
             chunk: origin.chunk,
-            format: format.to_owned(),
+            format: source_format(document).to_owned(),
             lossy: document.is_lossy(),
             origin: document_origin,
             nodes,

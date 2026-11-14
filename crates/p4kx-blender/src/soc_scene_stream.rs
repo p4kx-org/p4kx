@@ -38,7 +38,7 @@ impl Stream {
         stream: &SocStreamInput,
         index: &IndexedStream<'_>,
         sources: &SourceUses,
-        documents: &mut XmlDocuments,
+        documents: &mut XmlDocuments<'_>,
     ) -> Result<Self, SocSceneError> {
         let member = match &stream.member {
             Some(selection) => Member::read(selection, sources, |bytes, origin| {
@@ -89,12 +89,13 @@ impl Chunk {
         chunk: &SocEntityChunk<'_>,
         index: &IndexedStream<'_>,
         member: &XmlOrigin<'_>,
-        documents: &mut XmlDocuments,
+        documents: &mut XmlDocuments<'_>,
     ) -> Result<Self, SocSceneError> {
         let origin = XmlOrigin {
             sources: member.sources,
             scope: member.scope.clone(),
             chunk: Some(chunk.chunk_index()),
+            archive_member: None,
         };
         let xml = documents.bind(chunk.document(), &origin)?;
         let entities = chunk

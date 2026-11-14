@@ -134,6 +134,9 @@ pub enum SocSceneError {
     /// The original XML coordinate cannot be represented.
     #[error("cannot represent an original SOC XML coordinate")]
     Position,
+    /// A verified XML input could not be retained by the output sink.
+    #[error("cannot retain a verified XML source")]
+    DocumentSink(#[source] std::io::Error),
     /// Source projection was interrupted.
     #[error("SOC scene projection cancelled")]
     Cancelled,

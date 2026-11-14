@@ -64,7 +64,7 @@ pub(crate) fn read(
     sources: &SourceUses,
     directory: &SourceUse,
     classes: Classes<'_, '_>,
-    documents: &mut XmlDocuments,
+    documents: &mut XmlDocuments<'_>,
     cancel: &CancelToken,
 ) -> Result<Vec<SourcedValue<Loadout>>, PlayerSourceError> {
     let mut rows = Vec::new();
@@ -97,7 +97,7 @@ fn project(
     entry: &Entry,
     sources: &SourceUses,
     classes: Classes<'_, '_>,
-    documents: &mut XmlDocuments,
+    documents: &mut XmlDocuments<'_>,
     cancel: &CancelToken,
     uses: &mut Vec<SourceUse>,
 ) -> Result<Loadout, PlayerSourceError> {
@@ -108,7 +108,7 @@ fn project(
             Ok(())
         }
     })?;
-    let origin = XmlOrigin::new(sources, member.origin(), None)?;
+    let origin = XmlOrigin::with_archive_member(sources, &member)?;
     let source = origin.source();
     let payload = |role| {
         origin.scope.at(

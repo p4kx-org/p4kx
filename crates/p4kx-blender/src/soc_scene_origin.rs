@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_assembly::SocArchiveMember;
 use p4kx_extraction::cryxml::{
     SourceAttribute, SourceAttributePosition, SourceElement, SourceElementPosition,
 };
@@ -100,6 +101,7 @@ pub(crate) struct XmlOrigin<'a> {
     pub(crate) sources: &'a SourceUses,
     pub(crate) scope: SourceScope,
     pub(crate) chunk: Option<usize>,
+    pub(crate) archive_member: Option<&'a SocArchiveMember>,
 }
 
 impl<'a> XmlOrigin<'a> {
@@ -113,7 +115,17 @@ impl<'a> XmlOrigin<'a> {
             sources,
             scope,
             chunk,
+            archive_member: None,
         })
+    }
+
+    pub(crate) fn with_archive_member(
+        sources: &'a SourceUses,
+        member: &'a SocArchiveMember,
+    ) -> Result<Self, SocSceneError> {
+        let mut origin = Self::new(sources, member.origin(), None)?;
+        origin.archive_member = Some(member);
+        Ok(origin)
     }
 
     pub(crate) fn source(&self) -> PhysicalSourceRef {

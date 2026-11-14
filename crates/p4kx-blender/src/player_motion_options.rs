@@ -166,7 +166,7 @@ impl MotionOptions {
         controller: Controller,
         database: Database,
         selectors: [&SourceUse; 2],
-        documents: &mut XmlDocuments,
+        documents: &mut XmlDocuments<'_>,
     ) -> Result<Self, SocSceneError> {
         let mut uses: Vec<_> = selectors.into_iter().cloned().collect();
         uses.extend(controller.file.uses.iter().cloned());
@@ -302,7 +302,7 @@ fn shared_fragment_file(
     uses: &mut Vec<SourceUse>,
     controller: &AuthoredFile,
     database: &AuthoredFile,
-    documents: &mut XmlDocuments,
+    documents: &mut XmlDocuments<'_>,
 ) -> Result<SourcedValue<Resource<usize>>, SocSceneError> {
     let (Some(controller_path), Some(database_path)) =
         (controller.archive_path(), database.archive_path())
