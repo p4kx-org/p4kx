@@ -271,6 +271,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `lootTables` | The loot tables (`LootTableV3Record`) with the weighted archetypes of each, ordered by GUID |
 | `lootArchetypes` | The loot archetypes (`LootArchetypeV3Record`) with the weighted selectors of each, ordered by GUID |
 | `definitions.lootPoolFilters` | Complete original pool-filter fields and values, ordered by physical source GUID |
+| `definitions.lootSecondaryChoiceSingleLayers`, `definitions.lootSecondaryChoiceMultiLayers`, `definitions.lootThemes` | Original ordered choices, layers and owned theme values with physical Record identities |
 | `legacyLootTables` | The older loot tables (`LootTable`) with the weighted archetypes of each, ordered by GUID |
 | `legacyLootArchetypes` | The older loot archetypes (`LootArchetype`) with the weighted tags of each, ordered by GUID |
 | `lootContainers` | The containers placed with a multi config, with the starmap object each hangs below, ordered by config, container, system and object |
@@ -2162,6 +2163,13 @@ the name of its struct: `positiveTagGuids` and `negativeTagGuids` (`Tag` Records
 is informational. The tags are the `Tag` Records of the tag tree, not the free item tags of
 "Matching tags".
 
+**Secondary choices and themes.** `definitions.lootSecondaryChoiceSingleLayers`
+keeps the original ordered Class entries. `definitions.lootSecondaryChoiceMultiLayers`
+keeps original ordered Reference slots to those layers. `definitions.lootThemes`
+keeps the authored theme type and its owned fields. Each table has independent
+availability, source-state and selection accounting. The [Loot source contract](catalog-loot-source.md)
+describes the provenance and field representation.
+
 **Pool filters (`definitions.lootPoolFilters`).** The canonical `CatalogTable` contains each
 selected physical `PoolFilterRecord` under `lootgeneration/filters`, with its independently
 sourced eight-field header. `fields` lists every original root declaration in stored order;
@@ -2805,6 +2813,9 @@ stores it. It does not change the catalog's determinism: the same Archive gives 
 | `lootTables` | `libs/foundry/records/lootgeneration/loottables/` | `LootTableV3Record` |
 | `lootArchetypes` | `libs/foundry/records/lootgeneration/lootarchetypes/` | `LootArchetypeV3Record` |
 | `lootPoolFilters` | `libs/foundry/records/lootgeneration/filters/` | `PoolFilterRecord` |
+| `lootSecondaryChoiceSingleLayers` | Any physical Record path | `LootV3SecondaryChoicesSingleLayerRecord` |
+| `lootSecondaryChoiceMultiLayers` | Any physical Record path | `LootV3SecondaryChoicesMultiLayerRecord` |
+| `lootThemes` | Any physical Record path | `LootThemeRecord` |
 | `legacyLootTables` | `libs/foundry/records/lootgeneration/loottables/` | `LootTable` |
 | `legacyLootArchetypes` | `libs/foundry/records/lootgeneration/lootarchetypes/` | `LootArchetype` |
 | `lootContainers` | None: the `entdata` files of the containers below `ObjectContainers/PU/system` and the containers they place, no Records | |

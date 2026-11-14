@@ -39,7 +39,6 @@ fn rows_of_kind(catalog: &Value, kind: Kind) -> TestResult<&Vec<Value>> {
     }
     let path = match kind {
         Kind::GameplayProperties => "/definitions/gameplayProperties",
-        Kind::LootPoolFilters => "/definitions/lootPoolFilters",
         Kind::BlueprintCategoryLists => "/declarations/blueprintCategoryLists",
         Kind::Blueprints => "/definitions/blueprints",
         Kind::ShopInventories => "/definitions/shopInventories",
@@ -106,6 +105,10 @@ const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::EncounterIndices
             | Kind::MissionItems
             | Kind::ContractScopes
+            | Kind::LootPoolFilters
+            | Kind::LootSecondaryChoiceSingleLayers
+            | Kind::LootSecondaryChoiceMultiLayers
+            | Kind::LootThemes
     )
 }
 
@@ -117,51 +120,45 @@ fn checked_table<'catalog>(
     let rows = table(catalog, path)?;
     for row in rows {
         identity(row, kind)?;
-        if matches!(
-            kind,
-            Kind::Blueprints
-                | Kind::ContractTemplates
-                | Kind::MissionBrokerEntries
-                | Kind::BlueprintCategories
-                | Kind::BlueprintCategoryLists
-                | Kind::ExplosionDefinitions
-                | Kind::AmmoDefinitions
-                | Kind::InventoryContainers
-                | Kind::MedicalItemTierConfigs
-                | Kind::ReputationContexts
-                | Kind::ReputationScopes
-                | Kind::ReputationStandings
-                | Kind::GameplayProperties
-                | Kind::LootPoolFilters
-                | Kind::Factions
-                | Kind::FactionIdentities
-                | Kind::FactionReputations
-                | Kind::ReputationTriggerRecords
-                | Kind::ReputationRewardAmounts
-                | Kind::ReputationPerks
-                | Kind::Infractions
-                | Kind::InfractionSets
-                | Kind::Jurisdictions
-                | Kind::SecurityNetworkManifests
-                | Kind::MissionModuleDeclarations
-                | Kind::MissionItems
-                | Kind::LocationClasses
-                | Kind::LocationFunctions
-                | Kind::LocationSizes
-                | Kind::LocationClassRegistries
-                | Kind::LocationFunctionRegistries
-                | Kind::LocationSizeRegistries
-                | Kind::ContractScopes
-                | Kind::NpcArchetypes
-                | Kind::NpcClassPools
-                | Kind::AutoSpawns
-                | Kind::AutoSpawnSets
-                | Kind::EncounterIndices
-                | Kind::StarmapObjects
-                | Kind::StarmapTypes
-                | Kind::StarmapPresets
-                | Kind::StarmapAmenities
-        ) {
+        if uses_named_definition_table(kind)
+            || matches!(
+                kind,
+                Kind::Blueprints
+                    | Kind::ContractTemplates
+                    | Kind::MissionBrokerEntries
+                    | Kind::BlueprintCategories
+                    | Kind::BlueprintCategoryLists
+                    | Kind::ExplosionDefinitions
+                    | Kind::AmmoDefinitions
+                    | Kind::InventoryContainers
+                    | Kind::MedicalItemTierConfigs
+                    | Kind::ReputationContexts
+                    | Kind::ReputationScopes
+                    | Kind::ReputationStandings
+                    | Kind::GameplayProperties
+                    | Kind::Factions
+                    | Kind::FactionIdentities
+                    | Kind::FactionReputations
+                    | Kind::ReputationTriggerRecords
+                    | Kind::ReputationRewardAmounts
+                    | Kind::ReputationPerks
+                    | Kind::Infractions
+                    | Kind::InfractionSets
+                    | Kind::Jurisdictions
+                    | Kind::SecurityNetworkManifests
+                    | Kind::MissionModuleDeclarations
+                    | Kind::LocationClasses
+                    | Kind::LocationFunctions
+                    | Kind::LocationSizes
+                    | Kind::LocationClassRegistries
+                    | Kind::LocationFunctionRegistries
+                    | Kind::LocationSizeRegistries
+                    | Kind::StarmapObjects
+                    | Kind::StarmapTypes
+                    | Kind::StarmapPresets
+                    | Kind::StarmapAmenities
+            )
+        {
             record_header(row)?;
         }
         if kind == Kind::BlueprintCategoryLists {
@@ -251,56 +248,50 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
     if kind == Kind::Contracts && name == "guid" {
         return present(value);
     }
-    if matches!(
-        kind,
-        Kind::Blueprints
-            | Kind::ContractTemplates
-            | Kind::MissionBrokerEntries
-            | Kind::BlueprintCategories
-            | Kind::BlueprintCategoryLists
-            | Kind::ExplosionDefinitions
-            | Kind::AmmoDefinitions
-            | Kind::ReputationContexts
-            | Kind::ReputationScopes
-            | Kind::ReputationStandings
-            | Kind::GameplayProperties
-            | Kind::Manufacturers
-            | Kind::Factions
-            | Kind::FactionIdentities
-            | Kind::FactionReputations
-            | Kind::ReputationTriggerRecords
-            | Kind::ReputationRewardAmounts
-            | Kind::ReputationPerks
-            | Kind::Infractions
-            | Kind::InfractionSets
-            | Kind::Jurisdictions
-            | Kind::SecurityNetworkManifests
-            | Kind::MissionModuleDeclarations
-            | Kind::MissionItems
-            | Kind::LocationClasses
-            | Kind::LocationFunctions
-            | Kind::LocationSizes
-            | Kind::LocationClassRegistries
-            | Kind::LocationFunctionRegistries
-            | Kind::LocationSizeRegistries
-            | Kind::ContractScopes
-            | Kind::NpcArchetypes
-            | Kind::NpcClassPools
-            | Kind::AutoSpawns
-            | Kind::AutoSpawnSets
-            | Kind::EncounterIndices
-            | Kind::StarmapObjects
-            | Kind::StarmapTypes
-            | Kind::StarmapPresets
-            | Kind::StarmapAmenities
-            | Kind::Commodities
-            | Kind::ResourceTypes
-            | Kind::ResourceGroups
-            | Kind::Tags
-            | Kind::QualityDistributions
-            | Kind::QualityQuantizations
-            | Kind::LootPoolFilters
-    ) {
+    if uses_named_definition_table(kind)
+        || matches!(
+            kind,
+            Kind::Blueprints
+                | Kind::ContractTemplates
+                | Kind::MissionBrokerEntries
+                | Kind::BlueprintCategories
+                | Kind::BlueprintCategoryLists
+                | Kind::ExplosionDefinitions
+                | Kind::AmmoDefinitions
+                | Kind::ReputationContexts
+                | Kind::ReputationScopes
+                | Kind::ReputationStandings
+                | Kind::GameplayProperties
+                | Kind::Manufacturers
+                | Kind::Factions
+                | Kind::FactionIdentities
+                | Kind::FactionReputations
+                | Kind::ReputationTriggerRecords
+                | Kind::ReputationRewardAmounts
+                | Kind::ReputationPerks
+                | Kind::Infractions
+                | Kind::InfractionSets
+                | Kind::Jurisdictions
+                | Kind::SecurityNetworkManifests
+                | Kind::MissionModuleDeclarations
+                | Kind::LocationClasses
+                | Kind::LocationFunctions
+                | Kind::LocationSizes
+                | Kind::LocationClassRegistries
+                | Kind::LocationFunctionRegistries
+                | Kind::LocationSizeRegistries
+                | Kind::StarmapObjects
+                | Kind::StarmapTypes
+                | Kind::StarmapPresets
+                | Kind::StarmapAmenities
+                | Kind::Commodities
+                | Kind::ResourceTypes
+                | Kind::ResourceGroups
+                | Kind::Tags
+                | Kind::QualityDistributions
+                | Kind::QualityQuantizations
+        )
+    {
         present(value)
     } else {
         Ok(value)

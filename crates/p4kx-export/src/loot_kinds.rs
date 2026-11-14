@@ -4,7 +4,9 @@
 use p4kx_extraction::RecordTree;
 
 use crate::Kind;
-use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
+use crate::catalog_v3::loot_definition_catalog::{
+    LootDefinition, LootDefinitionKind, LootDefinitions,
+};
 use crate::contract_loot::{LootArchetype, LootTable};
 use crate::contract_loot_legacy::{LegacyLootArchetype, LegacyLootTable};
 use crate::guid_text::sort_by_guid;
@@ -17,8 +19,8 @@ pub(crate) enum LootPick<'f> {
     Table(LootTable<'f>),
     /// A loot archetype.
     Archetype(LootArchetype<'f>),
-    /// A pool filter.
-    Filter(Box<LootFilterDefinition<'f>>),
+    /// A physical Loot Record with an owner-local source value arena.
+    Definition(LootDefinitionKind, Box<LootDefinition<'f>>),
     /// An older loot table.
     LegacyTable(LegacyLootTable<'f>),
     /// An older loot archetype.
@@ -44,7 +46,7 @@ impl<'f> LootPick<'f> {
 pub(crate) struct LootKinds<'f> {
     pub(crate) tables: Vec<LootTable<'f>>,
     pub(crate) archetypes: Vec<LootArchetype<'f>>,
-    pub(crate) filters: Vec<LootFilterDefinition<'f>>,
+    pub(crate) definitions: LootDefinitions<'f>,
     pub(crate) legacy_tables: Vec<LegacyLootTable<'f>>,
     pub(crate) legacy_archetypes: Vec<LegacyLootArchetype<'f>>,
 }
@@ -55,7 +57,7 @@ impl<'f> LootKinds<'f> {
         match pick {
             LootPick::Table(entity) => self.tables.push(entity),
             LootPick::Archetype(entity) => self.archetypes.push(entity),
-            LootPick::Filter(entity) => self.filters.push(*entity),
+            LootPick::Definition(kind, entity) => self.definitions.push(kind, *entity),
             LootPick::LegacyTable(entity) => self.legacy_tables.push(entity),
             LootPick::LegacyArchetype(entity) => self.legacy_archetypes.push(entity),
         }
@@ -65,7 +67,7 @@ impl<'f> LootKinds<'f> {
     pub(crate) fn order(&mut self) {
         sort_by_guid(&mut self.tables, |entity| entity.guid);
         sort_by_guid(&mut self.archetypes, |entity| entity.guid);
-        sort_by_guid(&mut self.filters, |entity| entity.physical_guid);
+        self.definitions.order();
         sort_by_guid(&mut self.legacy_tables, |entity| entity.guid);
         sort_by_guid(&mut self.legacy_archetypes, |entity| entity.guid);
     }
@@ -75,10 +77,12 @@ impl<'f> LootKinds<'f> {
         match kind {
             Kind::LootTables => self.tables.len(),
             Kind::LootArchetypes => self.archetypes.len(),
-            Kind::LootPoolFilters => self.filters.len(),
             Kind::LegacyLootTables => self.legacy_tables.len(),
             Kind::LegacyLootArchetypes => self.legacy_archetypes.len(),
-            _ => 0,
+            _ => match LootDefinitionKind::of(kind) {
+                Some(kind) => self.definitions.count(kind),
+                None => 0,
+            },
         }
     }
 }

@@ -201,6 +201,9 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
             | Kind::GameplayProperties
             | Kind::Blueprints
             | Kind::LootPoolFilters
+            | Kind::LootSecondaryChoiceSingleLayers
+            | Kind::LootSecondaryChoiceMultiLayers
+            | Kind::LootThemes
             | Kind::ExplosionDefinitions
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs

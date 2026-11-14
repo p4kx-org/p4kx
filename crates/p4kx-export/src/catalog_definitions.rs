@@ -15,7 +15,7 @@ use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::inventory_container_definition::InventoryContainerDefinition;
 use crate::catalog_v3::law_kinds::LawTables;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyTables;
-use crate::catalog_v3::loot_filter_catalog::LootFilterDefinition;
+use crate::catalog_v3::loot_definition_catalog::LootDefinitionTables;
 use crate::catalog_v3::medical::medical_tier_config::MedicalItemTierConfig;
 use crate::catalog_v3::mission_sources::module_declaration::MissionModuleDeclaration;
 use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsTables;
@@ -53,7 +53,8 @@ pub(crate) struct CatalogDefinitions<'source> {
         CatalogTable<super::mission_scenario_definition::MissionScenarioDefinition<'source>>,
     pub(crate) contract_templates: CatalogTable<TemplateDefinition<'source>>,
     pub(crate) mission_broker_entries: CatalogTable<BrokerDefinition<'source>>,
-    pub(crate) loot_pool_filters: CatalogTable<LootFilterDefinition<'source>>,
+    #[serde(flatten)]
+    pub(crate) loot: LootDefinitionTables<'source>,
     pub(crate) blueprint_categories: CatalogTable<BlueprintCategoryDefinition<'source>>,
     pub(crate) gameplay_properties: CatalogTable<GameplayPropertyDefinition<'source>>,
     pub(crate) quality_distributions: CatalogTable<QualityDistributionDefinition<'source>>,

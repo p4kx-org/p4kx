@@ -141,6 +141,12 @@ pub(crate) struct Completeness<'a> {
     pub(crate) loot_archetypes: KindCompleteness<'a>,
     /// The completeness of `lootPoolFilters`.
     pub(crate) loot_pool_filters: KindCompleteness<'a>,
+    /// The completeness of `lootSecondaryChoiceSingleLayers`.
+    pub(crate) loot_secondary_choice_single_layers: KindCompleteness<'a>,
+    /// The completeness of `lootSecondaryChoiceMultiLayers`.
+    pub(crate) loot_secondary_choice_multi_layers: KindCompleteness<'a>,
+    /// The completeness of `lootThemes`.
+    pub(crate) loot_themes: KindCompleteness<'a>,
     /// The completeness of `legacyLootTables`.
     pub(crate) legacy_loot_tables: KindCompleteness<'a>,
     /// The completeness of `legacyLootArchetypes`.
@@ -246,6 +252,9 @@ impl<'a> Completeness<'a> {
             loot_tables: completeness,
             loot_archetypes: completeness,
             loot_pool_filters: completeness,
+            loot_secondary_choice_single_layers: completeness,
+            loot_secondary_choice_multi_layers: completeness,
+            loot_themes: completeness,
             legacy_loot_tables: completeness,
             legacy_loot_archetypes: completeness,
             mineable_entities: completeness,

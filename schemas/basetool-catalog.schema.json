@@ -4586,7 +4586,16 @@
           "$ref": "#/$defs/CatalogTableOfLocationDictionaryEntry"
         },
         "lootPoolFilters": {
-          "$ref": "#/$defs/CatalogTableOfLootFilterDefinition"
+          "$ref": "#/$defs/CatalogTableOfLootDefinition"
+        },
+        "lootSecondaryChoiceMultiLayers": {
+          "$ref": "#/$defs/CatalogTableOfLootDefinition"
+        },
+        "lootSecondaryChoiceSingleLayers": {
+          "$ref": "#/$defs/CatalogTableOfLootDefinition"
+        },
+        "lootThemes": {
+          "$ref": "#/$defs/CatalogTableOfLootDefinition"
         },
         "manufacturers": {
           "$ref": "#/$defs/CatalogTableOfManufacturerDefinition"
@@ -4689,6 +4698,9 @@
         "locationRegistries",
         "locationSizes",
         "lootPoolFilters",
+        "lootSecondaryChoiceMultiLayers",
+        "lootSecondaryChoiceSingleLayers",
+        "lootThemes",
         "manufacturers",
         "medicalItemTierConfigs",
         "missionBrokerEntries",
@@ -5880,7 +5892,7 @@
       ],
       "type": "object"
     },
-    "CatalogTableOfLootFilterDefinition": {
+    "CatalogTableOfLootDefinition": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
         "availability": {
@@ -5888,7 +5900,7 @@
         },
         "rows": {
           "items": {
-            "$ref": "#/$defs/LootFilterDefinition"
+            "$ref": "#/$defs/LootDefinition"
           },
           "type": "array"
         }
@@ -7686,9 +7698,21 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `lootPoolFilters`."
         },
+        "lootSecondaryChoiceMultiLayers": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `lootSecondaryChoiceMultiLayers`."
+        },
+        "lootSecondaryChoiceSingleLayers": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `lootSecondaryChoiceSingleLayers`."
+        },
         "lootTables": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `lootTables`."
+        },
+        "lootThemes": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The completeness of `lootThemes`."
         },
         "manufacturers": {
           "$ref": "#/$defs/KindCompleteness",
@@ -7890,7 +7914,10 @@
         "lootArchetypes",
         "lootContainers",
         "lootPoolFilters",
+        "lootSecondaryChoiceMultiLayers",
+        "lootSecondaryChoiceSingleLayers",
         "lootTables",
+        "lootThemes",
         "manufacturers",
         "medicalItemTierConfigs",
         "mineableCompositions",
@@ -18671,6 +18698,18 @@
           "value": "lootPoolFilters"
         },
         {
+          "description": "Physical Loot V3 secondary single-layer choice Records.",
+          "value": "lootSecondaryChoiceSingleLayers"
+        },
+        {
+          "description": "Physical Loot V3 secondary multi-layer choice Records.",
+          "value": "lootSecondaryChoiceMultiLayers"
+        },
+        {
+          "description": "Physical Loot theme Records.",
+          "value": "lootThemes"
+        },
+        {
           "description": "Loot containers: the containers whose placing entity carries a multi config, read from the\nentity files of the containers below the system containers. Derived from Archive files, so\nno record-path rule of its own.",
           "value": "lootContainers"
         },
@@ -20811,8 +20850,8 @@
       ],
       "type": "object"
     },
-    "LootFilterDefinition": {
-      "description": "Complete ordered source fields and values of one physical Loot filter Record.",
+    "LootDefinition": {
+      "description": "Complete ordered source fields and values of one physical Loot Record.",
       "properties": {
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"

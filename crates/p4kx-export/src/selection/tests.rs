@@ -92,7 +92,10 @@ fn record_types_disambiguate_kinds_that_share_a_path() {
                 | Kind::MedicalItemTierConfigs
                 | Kind::StarmapTypes
                 | Kind::StarmapPresets
-                | Kind::StarmapAmenities => {
+                | Kind::StarmapAmenities
+                | Kind::LootSecondaryChoiceSingleLayers
+                | Kind::LootSecondaryChoiceMultiLayers
+                | Kind::LootThemes => {
                     assert_eq!(
                         by_path,
                         Some(Kind::Tags),

@@ -93,6 +93,9 @@ impl Collected<'_> {
             Kind::LootTables
             | Kind::LootArchetypes
             | Kind::LootPoolFilters
+            | Kind::LootSecondaryChoiceSingleLayers
+            | Kind::LootSecondaryChoiceMultiLayers
+            | Kind::LootThemes
             | Kind::LegacyLootTables
             | Kind::LegacyLootArchetypes => self.loot_kinds.count(kind),
         }

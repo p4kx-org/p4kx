@@ -92,20 +92,12 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
             ))
             .chain(collected.mission_kinds.definition_sources())
             .chain(collected.starmap_definitions.sources())
+            .chain(collected.loot_kinds.definitions.sources())
             .map(|(kind, guid, path, _)| CatalogRow {
                 kind,
                 guid,
                 record_path: path.to_owned(),
             }),
-    );
-    append(
-        emitted,
-        Kind::LootPoolFilters,
-        collected
-            .loot_kinds
-            .filters
-            .iter()
-            .map(|row| (row.physical_guid.0, row.physical_path)),
     );
     append(
         emitted,
@@ -393,8 +385,8 @@ fn definition_number_groups<'rows>(
         .chain(
             collected
                 .loot_kinds
-                .filters
-                .iter()
-                .map(|row| (Kind::LootPoolFilters, row.numbers.as_slice())),
+                .definitions
+                .sources()
+                .map(|(kind, _, _, numbers)| (kind, numbers)),
         )
 }

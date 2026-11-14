@@ -11,11 +11,11 @@ use crate::schema_fields::every_field_required;
 
 use crate::source_value_catalog::{SourceField, SourceNode};
 
-/// Complete ordered source fields and values of one physical Loot filter Record.
+/// Complete ordered source fields and values of one physical Loot Record.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LootFilterDefinition<'source> {
+pub(crate) struct LootDefinition<'source> {
     #[serde(skip)]
     pub(crate) physical_guid: CatalogGuid,
     #[serde(skip)]

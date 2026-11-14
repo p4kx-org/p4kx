@@ -9,7 +9,7 @@ use crate::catalog_number_capture::NumberCapture;
 use crate::catalog_projection::CatalogProjection;
 use crate::guid_text::CatalogGuid;
 
-use super::definition::LootFilterDefinition;
+use super::definition::LootDefinition;
 use crate::source_value_catalog;
 
 /// Reads every original field and value once without following Reference target bodies.
@@ -18,13 +18,13 @@ pub(crate) fn read<'source>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
     cancel: Option<&CancelToken>,
-) -> Result<LootFilterDefinition<'source>, CatalogError> {
+) -> Result<LootDefinition<'source>, CatalogError> {
     let scope = projection.original().record_scope(record, tree)?;
     let source = CanonicalRecordHeader::read(tree, projection.origins())?;
     let numbers = NumberCapture::default();
     let output =
         source_value_catalog::read_arena(&scope, cancel, |site| numbers.retain_loot(site))?;
-    Ok(LootFilterDefinition {
+    Ok(LootDefinition {
         physical_guid: CatalogGuid(record.guid()),
         physical_path: tree.record_path(),
         numbers: numbers.finish(),

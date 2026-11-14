@@ -1,9 +1,18 @@
-# Complete Loot filter source values
+# Complete Loot source values
 
 `definitions.lootPoolFilters` is the canonical `CatalogTable` for selected physical
 `PoolFilterRecord` sources. Its availability is `available`, `absent` or `unavailable`, independently
 of row count. The Kind and completeness key remain `lootPoolFilters`. There is no second root
 `lootPoolFilters` dataset or recursive normal-output filter DTO.
+
+`definitions.lootSecondaryChoiceSingleLayers`, `definitions.lootSecondaryChoiceMultiLayers`
+and `definitions.lootThemes` use the same owner-local value format for the exact Record types
+`LootV3SecondaryChoicesSingleLayerRecord`, `LootV3SecondaryChoicesMultiLayerRecord` and
+`LootThemeRecord`. They have independent availability, selection, completeness and health keyed by
+their dataset names. Single-layer choices retain their original ordered class entries and concrete
+selectors. Multi-layer choices retain ordered Reference slots and original target headers even when
+the target body is outside the filter. Themes retain the concrete type and fields of their original
+owned theme value. The rows describe original source data and do not simulate loot selection.
 
 Each row has the common eight independently sourced header fields, ordered root `fields`, and a
 flat `values` vector. A field contains its sourced original `name`, a declaration with sourced

@@ -259,6 +259,7 @@ mod loot_reference_v3_fixture;
 mod loot_reference_v3_mutations;
 mod loot_reference_v3_source;
 mod loot_reference_v3_tests;
+mod loot_secondary_definition_tests;
 mod loot_storage_v3_fixture;
 mod loot_storage_v3_source;
 mod loot_storage_v3_tests;
@@ -391,6 +392,7 @@ mod scoped_canonical_failures;
 
 mod quality_field_capture;
 
+mod broker_full_source_tests;
 mod template_fixture_context;
 mod template_fixture_deep_flow;
 mod template_fixture_fields;
@@ -399,5 +401,3 @@ mod template_fixture_modifiers;
 mod template_fixture_options;
 mod template_fixture_tags;
 mod template_fixture_text;
-
-mod broker_full_source_tests;

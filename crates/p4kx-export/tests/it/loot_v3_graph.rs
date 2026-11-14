@@ -15,8 +15,12 @@ pub(crate) struct Graph<'catalog> {
 
 impl<'catalog> Graph<'catalog> {
     pub(crate) fn new(catalog: &'catalog Value, wanted: &str) -> Checked<Self> {
+        Self::in_table(catalog, "lootPoolFilters", wanted)
+    }
+
+    pub(crate) fn in_table(catalog: &'catalog Value, kind: &str, wanted: &str) -> Checked<Self> {
         let table = catalog
-            .pointer("/definitions/lootPoolFilters")
+            .pointer(&format!("/definitions/{kind}"))
             .ok_or("canonical Loot table")?;
         assert_eq!(
             table.get("availability"),

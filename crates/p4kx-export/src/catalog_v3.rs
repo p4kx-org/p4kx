@@ -312,8 +312,8 @@ pub(crate) mod catalog_text_contract;
 pub(crate) mod catalog_text_forms;
 #[path = "gameplay_property_catalog.rs"]
 pub(crate) mod gameplay_property_catalog;
-#[path = "loot_filter_catalog.rs"]
-pub(crate) mod loot_filter_catalog;
+#[path = "loot_definition_catalog.rs"]
+pub(crate) mod loot_definition_catalog;
 #[path = "quality_bands_read.rs"]
 pub(crate) mod quality_bands_read;
 #[path = "quality_curve_source_read.rs"]

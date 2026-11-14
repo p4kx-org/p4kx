@@ -341,6 +341,9 @@ pub(crate) fn minimal_catalog() -> Value {
         "missionModuleDeclarations",
         "missionItems",
         "contractScopes",
+        "lootSecondaryChoiceSingleLayers",
+        "lootSecondaryChoiceMultiLayers",
+        "lootThemes",
     ] {
         for (section, value) in [
             ("completeness", json!({"status": "complete"})),

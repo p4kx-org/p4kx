@@ -10,7 +10,6 @@ use crate::catalog_v3::location_vocabulary::{self, LocationVocabularyPick};
 use crate::catalog_v3::medical::medical_tier_config;
 use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsPick;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
-use crate::loot_kinds::LootPick;
 use crate::mission_kinds::MissionPick;
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
@@ -25,7 +24,6 @@ impl<'f> Scan<'_, '_, 'f> {
         tree: &RecordTree<'f>,
     ) -> Result<Option<(Picked<'f>, Vec<FieldError>)>, ScanError> {
         let projection = match kind {
-            Kind::LootPoolFilters => self.loot_pool_filter_definition(admission, tree)?,
             Kind::ExplosionDefinitions => self.explosion_definition(admission, tree)?,
             Kind::InventoryContainers => self.inventory_definition(admission, tree)?,
             Kind::MedicalItemTierConfigs => self.medical_definition(admission, tree)?,
@@ -144,20 +142,6 @@ impl<'f> Scan<'_, '_, 'f> {
             self.options.cancel,
         )?;
         Ok((Picked::NpcSpawnDefinitions(value), notes))
-    }
-
-    fn loot_pool_filter_definition(
-        &self,
-        admission: &RecordObservation<'_, 'f>,
-        tree: &RecordTree<'f>,
-    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
-        let value = crate::catalog_v3::loot_filter_catalog::read(
-            admission.record(),
-            tree,
-            self.projection,
-            self.options.cancel,
-        )?;
-        Ok((Picked::Loot(LootPick::Filter(Box::new(value))), Vec::new()))
     }
 
     fn medical_definition(

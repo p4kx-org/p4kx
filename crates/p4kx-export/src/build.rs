@@ -246,11 +246,7 @@ fn assemble<R>(
                 &["MissionBrokerEntry"],
                 collected.broker_definitions,
             ),
-            loot_pool_filters: CatalogTable::new(
-                &forge,
-                &["PoolFilterRecord"],
-                collected.loot_kinds.filters,
-            ),
+            loot: collected.loot_kinds.definitions.tables(&forge),
             gameplay_properties: crate::catalog_v3::gameplay_property_catalog::table(
                 &forge,
                 collected.gameplay_properties,

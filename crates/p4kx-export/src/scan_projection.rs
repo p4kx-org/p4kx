@@ -5,6 +5,7 @@ use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
 use super::Scan;
 use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resolution};
+use crate::catalog_v3::loot_definition_catalog::{self, LootDefinitionKind};
 use crate::catalog_v3::starmap_object_definition;
 use crate::commodity_resource::{self, CommodityResource};
 use crate::contract_stats::ItemStats;
@@ -12,6 +13,7 @@ use crate::export_diagnostic::{ExportDiagnosticCode, ExportSourceRole};
 use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDiagnosis};
 use crate::harvest_config::multi_config;
 use crate::harvest_preset::provider_preset;
+use crate::loot_kinds::LootPick;
 use crate::mining::mineable_entity;
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
@@ -157,6 +159,18 @@ impl<'f> Scan<'_, '_, 'f> {
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
+        if let Some(loot) = LootDefinitionKind::of(kind) {
+            let value = loot_definition_catalog::read(
+                admission.record(),
+                tree,
+                self.projection,
+                self.options.cancel,
+            )?;
+            return Ok(Some(Picked::Loot(LootPick::Definition(
+                loot,
+                Box::new(value),
+            ))));
+        }
         let Some((picked, notes)) = self.read_definition(kind, admission, tree)? else {
             return Ok(None);
         };

@@ -5,6 +5,7 @@ pub use crate::selection_rules::KindRule;
 pub(crate) use crate::selection_rules::starts_with_folder;
 
 mod blueprint_selection;
+mod names;
 mod record_leftovers;
 
 pub(crate) use blueprint_selection::{BlueprintSelection, selects_blueprint};
@@ -103,6 +104,12 @@ pub enum Kind {
     LootArchetypes,
     /// Loot pool filters: `PoolFilterRecord` Records under `lootgeneration/filters`.
     LootPoolFilters,
+    /// Physical Loot V3 secondary single-layer choice Records.
+    LootSecondaryChoiceSingleLayers,
+    /// Physical Loot V3 secondary multi-layer choice Records.
+    LootSecondaryChoiceMultiLayers,
+    /// Physical Loot theme Records.
+    LootThemes,
     /// Loot containers: the containers whose placing entity carries a multi config, read from the
     /// entity files of the containers below the system containers. Derived from Archive files, so
     /// no record-path rule of its own.
@@ -217,7 +224,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 83] = [
+    pub const ALL: [Self; 86] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -252,6 +259,9 @@ impl Kind {
         Self::LootTables,
         Self::LootArchetypes,
         Self::LootPoolFilters,
+        Self::LootSecondaryChoiceSingleLayers,
+        Self::LootSecondaryChoiceMultiLayers,
+        Self::LootThemes,
         Self::LootContainers,
         Self::MineableEntities,
         Self::LegacyLootTables,
@@ -302,100 +312,6 @@ impl Kind {
         Self::MissionItems,
         Self::ContractScopes,
     ];
-
-    /// Returns the stable kind identifier, independently of its canonical dataset path.
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one stable wire name per catalog kind"
-    )]
-    #[must_use]
-    pub const fn name(self) -> &'static str {
-        match self {
-            Self::Manufacturers => "manufacturers",
-            Self::Items => "items",
-            Self::Ships => "ships",
-            Self::Commodities => "commodities",
-            Self::Blueprints => "blueprints",
-            Self::ResourceGroups => "resourceGroups",
-            Self::BlueprintCategories => "blueprintCategories",
-            Self::GameplayProperties => "gameplayProperties",
-            Self::QualityDistributions => "qualityDistributions",
-            Self::QualityQuantizations => "qualityQuantizations",
-            Self::BlueprintPools => "blueprintPools",
-            Self::DismantleProcesses => "dismantleProcesses",
-            Self::Paints => "paints",
-            Self::Loadouts => "loadouts",
-            Self::StarmapObjects => "starmapObjects",
-            Self::Contracts => "contracts",
-            Self::MineableElements => "mineableElements",
-            Self::RefiningProcesses => "refiningProcesses",
-            Self::MineableCompositions => "mineableCompositions",
-            Self::MiningGlobalParams => "miningGlobalParams",
-            Self::HarvestableProviderPresets => "harvestableProviderPresets",
-            Self::SubHarvestableMultiConfigs => "subHarvestableMultiConfigs",
-            Self::HarvestableLocations => "harvestableLocations",
-            Self::Shops => "shops",
-            Self::FactionReputations => "factionReputations",
-            Self::ReputationScopes => "reputationScopes",
-            Self::ReputationStandings => "reputationStandings",
-            Self::ReputationContexts => "reputationContexts",
-            Self::MissionTypes => "missionTypes",
-            Self::MissionLocalities => "missionLocalities",
-            Self::ContractScenarios => "contractScenarios",
-            Self::MissionScenarios => "missionScenarios",
-            Self::MissionModuleDeclarations => "missionModuleDeclarations",
-            Self::MissionItems => "missionItems",
-            Self::ContractScopes => "contractScopes",
-            Self::LootTables => "lootTables",
-            Self::LootArchetypes => "lootArchetypes",
-            Self::LootPoolFilters => "lootPoolFilters",
-            Self::LootContainers => "lootContainers",
-            Self::MineableEntities => "mineableEntities",
-            Self::LegacyLootTables => "legacyLootTables",
-            Self::LegacyLootArchetypes => "legacyLootArchetypes",
-            Self::Crafters => "crafters",
-            Self::CargoManifests => "cargoManifests",
-            Self::MissionLocationTemplates => "missionLocationTemplates",
-            Self::ContractShipSpawns => "contractShipSpawns",
-            Self::ContractLocationQueries => "contractLocationQueries",
-            Self::ContractTemplates => "contractTemplates",
-            Self::MissionBrokerEntries => "missionBrokerEntries",
-            Self::ContractNpcSpawns => "contractNpcSpawns",
-            Self::ContractEntitySpawns => "contractEntitySpawns",
-            Self::MissionPropertySets => "missionPropertySets",
-            Self::ResourceTypes => "resourceTypes",
-            Self::Tags => "tags",
-            Self::BlueprintCategoryLists => "blueprintCategoryLists",
-            Self::ShopInventories => "shopInventories",
-            Self::ExplosionDefinitions => "explosionDefinitions",
-            Self::AmmoDefinitions => "ammoDefinitions",
-            Self::Factions => "factions",
-            Self::FactionIdentities => "factionIdentities",
-            Self::ReputationPerks => "reputationPerks",
-            Self::ReputationTriggerRecords => "reputationTriggerRecords",
-            Self::ReputationRewardAmounts => "reputationRewardAmounts",
-            Self::Infractions => "infractions",
-            Self::InfractionSets => "infractionSets",
-            Self::Jurisdictions => "jurisdictions",
-            Self::SecurityNetworkManifests => "securityNetworkManifests",
-            Self::LocationClasses => "locationClasses",
-            Self::LocationFunctions => "locationFunctions",
-            Self::LocationSizes => "locationSizes",
-            Self::LocationClassRegistries => "locationClassRegistries",
-            Self::LocationFunctionRegistries => "locationFunctionRegistries",
-            Self::LocationSizeRegistries => "locationSizeRegistries",
-            Self::NpcArchetypes => "npcArchetypes",
-            Self::NpcClassPools => "npcClassPools",
-            Self::AutoSpawns => "autoSpawns",
-            Self::AutoSpawnSets => "autoSpawnSets",
-            Self::EncounterIndices => "encounterIndices",
-            Self::InventoryContainers => "inventoryContainers",
-            Self::MedicalItemTierConfigs => "medicalItemTierConfigs",
-            Self::StarmapTypes => "starmapTypes",
-            Self::StarmapPresets => "starmapPresets",
-            Self::StarmapAmenities => "starmapAmenities",
-        }
-    }
 }
 
 #[cfg(test)]

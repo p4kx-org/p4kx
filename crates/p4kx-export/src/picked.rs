@@ -136,6 +136,9 @@ impl<'f> Picked<'f> {
                 return LootPick::entity(kind, tree).map(Self::Loot);
             }
             Kind::LootPoolFilters
+            | Kind::LootSecondaryChoiceSingleLayers
+            | Kind::LootSecondaryChoiceMultiLayers
+            | Kind::LootThemes
             | Kind::Tags
             | Kind::Manufacturers
             | Kind::Ships

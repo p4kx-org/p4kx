@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 use crate::selection::Kind;
 
 impl Kind {
@@ -283,10 +284,14 @@ impl Kind {
                 prefixes: &["libs/foundry/records/lootgeneration/lootarchetypes/"],
                 type_name: "LootArchetypeV3Record",
             },
-            Self::LootPoolFilters => KindRule {
-                prefixes: &["libs/foundry/records/lootgeneration/filters/"],
-                type_name: "PoolFilterRecord",
-            },
+            Self::LootPoolFilters => LootDefinitionKind::PoolFilter.rule(),
+            Self::LootSecondaryChoiceSingleLayers => {
+                LootDefinitionKind::SecondaryChoiceSingleLayer.rule()
+            }
+            Self::LootSecondaryChoiceMultiLayers => {
+                LootDefinitionKind::SecondaryChoiceMultiLayer.rule()
+            }
+            Self::LootThemes => LootDefinitionKind::Theme.rule(),
             Self::LegacyLootTables => KindRule {
                 prefixes: &["libs/foundry/records/lootgeneration/loottables/"],
                 type_name: "LootTable",
