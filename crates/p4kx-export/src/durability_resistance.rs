@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -14,7 +14,7 @@ use crate::source_value_catalog::SourceRecordReference;
 use crate::{CatalogError, ExportAccountingError};
 
 const BASE: &str = "DamageResistanceBase";
-const INLINE: &str = "DamageResistance";
+pub(in crate::catalog_v3) const INLINE: &str = "DamageResistance";
 const REFERENCE: &str = "DamageResistanceReference";
 
 /// The actual concrete resistance form owned by the Health component.
@@ -66,7 +66,7 @@ pub(crate) struct ResistanceSet {
 }
 
 impl ResistanceSet {
-    fn read(
+    pub(in crate::catalog_v3) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
@@ -109,6 +109,20 @@ impl ResistanceSet {
                 DurabilityResistanceEntry::read,
             )?,
         })
+    }
+}
+
+impl ResistanceSet {
+    pub(in crate::catalog_v3) const fn projected(&self) -> [(&'static str, SourceValueState); 7] {
+        [
+            ("IgnoreMeleeDamage", self.ignore_melee_damage.state()),
+            ("PhysicalResistance", self.physical.state()),
+            ("EnergyResistance", self.energy.state()),
+            ("DistortionResistance", self.distortion.state()),
+            ("ThermalResistance", self.thermal.state()),
+            ("BiochemicalResistance", self.biochemical.state()),
+            ("StunResistance", self.stun.state()),
+        ]
     }
 }
 

@@ -572,6 +572,34 @@
       ],
       "type": "object"
     },
+    "AimAssist": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "distanceMaxAssignment": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "distanceMinAssignment": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "outsideRangeBufferDistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "distanceMaxAssignment",
+        "distanceMinAssignment",
+        "outsideRangeBufferDistance",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "AlignmentAxis": {
       "properties": {
         "label": {
@@ -4678,6 +4706,9 @@
         "blueprintTiers": {
           "$ref": "#/$defs/CatalogTableOfBlueprintTier"
         },
+        "clothing": {
+          "$ref": "#/$defs/CatalogTableOfClothing"
+        },
         "contractTemplates": {
           "$ref": "#/$defs/CatalogTableOfTemplateProjection"
         },
@@ -4740,6 +4771,9 @@
         },
         "itemPorts": {
           "$ref": "#/$defs/CatalogTableOfItemPortContainer"
+        },
+        "itemRadars": {
+          "$ref": "#/$defs/CatalogTableOfItemRadar"
         },
         "itemRecoveryEconomy": {
           "$ref": "#/$defs/CatalogTableOfItemRecoveryEconomy"
@@ -4810,6 +4844,9 @@
         "shieldGenerators": {
           "$ref": "#/$defs/CatalogTableOfShieldGenerator"
         },
+        "suitArmor": {
+          "$ref": "#/$defs/CatalogTableOfSuitArmor"
+        },
         "thrusters": {
           "$ref": "#/$defs/CatalogTableOfThruster"
         },
@@ -4823,6 +4860,7 @@
       "required": [
         "ammoContainers",
         "blueprintTiers",
+        "clothing",
         "contractTemplates",
         "countermeasureEmitters",
         "degradation",
@@ -4844,6 +4882,7 @@
         "itemAttachmentConstraints",
         "itemBounds",
         "itemPorts",
+        "itemRadars",
         "itemRecoveryEconomy",
         "itemRecoveryOverrides",
         "itemRecoveryPolicy",
@@ -4867,6 +4906,7 @@
         "resourceContainers",
         "resourceNetworkParameters",
         "shieldGenerators",
+        "suitArmor",
         "thrusters",
         "vehicleArmor",
         "weaponActions"
@@ -4962,6 +5002,9 @@
         },
         "creatures": {
           "$ref": "#/$defs/CatalogTableOfPlanetCreature"
+        },
+        "damageResistanceMacros": {
+          "$ref": "#/$defs/CatalogTableOfDamageResistanceMacro"
         },
         "ecosystems": {
           "$ref": "#/$defs/CatalogTableOfEcosystem"
@@ -5161,6 +5204,7 @@
         "contractScopes",
         "contractTemplates",
         "creatures",
+        "damageResistanceMacros",
         "ecosystems",
         "encounterIndices",
         "explosionDefinitions",
@@ -5660,6 +5704,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfClothing": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/Clothing"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfCommodityDefinition": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -5802,6 +5865,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/CountermeasureEmitter"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfDamageResistanceMacro": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/DamageResistanceMacro"
           },
           "type": "array"
         }
@@ -6467,6 +6549,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ItemPortContainer"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfItemRadar": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ItemRadar"
           },
           "type": "array"
         }
@@ -7845,6 +7946,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfSuitArmor": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/SuitArmor"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfTagDefinition": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -8813,6 +8933,46 @@
         "variantProportion",
         "wheeledCollisionMode",
         "widthFromBaseToTopMultiplier"
+      ],
+      "type": "object"
+    },
+    "Clothing": {
+      "description": "One original clothing component with its temperature, radiation and flight fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "flight": {
+          "$ref": "#/$defs/SourcedValueOfFlight"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "radiationResistance": {
+          "$ref": "#/$defs/SourcedValueOfRadiationResistance"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "temperatureResistance": {
+          "$ref": "#/$defs/SourcedValueOfTemperatureResistance"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "componentOrdinal",
+        "flight",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "radiationResistance",
+        "sourceType",
+        "temperatureResistance"
       ],
       "type": "object"
     },
@@ -11906,6 +12066,26 @@
         "physical",
         "stun",
         "thermal"
+      ],
+      "type": "object"
+    },
+    "DamageResistanceMacro": {
+      "description": "One physical record defining shared damage resistance channels.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "damageResistance": {
+          "$ref": "#/$defs/SourcedValueOfMacroBody"
+        },
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "damageResistance",
+        "source"
       ],
       "type": "object"
     },
@@ -15989,6 +16169,26 @@
       "required": [
         "blindAmount",
         "flashbangBaseTime"
+      ],
+      "type": "object"
+    },
+    "Flight": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "gForceResistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "gForceResistance",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -22752,6 +22952,42 @@
       ],
       "type": "object"
     },
+    "ItemRadar": {
+      "description": "One original radar component installed on a physical entity record.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "aimAssist": {
+          "$ref": "#/$defs/SourcedValueOfAimAssist"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "pingProperties": {
+          "$ref": "#/$defs/SourcedValueOfPingProperties"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "aimAssist",
+        "componentOrdinal",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "pingProperties",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "ItemRecoveryEconomy": {
       "description": "The selected physical item-recovery policy and its authored economy.",
       "properties": {
@@ -26731,6 +26967,50 @@
         "name",
         "priorityCount",
         "weight"
+      ],
+      "type": "object"
+    },
+    "MacroBody": {
+      "description": "The six named resistance entries and the original melee flag.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "biochemical": {
+          "$ref": "#/$defs/SourcedValueOfDurabilityResistanceEntry"
+        },
+        "distortion": {
+          "$ref": "#/$defs/SourcedValueOfDurabilityResistanceEntry"
+        },
+        "energy": {
+          "$ref": "#/$defs/SourcedValueOfDurabilityResistanceEntry"
+        },
+        "ignoreMeleeDamage": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "physical": {
+          "$ref": "#/$defs/SourcedValueOfDurabilityResistanceEntry"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "stun": {
+          "$ref": "#/$defs/SourcedValueOfDurabilityResistanceEntry"
+        },
+        "thermal": {
+          "$ref": "#/$defs/SourcedValueOfDurabilityResistanceEntry"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "biochemical",
+        "distortion",
+        "energy",
+        "ignoreMeleeDamage",
+        "physical",
+        "sourceType",
+        "stun",
+        "thermal"
       ],
       "type": "object"
     },
@@ -31682,6 +31962,26 @@
       ],
       "type": "object"
     },
+    "PingProperties": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "cooldownTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "cooldownTime",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "PlanetAudioRtpc": {
       "description": "The authored audio RTPC identifier.",
       "properties": {
@@ -35271,6 +35571,30 @@
       "required": [
         "negativeTags",
         "positiveTags"
+      ],
+      "type": "object"
+    },
+    "RadiationResistance": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "maximumRadiationCapacity": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "radiationDissipationRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "maximumRadiationCapacity",
+        "radiationDissipationRate",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -43526,6 +43850,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/AdditionalProjectiles"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfAimAssist": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/AimAssist"
               }
             }
           }
@@ -73358,6 +73812,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfFlight": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/Flight"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfFragments": {
       "allOf": [
         {
@@ -87008,6 +87592,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfMacroBody": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/MacroBody"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfMaelstromEvent": {
       "allOf": [
         {
@@ -93805,6 +94519,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/PhysicalEntryRef"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfPingProperties": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/PingProperties"
               }
             }
           }
@@ -100695,6 +101539,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/RadarTagTerm"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfRadiationResistance": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/RadiationResistance"
               }
             }
           }
@@ -113211,6 +114185,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfTemperatureResistance": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/TemperatureResistance"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfTemplateVocabulary": {
       "allOf": [
         {
@@ -117495,6 +118599,42 @@
       ],
       "type": "object"
     },
+    "SuitArmor": {
+      "description": "One original suit armor component with its resistance definition link.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "damageResistance": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "integrityMilestoneToBreak": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "ownerGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "ownerRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "componentOrdinal",
+        "damageResistance",
+        "integrityMilestoneToBreak",
+        "ownerGuid",
+        "ownerRecordIndex",
+        "sourceType"
+      ],
+      "type": "object"
+    },
     "SunShadowMode": {
       "oneOf": [
         {
@@ -117969,6 +119109,30 @@
         "signatureCategories",
         "signatures",
         "tagToMatch"
+      ],
+      "type": "object"
+    },
+    "TemperatureResistance": {
+      "description": "Concrete source type and the original members outside its typed fields.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "maxResistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "minResistance": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "maxResistance",
+        "minResistance",
+        "sourceType"
       ],
       "type": "object"
     },

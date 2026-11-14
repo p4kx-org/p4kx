@@ -3,6 +3,9 @@
 
 //! The armour, clothing, radar, tractor beam and attachment stat blocks of the P4KX catalog.
 
+#[path = "catalog_gear_configurations.rs"]
+mod configurations;
+
 use crate::gear_fixture;
 
 use std::error::Error;

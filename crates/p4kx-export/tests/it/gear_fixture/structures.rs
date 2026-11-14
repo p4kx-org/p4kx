@@ -32,7 +32,11 @@ fn worn() -> Vec<TestStruct> {
         TestStruct::new("SItemDefinition").field("Type", TestType::Enum("EItemType".to_owned())),
         component("SCItemSuitArmorParams")
             .field("integrityMilestoneToBreak", TestType::Single)
-            .field("damageResistance", TestType::Reference),
+            .field(
+                "damageResistance",
+                TestType::ReferenceTo("DamageResistanceMacro".to_owned()),
+            )
+            .field("protectedBodyParts", TestType::UInt32),
         TestStruct::new("DamageResistanceMacro")
             .field("damageResistance", class("DamageResistance")),
         TestStruct::new("DamageResistance")
@@ -44,27 +48,37 @@ fn worn() -> Vec<TestStruct> {
             &["Multiplier", "Threshold", "DamageCap", "DamageCapLimit"],
         ),
         component("SCItemClothingParams")
-            .field("TemperatureResistance", class("ClothingTemperature"))
-            .field("RadiationResistance", class("ClothingRadiation"))
-            .field("Flight", class("ClothingFlight")),
-        singles("ClothingTemperature", &["MinResistance", "MaxResistance"]),
+            .field(
+                "TemperatureResistance",
+                class("SCItemClothingTemperatureResistanceParams"),
+            )
+            .field(
+                "RadiationResistance",
+                class("SCItemClothingRadiationResistanceParams"),
+            )
+            .field("Flight", class("SCItemClothingFlightParams")),
         singles(
-            "ClothingRadiation",
+            "SCItemClothingTemperatureResistanceParams",
+            &["MinResistance", "MaxResistance"],
+        ),
+        singles(
+            "SCItemClothingRadiationResistanceParams",
             &["MaximumRadiationCapacity", "RadiationDissipationRate"],
         ),
-        singles("ClothingFlight", &["gForceResistance"]),
+        singles("SCItemClothingFlightParams", &["gForceResistance"]),
         component("SCItemRadarComponentParams")
-            .field("aimAssist", class("RadarAimAssist"))
-            .field("pingProperties", class("RadarPing")),
+            .field("forceActiveAIControlled", TestType::Bool)
+            .field("aimAssist", class("SRadarAimAssistData"))
+            .field("pingProperties", class("SCItemRadarPingProperties")),
         singles(
-            "RadarAimAssist",
+            "SRadarAimAssistData",
             &[
                 "distanceMinAssignment",
                 "distanceMaxAssignment",
                 "outsideRangeBufferDistance",
             ],
         ),
-        singles("RadarPing", &["cooldownTime"]),
+        singles("SCItemRadarPingProperties", &["cooldownTime"]),
     ]
 }
 

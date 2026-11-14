@@ -42,11 +42,15 @@ mod jump_point;
 mod jump_point_globals;
 #[path = "loot_generation_component.rs"]
 mod loot_generation_component;
+#[path = "worn_gear_tables.rs"]
+mod worn_gear;
 
 use flight_configuration_tables::FlightConfigurationTables;
 use hackable_configuration::HackableConfiguration;
 use jump_point::JumpPointConfiguration;
 use jump_point_globals::GlobalJumpConfiguration;
+pub(crate) use worn_gear::DamageResistanceMacro;
+use worn_gear::WornGearTables;
 
 /// Independently scoped configurations with their physical owners.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -68,6 +72,8 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     jump_drive_definitions: JumpDriveDefinitions<'source>,
     jump_point_configurations: CatalogTable<JumpPointConfiguration<'source>>,
     global_jump_point_configurations: CatalogTable<GlobalJumpConfiguration<'source>>,
+    #[serde(flatten)]
+    worn_gear: WornGearTables<'source>,
 }
 
 pub(crate) struct IndependentConfigurations<'source> {
@@ -75,6 +81,7 @@ pub(crate) struct IndependentConfigurations<'source> {
     pub(crate) weapon_action_recoil_definitions:
         CatalogTable<WeaponActionRecoilDefinition<'source>>,
     pub(crate) weapon_procedural: WeaponProceduralTables<'source>,
+    pub(crate) damage_resistance_macros: CatalogTable<DamageResistanceMacro<'source>>,
     pub(crate) recovery_numbers: Vec<CapturedNumber>,
     pub(crate) configuration_numbers: Vec<CapturedNumber>,
 }
@@ -116,6 +123,8 @@ pub(crate) fn read<'source>(
     let loot_generation = components.table(LOOT_GENERATION, LootGenerationComponent::read)?;
     let hackable_devices = components.table(HACKABLE_DEVICES, HackableConfiguration::read)?;
     let jump_points = components.jump_points(jump_owners)?;
+    let worn_gear = WornGearTables::read(&mut components)?;
+    let damage_resistance_macros = worn_gear.resistance_macros(&mut components)?;
     Ok(IndependentConfigurations {
         tables: IndependentConfigurationTables {
             item_recovery_economy,
@@ -131,8 +140,10 @@ pub(crate) fn read<'source>(
             jump_drive_definitions,
             jump_point_configurations: jump_points.local,
             global_jump_point_configurations: jump_points.global,
+            worn_gear,
         },
         weapon_action_recoil_definitions,
+        damage_resistance_macros,
         weapon_procedural,
         recovery_numbers,
         configuration_numbers,

@@ -32,6 +32,10 @@ pub(crate) enum ConfigurationInspection {
     Ifcs,
     Thruster,
     HackableDevice,
+    SuitArmor,
+    Clothing,
+    ItemRadar,
+    DamageResistanceMacro,
 }
 
 /// Inspection of the canonical values relevant to one source scope.

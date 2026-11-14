@@ -27,7 +27,7 @@ mod initial_damage;
 #[path = "durability_lifecycle.rs"]
 mod lifecycle;
 #[path = "durability_resistance.rs"]
-mod resistance;
+pub(in crate::catalog_v3) mod resistance;
 #[path = "durability_wear.rs"]
 mod wear;
 

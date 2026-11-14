@@ -89,12 +89,12 @@ fn entry(multiplier: f32, threshold: f32) -> TestValue {
     )
 }
 
-fn resistance_record() -> TestRecord {
+fn resistance_record(path: &str, physical_multiplier: f32) -> TestRecord {
     TestRecord::new(
         RESISTANCE,
         "DamageResistanceMacro",
         "DamageResistanceMacro.HeavyArmor",
-        "libs/foundry/records/damage/heavyarmor.xml",
+        path,
     )
     .value(
         "damageResistance",
@@ -102,7 +102,10 @@ fn resistance_record() -> TestRecord {
             "DamageResistance",
             vec![
                 ("IgnoreMeleeDamage".to_owned(), TestValue::Bool(false)),
-                ("PhysicalResistance".to_owned(), entry(0.6, 0.0)),
+                (
+                    "PhysicalResistance".to_owned(),
+                    entry(physical_multiplier, 0.0),
+                ),
                 ("EnergyResistance".to_owned(), entry(0.75, 2.0)),
             ],
         ),
@@ -115,6 +118,7 @@ fn armor(link: u128) -> TestValue {
         vec![
             single("integrityMilestoneToBreak", 0.1),
             ("damageResistance".to_owned(), TestValue::Reference(link)),
+            ("protectedBodyParts".to_owned(), TestValue::UInt32(32)),
         ],
     )
 }
@@ -126,14 +130,14 @@ fn clothing() -> TestValue {
             (
                 "TemperatureResistance".to_owned(),
                 singles_of(
-                    "ClothingTemperature",
+                    "SCItemClothingTemperatureResistanceParams",
                     &[("MinResistance", -70.0), ("MaxResistance", 100.0)],
                 ),
             ),
             (
                 "RadiationResistance".to_owned(),
                 singles_of(
-                    "ClothingRadiation",
+                    "SCItemClothingRadiationResistanceParams",
                     &[
                         ("MaximumRadiationCapacity", 26_800.0),
                         ("RadiationDissipationRate", 145.8),
@@ -142,7 +146,7 @@ fn clothing() -> TestValue {
             ),
             (
                 "Flight".to_owned(),
-                singles_of("ClothingFlight", &[("gForceResistance", -0.5)]),
+                singles_of("SCItemClothingFlightParams", &[("gForceResistance", -0.5)]),
             ),
         ],
     )
@@ -152,10 +156,11 @@ fn radar() -> TestValue {
     instance(
         "SCItemRadarComponentParams",
         vec![
+            ("forceActiveAIControlled".to_owned(), TestValue::Bool(true)),
             (
                 "aimAssist".to_owned(),
                 singles_of(
-                    "RadarAimAssist",
+                    "SRadarAimAssistData",
                     &[
                         ("distanceMinAssignment", 780.0),
                         ("distanceMaxAssignment", 1028.5),
@@ -165,7 +170,7 @@ fn radar() -> TestValue {
             ),
             (
                 "pingProperties".to_owned(),
-                singles_of("RadarPing", &[("cooldownTime", 2.5)]),
+                singles_of("SCItemRadarPingProperties", &[("cooldownTime", 2.5)]),
             ),
         ],
     )
@@ -305,7 +310,7 @@ fn modifiers(salvage: bool) -> TestValue {
 
 fn records() -> Vec<TestRecord> {
     let mut records = vec![
-        resistance_record(),
+        resistance_record("libs/foundry/records/damage/heavyarmor.xml", 0.6),
         entity(ARMOR, "armor", "Char_Armor_Torso", vec![armor(RESISTANCE)]),
         entity(
             ARMOR_DANGLING,
@@ -338,6 +343,10 @@ fn records() -> Vec<TestRecord> {
         ),
     ];
     records.extend(mining::records());
+    records.push(resistance_record(
+        "libs/foundry/records/damage/duplicate_heavyarmor.xml",
+        0.25,
+    ));
     records
 }
 
