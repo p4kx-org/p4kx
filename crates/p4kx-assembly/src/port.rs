@@ -33,8 +33,8 @@ impl PortDefinition {
         self.position
     }
 
-    /// Returns whether the item keeps its own orientation and takes only the translation of the
-    /// port (`constraintParams.noRotation` of an entity attachment), as gimbals and turrets do.
+    /// Returns the authored entity attachment flag `constraintParams.noRotation`.
+    /// Static placement applies the complete helper transform.
     #[must_use]
     pub const fn no_rotation(&self) -> bool {
         self.no_rotation

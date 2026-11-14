@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! A port definition carries the data placement and fit need: the tags, the detach direction and
 //! whether the item keeps its own orientation.
 
 use std::error::Error;
 
-use p4kx_assembly::{EntityNode, LoadoutResolver, PortDefinition};
+use p4kx_assembly::{EntityNode, LoadoutResolver, Placement, PortDefinition};
 use p4kx_dataforge::DataForge;
-use p4kx_testkit::{DataForgeBuilder, TestEntity, TestPort, entity_schema};
+use p4kx_extraction::Archive;
+use p4kx_testkit::{
+    DataForgeBuilder, TestEntity, TestEntry, TestModel, TestNode, TestPort, entity_schema,
+};
+
+use crate::assembly_support::{assemble, fixture};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -35,7 +39,7 @@ fn definition<'n>(node: &'n EntityNode, port: &str) -> Result<&'n PortDefinition
 }
 
 #[test]
-fn a_gimbal_port_keeps_its_orientation_and_a_plain_port_does_not() -> TestResult {
+fn the_entity_attachment_flag_is_read_as_stored() -> TestResult {
     let ship = resolve(vec![
         TestPort::new("gimbal").entity_attachment(true),
         TestPort::new("fixed").entity_attachment(false),
@@ -71,5 +75,61 @@ fn the_tags_of_a_port_are_read_as_stored() -> TestResult {
     let rack = definition(&ship, "rack")?;
     assert_eq!(rack.port_tags(), "Missile Rack");
     assert_eq!(rack.required_tags(), "$Paint_Base");
+    Ok(())
+}
+
+#[test]
+fn a_static_attachment_with_no_rotation_takes_the_rotated_port_node() -> TestResult {
+    let fuse_guid = 2;
+    let relay = TestEntity::new(1, "TEST_Relay", "entities/test_relay.xml")
+        .geometry("objects/test/relay.cgf", None)
+        .port(
+            TestPort::new("slot")
+                .entity_attachment(true)
+                .default_item(fuse_guid),
+        );
+    let fuse = TestEntity::new(fuse_guid, "TEST_Fuse", "entities/test_fuse.xml")
+        .geometry("objects/test/fuse.cgf", None);
+    let forge = entity_schema(DataForgeBuilder::new())
+        .record(relay.record())
+        .record(fuse.record())
+        .build();
+    let relay_model = TestModel::cube()
+        .with_nodes(vec![TestNode {
+            name: "slot".into(),
+            parent: None,
+            local: [
+                [0.0, -1.0, 0.0, 2.0],
+                [1.0, 0.0, 0.0, 3.0],
+                [0.0, 0.0, 1.0, 4.0],
+            ],
+            kind: 2,
+        }])
+        .helpers_only();
+    let fixture = fixture(vec![
+        TestEntry::stored("Data/Game2.dcb", forge),
+        TestEntry::stored("Data/objects/test/relay.cgf", relay_model.cgf()),
+        TestEntry::stored("Data/objects/test/fuse.cgf", TestModel::cube().cgf()),
+        TestEntry::stored("Data/objects/test/fuse.cgfm", TestModel::cube().cgfm()),
+    ])?;
+    let archive = Archive::open(&fixture.path)?;
+    let assembly = assemble(&archive, "TEST_Relay", 0)?;
+    let attached = assembly
+        .part_at("slot")
+        .ok_or("attached fuse at static slot")?;
+    assert_eq!(
+        attached.placement(),
+        &Placement::PortNode,
+        "the model's slot node supplies the placement"
+    );
+    assert_eq!(
+        attached.world().rows,
+        [
+            [0.0, -1.0, 0.0, 2.0],
+            [1.0, 0.0, 0.0, 3.0],
+            [0.0, 0.0, 1.0, 4.0],
+        ],
+        "the static fuse takes the complete authored slot transform"
+    );
     Ok(())
 }
