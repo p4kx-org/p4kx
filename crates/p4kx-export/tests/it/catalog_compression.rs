@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The Basetool catalog written as plain JSON or as a zstd frame, through the public API.
+//! The P4KX catalog written as plain JSON or as a zstd frame, through the public API.
 
 use std::error::Error;
 use std::fs;
@@ -80,7 +80,7 @@ pub(crate) fn options() -> CatalogOptions<'static> {
 
 #[test]
 fn a_path_ending_in_zst_selects_zstd_and_any_other_path_plain_json() {
-    let zstd = Compression::for_path(Path::new("out/basetool-catalog.json.zst"));
+    let zstd = Compression::for_path(Path::new("out/p4kx-catalog.json.zst"));
     let upper = Compression::for_path(Path::new("CATALOG.JSON.ZST"));
     assert_eq!(zstd, Compression::ZSTD, "json.zst");
     assert_eq!(upper, Compression::ZSTD, "case is ignored");

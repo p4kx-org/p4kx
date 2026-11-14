@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The crafting fields of the Basetool catalog of a real Archive: tiers, selections, quantity
+//! The crafting fields of the P4KX catalog of a real Archive: tiers, selections, quantity
 //! multipliers, quality modifiers, pools with their reward sources, quality distributions and
 //! dismantle returns; runs with `--ignored` when `P4KX_DATA_P4K` names one. No blueprint of a
 //! real Archive has several tiers yet (checked on LIVE, PTU, EPTU, TECH-PREVIEW and HOTFIX), so

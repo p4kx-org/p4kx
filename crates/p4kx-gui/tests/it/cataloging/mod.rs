@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Helpers of the Basetool catalog tests: a synthetic Archive with manufacturers and their
+//! Helpers of the P4KX catalog tests: a synthetic Archive with manufacturers and their
 //! texts, opened headless.
 
 mod resource_fixture;
@@ -221,7 +221,7 @@ pub(crate) fn opened(
     Ok((dir, model, out))
 }
 
-/// Waits until the Basetool catalog is building, where a hold of the model keeps it.
+/// Waits until the P4KX catalog is building, where a hold of the model keeps it.
 pub(crate) fn building(model: &mut Model) -> TestResult {
     wait_until(model, |model| {
         model.catalog().is_some_and(|run| {
@@ -252,7 +252,7 @@ pub(crate) fn wait_until(model: &mut Model, done: impl Fn(&Model) -> bool) -> Te
     Ok(())
 }
 
-/// Waits until the Basetool catalog ended and returns where it stands.
+/// Waits until the P4KX catalog ended and returns where it stands.
 pub(crate) fn ended(model: &mut Model) -> Result<CatalogExportStatus<'_>, Box<dyn Error>> {
     wait_until(model, |model| {
         model.catalog().is_some_and(|run| !run.is_running())
@@ -260,7 +260,7 @@ pub(crate) fn ended(model: &mut Model) -> Result<CatalogExportStatus<'_>, Box<dy
     model
         .catalog()
         .map(CatalogExport::status)
-        .ok_or_else(|| "no Basetool catalog".into())
+        .ok_or_else(|| "no P4KX catalog".into())
 }
 
 /// Returns the names of the files in `dir`, sorted.

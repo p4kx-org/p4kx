@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The contract facts in the Basetool catalog: time to complete, buy-in, sharing, legality,
+//! The contract facts in the P4KX catalog: time to complete, buy-in, sharing, legality,
 //! availability and the required intro contracts.
 
 use std::error::Error;

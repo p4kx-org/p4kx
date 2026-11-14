@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Direct product-wire and Basetool consumer checks for the complete resource family.
+//! Direct wire and consumer checks for the complete resource family.
 
 #[path = "catalog_resource_language_origin.rs"]
 mod language_origin;
@@ -38,7 +38,7 @@ fn text_row<'a>(catalog: &'a Value, domain: &str, key: &str) -> TestResult<&'a V
 }
 
 #[test]
-fn basetool_classifies_each_value_without_reconstructing_provenance() -> TestResult {
+fn a_consumer_classifies_each_value_without_reconstructing_provenance() -> TestResult {
     let (_directory, archive) = fixture::open(fixture::database(2.5).build(), false)?;
     let built = build_catalog(&archive, &fixture::options())?;
     let catalog: Value = serde_json::from_slice(built.json())?;

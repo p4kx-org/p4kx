@@ -58,7 +58,7 @@ values, if any, `p4kx` computes.
 - **Facts, no game text.** A stat block holds numbers, struct names and enum names. None carries
   `x-gameText`, and none is a description. The identifier `name` of a fire mode is a debug name
   of the DataForge, not a game text.
-- **Sources.** Each field's source path is in `docs/basetool-catalog.md`. The catalog leaves out
+- **Sources.** Each field's source path is in `docs/catalog.md`. The catalog leaves out
   the per-value file and field of `p4kx ships`; the table is the audit trail.
 - **Ammunition is followed once.** A weapon's ammunition is the `AmmoParams` Record that its
   `SAmmoContainerComponentParams` links to. It is read while the weapon is scanned; a dangling

@@ -1265,10 +1265,10 @@ another type, failed or a development leftover; a Reference to a GUID no Record 
 
 `store_slugs` counts the curated RSI store slugs against the ships of the catalog and lists the
 `stale` ones whose mapping no longer holds; `stale_check_skipped` is `true` and `stale` empty when slugs are
-mapped but none resolves, as for an Archive that is not the game's ([basetool-catalog.md](basetool-catalog.md), "Ship store
+mapped but none resolves, as for an Archive that is not the game's ([catalog.md](catalog.md), "Ship store
 slugs").
 
-The catalog itself goes to `out` ([basetool-catalog.md](basetool-catalog.md)); a name ending in
+The catalog itself goes to `out` ([catalog.md](catalog.md)); a name ending in
 `.zst` writes a zstd frame, and a name ending in `.gz` is refused with exit code 2 before anything is
 written. `size` is the size of the JSON in bytes, uncompressed;
 `compressed_size` is the size of the file written when it is compressed and `null` otherwise.

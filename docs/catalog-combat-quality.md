@@ -52,7 +52,7 @@ Factory equipment uses the unmodified base inputs and evaluates without a recipe
 Resolve each active `costs[].context.modifiers[]` through its original
 `gameplayPropertyRecord` Reference. Join the physical `targetRecordIndex.value` from its source
 arena to `definitions.gameplayProperties.rows[].recordIndex.value`. Use the reviewed
-[property mapping](basetool-catalog.md#item-stats) and its item applicability. In particular,
+[property mapping](catalog.md#item-stats) and its item applicability. In particular,
 shield max health maps to the selected shield generator, projectile damage follows selected
 direct-hit `DamageInfo` channels, and the reviewed weapon fire-rate map currently demonstrates
 personal weapon applicability. A consumer needs evidence to extend that map to other equipment.
@@ -184,5 +184,5 @@ from the tier and source arena. Derive saved quality keys from original position
 The new weapon factory projection is an additional v3 dataset. Join its physical owner and
 mode to the typed action and ammo rows for authored inputs and definitive source uses.
 v3 uses per-value encryption and completeness markers so each result can be filtered
-independently. See the [v3 catalog layout](basetool-catalog.md), [Blueprint contract](catalog-blueprints.md)
+independently. See the [v3 catalog layout](catalog.md), [Blueprint contract](catalog-blueprints.md)
 and [formula and projection ADR](adr/0388-versioned-crafting-quality-and-weapon-base-values.md).

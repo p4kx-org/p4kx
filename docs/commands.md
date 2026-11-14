@@ -452,7 +452,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `--source` select the JSONL record, common reference and retained-source schemas.
 - `p4kx catalog <archive> --out <file> [--filter <filter>] [--diagnostic-partial]
   [--exported-at <seconds>]` writes the
-  Basetool catalog for the basetool's P4K import ([docs/basetool-catalog.md](basetool-catalog.md)):
+  P4KX catalog ([docs/catalog.md](catalog.md)):
   schema version (3), Channel and Build, Filter selection scope per kind, read/projection health
   and the kinds of the catalog:
   manufacturers, items (with their item class), ships and ground vehicles, commodities, crafting
@@ -467,9 +467,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   taxonomy complete and marks the owning Entity selection scope partial independently of
   read/projection health. It prints the counts per
   kind, the item classes read and the unresolved texts per language and warns when the catalog
-  nears or exceeds the 64 MB upload limit. An `--out` name ending in `.zst` writes the catalog as
-  one zstd frame (level 19, content size declared, plain `zstd -d` decodes it), a fraction of the size, which the Basetool accepts as
-  it does plain JSON. A read/projection failure or a source warning that makes the export incomplete
+  nears or exceeds the transfer or decoded-size reference thresholds. An `--out` name ending in
+  `.zst` writes the catalog as one zstd frame with content size declared. Plain `zstd -d` decodes
+  it. A read/projection failure or a source warning that makes the export incomplete
   refuses normal publication with exit code 1, before creating or replacing the destination.
   `--diagnostic-partial` explicitly permits writing the diagnostic result, marks its publication
   mode in the file and CLI status, and still exits with 1 when incomplete. Each invocation must

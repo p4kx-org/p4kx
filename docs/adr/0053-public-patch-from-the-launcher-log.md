@@ -16,7 +16,7 @@ line. The `P4KX_LAUNCHER_LOGS` environment variable names another log folder, as
 
 Only the two log files are read, as in ADR-0005; the settings store, `loginData.json` and every other
 launcher file stay unopened. The catalog gains `source.build.publicPatch` while schema version 1 is
-still open (`docs/basetool-catalog.md`).
+still open (`docs/catalog.md`).
 
 ## Considered Options
 

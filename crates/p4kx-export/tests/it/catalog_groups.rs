@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Resource groups and blueprint categories of the Basetool catalog, through the public API.
+//! Resource groups and blueprint categories of the P4KX catalog, through the public API.
 
 use crate::catalog_crafting_support::commodity::{self, TextDomain};
 use crate::catalog_crafting_support::{blueprint_categories, groups};

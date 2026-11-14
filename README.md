@@ -72,17 +72,17 @@ Copyright (c) 2026 the P4KX contributors
 - **Blender package.** Writes an Entity (a creature as one skinned rig), an Interior or a Character
   as a folder (`scene.json`, GLB parts, textures) that the Blender add-on imports with node-tree
   materials for layered surfaces, glass, stencil decals and liveries.
-- **Basetool catalog and ship base data.** Writes the versioned JSON catalog of manufacturers,
+- **P4KX catalog and ship base data.** Writes the versioned JSON catalog of manufacturers,
   items, ships, commodities, blueprints, loadouts, paints, shops, the starmap, contracts with their
-  templates, broker entries, spawns and hauling orders, reputation, mining, refining and loot that
-  the Basetool imports, and the base data of every ship.
+  templates, broker entries, spawns and hauling orders, reputation, mining, refining and loot.
+  Also exports the base data of every ship.
 
 ## The window
 
 `p4kx-gui` has the tabs **Browse**, **Comparison**, **Query**, **Localisation**, **Tags**,
 **Search**, **Entities**, **Sounds**, **Characters** and **UI**, a sidebar with the detected
 Channels and an Export menu. It previews text, hex, textures, models, sounds and Records, runs
-Queries, exports Records and the Basetool catalog, converts a folder of extracted files, opens a
+Queries, exports Records and the P4KX catalog, converts a folder of extracted files, opens a
 `Game2.dcb` on its own, and fits down to a window of 640 by 400 points. On Windows its 3D view
 opens Direct3D 12 first and falls back to the default backends; `WGPU_BACKEND` overrides that.
 The look is P4KX's own dark theme, and the language is German or British English. See
@@ -195,7 +195,7 @@ P4KX only reads the game folders and refuses to write into a Star Citizen instal
 | Commands and the MCP server | [docs/commands.md](docs/commands.md), [docs/cli-json.md](docs/cli-json.md) |
 | Queries | [docs/query.md](docs/query.md) |
 | Record formats | [docs/record-xml.md](docs/record-xml.md), [docs/record-json.md](docs/record-json.md), [docs/record-flat.md](docs/record-flat.md) |
-| Basetool catalog and ship base data | [docs/basetool-catalog.md](docs/basetool-catalog.md), [docs/ship-base-data.md](docs/ship-base-data.md) |
+| P4KX catalog and ship base data | [docs/catalog.md](docs/catalog.md), [docs/ship-base-data.md](docs/ship-base-data.md) |
 | Blender package | [docs/blender-package.md](docs/blender-package.md) |
 | Plan and decisions | [docs/ROADMAP.md](docs/ROADMAP.md), [docs/adr/](docs/adr/) |
 | The terms used | [CONTEXT.md](CONTEXT.md) |

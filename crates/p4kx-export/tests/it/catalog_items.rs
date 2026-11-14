@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Items and ships in the Basetool catalog: selection, fields and item class, through the public
+//! Items and ships in the P4KX catalog: selection, fields and item class, through the public
 //! API.
 
 use crate::catalog_fixture;

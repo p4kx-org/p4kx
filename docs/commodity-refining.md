@@ -62,7 +62,7 @@ number near it is a `refiningQualityUnitMultiplier` on one Record. Refinery yiel
 
 Third-party databases list refinery yield profiles per station: an ore mapped to a signed integer
 bonus, with one profile shared by several refineries. The LIVE Archive 4.10.197 holds no such
-table, and the Basetool catalog carries none. Only the LIVE channel was searched; the other
+table, and the P4KX catalog carries none. Only the LIVE channel was searched; the other
 channels were not. Result: none found. What was searched, with the commands (`<Data.p4k>` is the
 LIVE `Data.p4k`):
 

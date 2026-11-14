@@ -31,7 +31,7 @@ broker entries, spawn descriptions, reputation, mining, refining, harvesting, lo
 the starmap. These are not new export proposals.
 Sources: [selection](../crates/p4kx-export/src/selection.rs#L159),
 [catalog contract](../crates/p4kx-export/src/contract.rs#L60),
-[catalog documentation](basetool-catalog.md).
+[catalog documentation](catalog.md).
 
 There are two different coverage questions:
 
@@ -70,8 +70,8 @@ Evidence:
    [summary controls the exit code](../crates/p4kx/src/catalog.rs#L61).
    The [GUI job](../crates/p4kx-gui/src/catalog_export/job.rs#L271) also commits the artifact
    without a successful-summary gate.
-4. The [general guarantee](basetool-catalog.md#shape) and the explicit failure behavior
-   are documented in `docs/basetool-catalog.md` at lines 200 and 2528.
+4. The [general guarantee](catalog.md#shape) and the explicit failure behavior
+   are documented in `docs/catalog.md` at lines 200 and 2528.
    [ADR-0320](adr/0320-mission-broker-entries-are-a-catalog-kind-selected-by-their-struct-and-an-unknown-struct-fails-the-record.md#consequences)
    expressly requires consumers to check the separate failures.
 
@@ -79,7 +79,7 @@ Recommended follow-up: define an artifact-carried `exportHealth` with per-kind r
 failed GUIDs and relevant warnings, and update the consumer to require it before removal
 detection. Adding metadata is compatible with schema v2, but old consumers ignore new fields.
 A changed completeness meaning or stronger mandatory import guarantee needs a coordinated
-schema version change under [ADR-0054](adr/0054-the-basetool-catalog-grows-additively-within-version-1.md).
+schema version change under [ADR-0054](adr/0054-the-p4kx-catalog-grows-additively-within-version-1.md).
 Consider keeping the normal target file unchanged on partial failure and writing diagnostic
 partial exports only through an explicit workflow. Do not silently change existing semantics.
 
@@ -155,7 +155,7 @@ These are distinct from another generic Record dump.
 | Food/medical/consumable effects | The generator contains [Food](https://github.com/octfx/ScDataDumper/blob/120a728639bdd1b06525a0f8574cb0e91d0fbf8d/src/Formats/ScUnpacked/Food.php) and [Medical](https://github.com/octfx/ScDataDumper/blob/120a728639bdd1b06525a0f8574cb0e91d0fbf8d/src/Formats/ScUnpacked/Medical.php) projections. [P4KX coverage](coverage.md) already discovers consumable components, but [ItemStats](../crates/p4kx-export/src/contract_stats.rs#L23) has no corresponding typed block. This candidate still needs representative current-Build Record sampling before a field contract is fixed. |
 
 The inspected 0.4.2 baseline omitted offline shop prices, stock and rental offerings.
-[Catalog v3](basetool-catalog.md#physical-offline-shop-inventories) exports these values
+[Catalog v3](catalog.md#physical-offline-shop-inventories) exports these values
 with their physical source file and offline design-time meaning. Live market prices,
 server stock and rental availability are outside that projection.
 
@@ -164,7 +164,7 @@ server stock and rental availability are outside that projection.
 - **Starmap positions:** [`LoadStarmap.php:397`](https://github.com/octfx/ScDataDumper/blob/120a728639bdd1b06525a0f8574cb0e91d0fbf8d/src/Commands/LoadStarmap.php#L397)
   adds parent and child positions without composing rotations and caps external recursion at
   three levels. P4KX already composes rotations and handles ambiguity; preserve that behavior
-  ([starmap documentation](basetool-catalog.md#starmap-objects)).
+  ([starmap documentation](catalog.md#starmap-objects)).
   Different repeated placements also mean raw entity counts are not comparable to unique GUID counts.
 - **Jump connections:** the generator [pairs endpoint names](https://github.com/octfx/ScDataDumper/blob/120a728639bdd1b06525a0f8574cb0e91d0fbf8d/src/Commands/LoadStarmap.php#L539)
   with a regular expression and normalizes a global fuel parameter. This is not proof of a stored

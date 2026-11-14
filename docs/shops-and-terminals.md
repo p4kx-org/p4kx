@@ -2,7 +2,7 @@
 
 The archive findings below record the [#398](https://github.com/p4kx-org/p4kx/issues/398) spike on
 LIVE Build 4.10.197. The current export is described in the
-[catalog v3 inventory contract](basetool-catalog.md#physical-offline-shop-inventories).
+[catalog v3 inventory contract](catalog.md#physical-offline-shop-inventories).
 Live prices, stock and demand remain server-side. UEX IDs are outside the catalog.
 
 ## Short answer from the spike

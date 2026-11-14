@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Paints and the ships they fit in the Basetool catalog, through the public API.
+//! Paints and the ships they fit in the P4KX catalog, through the public API.
 
 use crate::paints_fixture;
 

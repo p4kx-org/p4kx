@@ -23,7 +23,7 @@ asks whether that belongs in the Basetool catalog or in a command of its own.
   catalog resolves what the Archive states (string-hash and organisation properties, with the
   organisation's tagged string variant) and writes what the game picks at mission start as
   `[LOCATION]`, `[TARGET]` or `[SHIP]`. The placeholders are the catalog's convention, documented
-  in `docs/basetool-catalog.md`; an unresolvable token becomes `[TOKEN]`. The title and the mission
+  in `docs/catalog.md`; an unresolvable token becomes `[TOKEN]`. The title and the mission
   name are game text (`x-gameText`).
 - **Reputation is listed, not summed.** `reputationGains` has one entry per amount of the results
   that fire on success (first `missionResults` entry set), with the faction and scope Records and the
@@ -34,7 +34,7 @@ asks whether that belongs in the Basetool catalog or in a command of its own.
 
 ## Consequences
 
-- The Rust types, the schema and `docs/basetool-catalog.md` change in one commit; version 1 stays.
+- The Rust types, the schema and `docs/catalog.md` change in one commit; version 1 stays.
 - Pickup places are the starmap objects of the locality and location prerequisites, system first,
   then planets and moons, stars left out, at most five; they need the starmap kind in the same
   build. They are the one exception to "the first level that states a value wins": the

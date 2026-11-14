@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! Factions, reputation, mission types, localities, scenarios and the standing of contracts in the
-//! Basetool catalog of a real Archive; runs with `--ignored` when `P4KX_DATA_P4K` names one.
+//! P4KX catalog of a real Archive; runs with `--ignored` when `P4KX_DATA_P4K` names one.
 
 use std::collections::HashSet;
 use std::error::Error;

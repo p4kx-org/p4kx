@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The description of contracts in the Basetool catalog.
+//! The description of contracts in the P4KX catalog.
 
 use crate::catalog_contracts::{A, C, E, TestResult, build, entry, v3};
 

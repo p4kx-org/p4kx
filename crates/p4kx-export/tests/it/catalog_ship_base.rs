@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The ship base data in the `ships` kind of the Basetool catalog, through the public API.
+//! The ship base data in the `ships` kind of the P4KX catalog, through the public API.
 
 use crate::ship_base_fixture::{
     ALPHA, BETA, BROKEN, CAR, DISPLAY, GROUND, GUN_DISPLAY, HUGE, MIXED, ROLLING, TEMP, UNKNOWN,

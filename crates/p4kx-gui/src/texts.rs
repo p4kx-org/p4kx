@@ -276,7 +276,7 @@ pub enum Text {
     Container(ContainerText),
     /// A text of the Export menu and the Record export windows.
     RecordExport(RecordExportText),
-    /// A text of the Basetool catalog windows.
+    /// A text of the P4KX catalog windows.
     Catalog(CatalogText),
     /// A text of the Record preview.
     Record(RecordText),

@@ -10,7 +10,7 @@ use crate::guid_text::CatalogGuid;
 use crate::item_variant::ItemKey;
 use crate::{Playability, VariantCounts, VariantSummary};
 
-/// What the ships of one variant group share (`docs/basetool-catalog.md`): the vehicle
+/// What the ships of one variant group share (`docs/catalog.md`): the vehicle
 /// definition path, compared without regard to case and separator, and the digest of the vehicle
 /// implementation after the Modification.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

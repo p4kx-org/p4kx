@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Ship spawns, location queries and location templates in the Basetool catalog.
+//! Ship spawns, location queries and location templates in the P4KX catalog.
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};

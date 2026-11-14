@@ -256,16 +256,15 @@ Records written, skipped, failed and cancelled, the Records with error values an
 and the target, then lists failed Records with the reason. A cancelled NDJSON export keeps no
 partial file.
 
-### Creating the Basetool catalog
+### Creating the P4KX catalog
 
-**Export › Basetool catalog…** writes the Basetool catalog of the open Archive (see
-[basetool-catalog.md](basetool-catalog.md)), the same file as `p4kx catalog`. It is offered while
+**Export › P4KX catalog…** writes the P4KX catalog of the open Archive (see
+[catalog.md](catalog.md)), the same file as `p4kx catalog`. It is offered while
 the open Archive holds DataForge that did not fail to load, and while no other catalog is being
-created. Choose the file in the save dialog, `basetool-catalog.json.zst` by default; an existing
+created. Choose the file in the save dialog, `p4kx-catalog.json.zst` by default; an existing
 file is replaced. The open Archive itself is refused as the target. The file name decides the form,
 not the file type selected in the dialog, which no system reports back: a name ending in `.zst`
-writes the catalog as one zstd frame, a fraction of the size, which the Basetool accepts as it does
-plain JSON; a name ending in `.json` writes plain JSON for inspection. The name is corrected after
+writes the catalog as one zstd frame. A name ending in `.json` writes plain JSON. The name is corrected after
 the dialog: `foo.zst` becomes `foo.json.zst`, and a doubled `.json` that a dialog appended is
 collapsed. A name ending in `.gz` is refused with a message, because gzip is not written. The summary
 shows the compressed and the uncompressed size, so it tells which form was written.
@@ -274,14 +273,13 @@ The catalog is created in the background with a progress window; DataForge alrea
 Record tree, a Query or a Record export is reused, and the other way round. **Cancel** stops it at once and writes no file; an
 existing file stays as it was. The summary shows export health separately from each kind's selection
 scope, then the entities written, the Records left out as development leftovers, per language the texts resolved,
-missing and placeholders, the size against the basetool upload limit of 64 MB and the file. A
-catalog close to the upload limit gets a warning, one over it an error note, because the basetool
-rejects it. A read/projection failure or a source warning that makes the export incomplete refuses
+missing and placeholders, the file and its size. The size notices compare stored and decoded bytes
+with reference thresholds. A read/projection failure or a source warning that makes the export incomplete refuses
 normal publication. The window explains the refusal and leaves any existing file intact.
 Both outcomes report failed Archive Entry operations by dataset, reason and count.
 
-**Export › Diagnostic Basetool catalog…** explicitly writes a result for investigation, including
-incomplete data. Its save dialog proposes `basetool-catalog.diagnostic.json.zst`. The progress and
+**Export › Diagnostic P4KX catalog…** explicitly writes a result for investigation, including
+incomplete data. Its save dialog proposes `p4kx-catalog.diagnostic.json.zst`. The progress and
 outcome windows identify the diagnostic job, and the file carries its publication mode and health.
 Unreadable selected Records are listed with their record path, GUID and reason. This permission
 applies only to that job. Check the file's `exportHealth` before importing it; incomplete source
@@ -450,7 +448,7 @@ hologram` draws the hologram of a vehicle, which the window does not offer.
   drop a `Data.p4k` on the window. A DataForge file opens as its DataForge only: no Entry table,
   folder tree or Entry counts, and no Search tab.
 - The **Export** menu holds **Record export…**, **Export as GLB…** for a model, **Export
-  Interior…** and the **Basetool catalog…**.
+  Interior…** and the **P4KX catalog…**.
 - The smallest window is 640 by 400 points. Below 872 points of width the sidebar folds into a
   rail on the left edge; a button on it shows and hides the sidebar. A toolbar that does not fit
   puts its actions in a line of its own, and what still does not fit scrolls.

@@ -12,7 +12,7 @@ use crate::catalog_export::{is_gzip, normalised_catalog_file, refused, refused_g
 use crate::hold::Pause;
 use crate::{CatalogExport, CatalogExportOptions, RecordTreeStatus};
 
-/// The Basetool catalog of the window: the running or finished catalog.
+/// The P4KX catalog of the window: the running or finished catalog.
 #[derive(Debug, Default)]
 pub(crate) struct CatalogState {
     run: Option<CatalogExport>,
@@ -21,7 +21,7 @@ pub(crate) struct CatalogState {
 }
 
 impl Model {
-    /// Returns whether a Basetool catalog can be created: the open Archive has a DataForge that
+    /// Returns whether a P4KX catalog can be created: the open Archive has a DataForge that
     /// did not fail to load, no catalog is being created, and the DataForge is not a file on
     /// its own, since the catalog reads Entries too.
     #[must_use]
@@ -82,7 +82,7 @@ impl Model {
         true
     }
 
-    /// Makes the next Basetool catalog wait once it started building, until the returned hold is
+    /// Makes the next P4KX catalog wait once it started building, until the returned hold is
     /// dropped or the catalog is cancelled.
     #[cfg(feature = "test-hooks")]
     pub fn hold_catalog(&mut self) -> crate::Hold {
@@ -104,32 +104,32 @@ impl Model {
             })
     }
 
-    /// Returns the running or finished Basetool catalog, or `None` when there is none.
+    /// Returns the running or finished P4KX catalog, or `None` when there is none.
     #[must_use]
     pub const fn catalog(&self) -> Option<&CatalogExport> {
         self.catalog.run.as_ref()
     }
 
-    /// Takes the outcome of a Basetool catalog that ended; returns whether one ended.
+    /// Takes the outcome of a P4KX catalog that ended; returns whether one ended.
     pub fn poll_catalog(&mut self) -> bool {
         self.catalog.run.as_mut().is_some_and(CatalogExport::poll)
     }
 
-    /// Asks the running Basetool catalog to stop.
+    /// Asks the running P4KX catalog to stop.
     pub fn cancel_catalog(&self) {
         if let Some(run) = &self.catalog.run {
             run.cancel();
         }
     }
 
-    /// Cancels the running Basetool catalog and waits until it ended.
+    /// Cancels the running P4KX catalog and waits until it ended.
     pub fn stop_catalog(&mut self) {
         if let Some(run) = &mut self.catalog.run {
             run.stop();
         }
     }
 
-    /// Dismisses the outcome of a Basetool catalog that ended.
+    /// Dismisses the outcome of a P4KX catalog that ended.
     pub fn close_catalog(&mut self) {
         if !self
             .catalog

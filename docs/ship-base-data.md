@@ -37,7 +37,7 @@ which are counted as skipped. Version 2 left out the ships with the three ship w
 {"schemaVersion": 2, "source": {…}, "filter": null, "ships": [ … ]}
 ```
 
-`source` is the `source` object of the Basetool catalog (Channel, Build, Archive size and time,
+`source` is the `source` object of the P4KX catalog (Channel, Build, Archive size and time,
 whether the Archive key was there and how many encrypted Entries stayed unread, tool version,
 export time). NDJSON has the ship objects only.
 
@@ -71,8 +71,8 @@ the origins that supplied a value appear.
 `entities/spaceships` whose vehicle implementation has no wheel (`class="SubPartWheel"`) or tread
 (`class="Tread"`) part. A missing or unreadable vehicle implementation counts as no wheels, so such
 a Record under `entities/spaceships` is a `spaceship`. A wheeled or tracked Record under `entities/spaceships` gives `null`: the
-folder and the implementation disagree, and the kind is not guessed. The Basetool catalog carries
-the value as `vehicleKind` (`basetool-catalog.md`, "Ship base data").
+folder and the implementation disagree, and the kind is not guessed. The P4KX catalog carries
+the value as `vehicleKind` (`catalog.md`, "Ship base data").
 
 ### Mass
 
@@ -144,4 +144,4 @@ or XML Loadout file whose entry supplied the attachment, the Record that defines
 `port_default` (field `Components/SItemPortContainerComponentParams/Ports`), an included XML file as its own file), `unresolved` (the reason, or
 `null`) and `dockedVehicle` (present and `true` for a docked vehicle: its `AttachDef.Type` starts
 with `NOITEM_Vehicle`, ignoring case; it stays in its port and its own ports are not listed or counted). The walk
-is `EntityNode::loadout` of `p4kx-assembly`, which the Basetool catalog's loadout kind shares.
+is `EntityNode::loadout` of `p4kx-assembly`, which the P4KX catalog's loadout kind shares.

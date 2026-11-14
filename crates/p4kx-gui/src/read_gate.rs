@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! The gate between giving an export up while it reads DataForge and its thread leaving that
-//! step, shared by the Record export and the Basetool catalog.
+//! step, shared by the Record export and the P4KX catalog.
 
 use std::sync::{Mutex, PoisonError};
 

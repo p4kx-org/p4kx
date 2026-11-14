@@ -22,7 +22,7 @@ references. Other original Record fields are under `additionalFields`. An unsupp
 control also retains its readable original storage there.
 
 An empty identifier is a present String. Older declarations can produce an absent control.
-The shared five-field [source carrier](basetool-catalog.md#per-value-source-origin-for-canonical-definitions) reports each observation's
+The shared five-field [source carrier](catalog.md#per-value-source-origin-for-canonical-definitions) reports each observation's
 state, encrypted origin and source-use references. These values are the authored DataForge
 identifiers. Audio bank objects and loose ecosystem sound declarations have their own source
 families. The catalog makes no inference about runtime ranges or binding targets from RTPC names.

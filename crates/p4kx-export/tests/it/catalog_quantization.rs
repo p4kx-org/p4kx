@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Quality quantizations in the Basetool catalog, through the public API.
+//! Quality quantizations in the P4KX catalog, through the public API.
 
 use crate::quantization_fixture::{
     ANOTHER, GOLD, IRON, NO_BANDS, ORE_GOLD, ORE_IRON, ORPHAN, REVERSED, SHARED_GOLD,

@@ -467,10 +467,10 @@ record-export-failed-title = Record-Export fehlgeschlagen
 record-export-failed = Der Record-Export nach { $path } ist fehlgeschlagen: { $reason }
 record-export-stopped = Der Record-Export nach { $path } brach ohne Ergebnis ab.
 
-catalog-action = Basetool-Katalog …
-catalog-diagnostic-action = Basetool-Diagnosekatalog …
-catalog-diagnostic-running-title = Erstelle Basetool-Diagnosekatalog
-catalog-diagnostic-summary-title = Basetool-Diagnosekatalog geschrieben
+catalog-action = P4KX-Katalog …
+catalog-diagnostic-action = P4KX-Diagnosekatalog …
+catalog-diagnostic-running-title = Erstelle P4KX-Diagnosekatalog
+catalog-diagnostic-summary-title = P4KX-Diagnosekatalog geschrieben
 catalog-diagnostic-notice = Diagnosekatalog. Prüfe den gemeldeten Exportzustand, bevor fehlende Daten als Löschungen gewertet werden.
 catalog-incomplete = Einige ausgewählte Daten konnten nicht gelesen oder übernommen werden. Es wurde keine Datei erstellt oder ersetzt. Nutze einen Diagnosekatalog, um das Teilergebnis zu untersuchen.
 catalog-health-complete = Exportzustand: Alle ausgewählten Quellen wurden erfolgreich gelesen und übernommen.
@@ -490,9 +490,9 @@ catalog-health-entry-diagnostic = { $kind ->
     [yes] Archivvorgang
    *[no] Archivvorgänge
 })
-catalog-file-filter = Basetool-Katalog (JSON)
-catalog-file-filter-compressed = Basetool-Katalog (JSON, zstd-komprimiert)
-catalog-running-title = Erstelle Basetool-Katalog
+catalog-file-filter = P4KX-Katalog (JSON)
+catalog-file-filter-compressed = P4KX-Katalog (JSON, zstd-komprimiert)
+catalog-running-title = Erstelle P4KX-Katalog
 catalog-reading = Lese DataForge …
 catalog-progress = { $done } von { $total } Records geprüft, { $percent } %
 catalog-crafting-progress = Crafting-Daten werden gelesen: { $done } von { $total } Records, { $percent } %
@@ -512,7 +512,7 @@ catalog-warning = { $kind ->
 }
 catalog-warning-more = und { $number } weitere
 catalog-writing = Schreibe { $path } …
-catalog-summary-title = Basetool-Katalog erstellt
+catalog-summary-title = P4KX-Katalog erstellt
 catalog-kinds-heading = Arten (Auswahlumfang)
 catalog-summary-kind = { $kind ->
     [tags] Globale Tags
@@ -576,22 +576,22 @@ catalog-summary-texts-unavailable = { $language ->
    *[other] { $language }
 }: das Archiv enthält keine global.ini, { $missing } fehlen
 catalog-summary-missing = Fehlende Texte: { $number }
-catalog-summary-size = Größe: { $size } vom Upload-Limit { $limit }
-catalog-summary-size-compressed = Größe: { $compressed } komprimiert (vom Upload-Limit { $limit }), { $size } unkomprimiert
-catalog-near-limit = Der Katalog liegt nahe am Upload-Limit des Basetools von { $limit }.
-catalog-over-limit = Der Katalog liegt über dem Upload-Limit des Basetools von { $limit }; das Basetool lehnt den Upload ab.
-catalog-near-limit-plain = Der JSON-Katalog liegt nahe am Upload-Limit des Basetools von { $limit }. Schreibe den Katalog für den Upload als .json.zst; reines .json dient der Ansicht.
-catalog-over-limit-plain = Der JSON-Katalog liegt über dem Upload-Limit des Basetools von { $limit }; das Basetool lehnt ihn ab. Schreibe den Katalog für den Upload als .json.zst; reines .json dient der Ansicht.
-catalog-decompressed-near-limit = Der entpackte Katalog liegt nahe am Limit des Basetools von { $limit } für entpackte Inhalte.
-catalog-decompressed-over-limit = Der entpackte Katalog liegt über dem Limit des Basetools von { $limit } für entpackte Inhalte; das Basetool lehnt ihn ab.
+catalog-summary-size = Größe: { $size } (Richtwert { $limit })
+catalog-summary-size-compressed = Größe: { $compressed } komprimiert (Richtwert { $limit }), { $size } entpackt
+catalog-near-limit = Der Katalog liegt nahe am Richtwert von { $limit } für die Übertragung.
+catalog-over-limit = Der Katalog überschreitet den Richtwert von { $limit } für die Übertragung.
+catalog-near-limit-plain = Der JSON-Katalog liegt nahe am Richtwert von { $limit } für die Übertragung. Wähle .json.zst für einen komprimierten Katalog.
+catalog-over-limit-plain = Der JSON-Katalog überschreitet den Richtwert von { $limit } für die Übertragung. Wähle .json.zst für einen komprimierten Katalog.
+catalog-decompressed-near-limit = Der entpackte Katalog liegt nahe am Richtwert von { $limit }.
+catalog-decompressed-over-limit = Der entpackte Katalog überschreitet den Richtwert von { $limit }.
 catalog-summary-file = Datei: { $path }
-catalog-cancelled-title = Basetool-Katalog abgebrochen
-catalog-cancelled = Der Basetool-Katalog wurde abgebrochen. Es wurde keine Datei geschrieben.
-catalog-failed-title = Basetool-Katalog fehlgeschlagen
-catalog-failed = Der Basetool-Katalog { $path } ließ sich nicht erstellen: { $reason }
-catalog-stopped = Der Basetool-Katalog { $path } brach ohne Ergebnis ab.
-catalog-output-is-archive = Der Basetool-Katalog kann nicht nach { $path } geschrieben werden, weil das das geöffnete Archiv ist. Eine andere Datei wählen.
-catalog-output-gzip = Der Basetool-Katalog wird nicht nach { $path } geschrieben, weil gzip nicht unterstützt wird. Einen Namen mit der Endung .json.zst für einen komprimierten oder .json für einen einfachen Katalog verwenden.
+catalog-cancelled-title = P4KX-Katalog abgebrochen
+catalog-cancelled = Der P4KX-Katalog wurde abgebrochen. Es wurde keine Datei geschrieben.
+catalog-failed-title = P4KX-Katalog fehlgeschlagen
+catalog-failed = Der P4KX-Katalog { $path } ließ sich nicht erstellen: { $reason }
+catalog-stopped = Der P4KX-Katalog { $path } brach ohne Ergebnis ab.
+catalog-output-is-archive = Der P4KX-Katalog kann nicht nach { $path } geschrieben werden, weil das das geöffnete Archiv ist. Eine andere Datei wählen.
+catalog-output-gzip = Der P4KX-Katalog wird nicht nach { $path } geschrieben, weil gzip nicht unterstützt wird. Einen Namen mit der Endung .json.zst für einen komprimierten oder .json für einen einfachen Katalog verwenden.
 preview-tab-xml = XML
 xml-converting = { $path } wird in XML umgewandelt …
 xml-too-large = { $path } ist { $size } groß. CryXml-Einträge über { $limit } werden in der Vorschau nicht umgewandelt; zum Lesen mit Umwandlung extrahieren.

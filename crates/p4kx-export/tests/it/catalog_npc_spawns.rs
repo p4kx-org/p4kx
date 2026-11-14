@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! NPC and entity spawn descriptions in the Basetool catalog.
+//! NPC and entity spawn descriptions in the P4KX catalog.
 
 use std::error::Error;
 

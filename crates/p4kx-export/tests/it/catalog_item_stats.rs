@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The typed stat blocks of items in the Basetool catalog, through the public API.
+//! The typed stat blocks of items in the P4KX catalog, through the public API.
 
 use crate::item_stats_fixture;
 

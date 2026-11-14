@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Mineable elements and refining processes in the Basetool catalog, through the public API.
+//! Mineable elements and refining processes in the P4KX catalog, through the public API.
 
 use crate::mining_fixture::{
     BEXALITE, DANGLING, FAST_CAREFUL, OTHER_RESOURCE, SHARED_RESOURCE, SLOW_WASTEFUL, UNLINKED,

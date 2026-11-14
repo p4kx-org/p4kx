@@ -3,7 +3,7 @@
 
 use crate::CatalogSummary;
 
-/// A built Basetool catalog: its JSON and its summary.
+/// A built P4KX catalog: its JSON and its summary.
 #[derive(Debug, Clone)]
 pub struct BuiltCatalog {
     pub(crate) json: Vec<u8>,

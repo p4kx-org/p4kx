@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The ship base data in the `ships` kind of the Basetool catalog of a real Archive; runs with
+//! The ship base data in the `ships` kind of the P4KX catalog of a real Archive; runs with
 //! `--ignored` when `P4KX_DATA_P4K` names one.
 //!
 //! Run with `--nocapture` to see the counts, the field survey and the build time.
 //!
 //! The anchors and counts are the exact values of LIVE and follow each patch; a failure after a
 //! patch means the value moved, to be checked against the Archive and updated here and in
-//! `docs/basetool-catalog.md`. The survey test asserts the documented findings on the field
+//! `docs/catalog.md`. The survey test asserts the documented findings on the field
 //! names of the ship Records.
 
 use std::collections::BTreeMap;

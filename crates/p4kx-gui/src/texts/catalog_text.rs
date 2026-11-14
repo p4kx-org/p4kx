@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-/// A text of the Basetool catalog entry of the Export menu and its windows, looked up in the
+/// A text of the P4KX catalog entry of the Export menu and its windows, looked up in the
 /// Fluent file of the current language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CatalogText {
@@ -84,7 +84,7 @@ pub enum CatalogText {
     NearLimitPlain,
     /// The plain JSON catalog is over the upload limit; takes `limit`.
     OverLimitPlain,
-    /// The decompressed catalog is close to the Basetool limit for decompressed content; takes `limit`.
+    /// Decoded size is close to its reference threshold; takes `limit`.
     DecompressedNearLimit,
     /// The decompressed catalog is over that limit; takes `limit`.
     DecompressedOverLimit,

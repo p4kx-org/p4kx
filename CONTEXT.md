@@ -717,13 +717,12 @@ The optional, user-switched question to GitHub whether a newer Release than the 
 it only links to that Release, never downloads it.
 _Avoid_: updater, auto-update
 
-**Basetool catalog**:
-The JSON Export of manufacturers, items, ships, commodities and blueprints that the basetool's P4K
-import consumes.
-_Avoid_: p4k-catalog, basetool export
+**P4KX catalog**:
+The versioned JSON Export of authored game data and derived projections from an Archive.
+_Avoid_: p4k-catalog
 
 **Kind**:
-One group of entities in the Basetool catalog, e.g. manufacturers or items, selected by record-path
+One group of entities in the P4KX catalog, e.g. manufacturers or items, selected by record-path
 prefix and type and complete or partial on its own.
 _Avoid_: category, entity type
 
@@ -740,7 +739,7 @@ without executing it; local node links organize original occurrences, not game i
 _Avoid_: evaluated stat, formatting result, shared operation identity
 
 **Export health**:
-Measured source-read and projection outcomes carried by the Basetool catalog, independently of
+Measured source-read and projection outcomes carried by the P4KX catalog, independently of
 Filter completeness. Physical source Records, required Archive Entry operations and emitted rows
 have separate accounting units; an incomplete result requires explicit diagnostic publication
 (`exportHealth`, ADR-0347).

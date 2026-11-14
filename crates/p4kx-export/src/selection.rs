@@ -13,7 +13,7 @@ pub(crate) use blueprint_selection::{BlueprintSelection, selects_blueprint};
 pub(crate) use record_leftovers::is_leftover;
 pub use record_leftovers::{EXCLUDED_TOKENS, SHIP_EXCLUDED_TOKENS, is_kind_leftover};
 
-/// A kind of entity in the Basetool catalog.
+/// A kind of entity in the P4KX catalog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = crate::schema_vocabulary::open_string_vocabulary)]

@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The checked-in JSON Schema of the Basetool catalog matches the catalog types.
+//! The checked-in JSON Schema of the P4KX catalog matches the catalog types.
 //!
-//! Run with `P4KX_BLESS=1` to regenerate `schemas/basetool-catalog.schema.json`.
+//! Run with `P4KX_BLESS=1` to regenerate `schemas/p4kx-catalog.schema.json`.
 
 #![recursion_limit = "256"]
 
@@ -32,7 +32,7 @@ use serde_json::{Value, json};
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn schema_file() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schemas/basetool-catalog.schema.json")
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schemas/p4kx-catalog.schema.json")
 }
 
 fn generated() -> Result<String, Box<dyn Error>> {

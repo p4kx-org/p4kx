@@ -240,7 +240,7 @@ fn archive_menu(ui: &mut Ui, model: &Model, requests: &mut Requests) -> Option<P
 }
 
 /// Shows the Export menu; returns the export that was picked, and asks for the catalog file when
-/// Basetool catalog was picked.
+/// P4KX catalog was picked.
 fn export_menu(ui: &mut Ui, model: &Model, requests: &mut Requests) -> Option<Pick> {
     let texts = model.texts();
     let title = texts.get(RecordExportText::Menu);

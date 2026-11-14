@@ -5,8 +5,7 @@ use std::io::{self, Write};
 
 use p4kx_export::{CatalogSummary, DECOMPRESSED_LIMIT, SizeWarning, UPLOAD_LIMIT};
 
-/// Warns on standard error when the catalog file or its decompressed content is close to or over
-/// a limit of the basetool, and advises `.json.zst` for a plain file.
+/// Reports catalog sizes near or above the transfer and decoded-size reference thresholds.
 pub(crate) fn warn_about_size(summary: &CatalogSummary) -> io::Result<()> {
     write_size_warnings(
         &mut io::stderr().lock(),
@@ -25,20 +24,20 @@ fn write_size_warnings(
     if let Some(warning) = SizeWarning::for_size(upload_size) {
         writeln!(
             err,
-            "warning: the catalog file is {upload_size} bytes, {} the basetool upload limit of {UPLOAD_LIMIT} bytes",
+            "warning: the catalog file is {upload_size} bytes, {} the transfer reference threshold of {UPLOAD_LIMIT} bytes",
             relation(warning)
         )?;
         if !compressed {
             writeln!(
                 err,
-                "note: upload the catalog as .json.zst (--out <file>.json.zst); plain .json is for inspection"
+                "note: write a compressed catalog with --out <file>.json.zst"
             )?;
         }
     }
     if let Some(warning) = SizeWarning::for_decompressed_size(decompressed_size) {
         writeln!(
             err,
-            "warning: the catalog is {decompressed_size} bytes decompressed, {} the basetool limit of {DECOMPRESSED_LIMIT} bytes for decompressed content",
+            "warning: the catalog is {decompressed_size} bytes decompressed, {} the decoded-size reference threshold of {DECOMPRESSED_LIMIT} bytes",
             relation(warning)
         )?;
     }
@@ -56,7 +55,7 @@ const fn relation(warning: SizeWarning) -> &'static str {
 mod tests {
     use super::*;
 
-    const NOTE: &str = "note: upload the catalog as .json.zst (--out <file>.json.zst)";
+    const NOTE: &str = "note: write a compressed catalog with --out <file>.json.zst";
 
     fn warnings(
         upload_size: u64,
@@ -73,7 +72,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let text = warnings(UPLOAD_LIMIT + 1, false, UPLOAD_LIMIT + 1)?;
         assert!(
-            text.contains("over the basetool upload limit") && text.contains(NOTE),
+            text.contains("over the transfer reference threshold") && text.contains(NOTE),
             "{text}"
         );
         Ok(())
@@ -84,7 +83,7 @@ mod tests {
     -> Result<(), Box<dyn std::error::Error>> {
         let text = warnings(UPLOAD_LIMIT / 10 * 9, false, UPLOAD_LIMIT / 10 * 9)?;
         assert!(
-            text.contains("close to the basetool upload limit") && text.contains(NOTE),
+            text.contains("close to the transfer reference threshold") && text.contains(NOTE),
             "{text}"
         );
         Ok(())
@@ -94,7 +93,7 @@ mod tests {
     fn a_compressed_file_over_the_limit_gets_no_advice() -> Result<(), Box<dyn std::error::Error>> {
         let text = warnings(UPLOAD_LIMIT + 1, true, 1_000)?;
         assert!(
-            text.contains("upload limit") && !text.contains(NOTE),
+            text.contains("transfer reference threshold") && !text.contains(NOTE),
             "{text}"
         );
         Ok(())

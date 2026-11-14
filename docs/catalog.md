@@ -1,8 +1,8 @@
-# Basetool catalog
+# P4KX catalog
 
-The Basetool catalog is the JSON Export the basetool's P4K import consumes (ADR-0002). Its contract
-is the JSON Schema (draft 2020-12) in
-[`schemas/basetool-catalog.schema.json`](../schemas/basetool-catalog.schema.json), generated from
+The P4KX catalog exports authored game data and derived projections as versioned JSON. Its
+contract is the JSON Schema (draft 2020-12) in
+[`schemas/p4kx-catalog.schema.json`](../schemas/p4kx-catalog.schema.json), generated from
 the Rust types in `crates/p4kx-export/src/contract.rs`. A test fails when the checked-in schema and
 the types drift apart; `P4KX_BLESS=1 cargo test -p p4kx-export --test catalog_schema` regenerates
 it.
@@ -43,7 +43,7 @@ The rule is ADR-0054 (amending ADR-0002):
 - **A consumer ignores kinds and fields it does not know,** and still rejects a `schemaVersion` it
   does not know. The JSON Schema therefore allows additional properties everywhere; every field it
   lists is required.
-- **Guarantees the Basetool relies on;** breaking one is a breaking change: an existing field never
+- **Field and selection guarantees:** an existing field never
   changes its type, its meaning or whether it can be `null`; a new kind never changes the
   selection or the ordering of an existing kind; the meaning of `completeness` stays.
 - **A new source-vocabulary value is additive,** e.g. a new playability value or a new
@@ -54,10 +54,8 @@ The rule is ADR-0054 (amending ADR-0002):
   health, source mode, diagnostic severity/stage/unit, source role and positive Reference-result
   status types reject unknown values. Their definitions carry `x-p4kx-vocabularyClass: "control"`.
   Unknown controls never become successful reads, resolved links or import/deletion permission.
-- **Loadouts (#393), paints, item stats and the starmap are kinds of the one catalog;** the size is
-  handled by compression (`.json.zst`), not by a second Export. The Basetool accepts `.json`,
-  `.json.gz` and `.json.zst`; the 64 MB limit applies to the compressed upload, the decompressed
-  content is capped at 1 GB. The compressed form is described under "Compressed form" below.
+- **Loadouts (#393), paints, item stats and the starmap are kinds of the same catalog.** The
+  `.json.zst` form compresses the complete JSON. See [Compressed form](#compressed-form).
 - **Version 2 (ADR-0161)** is breaking against version 1 in one respect: a paint also needs its own
   `RequiredTags` offered by the port or the ship (see "Paints"), so `paints[].shipGuids` lists
   fewer ships than version 1 did (40 fewer on LIVE 4.7). No field changed its name or type. The
@@ -105,9 +103,8 @@ of a mineable composition, the `displayName` of a faction, a reputation scope an
 standing, the `displayName` of each name variant of a mission location template and the
 `typeName` of a mission type, each with
 its `key`, `en` and `de`. `name` of the other kinds, `role`, `career` and the other fields are
-identifiers, short names or fact values. The catalog keeps the `description` fields for the
-Basetool's logged-in members; the Basetool keeps them, `displayType` and the contract texts away
-from third parties. Every such field carries
+identifiers, short names or fact values. Consumers apply the protected-text policy to descriptions,
+`displayType` and the other game text fields. Every such field carries
 `"x-gameText": true` in the JSON Schema, and no other field does; a test checks this.
 Display text is trimmed of leading and trailing white space; see Texts. Canonical text rows
 also retain their exact decoded source text. ResourceTypes, Commodities and Manufacturers use
@@ -142,8 +139,8 @@ This class annotation does not replace counter reconciliation, physical target o
 selection completeness or publication checks.
 
 ```powershell
-p4kx catalog <archive> --out basetool-catalog.json [--filter <filter>] [--exported-at <seconds>]
-p4kx catalog <archive> --out basetool-catalog.json.zst
+p4kx catalog <archive> --out p4kx-catalog.json [--filter <filter>] [--exported-at <seconds>]
+p4kx catalog <archive> --out p4kx-catalog.json.zst
 p4kx catalog schema
 ```
 
@@ -154,26 +151,24 @@ An output name ending in `.zst` (any case) writes the catalog as one zstd frame;
 which stays the default. The zstd encoder is libzstd (ADR-0149). The JSON is serialised straight into the encoder and
 never held in memory; it is serialised twice, the first time only to count its length. The frame
 uses zstd level 19, long-distance matching, a content checksum, and declares the content size
-(`Frame_Content_Size`), so the window it needs is the content size, about 26.5 MB for LIVE, and not
-the 2^27 maximum the encoder is allowed. A plain `zstd -d basetool-catalog.json.zst` is enough, no
-`--long` option is needed, and a decoder's memory is about the size of the catalog. The decoded
+(`Frame_Content_Size`). The encoding caps the compression window at 2^27 bytes. Plain
+`zstd -d p4kx-catalog.json.zst` decodes the frame. The decoded
 bytes are exactly the plain catalog for the same Archive and export time (tests check this with the
 Rust decoder and read the window and content size from the frame header). The file is written to a
 temporary file next to the target and renamed on success, so a failure or Ctrl+C leaves an
 existing catalog as it was.
 
-The Basetool detects `.json`, `.json.gz` and `.json.zst` by magic bytes, not by name. Its limits
-apply to two sizes, and `p4kx catalog` and the desktop window check both:
+The CLI and desktop compare stored and decoded sizes against transfer reference thresholds.
 
-| Size | Limit | Constant |
+| Size | Reference threshold | Constant |
 |------|------:|----------|
-| The file as uploaded, compressed if it is | 64,000,000 bytes (64 MB) | `UPLOAD_LIMIT` |
+| Stored file | 64,000,000 bytes (64 MB) | `UPLOAD_LIMIT` |
 | The decompressed content | 1,000,000,000 bytes (1 GB) | `DECOMPRESSED_LIMIT` |
 
-The Basetool rejects a file above either limit; `p4kx catalog` and the desktop window only warn,
-from 90 % of a limit and again above it. The summary (`--json`: `size`, `compressed_size`,
-`upload_limit`, `decompressed_limit`, `size_warning`, `decompressed_warning`) carries the
-uncompressed size, the compressed size (`null` for plain JSON) and the warnings of both.
+The notices start at 90 % of each threshold. Both encodings are written above the thresholds.
+The CLI summary carries decoded size, compressed size (`null` for plain JSON), reference thresholds
+and notices in `size`, `compressed_size`, `upload_limit`, `decompressed_limit`, `size_warning`
+and `decompressed_warning`. Each importer determines its own transport and resource limits.
 
 ## Shape
 
@@ -449,9 +444,8 @@ all 19 have grade 1:
   the integer disagree; the Archive does not say which one the game shows.
 - 9 name `Bespoke`: the ship-specific components of the Reclaimer, 890 Jump and Polaris.
 
-The Basetool can take the letter from `grade` by `1 = A` to `4 = D` for the five component types,
-and must treat grade 1 as unknown elsewhere and for those 19 items. It reads the integer, never the
-`Grade:` line, which is a game text and stays away from third parties.
+For the five component types, `grade` maps `1 = A` through `4 = D`. Treat grade 1 as unknown
+elsewhere and for those 19 items. The `Grade:` line is protected game text.
 
 Distribution of `grade` over the 23280 items of LIVE 4.10.2:
 
@@ -474,7 +468,7 @@ those parts too. No value is below 1 or above 7.
 
 `stats` holds raw facts of the Archive and no derived value (ADR-0065): every number is the stored
 field in the stored unit, `p4kx` computes no damage per second, no cycle time, no acceleration and
-no fuel rate. The Basetool owns those formulas. `stats` is present for items with any block below
+no fuel rate in this block. `stats` is present for items with any block below
 and for shield generators and quantum drives with health or resource states. Absent blocks and
 unstated fields are `null`. The physical device rows live in [`configurations.shieldGenerators`](catalog-shield-generators.md)
 and [`configurations.quantumDrives`](catalog-quantum-drives.md).
@@ -657,7 +651,7 @@ The meanings marked inferred come from the field names; the Archive states none.
 `null` when the Record states none, including every field of a ship whose
 `SEntityInsuranceProperties` has no `shipInsuranceParams`. The struct has exactly these fields: two
 times, one fee, `restoreOnClaim`, the class name and the `displayParams`. The numbers are those of
-the Record, unchanged; the Basetool applies any scaling or rule of its own. The `displayParams`
+the Record, in their stored units. The `displayParams`
 (name, role, career, crew size, manufacturer) repeat the ship's own fields, are mostly
 placeholders, and are not exported.
 
@@ -786,11 +780,9 @@ entity and has no playability. No structural marker sets the leftover-like ships
 ships a player owns, so a ship is also left out by name when its record path or name holds the
 whole word `temp`, `display` or `hijacked` (21 ships on LIVE, 15 of them `player`; ADR-0167).
 
-**The Basetool seeds only `player` ships and items, and treats them as candidates.** `player`
+`player` ships and items are candidates for a player inventory. `player`
 means the Records carry the structural markers of a player entity (ships: hangar-ready inclusion
-mode and no AI marker; items: a shop display name). It is not proof that a player can obtain
-it: items carry no AI marker. The Basetool
-matches every other value and `null` against what it knows and seeds none of them.
+mode and no AI marker; items: a shop display name). Availability requires separate evidence.
 
 `p4kx catalog` prints the count per value and the unclassified count for items and ships; `--json`
 lists them under `playability`. LIVE, 2026-10-21:
@@ -1173,7 +1165,7 @@ the entry of the turret itself shows the turret's own defaults. The walk is the 
 them too, except for an Entity outside both kinds: a development leftover, or an Entity of another
 folder (`p4kx catalog` counts them as the Entities without an entry in items or ships,
 `CatalogSummary::loadouts().outside`; the key `outside` of `--json`). Such a GUID stays, so the
-Basetool can tell an unknown Entity from an empty port. An `itemGuid` of an unresolved attachment
+consumers can distinguish an unknown Entity from an empty port. An `itemGuid` of an unresolved attachment
 may name no Record at all. With a `--filter` the references need not resolve.
 
 `p4kx catalog` counts the loadouts of ships and items, the ports (the nested ports of a ship are
@@ -1278,7 +1270,7 @@ value and exact origin. An allocation or cancellation failure stops publication.
 contract, handler), else the `description` of the broker entry; the template states none, its
 `displayString` slots carry no label. `~mission(Ã¢â‚¬Â¦)` expansion and trimming follow the rules for the
 title. It is a game text (`x-gameText`) like the title, and like every game text it must not be
-passed on to third parties: the Basetool keeps it for its logged-in members.
+passed on to third parties.
 
 **Broker entry.** A contract that names a `missionBrokerEntry` and has no template (on LIVE the 419
 `Covalex_HaulCargo_Career` contracts and their two sub contracts) takes what the layers and the
@@ -1652,8 +1644,8 @@ object only through the pickup `MissionLocality` Records (see "Contracts").
 not part of the kind): `guid`, `className`, `recordPath`, `disabled`, `isSecurityNetworkHost`, the
 `tags` (`generalTags`) a query matches, `producesTags`, `consumesTags` (`positiveTags` and
 `negativeTags`), `aiSpawnTags`, `names` (the `stringVariants`: `tag` and `displayName`, a game
-text; the German file lacks 3,246 of the 3,297 variants on LIVE, so `de` is `null` and the Basetool
-falls back to `en`) and `entityClusterMemberGuid`. The sourced `classification` holds the three
+text; the German file lacks 3,246 of the 3,297 variants on LIVE, so `de` is `null`) and
+`entityClusterMemberGuid`. The sourced `classification` holds the three
 original location class, function and size References. See [the location vocabulary contract](catalog-location-vocabulary.md).
 The sourced location configuration retains authored NPC auto-spawn settings, mission limits and
 the default Reference to [security network manifests](catalog-security-network-manifests.md),
@@ -2082,12 +2074,12 @@ catalog, and a smaller share compressed.
 object from one the game has not released (ADR-0067, #417): the three star system Records carry the same flags,
 `hideInStarmap` is set on helper content of the released systems too, and the type suffixes
 (`_ValidQT`, `_InvalidQT`) describe quantum travel. The catalog therefore has no such field; the
-Basetool decides from `system`, `position`, `hideInStarmap` and `type`.
+Consumers can use `system`, `position`, `hideInStarmap` and `type` in a display policy.
 
 ### Mineable elements and refining processes
 
 The raw facts only (ADR-0065): the catalog states no instability per commodity, because the
-relation is not one to one. The Basetool applies its own rule.
+relation is not one to one.
 
 A mineable element (`mineableElements`) is a `MineableElement` Record under `mining/mineableelements`
 (46 Records on LIVE, 43 entries). `resourceTypeGuid` is the `ResourceType` its Reference
@@ -2632,8 +2624,8 @@ The assumptions of `dismantle_return()` are those under "Dismantle returns" abov
 no resolved `Select`, no applied quantity multiplier, the resource blacklist exposed as
 `excluded_resources` and never applied to an amount.
 
-A blueprint's `name` is almost always a placeholder key. The Basetool names a blueprint through
-`producedItemGuid`, the item it produces, not through `name`.
+A blueprint's `name` is almost always a placeholder key. `producedItemGuid` identifies the item
+that provides the display name.
 
 Manufacturer GUIDs are always taken from References, never from embedded Records (ADR-0004).
 
@@ -2810,7 +2802,7 @@ Only a `global.ini` over 64 MiB or with more than 1,048,576 keys fails the catal
 code 3.
 
 A key the language's `global.ini` lacks or holds with an empty text (`key=`), or a language the
-Archive holds no `global.ini` for, leaves that text `null` and keeps the key, so the basetool can
+Archive holds no `global.ini` for, leaves that text `null` and keeps the key, so consumers can
 resolve it later; it counts as unresolved.
 
 The placeholder keys `@LOC_EMPTY`, `@LOC_PLACEHOLDER`, `@LOC_UNINITIALIZED` and `@blank_space`
@@ -2958,21 +2950,14 @@ Equal Archives and an equal export time give byte-identical catalogs. The export
 current time unless `--exported-at` or the `SOURCE_DATE_EPOCH` environment variable gives it in
 seconds since 1970-01-01 UTC.
 
-### Upload limit
+### Measuring output size
 
-`UPLOAD_LIMIT` in `crates/p4kx-export/src/summary.rs` is the largest catalog file the basetool
-accepts, 64,000,000 bytes (64 MB), compressed if it is; `DECOMPRESSED_LIMIT` is the cap of the
-decompressed content, 1,000,000,000 bytes (1 GB). They must match the basetool's limits: when one
-changes, the other changes with it. The owner kept the upload limit at 64 MB after the first
-measurement (21.6 MB). The crafting detail (all tiers, quality modifiers, pools and their reward
-sources) grew the largest plain catalog to 26.6 MB, 41 % of the upload limit; compressed it is a
-small fraction of it. The `loadouts` kind (ADR-0064) then grew the plain catalog of LIVE to
-132 MB (153 MB by 2026-10-26), which is **over the 64 MB upload limit: the upload must be
-`.json.zst`** (2.7 MB), and
-plain `.json` is for inspection only. `p4kx catalog` and the window warn about a plain file over
-the limit and advise `.json.zst`. The real-Archive tests write the catalog as `.json.zst`, assert
-that the compressed size is within 64 MB and the decompressed size within 1 GB, decode the frame
-and compare it with the plain catalog, and print both sizes and the time per zstd level.
+The compression test measures stored and decoded sizes, checks the reference thresholds and
+compares the decoded frame with plain JSON. The Catalog v3 investigation records exact section
+sizes for selected installed builds. [Catalog size investigation](https://github.com/p4kx-org/p4kx/issues/1151)
+
+The [domain partition assessment](catalog-partitioning.md) describes an optional package with
+reference-safe selective imports.
 
 Measured on LIVE on 2026-10-26 (complete catalog of every kind, English and German texts; Bytes
 is the whole catalog, the other kinds are in `p4kx catalog --json`):
@@ -3045,7 +3030,7 @@ on `P4KX_DATA_P4K` and `P4KX_DATA_P4K_B`.
   catalog holds 19 groups (8 of them nested) and 21 categories, 14 of which carry blueprints.
 - Texts that carry a key (placeholder keys excluded), checked per kind against the Archive's own
   `global.ini` files (ADR-0270): a key a file holds resolves in the catalog, a key it lacks is
-  `null` and the Basetool falls back to `en`. The verification prints the numbers per kind and
+  `null`. The verification prints the numbers per kind and
   holds each kind to a baseline of the share it may lack: the share measured on LIVE, rounded up to
   the hundredth. LIVE, every `name` and every game text
   field (`x-gameText`) that carries a key, wherever it sits in an entry:

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! Mining compositions, mining parameters, provider presets, multi configs and where the presets
-//! are used, in the Basetool catalog.
+//! are used, in the P4KX catalog.
 
 use crate::harvest_fixture::{
     COMPOSITION, CONTACT_TYPE, ELEMENT, ENTITY, ENTITY_BARE, ENTITY_SILENT, HARVESTABLE,

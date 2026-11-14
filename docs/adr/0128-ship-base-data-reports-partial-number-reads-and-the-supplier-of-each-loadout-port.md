@@ -14,7 +14,7 @@ count as invisible format characters.
   ports of thrusters, intakes and other hardware. The sum over the parts rather than the root
   part follows from the vehicle implementation, which states hit points per part and no total.
   Whether a reference tool agrees is open; the real-Archive anchors in
-  `docs/basetool-catalog.md` are the only comparison.
+  `docs/catalog.md` are the only comparison.
 - **Partial reads.** The prefix rule of ADR-0050 stays, so `12,5x` is still 12 and `1,5` still
   1. A remainder after the number other than white space, `d`, `f` or `kg` (ignoring case) is a
   partial read. The sums list it next to `unreadable` as `partial` with the part, the attribute,

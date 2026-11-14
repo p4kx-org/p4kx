@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! A synthetic Archive with commodities and crafting blueprints for the Basetool catalog tests.
+//! A synthetic Archive with commodities and crafting blueprints for the P4KX catalog tests.
 
 use std::error::Error;
 use std::path::{Path, PathBuf};

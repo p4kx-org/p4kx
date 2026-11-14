@@ -68,9 +68,8 @@ fn original_faction_reputation_preserves_owner_relations_and_perk_links() -> Tes
 }
 
 fn assert_schema(catalog: &Value) -> TestResult {
-    let schema: Value = serde_json::from_str(include_str!(
-        "../../../../schemas/basetool-catalog.schema.json"
-    ))?;
+    let schema: Value =
+        serde_json::from_str(include_str!("../../../../schemas/p4kx-catalog.schema.json"))?;
     jsonschema::validator_for(&schema)?
         .validate(catalog)
         .map_err(|error| format!("physical FactionReputation rows satisfy schema v3: {error}"))?;

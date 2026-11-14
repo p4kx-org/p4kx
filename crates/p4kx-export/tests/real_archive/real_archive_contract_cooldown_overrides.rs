@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The cooldown fields, their levels and `cooldownLayer` of contracts in the Basetool catalog of a
+//! The cooldown fields, their levels and `cooldownLayer` of contracts in the P4KX catalog of a
 //! real Archive, checked against the parameter overrides in the `ContractGenerator` Records; runs
 //! with `--ignored` when `P4KX_DATA_P4K` names one.
 

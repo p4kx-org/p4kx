@@ -17,12 +17,11 @@ pub(crate) use name::{is_gzip, normalised_catalog_file};
 
 use crate::read_gate::ReadGate;
 
-/// The file name the save dialog of the Basetool catalog suggests: the compressed form the
-/// Basetool takes for upload; plain `.json` stays selectable.
-pub const CATALOG_FILE: &str = "basetool-catalog.json.zst";
+/// The default file name for a compressed P4KX catalog.
+pub const CATALOG_FILE: &str = "p4kx-catalog.json.zst";
 
 /// The distinct filename proposed for explicitly requested diagnostic catalogs.
-pub const DIAGNOSTIC_CATALOG_FILE: &str = "basetool-catalog.diagnostic.json.zst";
+pub const DIAGNOSTIC_CATALOG_FILE: &str = "p4kx-catalog.diagnostic.json.zst";
 
 /// The selection and publication policy of one catalog job.
 #[derive(Debug, Default)]
@@ -33,7 +32,7 @@ pub struct CatalogExportOptions {
     pub publication_mode: CatalogPublicationMode,
 }
 
-/// The step a running Basetool catalog is at.
+/// The step a running P4KX catalog is at.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CatalogExportStage {
     /// DataForge is read from the Archive.
@@ -44,7 +43,7 @@ pub enum CatalogExportStage {
     Writing,
 }
 
-/// How far a running Basetool catalog has come.
+/// How far a running P4KX catalog has come.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CatalogExportProgress {
     /// The step it is at.
@@ -57,7 +56,7 @@ pub struct CatalogExportProgress {
     pub total: usize,
 }
 
-/// The outcome of a Basetool catalog that was written.
+/// The outcome of a P4KX catalog that was written.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CatalogExportSummary {
     file: PathBuf,

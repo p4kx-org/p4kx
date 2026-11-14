@@ -186,7 +186,7 @@ jobs:
           retention-days: 14
       - name: Record JSON schema matches the export
         run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-export --test record_json_schema
-      - name: Basetool catalog schema is current
+      - name: P4KX catalog schema is current
         run: cargo nextest run --target $env:P4KX_TARGET --locked -p p4kx-export --test catalog_schema
       - name: Native Linux disk texture permission failures remain errors
         if: runner.os == 'Linux'

@@ -4,7 +4,7 @@ Decided for issue #809. Applies ADR-0002 (the Archive is the source of the catal
 
 ## Context
 
-The `playability` of ships (ADR-0054, "Playability" in `docs/basetool-catalog.md`) is derived from
+The `playability` of ships (ADR-0054, "Playability" in `docs/catalog.md`) is derived from
 Record data and has never been compared with an outside reference. Another extractor takes "flight
 ready" from the public RSI ship matrix, `https://robertsspaceindustries.com/ship-matrix/index`
 (`production_status == "flight-ready"`). The same data can serve as a development check of our
@@ -46,7 +46,7 @@ never fetches the ship matrix.
   name table in the test (`NAME_SUPPLEMENT`), read off the Archive's class names and used only
   there; no name enters the `playability` rule.
 - The `playability` rule is refined only on a structural signal, never by name. The first
-  comparison (see "Comparison" in `docs/basetool-catalog.md`) showed none.
+  comparison (see "Comparison" in `docs/catalog.md`) showed none.
 - The second look (#838) found one for two ships: `ANVL_Hornet_F7C_Mk2_AI_Super` and
   `RSI_Perseus_AI_Super` were `player` although the matrix does not know them. Their hull values,
   crew manifest, tags and inclusion mode equal their `player` siblings. What separates them from

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The playability of ships and items in the Basetool catalog of a real Archive; runs with
+//! The playability of ships and items in the P4KX catalog of a real Archive; runs with
 //! `--ignored` when `P4KX_DATA_P4K` names one.
 
 use std::error::Error;

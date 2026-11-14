@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The links of the ship spawns and location queries of contracts in the Basetool catalog of a
+//! The links of the ship spawns and location queries of contracts in the P4KX catalog of a
 //! real Archive.
 
 use std::collections::HashSet;

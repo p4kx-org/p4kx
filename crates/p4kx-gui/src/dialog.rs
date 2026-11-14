@@ -28,9 +28,9 @@ pub enum Dialog {
     QueryExport(QueryExportFormat),
     /// Picks the folder of a Record export.
     RecordExportFolder,
-    /// Picks the file the Basetool catalog is written to.
+    /// Picks the file the P4KX catalog is written to.
     CatalogFile,
-    /// Picks the file of an explicitly requested diagnostic Basetool catalog.
+    /// Picks the file of an explicitly requested diagnostic P4KX catalog.
     DiagnosticCatalogFile,
     /// Picks the GLB file a model is exported to.
     ModelFile,

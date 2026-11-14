@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Commodities and blueprints of the Basetool catalog, through the public API.
+//! Commodities and blueprints of the P4KX catalog, through the public API.
 
 use crate::catalog_crafting_build;
 use crate::catalog_crafting_support::blueprint;

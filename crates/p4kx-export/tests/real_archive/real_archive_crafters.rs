@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The crafting stations of the Basetool catalog of a real Archive; runs with `--ignored` when
+//! The crafting stations of the P4KX catalog of a real Archive; runs with `--ignored` when
 //! `P4KX_DATA_P4K` names one.
 //!
 //! The anchors are the values of LIVE 4.10 and follow each patch; a failure after a patch means
 //! the value moved, to be checked against the Archive and updated here and in
-//! `docs/basetool-catalog.md`.
+//! `docs/catalog.md`.
 
 use std::collections::HashSet;
 use std::error::Error;

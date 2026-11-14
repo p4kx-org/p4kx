@@ -87,9 +87,8 @@ fn perk_list_keeps_owned_slots_shared_record_links_and_exact_payload_types() -> 
 }
 
 fn assert_schema(catalog: &Value) -> TestResult {
-    let schema: Value = serde_json::from_str(include_str!(
-        "../../../../schemas/basetool-catalog.schema.json"
-    ))?;
+    let schema: Value =
+        serde_json::from_str(include_str!("../../../../schemas/p4kx-catalog.schema.json"))?;
     let validator = jsonschema::validator_for(&schema)?;
     validator
         .validate(catalog)

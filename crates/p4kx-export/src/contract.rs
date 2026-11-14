@@ -45,11 +45,11 @@ pub(crate) use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 /// The version of the catalog shape and its closed payload unions.
 pub const SCHEMA_VERSION: u32 = 3;
 
-/// The Basetool catalog: the game data the basetool's P4K import reads.
+/// The versioned P4KX game-data catalog.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-#[schemars(title = "P4KX Basetool catalog")]
+#[schemars(title = "P4KX catalog")]
 pub(crate) struct Catalog<'a> {
     /// The version of the catalog shape; an import rejects a version it does not know.
     #[schemars(extend("const" = SCHEMA_VERSION))]
@@ -166,7 +166,7 @@ pub(crate) struct LocalisedText<'a> {
     pub(crate) de: Option<Cow<'a, str>>,
 }
 
-/// Returns the JSON Schema (draft 2020-12) of the Basetool catalog.
+/// Returns the JSON Schema (draft 2020-12) of the P4KX catalog.
 #[must_use]
 pub fn catalog_schema() -> serde_json::Value {
     schemars::generate::SchemaSettings::draft2020_12()

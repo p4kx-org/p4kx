@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::CatalogRefusal;
 
-/// A Basetool catalog cannot be built.
+/// A P4KX catalog cannot be built.
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum CatalogError {

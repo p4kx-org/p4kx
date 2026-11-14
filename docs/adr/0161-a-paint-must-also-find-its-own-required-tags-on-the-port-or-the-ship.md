@@ -1,7 +1,7 @@
 # A paint must also find its own required tags on the port or the ship, and the catalog becomes version 2
 
 Decided for issue #434, a follow-up of #399 and PR #428. Applies ADR-0054 to the paint rule of
-`docs/basetool-catalog.md`.
+`docs/catalog.md`.
 
 ## Context
 

@@ -132,7 +132,7 @@ shared typed sourced-value wrapper. A row/global flag or a reference that requir
 recompute the field marker is insufficient. Per-field source/selector/conversion contributors remain
 precise; the row aggregate is supplementary. Include source-backed identity/text/reference values
 and nested list members, not just top-level item statistics. Schema/control bookkeeping is not
-silently reclassified as game data. Basetool can classify each game value independently; x-gameText
+silently reclassified as game data. Consumers can classify each game value independently; x-gameText
 remains a separate protection axis.
 
 Use one immutable prepared typed result for plain JSON, compressed JSON and schema-driven callers.
@@ -141,10 +141,10 @@ Keep the existing atomic catalog file adapter and its cancellation/change/cleanu
 frontend-specific writer. Source preparation peak memory and serialization streaming are measured
 separately. Deduplicate common sources/texts/use sets without collapsing physical provenance.
 
-Retain one Build/document/upload. Measure exact 64,000,000-byte upload and 1,000,000,000-byte decoded
-Basetool budgets and peak memory with complete fields, languages and provenance. Existing size
-warnings are transport facts, not invented read failures. Do not silently drop data, split exports or
-impose a new global export refusal without a measured concrete transport decision.
+Retain one complete document per Export. Measure transfer size, decoded size and peak memory with
+complete fields, languages and provenance. The standard size notices are advisory. A transport split
+needs a separate versioned contract with the same logical snapshot and measured resource needs.
+See the [domain partition assessment](../catalog-partitioning.md).
 
 Synthetic checks must exercise mixed/unknown/encrypted origins, exact numbers, healthy zero-row
 projection, strict controls, source resolution versus selection, complete reference closure, duplicate

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The mining laser, module and gadget stat blocks of the Basetool catalog.
+//! The mining laser, module and gadget stat blocks of the P4KX catalog.
 
 use crate::gear_fixture;
 

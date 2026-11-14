@@ -32,7 +32,7 @@ const REFRESH: Duration = Duration::from_millis(100);
 const WINDOW: &str = "catalog-run";
 const OUTCOME: &str = "catalog-outcome";
 
-/// Shows the progress of a running Basetool catalog, or its outcome once it ended.
+/// Shows the progress of a running P4KX catalog, or its outcome once it ended.
 pub(super) fn show(ui: &Ui, model: &mut Model) {
     let Some(run) = model.catalog() else {
         return;

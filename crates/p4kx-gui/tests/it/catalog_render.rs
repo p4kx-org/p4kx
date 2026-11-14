@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The windows of the Basetool catalog drawn by wgpu at the desktop size and at the smallest
+//! The windows of the P4KX catalog drawn by wgpu at the desktop size and at the smallest
 //! window, in both languages, rendered headless by `egui_kittest`.
 //!
 //! The tests need a graphics adapter, a software one is enough, and return early without one
@@ -108,7 +108,7 @@ fn the_summary_of_a_compressed_catalog_is_drawn_at_both_sizes_in_both_languages(
         for size in SIZES {
             let (_dir, mut model, out) = opened(&makers())?;
             model.set_language(language);
-            model.start_catalog(out.join("basetool-catalog.json.zst"), || {});
+            model.start_catalog(out.join("p4kx-catalog.json.zst"), || {});
             let Some(mut harness) = window(model, size) else {
                 return Ok(());
             };
@@ -123,9 +123,9 @@ fn the_summary_of_a_compressed_catalog_is_drawn_at_both_sizes_in_both_languages(
             let close = if tag == "en" { "Close" } else { "Schließen" };
             shoot(&mut harness, ("summary", tag, size), close)?;
             let sizes = if tag == "en" {
-                " compressed (of"
+                " compressed (reference threshold"
             } else {
-                " komprimiert (vom"
+                " komprimiert (Richtwert"
             };
             harness.get_by_label_contains(sizes).scroll_to_me();
             harness.run_steps(3);
@@ -143,7 +143,7 @@ fn the_progress_window_of_a_building_catalog_is_drawn_at_both_sizes_in_both_lang
             let (_dir, mut model, out) = opened(&makers())?;
             model.set_language(language);
             let hold = model.hold_catalog();
-            model.start_catalog(out.join("basetool-catalog.json.zst"), || {});
+            model.start_catalog(out.join("p4kx-catalog.json.zst"), || {});
             let Some(mut harness) = window(model, size) else {
                 return Ok(());
             };
@@ -173,7 +173,7 @@ fn the_warnings_of_the_game_data_are_drawn_at_both_sizes_in_both_languages() -> 
             let (_dir, mut model, out) = opened(&cataloging::ambiguous())?;
             model.set_language(language);
             model.start_catalog_with_options(
-                out.join("basetool-catalog.diagnostic.json.zst"),
+                out.join("p4kx-catalog.diagnostic.json.zst"),
                 CatalogExportOptions {
                     publication_mode: CatalogPublicationMode::DiagnosticPartial,
                     ..CatalogExportOptions::default()
@@ -237,7 +237,7 @@ fn normal_incomplete_publication_is_drawn_as_a_refusal_in_both_languages() -> Te
 fn the_warning_alert_of_a_catalog_near_the_limit_is_drawn_at_both_sizes() -> TestResult {
     for size in SIZES {
         let (_dir, mut model, out) = opened(&cataloging::near_upload_limit())?;
-        model.start_catalog(out.join("basetool-catalog.json"), || {});
+        model.start_catalog(out.join("p4kx-catalog.json"), || {});
         let Some(mut harness) = window(model, size) else {
             return Ok(());
         };

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Hauling orders of contracts and cargo manifests in the Basetool catalog.
+//! Hauling orders of contracts and cargo manifests in the P4KX catalog.
 
 use crate::hauling_fixture::{
     BROKERED, CRATE, CRATES, FAR, GOLD, MANIFEST_CUSTOM, MANIFEST_EVEN, NAMELESS, NEAR, NOTHING,

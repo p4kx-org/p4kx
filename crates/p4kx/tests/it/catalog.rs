@@ -100,8 +100,7 @@ fn manufacturer_name(
 #[test]
 fn catalog_schema_prints_the_checked_in_schema() -> TestResult {
     let checked_in = fs::read_to_string(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../schemas/basetool-catalog.schema.json"),
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schemas/p4kx-catalog.schema.json"),
     )?;
     assert!(
         printed_schema()? == checked_in,
@@ -114,7 +113,7 @@ fn catalog_schema_prints_the_checked_in_schema() -> TestResult {
 fn catalog_writes_a_catalog_that_the_schema_accepts() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = write_archive(dir.path())?;
-    let out = dir.path().join("basetool-catalog.json");
+    let out = dir.path().join("p4kx-catalog.json");
 
     let summary = catalog(&archive, &out, &[])?;
 
@@ -146,7 +145,7 @@ fn catalog_to_a_zst_name_writes_a_zstd_frame_with_the_bytes_of_the_plain_catalog
     let dir = tempfile::tempdir()?;
     let archive = write_archive(dir.path())?;
     let plain = dir.path().join("plain.json");
-    let packed = dir.path().join("basetool-catalog.json.zst");
+    let packed = dir.path().join("p4kx-catalog.json.zst");
 
     catalog(&archive, &plain, &[])?;
     let summary = catalog(&archive, &packed, &["--json"])?;
@@ -273,7 +272,7 @@ fn catalog_without_an_output_file_is_invalid_input() -> TestResult {
 fn catalog_to_a_gz_name_is_refused_instead_of_writing_plain_json() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = write_archive(dir.path())?;
-    let out = dir.path().join("basetool-catalog.json.gz");
+    let out = dir.path().join("p4kx-catalog.json.gz");
 
     let output = p4kx(&["catalog"])?
         .arg(&archive)

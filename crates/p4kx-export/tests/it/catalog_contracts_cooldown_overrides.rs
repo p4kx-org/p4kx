@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The cooldown of contracts in the Basetool catalog when parameter overrides state it.
+//! The cooldown of contracts in the P4KX catalog when parameter overrides state it.
 
 use serde_json::{Value, json};
 

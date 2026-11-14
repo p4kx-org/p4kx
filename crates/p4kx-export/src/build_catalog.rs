@@ -8,7 +8,7 @@ use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 use crate::catalog_output::{Compression, emit};
 use crate::{BuiltCatalog, CatalogError, CatalogOptions, CatalogSummary};
 
-/// Builds a deterministic Basetool catalog from the DataForge and available localization inputs.
+/// Builds a deterministic P4KX catalog from the DataForge and available localization inputs.
 ///
 /// Resource definitions retain per-value source origins and canonical text references.
 /// Normal publication requires complete export health; diagnostic mode retains available rows.
@@ -28,7 +28,7 @@ pub fn build_catalog(
     build_catalog_from(archive, &entry, options)
 }
 
-/// Builds the Basetool catalog like [`build_catalog`] and streams it like [`write_catalog_from`].
+/// Builds the P4KX catalog like [`build_catalog`] and streams it like [`write_catalog_from`].
 ///
 /// # Errors
 ///
@@ -46,7 +46,7 @@ pub fn write_catalog<W: Write>(
     write_catalog_from(archive, &entry, options, compression, create)
 }
 
-/// Builds the Basetool catalog like [`build_catalog`] from `entry`, the DataForge Entry already
+/// Builds the P4KX catalog like [`build_catalog`] from `entry`, the DataForge Entry already
 /// read from `archive`, so that a caller holding it does not read it again.
 ///
 /// # Errors
@@ -66,7 +66,7 @@ pub fn build_catalog_from(
     })
 }
 
-/// Builds the Basetool catalog like [`build_catalog_from`] and streams its JSON into the writer
+/// Builds the P4KX catalog like [`build_catalog_from`] and streams its JSON into the writer
 /// `create` returns, compressed as `compression` says.
 ///
 /// The JSON is never held in memory; zstd serialises it twice, once to count its length for the

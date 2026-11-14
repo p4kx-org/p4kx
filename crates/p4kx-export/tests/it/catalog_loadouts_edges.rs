@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Loadouts of the Basetool catalog through the public API: an Entity that holds itself and an
+//! Loadouts of the P4KX catalog through the public API: an Entity that holds itself and an
 //! empty port with a nested Loadout.
 
 use crate::loadouts_fixture::{ALPHA, GUN, LOOP, NESTED};

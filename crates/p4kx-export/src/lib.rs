@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Export service of P4KX: the Record export and the Basetool catalog (ADR-0002).
+//! Export service of P4KX: the Record export and the P4KX catalog (ADR-0002).
 //!
 //! [`write_record_export`] writes a selection of Records in a [`RecordForm`]: one Record XML or
 //! Record JSON file per Record under its record path (ADR-0008), or one NDJSON file with one
@@ -13,7 +13,7 @@
 //! [`Playability`] data. Normal publication refuses incomplete source reads or projections.
 //! [`CatalogPublicationMode::DiagnosticPartial`] retains readable results with explicit health
 //! and failure evidence. [`catalog_schema`] generates the schema from the same catalog types
-//! (`docs/basetool-catalog.md`).
+//! (`docs/catalog.md`).
 //!
 //! The starmap objects of the catalog take their world positions from the system containers
 //! (`ObjectContainers/PU/system`): the position of every `Child` element is composed with the

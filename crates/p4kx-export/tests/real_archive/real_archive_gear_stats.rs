@@ -17,7 +17,7 @@ use crate::catalog_v3_consumer;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-const DOCS: &str = include_str!("../../../../docs/basetool-catalog.md");
+const DOCS: &str = include_str!("../../../../docs/catalog.md");
 
 #[expect(clippy::print_stdout, reason = "the numbers are the result of the run")]
 fn report(line: &str) {

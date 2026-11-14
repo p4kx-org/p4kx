@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Tiers, selections, quality, pools, reward sources and dismantle returns in the Basetool
+//! Tiers, selections, quality, pools, reward sources and dismantle returns in the P4KX
 //! catalog, built from a synthetic Archive with multi-tier blueprints (no blueprint of the
 //! real Archive has more than one tier).
 

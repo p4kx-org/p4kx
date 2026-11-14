@@ -114,7 +114,7 @@ pub(crate) enum Command {
     /// CryXml Entries.
     #[command(after_help = EXIT_CODES_HELP)]
     Grep(GrepArgs),
-    /// Writes the Basetool catalog of an Archive as JSON, or prints its JSON Schema.
+    /// Writes the P4KX catalog of an Archive as JSON, or prints its JSON Schema.
     #[command(
         after_help = EXIT_CODES_HELP,
         args_conflicts_with_subcommands = true,

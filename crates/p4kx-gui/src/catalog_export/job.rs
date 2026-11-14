@@ -22,7 +22,7 @@ use crate::EntryIndex;
 use crate::forge_cache::ReadFailure;
 use crate::model::describe;
 
-/// Where a Basetool catalog stands.
+/// Where a P4KX catalog stands.
 #[derive(Debug, Clone, Copy)]
 pub enum CatalogExportStatus<'a> {
     /// The catalog is being created; the progress so far.
@@ -61,7 +61,7 @@ enum State {
     Failed(Option<String>),
 }
 
-/// A Basetool catalog created on a background thread, or its outcome.
+/// A P4KX catalog created on a background thread, or its outcome.
 #[derive(Debug)]
 pub struct CatalogExport {
     id: u64,
@@ -209,7 +209,7 @@ fn ended(outcome: Option<RunResult>) -> State {
     }
 }
 
-/// Creates the Basetool catalog of the Archive of `index` into `file` on a background thread,
+/// Creates the P4KX catalog of the Archive of `index` into `file` on a background thread,
 /// reading DataForge into the cache of `index` unless it holds it already, and calls `wake` from
 /// that thread once the catalog ended.
 pub(crate) fn start(
@@ -233,7 +233,7 @@ pub(crate) fn start(
         pause,
     };
     let spawned = thread::Builder::new()
-        .name("basetool-catalog".to_owned())
+        .name("p4kx-catalog".to_owned())
         .spawn(move || {
             if sender.send(job.run()).is_ok() {
                 wake();

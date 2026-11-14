@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The quality quantizations of the Basetool catalog of a real Archive; runs with `--ignored` when
+//! The quality quantizations of the P4KX catalog of a real Archive; runs with `--ignored` when
 //! `P4KX_DATA_P4K` names one.
 
 use std::collections::HashSet;

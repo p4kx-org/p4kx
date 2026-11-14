@@ -467,10 +467,10 @@ record-export-failed-title = Record export failed
 record-export-failed = The Record export into { $path } failed: { $reason }
 record-export-stopped = The Record export into { $path } stopped without a result.
 
-catalog-action = Basetool catalog…
-catalog-diagnostic-action = Diagnostic Basetool catalog…
-catalog-diagnostic-running-title = Creating a diagnostic Basetool catalog
-catalog-diagnostic-summary-title = Diagnostic Basetool catalog written
+catalog-action = P4KX catalog…
+catalog-diagnostic-action = Diagnostic P4KX catalog…
+catalog-diagnostic-running-title = Creating a diagnostic P4KX catalog
+catalog-diagnostic-summary-title = Diagnostic P4KX catalog written
 catalog-diagnostic-notice = Diagnostic catalog. Check its reported export health before treating missing data as removals.
 catalog-incomplete = Some selected data could not be read or included. No file was created or replaced. Use a diagnostic catalog to inspect the partial result.
 catalog-health-complete = Export health: all selected sources were read and projected successfully.
@@ -490,9 +490,9 @@ catalog-health-entry-diagnostic = { $kind ->
     [yes] Archive Entry operation
    *[no] Archive Entry operations
 })
-catalog-file-filter = Basetool catalog (JSON)
-catalog-file-filter-compressed = Basetool catalog (JSON, zstd-compressed)
-catalog-running-title = Creating the Basetool catalog
+catalog-file-filter = P4KX catalog (JSON)
+catalog-file-filter-compressed = P4KX catalog (JSON, zstd-compressed)
+catalog-running-title = Creating the P4KX catalog
 catalog-reading = Reading DataForge…
 catalog-progress = { $done } of { $total } Records checked, { $percent } %
 catalog-crafting-progress = Reading the crafting data: { $done } of { $total } Records, { $percent } %
@@ -512,7 +512,7 @@ catalog-warning = { $kind ->
 }
 catalog-warning-more = and { $number } more
 catalog-writing = Writing { $path }…
-catalog-summary-title = Basetool catalog created
+catalog-summary-title = P4KX catalog created
 catalog-kinds-heading = Kinds (selection scope)
 catalog-summary-kind = { $kind ->
     [tags] Global tags
@@ -576,22 +576,22 @@ catalog-summary-texts-unavailable = { $language ->
    *[other] { $language }
 }: the Archive holds no global.ini, { $missing } missing
 catalog-summary-missing = Missing texts: { $number }
-catalog-summary-size = Size: { $size } of the upload limit of { $limit }
-catalog-summary-size-compressed = Size: { $compressed } compressed (of the upload limit of { $limit }), { $size } uncompressed
-catalog-near-limit = The catalog is close to the basetool upload limit of { $limit }.
-catalog-over-limit = The catalog is over the basetool upload limit of { $limit }; the basetool will reject the upload.
-catalog-near-limit-plain = The plain JSON catalog is close to the basetool upload limit of { $limit }. Write the catalog as .json.zst for the upload; plain .json is for inspection.
-catalog-over-limit-plain = The plain JSON catalog is over the basetool upload limit of { $limit }; the basetool will reject it. Write the catalog as .json.zst for the upload; plain .json is for inspection.
-catalog-decompressed-near-limit = The decompressed catalog is close to the basetool limit of { $limit } for decompressed content.
-catalog-decompressed-over-limit = The decompressed catalog is over the basetool limit of { $limit } for decompressed content; the basetool will reject it.
+catalog-summary-size = Size: { $size } (reference threshold { $limit })
+catalog-summary-size-compressed = Size: { $compressed } compressed (reference threshold { $limit }), { $size } decoded
+catalog-near-limit = The catalog is close to the transfer reference threshold of { $limit }.
+catalog-over-limit = The catalog exceeds the transfer reference threshold of { $limit }.
+catalog-near-limit-plain = The JSON catalog is close to the transfer reference threshold of { $limit }. Choose .json.zst for a compressed catalog.
+catalog-over-limit-plain = The JSON catalog exceeds the transfer reference threshold of { $limit }. Choose .json.zst for a compressed catalog.
+catalog-decompressed-near-limit = The decoded catalog is close to the reference threshold of { $limit }.
+catalog-decompressed-over-limit = The decoded catalog exceeds the reference threshold of { $limit }.
 catalog-summary-file = File: { $path }
-catalog-cancelled-title = Basetool catalog cancelled
-catalog-cancelled = The Basetool catalog was cancelled. No file was written.
-catalog-failed-title = Basetool catalog failed
-catalog-failed = The Basetool catalog { $path } could not be created: { $reason }
-catalog-stopped = The Basetool catalog { $path } stopped without a result.
-catalog-output-is-archive = The Basetool catalog cannot be written to { $path }, because that is the open Archive. Choose another file.
-catalog-output-gzip = The Basetool catalog is not written to { $path }, because gzip is not supported. Use a name ending in .json.zst for a compressed catalog or .json for a plain one.
+catalog-cancelled-title = P4KX catalog cancelled
+catalog-cancelled = The P4KX catalog was cancelled. No file was written.
+catalog-failed-title = P4KX catalog failed
+catalog-failed = The P4KX catalog { $path } could not be created: { $reason }
+catalog-stopped = The P4KX catalog { $path } stopped without a result.
+catalog-output-is-archive = The P4KX catalog cannot be written to { $path }, because that is the open Archive. Choose another file.
+catalog-output-gzip = The P4KX catalog is not written to { $path }, because gzip is not supported. Use a name ending in .json.zst for a compressed catalog or .json for a plain one.
 preview-tab-xml = XML
 xml-converting = Converting { $path } to XML…
 xml-too-large = { $path } is { $size }. CryXml Entries larger than { $limit } are not converted in the preview; extract it with Conversion on to read it.

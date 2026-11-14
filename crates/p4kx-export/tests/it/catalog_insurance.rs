@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The insurance data of the ships in the Basetool catalog, through the public API.
+//! The insurance data of the ships in the P4KX catalog, through the public API.
 
 use crate::catalog_recovery::{legacy, overrides, recovery_row};
 use crate::health_origin_assertions as proof;

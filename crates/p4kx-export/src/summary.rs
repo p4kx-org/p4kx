@@ -11,26 +11,24 @@ use crate::{
     PlayabilitySummary, StarmapReport,
 };
 
-/// The largest catalog file the basetool accepts for upload, in bytes, compressed if it is; it
-/// must match the basetool's upload limit (`docs/basetool-catalog.md`).
+/// The catalog file size reference threshold, in bytes as stored on disk.
 pub const UPLOAD_LIMIT: u64 = 64_000_000;
 
 /// The size from which a catalog file is close to [`UPLOAD_LIMIT`], 90 % of it.
 pub const UPLOAD_WARNING_SIZE: u64 = UPLOAD_LIMIT / 10 * 9;
 
-/// The largest decompressed catalog the basetool accepts, in bytes; it must match the basetool's
-/// limit (`docs/basetool-catalog.md`).
+/// The decoded catalog size reference threshold, in bytes.
 pub const DECOMPRESSED_LIMIT: u64 = 1_000_000_000;
 
 /// The decompressed size from which a catalog is close to [`DECOMPRESSED_LIMIT`], 90 % of it.
 pub const DECOMPRESSED_WARNING_SIZE: u64 = DECOMPRESSED_LIMIT / 10 * 9;
 
-/// How a catalog's size relates to the basetool upload limit.
+/// How a catalog's size relates to a reference threshold.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SizeWarning {
     /// At least [`UPLOAD_WARNING_SIZE`] bytes, but within [`UPLOAD_LIMIT`].
     NearLimit,
-    /// More than [`UPLOAD_LIMIT`] bytes; the basetool rejects the upload.
+    /// Above the reference threshold.
     OverLimit,
 }
 
@@ -353,21 +351,19 @@ impl CatalogSummary {
         self.compressed_size
     }
 
-    /// Returns the size of the catalog file, the compressed one if it is compressed; the size the
-    /// basetool checks against [`UPLOAD_LIMIT`].
+    /// Returns the stored file size, including compression when enabled.
     #[must_use]
     pub fn upload_size(&self) -> u64 {
         self.compressed_size.unwrap_or(self.size)
     }
 
-    /// Returns whether the catalog file is close to or over the basetool upload limit.
+    /// Returns the warning relative to the stored file size threshold.
     #[must_use]
     pub fn size_warning(&self) -> Option<SizeWarning> {
         SizeWarning::for_size(self.upload_size())
     }
 
-    /// Returns whether the decompressed catalog is close to or over the basetool limit for
-    /// decompressed content.
+    /// Returns the warning relative to the decoded size threshold.
     #[must_use]
     pub const fn decompressed_warning(&self) -> Option<SizeWarning> {
         SizeWarning::for_decompressed_size(self.size)

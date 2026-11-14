@@ -23053,7 +23053,7 @@
       "type": "object"
     },
     "Kind": {
-      "description": "A kind of entity in the Basetool catalog.",
+      "description": "A kind of entity in the P4KX catalog.",
       "type": "string",
       "x-p4kx-vocabularyClass": "open",
       "x-values": [
@@ -117830,7 +117830,7 @@
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "description": "The Basetool catalog: the game data the basetool's P4K import reads.",
+  "description": "The versioned P4KX game-data catalog.",
   "properties": {
     "blueprintPools": {
       "description": "The blueprint pools with the places that reward them, ordered by GUID.",
@@ -118154,6 +118154,6 @@
     "subHarvestableMultiConfigs",
     "texts"
   ],
-  "title": "P4KX Basetool catalog",
+  "title": "P4KX catalog",
   "type": "object"
 }

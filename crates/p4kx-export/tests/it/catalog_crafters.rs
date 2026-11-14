@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The crafting stations in the Basetool catalog, through the public API.
+//! The crafting stations in the P4KX catalog, through the public API.
 
 use crate::catalog_crafting_support::{blueprint_categories, commodity};
 use crate::crafters_fixture::{

@@ -1,6 +1,6 @@
 # The reward sources of a pool come from a targeted scan, not from the reference index
 
-The `rewardSources` of a blueprint pool (ADR-0054, `docs/basetool-catalog.md`) were found through
+The `rewardSources` of a blueprint pool (ADR-0054, `docs/catalog.md`) were found through
 the full `ReferenceIndex`: every Reference of every Record, capped at 2^23, then the referrers of
 the pool Records. Decided for issue #433, the follow-up of the review of #431 (#396).
 

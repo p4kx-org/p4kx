@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Loadouts of ships and items in the Basetool catalog, through the public API: the references
+//! Loadouts of ships and items in the P4KX catalog, through the public API: the references
 //! of the ports, the summary, the Filter and the order.
 
 use crate::loadouts_fixture::{ALPHA, BROKEN, GUN_TEMPLATE, MISSING, SNUB};

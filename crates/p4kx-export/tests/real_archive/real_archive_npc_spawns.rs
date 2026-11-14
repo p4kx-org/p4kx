@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The NPC and entity spawn descriptions of contracts in the Basetool catalog of a real Archive.
+//! The NPC and entity spawn descriptions of contracts in the P4KX catalog of a real Archive.
 
 use std::collections::{BTreeMap, HashSet};
 

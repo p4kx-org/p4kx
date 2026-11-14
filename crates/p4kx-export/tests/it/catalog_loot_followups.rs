@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The older loot Records and the warnings of the loot container scan, in the Basetool catalog.
+//! The older loot Records and the warnings of the loot container scan, in the P4KX catalog.
 
 #[path = "loot_generation_component_tests.rs"]
 mod loot_generation_component_tests;

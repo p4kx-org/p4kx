@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Starmap objects and their world positions in the Basetool catalog, through the public API.
+//! Starmap objects and their world positions in the P4KX catalog, through the public API.
 
 use crate::commodity_v3_fixture::{at, guid, text_row};
 use crate::health_origin_assertions as proof;

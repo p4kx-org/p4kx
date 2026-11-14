@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Loadouts of ships and items in the Basetool catalog, through the public API: the selection and
+//! Loadouts of ships and items in the P4KX catalog, through the public API: the selection and
 //! the ports.
 
 #[path = "catalog_item_alignment.rs"]

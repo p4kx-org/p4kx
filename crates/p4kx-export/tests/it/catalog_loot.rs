@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! Loot tables, archetypes, pool filters, the loot of a slot and the containers placed with a
-//! multi config, in the Basetool catalog.
+//! multi config, in the P4KX catalog.
 
 use crate::catalog_loot_filter_assertions;
 use crate::loot_fixture::{

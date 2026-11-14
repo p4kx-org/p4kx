@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! English and German names and descriptions in the Basetool catalog, through the public API.
+//! English and German names and descriptions in the P4KX catalog, through the public API.
 
 #[path = "catalog_text_values.rs"]
 mod values;

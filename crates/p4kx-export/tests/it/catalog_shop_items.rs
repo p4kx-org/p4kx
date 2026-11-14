@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Item lists of shops in the Basetool catalog, through the public API.
+//! Item lists of shops in the P4KX catalog, through the public API.
 
 use crate::shop_items_fixture::{self, ITEM_A, ITEM_B};
 use crate::shops_fixture::{CLOTHING, EXCHANGE, FOOD, LOOSE, MIXED};

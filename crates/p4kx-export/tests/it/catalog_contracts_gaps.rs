@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The places, the giver faction and the blueprint rewards of a contract in the Basetool catalog.
+//! The places, the giver faction and the blueprint rewards of a contract in the P4KX catalog.
 
 use crate::catalog_contracts::{A, B, C, E, SUB_ONE, TestResult, build, entry};
 

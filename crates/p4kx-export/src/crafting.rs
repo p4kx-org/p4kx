@@ -38,7 +38,7 @@ pub(crate) fn unknown_ranges_warning<'read, 'source: 'read>(
 ///
 /// Every list is ordered by the GUID of its Record; [`reward_sources`](Self::reward_sources) by
 /// the order of the Records that hold them. The blueprints are the same set as the `definitions.blueprints`
-/// kind of the Basetool catalog (development leftovers left out), selected by the one rule
+/// kind of the P4KX catalog (development leftovers left out), selected by the one rule
 /// behind both.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Crafting<'f> {

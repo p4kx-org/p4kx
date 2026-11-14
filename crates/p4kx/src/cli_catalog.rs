@@ -15,9 +15,9 @@ pub(crate) struct CatalogArgs {
     #[arg(required = true)]
     pub(crate) archive: Option<PathBuf>,
     /// The catalog file to write; an existing file is replaced. A name ending in `.zst`, e.g.
-    /// `basetool-catalog.json.zst`, writes one zstd frame (level 19, content size declared, so a
+    /// `p4kx-catalog.json.zst`, writes one zstd frame (level 19, content size declared, so a
     /// plain `zstd -d` decodes it); a name ending in `.gz` is refused, any other name writes plain
-    /// JSON. The Basetool takes both.
+    /// JSON.
     #[arg(long, value_name = "FILE", required = true)]
     pub(crate) out: Option<PathBuf>,
     /// Selects only the Records whose record path matches, with the rules of `p4kx search`; every
@@ -37,6 +37,6 @@ pub(crate) struct CatalogArgs {
 /// The subcommands of `p4kx catalog`.
 #[derive(Debug, Subcommand)]
 pub(crate) enum CatalogCommand {
-    /// Prints the JSON Schema (draft 2020-12) of the Basetool catalog.
+    /// Prints the JSON Schema (draft 2020-12) of the P4KX catalog.
     Schema,
 }

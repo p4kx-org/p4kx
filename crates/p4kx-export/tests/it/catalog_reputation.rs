@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! Factions, reputation scopes, standings and contexts, mission types and localities and contract
-//! scenarios in the Basetool catalog.
+//! scenarios in the P4KX catalog.
 
 #[path = "catalog_faction.rs"]
 mod catalog_faction;

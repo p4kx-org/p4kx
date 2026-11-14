@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The Basetool catalog of a real Archive written as zstd at levels 15, 17 and 19: sizes, ratios
-//! and times, the limits of the Basetool, and the decoded bytes against the plain catalog; runs
+//! The P4KX catalog of a real Archive written as zstd at levels 15, 17 and 19: sizes, ratios
+//! and times, reference size thresholds, and the decoded bytes against the plain catalog; runs
 //! with `--ignored` when `P4KX_DATA_P4K` names an Archive. The level 19 frame is left in the
-//! temporary folder as `basetool-catalog-<channel>.json.zst`, so that `zstd -d --long=27` can
+//! temporary folder as `p4kx-catalog-<channel>.json.zst`, so that `zstd -d --long=27` can
 //! check it.
 
 use std::error::Error;
@@ -92,7 +92,7 @@ fn the_catalog_of_a_real_archive_compresses_within_the_limits_at_every_level() -
         assert_eq!(json.len(), plain.json().len(), "decoded length");
         assert!(json == plain.json(), "byte-identical JSON at level {level}");
         if level == ZSTD_LEVEL {
-            let file = std::env::temp_dir().join(format!("basetool-catalog-{channel}.json.zst"));
+            let file = std::env::temp_dir().join(format!("p4kx-catalog-{channel}.json.zst"));
             fs::write(&file, &frame)?;
             print_line(&format!("level {level} frame: {}", file.display()));
         }

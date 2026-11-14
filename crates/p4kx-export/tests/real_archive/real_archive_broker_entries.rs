@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The mission broker entries in the Basetool catalog of a real Archive.
+//! The mission broker entries in the P4KX catalog of a real Archive.
 
 use std::collections::{BTreeMap, HashSet};
 use std::time::SystemTime;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Shops in the Basetool catalog, through the public API.
+//! Shops in the P4KX catalog, through the public API.
 
 use crate::shops_fixture::{self, EXCHANGE, LOOSE, write_archive};
 use crate::starmap_fixture;

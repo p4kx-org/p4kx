@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! The objective handlers and texts, payouts, modifiers, owner, mission flow and comms of the
-//! contract templates in the Basetool catalog of a real Archive.
+//! contract templates in the P4KX catalog of a real Archive.
 
 use std::collections::HashSet;
 use std::error::Error;
