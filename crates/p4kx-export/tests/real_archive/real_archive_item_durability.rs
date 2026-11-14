@@ -336,11 +336,19 @@ impl<'read, 'source> Trace<'read, 'source> {
                 SourceUseRole::Attempted,
             )
             .map_err(|_| "observe exact attempted source")?;
-        let id = observed.reference().as_str();
-        assert!(
-            self.uses.contains_key(id),
-            "the original attempt appears in the source inventory"
-        );
+        let actual = observed.description();
+        let location = serde_json::to_value(actual.location())?;
+        let id = self
+            .uses
+            .iter()
+            .find_map(|(id, row)| {
+                (row.get("source").and_then(Value::as_str) == Some(actual.source().as_str())
+                    && row.get("scope").and_then(Value::as_str) == Some("payload")
+                    && row.get("role").and_then(Value::as_str) == Some("attempted")
+                    && row.get("location") == Some(&location))
+                .then_some(*id)
+            })
+            .ok_or("the exact original attempt appears in the source inventory")?;
         let contributed = rows(cell, "/sourceUsesRefs")?
             .iter()
             .any(|reference| reference.as_str() == Some(id));

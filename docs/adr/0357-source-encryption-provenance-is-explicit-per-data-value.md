@@ -71,6 +71,11 @@ index. Localized values reference their actual language Entry, not every loaded 
 DCB and a localization Archive are separate actual origins; never claim the DCB came from whichever
 Archive was supplied for enrichment.
 
+Catalog source-use IDs are opaque strings scoped to one document. The producer derives compact
+IDs from physical source identity, input scope, contributor role and original location. With the
+physical inputs registered in fixed order, parallel observations produce the same references.
+The `provenance.uses` rows remain authoritative for the coordinates and selectors.
+
 Every structured tool output has the same immediate per-field obligation. Existing compatible
 JSON wrappers may use a typed fieldOrigins map at exact field paths, with the already materialized
 containsEncryptedSource marker, actual sourceUsesRefs and sourceSetComplete. Row-only origin is

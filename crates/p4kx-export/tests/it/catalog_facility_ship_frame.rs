@@ -18,7 +18,7 @@ fn catalog_composes_original_room_and_child_coordinates_into_the_ship_frame() ->
         (first_child, [9.0, 21.0, 37.0]),
         (second_child, [9.0, 29.0, 37.0]),
     ] {
-        assert_ship_translation(proof::at(row, "/source")?, expected)?;
+        assert_ship_translation(&catalog, proof::at(row, "/source")?, expected)?;
     }
     proof::cell(
         proof::at(invalid, "/source")?,
@@ -58,7 +58,7 @@ fn catalog_keeps_ship_frame_states_when_the_original_inputs_cannot_supply_a_matr
     Ok(())
 }
 
-fn assert_ship_translation(source: &Value, expected: [f64; 3]) -> TestResult {
+fn assert_ship_translation(catalog: &Value, source: &Value, expected: [f64; 3]) -> TestResult {
     let cell = proof::cell(source, "shipFrameTransform", "present")?;
     assert_eq!(
         cell["containsEncryptedSource"], true,
@@ -78,14 +78,8 @@ fn assert_ship_translation(source: &Value, expected: [f64; 3]) -> TestResult {
             "expected original room / Child / entity product {expected}, got {actual}"
         );
     }
-    let refs = proof::rows(cell, "/sourceUsesRefs")?;
     assert!(
-        refs.iter()
-            .filter(|value| value.as_str().is_some_and(|s| {
-                s.contains(":payload:s14:dataforgeValue") && s.ends_with(":$value")
-            }))
-            .count()
-            >= 6,
+        original_value_payloads(&proof::uses(catalog, cell)?) >= 6,
         "ship frame retains the six physical authored offset payload contributions"
     );
     assert_eq!(
@@ -94,4 +88,14 @@ fn assert_ship_translation(source: &Value, expected: [f64; 3]) -> TestResult {
         "existing entity-local transform is independent of the ship frame"
     );
     Ok(())
+}
+
+pub(super) fn original_value_payloads(uses: &[&Value]) -> usize {
+    uses.iter()
+        .filter(|used| {
+            used.pointer("/location/namespace").and_then(Value::as_str) == Some("dataforgeValue")
+                && used.pointer("/location/field").and_then(Value::as_str) == Some("$value")
+                && used.get("role").and_then(Value::as_str) == Some("payload")
+        })
+        .count()
 }

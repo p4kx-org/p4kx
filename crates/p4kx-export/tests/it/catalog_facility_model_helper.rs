@@ -25,30 +25,29 @@ fn catalog_uses_the_selected_model_helper_and_its_original_parent_route() -> Tes
             &json!([[1.0, 0.0, 0.0, x], [0.0, 1.0, 0.0, y], [0.0, 0.0, 1.0, z]]),
             Some(true),
         )?;
-        let refs = proof::rows(cell, "/sourceUsesRefs")?;
-        let encoded = refs.iter().filter_map(Value::as_str);
+        let uses = proof::uses(&catalog, cell)?;
         assert_eq!(
-            encoded
-                .clone()
-                .filter(|value| value.ends_with("localTransform")
-                    && value.contains("modelNodePlacementBytes"))
+            uses.iter()
+                .filter(
+                    |used| used.pointer("/location/field").and_then(Value::as_str)
+                        == Some("localTransform")
+                        && used.pointer("/location/namespace").and_then(Value::as_str)
+                            == Some("modelNodePlacementBytes")
+                )
                 .count(),
             2,
             "the helper and its parent supply independent original matrix ranges"
         );
         assert_eq!(
-            encoded
-                .clone()
-                .filter(|value| value.contains(":payload:s14:dataforgeValue")
-                    && value.ends_with(":$value"))
-                .count(),
+            super::ship_frame::original_value_payloads(&uses),
             if consumes_offset { 6 } else { 0 },
             "the six authored offset payloads contribute only when Assembly applies the offset"
         );
         assert!(
-            encoded
-                .clone()
-                .any(|value| value.contains("Geometry.Geometry.path")),
+            uses.iter().any(|used| used
+                .pointer("/location/field")
+                .and_then(Value::as_str)
+                .is_some_and(|field| field.contains("Geometry.Geometry.path"))),
             "the original hull geometry field selects the physical model"
         );
         assert_original_model(&catalog, cell)?;
@@ -86,11 +85,11 @@ fn catalog_reports_missing_and_ambiguous_helpers_without_using_the_offset_as_a_f
             cell["sourceSetComplete"], true,
             "the original model names were all consulted"
         );
-        let refs = proof::rows(cell, "/sourceUsesRefs")?;
         assert!(
-            refs.iter()
-                .filter_map(Value::as_str)
-                .any(|value| value.contains("nodeMeshTypePrefix")),
+            proof::uses(&catalog, cell)?.iter().any(|used| used
+                .pointer("/location/field")
+                .and_then(Value::as_str)
+                == Some("nodeMeshTypePrefix")),
             "an absent or ambiguous name retains the complete model node selection"
         );
         proof::cell(source, "localTransform", "present")?;

@@ -144,6 +144,7 @@ mod source_registration;
 mod source_registry;
 mod source_scope;
 mod source_use;
+mod source_use_ref_encoding;
 mod source_use_wire;
 mod source_uses;
 mod source_value;

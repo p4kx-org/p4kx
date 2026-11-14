@@ -20,6 +20,7 @@ use crate::source_scope::SourceInput;
 use crate::source_use::{
     InputScope, SourceLocation, SourceUse, SourceUseDescription, SourceUseRef, SourceUseRole,
 };
+use crate::source_use_ref_encoding;
 use crate::source_value::{SourceValue, SourcedValue};
 
 pub(crate) struct RegisteredSource {
@@ -42,7 +43,13 @@ pub(crate) struct SourceRegistry {
     pub(crate) inputs: Vec<InputIdentity>,
     pub(crate) sources: BTreeMap<PhysicalSourceRef, PhysicalSource>,
     pub(crate) uses: BTreeMap<SourceUseRef, Arc<SourceUseDescription>>,
-    compact_use_refs: Option<CompactUseRefs>,
+    use_references: UseReferences,
+}
+
+enum UseReferences {
+    Full,
+    CompactOrdinals(CompactUseRefs),
+    CompactCoordinates,
 }
 
 #[derive(Default)]
@@ -51,41 +58,87 @@ struct CompactUseRefs {
     batch: Option<u64>,
 }
 
+impl UseReferences {
+    fn reference(
+        &mut self,
+        source: &PhysicalSourceRef,
+        scope: InputScope,
+        role: SourceUseRole,
+        location: &SourceLocation,
+    ) -> SourceUseRef {
+        if matches!(self, Self::CompactCoordinates) {
+            return source_use_ref_encoding::encode(source, scope, role, location);
+        }
+        let id = SourceUseRef(format!(
+            "u{}:{}:{}:{}:{}",
+            source.0.len(),
+            source.0,
+            scope.key(),
+            role.key(),
+            location.key()
+        ));
+        let Self::CompactOrdinals(compact) = self else {
+            return id;
+        };
+        let ordinal = compact.aliases.len();
+        let batch = compact.batch;
+        compact
+            .aliases
+            .entry(id)
+            .or_insert_with(|| {
+                SourceUseRef(batch.map_or_else(
+                    || format!("u{ordinal}"),
+                    |batch| format!("u{batch}.{ordinal}"),
+                ))
+            })
+            .clone()
+    }
+}
+
 impl SourceRegistry {
     pub(crate) const fn new(identity: Arc<()>) -> Self {
+        Self::with_references(identity, UseReferences::Full)
+    }
+
+    const fn with_references(identity: Arc<()>, use_references: UseReferences) -> Self {
         Self {
             identity,
             inputs: Vec::new(),
             sources: BTreeMap::new(),
             uses: BTreeMap::new(),
-            compact_use_refs: None,
+            use_references,
         }
     }
 
     pub(crate) fn with_compact_use_refs(identity: Arc<()>) -> Self {
-        Self {
-            compact_use_refs: Some(CompactUseRefs::default()),
-            ..Self::new(identity)
-        }
+        Self::with_references(
+            identity,
+            UseReferences::CompactOrdinals(CompactUseRefs::default()),
+        )
+    }
+
+    pub(crate) const fn with_compact_coordinates(identity: Arc<()>) -> Self {
+        Self::with_references(identity, UseReferences::CompactCoordinates)
     }
 
     pub(crate) fn with_batched_use_refs(identity: Arc<()>) -> Self {
-        Self {
-            compact_use_refs: Some(CompactUseRefs {
+        Self::with_references(
+            identity,
+            UseReferences::CompactOrdinals(CompactUseRefs {
                 batch: Some(0),
                 ..CompactUseRefs::default()
             }),
-            ..Self::new(identity)
-        }
+        )
     }
 
     pub(crate) fn take_use_batch(
         &mut self,
     ) -> std::io::Result<BTreeMap<SourceUseRef, Arc<SourceUseDescription>>> {
-        let compact = self
-            .compact_use_refs
-            .as_mut()
-            .ok_or_else(|| std::io::Error::other("source inventory does not support batches"))?;
+        let UseReferences::CompactOrdinals(compact) = &mut self.use_references else {
+            return Err(std::io::Error::other(
+                "source inventory does not support batches",
+            ));
+        };
         compact.batch = Some(
             compact
                 .batch
@@ -210,30 +263,9 @@ impl SourceRegistry {
         role: SourceUseRole,
         encryption: SourceEncryptionState,
     ) -> SourceUse {
-        let id = SourceUseRef(format!(
-            "u{}:{}:{}:{}:{}",
-            source.0.len(),
-            source.0,
-            scope.key(),
-            role.key(),
-            location.key()
-        ));
-        let id = if let Some(compact) = &mut self.compact_use_refs {
-            let ordinal = compact.aliases.len();
-            let batch = compact.batch;
-            compact
-                .aliases
-                .entry(id)
-                .or_insert_with(|| {
-                    SourceUseRef(batch.map_or_else(
-                        || format!("u{ordinal}"),
-                        |batch| format!("u{batch}.{ordinal}"),
-                    ))
-                })
-                .clone()
-        } else {
-            id
-        };
+        let id = self
+            .use_references
+            .reference(source, scope, role, &location);
         let description = self.uses.entry(id.clone()).or_insert_with(|| {
             Arc::new(SourceUseDescription {
                 id: id.clone(),

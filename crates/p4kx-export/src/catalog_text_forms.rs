@@ -3,9 +3,7 @@
 
 use std::borrow::Cow;
 
-use p4kx_extraction::{
-    Language, SourceLocation, SourceUse, SourceUseRole, SourceUses, SourceValue,
-};
+use p4kx_extraction::{Language, SourceUse, SourceUseRole, SourceUses, SourceValue};
 
 use super::catalog_origins::CatalogLocaleInput;
 use super::catalog_text_contract::TextForms;
@@ -25,13 +23,9 @@ pub(crate) fn lookup_use(
     selector: &SourceUse,
     role: SourceUseRole,
 ) -> Result<SourceUse, CatalogError> {
-    Ok(input.scope().at(
-        SourceLocation::LocalizationLookup {
-            language,
-            selector: selector.reference().clone(),
-        },
-        role,
-    )?)
+    Ok(input
+        .scope()
+        .at_localization_lookup(language, selector, role)?)
 }
 
 /// Binds one prepared lookup to its exact key, locale and conversion inputs.

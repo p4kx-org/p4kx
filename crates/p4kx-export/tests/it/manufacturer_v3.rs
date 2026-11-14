@@ -183,11 +183,15 @@ fn guid_order_never_replaces_the_original_physical_record_index() -> TestResult 
 
 #[test]
 fn repeat_preparation_keeps_the_complete_catalog_bytes_deterministic() -> TestResult {
+    use rayon::ThreadPoolBuilder;
+
     let (_directory, archive) =
         crate::commodity_v3_fixture::open(&fixture::database(), DcbOrigin::Plain)?;
     let options = crate::commodity_v3_fixture::options();
-    let first = p4kx_export::build_catalog(&archive, &options)?;
-    let second = p4kx_export::build_catalog(&archive, &options)?;
+    let sequential = ThreadPoolBuilder::new().num_threads(1).build()?;
+    let parallel = ThreadPoolBuilder::new().num_threads(2).build()?;
+    let first = sequential.install(|| p4kx_export::build_catalog(&archive, &options))?;
+    let second = parallel.install(|| p4kx_export::build_catalog(&archive, &options))?;
     assert_eq!(
         first.json(),
         second.json(),

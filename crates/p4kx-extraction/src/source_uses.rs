@@ -48,6 +48,13 @@ impl SourceUses {
         Self::with_registry(SourceRegistry::with_compact_use_refs)
     }
 
+    /// Starts an inventory with compact source-use references independent of use observation order.
+    /// Register physical inputs in deterministic order for repeatable serialized references.
+    #[must_use]
+    pub fn with_compact_coordinates() -> Self {
+        Self::with_registry(SourceRegistry::with_compact_coordinates)
+    }
+
     fn with_registry(make: impl FnOnce(Arc<()>) -> SourceRegistry) -> Self {
         let identity = Arc::new(());
         let registry = Arc::new(Mutex::new(make(Arc::clone(&identity))));

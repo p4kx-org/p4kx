@@ -132,9 +132,10 @@ fn physical_field(used: &Value) -> TestResult<(u64, SourceField)> {
 
 /// Checks that every source-use reference closes in the catalog inventory.
 pub(crate) fn reference_closure(catalog: &Value) -> TestResult {
-    let ids: BTreeSet<_> = fixture::at(catalog, "/provenance/uses")?
+    let rows = fixture::at(catalog, "/provenance/uses")?
         .as_array()
-        .ok_or("use inventory")?
+        .ok_or("use inventory")?;
+    let ids: BTreeSet<_> = rows
         .iter()
         .map(|row| {
             fixture::at(row, "/id")?
@@ -142,6 +143,18 @@ pub(crate) fn reference_closure(catalog: &Value) -> TestResult {
                 .ok_or_else(|| "use inventory id is not a string".into())
         })
         .collect::<TestResult<_>>()?;
+    assert_eq!(ids.len(), rows.len(), "each source-use ID is unique");
+    for row in rows {
+        if row.pointer("/location/type").and_then(Value::as_str) == Some("localizationLookup") {
+            let selector = fixture::at(row, "/location/selector")?
+                .as_str()
+                .ok_or("selector ID")?;
+            assert!(
+                ids.contains(selector),
+                "the authored localization selector closes"
+            );
+        }
+    }
     walk_reference_closure(catalog, &ids)
 }
 

@@ -50,7 +50,7 @@ impl CatalogOrigins {
         {
             return Err(CatalogError::SourceOriginMismatch);
         }
-        let uses = SourceUses::new();
+        let uses = SourceUses::with_compact_coordinates();
         let input = match entry.origin() {
             DataForgeOrigin::Archive(origin) => SourceInput::Archive(origin),
             DataForgeOrigin::File(origin) => SourceInput::File(origin),

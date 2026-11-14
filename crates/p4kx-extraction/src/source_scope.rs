@@ -6,12 +6,12 @@ use std::sync::{Arc, Mutex};
 
 use p4kx_archive::{ArchiveInputOrigin, BuildManifestOrigin, EntryOrigin, ObservedEntry};
 
-use crate::ObservedFileOrigin;
 use crate::source_details::SourceCoordinateOmission;
 use crate::source_evidence_error::{self, SourceEvidenceError};
 use crate::source_inventory::{PhysicalSourceRef, SourceEncryptionState};
 use crate::source_registry::SourceRegistry;
 use crate::source_use::{InputScope, SourceLocation, SourceUse, SourceUseRole};
+use crate::{Language, ObservedFileOrigin};
 
 /// Actual observed input; no path, matching bytes or key flag can replace this binding.
 #[derive(Debug, Clone, Copy)]
@@ -63,6 +63,32 @@ impl SourceScope {
             role,
             self.encryption(),
         ))
+    }
+
+    /// Attaches a localization lookup to a registered authored key selector from this inventory.
+    ///
+    /// # Errors
+    /// Returns an error for foreign or missing selector evidence or an interrupted registry.
+    pub fn at_localization_lookup(
+        &self,
+        language: Language,
+        selector: &SourceUse,
+        role: SourceUseRole,
+    ) -> Result<SourceUse, SourceEvidenceError> {
+        let mut registry = source_evidence_error::lock(&self.registry)?;
+        if selector.role() != SourceUseRole::Selector
+            || !registry
+                .uses
+                .get(selector.reference())
+                .is_some_and(|known| Arc::ptr_eq(known, &selector.description))
+        {
+            return Err(SourceEvidenceError::ForeignEvidence);
+        }
+        let location = SourceLocation::LocalizationLookup {
+            language,
+            selector: selector.reference().clone(),
+        };
+        Ok(registry.register_use(&self.source, self.scope, location, role, self.encryption()))
     }
 
     /// Registers an actual use whose optional coordinate capture was not admitted.
