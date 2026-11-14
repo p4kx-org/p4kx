@@ -26,6 +26,7 @@ mod material_accounting;
 mod model_collision_frames;
 mod model_collision_replay;
 mod model_lod_distance_replay;
+mod model_material_witness;
 mod preservation_provider;
 mod privacy;
 mod shader_accounting;

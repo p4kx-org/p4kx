@@ -133,6 +133,18 @@ remain ambiguous. The model provider reports physical targets even when the mate
 is unselected, and never reads target material contents to resolve these references. The
 material provider owns the separate library payload and its status.
 
+For a bounded installed check, set `P4KX_DATA_P4K` and optionally
+`P4KX_DATA_P4K_B`, then run
+`cargo test --release -p p4kx-media --test real_archive installed_model_material_references_match_original_paths_and_field_origins -- --ignored --nocapture`.
+The test probes at most 96 decoded Entries per family and reads at most 512 KiB per
+Entry. It seeks one packed model and one CDF with a verified authored reference.
+The original archive reader verifies each selected payload. A private replay keeps
+the original file paths, source bytes, encryption state and proved target identities
+while substituting unread target payloads. The normal Media export is compared with
+the original independently parsed names, paths and per-field coordinates. Only
+aggregate counts and failure stages leave the test. A bounded miss does not establish
+absence from the installed Archive. The test does not hash or export the full Archive.
+
 The original decimal LOD suffix survives even when it exceeds the numeric range. The
 `canonical_reader_candidate` flag describes whether the existing model reader would
 construct that name under its supported naming and LOD range. Additional discovered siblings
