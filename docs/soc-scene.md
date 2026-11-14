@@ -128,6 +128,21 @@ validator check that each stream reference is distinct and belongs to its
 physical member. The optional hierarchy continues to render the usual scene
 meshes and lights.
 
+Each stream's optional `geometry` list addresses a model slot by its
+physical SOC chunk ordinal and local model ordinal. The selected tier uses
+the same path spellings as the preview model provider and searches the
+actual container chain from the nearest owner out. A tier records the
+owner depth and matching path form. Missing and invalid selectors remain
+visible and all duplicate entries in the first matching tier are retained.
+
+A target reference uses archive directory evidence. It carries no model
+payload contribution. The encrypted SOC selector may mark the lookup as
+encrypted even when the target directory is clear. Directory coverage
+evidence for proving uniqueness or absence is incomplete in this
+projection. `sourceSetComplete` remains false for directory lookups
+while their known contributing sources remain filterable. The same binary
+table can be referenced from different branches with different target entries.
+
 ## Blender package
 
 `p4kx interior package <archive> <container>... --out <folder> --authored-soc` includes the

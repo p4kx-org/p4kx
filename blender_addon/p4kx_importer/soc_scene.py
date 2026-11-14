@@ -93,9 +93,11 @@ def _validate_included_objects(document: dict[str, Any], occurrences: list[Any])
         for stream in streams:
             stream = read_object(stream, "SOC stream")
             refs = _array(stream.get("includedObjects", []), "SOC IncludedObjects references")
-            if refs:
+            geometry = _array(stream.get("geometry", []), "SOC geometry references")
+            if refs or geometry:
                 member = read_object(stream.get("member"), "SOC stream member")
                 _validate_included_refs(refs, included, member)
+                _validate_geometry_refs(geometry, [included[index] for index in refs])
 
 
 def _validate_included_payload(table: dict[str, Any]) -> None:
@@ -127,6 +129,28 @@ def _validate_included_refs(refs: list[Any], included: list[Any], member: dict[s
         if member.get("state") != "present" or included[index].get("source") != member.get("source"):
             raise PackageError("A SOC IncludedObjects reference must belong to its stream member.")
         seen.add(index)
+
+
+def _validate_geometry_refs(refs: list[Any], chunks: list[Any]) -> None:
+    if not refs:
+        return
+    counts = {}
+    for chunk in chunks:
+        tables = _present(chunk.get("tables"))
+        if tables is not None:
+            models = _array(read_object(tables, "SOC IncludedObjects tables").get("models"), "SOC model slots")
+            counts[chunk["ordinal"]] = len(models)
+    seen = set()
+    for item in refs:
+        reference = read_object(item, "SOC geometry reference")
+        chunk = reference.get("chunkOrdinal")
+        model = reference.get("modelOrdinal")
+        if type(chunk) is not int or type(model) is not int or not 0 <= model < counts.get(chunk, 0):
+            raise PackageError("A SOC geometry reference must identify a model slot of its stream.")
+        if (chunk, model) in seen:
+            raise PackageError("A SOC geometry reference must identify a distinct model slot.")
+        seen.add((chunk, model))
+        read_object(reference.get("target"), "SOC geometry target")
 
 
 def _placement(

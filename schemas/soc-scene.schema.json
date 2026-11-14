@@ -199,6 +199,13 @@
       ],
       "type": "object"
     },
+    "CandidateKind": {
+      "enum": [
+        "dataPrefixed",
+        "relative"
+      ],
+      "type": "string"
+    },
     "Child": {
       "properties": {
         "localTransform": {
@@ -1138,6 +1145,29 @@
         "name",
         "scopes",
         "animations"
+      ],
+      "type": "object"
+    },
+    "GeometryReference": {
+      "properties": {
+        "chunkOrdinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "modelOrdinal": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "target": {
+          "$ref": "#/$defs/SourcedValueOfTarget"
+        }
+      },
+      "required": [
+        "chunkOrdinal",
+        "modelOrdinal",
+        "target"
       ],
       "type": "object"
     },
@@ -6695,6 +6725,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfTarget": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/Target"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfTileTarget": {
       "allOf": [
         {
@@ -7877,6 +8037,12 @@
     },
     "Stream": {
       "properties": {
+        "geometry": {
+          "items": {
+            "$ref": "#/$defs/GeometryReference"
+          },
+          "type": "array"
+        },
         "includedObjects": {
           "items": {
             "format": "uint",
@@ -7960,6 +8126,94 @@
         "palettes",
         "rows",
         "complete"
+      ],
+      "type": "object"
+    },
+    "Target": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "invalidSelector",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "missing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "source": {
+              "$ref": "#/$defs/PhysicalSourceRef"
+            },
+            "tier": {
+              "$ref": "#/$defs/Tier"
+            },
+            "type": {
+              "const": "matched",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "tier",
+            "source"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "candidates": {
+              "items": {
+                "$ref": "#/$defs/PhysicalSourceRef"
+              },
+              "type": "array"
+            },
+            "tier": {
+              "$ref": "#/$defs/Tier"
+            },
+            "type": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "tier",
+            "candidates"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "Tier": {
+      "properties": {
+        "depth": {
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "kind": {
+          "$ref": "#/$defs/CandidateKind"
+        }
+      },
+      "required": [
+        "depth",
+        "kind"
       ],
       "type": "object"
     },

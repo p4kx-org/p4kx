@@ -29,6 +29,27 @@ from synthetic import interior_manifest, write_package  # noqa: E402
 from synthetic_soc_scene import scene  # noqa: E402
 
 
+def binary_scene():
+    """Adds one physical binary table and model lookup to the authored hierarchy."""
+    document = scene()
+    stream = document["occurrences"][0]["streams"][0]
+    stream["member"]["source"] = "synthetic-stream"
+    stream["includedObjects"] = [0]
+    stream["geometry"] = [{
+        "chunkOrdinal": 2,
+        "modelOrdinal": 0,
+        "target": {"state": "present", "value": {"type": "missing"}},
+    }]
+    document["includedObjects"] = [{
+        "ordinal": 2,
+        "source": "synthetic-stream",
+        "byteLength": "4",
+        "raw": {"state": "present", "value": "AQAAAA=="},
+        "tables": {"state": "present", "value": {"models": [{"ordinal": 0}]}},
+    }]
+    return document
+
+
 def native_import(folder: Path, authored: bool):
     """Imports a fixture with the same visible scene in either mode."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -39,7 +60,7 @@ def native_import(folder: Path, authored: bool):
         manifest["authored_soc"] = {"file": soc_scene.SOC_SCENE_FILE, "schema_version": 1}
         target = folder / soc_scene.SOC_SCENE_FILE
         target.parent.mkdir(parents=True)
-        target.write_text(json.dumps(scene()), encoding="utf-8")
+        target.write_text(json.dumps(binary_scene()), encoding="utf-8")
     loaded = package.load_package(write_package(folder, manifest))
     result = importer.import_package(bpy.context, loaded)
     bpy.context.view_layer.update()

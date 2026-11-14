@@ -11,6 +11,7 @@ use serde::Serialize;
 
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_entities::Entity;
+use crate::soc_scene_geometry::GeometryReference;
 use crate::soc_scene_included::IncludedSources;
 use crate::soc_scene_occurrence::{InputState, Member, Selector};
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
@@ -34,6 +35,8 @@ pub(crate) struct Stream {
     member: Member<Vec<Chunk>>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     included_objects: Vec<usize>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    geometry: Vec<GeometryReference>,
 }
 
 impl Stream {
@@ -45,12 +48,22 @@ impl Stream {
         cancel: &CancelToken,
     ) -> Result<Self, SocSceneError> {
         let mut included_objects = Vec::new();
+        let mut geometry = Vec::new();
         let member = match &stream.member {
             Some(selection) => Member::read(selection, sources, |bytes, origin| {
                 let file = SocEntityFile::parse(bytes).map_err(|_| InputState::Invalid)?;
                 included_objects = included
                     .bind(&file, origin, cancel)
                     .map_err(InputState::Capture)?;
+                geometry
+                    .try_reserve_exact(stream.geometry.len())
+                    .map_err(|error| InputState::Capture(SocSceneError::Allocation(error)))?;
+                for reference in &*stream.geometry {
+                    crate::soc_scene_classes::check(cancel).map_err(InputState::Capture)?;
+                    geometry.push(
+                        GeometryReference::read(reference, origin).map_err(InputState::Capture)?,
+                    );
+                }
                 file.entity_chunks()
                     .map(|chunk| match chunk {
                         Ok(chunk) => Chunk::read(&chunk, index, origin, documents)
@@ -70,6 +83,7 @@ impl Stream {
                 .transpose()?,
             member,
             included_objects,
+            geometry,
         })
     }
 }

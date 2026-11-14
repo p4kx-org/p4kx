@@ -48,6 +48,7 @@ fn the_authored_package_and_standalone_source_retain_identical_binary_placements
         "the CLI command and package publish the same source document"
     );
     verify_chronology(&source)?;
+    package::verify_geometry(&source)?;
     verify_chunks(&source, &fixture)
 }
 

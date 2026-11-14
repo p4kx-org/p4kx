@@ -67,3 +67,83 @@ fn validate_schema(schema: &Value, document: &Value) -> Check {
         .map_err(|error| error.to_string())?;
     Ok(())
 }
+
+pub(super) fn verify_geometry(source: &Value) -> Check {
+    let geometry = source
+        .pointer("/occurrences/0/streams/0/geometry")
+        .and_then(Value::as_array)
+        .ok_or("the first stream's geometry references")?;
+    let [first, second] = geometry.as_slice() else {
+        return Err("expected a reference for each chunk model slot".into());
+    };
+    assert_eq!(
+        source.pointer("/occurrences/0/streams/1/geometry"),
+        source.pointer("/occurrences/0/streams/0/geometry"),
+        "repeated streams preserve the same physical source and target links"
+    );
+    assert_eq!(
+        first.get("chunkOrdinal").and_then(Value::as_u64),
+        Some(0),
+        "first binary chunk keeps its original ordinal"
+    );
+    assert_eq!(
+        second.get("chunkOrdinal").and_then(Value::as_u64),
+        Some(2),
+        "the intervening XML chunk does not renumber geometry"
+    );
+    let original = first
+        .pointer("/target/value/source")
+        .ok_or("target entry")?;
+    for reference in [first, second] {
+        verify_target(reference, original);
+    }
+    Ok(())
+}
+
+fn verify_target(reference: &Value, original: &Value) {
+    assert_eq!(
+        reference.get("modelOrdinal").and_then(Value::as_u64),
+        Some(0),
+        "model ordinal is local to each binary table"
+    );
+    assert_eq!(
+        reference.pointer("/target/value/source"),
+        Some(original),
+        "both tables refer to the same physical model"
+    );
+    assert_eq!(
+        reference
+            .pointer("/target/value/type")
+            .and_then(Value::as_str),
+        Some("matched"),
+        "the fixture has a matching archive entry"
+    );
+    assert_eq!(
+        reference
+            .pointer("/target/value/tier/kind")
+            .and_then(Value::as_str),
+        Some("dataPrefixed"),
+        "the stored path requires the Data prefix"
+    );
+    assert_eq!(
+        reference
+            .pointer("/target/value/tier/depth")
+            .and_then(Value::as_u64),
+        Some(1),
+        "the root archive is one owner beyond the container"
+    );
+    assert_eq!(
+        reference
+            .pointer("/target/containsEncryptedSource")
+            .and_then(Value::as_bool),
+        Some(true),
+        "the encrypted SOC path selects a clear directory entry"
+    );
+    assert_eq!(
+        reference
+            .pointer("/target/sourceSetComplete")
+            .and_then(Value::as_bool),
+        Some(false),
+        "directory absence evidence from inner tiers is not retained"
+    );
+}

@@ -78,3 +78,31 @@ def test_included_objects_refs_are_physical_and_scoped_to_the_stream():
     chunk["source"] = "different-source"
     with pytest.raises(package.PackageError, match="belong to its stream"):
         soc_scene.nodes(data)
+
+
+def test_geometry_refs_must_link_a_model_slot_in_the_same_stream():
+    data = scene()
+    stream = data["occurrences"][0]["streams"][0]
+    stream["member"]["source"] = "synthetic-source"
+    stream["includedObjects"] = [0]
+    data["includedObjects"] = [
+        {
+            "ordinal": 2,
+            "source": "synthetic-source",
+            "byteLength": "0",
+            "raw": {"state": "present", "value": ""},
+            "tables": {"state": "present", "value": {"models": [{}]}},
+        }
+    ]
+    selection = {"chunkOrdinal": 2, "modelOrdinal": 0, "target": {"state": "present"}}
+    stream["geometry"] = [selection]
+    assert soc_scene.nodes(data) == soc_scene.nodes(scene())
+    stream["geometry"] = [selection, selection]
+    with pytest.raises(package.PackageError, match="distinct model slot"):
+        soc_scene.nodes(data)
+    stream["geometry"] = [{**selection, "chunkOrdinal": 3}]
+    with pytest.raises(package.PackageError, match="model slot of its stream"):
+        soc_scene.nodes(data)
+    stream["geometry"] = [{**selection, "modelOrdinal": 1}]
+    with pytest.raises(package.PackageError, match="model slot of its stream"):
+        soc_scene.nodes(data)
