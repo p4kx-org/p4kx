@@ -153,3 +153,20 @@ fn the_mesh_vertex_map_row_schema_retains_v1_and_validates_v2_fields() -> TestRe
     assert!(!validator.is_valid(&draw), "closed per-primitive row");
     Ok(())
 }
+
+#[test]
+fn the_material_source_sidecar_schema_is_current() -> TestResult {
+    let schema = p4kx_blender::material_source_sidecar_schema();
+    jsonschema::draft202012::meta::validate(&schema).map_err(|error| error.to_string())?;
+    let generated = serde_json::to_string_pretty(&schema)? + "\n";
+    let path = schema_file().with_file_name("blender-material-source.schema.json");
+    if std::env::var_os("P4KX_BLESS").is_some_and(|value| value == "1") {
+        std::fs::write(&path, &generated)?;
+    }
+    assert_eq!(
+        std::fs::read_to_string(&path)?,
+        generated,
+        "regenerate the material source schema"
+    );
+    Ok(())
+}

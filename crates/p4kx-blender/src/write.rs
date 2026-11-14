@@ -14,14 +14,17 @@ use crate::creature::write_creature_package;
 use crate::entity_classification::EntityClassifications;
 use crate::finite::sanitise;
 use crate::items::{Item, entity_ref, items};
-use crate::manifest::{
-    BuildInfo, EntityRef, Issue, MESHES_FOLDER, NodeKind, Replacement, TEXTURES_FOLDER,
-};
+use crate::manifest::{BuildInfo, EntityRef, Issue, MESHES_FOLDER, Replacement, TEXTURES_FOLDER};
 use crate::package_receipt::{self, PackageFile};
 use crate::plan::MeshPlan;
 use crate::stage::Staging;
-use crate::textures::{self, Outcome};
+use crate::textures;
 use crate::{PackageResult, PackageWriteContext, meshes};
+
+#[path = "write_summary.rs"]
+mod summary;
+
+use self::summary::summarise;
 
 /// What the package records about where the Assembly comes from and how it was chosen.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -252,7 +255,7 @@ fn write_scene_files(
     let items = &scene.items;
     let plan = MeshPlan::of(items);
     let fallback = crate::package_default_material::select(items, &plan, options.lod, models);
-    let collected = Collected::of(
+    let mut collected = Collected::of(
         items,
         &plan,
         options.lod,
@@ -279,6 +282,7 @@ fn write_scene_files(
             .and_then(ArchiveDefaultMaterial::material),
     )?;
     context.check()?;
+    let mut authored_files = collected.library_sources.write_authored(staging, context)?;
     let mut manifest = manifest(&Inputs {
         entity: scene.entity.clone(),
         assembly_issues: scene.issues,
@@ -292,19 +296,37 @@ fn write_scene_files(
     });
     let authored_soc_file =
         complete_manifest(&mut manifest, scene, fallback.as_deref(), staging, context)?;
-    let mut summary = summarise(&manifest, &outcomes, &written);
+    let summary = summarise(&manifest, &outcomes, &written);
     let mut files = package_receipt::scene_files(written, &outcomes, authored_soc_file);
-    files.extend(crate::collision_helpers::write(
+    files.append(&mut authored_files);
+    finish_scene(
         &mut manifest,
+        scene,
+        options,
+        staging,
+        context,
+        files,
+        summary,
+    )
+}
+
+fn finish_scene(
+    manifest: &mut crate::Manifest,
+    scene: &Scene<'_>,
+    options: &GlbOptions,
+    staging: &Path,
+    context: &PackageWriteContext<'_>,
+    mut files: Vec<PackageFile>,
+    mut summary: PackageSummary,
+) -> PackageResult<PackageSummary> {
+    files.extend(crate::collision_helpers::write(
+        manifest,
         scene.classification,
         options.lod,
         staging,
         context,
     )?);
-    if manifest.meshes.iter().any(|mesh| mesh.vertex_map.is_some()) {
-        crate::mesh_vertex_map_wire::PACKAGE_VERSION.clone_into(&mut manifest.version);
-    }
-    let totals = package_receipt::write_metadata(staging, &manifest, files, context)?;
+    let totals = package_receipt::write_metadata(staging, manifest, files, context)?;
     summary.files = totals.files;
     summary.bytes = totals.bytes;
     context.check()?;
@@ -334,57 +356,4 @@ fn complete_manifest(
     }
     sanitise(manifest);
     Ok(authored_soc)
-}
-
-fn count(manifest: &crate::Manifest, kind: NodeKind) -> usize {
-    manifest
-        .nodes
-        .iter()
-        .filter(|node| node.kind == kind)
-        .count()
-}
-
-fn summarise(
-    manifest: &crate::Manifest,
-    outcomes: &[Outcome],
-    meshes: &[meshes::WrittenMesh],
-) -> PackageSummary {
-    let mut summary = PackageSummary {
-        nodes: manifest.nodes.len(),
-        containers: count(manifest, NodeKind::Container),
-        objects: count(manifest, NodeKind::Object),
-        lights: count(manifest, NodeKind::Light),
-        drawn_nodes: manifest
-            .nodes
-            .iter()
-            .filter(|node| node.mesh.is_some())
-            .count(),
-        meshes: manifest.meshes.len(),
-        textures: manifest.textures.len(),
-        materials: manifest.materials.len(),
-        palettes: manifest.palettes.len(),
-        issues: manifest.issues.clone(),
-        ..PackageSummary::default()
-    };
-    summary.shared_meshes = summary.drawn_nodes.saturating_sub(summary.meshes);
-    for mesh in meshes {
-        summary.vertices += mesh.summary.vertices;
-        summary.triangles += mesh.summary.triangles;
-        summary.lod_fallbacks += mesh.summary.lod_fallbacks;
-    }
-    for outcome in outcomes {
-        match outcome {
-            Outcome::Written {
-                width,
-                height,
-                smoothness,
-                ..
-            } => {
-                let images = if smoothness.is_some() { 2 } else { 1 };
-                summary.texture_pixels += images * u64::from(*width) * u64::from(*height);
-            }
-            Outcome::Failed { .. } => summary.texture_failures += 1,
-        }
-    }
-    summary
 }

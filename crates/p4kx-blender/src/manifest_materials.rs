@@ -2,6 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{FieldOrigins, MaterialLibrarySourceInfo, SourceInventory};
+
+use crate::MaterialSourceReference;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -330,9 +332,13 @@ pub struct Palette {
 pub struct MaterialLibrarySourceDescription {
     /// Library path exposed by the model reader, without a unique physical-source claim.
     pub path: String,
-    /// Bounded source root, namespaces/content and actual projection boundaries.
-    pub authored: MaterialLibrarySourceInfo<'static>,
-    /// Exact original evidence of the values within the authored material library.
+    /// Streamed authored source data and original field positions of this library.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authored_file: Option<MaterialSourceReference>,
+    /// Inline authored source root of an earlier manifest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub authored: Option<MaterialLibrarySourceInfo<'static>>,
+    /// Inline source evidence of an earlier manifest.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub authored_origin: Option<AuthoredMaterialOrigin>,
     /// Physical sources and exact use references for this library's emission fields.

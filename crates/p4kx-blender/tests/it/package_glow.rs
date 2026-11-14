@@ -79,7 +79,7 @@ fn validate(bytes: &[u8], package: &Path) -> TestResult {
         .map_err(|error| error.to_string())?;
     assert_eq!(
         manifest.get("version").and_then(Value::as_str),
-        Some("1.18"),
+        Some(p4kx_blender::FORMAT_VERSION),
         "authored helper version"
     );
     let authored = "/entity_glow/declarations/0/components/0";

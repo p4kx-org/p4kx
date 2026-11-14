@@ -15,6 +15,7 @@ use crate::TextureFormat;
 use crate::manifest::{FORMAT, MANIFEST_FILE, MESHES_FOLDER, TEXTURES_FOLDER};
 use crate::package_receipt::RECEIPT_FILE;
 use crate::{ManifestSocScene, PackageError, PackageResult, package_soc_scene};
+use crate::{MaterialSourceReference, material_source_sidecar};
 
 const MAX_MARKER_LEN: u64 = 1 << 30;
 const MIN_ID_DIGITS: usize = 4;
@@ -28,6 +29,8 @@ struct Marker {
     textures: Vec<TextureMarker>,
     #[serde(default)]
     meshes: Vec<MeshMarker>,
+    #[serde(default)]
+    material_libraries: Vec<LibraryMarker>,
 }
 
 #[derive(Deserialize)]
@@ -40,6 +43,11 @@ struct MeshMarker {
 struct TextureMarker {
     file: String,
     format: Option<TextureFormat>,
+}
+
+#[derive(Deserialize)]
+struct LibraryMarker {
+    authored_file: Option<MaterialSourceReference>,
 }
 
 pub(crate) fn check_shape(out: &Path) -> PackageResult<()> {
@@ -75,6 +83,7 @@ fn check_replaceable(out: &Path) -> PackageResult<()> {
         MESHES_FOLDER,
         TEXTURES_FOLDER,
         package_soc_scene::DIRECTORY,
+        material_source_sidecar::DIRECTORY,
         crate::collision_helper_document::FILE,
     ];
     if !names
@@ -86,7 +95,7 @@ fn check_replaceable(out: &Path) -> PackageResult<()> {
     if names.iter().any(|name| name == RECEIPT_FILE) && !is_plain_file(&out.join(RECEIPT_FILE)) {
         return Err(not_a_package());
     }
-    if !matches_asset_folders(out, &marker)? {
+    if !matches_asset_folders(out, &marker)? || !matches_material_sources(out, &marker)? {
         return Err(not_a_package());
     }
     let collision = crate::collision_helper_document::FILE;
@@ -105,6 +114,38 @@ fn check_replaceable(out: &Path) -> PackageResult<()> {
         return Err(not_a_package());
     }
     Ok(())
+}
+
+fn matches_material_sources(out: &Path, marker: &Marker) -> PackageResult<bool> {
+    let mut expected = BTreeSet::new();
+    let prefix = format!("{}/", material_source_sidecar::DIRECTORY);
+    for (ordinal, library) in marker.material_libraries.iter().enumerate() {
+        if let Some(reference) = &library.authored_file {
+            if !reference.is_valid(ordinal) {
+                return Ok(false);
+            }
+            let Some(name) = reference.file.strip_prefix(&prefix) else {
+                return Ok(false);
+            };
+            expected.insert(name);
+        }
+    }
+    let path = out.join(material_source_sidecar::DIRECTORY);
+    match fs::symlink_metadata(&path) {
+        Ok(metadata)
+            if !expected.is_empty() && metadata.is_dir() && !is_redirected_metadata(&metadata) =>
+        {
+            let names = names_in(&path).map_err(|source| PackageError::write(&path, source))?;
+            Ok(names.len() == expected.len()
+                && names.iter().all(|name| {
+                    name.to_str().is_some_and(|name| expected.contains(name))
+                        && is_plain_file(&path.join(name))
+                }))
+        }
+        Ok(_) => Ok(false),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(expected.is_empty()),
+        Err(source) => Err(PackageError::write(&path, source)),
+    }
 }
 
 fn matches_asset_folders(out: &Path, marker: &Marker) -> PackageResult<bool> {

@@ -38,7 +38,11 @@ fn package_collision_helpers_are_optional_and_keep_original_attachment_rig() -> 
         p4kx_blender::FORMAT_VERSION,
         "default format version"
     );
-    assert_eq!(optional.version, "1.18", "opt-in additive manifest version");
+    assert_eq!(
+        optional.version,
+        p4kx_blender::FORMAT_VERSION,
+        "helpers use the current package version"
+    );
     for mesh in &default.meshes {
         assert_eq!(
             fs::read(base.join(&mesh.file))?,

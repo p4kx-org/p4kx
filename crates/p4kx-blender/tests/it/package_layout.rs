@@ -70,7 +70,13 @@ fn the_package_is_a_folder_of_a_manifest_meshes_and_textures() -> TestResult {
 
     assert_eq!(
         names_in(&written.out)?,
-        ["meshes", "receipt.json", "scene.json", "textures"],
+        [
+            "material-sources",
+            "meshes",
+            "receipt.json",
+            "scene.json",
+            "textures"
+        ],
         "nothing else is in the folder"
     );
     assert_eq!(
@@ -78,24 +84,37 @@ fn the_package_is_a_folder_of_a_manifest_meshes_and_textures() -> TestResult {
         ["m0001.glb", "m0002.glb", "m0003.glb", "m0004.glb"]
     );
     assert_eq!(names_in(&written.out.join("textures"))?, ["t0001.png"]);
-    assert_eq!(written.summary.files, 7);
-    let on_disk: u64 = [
-        "receipt.json",
-        "scene.json",
-        "meshes/m0001.glb",
-        "meshes/m0002.glb",
-        "meshes/m0003.glb",
-        "meshes/m0004.glb",
-        "textures/t0001.png",
-    ]
-    .iter()
-    .map(|path| std::fs::metadata(written.out.join(path)).map(|metadata| metadata.len()))
-    .sum::<Result<u64, _>>()?;
+    let mut expected = declared_files(&written.manifest);
+    expected.push("receipt.json".into());
+    assert_eq!(
+        written.summary.files,
+        expected.len(),
+        "summary counts sidecars"
+    );
+    let on_disk = expected
+        .iter()
+        .map(|path| std::fs::metadata(written.out.join(path)).map(|metadata| metadata.len()))
+        .sum::<Result<u64, _>>()?;
     assert_eq!(
         written.summary.bytes, on_disk,
         "the summary counts every file"
     );
     Ok(())
+}
+
+fn declared_files(manifest: &Manifest) -> Vec<String> {
+    let mut paths = vec!["scene.json".to_owned()];
+    paths.extend(manifest.meshes.iter().map(|mesh| mesh.file.clone()));
+    paths.extend(manifest.textures.iter().map(|texture| texture.file.clone()));
+    paths.extend(
+        manifest
+            .material_libraries
+            .iter()
+            .filter_map(|material| material.authored_file.as_ref())
+            .map(|source| source.file.clone()),
+    );
+    paths.sort_unstable();
+    paths
 }
 
 #[test]
@@ -114,14 +133,11 @@ fn independent_writes_have_the_same_receipt_with_every_declared_file() -> TestRe
             .iter()
             .map(|file| file["path"].as_str())
             .collect::<Vec<_>>(),
-        [
-            Some("meshes/m0001.glb"),
-            Some("meshes/m0002.glb"),
-            Some("meshes/m0003.glb"),
-            Some("meshes/m0004.glb"),
-            Some("scene.json"),
-            Some("textures/t0001.png"),
-        ]
+        declared_files(&first.manifest)
+            .iter()
+            .map(|path| Some(path.as_str()))
+            .collect::<Vec<_>>(),
+        "every declared file has a deterministic digest"
     );
     for row in files {
         let path = row["path"].as_str().ok_or("relative file")?;

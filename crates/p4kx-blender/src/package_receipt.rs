@@ -62,28 +62,7 @@ pub(crate) fn write_metadata(
     files.push(PackageFile::new(MANIFEST_FILE.to_owned(), &manifest_digest));
     files.sort_unstable_by(|left, right| left.path.cmp(&right.path));
     let receipt_path = staging.join(RECEIPT_FILE);
-    let expected = std::iter::once(MANIFEST_FILE)
-        .chain(manifest.meshes.iter().map(|mesh| mesh.file.as_str()))
-        .chain(
-            manifest
-                .meshes
-                .iter()
-                .filter_map(|mesh| mesh.vertex_map.as_deref()),
-        )
-        .chain(
-            manifest
-                .textures
-                .iter()
-                .map(|texture| texture.file.as_str()),
-        )
-        .chain(manifest.authored_soc.iter().map(|soc| soc.file.as_str()))
-        .chain(
-            manifest
-                .collision_helpers
-                .iter()
-                .map(|helper| helper.file.as_str()),
-        );
-    let mut expected: Vec<_> = expected.collect();
+    let mut expected: Vec<_> = declared_files(manifest).collect();
     expected.sort_unstable();
     if expected
         .into_iter()
@@ -114,6 +93,36 @@ pub(crate) fn write_metadata(
         files: files_len,
         bytes: payload_bytes + digest.byte_length(),
     })
+}
+
+fn declared_files(manifest: &Manifest) -> impl Iterator<Item = &str> {
+    std::iter::once(MANIFEST_FILE)
+        .chain(manifest.meshes.iter().map(|mesh| mesh.file.as_str()))
+        .chain(
+            manifest
+                .meshes
+                .iter()
+                .filter_map(|mesh| mesh.vertex_map.as_deref()),
+        )
+        .chain(
+            manifest
+                .textures
+                .iter()
+                .map(|texture| texture.file.as_str()),
+        )
+        .chain(manifest.authored_soc.iter().map(|soc| soc.file.as_str()))
+        .chain(manifest.material_libraries.iter().filter_map(|library| {
+            library
+                .authored_file
+                .as_ref()
+                .map(|source| source.file.as_str())
+        }))
+        .chain(
+            manifest
+                .collision_helpers
+                .iter()
+                .map(|helper| helper.file.as_str()),
+        )
 }
 
 fn source_revision(candidate: Option<&'static str>) -> Option<&'static str> {

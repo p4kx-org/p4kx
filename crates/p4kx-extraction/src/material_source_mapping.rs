@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 use p4kx_model::{
     Attributes, AuthoredAttributeKind, AuthoredContent, Material, MaterialEncoding,
-    MaterialEntryDisposition, MaterialLibrary, MaterialSourceLossKind, RawElement,
+    MaterialEntryDisposition, MaterialLibrary, MaterialSource, MaterialSourceLossKind, RawElement,
 };
 
 use crate::material_source_info::{
@@ -22,7 +22,12 @@ impl<'source> MaterialLibrarySourceInfo<'source> {
     /// Projects one library's authored root without copying its original byte payload.
     #[must_use]
     pub fn of(library: &'source MaterialLibrary) -> Self {
-        let source = &library.authored;
+        Self::of_source(&library.authored)
+    }
+
+    /// Projects the retained authored root and exact source coverage of one material source.
+    #[must_use]
+    pub fn of_source(source: &'source MaterialSource) -> Self {
         Self {
             encoding: match source.encoding {
                 MaterialEncoding::Text => MaterialEncodingInfo::Text,

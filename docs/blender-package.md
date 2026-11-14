@@ -182,7 +182,7 @@ written (there are no `null`s).
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.12` today. |
+| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.20` for current exports. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
@@ -426,7 +426,7 @@ the DirectX convention inverts green again.
 
 #### Optional collision helpers
 
-`p4kx entity package --collision-helpers` writes a version 1.18 package with an optional
+`p4kx entity package --collision-helpers` writes a package with an optional
 collision companion for supported decomposed Entity models. In Blender, enable **Collision
 helpers** when selecting `scene.json`. The add-on creates tagged wire objects in a separate
 nonrendering collection, using the original node-local triangle vertices and measured NMC
@@ -442,7 +442,7 @@ bind pose and whole-object collider keys remain documented without a preview pla
 The helper preview currently draws indexed triangles. Analytic primitives and other
 collision blob kinds retain their Media records and original bytes.
 
-The ordinary package uses version 1.17, and the standard add-on import reads the render
+The standard add-on import reads the render
 hierarchy. Render GLBs do not depend on the opt-in flag. The source companion has a
 separate `schemas/blender-collision-helpers.schema.json` contract.
 
@@ -568,13 +568,15 @@ material with the shader `MeshDecal` (its stencil colours in `parameters`, the p
 `$TintPaletteDecal` in a slot), wear is `wear` textures, `WearTint`/`WearGloss` on layers and
 `Wear*` parameters.
 
-The optional `material_libraries[].authored_origin` companion describes the retained source.
-Its `field_origins` addresses values within the same library row, including
-`/authored` and its child declarations. The accompanying `provenance` resolves each
-`sourceUsesRefs` reference to the original library input. Original positions are
-logical XML or CryXml coordinates. Libraries without a verified physical binding
-carry an unknown encryption marker for their authored values. Material selection,
-rendered values and emission evidence have their own source relationships.
+Each `material_libraries[].authored_file` points to the matching library ordinal in
+`material-sources/sNNNN.jsonl.gz`. The package receipt hashes these compressed bytes.
+The version 1 stream retains the original library object, physical sources, source uses
+and field origins. Field paths are relative to that library row and include
+`/authored` and retained child declarations. Original positions are logical XML or
+CryXml coordinates. Unbound source fields carry an unknown encryption marker.
+Material selection, rendered values and emission evidence have their own relationships.
+Earlier versions can include `authored` and `authored_origin` directly in the library row.
+The [material source schema](../schemas/blender-material-source.schema.json) describes the stream.
 
 ### Palettes
 
@@ -758,10 +760,13 @@ counts to supported DDS rows and records alpha unassociation when applied to PNG
 **1.16** adds optional entity classifications and light-placement evidence. **1.17** adds
 separate DDS normal and smoothness pairs with linked source and per-file evidence.
 **1.18** adds the optional collision-helper companion.
+**1.19** adds the optional vertex-map companion.
+**1.20** adds exact primitive bindings to that companion, identifies the texture rendition and
+stores authored material libraries and their field provenance in independent gzip JSONL files.
 
 ### Authored Entity Glow
 
-Entity packages use format 1.18 when they contain authored Glow links. The optional
+Authored Glow links first appeared in format 1.18. The optional
 `entity_glow` member contains declarations and owners. Each declaration names the original
 DataForge record index and GUID. Its components retain their original array ordinals,
 canonical material-effect values and field origins, including disabled effects, trigger or

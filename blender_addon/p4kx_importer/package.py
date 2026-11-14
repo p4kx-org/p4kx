@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from . import collision_helpers as collisions
+from . import material_source
 from . import ddna_pair
 from .glb_preflight import check_glb as check_glb
 from .manifest_fields import (
@@ -111,6 +112,7 @@ class Package:
     palettes: dict[str, Palette] = field(default_factory=dict)
     authored_soc: str | None = None
     collision_helpers: str | None = None
+    material_sources: dict[int, str] = field(default_factory=dict)
 
 
 def load_package(location: Path) -> Package:
@@ -131,7 +133,7 @@ def load_package(location: Path) -> Package:
     package = parse_manifest(data, manifest_path.parent)
     assets = chain(package.meshes.values(), package.textures.values())
     maps = (mesh.vertex_map for mesh in package.meshes.values() if mesh.vertex_map is not None)
-    require_exact_asset_case(package.root, chain((asset.file for asset in assets), maps))
+    require_exact_asset_case(package.root, chain((asset.file for asset in assets), maps, package.material_sources.values()))
     return package
 
 
@@ -160,6 +162,7 @@ def parse_manifest(data: object, root: Path) -> Package:
         palettes=parse_palettes(manifest.get("palettes"), warnings),
         authored_soc=parse_soc_ref(manifest.get("authored_soc")),
         collision_helpers=collisions.parse_ref(manifest.get("collision_helpers"), version[1]),
+        material_sources=material_source.parse_refs(manifest.get("material_libraries")),
     )
 
 

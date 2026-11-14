@@ -3140,8 +3140,26 @@
       "description": "One authored library root retained independently of its interpreted child materials.",
       "properties": {
         "authored": {
-          "$ref": "#/$defs/MaterialLibrarySourceInfo",
-          "description": "Bounded source root, namespaces/content and actual projection boundaries."
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialLibrarySourceInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Inline authored source root of an earlier manifest."
+        },
+        "authored_file": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/MaterialSourceReference"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Streamed authored source data and original field positions of this library."
         },
         "authored_origin": {
           "anyOf": [
@@ -3152,7 +3170,7 @@
               "type": "null"
             }
           ],
-          "description": "Exact original evidence of the values within the authored material library."
+          "description": "Inline source evidence of an earlier manifest."
         },
         "emission_provenance": {
           "anyOf": [
@@ -3171,8 +3189,7 @@
         }
       },
       "required": [
-        "path",
-        "authored"
+        "path"
       ],
       "type": "object"
     },
@@ -3312,6 +3329,30 @@
           "type": "string"
         }
       ]
+    },
+    "MaterialSourceReference": {
+      "additionalProperties": false,
+      "description": "Package-local reference to the retained declarations of one material-library row.",
+      "properties": {
+        "file": {
+          "description": "The sidecar path derived from the zero-based position of its library row.",
+          "pattern": "^material-sources/s[0-9]{4,}\\.jsonl\\.gz$",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": 1,
+          "description": "The material-source sidecar's schema version.",
+          "format": "uint8",
+          "maximum": 255,
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "file",
+        "schema_version"
+      ],
+      "type": "object"
     },
     "MaterialStencil": {
       "description": "How a stencil decal is drawn (1.6); the stencil map itself is the texture with the usage\n`stencil`.",

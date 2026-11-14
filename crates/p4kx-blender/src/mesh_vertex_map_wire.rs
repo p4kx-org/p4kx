@@ -10,7 +10,6 @@ use serde::Serialize;
 
 pub(crate) const FORMAT: &str = "p4kx-mesh-vertex-map";
 pub(crate) const VERSION: u8 = 2;
-pub(crate) const PACKAGE_VERSION: &str = "1.20";
 
 #[derive(Serialize, JsonSchema)]
 #[serde(

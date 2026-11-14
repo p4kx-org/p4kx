@@ -91,9 +91,6 @@ pub(crate) fn attach(
 ) -> PackageResult<()> {
     if let Some(source) = context.glow_source {
         manifest.entity_glow = capture(manifest, assembly, context, source)?;
-        if manifest.entity_glow.is_some() {
-            crate::manifest::AUTHORED_HELPER_FORMAT_VERSION.clone_into(&mut manifest.version);
-        }
     }
     Ok(())
 }

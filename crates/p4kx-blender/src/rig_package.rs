@@ -19,7 +19,7 @@ use crate::manifest::{
 };
 use crate::manifest_rig::Rig;
 use crate::mesh_vertex_map::Writer;
-use crate::mesh_vertex_map_wire;
+
 use crate::package_receipt::{self, PackageFile, PackageTotals};
 use crate::plan::mesh_id;
 use crate::stage::Staging;
@@ -205,7 +205,6 @@ fn write_rig_files(
             )
         })?;
         mesh.vertex_map = Some(sidecar.path.clone());
-        mesh_vertex_map_wire::PACKAGE_VERSION.clone_into(&mut manifest.version);
     }
     sanitise(&mut manifest);
     let files = std::iter::once(PackageFile::new(relative, &digest))

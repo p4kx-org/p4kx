@@ -42,6 +42,7 @@ mod manifest_mesh;
 mod manifest_rig;
 mod material_emission_origins;
 mod material_library_sources;
+mod material_source_sidecar;
 mod mesh_options;
 mod mesh_vertex_map;
 mod mesh_vertex_map_wire;
@@ -120,6 +121,7 @@ pub use manifest_materials::{
     PaletteEntry, Parameter, TextureUse,
 };
 pub use manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
+pub use material_source_sidecar::{MaterialSourceReference, material_source_sidecar_schema};
 pub use mesh_vertex_map_wire::mesh_vertex_map_schema;
 pub use package_default_material::{FallbackMaterialCause, FallbackMaterialSlot};
 pub use package_material_emission::{

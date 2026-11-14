@@ -2,10 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{ArchiveModels, Interior, InteriorOptions};
-use p4kx_blender::{
-    AuthoredMaterialOrigin, InteriorScene, Manifest, PackageInfo, write_interior_package,
-};
+use p4kx_blender::{InteriorScene, Manifest, PackageInfo, write_interior_package};
 use p4kx_extraction::{Archive, FieldPath, OpenOptions, select_entries};
+use std::path::Path;
+
 use p4kx_testkit::{
     SOC_IDENTITY, TestContainer, TestEntry, TestModel, TestObjectContainer, TestSoc, test_key,
 };
@@ -59,7 +59,7 @@ fn a_plain_interior_material_keeps_its_encrypted_container_ancestor() -> TestRes
     )?;
     let manifest: Manifest = serde_json::from_slice(&std::fs::read(target.join("scene.json"))?)?;
     check_encrypted_material(&manifest)?;
-    check_authored_material(&manifest)
+    check_authored_material(&manifest, &target)
 }
 
 fn check_encrypted_material(manifest: &Manifest) -> TestResult {
@@ -102,59 +102,62 @@ fn check_encrypted_material(manifest: &Manifest) -> TestResult {
     Ok(())
 }
 
-fn check_authored_material(manifest: &Manifest) -> TestResult {
+fn check_authored_material(manifest: &Manifest, target: &Path) -> TestResult {
     let material = manifest.materials.first().ok_or("placed model material")?;
+    let position = material.source_library.ok_or("material library link")?;
     let library = manifest
         .material_libraries
-        .get(material.source_library.ok_or("material library link")?)
+        .get(position)
         .ok_or("package source row")?;
-    let origins = library
-        .authored_origin
+    assert!(
+        library.authored.is_none() && library.authored_origin.is_none(),
+        "the manifest has no duplicated raw source"
+    );
+    let source = library
+        .authored_file
         .as_ref()
-        .ok_or("authored provenance")?;
-    let row = serde_json::to_value(library)?;
-    for (field_path, _) in origins.field_origins.iter() {
-        assert!(
-            row.pointer(field_path.as_str()).is_some(),
-            "field pointer {} refers to an emitted value",
-            field_path.as_str()
-        );
-    }
+        .ok_or("material source file")?;
+    let rows = crate::material_source_metadata::read_rows(&target.join(&source.file))?;
+    let authored = rows
+        .iter()
+        .find(|row| crate::material_source_metadata::row_type(row) == Some("library"))
+        .ok_or("authored payload row")?;
+    crate::material_source_metadata::check_field_paths(authored, &rows);
     let pointer = "/authored/root/children/0/syntax/attributes/0/lexeme";
     assert_eq!(
-        row.pointer(pointer).and_then(Value::as_str),
+        authored.pointer(pointer).and_then(Value::as_str),
         Some("first&amp;last"),
-        "source XML retains the literal token on an unknown element"
+        "source XML retains exact lexical spelling on an unknown element"
     );
-    check_authored_inventory(origins, pointer)
+    check_authored_inventory(&rows, pointer)
 }
 
-fn check_authored_inventory(origins: &AuthoredMaterialOrigin, pointer: &str) -> TestResult {
-    let field = origins
-        .field_origins
-        .get(&FieldPath::parse(pointer)?)
+fn check_authored_inventory(rows: &[Value], pointer: &str) -> TestResult {
+    let field = rows
+        .iter()
+        .find(|row| row.get("path").and_then(Value::as_str) == Some(pointer))
         .ok_or("original authored field")?;
     assert_eq!(
-        field.contains_encrypted_source(),
+        field
+            .get("containsEncryptedSource")
+            .and_then(Value::as_bool),
         Some(true),
         "effective parent encryption"
     );
-    assert!(
-        field.source_set_complete(),
+    assert_eq!(
+        field.get("sourceSetComplete").and_then(Value::as_bool),
+        Some(true),
         "leaf and parent archive facts are known"
     );
-    let matching = origins
-        .provenance
-        .get("uses")
-        .and_then(Value::as_array)
-        .ok_or("source uses")?
+    let matching = rows
         .iter()
+        .filter_map(|row| row.get("sourceUse"))
         .find(|item| {
-            item.get("id").and_then(Value::as_str).is_some_and(|id| {
+            item.get("id").is_some_and(|id| {
                 field
-                    .source_uses_refs()
-                    .iter()
-                    .any(|reference| reference.as_str() == id)
+                    .get("sourceUsesRefs")
+                    .and_then(Value::as_array)
+                    .is_some_and(|references| references.contains(id))
             })
         })
         .ok_or("authored use reference")?;
@@ -170,14 +173,12 @@ fn check_authored_inventory(origins: &AuthoredMaterialOrigin, pointer: &str) -> 
         Some(&serde_json::json!(["0", "0"])),
         "original unknown child and attribute positions"
     );
-    let sources = origins
-        .provenance
-        .get("sources")
-        .and_then(Value::as_array)
-        .ok_or("physical sources")?;
+    let sources = rows
+        .iter()
+        .filter(|row| crate::material_source_metadata::row_type(row) == Some("source"))
+        .count();
     assert_eq!(
-        sources.len(),
-        2,
+        sources, 2,
         "physical leaf and encrypted ancestor are retained"
     );
     Ok(())
