@@ -98,6 +98,7 @@ mod compat;
 mod creature_animation;
 mod creature_rig;
 mod entities;
+mod entity_clip_catalogue;
 mod entity_glow;
 mod entity_interior;
 mod entity_rig_catalogue;
@@ -211,6 +212,10 @@ pub use creature_animation::{
     CreatureAnimations, CreatureClips, creature_animations,
 };
 pub use entities::{ENTITY_TYPE, Entities};
+pub use entity_clip_catalogue::{
+    ClipArchiveSource, ClipDatabaseUnavailable, ClipSourceLink, ClipSourceSelection,
+    EntityClipCatalogue, EntityClipRig, discover_entity_clips,
+};
 pub use entity_glow::{
     EntityGlow, EntityGlowBindingError, EntityGlowLink, GlowEffectKind, GlowSelection, GlowSubset,
     GlowSubsetMaterial,

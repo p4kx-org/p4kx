@@ -73,6 +73,41 @@ impl<'a> AnimationMetadata<'a> {
         }
     }
 
+    /// Reads the CAF's original metadata record independently of controller data.
+    ///
+    /// # Errors
+    /// Returns an error for a missing, unsupported or truncated metadata chunk.
+    pub fn read_caf<B: AsRef<[u8]>>(
+        file_name: &str,
+        file: &'a ChunkFile<B>,
+    ) -> Result<Self, AnimationError> {
+        let metadata = SourceChunk::read(
+            file_name,
+            file,
+            ivo::ANIM_INFO,
+            ANIM_INFO_VERSION,
+            "AnimInfo",
+        )?;
+        let record = metadata.bytes.first_chunk().ok_or_else(|| {
+            corrupt(
+                file_name,
+                "AnimInfo",
+                ParseError::UnexpectedEnd {
+                    offset: metadata.at,
+                    needed: RECORD_LEN as u64,
+                    available: metadata.bytes.len() as u64,
+                }
+                .into(),
+            )
+        })?;
+        Ok(Self::of(
+            metadata.index,
+            metadata.at,
+            metadata.version,
+            record,
+        ))
+    }
+
     /// Returns the original metadata bytes.
     #[must_use]
     pub const fn bytes(&self) -> &'a [u8; RECORD_LEN] {
@@ -150,35 +185,11 @@ impl<'a> AnimationSource<'a> {
         file_name: &str,
         file: &'a ChunkFile<B>,
     ) -> Result<Self, AnimationError> {
-        let metadata = SourceChunk::read(
-            file_name,
-            file,
-            ivo::ANIM_INFO,
-            ANIM_INFO_VERSION,
-            "AnimInfo",
-        )?;
-        let record = metadata.bytes.first_chunk().ok_or_else(|| {
-            corrupt(
-                file_name,
-                "AnimInfo",
-                ParseError::UnexpectedEnd {
-                    offset: metadata.at,
-                    needed: RECORD_LEN as u64,
-                    available: metadata.bytes.len() as u64,
-                }
-                .into(),
-            )
-        })?;
+        let metadata = AnimationMetadata::read_caf(file_name, file)?;
         let data = SourceChunk::read(file_name, file, ivo::CAF_DATA, CAF_DATA_VERSION, "CafData")?;
         let block = read_block(data.bytes, 0, CAF_SIGNATURE)
             .map_err(|err| corrupt(file_name, "CafData", err))?;
-        Ok(Self::of(
-            0,
-            AnimationMetadata::of(metadata.index, metadata.at, metadata.version, record),
-            None,
-            data,
-            block,
-        ))
+        Ok(Self::of(0, metadata, None, data, block))
     }
 
     /// Returns the zero-based clip ordinal in its source file.

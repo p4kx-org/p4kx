@@ -11,8 +11,8 @@ use crate::{ArchiveModels, Attachment, EntityNode, GearPlacementSource, LandingG
 
 #[path = "entity_rig_files.rs"]
 mod files;
-pub(crate) use files::RigEntry;
 pub use files::{RigDefinition, RigFile, RigFileRead};
+pub(crate) use files::{RigEntry, read_rig_entry};
 
 pub use crate::gear_params::RigParameter;
 

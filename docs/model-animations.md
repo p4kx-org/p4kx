@@ -29,8 +29,16 @@ failure. Encryption is unknown for a request whose bytes could not be read, and 
 observed input and its Archive ancestry after a successful read. Unread or invalid root inputs
 leave child and gear discovery available.
 
-This is a Rust discovery API. It reads neither geometry companions nor clip payloads and reports
-authored names and patterns without expanding them into selected clips.
+The Rust `discover_entity_clips` API inventories CAF and DBA header declarations under the
+resolved rig positions. Tracks-database links preserve the actual source read or why it could
+not be selected. A folder directive links the physical CAF and DBA candidates in its subtree.
+Candidates shared by different placements refer to the same inventoried Entry. Unexpanded
+names and wildcards remain in the authored parameters.
+
+The header inventory preserves the physical clip ordinal, original 48-byte metadata and DBA name,
+independent timing, and each observed controller descriptor and encoding word. A malformed block
+does not discard a separately readable metadata record. The inventory reads one Archive Entry at
+a time without decoding animation key samples or generating a pose.
 
 ## Where the keys are
 

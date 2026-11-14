@@ -187,7 +187,7 @@ mod write_compare;
 mod written_paths;
 mod zip_header_info;
 
-pub use animation_listing::AnimationListing;
+pub use animation_listing::{AnimationListing, headers as animation_headers};
 pub use animation_set::{
     AnimationBounds, AnimationChoice, AnimationSet, MAX_ANIMATION_FILE_LEN, UnreadAnimation,
 };

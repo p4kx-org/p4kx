@@ -13,14 +13,14 @@ use crate::{ArchiveModels, ModelFailure};
 /// An authored file request and its actual discovery outcome.
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct RigFile<T> {
+pub struct RigFile<T, E = String> {
     /// Requested path, independent of archive lookup normalization.
     pub path: String,
     /// Whether the bytes were read and parsed.
-    pub read: Arc<RigFileRead<T>>,
+    pub read: Arc<RigFileRead<T, E>>,
 }
 
-impl<T> RigFile<T> {
+impl<T, E> RigFile<T, E> {
     /// Returns the parsed value only when a source was successfully read.
     #[must_use]
     pub fn value(&self) -> Option<&T> {
@@ -52,7 +52,7 @@ impl<T> RigFile<T> {
 /// Whether rig discovery was able to consume the requested original input.
 #[derive(Debug)]
 #[non_exhaustive]
-pub enum RigFileRead<T> {
+pub enum RigFileRead<T, E = String> {
     /// The lookup found no matching Archive Entry.
     Missing,
     /// More than one physical Archive Entry matches the requested path.
@@ -71,7 +71,7 @@ pub enum RigFileRead<T> {
         /// Physical Entry when the Archive can establish its identity.
         source: Option<Box<EntryOrigin>>,
         /// Parsed metadata or the original parser diagnostic.
-        value: Result<T, String>,
+        value: Result<T, E>,
     },
 }
 
@@ -111,15 +111,11 @@ pub(super) fn read<T>(
         RigEntry::Missing => Arc::new(RigFileRead::Missing),
         RigEntry::Ambiguous => Arc::new(RigFileRead::Ambiguous),
         RigEntry::Unreadable(reason) => Arc::new(RigFileRead::Unreadable { reason }),
-        RigEntry::Unique(entry) => Arc::clone(cache.entry(entry.index()).or_insert_with(|| {
-            Arc::new(match models.read_file_entry(entry, u64::MAX) {
-                Ok(bytes) => RigFileRead::Read {
-                    source: models.archive.entry_origin(entry).map(Box::new),
-                    value: parse(&bytes),
-                },
-                Err(error) => read_failure(&error),
-            })
-        })),
+        RigEntry::Unique(entry) => Arc::clone(
+            cache
+                .entry(entry.index())
+                .or_insert_with(|| read_rig_entry(models, entry, parse)),
+        ),
     };
     RigFile {
         path: path.to_owned(),
@@ -127,7 +123,21 @@ pub(super) fn read<T>(
     }
 }
 
-fn read_failure<T>(error: &ModelFailure) -> RigFileRead<T> {
+pub(crate) fn read_rig_entry<T, E>(
+    models: &ArchiveModels<'_>,
+    entry: &Entry,
+    parse: impl FnOnce(&[u8]) -> Result<T, E>,
+) -> Arc<RigFileRead<T, E>> {
+    Arc::new(match models.read_file_entry(entry, u64::MAX) {
+        Ok(bytes) => RigFileRead::Read {
+            source: models.archive.entry_origin(entry).map(Box::new),
+            value: parse(&bytes),
+        },
+        Err(error) => read_failure(&error),
+    })
+}
+
+fn read_failure<T, E>(error: &ModelFailure) -> RigFileRead<T, E> {
     match archive_error_in(error) {
         Some(error) if error.is_key_required() => RigFileRead::KeyRequired,
         Some(error) if error.is_wrong_key() => RigFileRead::WrongKey,
