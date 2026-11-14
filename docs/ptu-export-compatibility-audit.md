@@ -60,6 +60,21 @@ change the container version from 17 to 15 while keeping the same frame count an
 unread tag inventory. The exported symbols and frame labels do not identify the missile-lock
 interface. A file-type match by itself cannot attribute this change to the announced UI.
 
+A separate archive path census finds 13 missile-lock geometry Entries, their 13
+same-stem companions, and one material added relative to LIVE. The installed
+PTU CRC check passed on all 116 Entries in the broader missile-and-lock path
+selection with zero unreadable Entries or mismatches. Three sampled geometry
+pairs open from both the Archive and loose files through `model info`. Each has
+one node, one LOD, no declared material-library binding and no model issue.
+The independent CryXml material contains `Material`, `PublicParams` and
+`Textures` with render parameters. The Media model and material providers
+admit these physical families separately. Neither checked asset source exposes an
+authored mapping for the four lock states or the effective range indicator.
+
+The directory and changed declaration inventories have no matches for territory,
+server meshing or claim reservation names. This name-based check leaves the
+territory transform, entity-count bias and runtime candidate behavior unverified.
+
 Current PTU has 24 `.resource`, 35 `.climasset`, 68 `.geoasset` and 156 `.dst` Entry additions
 against LIVE. The prior 5.0 audit already observed the loose planet descriptor families.
 The present Entry comparison shows 980 additions, 80 removals and 7,677 changes for SOCPAKs.
