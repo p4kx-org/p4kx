@@ -146,7 +146,7 @@ fn write_rigged<'m>(
     if let Some(buffer) = root.buffers.first().map(|_| json::Index::new(0)) {
         push_animations(&mut root, buffer, &layout, &plans);
     }
-    let total = write_file(&root, &layout, &images, out)?;
+    let total = write_file(&root, &layout, &images, options.json_byte_budget, out)?;
     match observe {
         Observation::None => {}
         Observation::Emission(emission) => {

@@ -22,6 +22,7 @@ def test_zip_holds_the_addon_at_its_root_and_is_reproducible(tmp_path: Path) -> 
         names = archive.namelist()
     assert "blender_manifest.toml" in names
     assert "__init__.py" in names
+    assert "glb-json-budget.bytes" in names
     assert names == sorted(names)
     assert not any("__pycache__" in name for name in names)
 

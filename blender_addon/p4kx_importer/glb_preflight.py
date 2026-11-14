@@ -16,7 +16,7 @@ from .glb_material_slots import material_slot_issue
 from .glb_references import validate_references
 from .manifest_fields import PackageError, read_object
 
-MAX_GLB_JSON_BYTES = 16 * 1024 * 1024
+MAX_GLB_JSON_BYTES = int(Path(__file__).with_name("glb-json-budget.bytes").read_text(encoding="ascii"))
 
 _HEADER = Struct("<4sII")
 _CHUNK_HEADER = Struct("<I4s")
@@ -62,8 +62,12 @@ def _check_stream(stream: BinaryIO) -> GlbInfo:
         raise PackageError("GLB total length does not match the file size.")
 
     json_length, kind = _read_chunk(stream, actual_size)
-    if kind != _JSON or json_length > MAX_GLB_JSON_BYTES:
-        raise PackageError("GLB has no usable JSON chunk.")
+    if kind != _JSON:
+        raise PackageError("GLB has no JSON chunk in the first position.")
+    if json_length > MAX_GLB_JSON_BYTES:
+        raise PackageError(
+            f"GLB JSON chunk needs {json_length} bytes, exceeding the package budget of {MAX_GLB_JSON_BYTES} bytes."
+        )
     document = _read_document(stream, json_length)
     bin_length, bin_offset = _skip_chunks(stream, actual_size)
     data_length, material_count = validate_references(document, bin_length)

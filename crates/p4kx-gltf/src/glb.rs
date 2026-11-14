@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::Write;
+use std::num::NonZeroU64;
 
 use gltf_json as json;
 use p4kx_model::Material;
@@ -10,6 +11,7 @@ use p4kx_model::{Animation, Lod, Model};
 use crate::GltfError;
 use crate::animations::AnimationSummary;
 use crate::document::document;
+use crate::glb_json;
 pub use crate::glb_options::{GlbOptions, MaterialMode, VertexColours};
 use crate::glb_plan::{Skeletal, animation_plans, own_binds, plan_layout, summarise, texture_set};
 use crate::instance::{Content, Instance, material_requests};
@@ -288,7 +290,7 @@ pub(crate) fn write_instances(
     if options.material_indices {
         index_materials(&mut root);
     }
-    let total = write_file(&root, &layout, &images, out)?;
+    let total = write_file(&root, &layout, &images, options.json_byte_budget, out)?;
     if let Some(visitor) = visitor {
         mesh_vertex_map::observe(&root, &layout, instances, options.lod, visitor)?;
     }
@@ -329,10 +331,10 @@ pub(crate) fn write_file(
     root: &json::Root,
     layout: &Layout<'_>,
     images: &TextureSet,
+    json_byte_budget: Option<NonZeroU64>,
     out: &mut impl Write,
 ) -> Result<WrittenGlb, GltfError> {
-    let mut json = root.to_vec()?;
-    json.resize(json.len().next_multiple_of(4), b' ');
+    let json = glb_json::encode(root, json_byte_budget)?;
     let json_len = json.len() as u64;
     let bin_len = layout.len;
     let json_end = HEADER_LEN + CHUNK_HEADER_LEN + json_len;

@@ -31,8 +31,12 @@ checks types, finite numbers (a number too large for a float is refused) and par
 references only as the writer's ids: a mesh file must be `meshes/m<digits>.glb`, a texture file
 `textures/t<digits>.png`, and every path is resolved and refused when it leaves the package
 folder (symbolic links included). Before Blender's importer sees a mesh, the add-on reads the
-GLB header and its JSON chunk (at most 16 MiB) and refuses a mesh whose buffers or images name
-an external `uri`; the GLBs of a package embed everything. Names from the package are only
+GLB header and checks the padded JSON size against the 16 MiB package budget before allocating
+its payload. The exporter uses the same budget and refuses oversized metadata before package
+publication. The error includes both byte counts. The validator rejects buffers or images that
+name an external `uri` and seeks past embedded binary payloads. The 16 MiB budget bounds the
+cost of parsing metadata into Python objects. In a Blender 5.3 measurement, a generated
+animation GLB reached that limit at about 152 MiB of validator peak working set. Names from the package are only
 object and material names, shortened to Blender's 63 bytes. A texture with a format, colour
 space or alpha meaning this add-on does not know is skipped with a warning, so later minor
 versions can add values.

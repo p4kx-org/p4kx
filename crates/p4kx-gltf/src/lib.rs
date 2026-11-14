@@ -36,6 +36,7 @@ mod block_data;
 mod document;
 mod error;
 mod glb;
+mod glb_json;
 mod glb_options;
 mod glb_plan;
 mod instance;

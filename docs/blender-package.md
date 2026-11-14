@@ -15,6 +15,20 @@ when the two differ (`P4KX_BLESS=1 cargo test -p p4kx-blender --test schema` reg
 A note on words: a **node** of the package is a placed Entity (a **Part** of the Assembly in the
 glossary); a **mesh** of the package is a GLB file with the geometry of one model.
 
+## Embedded GLB JSON budget
+
+The package exporter, standalone validator and Blender importer share a 16 MiB budget
+(16,777,216 bytes) for each GLB's padded JSON chunk. The exporter reports the required
+padded size and the budget if it cannot finish a mesh. A refused export leaves the
+previously published package in place. The validators report a budget refusal separately
+from malformed GLB headers or JSON. The structural checks stream past the binary chunk.
+Standalone GLB exports use the GLB format's own length bounds.
+
+The Windows Blender 5.3 validator used about 152 MiB of peak working set for a synthetic
+animation GLB whose JSON reached the budget. A package with about 66 MiB of binary data
+and 77 KiB of JSON used about 26 MiB in the structural and receipt validator. Metadata
+shape also affects memory use.
+
 ## Authored item classification
 
 Assembly Entity nodes can include `entity.classification` with typed

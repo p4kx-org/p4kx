@@ -50,14 +50,28 @@ def test_glb_header_rejects_inconsistent_fields(
         package.check_glb(path)
 
 
-def test_glb_json_limit_is_enforced_before_reading(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+def test_glb_json_budget_checks_padded_size_before_reading(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    path = tmp_path / "mesh.glb"
-    path.write_bytes(glb("mesh", ["mat"]))
-    monkeypatch.setattr(glb_preflight, "MAX_GLB_JSON_BYTES", 32)
-    with pytest.raises(package.PackageError, match="no usable JSON"):
-        package.check_glb(path)
+    content = glb("mesh", ["mat"])
+    json_length = unpack_from("<I", content, 12)[0]
+    monkeypatch.setattr(glb_preflight, "MAX_GLB_JSON_BYTES", json_length)
+    assert glb_preflight._check_stream(BytesIO(content)).bytes == len(content)
+
+    class HeaderReader(BytesIO):
+        def read(self, size: int = -1) -> bytes:
+            assert size >= 0 and self.tell() + size <= 20
+            return super().read(size)
+
+    budget = json_length - 4
+    monkeypatch.setattr(glb_preflight, "MAX_GLB_JSON_BYTES", budget)
+    message = f"JSON chunk needs {json_length} bytes, exceeding the package budget of {budget} bytes"
+    with pytest.raises(package.PackageError, match=message):
+        glb_preflight._check_stream(HeaderReader(content))
+
+    no_json_chunk = with_header(content, 16, int.from_bytes(b"BIN\0", byteorder="little"))
+    with pytest.raises(package.PackageError, match="no JSON chunk in the first position"):
+        glb_preflight._check_stream(HeaderReader(no_json_chunk))
 
 
 @pytest.mark.parametrize(
