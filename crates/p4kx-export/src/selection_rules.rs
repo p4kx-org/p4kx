@@ -328,6 +328,8 @@ impl Kind {
             | Self::ParticleLibraries
             | Self::PlanetResources
             | Self::Creatures
+            | Self::ClimateAssets
+            | Self::GeologyAssets
             | Self::ContractShipSpawns
             | Self::ContractLocationQueries
             | Self::ContractNpcSpawns

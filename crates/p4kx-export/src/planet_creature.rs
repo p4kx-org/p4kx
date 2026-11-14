@@ -1,16 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{
-    Archive, DataForge, Guid, SourceUses, SourceValue, SourceValueState, SourcedValue,
-};
+use p4kx_extraction::{Archive, DataForge, SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::catalog_json_number::CatalogJsonNumber;
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
-use crate::catalog_read::loose_archive_path::LooseArchivePathState;
 use crate::catalog_read::loose_definition::{
     self, DefinitionFamily, DefinitionIssue, LooseDefinition,
 };
@@ -91,7 +88,14 @@ fn project(
     let entity_class_raw = object.field("entityClass", entry_json_object::text)?;
     let need_vertical_offset = object.field("needVerticalOffset", entry_json_object::boolean)?;
     let slope_tolerance = object.field("slopeTolerance", entry_json_object::number)?;
-    let entity = entity_link(forge, original, options, &entity_class, &entity_class_raw)?;
+    let entity = loose_record_link::by_guid(
+        forge,
+        original,
+        options,
+        &entity_class,
+        &entity_class_raw,
+        ENTITY,
+    )?;
     let mut issues: Vec<_> = loose_definition::identity_issue("guid", &guid)
         .into_iter()
         .collect();
@@ -127,45 +131,6 @@ fn project(
         need_vertical_offset,
         slope_tolerance,
         issues,
-    })
-}
-
-fn entity_link(
-    forge: &DataForge<'_>,
-    original: &OriginalCatalogInput<'_, '_>,
-    options: &CatalogOptions<'_>,
-    entity: &SourcedValue<CatalogGuid>,
-    raw: &SourcedValue<String>,
-) -> Result<LooseRecordLink, CatalogError> {
-    let nil = Guid::default();
-    if let Some(guid) = entity.value().filter(|guid| guid.0 != nil) {
-        return loose_record_link::resolve(
-            entity,
-            original,
-            forge.records_by_guid(guid.0),
-            ENTITY,
-            options.filter,
-            options.cancel,
-        );
-    }
-    let state = match (entity.state(), raw.value()) {
-        (SourceValueState::Absent, _) => LooseArchivePathState::Absent,
-        (SourceValueState::Null, _) => LooseArchivePathState::Null,
-        (SourceValueState::Present, _) => LooseArchivePathState::Empty,
-        (_, Some(raw)) if raw.is_empty() => LooseArchivePathState::Empty,
-        _ => LooseArchivePathState::Invalid,
-    };
-    no_target(&original.origins().uses, entity, state)
-}
-
-fn no_target(
-    sources: &SourceUses,
-    entity: &SourcedValue<CatalogGuid>,
-    state: LooseArchivePathState,
-) -> Result<LooseRecordLink, CatalogError> {
-    Ok(LooseRecordLink {
-        state: sources.value_with_origins(SourceValue::Present(state), &[entity.origin()])?,
-        candidates: Vec::new(),
     })
 }
 

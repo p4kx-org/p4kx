@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, Filter, Record, SourceValue, SourcedValue};
+use p4kx_extraction::{
+    CancelToken, DataForge, Filter, Guid, Record, SourceValue, SourceValueState, SourcedValue,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::loose_archive_path::LooseArchivePathState;
 use crate::catalog_read::parsed_entry_json;
 use crate::guid_text::CatalogGuid;
 use crate::record_header_field::RecordHeaderField;
 use crate::schema_fields::every_field_required;
+use crate::{CatalogError, CatalogOptions};
 
 /// Resolution of an authored loose JSON reference against original Record headers.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -30,6 +32,40 @@ pub(crate) struct LooseRecordCandidate {
     guid: SourcedValue<CatalogGuid>,
     path: SourcedValue<String>,
     source_type: SourcedValue<String>,
+}
+
+pub(crate) fn by_guid(
+    forge: &DataForge<'_>,
+    original: &OriginalCatalogInput<'_, '_>,
+    options: &CatalogOptions<'_>,
+    selector: &SourcedValue<CatalogGuid>,
+    raw: &SourcedValue<String>,
+    expected_type: &str,
+) -> Result<LooseRecordLink, CatalogError> {
+    if let Some(guid) = selector.value().filter(|guid| guid.0 != Guid::default()) {
+        return resolve(
+            selector,
+            original,
+            forge.records_by_guid(guid.0),
+            expected_type,
+            options.filter,
+            options.cancel,
+        );
+    }
+    let state = match (selector.state(), raw.value()) {
+        (SourceValueState::Absent, _) => LooseArchivePathState::Absent,
+        (SourceValueState::Null, _) => LooseArchivePathState::Null,
+        (SourceValueState::Present, _) => LooseArchivePathState::Empty,
+        (_, Some(raw)) if raw.is_empty() => LooseArchivePathState::Empty,
+        _ => LooseArchivePathState::Invalid,
+    };
+    Ok(LooseRecordLink {
+        state: original
+            .origins()
+            .uses
+            .value_with_origins(SourceValue::Present(state), &[selector.origin()])?,
+        candidates: Vec::new(),
+    })
 }
 
 pub(crate) fn resolve<'record, T>(

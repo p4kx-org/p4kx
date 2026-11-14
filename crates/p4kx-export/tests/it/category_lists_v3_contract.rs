@@ -215,7 +215,7 @@ fn assert_header(catalog: &Value) -> TestResult {
     Ok(())
 }
 
-const EXPECTED_KINDS: [&str; 94] = [
+const EXPECTED_KINDS: [&str; 96] = [
     "manufacturers",
     "items",
     "ships",
@@ -277,6 +277,8 @@ const EXPECTED_KINDS: [&str; 94] = [
     "particleLibraries",
     "planetResources",
     "creatures",
+    "climateAssets",
+    "geologyAssets",
     "explosionDefinitions",
     "ammoDefinitions",
     "factions",

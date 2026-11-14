@@ -75,6 +75,8 @@ fn expected_completeness() -> Value {
         "particleLibraries",
         "planetResources",
         "creatures",
+        "climateAssets",
+        "geologyAssets",
         "explosionDefinitions",
         "ammoDefinitions",
         "factions",

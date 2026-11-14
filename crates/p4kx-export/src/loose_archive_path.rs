@@ -40,6 +40,53 @@ pub(crate) struct LooseArchivePath {
     targets: Vec<SourcedValue<PhysicalEntryRef>>,
 }
 
+/// Lazily indexes the Archive directory for repeated sourced path resolutions.
+pub(crate) struct Resolver<'archive, 'capture, 'input> {
+    archive: &'archive Archive,
+    capture: &'capture EntryCapture<'input>,
+    cancel: Option<&'archive CancelToken>,
+    keys: Option<PathKeys>,
+}
+
+impl<'archive, 'capture, 'input> Resolver<'archive, 'capture, 'input> {
+    /// Shares one directory index across a family's original path lookups.
+    pub(crate) const fn new(
+        archive: &'archive Archive,
+        capture: &'capture EntryCapture<'input>,
+        cancel: Option<&'archive CancelToken>,
+    ) -> Self {
+        Self {
+            archive,
+            capture,
+            cancel,
+            keys: None,
+        }
+    }
+
+    /// Resolves an authored path and its optional `Data/` prefix against a target family.
+    /// The result cites the selector and observed physical directory candidates.
+    pub(crate) fn resolve(
+        &mut self,
+        path: &SourcedValue<String>,
+        accepted: impl Fn(&Entry) -> bool,
+    ) -> Result<LooseArchivePath, CatalogError> {
+        if path.value().is_none_or(|raw| !valid(raw)) {
+            return from_field(path, self.capture);
+        }
+        let keys = match &mut self.keys {
+            Some(keys) => keys,
+            slot @ None => slot.insert(keys(self.archive, self.cancel)?),
+        };
+        resolve(
+            &keys.index(self.archive),
+            self.capture,
+            self.cancel,
+            path,
+            accepted,
+        )
+    }
+}
+
 pub(crate) fn from_field(
     path: &SourcedValue<String>,
     capture: &EntryCapture<'_>,

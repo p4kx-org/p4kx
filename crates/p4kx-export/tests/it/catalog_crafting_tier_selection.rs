@@ -97,7 +97,19 @@ fn the_summary_counts_the_crafting_kinds_and_the_skipped_blueprints() -> TestRes
         .summary()
         .kinds()
         .iter()
-        .filter(|kind| kind.kind.name().starts_with(['b', 'g', 'q', 'd']))
+        .filter(|kind| {
+            matches!(
+                kind.kind,
+                Kind::Blueprints
+                    | Kind::BlueprintCategories
+                    | Kind::GameplayProperties
+                    | Kind::QualityDistributions
+                    | Kind::QualityQuantizations
+                    | Kind::BlueprintPools
+                    | Kind::DismantleProcesses
+                    | Kind::BlueprintCategoryLists
+            )
+        })
         .map(|kind| (kind.kind, kind.count, kind.skipped))
         .collect();
     assert_eq!(

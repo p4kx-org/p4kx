@@ -79,6 +79,8 @@ impl Collected<'_> {
             Kind::ParticleLibraries => self.particle_libraries.rows.len(),
             Kind::PlanetResources => self.planet_tech.planet_resources.rows.len(),
             Kind::Creatures => self.planet_tech.creatures.rows.len(),
+            Kind::ClimateAssets => self.planet_tech.climate_assets.rows.len(),
+            Kind::GeologyAssets => self.planet_tech.geology_assets.rows.len(),
             Kind::Crafters => self.crafters.len(),
             Kind::FactionReputations
             | Kind::ReputationScopes

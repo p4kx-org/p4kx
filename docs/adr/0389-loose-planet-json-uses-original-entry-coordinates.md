@@ -16,3 +16,19 @@ A tint palette path in the DataForge Record namespace is a Record reference
 resolved by the original path and exact TintPaletteTree type. Archive-relative
 paths use exact directory evidence and the applicable Data root prefix. Retain
 the authored extensionless path, observed candidates and lookup state.
+
+Resolve the original climate `entityClass`, `harvestableResource` and
+`harvestableSetupRecord` declarations against their respective families.
+The last identifies a DataForge `HarvestableSetup` header in the verified PTU
+sample. The EntXML `SubHarvestableMultiConfigRecord` and Child `ContextPreset`
+declarations identify separate source families. Emit four independently
+sourced shading-class GUID selectors so the shading-class family can be
+joined without making the climate definition depend on that projection.
+
+The bounded PTU review covered original `.climasset`, `.geoasset`, `.creature`,
+`.resource`, `.eco`, `.geology` and `.shadingclass` definitions, the Child and
+HCD/EntXML placement declarations, and the exact known harvestable setup
+headers. These establish authored definition relations. A per-body
+climate/geology/fauna assignment remains unestablished in those sources.
+Emit a per-body relation when an original assignment edge and its route are
+both available. Preserve readable definitions independently of that evidence.

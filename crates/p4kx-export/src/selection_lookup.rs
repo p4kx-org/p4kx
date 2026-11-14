@@ -78,6 +78,8 @@ impl Kind {
                 | Self::ParticleLibraries
                 | Self::PlanetResources
                 | Self::Creatures
+                | Self::ClimateAssets
+                | Self::GeologyAssets
                 | Self::LootContainers
                 | Self::ContractShipSpawns
                 | Self::ContractLocationQueries

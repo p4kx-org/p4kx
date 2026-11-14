@@ -83,6 +83,8 @@ pub(crate) struct Completeness<'a> {
     pub(crate) particle_libraries: KindCompleteness<'a>,
     pub(crate) planet_resources: KindCompleteness<'a>,
     pub(crate) creatures: KindCompleteness<'a>,
+    pub(crate) climate_assets: KindCompleteness<'a>,
+    pub(crate) geology_assets: KindCompleteness<'a>,
     /// The completeness of `factions`.
     pub(crate) factions: KindCompleteness<'a>,
     /// The completeness of the physical `FactionIdentity` selection.
@@ -231,6 +233,8 @@ impl<'a> Completeness<'a> {
             particle_libraries: completeness,
             planet_resources: completeness,
             creatures: completeness,
+            climate_assets: completeness,
+            geology_assets: completeness,
             factions: completeness,
             faction_identities: completeness,
             reputation_perks: completeness,

@@ -12,6 +12,8 @@ pub(super) const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::AutoSpawnSets
             | Kind::PlanetResources
             | Kind::Creatures
+            | Kind::ClimateAssets
+            | Kind::GeologyAssets
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
             | Kind::ParticleLibraries

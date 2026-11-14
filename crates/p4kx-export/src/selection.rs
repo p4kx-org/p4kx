@@ -169,6 +169,10 @@ pub enum Kind {
     PlanetResources,
     /// Original loose `PlanetTech` fauna definitions in the Archive.
     Creatures,
+    /// Original loose `PlanetTech` climate asset definitions.
+    ClimateAssets,
+    /// Original loose `PlanetTech` geology asset definitions.
+    GeologyAssets,
     /// Reusable physical `ExplosionRecord` definitions.
     ExplosionDefinitions,
     /// Physical ammunition configurations.
@@ -239,7 +243,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 94] = [
+    pub const ALL: [Self; 96] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -301,6 +305,8 @@ impl Kind {
         Self::ParticleLibraries,
         Self::PlanetResources,
         Self::Creatures,
+        Self::ClimateAssets,
+        Self::GeologyAssets,
         Self::ExplosionDefinitions,
         Self::AmmoDefinitions,
         Self::Factions,

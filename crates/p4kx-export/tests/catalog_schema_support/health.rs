@@ -96,7 +96,9 @@ const fn mode(kind: Kind) -> ExportSourceMode {
         | Kind::ShopInventories
         | Kind::ParticleLibraries
         | Kind::PlanetResources
-        | Kind::Creatures => ExportSourceMode::ArchiveEntries,
+        | Kind::Creatures
+        | Kind::ClimateAssets
+        | Kind::GeologyAssets => ExportSourceMode::ArchiveEntries,
         Kind::Paints
         | Kind::Loadouts
         | Kind::ContractShipSpawns

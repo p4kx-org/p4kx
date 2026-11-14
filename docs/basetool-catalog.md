@@ -205,7 +205,9 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.resourceTypes` | Closed source-family `availability` and canonical `rows`, independently selected and ordered by GUID; every source-backed field uses the typed value carrier ([contract](catalog-resource-types.md)) |
 | `texts.publicNames`, `texts.gameTexts` | Canonical sourced-definition short-name and protected-description rows, each with sourced `id`, `key` and per-language `translations` containing separate source and display forms |
 | `provenance.sources`, `provenance.uses` | Physical source/ancestry declarations and observed source uses referenced by the sourced definition carriers |
+| `definitions.climateAssets` | Original ordered PlanetTech climate assets, sub-assets, growth buckets and declared GUID links ([contract](catalog-planet-assets.md)) |
 | `definitions.creatures` | Original PlanetTech fauna definitions with exact Entity GUID links and authored spawn tolerance fields ([contract](catalog-planet-creatures.md)) |
+| `definitions.geologyAssets` | Original PlanetTech geology assets with placement, substrate and mineable paths ([contract](catalog-planet-assets.md)) |
 | `definitions.planetResources` | Original loose planet resource definitions and declared tint palette paths with physical source and link states ([contract](catalog-planet-resources.md)) |
 | `definitions.proceduralPlanetAudio` | Physical planet audio records with separately sourced RTPC identifiers and original declaration collections. [Procedural planet audio](catalog-procedural-planet-audio.md) |
 | `definitions.ammoDefinitions` | Physical `AmmoParams` definitions with original projectile, physics and conversion fields and per-value source origin. [Ammunition definitions](catalog-ammo-definitions.md) |

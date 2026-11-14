@@ -4889,6 +4889,9 @@
         "blueprints": {
           "$ref": "#/$defs/CatalogTableOfBlueprintDefinition"
         },
+        "climateAssets": {
+          "$ref": "#/$defs/CatalogTableOfPlanetClimateAsset"
+        },
         "commodities": {
           "$ref": "#/$defs/CatalogTableOfCommodityDefinition"
         },
@@ -4921,6 +4924,9 @@
         },
         "gameplayProperties": {
           "$ref": "#/$defs/CatalogTableOfGameplayPropertyDefinition"
+        },
+        "geologyAssets": {
+          "$ref": "#/$defs/CatalogTableOfPlanetGeologyAsset"
         },
         "hierarchicalContextualDataPresets": {
           "$ref": "#/$defs/CatalogTableOfLootDefinition"
@@ -5075,6 +5081,7 @@
         "autoSpawns",
         "blueprintCategories",
         "blueprints",
+        "climateAssets",
         "commodities",
         "contractGenerators",
         "contractScopes",
@@ -5086,6 +5093,7 @@
         "factionReputations",
         "factions",
         "gameplayProperties",
+        "geologyAssets",
         "hierarchicalContextualDataPresets",
         "infractionSets",
         "infractions",
@@ -6738,6 +6746,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfPlanetClimateAsset": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/PlanetClimateAsset"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfPlanetCreature": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -6747,6 +6774,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/PlanetCreature"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfPlanetGeologyAsset": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/PlanetGeologyAsset"
           },
           "type": "array"
         }
@@ -7973,6 +8019,373 @@
       ],
       "type": "object"
     },
+    "ClimateAppearance": {
+      "properties": {
+        "debrisPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "excludeFromSnow": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "farLutPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "shadingClass": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "shadingClassClose": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "shadingClassFar": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "shadingClassMid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        }
+      },
+      "required": [
+        "debrisPath",
+        "excludeFromSnow",
+        "farLutPath",
+        "shadingClass",
+        "shadingClassClose",
+        "shadingClassFar",
+        "shadingClassMid"
+      ],
+      "type": "object"
+    },
+    "ClimateEnvelope": {
+      "properties": {
+        "aggregateSizeRange": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "bedrockCurveImpact": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "biomeMask": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "elevationCurveImpact": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "elevationHighCurveImpact": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "humidityCurveImpact": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "luminosityCurveImpact": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "luminosityRange": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "maxAnnualRainfall": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "maxElevation": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "maxTemperature": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "minAnnualRainfall": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "minElevation": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "minTemperature": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "optimalAggregateSize": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "optimalLuminosity": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "seedExclusionMask": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "slopeRangeDeg": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "soilDepthCurve": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "soilDepthMax": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "soilDepthMin": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "soilExclusionMask": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "temperatureCurveImpact": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        }
+      },
+      "required": [
+        "aggregateSizeRange",
+        "bedrockCurveImpact",
+        "biomeMask",
+        "elevationCurveImpact",
+        "elevationHighCurveImpact",
+        "humidityCurveImpact",
+        "luminosityCurveImpact",
+        "luminosityRange",
+        "maxAnnualRainfall",
+        "maxElevation",
+        "maxTemperature",
+        "minAnnualRainfall",
+        "minElevation",
+        "minTemperature",
+        "optimalAggregateSize",
+        "optimalLuminosity",
+        "seedExclusionMask",
+        "slopeRangeDeg",
+        "soilDepthCurve",
+        "soilDepthMax",
+        "soilDepthMin",
+        "soilExclusionMask",
+        "temperatureCurveImpact"
+      ],
+      "type": "object"
+    },
+    "ClimateGrowth": {
+      "properties": {
+        "buckets": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfClimateGrowthBucket"
+        },
+        "dominance": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "historicGrowthFactorsSize0": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "historicGrowthFactorsSize1": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "historicGrowthFactorsSize2": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "historicGrowthModeA": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "historicGrowthModeB": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "historicGrowthModeC": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "seasonOffsetRange": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "sparsity": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "vitalityFactor": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        }
+      },
+      "required": [
+        "buckets",
+        "dominance",
+        "historicGrowthFactorsSize0",
+        "historicGrowthFactorsSize1",
+        "historicGrowthFactorsSize2",
+        "historicGrowthModeA",
+        "historicGrowthModeB",
+        "historicGrowthModeC",
+        "seasonOffsetRange",
+        "sparsity",
+        "vitalityFactor"
+      ],
+      "type": "object"
+    },
+    "ClimateGrowthBucket": {
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "shadeDensity": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "shadeDensity"
+      ],
+      "type": "object"
+    },
+    "ClimateSubAsset": {
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "assetSize": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "assetSizeY": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "biomeTag": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "entity": {
+          "$ref": "#/$defs/LooseRecordLink"
+        },
+        "entityClass": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "entityClassRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fallbackPromotionType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "geometryPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "gravityAligned": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "groundCover": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "growthStageBucket": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "harvestableResource": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "harvestableResourceLink": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TerrainGuidLink"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "harvestableResourceRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "harvestableSetup": {
+          "$ref": "#/$defs/LooseRecordLink"
+        },
+        "harvestableSetupRecord": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "harvestableSetupRecordRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/DefinitionIssue"
+          },
+          "type": "array"
+        },
+        "lodRatio": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "materialPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "opacity": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "promotionType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "randomRotationMax": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "randomRotationMin": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "randomRotationQuantization": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "randomScale": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "randomZOffsetMax": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "randomZOffsetMin": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "slopeAlignmentAmount": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "spawnOceanSurface": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "sunShadowMode": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "useGroundCoverCoverage": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "variantProportion": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "wheeledCollisionMode": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "widthFromBaseToTopMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "assetSize",
+        "assetSizeY",
+        "biomeTag",
+        "entity",
+        "entityClass",
+        "entityClassRaw",
+        "fallbackPromotionType",
+        "geometryPath",
+        "gravityAligned",
+        "groundCover",
+        "growthStageBucket",
+        "harvestableResource",
+        "harvestableResourceLink",
+        "harvestableResourceRaw",
+        "harvestableSetup",
+        "harvestableSetupRecord",
+        "harvestableSetupRecordRaw",
+        "issues",
+        "lodRatio",
+        "materialPath",
+        "opacity",
+        "promotionType",
+        "randomRotationMax",
+        "randomRotationMin",
+        "randomRotationQuantization",
+        "randomScale",
+        "randomZOffsetMax",
+        "randomZOffsetMin",
+        "slopeAlignmentAmount",
+        "spawnOceanSurface",
+        "sunShadowMode",
+        "useGroundCoverCoverage",
+        "variantProportion",
+        "wheeledCollisionMode",
+        "widthFromBaseToTopMultiplier"
+      ],
+      "type": "object"
+    },
     "ClothingStats": {
       "description": "The worn properties of an item, raw facts of `SCItemClothingParams`.",
       "properties": {
@@ -8594,6 +9007,9 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `cargoManifests`."
         },
+        "climateAssets": {
+          "$ref": "#/$defs/KindCompleteness"
+        },
         "commodities": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `commodities`."
@@ -8663,6 +9079,9 @@
         "gameplayProperties": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `gameplayProperties`."
+        },
+        "geologyAssets": {
+          "$ref": "#/$defs/KindCompleteness"
         },
         "harvestableLocations": {
           "$ref": "#/$defs/KindCompleteness",
@@ -8939,6 +9358,7 @@
         "blueprintPools",
         "blueprints",
         "cargoManifests",
+        "climateAssets",
         "commodities",
         "contractEntitySpawns",
         "contractLocationQueries",
@@ -8957,6 +9377,7 @@
         "factionReputations",
         "factions",
         "gameplayProperties",
+        "geologyAssets",
         "harvestableLocations",
         "harvestableProviderPresets",
         "hierarchicalContextualDataPresets",
@@ -15376,6 +15797,167 @@
       ],
       "type": "object"
     },
+    "GeologyGeometry": {
+      "properties": {
+        "entityClass": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "entityClassRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fallbackPromotionType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "geometryPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "groundCover": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "lodRatio": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "materialPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "promotionType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "size": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "sunShadowMode": {
+          "$ref": "#/$defs/SourcedValueOfSunShadowMode"
+        },
+        "wheeledCollisionMode": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "entityClass",
+        "entityClassRaw",
+        "fallbackPromotionType",
+        "geometryPath",
+        "groundCover",
+        "lodRatio",
+        "materialPath",
+        "promotionType",
+        "size",
+        "sunShadowMode",
+        "wheeledCollisionMode"
+      ],
+      "type": "object"
+    },
+    "GeologyPlacement": {
+      "properties": {
+        "alignToProjectionDirection": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "gravityAligned": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "ignoresParentBlocking": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "immuneToBurying": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "randomRotationMax": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "randomRotationMin": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "randomRotationQuantization": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "randomScale": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "randomZOffsetMax": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "randomZOffsetMin": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "slopeAlignmentAmount": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "slopeRangeDeg": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        }
+      },
+      "required": [
+        "alignToProjectionDirection",
+        "gravityAligned",
+        "ignoresParentBlocking",
+        "immuneToBurying",
+        "randomRotationMax",
+        "randomRotationMin",
+        "randomRotationQuantization",
+        "randomScale",
+        "randomZOffsetMax",
+        "randomZOffsetMin",
+        "slopeAlignmentAmount",
+        "slopeRangeDeg"
+      ],
+      "type": "object"
+    },
+    "GeologyReferences": {
+      "description": "Original Archive target paths of the geometry and mineable settings.",
+      "properties": {
+        "geometry": {
+          "$ref": "#/$defs/LooseArchivePath"
+        },
+        "material": {
+          "$ref": "#/$defs/LooseArchivePath"
+        },
+        "mineableConfig": {
+          "$ref": "#/$defs/LooseArchivePath"
+        },
+        "mineableMaterial": {
+          "$ref": "#/$defs/LooseArchivePath"
+        }
+      },
+      "required": [
+        "geometry",
+        "material",
+        "mineableConfig",
+        "mineableMaterial"
+      ],
+      "type": "object"
+    },
+    "GeologySubstrate": {
+      "properties": {
+        "aggregateSize": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "aggregateSizeMax": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "bedrockFalldownDistance": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "bedrockPointOfMaxInfluence": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "bedrockScaleRatio": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        },
+        "maxSoilDepth": {
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+        }
+      },
+      "required": [
+        "aggregateSize",
+        "aggregateSizeMax",
+        "bedrockFalldownDistance",
+        "bedrockPointOfMaxInfluence",
+        "bedrockScaleRatio",
+        "maxSoilDepth"
+      ],
+      "type": "object"
+    },
     "GeometryAsset": {
       "description": "The exact authored path of a geometry or material asset.",
       "properties": {
@@ -20528,6 +21110,14 @@
         {
           "description": "Original loose `PlanetTech` fauna definitions in the Archive.",
           "value": "creatures"
+        },
+        {
+          "description": "Original loose `PlanetTech` climate asset definitions.",
+          "value": "climateAssets"
+        },
+        {
+          "description": "Original loose `PlanetTech` geology asset definitions.",
+          "value": "geologyAssets"
         },
         {
           "description": "Reusable physical `ExplosionRecord` definitions.",
@@ -28004,6 +28594,65 @@
       ],
       "type": "object"
     },
+    "PlanetClimateAsset": {
+      "description": "Original physical climate-asset definitions and ordered declarations.",
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "appearance": {
+          "$ref": "#/$defs/ClimateAppearance"
+        },
+        "audioOffset": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "envelope": {
+          "$ref": "#/$defs/ClimateEnvelope"
+        },
+        "growth": {
+          "$ref": "#/$defs/ClimateGrowth"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "guidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/DefinitionIssue"
+          },
+          "type": "array"
+        },
+        "proceduralAudio": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "subAssets": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfClimateSubAsset"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "appearance",
+        "audioOffset",
+        "envelope",
+        "growth",
+        "guid",
+        "guidRaw",
+        "identity",
+        "issues",
+        "proceduralAudio",
+        "subAssets"
+      ],
+      "type": "object"
+    },
     "PlanetCreature": {
       "description": "Original `PlanetTech` fauna configuration from a physical loose JSON Entry.",
       "properties": {
@@ -28048,6 +28697,91 @@
         "issues",
         "needVerticalOffset",
         "slopeTolerance"
+      ],
+      "type": "object"
+    },
+    "PlanetGeologyAsset": {
+      "description": "A physical loose geology definition and its authored fields.",
+      "properties": {
+        "additionalFields": {
+          "items": {
+            "$ref": "#/$defs/RawPlanetAssetMember"
+          },
+          "type": "array"
+        },
+        "audioOffset": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+        },
+        "entity": {
+          "$ref": "#/$defs/LooseRecordLink"
+        },
+        "geometry": {
+          "$ref": "#/$defs/GeologyGeometry"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "guidRaw": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "harvestableModelTag": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "identity": {
+          "$ref": "#/$defs/PhysicalEntryIdentity"
+        },
+        "issues": {
+          "items": {
+            "$ref": "#/$defs/DefinitionIssue"
+          },
+          "type": "array"
+        },
+        "mineableConfigPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "mineableMaterialPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "placement": {
+          "$ref": "#/$defs/GeologyPlacement"
+        },
+        "proceduralAudio": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "references": {
+          "$ref": "#/$defs/GeologyReferences"
+        },
+        "resources": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "resourcesCount": {
+          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+        },
+        "substrate": {
+          "$ref": "#/$defs/GeologySubstrate"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "audioOffset",
+        "entity",
+        "geometry",
+        "guid",
+        "guidRaw",
+        "harvestableModelTag",
+        "identity",
+        "issues",
+        "mineableConfigPath",
+        "mineableMaterialPath",
+        "placement",
+        "proceduralAudio",
+        "references",
+        "resources",
+        "resourcesCount",
+        "substrate"
       ],
       "type": "object"
     },
@@ -31530,6 +32264,23 @@
         "spinParam",
         "spinUpTime",
         "wearPerShot"
+      ],
+      "type": "object"
+    },
+    "RawPlanetAssetMember": {
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        },
+        "token": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "x-gameText": true
+        }
+      },
+      "required": [
+        "name",
+        "token"
       ],
       "type": "object"
     },
@@ -42998,6 +43749,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference": {
       "allOf": [
         {
@@ -43093,6 +43977,272 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfClimateGrowthBucket": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfClimateGrowthBucket"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfClimateSubAsset": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfClimateSubAsset"
                 },
                 "type": "array"
               }
@@ -60593,6 +61743,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/CatalogRecordReference"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfClimateGrowthBucket": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ClimateGrowthBucket"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfClimateSubAsset": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ClimateSubAsset"
               }
             }
           }
@@ -101782,6 +103192,136 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfSunShadowMode": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/SunShadowMode"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfTagPathParent": {
       "allOf": [
         {
@@ -102266,6 +103806,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/TemplateVocabulary"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfTerrainGuidLinkState": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/TerrainGuidLinkState"
               }
             }
           }
@@ -106066,6 +107736,42 @@
       ],
       "type": "object"
     },
+    "SunShadowMode": {
+      "oneOf": [
+        {
+          "properties": {
+            "type": {
+              "const": "named",
+              "type": "string"
+            },
+            "value": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "type": {
+              "const": "numeric",
+              "type": "string"
+            },
+            "value": {
+              "$ref": "#/$defs/CatalogJsonNumber"
+            }
+          },
+          "required": [
+            "type",
+            "value"
+          ],
+          "type": "object"
+        }
+      ]
+    },
     "TachyonProjectile": {
       "description": "Authored Tachyon damage, ranges and hit parameters.",
       "properties": {
@@ -107738,6 +109444,62 @@
         "source"
       ],
       "type": "object"
+    },
+    "TerrainGuidCandidate": {
+      "properties": {
+        "entry": {
+          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "kind": {
+          "$ref": "#/$defs/Kind"
+        }
+      },
+      "required": [
+        "entry",
+        "guid",
+        "kind"
+      ],
+      "type": "object"
+    },
+    "TerrainGuidLink": {
+      "description": "A declared terrain GUID relation and its original, ordered candidate receipts.",
+      "properties": {
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/TerrainGuidCandidate"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourcedValueOfTerrainGuidLinkState"
+        }
+      },
+      "required": [
+        "candidates",
+        "state"
+      ],
+      "type": "object"
+    },
+    "TerrainGuidLinkState": {
+      "enum": [
+        "absent",
+        "null",
+        "invalid",
+        "zero",
+        "unreadable",
+        "unsupported",
+        "unavailable",
+        "missing",
+        "wrongFamily",
+        "ambiguous",
+        "filtered",
+        "resolved"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
     },
     "TextForms": {
       "description": "The exact decoded source text and its derived display form for one language.",

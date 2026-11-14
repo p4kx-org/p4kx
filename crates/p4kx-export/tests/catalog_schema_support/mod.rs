@@ -359,6 +359,8 @@ pub(crate) fn minimal_catalog() -> Value {
         "particleLibraries",
         "planetResources",
         "creatures",
+        "climateAssets",
+        "geologyAssets",
         "proceduralPlanetAudio",
     ] {
         for (section, value) in [

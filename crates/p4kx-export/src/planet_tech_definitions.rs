@@ -5,11 +5,13 @@ use p4kx_extraction::{Archive, DataForge};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::planet_climate_asset::{self, PlanetClimateAsset};
 use super::planet_creature::{self, PlanetCreatureTable};
+use super::planet_geology_asset::{self, PlanetGeologyAsset};
 use super::planet_resource::{self, PlanetResourceTable};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::EntryCapture;
-use crate::catalog_table::DatasetAvailability;
+use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::export_ledger::ExportLedger;
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, CatalogOptions};
@@ -21,6 +23,8 @@ use crate::{CatalogError, CatalogOptions};
 pub(crate) struct PlanetTechDefinitions {
     pub(crate) planet_resources: PlanetResourceTable,
     pub(crate) creatures: PlanetCreatureTable,
+    pub(crate) climate_assets: CatalogTable<PlanetClimateAsset>,
+    pub(crate) geology_assets: CatalogTable<PlanetGeologyAsset>,
 }
 
 impl Default for PlanetTechDefinitions {
@@ -28,6 +32,8 @@ impl Default for PlanetTechDefinitions {
         Self {
             planet_resources: PlanetResourceTable::empty(DatasetAvailability::Absent),
             creatures: PlanetCreatureTable::empty(DatasetAvailability::Absent),
+            climate_assets: CatalogTable::empty(DatasetAvailability::Absent),
+            geology_assets: CatalogTable::empty(DatasetAvailability::Absent),
         }
     }
 }
@@ -45,5 +51,11 @@ pub(crate) fn read(
             archive, forge, original, capture, ledger, options,
         )?,
         creatures: planet_creature::read(archive, forge, original, capture, ledger, options)?,
+        climate_assets: planet_climate_asset::read(
+            archive, forge, original, capture, ledger, options,
+        )?,
+        geology_assets: planet_geology_asset::read(
+            archive, forge, original, capture, ledger, options,
+        )?,
     })
 }

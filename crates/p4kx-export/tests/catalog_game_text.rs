@@ -107,7 +107,7 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 88,
+        marked, 94,
         "every protected field in the canonical schema is accounted for"
     );
 }
@@ -142,6 +142,9 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
         | ("HcdDocument", "presetRecordName")
         | ("HcdAttribute" | "LocationAttribute" | "SourcedXmlAttribute", "value")
         | ("ParticleLibraryElement" | "TemplateLocalization", "text")
+        | ("PlanetClimateAsset", "proceduralAudio")
+        | ("PlanetGeologyAsset", "harvestableModelTag" | "proceduralAudio" | "resources")
+        | ("RawPlanetAssetMember", "name" | "token")
         | ("ProjectedMissionText", "key" | "translations" | "itemTokens") => true,
         ("SharedInteraction", "displayType") => false,
         ("BlackboardPropertyBody", "value") => {

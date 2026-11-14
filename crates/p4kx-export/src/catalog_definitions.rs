@@ -36,14 +36,33 @@ use crate::manufacturer::ManufacturerDefinition;
 use crate::mission_generator::GeneratorDefinition;
 use planet_tech_definitions::PlanetTechDefinitions;
 
+#[path = "planet_asset_raw_fields.rs"]
+mod planet_asset_raw_fields;
+#[cfg(test)]
+#[path = "planet_asset_tests.rs"]
+mod planet_asset_tests;
+#[path = "planet_climate_asset.rs"]
+mod planet_climate_asset;
+#[path = "planet_climate_properties.rs"]
+mod planet_climate_properties;
+#[path = "planet_climate_subasset.rs"]
+mod planet_climate_subasset;
 #[path = "planet_creature.rs"]
 pub(crate) mod planet_creature;
+#[path = "planet_geology_asset.rs"]
+mod planet_geology_asset;
+#[path = "planet_geology_properties.rs"]
+mod planet_geology_properties;
+#[path = "planet_geology_references.rs"]
+mod planet_geology_references;
 #[path = "planet_palette_reference.rs"]
 mod planet_palette_reference;
 #[path = "planet_resource.rs"]
 pub(crate) mod planet_resource;
 #[path = "planet_tech_definitions.rs"]
 pub(crate) mod planet_tech_definitions;
+#[path = "terrain_guid_link.rs"]
+mod terrain_guid_link;
 use crate::quality_catalog::contract::{
     QualityDistributionDefinition, QualityQuantizationDefinition,
 };

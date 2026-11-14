@@ -125,3 +125,16 @@ pub(crate) fn with_same_forge_reports(
     let second = OriginalCatalogInput::new(&forge, &second);
     check(&forge, &first, &second)
 }
+
+/// Lends the admitted original Forge and Entry scopes without running catalog assembly.
+pub(crate) fn with_archive_input(
+    archive: &Archive,
+    check: impl FnOnce(&DataForge<'_>, &OriginalCatalogInput<'_, '_>) -> TestResult,
+) -> TestResult {
+    let entry = DataForgeEntry::read(archive)?;
+    let forge = entry.open()?;
+    let texts = TextSources::read(archive)?;
+    let origins = CatalogOrigins::new(archive, &entry, &texts)?;
+    let input = OriginalCatalogInput::new(&forge, &origins);
+    check(&forge, &input)
+}

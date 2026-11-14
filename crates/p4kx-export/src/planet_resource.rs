@@ -8,7 +8,7 @@ use serde::Serialize;
 use super::planet_palette_reference::PlanetPaletteReference;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
-use crate::catalog_read::loose_archive_path::{self, LooseArchivePathState};
+use crate::catalog_read::loose_archive_path::{LooseArchivePathState, Resolver};
 use crate::catalog_read::loose_definition::{
     self, DefinitionFamily, DefinitionIssue, LooseDefinition,
 };
@@ -23,7 +23,7 @@ use crate::{CatalogError, CatalogOptions, Kind};
 const FOLDER: &str = "data/libs/planets/resources/";
 const EXTENSION: &str = "resource";
 const KIND: Kind = Kind::PlanetResources;
-const FAMILY: DefinitionFamily =
+pub(super) const FAMILY: DefinitionFamily =
     DefinitionFamily::new(KIND, FOLDER, EXTENSION, "PlanetResource", "guid");
 
 pub(crate) type PlanetResourceTable = CatalogTable<PlanetResource>;
@@ -55,13 +55,12 @@ impl LooseDefinition for PlanetResource {
 }
 
 struct Definitions<'input, 'forge, 'source> {
-    archive: &'input Archive,
     forge: &'input DataForge<'source>,
     original: &'input OriginalCatalogInput<'forge, 'source>,
     capture: &'input EntryCapture<'input>,
     filter: Option<&'input Filter>,
     cancel: Option<&'input CancelToken>,
-    keys: Option<p4kx_extraction::PathKeys>,
+    paths: Resolver<'input, 'input, 'input>,
 }
 
 pub(crate) fn read(
@@ -73,13 +72,12 @@ pub(crate) fn read(
     options: &CatalogOptions<'_>,
 ) -> Result<PlanetResourceTable, CatalogError> {
     let mut reader = Definitions {
-        archive,
         forge,
         original,
         capture,
         filter: options.filter,
         cancel: options.cancel,
-        keys: None,
+        paths: Resolver::new(archive, capture, options.cancel),
     };
     loose_definition::read(
         archive,
@@ -130,20 +128,7 @@ impl Definitions<'_, '_, '_> {
         )? {
             return Ok(link);
         }
-        if self.keys.is_none() {
-            self.keys = Some(loose_archive_path::keys(self.archive, self.cancel)?);
-        }
-        let keys = self
-            .keys
-            .as_ref()
-            .ok_or(crate::ExportAccountingError::ConflictingSourceDatum)?;
-        let resolution = loose_archive_path::resolve(
-            &keys.index(self.archive),
-            self.capture,
-            self.cancel,
-            path,
-            |_| true,
-        )?;
+        let resolution = self.paths.resolve(path, |_| true)?;
         Ok(PlanetPaletteReference::ArchiveEntry { resolution })
     }
 }
