@@ -548,3 +548,62 @@ check under [#1133](https://github.com/p4kx-org/p4kx/issues/1133) can establish
 which additional combinations merit a projection.
 [StarBreaker material classification](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/material_semantics.rs)
 · [P4KX Blender policy](blender-package.md).
+
+### Recheck after the directional and CAF alias changes
+
+The complete paginated PR list contains 123 paths. The merged tree remains
+identical to the audited head. No archive reader, DataForge or Wwise parser
+changed in this PR. The upstream LIVE demonstrations and v0.3.2 release are
+different producer evidence. This recheck compares pinned source and P4KX
+integration `2889c5bd2`.
+[StarBreaker PR #54](https://github.com/diogotr7/StarBreaker/pull/54) ·
+[Merge tree](https://github.com/diogotr7/StarBreaker/commit/305215bca75350013c221bdfbcb2f8180fe09dbe).
+
+- **Binary SOC placements.** StarBreaker passes geometry from IncludedObjects
+  through its interior pipeline and uses some exact CGA paths to look for
+  controller candidates. P4KX uses the binary placements in preview, while the
+  authored SOC document's stream projection currently emits only XML chunks.
+  The preview reader skips the original material table, casts f64 placement
+  transforms to f32 and joins chunk-local model and palette positions. Export
+  the physical tables and placements first in [#1143](https://github.com/p4kx-org/p4kx/issues/1143).
+  [#1095](https://github.com/p4kx-org/p4kx/issues/1095) can then refer to those
+  placements when publishing candidate controllers. A matching geometry alone
+  leaves the controller ownership unresolved. P4KX's independent LIVE framing
+  uses the header layout word to select the record stride. The StarBreaker
+  variable-length heuristic and palette width need independent evidence before
+  any format change.
+  [StarBreaker selector](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/pipeline/animation_sources.rs#L209-L272) ·
+  [StarBreaker binary reader](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/included_objects.rs) ·
+  [P4KX preview](../crates/p4kx-model/src/included.rs) ·
+  [P4KX authored stream](../crates/p4kx-blender/src/soc_scene_stream.rs) ·
+  [Measured layouts](adr/0193-included-object-records-have-the-length-their-layout-word-gives.md).
+- **Animation inventory.** Named CAF aliases now expose exact physical DBA
+  candidates from each declared bank in the same AnimationList. P4KX also
+  exports verified directional record and pose framing, orientations and polar
+  grid ranges separately from unresolved aim runtime semantics. Keep each
+  contributor's scope and physical identity independent when showing a merged
+  name. Upstream's explicit final-frame pose is a useful test for preserving
+  unkeyed bind components and applying basis conversion once if a derived pose
+  is introduced.
+  [P4KX alias change](https://github.com/p4kx-org/p4kx/commit/d44e8ba86) ·
+  [P4KX directional output](media-animation-source.md) ·
+  [StarBreaker pose change](https://github.com/diogotr7/StarBreaker/commit/2b4c8454f).
+- **Collision.** P4KX's optional Blender helpers can link a CDF attachment to a
+  uniquely selected rig and bone. The general Model Media output still gives
+  the authored bone selector and offset without that physical bone binding.
+  [#1128](https://github.com/p4kx-org/p4kx/issues/1128) can reuse the established
+  bind-frame calculation and expose lookup dispositions and field origins.
+  The vehicle-grid archive target is already represented. Linking its actual
+  selected collision shapes requires retaining the frame and actual affine
+  transform independently. Literal NMC names are already exported. A derived
+  name convention would require a source witness and carries no collision mask.
+  [P4KX Blender CDF lookup](../crates/p4kx-blender/src/collision_helper_cdf.rs) ·
+  [P4KX Media CDF output](../crates/p4kx-media/src/model_source/character.rs) ·
+  [StarBreaker grid transform fix](https://github.com/diogotr7/StarBreaker/commit/82362386d).
+- **Forward emission.** P4KX already preserves positive over-range static
+  emission in GLB via `KHR_materials_emissive_strength`. Keep the remaining
+  forward material, colour and coverage verification in
+  [#1133](https://github.com/p4kx-org/p4kx/issues/1133). An upstream preview
+  formula does not establish a game default when `Glow` is absent.
+  [P4KX GLB factors](../crates/p4kx-gltf/tests/it/material_emission.rs) ·
+  [StarBreaker material classification](https://github.com/diogotr7/StarBreaker/blob/305215bca75350013c221bdfbcb2f8180fe09dbe/crates/starbreaker-3d/src/material_semantics.rs).
