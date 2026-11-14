@@ -11,6 +11,8 @@ use serde::Serialize;
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_included::{ByteRange, IncludedOrigin};
 
+const NO_PALETTE: u8 = u8::MAX;
+
 #[derive(Debug, Serialize, JsonSchema)]
 pub(super) struct ObjectRow {
     ordinal: usize,
@@ -104,7 +106,8 @@ impl Placement {
                 SourceValue::Present(palette),
                 true,
             )?,
-            palette_slot: (palette_slot < palette_count).then_some(palette_slot),
+            palette_slot: (palette != NO_PALETTE && palette_slot < palette_count)
+                .then_some(palette_slot),
             prefix_f64,
             transform: origin.cell(
                 record.transform_range(),

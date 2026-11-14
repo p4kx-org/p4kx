@@ -251,8 +251,9 @@ fn compare_row(
     let [palette] = original::word(bytes, 172)?;
     let model_slot =
         (usize::from(model) < original.name_ranges[0].len() / NAME_BYTES).then_some(model);
-    let palette_slot =
-        (usize::from(palette) < original.name_ranges[2].len() / NAME_BYTES).then_some(palette);
+    let palette_slot = (palette != 255
+        && usize::from(palette) < original.name_ranges[2].len() / NAME_BYTES)
+        .then_some(palette);
     assert_eq!(
         *field_at(row, "/modelIndex/value")?,
         model,

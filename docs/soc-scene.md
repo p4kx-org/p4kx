@@ -107,7 +107,10 @@ empty and repeated spellings. Invalid UTF-8 or missing NUL termination has
 an explicit invalid interpretation and the original slot remains in `raw`.
 A known kind-1 placement records the original model index and byte at
 palette selector offset 172. The nullable local slot links describe
-in-range table indices. Material entries are separate declarations.
+in-range table indices. A palette selector of 255 declares no palette and
+leaves `paletteSlot` null even when the palette table has a slot at that
+index. Another selector with a null link identifies an out-of-range slot.
+Material entries are separate declarations.
 Their presence does not establish a material override.
 
 Placement transforms retain row-major binary64 values in container space,

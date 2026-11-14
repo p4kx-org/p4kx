@@ -39,6 +39,7 @@ mod player_source_bundle;
 mod soc_door_classes;
 mod soc_light_inheritance;
 mod soc_light_source;
+mod soc_palette_sentinel;
 mod soc_scene;
 mod support;
 
