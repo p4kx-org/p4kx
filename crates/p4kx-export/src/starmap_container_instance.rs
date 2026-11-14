@@ -100,6 +100,13 @@ pub(crate) struct ContainerInstance {
     world_rotation: SourcedValue<[f64; 4]>,
 }
 
+#[cfg(test)]
+impl ContainerInstance {
+    pub(crate) fn source_path_for_test(&self) -> Option<&str> {
+        self.source_path.value().map(String::as_str)
+    }
+}
+
 impl ContainerOccurrence<'_> {
     pub(crate) fn project(
         self,

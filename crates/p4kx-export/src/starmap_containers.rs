@@ -34,6 +34,10 @@ pub(crate) mod location_declaration;
 #[path = "starmap_location_instance.rs"]
 pub(crate) mod location_instance;
 
+#[cfg(test)]
+#[path = "starmap_installed_witness.rs"]
+mod installed_witness;
+
 /// What bounds the walk through a star system.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Limits {
