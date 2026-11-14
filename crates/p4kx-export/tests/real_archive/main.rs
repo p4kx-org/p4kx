@@ -100,6 +100,7 @@ mod real_archive_reputation_sandbox;
 mod real_archive_reputation_standings;
 mod real_archive_resource_components;
 mod real_archive_resource_network;
+mod real_archive_resource_network_global;
 mod real_archive_resource_oracles;
 mod real_archive_security_manifests;
 mod real_archive_ship_base;

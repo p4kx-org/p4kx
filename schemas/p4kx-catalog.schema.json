@@ -5298,6 +5298,9 @@
         "resourceGroups": {
           "$ref": "#/$defs/CatalogTableOfResourceGroupDefinition"
         },
+        "resourceNetworkGlobals": {
+          "$ref": "#/$defs/CatalogTableOfResourceNetworkGlobal"
+        },
         "resourceTypes": {
           "$ref": "#/$defs/CatalogTableOfResourceType"
         },
@@ -5411,6 +5414,7 @@
         "reputationStandings",
         "reputationTriggerRecords",
         "resourceGroups",
+        "resourceNetworkGlobals",
         "resourceTypes",
         "securityNetworkManifests",
         "shadingClasses",
@@ -7860,6 +7864,25 @@
       ],
       "type": "object"
     },
+    "CatalogTableOfResourceNetworkGlobal": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ResourceNetworkGlobal"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
     "CatalogTableOfResourceNetworkLinkBinding": {
       "description": "One named typed dataset with its measured source-family availability.",
       "properties": {
@@ -10217,6 +10240,10 @@
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `resourceGroups`."
         },
+        "resourceNetworkGlobals": {
+          "$ref": "#/$defs/KindCompleteness",
+          "description": "The filtered physical DataForge resource network global selection."
+        },
         "resourceTypes": {
           "$ref": "#/$defs/KindCompleteness",
           "description": "The completeness of `resourceTypes`."
@@ -10367,6 +10394,7 @@
         "reputationStandings",
         "reputationTriggerRecords",
         "resourceGroups",
+        "resourceNetworkGlobals",
         "resourceTypes",
         "securityNetworkManifests",
         "shadingClasses",
@@ -12946,6 +12974,42 @@
         }
       ],
       "required": []
+    },
+    "DefaultPowerDistribution": {
+      "description": "Stored distribution pool defaults and their control settings.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "poolDefaultEngines": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "poolDefaultShields": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "poolDefaultWeapons": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "powerDistCoolerMin": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "powerDistPoolsFillMin": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "powerDistPoolsProportion": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "poolDefaultEngines",
+        "poolDefaultShields",
+        "poolDefaultWeapons",
+        "powerDistCoolerMin",
+        "powerDistPoolsFillMin",
+        "powerDistPoolsProportion"
+      ],
+      "type": "object"
     },
     "DefinitionIssue": {
       "description": "A represented issue of one authored field in a readable loose definition.",
@@ -25372,6 +25436,10 @@
           "value": "proceduralPlanetAudio"
         },
         {
+          "description": "Physical DataForge resource network global definitions.",
+          "value": "resourceNetworkGlobals"
+        },
+        {
           "description": "Physical starmap object type definitions.",
           "value": "starmapTypes"
         },
@@ -33602,6 +33670,41 @@
       ],
       "type": "object"
     },
+    "PowerModifier": {
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "additiveModifier": {
+          "$ref": "#/$defs/SourcedValueOfint32"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "additiveModifier",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "PowerParameters": {
+      "description": "Ordered modifiers of the original global power declaration.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "modifiers": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfPowerModifier"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "modifiers"
+      ],
+      "type": "object"
+    },
     "PowerRange": {
       "properties": {
         "additionalFields": {
@@ -39220,6 +39323,74 @@
         "gameModeId",
         "params",
         "source"
+      ],
+      "type": "object"
+    },
+    "ResourceNetworkGlobal": {
+      "description": "Original global resource network settings and owned power distribution parameters.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "defaultPowerDistributionParams": {
+          "$ref": "#/$defs/SourcedValueOfDefaultPowerDistribution"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "maxPowerToCoolantRatio": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "misfireRepairGracePeriod": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "powerBaseConversionRate": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        },
+        "powerParams": {
+          "$ref": "#/$defs/SourcedValueOfPowerParameters"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "thrusterCoolantMultiplier": {
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "className",
+        "defaultPowerDistributionParams",
+        "fileName",
+        "guid",
+        "maxPowerToCoolantRatio",
+        "metadataTag",
+        "misfireRepairGracePeriod",
+        "powerBaseConversionRate",
+        "powerParams",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType",
+        "thrusterCoolantMultiplier"
       ],
       "type": "object"
     },
@@ -58981,6 +59152,139 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfPowerModifier": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfPowerModifier"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfProjectileBeamEffect": {
       "allOf": [
         {
@@ -72499,6 +72803,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/DecimalU64"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfDefaultPowerDistribution": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/DefaultPowerDistribution"
               }
             }
           }
@@ -98182,6 +98616,266 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/PortItemType"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfPowerModifier": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/PowerModifier"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfPowerParameters": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/PowerParameters"
               }
             }
           }

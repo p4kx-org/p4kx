@@ -99,6 +99,7 @@ encounterIndices: 0 written, 0 skipped, complete
 inventoryContainers: 0 written, 0 skipped, complete
 medicalItemTierConfigs: 0 written, 0 skipped, complete
 proceduralPlanetAudio: 0 written, 0 skipped, complete
+resourceNetworkGlobals: 0 written, 0 skipped, complete
 starmapTypes: 0 written, 0 skipped, complete
 starmapPresets: 0 written, 0 skipped, complete
 starmapAmenities: 0 written, 0 skipped, complete
@@ -119,4 +120,4 @@ ships variants: 0 in 0 groups
 quality quantizations: 0 used by no ResourceType, 0 links reach no quantization
 en: 16 texts resolved, 1 unresolved, 0 placeholders
 de: 2 texts resolved, 15 unresolved, 0 placeholders
-wrote [DIR]/p4kx-catalog.json: 233268 bytes, 1 Records skipped, 0 failed
+wrote [DIR]/p4kx-catalog.json: 234103 bytes, 1 Records skipped, 0 failed

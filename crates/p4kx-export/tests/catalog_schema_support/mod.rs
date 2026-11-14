@@ -12,6 +12,7 @@ mod commodities;
 mod contract_properties;
 mod contracts;
 mod crafters;
+mod dataset_availability;
 mod gameplay_properties;
 mod harvest;
 mod health;
@@ -352,35 +353,7 @@ pub(crate) fn minimal_catalog() -> Value {
         "cargoManifests": contracts::manifests(),
         "shipStoreSlugs": slugs::ship_store_slugs()
     });
-    for kind in [
-        "factionIdentities",
-        "securityNetworkManifests",
-        "missionModuleDeclarations",
-        "missionItems",
-        "contractScopes",
-        "locationResourceSlots",
-        "particleLibraries",
-        "planetResources",
-        "creatures",
-        "climateAssets",
-        "geologyAssets",
-        "ecosystems",
-        "geologySets",
-        "geologyTextureSets",
-        "soils",
-        "soilTextureSets",
-        "shadingClasses",
-        "proceduralPlanetAudio",
-    ] {
-        for (section, value) in [
-            ("completeness", json!({"status": "complete"})),
-            ("definitions", absent_table()),
-        ] {
-            if let Some(object) = catalog.get_mut(section).and_then(Value::as_object_mut) {
-                object.insert(kind.to_owned(), value);
-            }
-        }
-    }
+    dataset_availability::add_empty_definitions(&mut catalog);
     if let Some(configurations) = catalog
         .get_mut("configurations")
         .and_then(Value::as_object_mut)

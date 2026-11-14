@@ -3,18 +3,20 @@
 
 use std::collections::{BTreeSet, HashSet};
 
-use p4kx_extraction::{CancelToken, Guid, Record, TreeBuilder};
+use p4kx_extraction::{CancelToken, Guid, Record, RecordTree, TreeBuilder};
 
 use super::{RESOURCE_TYPE, Scan};
 use crate::blueprint_catalog_rows::BlueprintRow;
 use crate::catalog_crafting::CraftingKinds;
 use crate::catalog_v3::catalog_entity_configurations::EntityConfigurationRows;
+use crate::catalog_v3::catalog_resource_network_read::resource_network_global;
 use crate::commodity;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
 use crate::scan_health::{ScanError, ScanRead, SourceTrace};
+use crate::source_fields::FieldError;
 use crate::{CatalogError, Kind};
 
 struct BackfillContext<'context, 'source> {
@@ -23,6 +25,34 @@ struct BackfillContext<'context, 'source> {
     scanned: &'context ExportLedger,
 }
 impl<'f> Scan<'_, '_, 'f> {
+    pub(super) fn resource_network_global(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (value, notes) =
+            resource_network_global::read(tree, self.projection, admission, self.options.cancel)?;
+        Ok((Picked::ResourceNetworkGlobal(Box::new(value)), notes))
+    }
+
+    pub(super) fn resource_group(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let parent = self
+            .groups
+            .parent_choice(&tree.guid(), self.options.cancel)?;
+        let read = crate::resource_group_read::read(
+            tree,
+            self.projection,
+            parent,
+            admission,
+            self.options.cancel,
+        )?;
+        Ok((Picked::ResourceGroup(read.value), read.notes))
+    }
+
     /// Reads the used additional resource definitions at their actual projection boundary.
     pub(super) fn resource_commodities(
         &self,

@@ -18,6 +18,7 @@ use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
 use crate::catalog_v3::catalog_entity_configurations::EntityConfigurationRows;
 use crate::catalog_v3::catalog_item_components::ItemComponentRows;
+use crate::catalog_v3::catalog_resource_network_read::resource_network_global::PreparedResourceNetworkGlobal;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
@@ -96,6 +97,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) inventory_containers: Vec<PreparedInventoryContainer<'f>>,
     pub(crate) medical_item_tier_configs: Vec<PreparedMedicalTier<'f>>,
     pub(crate) procedural_planet_audio: Vec<PreparedPlanetAudio<'f>>,
+    pub(crate) resource_network_globals: Vec<PreparedResourceNetworkGlobal<'f>>,
     pub(crate) ammo_definitions: Vec<PreparedAmmoDefinition<'f>>,
     pub(crate) gameplay_properties: Vec<GameplayPropertyDefinition<'f>>,
     pub(crate) quality: QualityRows<'f>,
@@ -205,6 +207,7 @@ impl<'f> Collected<'f> {
             inventory_containers: Vec::new(),
             medical_item_tier_configs: Vec::new(),
             procedural_planet_audio: Vec::new(),
+            resource_network_globals: Vec::new(),
             ammo_definitions: Vec::new(),
             gameplay_properties: crafting.properties,
             quality: crafting.quality,
@@ -304,6 +307,7 @@ impl<'f> Collected<'f> {
             Picked::InventoryContainer(entity) => self.inventory_containers.push(*entity),
             Picked::MedicalItemTierConfig(entity) => self.medical_item_tier_configs.push(*entity),
             Picked::ProceduralPlanetAudio(entity) => self.procedural_planet_audio.push(*entity),
+            Picked::ResourceNetworkGlobal(entity) => self.resource_network_globals.push(*entity),
             Picked::Starmap(read) => {
                 self.starmap_definitions.push_object(read.definition);
                 self.starmap_objects.push(read.object);

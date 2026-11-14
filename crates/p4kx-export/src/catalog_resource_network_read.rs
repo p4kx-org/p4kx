@@ -26,6 +26,9 @@ use crate::source_projection_notes;
 use crate::template_field_capture::TemplateFieldCapture;
 use crate::{CatalogError, CatalogReadFailure};
 
+#[path = "resource_network_global.rs"]
+pub(crate) mod resource_network_global;
+
 const ROLE: ExportSourceRole = ExportSourceRole::Dependency;
 
 pub(super) struct GameModeRead<'source> {

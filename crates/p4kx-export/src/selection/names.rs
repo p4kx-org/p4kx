@@ -111,6 +111,7 @@ impl Kind {
             Self::InventoryContainers => "inventoryContainers",
             Self::MedicalItemTierConfigs => "medicalItemTierConfigs",
             Self::ProceduralPlanetAudio => "proceduralPlanetAudio",
+            Self::ResourceNetworkGlobals => "resourceNetworkGlobals",
             Self::StarmapTypes => "starmapTypes",
             Self::StarmapPresets => "starmapPresets",
             Self::StarmapAmenities => "starmapAmenities",

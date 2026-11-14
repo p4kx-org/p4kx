@@ -8,6 +8,7 @@ use crate::blueprint_category::BlueprintCategory;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
+use crate::catalog_v3::catalog_resource_network_read::resource_network_global::PreparedResourceNetworkGlobal;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
@@ -69,6 +70,7 @@ pub(crate) enum Picked<'f> {
     InventoryContainer(Box<PreparedInventoryContainer<'f>>),
     MedicalItemTierConfig(Box<PreparedMedicalTier<'f>>),
     ProceduralPlanetAudio(Box<PreparedPlanetAudio<'f>>),
+    ResourceNetworkGlobal(Box<PreparedResourceNetworkGlobal<'f>>),
     FactionIdentity(
         Box<crate::catalog_v3::faction_identity_definition::PreparedFactionIdentity<'f>>,
     ),
@@ -166,6 +168,7 @@ impl<'f> Picked<'f> {
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
             | Kind::ProceduralPlanetAudio
+            | Kind::ResourceNetworkGlobals
             | Kind::Factions
             | Kind::FactionIdentities
             | Kind::ReputationPerks

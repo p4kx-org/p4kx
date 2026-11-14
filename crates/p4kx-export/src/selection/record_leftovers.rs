@@ -74,6 +74,7 @@ pub fn is_kind_leftover(kind: Kind, record_path: &str, name: &str) -> bool {
         | Kind::InventoryContainers
         | Kind::MedicalItemTierConfigs
         | Kind::ProceduralPlanetAudio
+        | Kind::ResourceNetworkGlobals
         | Kind::StarmapTypes
         | Kind::StarmapPresets
         | Kind::StarmapAmenities => false,

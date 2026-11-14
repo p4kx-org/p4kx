@@ -11,19 +11,19 @@ use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags, pa
 use crate::build_harvest::add_harvest_locations;
 use crate::build_loot::add_loot_containers;
 use crate::build_starmap::add_starmap;
-use crate::catalog_crafting::kinds;
+use crate::catalog_crafting;
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_projections::CatalogProjections;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_independent_configurations;
+use crate::catalog_v3::catalog_resource_network_read::resource_network_global;
 use crate::catalog_v3::inventory_container_definition::table as inventory_table;
 use crate::catalog_v3::medical::medical_tier_config;
 use crate::catalog_v3::procedural_planet_audio;
 use crate::catalog_v3::weapon_combat_base;
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
-use crate::crafting::read_with_progress;
 use crate::mission_data::link_scenario_factions;
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
@@ -65,17 +65,7 @@ fn assemble<R>(
     let input = original_input::OriginalCatalogInput::new(&forge, &origins);
     let projection = CatalogProjection::new(&texts, &input);
     let entry_capture = EntryCapture::for_input(&input);
-    let crafting = kinds(
-        read_with_progress(
-            &forge,
-            options.filter,
-            options.cancel,
-            options.progress,
-            &projection,
-        )?,
-        &origins,
-        options.filter,
-    )?;
+    let crafting = catalog_crafting::read(&forge, options, &projection)?;
     let files = ArchiveFiles::new(archive);
     let entities = Arc::new(Entities::new(&forge));
     let (mut collected, mut placements) = scanning::scan(
@@ -223,6 +213,10 @@ fn assemble<R>(
             procedural_planet_audio: procedural_planet_audio::table(
                 &forge,
                 collected.procedural_planet_audio,
+            ),
+            resource_network_globals: resource_network_global::table(
+                &forge,
+                collected.resource_network_globals,
             ),
             explosion_definitions: crate::catalog_v3::explosion_definition::table(
                 &forge,

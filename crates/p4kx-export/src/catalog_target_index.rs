@@ -168,62 +168,70 @@ fn origins<'source>(
 }
 
 const fn uses_physical_row_identity(kind: Kind) -> bool {
+    uses_physical_reputation_identity(kind)
+        || matches!(
+            kind,
+            Kind::Manufacturers
+                | Kind::Infractions
+                | Kind::InfractionSets
+                | Kind::Jurisdictions
+                | Kind::SecurityNetworkManifests
+                | Kind::MissionScenarios
+                | Kind::MissionModuleDeclarations
+                | Kind::MissionItems
+                | Kind::LocationClasses
+                | Kind::LocationFunctions
+                | Kind::LocationSizes
+                | Kind::LocationResourceSlots
+                | Kind::LocationClassRegistries
+                | Kind::LocationFunctionRegistries
+                | Kind::LocationSizeRegistries
+                | Kind::ContractScopes
+                | Kind::NpcArchetypes
+                | Kind::NpcClassPools
+                | Kind::AutoSpawns
+                | Kind::AutoSpawnSets
+                | Kind::EncounterIndices
+                | Kind::ContractTemplates
+                | Kind::MissionBrokerEntries
+                | Kind::GameplayProperties
+                | Kind::Blueprints
+                | Kind::LootPoolFilters
+                | Kind::LootSecondaryChoiceSingleLayers
+                | Kind::LootSecondaryChoiceMultiLayers
+                | Kind::LootThemes
+                | Kind::HierarchicalContextualDataPresets
+                | Kind::LootGenerationGlobalParams
+                | Kind::SubHarvestableConfigs
+                | Kind::SubHarvestableMultiConfigs
+                | Kind::ExplosionDefinitions
+                | Kind::InventoryContainers
+                | Kind::MedicalItemTierConfigs
+                | Kind::ProceduralPlanetAudio
+                | Kind::ResourceNetworkGlobals
+                | Kind::AmmoDefinitions
+                | Kind::Tags
+                | Kind::Commodities
+                | Kind::ResourceTypes
+                | Kind::ResourceGroups
+                | Kind::QualityDistributions
+                | Kind::QualityQuantizations
+                | Kind::StarmapObjects
+                | Kind::StarmapTypes
+                | Kind::StarmapPresets
+                | Kind::StarmapAmenities
+        )
+}
+
+const fn uses_physical_reputation_identity(kind: Kind) -> bool {
     matches!(
         kind,
-        Kind::Manufacturers
-            | Kind::Factions
+        Kind::Factions
             | Kind::FactionIdentities
             | Kind::FactionReputations
             | Kind::ReputationPerks
             | Kind::ReputationTriggerRecords
             | Kind::ReputationRewardAmounts
-            | Kind::Infractions
-            | Kind::InfractionSets
-            | Kind::Jurisdictions
-            | Kind::SecurityNetworkManifests
-            | Kind::MissionScenarios
-            | Kind::MissionModuleDeclarations
-            | Kind::MissionItems
-            | Kind::LocationClasses
-            | Kind::LocationFunctions
-            | Kind::LocationSizes
-            | Kind::LocationResourceSlots
-            | Kind::LocationClassRegistries
-            | Kind::LocationFunctionRegistries
-            | Kind::LocationSizeRegistries
-            | Kind::ContractScopes
-            | Kind::NpcArchetypes
-            | Kind::NpcClassPools
-            | Kind::AutoSpawns
-            | Kind::AutoSpawnSets
-            | Kind::EncounterIndices
-            | Kind::ContractTemplates
-            | Kind::MissionBrokerEntries
-            | Kind::GameplayProperties
-            | Kind::Blueprints
-            | Kind::LootPoolFilters
-            | Kind::LootSecondaryChoiceSingleLayers
-            | Kind::LootSecondaryChoiceMultiLayers
-            | Kind::LootThemes
-            | Kind::HierarchicalContextualDataPresets
-            | Kind::LootGenerationGlobalParams
-            | Kind::SubHarvestableConfigs
-            | Kind::SubHarvestableMultiConfigs
-            | Kind::ExplosionDefinitions
-            | Kind::InventoryContainers
-            | Kind::MedicalItemTierConfigs
-            | Kind::ProceduralPlanetAudio
-            | Kind::AmmoDefinitions
-            | Kind::Tags
-            | Kind::Commodities
-            | Kind::ResourceTypes
-            | Kind::ResourceGroups
-            | Kind::QualityDistributions
-            | Kind::QualityQuantizations
-            | Kind::StarmapObjects
-            | Kind::StarmapTypes
-            | Kind::StarmapPresets
-            | Kind::StarmapAmenities
             | Kind::ReputationContexts
             | Kind::ReputationScopes
             | Kind::ReputationStandings

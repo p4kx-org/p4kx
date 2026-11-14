@@ -237,6 +237,8 @@ pub enum Kind {
     MedicalItemTierConfigs,
     /// Physical DataForge procedural planet audio configuration Records.
     ProceduralPlanetAudio,
+    /// Physical DataForge resource network global definitions.
+    ResourceNetworkGlobals,
     /// Physical starmap object type definitions.
     StarmapTypes,
     /// Physical starmap preset definitions.
@@ -255,7 +257,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order of the catalog.
-    pub const ALL: [Self; 102] = [
+    pub const ALL: [Self; 103] = [
         Self::Manufacturers,
         Self::Items,
         Self::Ships,
@@ -351,6 +353,7 @@ impl Kind {
         Self::InventoryContainers,
         Self::MedicalItemTierConfigs,
         Self::ProceduralPlanetAudio,
+        Self::ResourceNetworkGlobals,
         Self::StarmapTypes,
         Self::StarmapPresets,
         Self::StarmapAmenities,

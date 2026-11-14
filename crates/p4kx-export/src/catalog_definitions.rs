@@ -12,6 +12,7 @@ use crate::catalog_v3::ammo_definition::AmmoDefinition;
 use crate::catalog_v3::catalog_independent_configurations::{
     ConsumableDefinitions, DamageResistanceMacro, MiningLaserGlobalDefinition,
 };
+use crate::catalog_v3::catalog_resource_network_read::resource_network_global::ResourceNetworkGlobal;
 use crate::catalog_v3::explosion_definition::ExplosionDefinition;
 use crate::catalog_v3::faction_definition::FactionDefinition;
 use crate::catalog_v3::faction_identity_definition::FactionIdentityDefinition;
@@ -129,6 +130,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) inventory_containers: CatalogTable<InventoryContainerDefinition<'source>>,
     pub(crate) medical_item_tier_configs: CatalogTable<MedicalItemTierConfig<'source>>,
     pub(crate) procedural_planet_audio: CatalogTable<ProceduralPlanetAudio<'source>>,
+    pub(crate) resource_network_globals: CatalogTable<ResourceNetworkGlobal<'source>>,
     pub(crate) ammo_definitions: CatalogTable<AmmoDefinition<'source>>,
     pub(crate) weapon_action_recoil_definitions:
         CatalogTable<WeaponActionRecoilDefinition<'source>>,

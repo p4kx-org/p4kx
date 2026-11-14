@@ -122,6 +122,9 @@ impl SourceTrace {
                     crate::catalog_v3::procedural_planet_audio::SOURCE_TYPE => {
                         Some(Kind::ProceduralPlanetAudio)
                     }
+                    crate::catalog_v3::catalog_resource_network_read::resource_network_global::SOURCE_TYPE => {
+                        Some(Kind::ResourceNetworkGlobals)
+                    }
                     crate::catalog_v3::reputation_perk_list::SOURCE_TYPE => {
                         Some(Kind::ReputationPerks)
                     }

@@ -177,13 +177,16 @@ numeric words and reported only counts and directions of change.
 | TTK armor and turrets | Of 223 matched armor-owner `SHealthComponentParams` slots, `Health` changed in 220, with 105 increases and 115 decreases. Of 460 matched turret-owner slots, `Health` increased in 272 and stayed unchanged in 188. Every matched `DamageCap` was unchanged. Selected Item components retain these two words in `configurations.durability`. | This measures the currently installed LIVE-to-PTU change. The earlier PTU values and any across-the-board balance claim remain unverified. |
 | TTK destruction rules | All 24 matching physical GameMode Records have an original `ResourceNetworkParams` Class. Its `shipDestructionHealthThreshold` increased in 23 and stayed unchanged in one. Its `shipDestructionBufferMultiplier` remained unchanged in all 24. Both fields are already exported in `configurations.resourceNetworkParameters`. | The exact runtime relationship between these two settings and a single-hit destruction event is unverified. |
 | TTK beam and projectile inputs | The scoped ammunition comparison found an authored damage change and existing Catalog coverage for that value. #1052 checks the complete authored weapon-action input paths, including independently stored beam and launcher heat in synthetic fixtures. | The narrow sample does not measure the other weapon-series, beam and projectile-speed claims. |
-| Component power and distribution | All 14 matched wheeled-controller `MinimumPowerAmount` Singles were unchanged. The five matched legacy power connection rows retained identical base, draw and overclock threshold Singles. The separate authored `ItemResourceNetworkGlobal` Record changed five Singles in `defaultPowerDistributionParams`, including `powerDistCoolerMin`. | These source fields do not establish a general minimum assignment rule. The independent global Record and its power settings require their own Catalog path. |
+| Component power and distribution | All 14 matched wheeled-controller `MinimumPowerAmount` Singles were unchanged. The five matched legacy power connection rows retained identical base, draw and overclock threshold Singles. The separate authored `ItemResourceNetworkGlobal` Record changed five Singles in `defaultPowerDistributionParams`, including `powerDistCoolerMin`. | `definitions.resourceNetworkGlobals` preserves the original distribution block. The field evidence leaves the general minimum assignment rule unverified. |
 | Other fixes and platform behavior | The source audit records archive readers, source declarations and scoped Catalog checks. | Gameplay fixes, VR, runtime rendering and crashes require runtime evidence. The installed release export and native package acceptance are tracked in #1116. |
 
-Two independent original source shapes merit preserving. The standalone
-`ItemResourceNetworkGlobal` definition owns the power distribution block
-and `powerParams`. Its physical Record differs from the per-GameMode
-resource-network rules. The standalone `STurretHealthModifierDef` contains
+The standalone `ItemResourceNetworkGlobal` definition owns the power distribution block
+and `powerParams`. The Catalog keeps its physical Record distinct from the per-GameMode
+resource-network rules. Direct comparisons of the selected LIVE and PTU Records checked the
+modeled values, ordered modifiers and physical source coordinates.
+[Global resource-network definitions](catalog-resource-components.md#original-global-resource-network-definitions)
+
+The standalone `STurretHealthModifierDef` contains
 a `damageMovementModifier` curve. Its nine stored point pairs and LUT flag
 are unchanged in this comparison. All 474 LIVE and 475 PTU
 `SCItemTurretParams.healthModifierRecord` slots are authored null. The curve

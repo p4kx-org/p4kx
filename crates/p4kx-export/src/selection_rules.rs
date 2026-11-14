@@ -134,6 +134,10 @@ impl Kind {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::procedural_planet_audio::SOURCE_TYPE,
             },
+            Self::ResourceNetworkGlobals => KindRule {
+                prefixes: &[""],
+                type_name: crate::catalog_v3::catalog_resource_network_read::resource_network_global::SOURCE_TYPE,
+            },
             Self::ExplosionDefinitions => KindRule {
                 prefixes: &[""],
                 type_name: crate::catalog_v3::explosion_definition::SOURCE_TYPE,

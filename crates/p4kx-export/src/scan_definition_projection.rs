@@ -29,6 +29,7 @@ impl<'f> Scan<'_, '_, 'f> {
             Kind::InventoryContainers => self.inventory_definition(admission, tree)?,
             Kind::MedicalItemTierConfigs => self.medical_definition(admission, tree)?,
             Kind::ProceduralPlanetAudio => self.planet_audio(admission, tree)?,
+            Kind::ResourceNetworkGlobals => self.resource_network_global(admission, tree)?,
             Kind::Factions => self.faction_definition(admission, tree)?,
             Kind::StarmapTypes | Kind::StarmapPresets | Kind::StarmapAmenities => {
                 self.starmap_definition(kind, admission, tree)?
@@ -375,23 +376,5 @@ impl<'f> Scan<'_, '_, 'f> {
         )?;
         let picked = MissionPick::Faction(Box::new(read.value));
         Ok((Picked::Mission(picked), read.notes))
-    }
-
-    fn resource_group(
-        &self,
-        admission: &RecordObservation<'_, 'f>,
-        tree: &RecordTree<'f>,
-    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
-        let parent = self
-            .groups
-            .parent_choice(&tree.guid(), self.options.cancel)?;
-        let read = crate::resource_group_read::read(
-            tree,
-            self.projection,
-            parent,
-            admission,
-            self.options.cancel,
-        )?;
-        Ok((Picked::ResourceGroup(read.value), read.notes))
     }
 }

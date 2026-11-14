@@ -122,6 +122,30 @@ Health inspection covers the original rule subtree and the required
 selectors. Component and loadout rows retain their independent source
 scope.
 
+## Original global resource-network definitions
+
+`definitions.resourceNetworkGlobals` contains each physical
+`ItemResourceNetworkGlobal` Record. The original Record header identifies the
+owner and describes its build-local location. The catalog applies its Record
+filter to this owner. Configurations owned by separate GameMode Records
+continue through the GameMode rules table.
+
+The original scalar Class `defaultPowerDistributionParams` exposes its
+`powerDistPoolsFillMin` Boolean and the five stored Singles
+`powerDistCoolerMin`, `powerDistPoolsProportion`, `poolDefaultWeapons`,
+`poolDefaultEngines` and `poolDefaultShields`. The original scalar Class
+`powerParams` retains ordered `modifiers` and their authored signed Int32
+`additiveModifier` fields. The four original root Singles
+`maxPowerToCoolantRatio`, `thrusterCoolantMultiplier`,
+`powerBaseConversionRate` and `misfireRepairGracePeriod` keep their
+stored words.
+
+The original `networkResources`, `resourcePairs`, `itemResourceTypeData`,
+`uiParams` and remaining members are available from `additionalFields`.
+Each projected body also carries any unselected original members in its own
+arena. Typed values retain their original state and immediate source
+origins. The authored words do not determine runtime power allocation.
+
 ## Authored GameMode radar options
 
 `configurations.radarOptions` contains one row per selected physical

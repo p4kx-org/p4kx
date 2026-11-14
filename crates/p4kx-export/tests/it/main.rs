@@ -84,6 +84,7 @@ mod catalog_resource_1069_properties;
 mod catalog_resource_edges;
 mod catalog_resource_health;
 mod catalog_resource_metadata;
+mod catalog_resource_network_global;
 mod catalog_resource_origin;
 mod catalog_resource_text_origin;
 mod catalog_resources;
@@ -388,9 +389,8 @@ mod variants_fixture;
 mod mission_template_original;
 
 mod mission_canonical_health;
-mod scoped_canonical_failures;
-
 mod quality_field_capture;
+mod scoped_canonical_failures;
 
 mod broker_full_source_tests;
 mod template_fixture_context;

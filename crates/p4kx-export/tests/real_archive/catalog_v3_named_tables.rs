@@ -26,6 +26,7 @@ pub(super) const fn uses_named_definition_table(kind: Kind) -> bool {
             | Kind::EncounterIndices
             | Kind::MissionItems
             | Kind::ProceduralPlanetAudio
+            | Kind::ResourceNetworkGlobals
             | Kind::ContractScopes
             | Kind::LootPoolFilters
             | Kind::LootSecondaryChoiceSingleLayers

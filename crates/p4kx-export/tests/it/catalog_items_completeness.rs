@@ -109,6 +109,7 @@ fn expected_completeness() -> Value {
         "inventoryContainers",
         "medicalItemTierConfigs",
         "proceduralPlanetAudio",
+        "resourceNetworkGlobals",
         "starmapTypes",
         "starmapPresets",
         "starmapAmenities",

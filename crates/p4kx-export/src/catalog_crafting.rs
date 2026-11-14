@@ -3,17 +3,19 @@
 
 use std::collections::{HashMap, HashSet};
 
-use p4kx_extraction::{Filter, Guid};
+use p4kx_extraction::{DataForge, Filter, Guid};
 
 use crate::CatalogError;
+use crate::CatalogOptions;
 use crate::Kind;
 use crate::blueprint_catalog_rows::{self, BlueprintRow};
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::contract::{BlueprintPool, CraftingGlobal, DismantleProcess};
 use crate::contract_rewards::{PoolEntry, RewardSource};
-use crate::crafting::{Crafting, ReadCrafting};
+use crate::crafting::{self, Crafting, ReadCrafting};
 use crate::crafting_types as library;
 use crate::crafting_warning::CraftingWarning;
 use crate::export_ledger::ExportLedger;
@@ -35,6 +37,22 @@ pub(crate) struct CraftingKinds<'f> {
     pub(crate) failures: Vec<CatalogReadFailure<'f>>,
     pub(crate) warnings: Vec<CraftingWarning>,
     pub(crate) ledger: ExportLedger,
+}
+
+/// Reads and projects the catalog's selected crafting datasets.
+pub(crate) fn read<'source>(
+    forge: &'source DataForge<'_>,
+    options: &CatalogOptions<'_>,
+    projection: &CatalogProjection<'_, 'source>,
+) -> Result<CraftingKinds<'source>, CatalogError> {
+    let input = crafting::read_with_progress(
+        forge,
+        options.filter,
+        options.cancel,
+        options.progress,
+        projection,
+    )?;
+    kinds(input, projection.origins(), options.filter)
 }
 
 /// Combines canonical gameplay and quality facts with interpreted crafting datasets.
