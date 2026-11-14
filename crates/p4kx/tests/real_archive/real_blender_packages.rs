@@ -25,10 +25,13 @@ const MAX_COARSE_SHIP_BYTES: u64 = 128 << 20;
 const MAX_INTERIOR_BYTES: u64 = 3 << 29;
 const MAX_MESH_RATIO: f64 = 0.85;
 const MIN_SHARING: f64 = 0.3;
-const MIN_SHIP_TEXTURES: usize = 100;
+const MIN_SHIP_TEXTURE_SOURCES: usize = 100;
 
 fn shared(built: &Built, measured: &Measured) -> TestResult {
-    package_fault::require(measured.textures >= MIN_SHIP_TEXTURES, Check::Textures)?;
+    package_fault::require(
+        measured.texture_sources >= MIN_SHIP_TEXTURE_SOURCES,
+        Check::Textures,
+    )?;
     package_fault::require(
         built.report.get("drawn_nodes").and_then(Value::as_u64) == Some(measured.instances),
         Check::MeshInstances,

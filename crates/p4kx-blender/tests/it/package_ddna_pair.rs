@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use p4kx_assembly::{ArchiveModels, Assembly};
 use p4kx_blender::{
     AlphaMeaning, DdnaSelection, DdsTextureAsset, Manifest, PackageError, PackageInfo,
-    PackageTextureContainer, PackageWriteContext, TextureFormat, manifest_schema,
-    write_package_with_context,
+    PackageTextureContainer, PackageWriteContext, Texture, TextureFormat, TextureRendition,
+    manifest_schema, write_package_with_context,
 };
 use p4kx_extraction::{Archive, ArchiveWriteProtection, CancelToken, FieldPath};
 use p4kx_extraction::{OriginArtifactDigest, OriginDigestWriter};
@@ -193,29 +193,55 @@ fn verify(package: &Path, manifest: &Manifest) -> TestResult {
     );
     let receipt = package_receipt(package)?;
     let files = receipt.as_array().ok_or("file receipt rows")?;
-    for (texture, block, encrypted) in [
-        (normal, TEST_NORMAL_BLOCK.as_slice(), false),
-        (smoothness, SMOOTHNESS_BLOCK.as_slice(), true),
+    for (texture, block, encrypted, rendition) in [
+        (
+            normal,
+            TEST_NORMAL_BLOCK.as_slice(),
+            false,
+            TextureRendition::NormalSmoothness,
+        ),
+        (
+            smoothness,
+            SMOOTHNESS_BLOCK.as_slice(),
+            true,
+            TextureRendition::SeparateSmoothness,
+        ),
     ] {
-        assert_eq!(texture.format, TextureFormat::Dds, "each texture uses DDS");
         assert_eq!(
-            (texture.width, texture.height),
-            (3, 2),
-            "matches the negotiated mip"
+            texture.source_rendition,
+            Some(rendition),
+            "records the exact DDNA member role"
         );
-        let file = texture.file.as_str();
-        let asset = texture.dds_asset.as_deref().ok_or("per-file evidence")?;
-        let hash = verify_dds(package, file, asset, block, encrypted)?;
-        let listed = files
-            .iter()
-            .find(|row| row.get("path").and_then(Value::as_str) == Some(file))
-            .ok_or("declared receipt member")?;
-        assert_eq!(
-            listed.get("sha256").and_then(Value::as_str),
-            Some(hash.as_str()),
-            "receipt authenticates the DDS file"
-        );
+        verify_pair_member(package, files, texture, block, encrypted)?;
     }
+    Ok(())
+}
+
+fn verify_pair_member(
+    package: &Path,
+    files: &[Value],
+    texture: &Texture,
+    block: &[u8],
+    encrypted: bool,
+) -> TestResult {
+    assert_eq!(texture.format, TextureFormat::Dds, "each texture uses DDS");
+    assert_eq!(
+        (texture.width, texture.height),
+        (3, 2),
+        "matches the negotiated mip"
+    );
+    let file = texture.file.as_str();
+    let asset = texture.dds_asset.as_deref().ok_or("per-file evidence")?;
+    let hash = verify_dds(package, file, asset, block, encrypted)?;
+    let listed = files
+        .iter()
+        .find(|row| row.get("path").and_then(Value::as_str) == Some(file))
+        .ok_or("declared receipt member")?;
+    assert_eq!(
+        listed.get("sha256").and_then(Value::as_str),
+        Some(hash.as_str()),
+        "receipt authenticates the DDS file"
+    );
     Ok(())
 }
 

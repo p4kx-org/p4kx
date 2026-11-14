@@ -310,6 +310,9 @@ pub struct Texture {
     pub file: String,
     /// The texture's path in the Archive, below `Data`.
     pub source: String,
+    /// The rendition selected by the package writer for that source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_rendition: Option<crate::TextureRendition>,
     /// The image format.
     pub format: TextureFormat,
     /// The bits per channel; 8 in version 1.

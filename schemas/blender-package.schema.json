@@ -6262,6 +6262,17 @@
           ],
           "description": "Original DDS header and actual mip evidence, when the loader exposes its physical input."
         },
+        "source_rendition": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TextureRendition"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The rendition selected by the package writer for that source."
+        },
         "width": {
           "description": "The width in pixels of the mip level that was written.",
           "format": "uint32",
@@ -6328,6 +6339,41 @@
         {
           "const": "dds",
           "description": "A standard DDS container holding an original selected mip.",
+          "type": "string"
+        }
+      ]
+    },
+    "TextureRendition": {
+      "description": "The package rendition selected for one Archive texture source.",
+      "oneOf": [
+        {
+          "const": "colour",
+          "description": "Colour samples for a diffuse or emissive use.",
+          "type": "string"
+        },
+        {
+          "const": "specular",
+          "description": "Specular samples, with their original transfer when declared.",
+          "type": "string"
+        },
+        {
+          "const": "data",
+          "description": "Data channels without a colour-role transform.",
+          "type": "string"
+        },
+        {
+          "const": "normal",
+          "description": "A normal map without a smoothness request.",
+          "type": "string"
+        },
+        {
+          "const": "normal_smoothness",
+          "description": "A normal map requested with its authored smoothness data.",
+          "type": "string"
+        },
+        {
+          "const": "separate_smoothness",
+          "description": "The separate DDS image carrying smoothness for a normal map.",
           "type": "string"
         }
       ]

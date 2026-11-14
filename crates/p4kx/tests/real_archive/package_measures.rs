@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashSet;
 use std::io::Error;
 use std::path::{Path, PathBuf};
 
@@ -31,25 +30,8 @@ fn files_below(folder: &Path) -> package_fault::Result<Vec<(PathBuf, u64)>> {
     Ok(found)
 }
 
-fn textures(built: &Built) -> package_fault::Result<usize> {
-    let mut sources = HashSet::new();
-    for texture in array(&built.manifest, "textures")? {
-        let file = texture["file"].as_str().ok_or(Check::ManifestField)?;
-        package_fault::require(built.out.join(file).is_file(), Check::TextureFile)?;
-        let source = texture["source"].as_str().ok_or(Check::ManifestField)?;
-        package_fault::require(
-            sources.insert(source.to_ascii_lowercase()),
-            Check::TextureDuplicate,
-        )?;
-    }
-    let spent = array(&built.manifest, "issues")?.iter().any(|issue| {
-        issue["reason"]
-            .as_str()
-            .is_some_and(|reason| reason.contains("budget"))
-    });
-    package_fault::require(!spent, Check::LayerBudget)?;
-    Ok(sources.len())
-}
+#[path = "package_texture_measures.rs"]
+mod texture_measures;
 
 pub(crate) fn verify(built: &Built) -> package_fault::Result<Measured> {
     let validator = jsonschema::draft202012::new(&p4kx_blender::manifest_schema())?;
@@ -65,7 +47,8 @@ pub(crate) fn verify(built: &Built) -> package_fault::Result<Measured> {
         bytes,
         mesh_bytes: 0,
         meshes: 0,
-        textures: textures(built)?,
+        texture_sources: texture_measures::verify(built)?,
+        textures: array(&built.manifest, "textures")?.len(),
         instances: 0,
         undeduplicated_mesh_bytes: 0,
     };
@@ -114,7 +97,7 @@ fn measure_mesh(built: &Built, mesh: &Value, measured: &mut Measured) -> package
 )]
 fn report(built: &Built, measured: &Measured) -> package_fault::Result<()> {
     println!(
-        "package totals: files={} bytes={} meshes={} instances={} sharing={:.3} mesh_bytes={} mesh_ratio={:.3} textures={} issues={} duration_ms={}",
+        "package totals: files={} bytes={} meshes={} instances={} sharing={:.3} mesh_bytes={} mesh_ratio={:.3} textures={} texture_sources={} issues={} duration_ms={}",
         measured.files,
         measured.bytes,
         measured.meshes,
@@ -123,6 +106,7 @@ fn report(built: &Built, measured: &Measured) -> package_fault::Result<()> {
         measured.mesh_bytes,
         measured.mesh_ratio(),
         measured.textures,
+        measured.texture_sources,
         array(&built.manifest, "issues")?.len(),
         built.elapsed.as_millis()
     );

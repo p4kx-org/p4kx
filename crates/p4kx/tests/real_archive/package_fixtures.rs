@@ -64,22 +64,22 @@ pub(crate) fn matrix(
                     return Ok(media_fixtures::absent());
                 };
                 media_fixtures::selected(&case, &choice);
-                let argument = argument(&entities, &choice.candidate)?;
-                let built = package_support::build(
+                let argument = package_fault::report(argument(&entities, &choice.candidate))?;
+                let built = package_fault::report(package_support::build(
                     scratch,
                     "entity",
                     Some(&argument),
                     &format!("case-{ordinal}"),
                     extra,
-                )?;
-                package_fault::require(
+                ))?;
+                package_fault::report(package_fault::require(
                     built.report.get("guid").and_then(Value::as_str)
                         == Some(choice.candidate.identity.guid.to_string().as_str())
                         && built.report.get("entity").and_then(Value::as_str)
                             == Some(choice.candidate.class_name.as_str()),
                     Check::SourceIdentity,
-                )?;
-                let measured = package_support::verify(&built)?;
+                ))?;
+                let measured = package_fault::report(package_support::verify(&built))?;
                 package_fault::report(verify(&built, &measured))?;
                 Ok(CaseOutcome::Completed(()))
             });

@@ -20,6 +20,25 @@ pub enum TextureChannelTransform {
     FlipNormalGreen,
 }
 
+/// The package rendition selected for one Archive texture source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum TextureRendition {
+    /// Colour samples for a diffuse or emissive use.
+    Colour,
+    /// Specular samples, with their original transfer when declared.
+    Specular,
+    /// Data channels without a colour-role transform.
+    Data,
+    /// A normal map without a smoothness request.
+    Normal,
+    /// A normal map requested with its authored smoothness data.
+    NormalSmoothness,
+    /// The separate DDS image carrying smoothness for a normal map.
+    SeparateSmoothness,
+}
+
 /// How the package importer samples the image's colour channels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -41,6 +60,16 @@ pub(crate) enum TextureMode {
 }
 
 impl TextureMode {
+    pub(crate) const fn rendition(self) -> TextureRendition {
+        match self {
+            Self::Colour => TextureRendition::Colour,
+            Self::Specular => TextureRendition::Specular,
+            Self::Data => TextureRendition::Data,
+            Self::Normal { gloss: false } => TextureRendition::Normal,
+            Self::Normal { gloss: true } => TextureRendition::NormalSmoothness,
+        }
+    }
+
     pub(crate) const fn of(role: TextureUse, gloss: bool) -> Self {
         match role {
             TextureUse::Diffuse => Self::Colour,

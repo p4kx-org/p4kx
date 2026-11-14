@@ -399,8 +399,9 @@ authored library failure remains in `issues`. This selection is P4KX's policy.
 
 ### Textures
 
-Each texture the materials of the meshes name is written once, whichever meshes and materials use
-it, as the pixels the Archive holds: no palette colour is baked in and the maps are not merged.
+Each case-insensitive Archive texture path and selected rendition is written once. Different
+renditions of the same path have separate texture IDs and files. The package writes the original
+texture content without baking in a palette colour or merging maps.
 From 1.1 these are the files of every texture slot of every described material, layer materials
 included (diffuse, normal, specular, blend, mask, detail, wear and the rest); 1.0 packages hold
 only the diffuse, normal and specular maps of the meshes' materials. The importer builds the
@@ -410,6 +411,7 @@ materials from them; the `textures` of a material description say which slot use
 | --- | --- |
 | `id`, `file` | The id and the file relative to the package folder (`textures/t0001.png`). |
 | `source` | The texture's path in the Archive, below `Data`. |
+| `source_rendition` | The selected use of the original texture: `colour`, `specular`, `data`, `normal`, `normal_smoothness` or `separate_smoothness`. It identifies the rendition independently of the resulting `encoding` and is absent in older packages. |
 | `format`, `bit_depth` | `png` or `dds`. The supported package images use 8-bit decoded channels. |
 | `colour_space` | Compatibility setting for readers of earlier 1.x packages. |
 | `encoding` | Importer input for this image: `srgb`, `linear_colour` (Linear Rec.709) or `data` (Non-Color). The same source can supply different image files when its uses require different sampling or channel transforms. |
@@ -644,8 +646,9 @@ The bounds a package keeps, asserted by the real-Archive tests
 - The sharing, `1 - meshes / instances` (the sum of `instances` over all meshes is the number of
   drawing nodes), is at least 0.3, and the meshes take at most 85 % of the bytes they would take
   if every node had its own file. Every drawing node is an instance of exactly one mesh.
-- A ship package holds at least 100 textures, and every texture of the Archive is written once:
-  no two entries of `textures` have the same `source`.
+- A ship package holds at least 100 distinct Archive texture source paths. Each case-insensitive
+  `source` and `source_rendition` pair has one output, all texture IDs and files are unique, and
+  material and DDNA texture references resolve to emitted textures.
 
 ### What a Character package holds
 

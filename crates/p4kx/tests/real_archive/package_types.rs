@@ -17,6 +17,7 @@ pub(crate) struct Measured {
     pub(crate) bytes: u64,
     pub(crate) mesh_bytes: u64,
     pub(crate) meshes: usize,
+    pub(crate) texture_sources: usize,
     pub(crate) textures: usize,
     pub(crate) instances: u64,
     pub(crate) undeduplicated_mesh_bytes: u64,

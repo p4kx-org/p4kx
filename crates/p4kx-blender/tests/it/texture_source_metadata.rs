@@ -7,15 +7,18 @@ use std::path::{Path, PathBuf};
 
 use p4kx_blender::{
     DdsTextureFallback, Manifest, PackageInfo, PackageTextureContainer, PackageWriteContext,
-    TextureChannelTransform, TextureEncoding, TextureFormat, write_package_with_context,
+    TextureChannelTransform, TextureEncoding, TextureFormat, TextureRendition,
+    write_package_with_context,
 };
 use p4kx_extraction::texture_codec::{DdsPngTransform, DdsTransfer};
 use p4kx_extraction::{
     Archive, ArchiveWriteProtection, CancelToken, FieldPath, OpenOptions, OriginDigestWriter,
 };
-use p4kx_testkit::{SplitDds, TestEntry, TestTextureFormat, layered_entries, test_key};
+use p4kx_testkit::{
+    SplitDds, TestEntry, TestMtl, TestMtlMaterial, TestTextureFormat, layered_entries, test_key,
+};
 
-use crate::support::{TestResult, assemble, glb_options};
+use crate::support::{TestResult, assemble, fixture, glb_options};
 
 #[test]
 fn package_texture_keeps_plain_dds_words_separate_from_used_encrypted_alpha() -> TestResult {
@@ -100,6 +103,11 @@ fn verify_linear_colour(manifest: &Manifest, root: &Path) -> TestResult {
         .iter()
         .find(|texture| texture.source.ends_with("base_diff.dds"))
         .ok_or("linear colour texture")?;
+    assert_eq!(
+        colour.source_rendition,
+        Some(TextureRendition::Colour),
+        "the colour rendition records its role"
+    );
     assert_eq!(
         colour.encoding,
         Some(TextureEncoding::LinearColour),
@@ -330,5 +338,55 @@ fn verify_dds_asset(manifest: &Manifest, package: &Path) -> TestResult {
             "{field} binds complete source uses"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn one_archive_texture_can_keep_colour_and_data_renditions() -> TestResult {
+    let material_path = r"Data\Objects\Test\layers\base.mtl";
+    let archive_texture = r"Data\Objects\Test\layers\textures\shared.dds";
+    let authored_texture = "Objects/Test/layers/textures/shared.tif";
+    let material = TestMtlMaterial::new("layer")
+        .shader("Layer")
+        .texture("TexSlot1", authored_texture)
+        .texture("TexSlot8", authored_texture);
+    let mut entries = layered_entries();
+    entries.retain(|entry| entry.path() != material_path);
+    entries.push(TestEntry::stored(
+        material_path,
+        TestMtl::single(&material).cryxml(),
+    ));
+    entries.extend(SplitDds::new(TestTextureFormat::LegacyDxt1, 8, 8).entries(archive_texture));
+    let fixture = fixture(entries)?;
+    let archive = Archive::open(&fixture.path)?;
+    let directory = tempfile::tempdir()?;
+    let manifest = write(
+        &archive,
+        &directory.path().join("ship"),
+        PackageTextureContainer::Png,
+    )?;
+    let outputs: Vec<_> = manifest
+        .textures
+        .iter()
+        .filter(|texture| texture.source.ends_with("shared.dds"))
+        .collect();
+    let [colour, data] = outputs.as_slice() else {
+        return Err("one colour and one data output".into());
+    };
+    assert_eq!(
+        colour.source_rendition,
+        Some(TextureRendition::Colour),
+        "the colour rendition records its role"
+    );
+    assert_eq!(
+        data.source_rendition,
+        Some(TextureRendition::Data),
+        "the data rendition records its role"
+    );
+    assert_ne!(colour.id, data.id, "distinct renditions have distinct IDs");
+    assert_ne!(
+        colour.file, data.file,
+        "distinct renditions have distinct files"
+    );
     Ok(())
 }

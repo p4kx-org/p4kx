@@ -135,7 +135,7 @@ pub use texture_ddna::{DdnaNormalAxis, DdnaSelection, DdnaSmoothnessChannel, Ddn
 pub use texture_dds::{
     DdsTextureAsset, DdsTextureFallback, DdsTextureSourceChecksum, PackageTextureContainer,
 };
-pub use texture_encoding::{TextureChannelTransform, TextureEncoding};
+pub use texture_encoding::{TextureChannelTransform, TextureEncoding, TextureRendition};
 pub use texture_format::TextureFormat;
 pub use texture_source_metadata::TextureSourceMetadata;
 pub use write::{PackageInfo, PackageSummary, write_package, write_package_with_context};
