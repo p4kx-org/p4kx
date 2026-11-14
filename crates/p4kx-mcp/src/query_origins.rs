@@ -176,9 +176,7 @@ fn rows(origins: &mut ForgeOrigins, page: &PageEvidence<'_, '_>) -> Result<(), E
         }
     }
     bind(origins, "rows", &output, output_complete)?;
-    if !failures.is_empty() {
-        bind(origins, "failed", &failures, origins.complete)?;
-    }
+    bind(origins, "failed", &failures, origins.complete)?;
     bind(
         origins,
         "unresolved_references",

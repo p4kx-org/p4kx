@@ -893,7 +893,8 @@ compared during lookup. The echoed `folder` value uses the request spelling and,
 container, its observed prefix. An empty folder selection has a directory receipt and an
 empty list of returned items.
 
-For `run_query`, `fieldOrigins` addresses the actual JSON columns and list elements. Scalar
+For `run_query`, every successful page has a `failed` array. It is empty when the page has
+no unreadable Records. `fieldOrigins` addresses the actual JSON columns and list elements. Scalar
 payloads, followed Reference slots and selected instances identify their original decoded DCB
 positions. The total retains the WHERE inputs actually read, including short-circuit evaluation.
 Pages charge provenance to the 256 KiB response budget. A selection survey that cannot fit retains

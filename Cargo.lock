@@ -3868,6 +3868,7 @@ dependencies = [
  "anyhow",
  "base64",
  "clap",
+ "jsonschema",
  "p4kx-assembly",
  "p4kx-channels",
  "p4kx-export",

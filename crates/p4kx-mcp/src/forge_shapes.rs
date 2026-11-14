@@ -171,8 +171,7 @@ pub(crate) struct QueryResult {
     /// heading, as `p4kx dcb query --format json` writes them.
     #[schemars(with = "serde_json::Value")]
     pub(crate) rows: Box<RawValue>,
-    /// The selected Records on this page whose values cannot be read.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
+    /// The selected Records on this page whose values cannot be read. Empty when they all succeed.
     pub(crate) failed: Vec<FailedRow>,
     /// The null or dangling links `->` met in the rows of this page, once per row.
     pub(crate) unresolved_references: usize,
